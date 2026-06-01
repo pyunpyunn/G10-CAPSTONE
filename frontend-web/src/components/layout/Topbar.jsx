@@ -1,33 +1,75 @@
-import { Bell, ShieldCheck } from 'lucide-react'
+import { Bell, CheckCircle2, Eye, ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
 
 export default function Topbar({ user }) {
+  const [isOpen, setIsOpen] = useState(false)
   const roleName = user?.role?.role_name || 'HQ'
   const initials = getInitials(user?.full_name)
 
   return (
     <header className="topbar">
-      <div>
-        <p className="eyebrow">RESQPERATION HQ</p>
-        <h1>Barangay Response Command</h1>
+      <div className="header-brand" aria-label="RESQPERATION">
+        <div className="header-brand-mark">R</div>
+        <strong>RESQPERATION</strong>
       </div>
 
-      <div className="topbar-actions">
-        <button className="icon-button" type="button" aria-label="Notifications">
-          <Bell size={18} />
-          <span className="notice-dot" />
+      <div className="header-actions" aria-label="Header actions">
+        <button
+          className="header-action"
+          type="button"
+          title="Notifications"
+          aria-label="Notifications"
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <Bell size={17} />
+          <span className="notification-dot" aria-hidden="true" />
         </button>
 
-        <div className="user-chip">
-          <span className="avatar">{initials}</span>
+        <button className="header-profile" type="button" title="Profile" aria-label="Profile">
+          <span className="profile-avatar">{initials}</span>
           <div>
             <strong>{user?.full_name || 'HQ Admin'}</strong>
-            <span>
+            <span className="profile-label">
               <ShieldCheck size={13} />
               {roleName}
             </span>
           </div>
-        </div>
+        </button>
       </div>
+
+      {isOpen && (
+        <div className="notification-popover" role="dialog" aria-label="Recent notifications">
+          <div className="notification-popover-head">
+            <div className="notification-popover-title">
+              <Bell size={16} />
+              Notifications
+            </div>
+            <span className="notification-count-pill">3 unread</span>
+          </div>
+          <div className="notification-popover-list">
+            <div className="notification-preview-item">
+              <strong>Unsafe household report</strong>
+              <span>Reyes Family, Purok 5. Rescuer flagged for dispatch.</span>
+            </div>
+            <div className="notification-preview-item">
+              <strong>Resource request received</strong>
+              <span>Food packs request from evacuation site needs validation.</span>
+            </div>
+          </div>
+          <div className="notification-popover-actions">
+            <button className="btn btn-secondary btn-sm" type="button">
+              <CheckCircle2 size={14} />
+              Mark as read
+            </button>
+            <button className="btn btn-primary btn-sm" type="button">
+              <Eye size={14} />
+              View all
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   )
 }

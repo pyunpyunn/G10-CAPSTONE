@@ -8,6 +8,7 @@ import {
   useNavigate,
 } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
+import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import { getCurrentUser, loginUser, logoutUser } from './api/authApi'
@@ -179,7 +180,13 @@ function AuthRoutes() {
           <Route
             key={page.path}
             path={page.path.replace('/', '')}
-            element={<PlaceholderPage page={page} />}
+            element={
+              page.path === '/dashboard' ? (
+                <DashboardPage />
+              ) : (
+                <PlaceholderPage page={page} />
+              )
+            }
           />
         ))}
       </Route>

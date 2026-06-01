@@ -9,6 +9,7 @@ import {
   LogOut,
   Map,
   PackageCheck,
+  Pin,
   Radio,
   Route,
   ShieldUser,
@@ -27,45 +28,56 @@ const icons = {
   '/archive': Database,
 }
 
-export default function Sidebar({ pages, onLogout }) {
+export default function Sidebar({ pages, isPinned, onTogglePin, onLogout }) {
   return (
-    <aside className="sidebar" aria-label="Primary modules">
-      <div className="brand-block">
-        <span className="brand-mark">R</span>
-        <div>
-          <strong>RESQPERATION</strong>
-          <span>HQ Command</span>
-        </div>
+    <aside className="leftbar" aria-label="Primary modules">
+      <div className="left-sidebar-actions" aria-label="Navigation controls">
+        <button
+          className="left-pin-button"
+          type="button"
+          title={isPinned ? 'Unpin left navigation' : 'Pin left navigation'}
+          aria-label={isPinned ? 'Unpin left navigation' : 'Pin left navigation'}
+          aria-pressed={isPinned}
+          onClick={onTogglePin}
+        >
+          <Pin size={17} />
+        </button>
       </div>
 
-      <nav className="module-nav">
+      <nav className="left-nav">
         <NavGroup title="Main Views" pages={pages.slice(0, 3)} />
         <NavGroup title="Response Operations" pages={pages.slice(3, 6)} />
         <NavGroup title="Management & Reports" pages={pages.slice(6)} />
       </nav>
 
-      <button className="logout-button" type="button" onClick={onLogout}>
-        <LogOut size={18} />
-        <span>Logout</span>
-      </button>
+      <div className="left-sidebar-logout">
+        <button className="nav-item" type="button" onClick={onLogout}>
+          <LogOut size={17} />
+          <span>Logout</span>
+        </button>
+      </div>
     </aside>
   )
 }
 
 function NavGroup({ title, pages }) {
   return (
-    <div className="nav-group">
-      <div className="nav-title">{title}</div>
+    <>
+      <div className="nav-section-title">{title}</div>
       {pages.map((page) => {
         const Icon = icons[page.path] || Archive
 
         return (
-          <NavLink key={page.path} to={page.path} className="nav-item">
-            <Icon size={18} />
+          <NavLink
+            key={page.path}
+            to={page.path}
+            className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+          >
+            <Icon size={17} />
             <span>{page.title}</span>
           </NavLink>
         )
       })}
-    </div>
+    </>
   )
 }
