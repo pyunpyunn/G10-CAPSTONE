@@ -98,6 +98,53 @@ responder_location_logs
 responder_routes
 ```
 
+## Overall Lacking Tables
+
+These are the expected RESQPERATION tables from the development guide that are not present in the current shared DB using the exact planned table names.
+
+```text
+broadcast_logs
+weather_logs
+household_devices
+household_geotags
+household_status_logs
+evacuation_sites
+rescuer_profiles
+rescue_dispatches
+dispatch_routes
+resource_items
+request_validations
+audit_logs
+integration_logs
+```
+
+Important:
+
+Some of these are not completely missing as concepts. The shared DB already has older or differently named tables that partially cover them. Do not create duplicate tables until the team approves whether to reuse, alter, or replace the existing structures.
+
+| Planned table | Current DB status | Existing table that may cover it | Action needed |
+| --- | --- | --- | --- |
+| `broadcast_logs` | Missing exact name | `disaster_broadcasts`, `notifications`, `notification_logs`, `notification_recipients` | Decide whether to reuse broadcast/notification tables or create a clearer log table. |
+| `weather_logs` | Missing | None confirmed | Needed for stored PAGASA/Open-Meteo weather snapshots. |
+| `household_devices` | Missing exact name | `device_tokens`, `device_tracking_logs` | Prefer altering existing device tables instead of duplicating device records. |
+| `household_geotags` | Missing exact name | `geotagged_locations` | Reuse or extend `geotagged_locations` if it fits household geotag needs. |
+| `household_status_logs` | Missing | `household_statuses`, `household_disasters`, `responder_field_reports`, `hq_field_reports` | Needed as a clear status history/source log, unless an existing table is formally assigned for this purpose. |
+| `evacuation_sites` | Missing exact name | `evacuation_centers` | Use existing `evacuation_centers`; do not create duplicate sites table unless renamed by team. |
+| `rescuer_profiles` | Missing exact name | `responders` | Use or extend `responders`; likely link responders to `users.user_id`. |
+| `rescue_dispatches` | Missing exact name | `responder_assignments` | Use or extend `responder_assignments` for dispatch records. |
+| `dispatch_routes` | Missing exact name | `responder_routes`, `route_coordinates` | Use existing route tables if they can store dispatch route geometry. |
+| `resource_items` | Missing | `unit_allocations`, resource request tables | Confirm whether inventory/resource availability is handled by external TrackingAid or local mirror table. |
+| `request_validations` | Missing | None confirmed | Needed for validation history before forwarding requests. |
+| `audit_logs` | Missing | `analytics_job_logs`, `import_logs` | Needed for user/module action tracking, unless a general log table is selected. |
+| `integration_logs` | Missing | `import_logs`, `csv_uploads`, `data_sources` | Needed for EvaTrack/TrackingAid/API integration tracing. |
+
+Suggested decision for version 1:
+
+- Reuse existing tables when they already match the purpose.
+- Add missing columns to existing tables when safer than creating a duplicate table.
+- Create new tables only for real gaps such as `weather_logs`, `request_validations`, and `integration_logs`.
+- Keep all proposed SQL review-only until the team approves it.
+
 ## Important Gaps
 
 The DB has a strong base, but some fields/tables are still needed for the actual RESQPERATION requirements.
