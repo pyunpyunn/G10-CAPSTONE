@@ -93,7 +93,7 @@ Status: done.
 - [x] Add current user endpoint: `GET /api/v1/auth/me`
 - [x] Add role middleware
 - [x] Protect API routes using Sanctum
-- [ ] Test login with existing DB user
+- [x] Test login with existing DB user
 
 Existing DB role keys:
 
@@ -106,7 +106,7 @@ rescuer
 household_resident
 ```
 
-Status: mostly done. Needs a known active user credential for final login test.
+Status: done for backend foundation. A test HQ Admin login now exists in the shared DB.
 
 ### 3. Database Migrations / DB Alignment
 
@@ -365,6 +365,5 @@ GET  /api/v1/auth/me
 
 Still needed:
 
-1. Test login with a known active DB user.
-2. Keep migrations paused while the DB member works.
-3. After auth is verified, start the Web App Shell.
+1. Keep migrations paused while the DB member works.
+2. After auth is verified from the web form, start the Web App Shell.
