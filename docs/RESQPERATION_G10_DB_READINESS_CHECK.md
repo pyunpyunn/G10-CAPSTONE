@@ -145,6 +145,55 @@ Suggested decision for version 1:
 - Create new tables only for real gaps such as `weather_logs`, `request_validations`, and `integration_logs`.
 - Keep all proposed SQL review-only until the team approves it.
 
+## Latest DB Member Export Review
+
+Date reviewed: 2026-06-01  
+Source file reviewed: `C:\Users\Kathleen Barro\Downloads\all.sql`
+
+Important warning:
+
+Do not run `all.sql` directly against the shared database because the dump contains `DROP TABLE IF EXISTS` statements. Running it can remove existing tables/data before recreating structure.
+
+New review script created:
+
+`docs/sql_proposals/2026_06_01_g10_all_sql_additive_update.sql`
+
+This newer script replaces the earlier gap proposal as the recommended review file because it follows the latest export and keeps the same ID styles:
+
+- `user_id` stays `varchar(255)`
+- `household_id` stays `varchar(255)`
+- `event_id` / `disaster_id` stay `varchar(255)`
+- `request_id` stays `varchar(255)`
+- `responder_id`, `team_id`, and lookup IDs stay `int`
+
+### Updated Lacking Table Decisions
+
+| Previous lacking table name | Latest decision based on `all.sql` | Reason |
+| --- | --- | --- |
+| `broadcast_logs` | Do not create. Extend `disaster_broadcasts` and use `notification_logs`. | Existing tables already cover broadcast message and delivery logs. |
+| `weather_logs` | Create new `weather_logs`. | No existing weather snapshot table was found. |
+| `household_devices` | Do not create. Extend `device_tokens` and `device_tracking_logs`. | Existing device tables already store tokens, battery, signal, and GPS logs. |
+| `household_geotags` | Do not create. Extend `geotagged_locations`. | Existing table already stores household latitude/longitude. |
+| `household_status_logs` | Create new `household_status_logs`; extend `household_disasters` for latest status. | Existing tables have lookup/current relation pieces but no clear full status history. |
+| `evacuation_sites` | Do not create. Extend `evacuation_centers`. | Existing table already represents evacuation sites. |
+| `rescuer_profiles` | Do not create. Extend `responders`. | Existing table already stores rescuer/responder profile data. |
+| `rescue_dispatches` | Do not create. Extend `responder_assignments`. | Existing table already represents dispatch assignments. |
+| `dispatch_routes` | Do not create. Extend `responder_routes` and `route_coordinates`. | Existing route tables already support dispatch route data. |
+| `resource_items` | Do not create for version 1. Extend `resource_requests`. | RESQPERATION validates/forwards requests but does not manage delivery inventory. |
+| `request_validations` | Create new `request_validations`. | Needed for validation history before forwarding to TrackingAid. |
+| `audit_logs` | Create new `audit_logs`. | `import_logs` and `analytics_job_logs` are not general user action logs. |
+| `integration_logs` | Create new `integration_logs`; also extend `data_sources` and `import_logs`. | Needed for inbound EvaTrack and outbound TrackingAid/API tracing. |
+
+Status:
+
+- [x] Latest SQL export reviewed
+- [x] Similar-purpose tables mapped to existing tables
+- [x] Additive SQL proposal created
+- [ ] DB member review complete
+- [ ] Instructor/team approval complete
+- [ ] SQL safely tested on a local copy
+- [ ] SQL applied to shared DB
+
 ## Important Gaps
 
 The DB has a strong base, but some fields/tables are still needed for the actual RESQPERATION requirements.

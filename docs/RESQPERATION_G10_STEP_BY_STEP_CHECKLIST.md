@@ -57,7 +57,11 @@ Do not use the full `prototype/resqperation-2 (1).html` for development. If a UI
   - `resource_requests.request_id`
 - [x] DB readiness note created: `docs/RESQPERATION_G10_DB_READINESS_CHECK.md`
 - [x] Existing DB gap SQL proposal created: `docs/sql_proposals/2026_06_01_g10_existing_db_gap_review.sql`
+- [x] Latest DB member `all.sql` export reviewed
+- [x] Additive DB update proposal created: `docs/sql_proposals/2026_06_01_g10_all_sql_additive_update.sql`
+- [x] Older DB gap proposal marked as superseded
 - [ ] SQL gap proposal reviewed by team/instructor
+- [ ] Additive DB update proposal tested on a local database copy
 - [ ] Laravel migrations adjusted to existing DB style
 - [ ] Default Laravel `create_users_table` migration handled safely
 - [ ] No new migration has been run against the shared DB yet
@@ -110,7 +114,8 @@ Status: done for backend foundation. A test HQ Admin login now exists in the sha
 
 ### 3. Database Migrations / DB Alignment
 
-- [ ] Review existing DB gap SQL
+- [ ] Review latest additive DB update SQL
+- [ ] Test latest additive DB update SQL on a local copy first
 - [ ] Decide which changes are needed for version 1
 - [ ] Convert approved SQL changes to Laravel migrations
 - [ ] Avoid duplicate tables

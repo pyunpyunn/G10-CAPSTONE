@@ -2,6 +2,17 @@
 -- Date: 2026-06-01
 -- Purpose: review-only SQL based on the actual shared MySQL structure.
 --
+-- SUPERSEDED NOTE:
+-- A newer DB export was provided at:
+-- C:\Users\Kathleen Barro\Downloads\all.sql
+--
+-- Use this newer proposal instead:
+-- docs/sql_proposals/2026_06_01_g10_all_sql_additive_update.sql
+--
+-- This older file is kept only for audit/history because some column types
+-- used BIGINT while the latest all.sql uses varchar(255) for important IDs
+-- such as user_id, household_id, event_id, and request_id.
+--
 -- DO NOT RUN THIS SCRIPT YET.
 -- The shared DB already has 77 tables and uses custom primary keys such as:
 -- users.user_id, roles.role_id, disaster_events.event_id, households.household_id.
@@ -261,4 +272,3 @@ CREATE TABLE weather_logs (
 -- ALTER TABLE weather_logs
 --   ADD CONSTRAINT weather_logs_disaster_id_foreign
 --     FOREIGN KEY (disaster_id) REFERENCES disaster_events(event_id) ON DELETE SET NULL;
-

@@ -54,6 +54,7 @@ Role: HQ/Admin
 - [x] Mobile login created for household and rescuer roles
 - [x] Web dashboard shell aligned with the HTML prototype header and sidebar behavior
 - [x] API unauthenticated errors return JSON
+- [ ] Latest additive DB update proposal reviewed by DB member
 - [ ] Shared DB gap review approved
 - [ ] Laravel migrations adjusted to the existing shared DB structure
 - [ ] HQ/Admin dashboard API connected to live database data
@@ -101,7 +102,8 @@ Important development rule:
 - `docs/RESQPERATION_G10_DB_READINESS_CHECK.md`
 - `docs/RESQPERATION_G10_DEVELOPMENT_READINESS_AUDIT.md`
 - `docs/RESQPERATION_G10_BEGINNER_MODULE_PROMPTS.md`
-- `docs/sql_proposals/2026_06_01_g10_existing_db_gap_review.sql`
+- `docs/sql_proposals/2026_06_01_g10_all_sql_additive_update.sql`
+- `docs/sql_proposals/2026_06_01_g10_existing_db_gap_review.sql` - superseded historical proposal
 
 Private local references:
 
