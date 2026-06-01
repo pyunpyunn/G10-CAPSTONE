@@ -1,0 +1,68 @@
+# RESQPERATION local/private files
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+web-build/
+public/build/
+public/hot
+
+# Laravel runtime files
+backend-laravel/storage/*.key
+backend-laravel/storage/logs/*.log
+backend-laravel/storage/pail/
+backend-laravel/bootstrap/cache/*.php
+backend-laravel/.phpunit.cache/
+backend-laravel/.phpunit.result.cache
+backend-laravel/auth.json
+
+# Expo / React Native generated files
+.expo/
+frontend-mobile/.expo/
+frontend-mobile/expo-env.d.ts
+frontend-mobile/app-example/
+frontend-mobile/ios/
+frontend-mobile/android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+*.tsbuildinfo
+
+# Prototype and development-only reference materials
+FOR DEV/
+prototype/
+
+# AI/editor/generated folders and files
+.sixth/
+.dist/
+.claude/
+.codex/
+.cursor/
+.vscode/
+.idea/
+.zed/
+.nova/
+CLAUDE.md
+AGENTS.md
+
+# Logs and OS files
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+Thumbs.db
+.DS_Store
+

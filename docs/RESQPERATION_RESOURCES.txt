@@ -1,0 +1,435 @@
+RESQPERATION RESOURCE LIST
+Updated: 2026-05-29
+
+Purpose:
+This file stores the tools, official documentation, APIs, packages, and study resources needed to develop RESQPERATION.
+
+============================================================
+1. CORE PROJECT STACK
+============================================================
+
+Backend:
+- Laravel current stable, preferably Laravel 13 if PHP 8.3+ is available.
+- Laravel 12 fallback if the lab/hosting environment cannot run Laravel 13.
+- Avoid Laravel 11 for new planning unless required by the instructor.
+
+Official Laravel installation:
+https://laravel.com/docs/12.x/installation
+https://laravel.com/docs/13.x/installation
+
+Laravel API setup:
+Command:
+composer create-project laravel/laravel backend-laravel
+cd backend-laravel
+php artisan install:api
+
+Laravel Sanctum:
+https://laravel.com/docs/sanctum
+
+Laravel HTTP Client:
+https://laravel.com/docs/http-client
+
+Laravel Task Scheduling:
+https://laravel.com/docs/scheduling
+
+Laravel Pagination:
+https://laravel.com/docs/pagination
+
+Laravel Eloquent Relationships:
+https://laravel.com/docs/eloquent-relationships
+
+Laravel Validation:
+https://laravel.com/docs/validation
+
+Laravel Database Migrations:
+https://laravel.com/docs/migrations
+
+Laravel API Resources:
+https://laravel.com/docs/eloquent-resources
+
+------------------------------------------------------------
+
+Frontend Web:
+- React
+- Vite
+- React Router
+- Axios
+- Lucide React
+- Plain shared CSS design system
+
+React official docs:
+https://react.dev/learn
+
+React start project guidance:
+https://react.dev/learn/start-a-new-react-project
+
+Vite official guide:
+https://vite.dev/guide/
+
+Create React + Vite:
+npm create vite@latest frontend-web -- --template react
+
+Install web packages:
+npm install axios react-router-dom lucide-react
+
+React Router:
+https://reactrouter.com/
+
+Axios:
+https://axios-http.com/
+
+Lucide React:
+https://lucide.dev/guide/packages/lucide-react
+
+------------------------------------------------------------
+
+Frontend Mobile:
+- Expo React Native
+- React Navigation
+- Axios
+- Expo SecureStore
+- Expo Location
+- Expo Notifications
+
+Expo create project:
+https://docs.expo.dev/get-started/create-a-project/
+
+Create Expo project:
+npx create-expo-app@latest frontend-mobile
+
+Expo Router docs if the team chooses file-based routing:
+https://docs.expo.dev/router/introduction/
+
+React Navigation docs if the team chooses stack-based routing:
+https://reactnavigation.org/
+
+Expo SecureStore:
+https://docs.expo.dev/versions/latest/sdk/securestore/
+
+Expo Location:
+https://docs.expo.dev/versions/latest/sdk/location/
+
+Expo Notifications:
+https://docs.expo.dev/versions/latest/sdk/notifications/
+
+Install mobile basics:
+npm install axios
+npm install @react-navigation/native @react-navigation/native-stack
+npx expo install expo-secure-store expo-location expo-notifications react-native-screens react-native-safe-area-context
+
+============================================================
+2. DATABASE
+============================================================
+
+Shared MySQL database:
+DB_HOST=10.150.111.114
+DB_PORT=3306
+DB_DATABASE=klint
+DB_USERNAME=groupmate
+DB_PASSWORD=password123
+
+Backend .env:
+DB_CONNECTION=mysql
+DB_HOST=10.150.111.114
+DB_PORT=3306
+DB_DATABASE=klint
+DB_USERNAME=groupmate
+DB_PASSWORD=password123
+
+Important:
+- Do not commit .env.
+- Ask groupmates before running migrations on a shared database.
+- Use table prefixes if another group is using the same DB.
+- Back up important shared data before running migration changes.
+
+Recommended DB tools:
+- phpMyAdmin if provided by school
+- MySQL Workbench
+- DBeaver Community
+
+============================================================
+3. WEATHER DATA SOURCES
+============================================================
+
+Use weather data in this order:
+
+1. PAGASA for official advisory context.
+2. Open-Meteo for structured numeric JSON data.
+3. Store all fetched weather snapshots in weather_logs.
+4. Frontend displays saved weather logs from Laravel, not direct API calls.
+
+PAGASA official site:
+https://pagasa.dost.gov.ph/
+
+PAGASA products and services:
+https://pagasa.dost.gov.ph/products-and-services
+
+PAGASA tropical cyclone bulletins:
+https://pagasa.dost.gov.ph/tropical-cyclone/severe-weather-bulletin
+
+Open-Meteo API:
+https://open-meteo.com/
+https://open-meteo.com/en/docs
+
+Open-Meteo sample idea:
+Use latitude/longitude of the barangay.
+Fetch:
+- temperature
+- precipitation/rainfall
+- wind speed
+- wind direction
+- weather code
+
+Backend approach:
+- WeatherLogController
+- WeatherService or simple private method in controller for version 1
+- Laravel Http::get()
+- Save response in weather_logs
+
+Do not:
+- scrape unstable pages unless there is no alternative
+- expose API keys in React
+- let the frontend decide trusted weather source logic
+
+============================================================
+4. MAPPING / GEOTAGGING
+============================================================
+
+Recommended:
+- Leaflet
+- React Leaflet
+- OpenStreetMap tiles
+
+Leaflet official docs:
+https://leafletjs.com/
+https://leafletjs.com/examples/quick-start/
+
+React Leaflet docs:
+https://react-leaflet.js.org/
+
+OpenStreetMap:
+https://www.openstreetmap.org/
+
+OpenStreetMap tile usage policy:
+https://operations.osmfoundation.org/policies/tiles/
+
+Install:
+npm install leaflet react-leaflet
+
+Map requirements:
+- household geotag markers
+- green/safe markers
+- red/unsafe markers
+- grey/unchecked markers
+- evacuation site pins
+- route polylines
+- dispatch route polylines
+
+Beginner rule:
+- Use normal markers first.
+- Use marker clustering only after normal markers work.
+- Do not build custom GIS logic in version 1.
+
+Optional marker cluster package:
+https://github.com/yuzhva/react-leaflet-markercluster
+
+============================================================
+5. EXPORTS
+============================================================
+
+CSV:
+Use Laravel streamed response first.
+This avoids a package for simple table exports.
+
+Laravel streamed downloads:
+https://laravel.com/docs/responses#streamed-downloads
+
+PDF:
+Use PDF only for situation reports and archive report summaries.
+
+Common Laravel PDF package:
+barryvdh/laravel-dompdf
+https://github.com/barryvdh/laravel-dompdf
+
+Install:
+composer require barryvdh/laravel-dompdf
+
+Alternative:
+Use browser print for the first demo if PDF package setup becomes too hard.
+
+============================================================
+6. NOTIFICATIONS
+============================================================
+
+Version 1:
+- Save broadcast logs in database.
+- Display alerts in household/rescuer mobile app after refresh/login.
+
+Version 2:
+- Add Expo push notifications.
+
+Expo Notifications:
+https://docs.expo.dev/versions/latest/sdk/notifications/
+
+Laravel notification docs:
+https://laravel.com/docs/notifications
+
+============================================================
+7. BEGINNER CODE STUDY TOPICS
+============================================================
+
+Laravel:
+- routes/api.php
+- controllers
+- request validation
+- migrations
+- seeders
+- Eloquent models
+- relationships
+- pagination
+- JSON resources
+- Sanctum auth
+
+React:
+- components
+- props
+- useState
+- useEffect
+- rendering arrays with .map()
+- React Router
+- Axios API calls
+- conditional rendering
+- modal state
+- shared CSS classes
+
+Expo React Native:
+- screens
+- navigation
+- SecureStore
+- Location permission
+- form submission
+- API calls
+
+Database:
+- primary keys
+- foreign keys
+- indexes
+- status columns
+- log/history tables
+
+============================================================
+8. SYSTEM MODULE REQUIREMENT RESOURCES
+============================================================
+
+Auth:
+- Laravel Sanctum docs
+- React Router ProtectedRoute examples
+- Expo SecureStore docs
+
+Dashboard:
+- Laravel aggregate queries
+- React reusable cards
+
+Broadcast:
+- disaster_events table
+- broadcast_logs table
+- Expo Notifications later
+
+Weather:
+- PAGASA bulletins
+- Open-Meteo API
+- Laravel HTTP Client
+- Laravel Scheduler
+
+Mapping:
+- Leaflet
+- React Leaflet
+- OpenStreetMap tiles
+- Expo Location
+
+Household Status:
+- Laravel pagination
+- status log table design
+- mobile geotag submission
+
+Dispatch:
+- rescue_teams table
+- rescue_dispatches table
+- dispatch_routes table
+- status updates
+
+Rescuer Accounts:
+- users table
+- rescuer_profiles table
+- role-based access
+
+Resources and Requests:
+- resource_requests table
+- request_validations table
+- status workflow
+
+Situation Reporting:
+- situation_reports table
+- disaster event dropdown
+- saved summary JSON
+- PDF export
+
+Archive:
+- archive endpoints
+- tabs
+- filters by event/date/category
+- CSV and PDF export
+
+============================================================
+9. SIMPLIFIED CODE RULES TO PUT IN EVERY AI PROMPT
+============================================================
+
+Paste this into every AI coding prompt:
+
+"Write beginner-friendly code. Do not over-engineer. Do not use advanced architecture unless necessary. Use small React components, simple Laravel controllers, Eloquent queries, Form Requests for validation, and API Resources for JSON. Render repeated UI from arrays using .map(). Do not copy-paste repeated cards or rows. Keep files short and readable. Use pagination and summary endpoints for large data. Match the prototype UI/UX, but do not copy the prototype as one huge file."
+
+============================================================
+10. INSTALL COMMAND SUMMARY
+============================================================
+
+Backend:
+composer create-project laravel/laravel backend-laravel
+cd backend-laravel
+php artisan install:api
+php artisan serve
+
+Web:
+npm create vite@latest frontend-web -- --template react
+cd frontend-web
+npm install
+npm install axios react-router-dom lucide-react leaflet react-leaflet
+npm run dev
+
+Mobile:
+npx create-expo-app@latest frontend-mobile
+cd frontend-mobile
+npm install axios
+npm install @react-navigation/native @react-navigation/native-stack
+npx expo install expo-secure-store expo-location expo-notifications react-native-screens react-native-safe-area-context
+npx expo start
+
+============================================================
+11. FILES TO READ IN THIS FOLDER
+============================================================
+
+Main plan:
+RESQPERATION_ACTUAL_DEVELOPMENT_PLAN.md
+
+Requirement breakdown:
+RESQPERATION_REQUIREMENTS_BREAKDOWN.md
+
+Resource list:
+RESQPERATION_RESOURCES.txt
+
+Original prototype reference:
+resqperation-2 (1).html
+
+Claude documents:
+ResQperation_DevPlan.docx
+ResQperation_StepGuide.docx
+
