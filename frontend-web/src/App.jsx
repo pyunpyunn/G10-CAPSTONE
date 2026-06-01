@@ -211,14 +211,35 @@ function isWebUser(user) {
 }
 
 function getLoginMessage(error) {
+  if (!error?.response) {
+    return 'Cannot connect to the server right now. Please check if the backend is running.'
+  }
+
   const data = error?.response?.data
+  const status = error?.response?.status
 
   if (data?.errors) {
     const firstError = Object.values(data.errors)[0]
     return Array.isArray(firstError) ? firstError[0] : 'Please check your entry.'
   }
 
-  return data?.message || 'Unable to sign in. Please check the server and try again.'
+  if (status === 401 || status === 422) {
+    return data?.message || 'The account ID or password is incorrect.'
+  }
+
+  if (status === 403) {
+    return data?.message || 'This account is not allowed to access the web dashboard.'
+  }
+
+  if (status === 503) {
+    return data?.message || 'The database is not available right now. Please contact the system administrator.'
+  }
+
+  if (status >= 500) {
+    return 'Something went wrong while logging in. Please contact the system administrator.'
+  }
+
+  return data?.message || 'Unable to log in. Please try again.'
 }
 
 export default App

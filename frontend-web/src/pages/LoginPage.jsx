@@ -297,7 +297,7 @@ export default function LoginPage({ onLogin, error }) {
               {error && <div className="form-error">{error}</div>}
               <button className="primary-button" type="submit" disabled={submitting}>
                 <LogIn size={16} />
-                {submitting ? 'Checking account...' : 'Continue to dashboard'}
+                {submitting ? 'Logging in...' : 'Login'}
               </button>
             </form>
           </section>
