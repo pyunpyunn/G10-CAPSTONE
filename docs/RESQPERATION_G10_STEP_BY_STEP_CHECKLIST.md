@@ -135,17 +135,17 @@ Status: not started.
 
 ### 5. Web App Shell
 
-- [ ] Replace default Vite starter UI
-- [ ] Create React Router setup
-- [ ] Create `AppShell`
-- [ ] Create `Sidebar`
-- [ ] Create `Topbar`
-- [ ] Create `ProtectedRoute`
-- [ ] Create `LoginPage`
-- [ ] Add page placeholders for all modules
-- [ ] Use API base URL from `frontend-web/.env`
+- [x] Replace default Vite starter UI
+- [x] Create React Router setup
+- [x] Create `AppShell`
+- [x] Create `Sidebar`
+- [x] Create `Topbar`
+- [x] Create `ProtectedRoute`
+- [x] Create `LoginPage`
+- [x] Add page placeholders for all modules
+- [x] Use API base URL from `frontend-web/.env`
 
-Status: not started.
+Status: mostly done. Web shell and login are built; real module APIs/pages will be built one by one.
 
 ### 6. Shared Web Components
 
@@ -290,9 +290,9 @@ Status: not started.
 
 ### 17. Mobile Household
 
-- [ ] Decide whether to keep Expo Router/TypeScript or simplify to JavaScript screens
-- [ ] Login flow
-- [ ] Household home
+- [x] Decide whether to keep Expo Router/TypeScript or simplify to JavaScript screens
+- [x] Login flow
+- [x] Household home placeholder
 - [ ] Submit status screen
 - [ ] Status history screen
 - [ ] Household profile/device location screen
@@ -300,19 +300,19 @@ Status: not started.
 - [ ] Send battery level if available
 - [ ] Register/update device record
 
-Status: role folder exists, screens not built.
+Status: login and role routing only. Other household mobile features wait until the Household Status module.
 
 ### 18. Mobile Rescuer
 
-- [ ] Login flow
-- [ ] Rescuer home
+- [x] Login flow
+- [x] Rescuer home placeholder
 - [ ] Assigned dispatch screen
 - [ ] Update household status screen
 - [ ] Update dispatch status screen
 - [ ] Request resources/personnel screen
 - [ ] Foreground location tracking while on mission
 
-Status: role folder exists, screens not built.
+Status: login and role routing only. Other rescuer mobile features wait until Dispatch/Household Status modules.
 
 ### 19. Exports
 
@@ -347,7 +347,7 @@ Status: not started.
 The current development task is:
 
 ```text
-Finish Backend Auth and Roles verification.
+Start Dashboard API/page.
 ```
 
 Completed:
@@ -362,8 +362,12 @@ POST /api/v1/auth/login
 POST /api/v1/auth/logout
 GET  /api/v1/auth/me
 ```
+- Web login and HQ/Admin app shell are built.
+- Mobile login routes household/rescuer users to their role folders only.
+- Auth was verified through real HTTP login, `/auth/me`, and logout using the HQ Admin test account.
 
 Still needed:
 
 1. Keep migrations paused while the DB member works.
-2. After auth is verified from the web form, start the Web App Shell.
+2. Manually try the web login screen in the browser.
+3. Start real module development with Dashboard API/page.

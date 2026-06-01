@@ -1,122 +1,217 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { useEffect, useState } from 'react'
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom'
+import AppShell from './components/layout/AppShell'
+import LoginPage from './pages/LoginPage'
+import PlaceholderPage from './pages/PlaceholderPage'
+import { getCurrentUser, loginUser, logoutUser } from './api/authApi'
+import { clearToken, getToken, saveToken } from './api/token'
 import './App.css'
 
+const webRoles = ['super_admin', 'admin']
+
+const modulePages = [
+  {
+    path: '/dashboard',
+    title: 'Dashboard',
+    kicker: 'Command overview',
+    summary: 'Active event, household reporting progress, dispatch status, weather, requests, and recent activity.',
+  },
+  {
+    path: '/broadcast',
+    title: 'Disaster Broadcasting',
+    kicker: 'Alerts',
+    summary: 'Create disaster events and send official barangay or purok-specific instructions.',
+  },
+  {
+    path: '/weather',
+    title: 'Weather Updates',
+    kicker: 'Monitoring',
+    summary: 'Display saved PAGASA/Open-Meteo snapshots fetched by Laravel for archive and reports.',
+  },
+  {
+    path: '/mapping',
+    title: 'Mapping',
+    kicker: 'Geotagging',
+    summary: 'View household status points, evacuation centers, dispatch markers, and route lines.',
+  },
+  {
+    path: '/households',
+    title: 'Household Status',
+    kicker: 'Reports only',
+    summary: 'Review latest household reports, members, devices, battery level, and last known location.',
+  },
+  {
+    path: '/dispatch',
+    title: 'Rescue Dispatch',
+    kicker: 'Operations',
+    summary: 'Assign teams, monitor progress, and record field outcomes from rescuer updates.',
+  },
+  {
+    path: '/rescuers',
+    title: 'Rescuer Accounts',
+    kicker: 'Verified accounts',
+    summary: 'Create and manage HQ-created rescuer accounts, teams, duty status, and contact details.',
+  },
+  {
+    path: '/resources-requests',
+    title: 'Resources & Requests',
+    kicker: 'Validation queue',
+    summary: 'Validate EvaTrack/manual requests before forwarding verified records to TrackingAid/HQ.',
+  },
+  {
+    path: '/situation',
+    title: 'Situation Reporting',
+    kicker: 'Reports',
+    summary: 'Generate saved event snapshots for household, dispatch, resources, weather, and casualty summaries.',
+  },
+  {
+    path: '/archive',
+    title: 'Archive',
+    kicker: 'Records',
+    summary: 'Search and export historical event records, household logs, dispatches, requests, and SitReps.',
+  },
+]
+
 function App() {
-  const [count, setCount] = useState(0)
+  return (
+    <BrowserRouter>
+      <AuthRoutes />
+    </BrowserRouter>
+  )
+}
+
+function AuthRoutes() {
+  const [user, setUser] = useState(null)
+  const [checkingSession, setCheckingSession] = useState(true)
+  const [loginError, setLoginError] = useState('')
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    async function loadSession() {
+      if (!getToken()) {
+        setCheckingSession(false)
+        return
+      }
+
+      try {
+        const currentUser = await getCurrentUser()
+        if (isWebUser(currentUser)) {
+          setUser(currentUser)
+        } else {
+          clearToken()
+          setLoginError('This account is for the mobile app.')
+        }
+      } catch {
+        clearToken()
+      } finally {
+        setCheckingSession(false)
+      }
+    }
+
+    loadSession()
+  }, [])
+
+  async function handleLogin(form) {
+    setLoginError('')
+
+    try {
+      const data = await loginUser(form)
+      const nextUser = data.user
+
+      if (!isWebUser(nextUser)) {
+        clearToken()
+        setLoginError('Household and rescuer accounts should use the mobile app.')
+        return
+      }
+
+      saveToken(data.token)
+      setUser(nextUser)
+      navigate('/dashboard', { replace: true })
+    } catch (error) {
+      setLoginError(getLoginMessage(error))
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await logoutUser()
+    } finally {
+      clearToken()
+      setUser(null)
+      navigate('/login', { replace: true })
+    }
+  }
+
+  if (checkingSession) {
+    return <div className="screen-loader">Checking session...</div>
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          user ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <LoginPage onLogin={handleLogin} error={loginError} />
+          )
+        }
+      />
 
-      <div className="ticks"></div>
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute user={user}>
+            <AppShell user={user} pages={modulePages} onLogout={handleLogout} />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        {modulePages.map((page) => (
+          <Route
+            key={page.path}
+            path={page.path.replace('/', '')}
+            element={<PlaceholderPage page={page} />}
+          />
+        ))}
+      </Route>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+    </Routes>
   )
+}
+
+function ProtectedRoute({ user, children }) {
+  const location = useLocation()
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />
+  }
+
+  return children
+}
+
+function isWebUser(user) {
+  return webRoles.includes(user?.role?.role_key)
+}
+
+function getLoginMessage(error) {
+  const data = error?.response?.data
+
+  if (data?.errors) {
+    const firstError = Object.values(data.errors)[0]
+    return Array.isArray(firstError) ? firstError[0] : 'Please check your entry.'
+  }
+
+  return data?.message || 'Unable to sign in. Please check the server and try again.'
 }
 
 export default App
