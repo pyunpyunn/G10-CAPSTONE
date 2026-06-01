@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, Eye, ShieldCheck } from 'lucide-react'
+import { Bell, CheckCircle2, Eye } from 'lucide-react'
 import { useState } from 'react'
 
 export default function Topbar({ user }) {
@@ -29,13 +29,7 @@ export default function Topbar({ user }) {
 
         <button className="header-profile" type="button" title="Profile" aria-label="Profile">
           <span className="profile-avatar">{initials}</span>
-          <div>
-            <strong>{user?.full_name || 'HQ Admin'}</strong>
-            <span className="profile-label">
-              <ShieldCheck size={13} />
-              {roleName}
-            </span>
-          </div>
+          <span className="profile-label">{roleName}</span>
         </button>
       </div>
 
@@ -50,12 +44,20 @@ export default function Topbar({ user }) {
           </div>
           <div className="notification-popover-list">
             <div className="notification-preview-item">
-              <strong>Unsafe household report</strong>
-              <span>Reyes Family, Purok 5. Rescuer flagged for dispatch.</span>
+              <span className="notification-preview-dot" />
+              <div>
+                <div className="notification-preview-title">Unsafe household report</div>
+                <div className="notification-preview-body">Reyes Family, Purok 5. Rescuer flagged for dispatch.</div>
+                <div className="notification-preview-time">Just now</div>
+              </div>
             </div>
             <div className="notification-preview-item">
-              <strong>Resource request received</strong>
-              <span>Food packs request from evacuation site needs validation.</span>
+              <span className="notification-preview-dot" />
+              <div>
+                <div className="notification-preview-title">Resource request received</div>
+                <div className="notification-preview-body">Food packs request from evacuation site needs validation.</div>
+                <div className="notification-preview-time">5 min ago</div>
+              </div>
             </div>
           </div>
           <div className="notification-popover-actions">

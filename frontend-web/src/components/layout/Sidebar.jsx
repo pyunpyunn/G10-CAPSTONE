@@ -28,9 +28,16 @@ const icons = {
   '/archive': Database,
 }
 
-export default function Sidebar({ pages, isPinned, onTogglePin, onLogout }) {
+export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onPeekEnd, onLogout }) {
   return (
-    <aside className="leftbar" aria-label="Primary modules">
+    <aside
+      className="leftbar"
+      aria-label="Primary modules"
+      onMouseEnter={onPeekStart}
+      onMouseLeave={onPeekEnd}
+      onFocus={onPeekStart}
+      onBlur={onPeekEnd}
+    >
       <div className="left-sidebar-actions" aria-label="Navigation controls">
         <button
           className="left-pin-button"

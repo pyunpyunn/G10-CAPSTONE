@@ -5,7 +5,12 @@ import Topbar from './Topbar'
 
 export default function AppShell({ user, pages, onLogout }) {
   const [isPinned, setIsPinned] = useState(false)
-  const shellClass = isPinned ? 'app-shell left-pinned' : 'app-shell left-hidden'
+  const [isPeeking, setIsPeeking] = useState(false)
+  const shellClass = [
+    'app-shell',
+    isPinned ? 'left-pinned' : 'left-hidden',
+    isPeeking && !isPinned ? 'left-peeking' : '',
+  ].filter(Boolean).join(' ')
 
   return (
     <div className={shellClass}>
@@ -13,14 +18,14 @@ export default function AppShell({ user, pages, onLogout }) {
         pages={pages}
         isPinned={isPinned}
         onTogglePin={() => setIsPinned(!isPinned)}
+        onPeekStart={() => setIsPeeking(true)}
+        onPeekEnd={() => setIsPeeking(false)}
         onLogout={onLogout}
       />
-      <div className="workspace">
-        <Topbar user={user} />
-        <main className="page-area">
-          <Outlet />
-        </main>
-      </div>
+      <Topbar user={user} />
+      <main className="main">
+        <Outlet />
+      </main>
     </div>
   )
 }

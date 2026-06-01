@@ -20,6 +20,10 @@ body,
 
 body {
   margin: 0;
+  overflow-x: hidden;
+  color: #111827;
+  background: #f5f7fb;
+  font-size: 13px;
 }
 
 a {
