@@ -37,11 +37,20 @@ RESQPERATION is a capstone project for barangay disaster response operations. Th
 
 For local development testing:
 
-```text
-Account ID: 2024035500
-Password: password
-Role: HQ/Admin
-```
+| Role | Account ID | Password | App |
+| --- | --- | --- | --- |
+| HQ/Admin | `2024035500` | `password` | Web |
+| Household Resident | `2024035501` | `password` | Mobile |
+| Rescuer | `2024035502` | `password` | Mobile |
+
+ID note:
+
+- The login ID uses the existing 10-digit numeric `username` pattern.
+- Internal `user_id` values use readable prefixes:
+  - `USR-HQ-2024035500`
+  - `USR-HH-2024035501`
+  - `USR-RSC-2024035502`
+- Temporary mobile account SQL proposal: `docs/sql_proposals/2026_06_02_g10_temporary_mobile_login_accounts.sql`
 
 ## Set Up Feature Checklist
 
