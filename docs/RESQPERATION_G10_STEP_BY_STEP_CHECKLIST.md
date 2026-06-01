@@ -262,11 +262,11 @@ Status: not started.
 
 - [ ] Align existing `resource_requests` table
 - [ ] Add request validation workflow after approval
-- [ ] Add EvaTrack inbound reference fields after approval
-- [ ] Add TrackingAid forwarding reference fields after approval
+- [ ] Add shared DB request source/reference fields after approval
+- [ ] Add tracking-ready fields after approval
 - [ ] Request queue page
 - [ ] Validation modal
-- [ ] Forward/return actions
+- [ ] Mark ready for tracking / return actions
 
 Status: not started.
 

@@ -26,10 +26,12 @@ RESQPERATION is a capstone project for barangay disaster response operations. Th
 - HQ/Admin: Uses the web dashboard to manage operations, review reports, create rescuer/HQ accounts, validate requests, and generate reports.
 - Rescuer: Uses the mobile app login. Full rescuer mobile operations are planned after HQ/Admin backend modules.
 - Household Resident: Uses the mobile app login. Household accounts are expected to come from the external SafeTrack system.
-- External Systems:
-  - SafeTrack provides household account records for authentication.
-  - EvaTrack may send resource and personnel requests to RESQPERATION.
-  - TrackingAid receives validated resource requests after RESQPERATION review.
+- Shared Database Modules:
+  - Household account records may come from the shared SafeTrack tables.
+  - Resource/personnel requests may be read from shared request tables.
+  - Validated requests are marked ready for tracking in the same database.
+  - Weather providers such as PAGASA/OpenMeteo are treated as data sources, not separate capstone systems.
+  - ExpoPush is treated as a notification provider, not a separate capstone system.
 
 ## Default Login Credentials
 

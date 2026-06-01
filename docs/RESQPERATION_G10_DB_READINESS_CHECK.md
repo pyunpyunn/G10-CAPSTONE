@@ -115,7 +115,6 @@ dispatch_routes
 resource_items
 request_validations
 audit_logs
-integration_logs
 ```
 
 Important:
@@ -133,16 +132,16 @@ Some of these are not completely missing as concepts. The shared DB already has 
 | `rescuer_profiles` | Missing exact name | `responders` | Use or extend `responders`; likely link responders to `users.user_id`. |
 | `rescue_dispatches` | Missing exact name | `responder_assignments` | Use or extend `responder_assignments` for dispatch records. |
 | `dispatch_routes` | Missing exact name | `responder_routes`, `route_coordinates` | Use existing route tables if they can store dispatch route geometry. |
-| `resource_items` | Missing | `unit_allocations`, resource request tables | Confirm whether inventory/resource availability is handled by external TrackingAid or local mirror table. |
+| `resource_items` | Missing | `unit_allocations`, resource request tables | Do not create for version 1 because RESQPERATION validates requests but does not manage delivery inventory. |
 | `request_validations` | Missing | None confirmed | Needed for validation history before forwarding requests. |
 | `audit_logs` | Missing | `analytics_job_logs`, `import_logs` | Needed for user/module action tracking, unless a general log table is selected. |
-| `integration_logs` | Missing | `import_logs`, `csv_uploads`, `data_sources` | Needed for EvaTrack/TrackingAid/API integration tracing. |
+| `integration_logs` | Not needed for version 1 | Shared DB, `weather_logs`, `notification_logs` | Do not create while all capstone modules use one shared DB. Weather/API providers are logged in their module tables. |
 
 Suggested decision for version 1:
 
 - Reuse existing tables when they already match the purpose.
 - Add missing columns to existing tables when safer than creating a duplicate table.
-- Create new tables only for real gaps such as `weather_logs`, `request_validations`, and `integration_logs`.
+- Create new tables only for real gaps such as `weather_logs`, `household_status_logs`, `request_validations`, and `audit_logs`.
 - Keep all proposed SQL review-only until the team approves it.
 
 ## Latest DB Member Export Review
@@ -180,9 +179,9 @@ This newer script replaces the earlier gap proposal as the recommended review fi
 | `rescue_dispatches` | Do not create. Extend `responder_assignments`. | Existing table already represents dispatch assignments. |
 | `dispatch_routes` | Do not create. Extend `responder_routes` and `route_coordinates`. | Existing route tables already support dispatch route data. |
 | `resource_items` | Do not create for version 1. Extend `resource_requests`. | RESQPERATION validates/forwards requests but does not manage delivery inventory. |
-| `request_validations` | Create new `request_validations`. | Needed for validation history before forwarding to TrackingAid. |
+| `request_validations` | Create new `request_validations`. | Needed for validation history before marking requests ready for tracking. |
 | `audit_logs` | Create new `audit_logs`. | `import_logs` and `analytics_job_logs` are not general user action logs. |
-| `integration_logs` | Create new `integration_logs`; also extend `data_sources` and `import_logs`. | Needed for inbound EvaTrack and outbound TrackingAid/API tracing. |
+| `integration_logs` | Do not create for version 1. | All capstone modules now share one DB. PAGASA/OpenMeteo belong in `weather_logs`; ExpoPush belongs in notification delivery logs. |
 
 Status:
 
@@ -266,13 +265,20 @@ urgency_levels
 
 Still needed:
 
-- source system, such as EvaTrack
-- external request reference
+- request source, such as manual entry, household mobile, rescuer mobile, or shared DB request
+- source reference
 - validation status and notes
 - validator and validation timestamp
-- forwarded system, such as TrackingAid
-- TrackingAid reference
-- integration log table
+- released for tracking timestamp
+- tracking reference
+
+Not needed for version 1:
+
+- `integration_logs`
+- `source_system`
+- `forwarded_to_system`
+
+Reason: all capstone modules now share one database, so request handoff can be represented by validation and tracking-ready fields on `resource_requests`.
 
 ## First Thing To Do
 

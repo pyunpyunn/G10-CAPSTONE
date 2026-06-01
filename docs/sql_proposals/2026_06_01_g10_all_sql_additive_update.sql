@@ -1,18 +1,5 @@
 -- RESQPERATION G10 additive database update proposal based on all.sql
 -- Date: 2026-06-01
--- Source reviewed: C:\Users\Kathleen Barro\Downloads\all.sql
---
--- IMPORTANT:
--- 1. This is a REVIEW SCRIPT. Do not run it until the database member approves it.
--- 2. Do not run all.sql directly on the shared DB because it contains DROP TABLE IF EXISTS.
--- 3. This script does not delete, drop, or rename existing tables.
--- 4. Existing same-purpose tables are reused through ALTER TABLE.
--- 5. New tables are only proposed where no suitable existing table exists.
---
--- Existing DB naming style observed in all.sql:
--- - household_id, user_id, event_id, request_id are varchar(255)
--- - responder_id, team_id, status_id are int
--- - custom tables commonly use datetime columns
 
 -- ============================================================
 -- A. Final table mapping decisions
@@ -34,7 +21,10 @@
 -- household_status_logs
 -- request_validations
 -- audit_logs
--- integration_logs
+--
+-- No separate integration_logs table for version 1 because all capstone
+-- modules now share one database. PAGASA/OpenMeteo are weather sources in
+-- weather_logs. ExpoPush is a notification provider covered by notification_logs.
 
 -- ============================================================
 -- B. Household mobile devices
@@ -294,23 +284,22 @@ CREATE TABLE IF NOT EXISTS weather_logs (
 -- ============================================================
 -- M. Resource and personnel requests
 -- Existing table: resource_requests
--- Purpose: receive from EvaTrack/manual entry, validate, forward to TrackingAid
--- Delivery is not handled by RESQPERATION.
+-- Purpose: receive requests from the shared DB/manual entry, validate them,
+-- then mark them as ready for tracking. Delivery is not handled by RESQPERATION.
 -- ============================================================
 
 ALTER TABLE resource_requests
-    ADD COLUMN source_system VARCHAR(80) NULL AFTER request_id,
-    ADD COLUMN external_request_id VARCHAR(120) NULL AFTER source_system,
-    ADD COLUMN request_category VARCHAR(50) NULL AFTER external_request_id,
+    ADD COLUMN request_source VARCHAR(80) NULL AFTER request_id,
+    ADD COLUMN source_reference VARCHAR(120) NULL AFTER request_source,
+    ADD COLUMN request_category VARCHAR(50) NULL AFTER source_reference,
     ADD COLUMN item_name VARCHAR(150) NULL AFTER resource_type,
     ADD COLUMN unit VARCHAR(50) NULL AFTER quantity,
     ADD COLUMN validation_status VARCHAR(30) NOT NULL DEFAULT 'needs_validation' AFTER status_id,
     ADD COLUMN validation_notes TEXT NULL AFTER validation_status,
     ADD COLUMN validated_by_user_id VARCHAR(255) NULL AFTER validation_notes,
     ADD COLUMN validated_at DATETIME NULL AFTER validated_by_user_id,
-    ADD COLUMN forwarded_to_system VARCHAR(80) NULL AFTER validated_at,
-    ADD COLUMN forwarded_at DATETIME NULL AFTER forwarded_to_system,
-    ADD COLUMN trackingaid_reference VARCHAR(120) NULL AFTER forwarded_at;
+    ADD COLUMN released_for_tracking_at DATETIME NULL AFTER validated_at,
+    ADD COLUMN tracking_reference VARCHAR(120) NULL AFTER released_for_tracking_at;
 
 CREATE TABLE IF NOT EXISTS request_validations (
     validation_id INT NOT NULL AUTO_INCREMENT,
@@ -331,42 +320,19 @@ CREATE TABLE IF NOT EXISTS request_validations (
 -- CREATE INDEX idx_request_validations_status ON request_validations (validation_status);
 
 -- ============================================================
--- N. Data source and integration tracking
--- Existing related tables: data_sources, import_logs, csv_uploads
--- New integration_logs is still needed because TrackingAid forwarding is outbound.
+-- N. Source/provider logging decision
+-- No integration_logs table for version 1.
+-- Shared capstone modules use the same database, so there is no separate
+-- inter-system API handoff to log.
+--
+-- Weather provider details:
+-- Store PAGASA/OpenMeteo source information in weather_logs.source_name,
+-- weather_logs.source_url, and weather_logs.raw_payload.
+--
+-- Push provider details:
+-- Store ExpoPush delivery information in notifications/notification_logs.
+-- notification_logs already has external_message_id for provider message IDs.
 -- ============================================================
-
-ALTER TABLE data_sources
-    ADD COLUMN system_name VARCHAR(80) NULL AFTER type,
-    ADD COLUMN base_url VARCHAR(255) NULL AFTER system_name,
-    ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER base_url,
-    ADD COLUMN notes TEXT NULL AFTER is_active;
-
-ALTER TABLE import_logs
-    ADD COLUMN module VARCHAR(80) NULL AFTER data_source_id,
-    ADD COLUMN external_reference VARCHAR(120) NULL AFTER module,
-    ADD COLUMN raw_payload JSON NULL AFTER external_reference;
-
-CREATE TABLE IF NOT EXISTS integration_logs (
-    integration_log_id INT NOT NULL AUTO_INCREMENT,
-    system_name VARCHAR(80) NOT NULL,
-    direction VARCHAR(20) NOT NULL,
-    module VARCHAR(80) NOT NULL,
-    reference_table VARCHAR(80) NULL,
-    reference_id VARCHAR(255) NULL,
-    external_reference VARCHAR(120) NULL,
-    status VARCHAR(30) NOT NULL DEFAULT 'pending',
-    request_payload JSON NULL,
-    response_payload JSON NULL,
-    error_message TEXT NULL,
-    processed_at DATETIME NULL,
-    created_at DATETIME NULL,
-    updated_at DATETIME NULL,
-    PRIMARY KEY (integration_log_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- direction examples: inbound, outbound
--- system_name examples: SafeTrack, EvaTrack, TrackingAid, PAGASA, OpenMeteo, ExpoPush
 
 -- ============================================================
 -- O. Audit logs
