@@ -81,21 +81,32 @@ Status: done.
 
 ### 2. Backend Auth and Roles
 
-- [ ] Update `User` model for existing `users.user_id`
-- [ ] Add `Role` model for existing `roles.role_id`
-- [ ] Confirm existing users/roles column names
-- [ ] Decide final login identifier: username, email, or both
-- [ ] Create `AuthController`
-- [ ] Create `LoginRequest`
-- [ ] Create `UserResource`
-- [ ] Add login endpoint: `POST /api/v1/auth/login`
-- [ ] Add logout endpoint: `POST /api/v1/auth/logout`
-- [ ] Add current user endpoint: `GET /api/v1/auth/me`
-- [ ] Add role middleware
-- [ ] Protect API routes using Sanctum
+- [x] Update `User` model for existing `users.user_id`
+- [x] Add `Role` model for existing `roles.role_id`
+- [x] Confirm existing users/roles column names
+- [x] Decide final login identifier: username or email
+- [x] Create `AuthController`
+- [x] Create `LoginRequest`
+- [x] Create `UserResource`
+- [x] Add login endpoint: `POST /api/v1/auth/login`
+- [x] Add logout endpoint: `POST /api/v1/auth/logout`
+- [x] Add current user endpoint: `GET /api/v1/auth/me`
+- [x] Add role middleware
+- [x] Protect API routes using Sanctum
 - [ ] Test login with existing DB user
 
-Status: next task.
+Existing DB role keys:
+
+```text
+super_admin
+evac_admin
+evac_personnel
+admin
+rescuer
+household_resident
+```
+
+Status: mostly done. Needs a known active user credential for final login test.
 
 ### 3. Database Migrations / DB Alignment
 
@@ -333,21 +344,18 @@ Status: not started.
 
 ## Next Thing To Do
 
-The next development task is:
+The current development task is:
 
 ```text
-Backend Auth and Roles, using the existing shared DB structure.
+Finish Backend Auth and Roles verification.
 ```
 
-Before writing the auth endpoints, first align Laravel models with the shared DB:
+Completed:
 
-1. Update `User` model to use `user_id`.
-2. Create `Role` model to use `role_id`.
-3. Confirm the role values in the `roles` table.
-4. Confirm login should use `username` and/or `email`.
-5. Do not run migrations yet.
-
-After that, build:
+- `User` model now uses `user_id`.
+- `Role` model now uses `role_id`.
+- Login accepts username or email.
+- Auth endpoints exist:
 
 ```text
 POST /api/v1/auth/login
@@ -355,3 +363,8 @@ POST /api/v1/auth/logout
 GET  /api/v1/auth/me
 ```
 
+Still needed:
+
+1. Test login with a known active DB user.
+2. Keep migrations paused while the DB member works.
+3. After auth is verified, start the Web App Shell.
