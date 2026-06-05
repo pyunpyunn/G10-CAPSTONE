@@ -114,29 +114,32 @@ export default function ArchivePage() {
         </div>
       </div>
 
-      <ArchiveFilters
-        search={search}
-        onSearchChange={setSearch}
-        purok={purok}
-        onPurokChange={setPurok}
-        eventId={eventId}
-        onEventChange={setEventId}
-        status={status}
-        onStatusChange={setStatus}
-        filters={filters}
-      />
-
-      {message && <div className="rr-message archive-message">{message}</div>}
       {isLoading && <LoadingState message="Loading archive records..." />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && (
-        <ArchiveTable
-          category={activeCategory}
-          records={records}
-          pagination={pagination}
-          onView={setSelectedRecord}
-        />
+        <>
+          <ArchiveFilters
+            search={search}
+            onSearchChange={setSearch}
+            purok={purok}
+            onPurokChange={setPurok}
+            eventId={eventId}
+            onEventChange={setEventId}
+            status={status}
+            onStatusChange={setStatus}
+            filters={filters}
+          />
+
+          {message && <div className="rr-message archive-message">{message}</div>}
+
+          <ArchiveTable
+            category={activeCategory}
+            records={records}
+            pagination={pagination}
+            onView={setSelectedRecord}
+          />
+        </>
       )}
 
       <ArchiveRecordModal

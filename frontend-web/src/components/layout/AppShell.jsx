@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
-export default function AppShell({ user, pages, onLogout }) {
+export default function AppShell({ user, pages, onLogout, onUserChange }) {
   const [isPinned, setIsPinned] = useState(false)
   const [isPeeking, setIsPeeking] = useState(false)
   const shellClass = [
@@ -24,7 +24,7 @@ export default function AppShell({ user, pages, onLogout }) {
       />
       <Topbar user={user} />
       <main className="main">
-        <Outlet />
+        <Outlet context={{ user, onUserChange }} />
       </main>
     </div>
   )

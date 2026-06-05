@@ -14,7 +14,9 @@ import DashboardPage from './pages/DashboardPage'
 import HouseholdStatusPage from './pages/HouseholdStatusPage'
 import LoginPage from './pages/LoginPage'
 import MappingPage from './pages/MappingPage'
+import NotificationsPage from './pages/NotificationsPage'
 import PlaceholderPage from './pages/PlaceholderPage'
+import ProfilePage from './pages/ProfilePage'
 import ResourcesRequestsPage from './pages/ResourcesRequestsPage'
 import RescuerAccountsPage from './pages/RescuerAccountsPage'
 import RescueDispatchPage from './pages/RescueDispatchPage'
@@ -180,7 +182,7 @@ function AuthRoutes() {
         path="/"
         element={
           <ProtectedRoute user={user}>
-            <AppShell user={user} pages={modulePages} onLogout={handleLogout} />
+            <AppShell user={user} pages={modulePages} onLogout={handleLogout} onUserChange={setUser} />
           </ProtectedRoute>
         }
       >
@@ -216,6 +218,8 @@ function AuthRoutes() {
             }
           />
         ))}
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />

@@ -209,30 +209,30 @@ export default function HouseholdStatusPage() {
         <span>Latest row per household - History on open</span>
       </div>
 
-      {!hasActiveEvent && !isLoading && (
-        <div className="standby-strip hh-standby-strip">
-          <strong>No active disaster event</strong>
-          <span>Household reporting starts only after HQ/Admin declares and broadcasts an active event.</span>
-        </div>
-      )}
-
-      <HouseholdSummary summary={summary} />
-      <HouseholdFilters
-        searchText={searchText}
-        purok={purok}
-        status={status}
-        summary={summary}
-        puroks={puroks}
-        onSearchTextChange={setSearchText}
-        onPurokChange={changePurok}
-        onStatusChange={changeStatusFilter}
-      />
-
       {isLoading && <LoadingState message="Loading household status..." />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && (
         <>
+          {!hasActiveEvent && (
+            <div className="standby-strip hh-standby-strip">
+              <strong>No active disaster event</strong>
+              <span>Household reporting starts after HQ/Admin broadcasts an active event.</span>
+            </div>
+          )}
+
+          <HouseholdSummary summary={summary} />
+          <HouseholdFilters
+            searchText={searchText}
+            purok={purok}
+            status={status}
+            summary={summary}
+            puroks={puroks}
+            onSearchTextChange={setSearchText}
+            onPurokChange={changePurok}
+            onStatusChange={changeStatusFilter}
+          />
+
           <HouseholdTable households={households} meta={meta} onOpen={openHousehold} onPageChange={setPage} />
           <HouseholdOpsPanels activities={payload?.recent_activity || []} rows={payload?.purok_summary || []} />
         </>

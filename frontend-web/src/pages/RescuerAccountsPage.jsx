@@ -206,24 +206,24 @@ export default function RescuerAccountsPage() {
         </div>
       </div>
 
-      <RescuerNotice />
-      <RescuerStats summary={summary} />
-
-      <RescuerFilters
-        search={search}
-        onSearchChange={setSearch}
-        purok={purok}
-        onPurokChange={setPurok}
-        puroks={filters.puroks || []}
-        activeChip={activeChip}
-        onChipChange={setActiveChip}
-      />
-
       {isLoading && <LoadingState message="Loading verified rescuer roster..." />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && (
         <>
+          <RescuerNotice />
+          <RescuerStats summary={summary} />
+
+          <RescuerFilters
+            search={search}
+            onSearchChange={setSearch}
+            purok={purok}
+            onPurokChange={setPurok}
+            puroks={filters.puroks || []}
+            activeChip={activeChip}
+            onChipChange={setActiveChip}
+          />
+
           <RescuerRosterTable
             rescuers={rescuers}
             pagination={pagination}

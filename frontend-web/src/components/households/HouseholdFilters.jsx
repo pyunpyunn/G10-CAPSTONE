@@ -31,16 +31,13 @@ export default function HouseholdFilters({
         ))}
       </select>
 
-      {statusFilters.map((filter) => (
-        <button
-          className={`hh-filter-chip ${status === filter.key ? 'active' : ''} ${filter.urgent ? 'urgent' : ''}`}
-          type="button"
-          key={filter.key}
-          onClick={() => onStatusChange(filter.key)}
-        >
-          {filter.label} ({summary[filter.countKey] || 0})
-        </button>
-      ))}
+      <select className="hh-filter-select" value={status} onChange={(event) => onStatusChange(event.target.value)} aria-label="Filter households by status">
+        {statusFilters.map((filter) => (
+          <option key={filter.key} value={filter.key}>
+            {filter.label} ({summary[filter.countKey] || 0})
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

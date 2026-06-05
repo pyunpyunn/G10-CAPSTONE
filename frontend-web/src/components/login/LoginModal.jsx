@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { LogIn, X } from 'lucide-react'
+import { Eye, EyeOff, LogIn, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 
 export default function LoginModal({ error, onClose, onLogin }) {
   const [form, setForm] = useState({ login: '', password: '' })
   const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -51,15 +52,26 @@ export default function LoginModal({ error, onClose, onLogin }) {
             aria-label="Account ID"
             autoComplete="username"
           />
-          <input
-            type="password"
-            name="password"
-            value={form.password}
-            onChange={updateField}
-            placeholder="Password"
-            aria-label="Password"
-            autoComplete="current-password"
-          />
+          <div className="login-password-field">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              value={form.password}
+              onChange={updateField}
+              placeholder="Password"
+              aria-label="Password"
+              autoComplete="current-password"
+            />
+            <button
+              className="login-password-toggle"
+              type="button"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              title={showPassword ? 'Hide password' : 'Show password'}
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
           <div className="login-note">
             Role access is automatically matched from the account ID, such as HQ/Admin,
             Rescuer, or Household.

@@ -18,7 +18,7 @@ class NotificationController extends Controller
     {
         $status = $this->statusFilter((string) $request->query('status', 'all'));
         $page = max(1, (int) $request->query('page', 1));
-        $allItems = $this->notificationFeed();
+        $allItems = $this->applySavedViewState($this->notificationFeed(), $request);
         $filteredItems = $this->filterByStatus($allItems, $status);
         $pageCount = max(1, (int) ceil($filteredItems->count() / self::PAGE_SIZE));
         $page = min($page, $pageCount);
@@ -51,8 +51,20 @@ class NotificationController extends Controller
 
     public function markRead(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'notification_ids' => ['nullable', 'array'],
+            'notification_ids.*' => ['string', 'max:120'],
+        ]);
+        $selectedIds = $validated['notification_ids'] ?? [];
+
+        if (count($selectedIds) === 0) {
+            $selectedIds = $this->applySavedViewState($this->notificationFeed(), $request)
+                ->pluck('id')
+                ->all();
+        }
+
         $this->writeAuditLog($request, 'mark_read', [
-            'selected_ids' => $request->input('notification_ids', []),
+            'selected_ids' => $selectedIds,
         ]);
 
         return response()->json([
@@ -88,8 +100,13 @@ class NotificationController extends Controller
 
     public function clearAll(Request $request): JsonResponse
     {
+        $hiddenIds = $this->applySavedViewState($this->notificationFeed(), $request)
+            ->pluck('id')
+            ->all();
+
         $this->writeAuditLog($request, 'clear_all', [
             'scope' => 'current_hq_view',
+            'hidden_ids' => $hiddenIds,
         ]);
 
         return response()->json([
@@ -297,6 +314,7 @@ class NotificationController extends Controller
         }
 
         return DB::table('audit_logs')
+            ->where('module', '<>', 'notifications')
             ->orderByDesc('created_at')
             ->limit(12)
             ->get()
@@ -323,6 +341,120 @@ class NotificationController extends Controller
         }
 
         return $items;
+    }
+
+    private function applySavedViewState(Collection $items, Request $request): Collection
+    {
+        $state = $this->savedViewState($request);
+
+        if ($state['empty']) {
+            return $items;
+        }
+
+        return $items
+            ->filter(function (array $item) use ($state): bool {
+                if ($state['clear_all_time'] && $item['sort_time'] <= $state['clear_all_time']) {
+                    return false;
+                }
+
+                return ! in_array($item['id'], $state['hidden_ids'], true);
+            })
+            ->map(function (array $item) use ($state): array {
+                if ($state['mark_all_read_time'] && $item['sort_time'] <= $state['mark_all_read_time']) {
+                    $item['read'] = true;
+                }
+
+                if (in_array($item['id'], $state['read_ids'], true)) {
+                    $item['read'] = true;
+                }
+
+                return $item;
+            })
+            ->values();
+    }
+
+    private function savedViewState(Request $request): array
+    {
+        if (! Schema::hasTable('audit_logs') || ! $request->user()) {
+            return [
+                'empty' => true,
+                'read_ids' => [],
+                'hidden_ids' => [],
+                'mark_all_read_time' => null,
+                'clear_all_time' => null,
+            ];
+        }
+
+        $rows = DB::table('audit_logs')
+            ->where('user_id', $request->user()->user_id)
+            ->where('module', 'notifications')
+            ->whereIn('action', ['mark_read', 'delete_selected', 'clear_all'])
+            ->orderBy('created_at')
+            ->get(['action', 'new_values', 'created_at']);
+        $readIds = [];
+        $hiddenIds = [];
+        $markAllReadTime = null;
+        $clearAllTime = null;
+
+        foreach ($rows as $row) {
+            $values = $this->decodeJson($row->new_values);
+            $time = Carbon::parse($row->created_at)->timestamp;
+
+            if ($row->action === 'mark_read') {
+                $selectedIds = $this->idList($values['selected_ids'] ?? []);
+
+                if (count($selectedIds) === 0) {
+                    $markAllReadTime = $time;
+                } else {
+                    $readIds = array_values(array_unique([...$readIds, ...$selectedIds]));
+                }
+            }
+
+            if ($row->action === 'delete_selected') {
+                $selectedIds = $this->idList($values['selected_ids'] ?? []);
+                $hiddenIds = array_values(array_unique([...$hiddenIds, ...$selectedIds]));
+            }
+
+            if ($row->action === 'clear_all') {
+                $selectedIds = $this->idList($values['hidden_ids'] ?? []);
+                $hiddenIds = array_values(array_unique([...$hiddenIds, ...$selectedIds]));
+
+                if (count($selectedIds) === 0) {
+                    $clearAllTime = $time;
+                }
+            }
+        }
+
+        return [
+            'empty' => false,
+            'read_ids' => $readIds,
+            'hidden_ids' => $hiddenIds,
+            'mark_all_read_time' => $markAllReadTime,
+            'clear_all_time' => $clearAllTime,
+        ];
+    }
+
+    private function decodeJson(?string $value): array
+    {
+        if (! $value) {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function idList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return collect($value)
+            ->filter(fn (mixed $item): bool => is_string($item) && trim($item) !== '')
+            ->values()
+            ->all();
     }
 
     private function notice(string $id, string $type, string $priority, string $title, string $body, mixed $time, bool $read): array

@@ -29,18 +29,19 @@ export default function ResourceRequestFilters({
           <option value={item} key={item}>{item}</option>
         ))}
       </select>
-      <div className="filter-chip-row">
+
+      <select
+        className="filter-select"
+        value={activeChip}
+        aria-label="Filter requests by validation status or category"
+        onChange={(event) => onChipChange(event.target.value)}
+      >
         {requestChips.map((chip) => (
-          <button
-            className={`filter-chip ${activeChip === chip.key ? 'active' : ''}`}
-            type="button"
-            key={chip.key}
-            onClick={() => onChipChange(chip.key)}
-          >
+          <option value={chip.key} key={chip.key}>
             {chip.label}
-          </button>
+          </option>
         ))}
-      </div>
+      </select>
     </div>
   )
 }

@@ -52,10 +52,10 @@ function SourceRule({ autoRefresh }) {
         <Badge tone="blue">Auto</Badge>
       </div>
       <div className="wx-source-note">
-        Numeric forecast snapshots are saved from {autoRefresh?.source || 'Open-Meteo Forecast API'} every 3 hours through Laravel Scheduler.
+        {autoRefresh?.source || 'Open-Meteo Forecast API'} refreshes every 3 hours.
       </div>
       <div className="wx-source-note">
-        Confirm official warnings through PAGASA before broadcasting.
+        Confirm PAGASA warnings before broadcasting.
       </div>
     </section>
   )
@@ -82,7 +82,7 @@ function AlertHistory({ logs }) {
         </div>
       )}
       <div className="wx-source-note">
-        Later, if PAGASA gives the Ten-Day API token, Laravel can add PAGASA as another backend source without changing the frontend workflow.
+        PAGASA Ten-Day API can be added after token approval.
       </div>
     </section>
   )

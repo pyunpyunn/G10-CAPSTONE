@@ -4,7 +4,6 @@ export default function LoadingState({ message = 'Loading...' }) {
       <div className="page-loading-spinner" aria-hidden="true" />
       <div>
         <div className="page-loading-title">{message}</div>
-        <div className="page-loading-sub">Fetching live RESQPERATION records from the server.</div>
       </div>
       <div className="page-loading-skeleton" aria-hidden="true">
         <span />

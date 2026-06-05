@@ -5,9 +5,9 @@ export default function ResourceRequestNotice({ note }) {
     <div className="rr-note">
       <span>
         <ShieldCheck size={16} />
-        {note || 'RESQPERATION validates requests only. TrackingAid owns release and delivery after handoff.'}
+        {note || 'Validate before TrackingAid handoff.'}
       </span>
-      <strong>Shared DB - no duplicate system log</strong>
+      <strong>Shared DB</strong>
     </div>
   )
 }

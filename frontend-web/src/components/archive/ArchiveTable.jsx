@@ -15,7 +15,6 @@ export default function ArchiveTable({ category, records = [], pagination = {}, 
         <div className="tbl-head-row archive-table-head">
           <div>
             <span className="tbl-title">{copy.title}</span>
-            <span className="archive-table-subtitle">{copy.subtitle}</span>
           </div>
           <span className="archive-table-count">{total ? `Showing ${from}-${to} of ${total}` : 'No records yet'}</span>
         </div>
@@ -37,7 +36,7 @@ export default function ArchiveTable({ category, records = [], pagination = {}, 
               records.map((record) => (
                 <tr key={`${category}-${record.id}`} data-archive-row>
                   {columns.map((column) => (
-                    <td key={column.key}>{renderCell(record[column.key])}</td>
+                    <td key={column.key}>{renderCell(record[column.key], column.key, category)}</td>
                   ))}
                   <td>
                     <button className="btn btn-secondary btn-sm archive-view-button" type="button" onClick={() => onView(record)}>
@@ -55,7 +54,7 @@ export default function ArchiveTable({ category, records = [], pagination = {}, 
   )
 }
 
-function renderCell(value) {
+function renderCell(value, columnKey = '', category = '') {
   if (!value) {
     return 'Not recorded'
   }
@@ -69,13 +68,33 @@ function renderCell(value) {
   }
 
   if (value.title || value.meta) {
+    const meta = compactMeta(value.meta, columnKey, category)
+
     return (
       <>
         {value.title && <div className="archive-record-title">{value.title}</div>}
-        {value.meta && <div className="archive-record-meta">{value.meta}</div>}
+        {meta && <div className="archive-record-meta">{meta}</div>}
       </>
     )
   }
 
   return String(value)
+}
+
+function compactMeta(meta, columnKey, category) {
+  if (!meta) {
+    return ''
+  }
+
+  if (category === 'disaster-events' && ['period', 'broadcasts'].includes(columnKey)) {
+    return ''
+  }
+
+  const text = String(meta)
+
+  if (text.length <= 72) {
+    return text
+  }
+
+  return `${text.slice(0, 69).trim()}...`
 }

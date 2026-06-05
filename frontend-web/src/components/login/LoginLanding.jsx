@@ -2,7 +2,6 @@ import {
   CloudSun,
   Database,
   House,
-  LockKeyhole,
   Map,
   Radio,
   Route,
@@ -12,7 +11,7 @@ import {
 const featureCards = [
   {
     title: 'Disaster broadcasting',
-    text: 'Critical alerts, purok targeting, evacuation instructions, and mobile notification support.',
+    text: 'Critical alerts, purok targeting, evacuation instructions, and mobile push notification support.',
     Icon: Radio,
   },
   {
@@ -37,7 +36,7 @@ const featureCards = [
   },
   {
     title: 'Archive and reports',
-    text: 'Disaster duration, casualties, requests, resources, damage notes, and situation reports.',
+    text: 'Disaster duration, casualties, missing and injured counts, property damage, and situation reports.',
     Icon: Database,
   },
 ]
@@ -62,16 +61,20 @@ export default function LoginLanding({ onOpenLogin }) {
             <a href="#contact">Contact</a>
           </nav>
 
-          <button className="primary-button" type="button" onClick={onOpenLogin}>
-            Sign in
-          </button>
+          <div className="landing-actions">
+            <button className="primary-button" type="button" onClick={onOpenLogin}>
+              Sign in
+            </button>
+          </div>
         </div>
       </header>
 
       <HeroSection onOpenLogin={onOpenLogin} />
       <WorkflowSection />
       <BasisSection />
+      <SdgSection />
       <FeatureSection />
+      <VisualPanelsSection />
       <ContactSection />
       <LandingFooter />
     </main>
@@ -150,7 +153,7 @@ function WorkflowSection() {
         <div className="workflow-grid">
           <StepCard number="01" title="Declare event" text="Open an active disaster record and reset household status to unchecked for a clean operation cycle." />
           <StepCard number="02" title="Broadcast alert" text="Send barangay-wide or purok-specific instructions to households and rescue mobile users." />
-          <StepCard number="03" title="Collect reports" text="Track household status reports from verified accounts and authenticated responders." />
+          <StepCard number="03" title="Collect reports" text="Track safe, evacuated, unsafe, injured, missing, and unchecked households from verified accounts." />
           <StepCard number="04" title="Dispatch and archive" text="Assign teams, monitor requests and resources, then close the event with a situation report." />
         </div>
       </div>
@@ -164,14 +167,44 @@ function BasisSection() {
       <div className="landing-wrap">
         <div className="section-heading">
           <h2>Built around Philippine DRRM practice</h2>
-          <p>Local risk information, warning, response coordination, and recovery reporting guide the workflow.</p>
+          <p>The landing copy is based on official DRRM roles, local risk information, early warning, response coordination, and recovery reporting.</p>
         </div>
 
         <div className="pillar-grid">
-          <StepCard number="PM" title="Prevention and Mitigation" text="Risk maps and archived records help identify repeated vulnerabilities." />
+          <StepCard number="PM" title="Prevention and Mitigation" text="Risk maps, household status patterns, and archived records help identify repeated vulnerabilities." />
           <StepCard number="PR" title="Preparedness" text="Broadcasts, evacuation routes, resource visibility, and assigned accounts support readiness." />
           <StepCard number="RS" title="Response" text="Dispatch tracking connects household reports with rescue teams, medical aid, evacuation, and resources." />
           <StepCard number="RR" title="Rehabilitation and Recovery" text="Situation reporting and archives preserve casualties, damage, resource actions, and timelines." />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function SdgSection() {
+  return (
+    <section className="section" aria-labelledby="sdg-title">
+      <div className="landing-wrap">
+        <div className="sdg-band">
+          <div>
+            <div className="sdg-mark">11</div>
+            <h2 id="sdg-title">Supports SDG 11: resilient communities</h2>
+            <p>SDG 11 includes local disaster risk reduction strategies. RESQPERATION supports that goal by helping barangays organize response data, warnings, evacuation status, and post-disaster records.</p>
+          </div>
+          <div className="sdg-list">
+            <div>
+              <strong>Local strategy support</strong>
+              Links household reporting, mapping, dispatching, and records in one barangay-level workflow.
+            </div>
+            <div>
+              <strong>Inclusive response view</strong>
+              Helps the command desk see unchecked households and urgent status reports during operations.
+            </div>
+            <div>
+              <strong>Evidence for planning</strong>
+              Archived events can support future drills, resource requests, and evacuation improvements.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -203,6 +236,58 @@ function FeatureSection() {
   )
 }
 
+function VisualPanelsSection() {
+  return (
+    <section className="section" aria-labelledby="visuals-title">
+      <div className="landing-wrap">
+        <div className="section-heading">
+          <h2 id="visuals-title">Operational picture panels</h2>
+          <p>Original prototype visuals are used here instead of copyrighted photographs or agency logos.</p>
+        </div>
+
+        <div className="photo-grid">
+          <article className="soft-card visual-card">
+            <div className="visual-scene command" role="img" aria-label="Original command desk dashboard visual">
+              <div className="screen-block" />
+            </div>
+            <div className="visual-card-content">
+              <h3>Command desk view</h3>
+              <p>Dashboard status, requests, resources, and dispatch activity in one headquarters view.</p>
+            </div>
+          </article>
+          <article className="soft-card visual-card">
+            <div className="visual-scene evacuation" role="img" aria-label="Original evacuation route map visual">
+              <div className="route-block">
+                <span className="route-dot one" />
+                <span className="route-dot two" />
+                <span className="route-dot three" />
+              </div>
+            </div>
+            <div className="visual-card-content">
+              <h3>Evacuation and routing</h3>
+              <p>Compact pins and route lines keep maps usable even with many households.</p>
+            </div>
+          </article>
+          <article className="soft-card visual-card">
+            <div className="visual-scene mobile" role="img" aria-label="Original mobile household status report visual">
+              <div className="phone-block">
+                <span className="phone-line" />
+                <span className="phone-line" />
+                <span className="phone-line" />
+                <span className="phone-line" />
+              </div>
+            </div>
+            <div className="visual-card-content">
+              <h3>Mobile status reports</h3>
+              <p>Households and rescuers submit field information that updates the command dashboard.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function ContactSection() {
   return (
     <section className="section" id="contact">
@@ -221,10 +306,10 @@ function ContactSection() {
                 </div>
               </div>
               <div className="contact-item">
-                <div className="contact-icon"><LockKeyhole size={18} /></div>
+                <div className="contact-icon"><Radio size={18} /></div>
                 <div>
-                  <strong>Credential-based access only</strong>
-                  <span>No public registration. Accounts are role-based.</span>
+                  <strong>System demo and coordination</strong>
+                  <span>Available for BDRRMO and barangay response walkthroughs</span>
                 </div>
               </div>
             </div>
@@ -249,12 +334,12 @@ function LandingFooter() {
   return (
     <footer className="landing-footer">
       <div className="landing-wrap footer-inner">
-        <span>RESQPERATION capstone prototype. Original UI visuals, no public registration.</span>
+        <span>RESQPERATION capstone prototype. Original UI visuals, no public registration, credential-based access only.</span>
         <div className="footer-links" aria-label="Reference links">
-          <a href="#basis">RA 10121</a>
-          <a href="#basis">NDRRMP 2020-2030</a>
-          <a href="#features">PAGASA</a>
-          <a href="#features">SDG 11</a>
+          <a href="https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/2/21121" target="_blank" rel="noreferrer">RA 10121</a>
+          <a href="https://www.preventionweb.net/publication/policies-and-plans/philippines-national-disaster-risk-reduction-and-management-plan" target="_blank" rel="noreferrer">NDRRMP 2020-2030</a>
+          <a href="https://pagasa.dost.gov.ph/products-and-services" target="_blank" rel="noreferrer">PAGASA</a>
+          <a href="https://sdgs.un.org/goals/goal11" target="_blank" rel="noreferrer">SDG 11</a>
         </div>
       </div>
     </footer>

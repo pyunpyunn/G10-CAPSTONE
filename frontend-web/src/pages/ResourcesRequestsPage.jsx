@@ -254,35 +254,38 @@ export default function ResourcesRequestsPage() {
         </div>
       </div>
 
-      <ResourceRequestNotice note={payload?.scope_note} />
-      <ResourceRequestStats summary={payload?.summary} />
-
-      <ResourceRequestFilters
-        search={search}
-        onSearchChange={setSearch}
-        purok={purok}
-        onPurokChange={setPurok}
-        puroks={options.puroks || []}
-        activeChip={activeChip}
-        onChipChange={setActiveChip}
-      />
-
-      {message && <div className="rr-message">{message}</div>}
       {isLoading && <LoadingState message="Loading resource requests..." />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && (
-        <div className="rr-layout">
-          <ResourceRequestQueueTable
-            requests={requests}
-            pagination={pagination}
-            onView={(request) => openExistingModal(request, 'view')}
-            onValidate={(request) => openExistingModal(request, 'edit')}
-            onForward={handleRowForward}
-            onReturn={(request) => openExistingModal(request, 'edit', 'returned', 'Add the return reason before saving.')}
+        <>
+          <ResourceRequestNotice note={payload?.scope_note} />
+          <ResourceRequestStats summary={payload?.summary} />
+
+          <ResourceRequestFilters
+            search={search}
+            onSearchChange={setSearch}
+            purok={purok}
+            onPurokChange={setPurok}
+            puroks={options.puroks || []}
+            activeChip={activeChip}
+            onChipChange={setActiveChip}
           />
-          <TrackingAidMirror items={payload?.tracking_mirror || []} />
-        </div>
+
+          {message && <div className="rr-message">{message}</div>}
+
+          <div className="rr-layout">
+            <ResourceRequestQueueTable
+              requests={requests}
+              pagination={pagination}
+              onView={(request) => openExistingModal(request, 'view')}
+              onValidate={(request) => openExistingModal(request, 'edit')}
+              onForward={handleRowForward}
+              onReturn={(request) => openExistingModal(request, 'edit', 'returned', 'Add the return reason before saving.')}
+            />
+            <TrackingAidMirror items={payload?.tracking_mirror || []} />
+          </div>
+        </>
       )}
 
       <ResourceValidationModal

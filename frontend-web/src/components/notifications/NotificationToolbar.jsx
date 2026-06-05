@@ -6,6 +6,7 @@ export default function NotificationToolbar({
   onMarkAllRead,
   onDeleteSelected,
   onClearAll,
+  disabled = false,
 }) {
   return (
     <div className="page-ops-row">
@@ -22,15 +23,15 @@ export default function NotificationToolbar({
         </select>
       </div>
       <div className="right">
-        <button className="btn btn-secondary btn-sm" type="button" onClick={onMarkAllRead}>
+        <button className="btn btn-secondary btn-sm" type="button" disabled={disabled} onClick={onMarkAllRead}>
           <CheckCircle2 size={14} />
           Mark all read
         </button>
-        <button className="btn btn-secondary btn-sm" type="button" onClick={onDeleteSelected}>
+        <button className="btn btn-secondary btn-sm" type="button" disabled={disabled} onClick={onDeleteSelected}>
           <X size={14} />
           Delete selected
         </button>
-        <button className="btn btn-danger btn-sm" type="button" onClick={onClearAll}>
+        <button className="btn btn-danger btn-sm" type="button" disabled={disabled} onClick={onClearAll}>
           <X size={14} />
           Clear all
         </button>

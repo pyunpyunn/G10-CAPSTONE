@@ -311,6 +311,19 @@ Status: v1 done for live HQ/Admin Situation Reporting. The backend reuses the ex
 
 Status: v1 done for live HQ/Admin Archive. The backend reuses existing shared DB records only: `disaster_events`, `disaster_broadcasts`, `weather_logs`, `household_status_logs`, `household_disasters`, `responder_assignments`, `resource_requests`, `request_validations`, `situation_reports`, `incident_archives`, and related lookup tables. No migrations were run and no schema was changed. Archive endpoints now support tab-specific loading, search, event, purok, status filters, pagination, and CSV export. The frontend uses feature-based component splitting for tabs, filters, download menu, archive table, and record modal. Live DB read-only testing passed for all five archive categories and CSV export. PDF export is intentionally left for the later PDF package step.
 
+### 16.1 Notifications and HQ Profile
+
+- [x] Proper shared page loading screen
+- [x] Notification bell preview
+- [x] Notifications page with all/unread/read filter
+- [x] Mark all read, delete selected, and clear current HQ view actions
+- [x] Profile page
+- [x] Edit profile modal
+- [x] Change password modal
+- [x] Feature-based component split
+
+Status: v1 done for live HQ/Admin Notifications and Profile. The backend reuses existing shared DB tables only: `notifications`, `notification_logs`, `notification_recipients`, `household_status_logs`, `responder_assignments`, `resource_requests`, `weather_logs`, `disaster_broadcasts`, `audit_logs`, `users`, and `personal_access_tokens`. No migrations were run and no schema was changed. Notification actions are intentionally audit-logged only and do not delete delivery logs or broadcast records. Profile editing updates the authenticated HQ/Admin user in `users`, while barangay deployment settings still depend on the separate `barangay_profiles` proposal.
+
 ### 17. Mobile Household
 
 - [x] Decide whether to keep Expo Router/TypeScript or simplify to JavaScript screens

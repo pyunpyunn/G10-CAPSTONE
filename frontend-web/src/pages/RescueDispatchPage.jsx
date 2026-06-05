@@ -238,52 +238,48 @@ export default function RescueDispatchPage() {
         }
       />
 
-      {!hasActiveEvent && !isLoading && (
-        <div className="standby-strip">
-          <strong>No active disaster event</strong>
-          <span>New dispatch assignments are enabled only after HQ/Admin declares an active event.</span>
-        </div>
-      )}
+      {isLoading && <LoadingState message="Loading dispatch teams..." />}
+      {error && <div className="form-error">{error}</div>}
 
-      <DispatchSummary summary={summary} />
-
-      <div className="dp-dispatch-layout">
-        <DispatchSidePanel
-          teams={teams}
-          responders={responders}
-          logs={payload?.activity_log || []}
-          dispatches={dispatches}
-          filter={dispatchFilter}
-          setFilter={setDispatchFilter}
-          searchText={searchText}
-          setSearchText={setSearchText}
-          onSearch={loadDispatch}
-        />
-
-        <main className="dp-main-column dp-team-side-panel">
-          <div className="dp-team-toolbar">
-            <span>Team status cards</span>
-            <div className="dp-filter-chip-row">
-              {teamFilters.map((filter) => (
-                <button
-                  className={`hh-filter-chip ${teamFilter === filter.key ? 'active' : ''}`}
-                  type="button"
-                  key={filter.key}
-                  onClick={() => setTeamFilter(filter.key)}
-                >
-                  {filter.label}
-                </button>
-              ))}
+      {!isLoading && !error && (
+        <>
+          {!hasActiveEvent && (
+            <div className="standby-strip">
+              <strong>No active disaster event</strong>
+              <span>New dispatch assignments are enabled after HQ/Admin declares an active event.</span>
             </div>
-          </div>
-
-          {isLoading && <LoadingState message="Loading dispatch teams..." />}
-          {error && <div className="form-error">{error}</div>}
-          {!isLoading && !error && (
-            <DispatchTeamGrid teams={filteredTeams} onOpenUpdate={openUpdateDispatch} onOpenNew={openNewDispatch} />
           )}
-        </main>
-      </div>
+
+          <DispatchSummary summary={summary} />
+
+          <div className="dp-dispatch-layout">
+            <DispatchSidePanel
+              teams={teams}
+              responders={responders}
+              logs={payload?.activity_log || []}
+              dispatches={dispatches}
+              filter={dispatchFilter}
+              setFilter={setDispatchFilter}
+              searchText={searchText}
+              setSearchText={setSearchText}
+              onSearch={loadDispatch}
+            />
+
+            <main className="dp-main-column dp-team-side-panel">
+              <div className="dp-team-toolbar">
+                <span>Team status cards</span>
+                <select className="dp-filter-select" value={teamFilter} onChange={(event) => setTeamFilter(event.target.value)} aria-label="Filter team status cards">
+                  {teamFilters.map((filter) => (
+                    <option value={filter.key} key={filter.key}>{filter.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <DispatchTeamGrid teams={filteredTeams} onOpenUpdate={openUpdateDispatch} onOpenNew={openNewDispatch} />
+            </main>
+          </div>
+        </>
+      )}
 
       <Modal
         title={editingDispatch ? 'Update Dispatch' : 'New Dispatch'}
