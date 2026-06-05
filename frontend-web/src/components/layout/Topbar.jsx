@@ -1,8 +1,9 @@
-import { Bell, CheckCircle2, Eye } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { useState } from 'react'
 
 export default function Topbar({ user }) {
   const [isOpen, setIsOpen] = useState(false)
+  const notifications = []
   const roleName = user?.role?.role_name || 'HQ'
   const initials = getInitials(user?.full_name)
 
@@ -24,7 +25,7 @@ export default function Topbar({ user }) {
           onClick={() => setIsOpen(!isOpen)}
         >
           <Bell size={17} />
-          <span className="notification-dot" aria-hidden="true" />
+          {notifications.length > 0 && <span className="notification-dot" aria-hidden="true" />}
         </button>
 
         <button className="header-profile" type="button" title="Profile" aria-label="Profile">
@@ -40,35 +41,13 @@ export default function Topbar({ user }) {
               <Bell size={16} />
               Notifications
             </div>
-            <span className="notification-count-pill">3 unread</span>
+            <span className="notification-count-pill">{notifications.length} unread</span>
           </div>
           <div className="notification-popover-list">
-            <div className="notification-preview-item">
-              <span className="notification-preview-dot" />
-              <div>
-                <div className="notification-preview-title">Unsafe household report</div>
-                <div className="notification-preview-body">Reyes Family, Purok 5. Rescuer flagged for dispatch.</div>
-                <div className="notification-preview-time">Just now</div>
-              </div>
+            <div className="notification-empty">
+              <strong>No notifications yet</strong>
+              <span>Broadcast delivery, household alerts, and request notices will appear here after those modules are connected.</span>
             </div>
-            <div className="notification-preview-item">
-              <span className="notification-preview-dot" />
-              <div>
-                <div className="notification-preview-title">Resource request received</div>
-                <div className="notification-preview-body">Food packs request from evacuation site needs validation.</div>
-                <div className="notification-preview-time">5 min ago</div>
-              </div>
-            </div>
-          </div>
-          <div className="notification-popover-actions">
-            <button className="btn btn-secondary btn-sm" type="button">
-              <CheckCircle2 size={14} />
-              Mark as read
-            </button>
-            <button className="btn btn-primary btn-sm" type="button">
-              <Eye size={14} />
-              View all
-            </button>
           </div>
         </div>
       )}

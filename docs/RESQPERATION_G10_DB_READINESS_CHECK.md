@@ -188,14 +188,40 @@ Status:
 - [x] Latest SQL export reviewed
 - [x] Similar-purpose tables mapped to existing tables
 - [x] Additive SQL proposal created
-- [ ] DB member review complete
-- [ ] Instructor/team approval complete
-- [ ] SQL safely tested on a local copy
-- [ ] SQL applied to shared DB
+- [x] DB member/team review complete for current shared DB scope
+- [x] Live DB schema safety check completed before apply
+- [x] SQL applied to shared DB
+- [ ] Instructor approval complete
+- [ ] SQL safely tested on a separate local copy
 
 ## Important Gaps
 
-The DB has a strong base, but some fields/tables are still needed for the actual RESQPERATION requirements.
+The DB has a strong base, and the current additive update has now added the version 1 fields/tables listed below. Keep this section as the review reference when building Laravel models and module APIs.
+
+### Disaster Broadcasting
+
+Current DB has:
+
+```text
+disaster_broadcasts
+notification_logs
+disaster_events
+```
+
+Applied to the shared DB on 2026-06-03:
+
+- `target_area_label`
+- `direct_impact_puroks_json`
+- `allowed_statuses_json`
+- `recipient_count`
+- `push_status`
+
+Notes:
+
+- No Laravel migration was run for this update.
+- The update was additive only: no table, column, or existing row was deleted.
+- New broadcasts now save direct-impact puroks, selected mobile status buttons, recipient count, and future push status in their intended columns.
+- The old `allowed_statuses` field is kept for backward compatibility and compact display metadata.
 
 ### Household Status
 
@@ -208,7 +234,7 @@ responder_field_reports
 hq_field_reports
 ```
 
-Still needed:
+Added in the current DB update:
 
 - a clear household status history table
 - source tracking for household mobile vs responder field report
@@ -224,7 +250,7 @@ device_tokens
 device_tracking_logs
 ```
 
-Still needed:
+Added in the current DB update:
 
 - device label
 - linked household member
@@ -244,7 +270,7 @@ responders
 rescue_teams
 ```
 
-Still needed:
+Added in the current DB update:
 
 - link responder profile to `users` if one login table will be used
 - emergency contact
@@ -263,7 +289,7 @@ resource_request_status
 urgency_levels
 ```
 
-Still needed:
+Added in the current DB update:
 
 - request source, such as manual entry, household mobile, rescuer mobile, or shared DB request
 - source reference
@@ -288,7 +314,7 @@ The first actual backend task should be:
 Fix backend .env for MySQL, then build auth and roles against the existing users/roles table structure.
 ```
 
-Do not start Household Status, Dispatch, Weather, or Resources controllers until the Laravel models are aligned with the existing DB primary keys.
+Household Status, Dispatch, Weather, and Resources controllers can start after each module model is aligned with the existing DB primary keys and column names.
 
 ## Backend Preparation Checklist
 
@@ -296,11 +322,11 @@ Before coding module APIs:
 
 1. Keep `DB_CONNECTION=mysql` in `backend-laravel/.env`.
 2. Keep `DB_DATABASE=klint` without trailing spaces.
-3. Use `php artisan migrate:status` only to inspect, not migrate.
+3. Use `php artisan migrate:status` to inspect migration state before adding new migrations.
 4. Create or update Laravel models for existing DB tables.
 5. Set each model primary key correctly.
 6. Decide whether all logins use `users`, or whether `responders` remains a separate credential table.
-7. Approve the SQL gap proposal before altering the shared DB.
+7. Keep future schema changes in SQL proposals or migrations for review before altering the shared DB.
 8. Build backend auth and roles.
 9. Add Form Requests and API Resources before module CRUD.
 

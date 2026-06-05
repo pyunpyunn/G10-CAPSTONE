@@ -45,8 +45,11 @@ For local development testing:
 
 ID note:
 
-- The login ID uses the existing 10-digit numeric `username` pattern.
-- Internal `user_id` values use readable prefixes:
+- The temporary seeded test accounts still use the old 10-digit numeric `username` pattern.
+- New HQ-created rescuer accounts now follow the shared DB format `RTR-{TEAM_CODE}-#####`, such as `RTR-SAR-24001`.
+- New rescuer internal `user_id` values use the shared readable prefix:
+  - `USR-RESCUER-RTR-SAR-24001`
+- Older temporary internal `user_id` values remain valid for development testing:
   - `USR-HQ-2024035500`
   - `USR-HH-2024035501`
   - `USR-RSC-2024035502`
@@ -65,19 +68,23 @@ ID note:
 - [x] Mobile login created for household and rescuer roles
 - [x] Web dashboard shell aligned with the HTML prototype header and sidebar behavior
 - [x] API unauthenticated errors return JSON
-- [ ] Latest additive DB update proposal reviewed by DB member
-- [ ] Shared DB gap review approved
-- [ ] Laravel migrations adjusted to the existing shared DB structure
-- [ ] HQ/Admin dashboard API connected to live database data
+- [x] Latest additive DB update proposal reviewed by DB member
+- [x] Shared DB gap review approved for current version 1 scope
+- [x] Additive DB update applied to the shared database
+- [x] Laravel migrations adjusted to the existing shared DB structure
+- [x] Temporary HQ/Admin, household, and rescuer login accounts seeded
+- [x] Shared React web components created
+- [x] HQ/Admin dashboard API connected to live database data
+- [x] Barangay Profile foundation for shared dashboard/weather/map focus
 - [ ] Disaster Broadcasting module backend and frontend
-- [ ] Weather Updates module with API source integration
+- [x] Weather Updates module with Open-Meteo auto snapshots and PAGASA advisory links
 - [ ] Mapping module with actual map and geotagged records
 - [ ] Household Status module backend and frontend
 - [ ] Rescue Dispatch module backend and frontend
-- [ ] Rescuer Accounts module backend and frontend
-- [ ] Resources & Requests module backend and frontend
-- [ ] Situation Reporting module backend and frontend
-- [ ] Archive module backend and frontend
+- [x] Rescuer Accounts module backend and frontend
+- [x] Resources & Requests module backend and frontend
+- [x] Situation Reporting module backend and frontend
+- [x] Archive module backend and frontend
 - [ ] Push notification sending and receiving
 
 ## Current Structure Notes
@@ -105,16 +112,19 @@ Important development rule:
 - Do not use HTML files as the backend.
 - The HTML prototype is only a UI/UX reference.
 - Real development should use Laravel API routes, React pages/components, Expo screens, proper request validation, and JSON responses.
-- Do not run shared database migrations until the DB proposal is reviewed and approved.
+- Do not restore default Laravel migrations that conflict with the shared DB structure.
 
 ## Key Documentation
 
 - `docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md`
 - `docs/RESQPERATION_G10_DB_READINESS_CHECK.md`
+- `docs/RESQPERATION_G10_SAFE_SAMPLE_SEED_PLAN.md`
 - `docs/RESQPERATION_G10_DEVELOPMENT_READINESS_AUDIT.md`
 - `docs/RESQPERATION_G10_BEGINNER_MODULE_PROMPTS.md`
+- `docs/RESQPERATION_BARANGAY_PROFILE_SCOPE.md`
 - `docs/sql_proposals/2026_06_01_g10_all_sql_additive_update.sql`
 - `docs/sql_proposals/2026_06_01_g10_existing_db_gap_review.sql` - superseded historical proposal
+- `docs/sql_proposals/initial/2026_06_03_g10_barangay_profile_review.sql` - review-only Barangay Profile proposal
 
 Private local references:
 
@@ -134,7 +144,17 @@ php artisan serve --host=127.0.0.1 --port=8000
 php artisan test
 php artisan route:list
 php artisan config:clear
+php artisan weather:refresh
+php artisan schedule:list
+php artisan schedule:run
 ```
+
+Weather update note:
+
+- `weather:refresh` saves the latest Open-Meteo snapshot to `weather_logs`.
+- Laravel Scheduler runs `weather:refresh` every 3 hours.
+- On a real deployment machine, configure the server scheduler or Windows Task Scheduler to run `php artisan schedule:run` every minute.
+- PAGASA remains the official warning confirmation source before HQ/Admin broadcasts.
 
 Web frontend:
 
@@ -159,6 +179,15 @@ npm run lint
 Local development URLs:
 
 ```text
-Web app: http://127.0.0.1:5173/login
+Web app: http://127.0.0.1:5175/login
 Backend API: http://127.0.0.1:8000/api/v1
 ```
+
+
+Local:   http://localhost:5175/
+Local:   http://127.0.0.1:5175/
+Network: http://192.168.112.109:5175/
+VPN:     http://100.113.172.151:5175/
+
+Local:   http://localhost:5175/login
+Network: http://192.168.112.109:5175/login

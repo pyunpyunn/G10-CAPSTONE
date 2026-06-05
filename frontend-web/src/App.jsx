@@ -8,9 +8,18 @@ import {
   useNavigate,
 } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
+import ArchivePage from './pages/ArchivePage'
+import BroadcastPage from './pages/BroadcastPage'
 import DashboardPage from './pages/DashboardPage'
+import HouseholdStatusPage from './pages/HouseholdStatusPage'
 import LoginPage from './pages/LoginPage'
+import MappingPage from './pages/MappingPage'
 import PlaceholderPage from './pages/PlaceholderPage'
+import ResourcesRequestsPage from './pages/ResourcesRequestsPage'
+import RescuerAccountsPage from './pages/RescuerAccountsPage'
+import RescueDispatchPage from './pages/RescueDispatchPage'
+import SituationReportPage from './pages/SituationReportPage'
+import WeatherPage from './pages/WeatherPage'
 import { getCurrentUser, loginUser, logoutUser } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
 import './App.css'
@@ -183,6 +192,24 @@ function AuthRoutes() {
             element={
               page.path === '/dashboard' ? (
                 <DashboardPage />
+              ) : page.path === '/broadcast' ? (
+                <BroadcastPage />
+              ) : page.path === '/weather' ? (
+                <WeatherPage />
+              ) : page.path === '/mapping' ? (
+                <MappingPage />
+              ) : page.path === '/households' ? (
+                <HouseholdStatusPage />
+              ) : page.path === '/dispatch' ? (
+                <RescueDispatchPage />
+              ) : page.path === '/rescuers' ? (
+                <RescuerAccountsPage />
+              ) : page.path === '/resources-requests' ? (
+                <ResourcesRequestsPage />
+              ) : page.path === '/situation' ? (
+                <SituationReportPage />
+              ) : page.path === '/archive' ? (
+                <ArchivePage />
               ) : (
                 <PlaceholderPage page={page} />
               )

@@ -60,15 +60,16 @@ Do not use the full `prototype/resqperation-2 (1).html` for development. If a UI
 - [x] Latest DB member `all.sql` export reviewed
 - [x] Additive DB update proposal created: `docs/sql_proposals/2026_06_01_g10_all_sql_additive_update.sql`
 - [x] Older DB gap proposal marked as superseded
-- [ ] SQL gap proposal reviewed by team/instructor
-- [ ] Additive DB update proposal tested on a local database copy
-- [ ] Laravel migrations adjusted to existing DB style
-- [ ] Default Laravel `create_users_table` migration handled safely
-- [ ] No new migration has been run against the shared DB yet
+- [x] SQL gap proposal reviewed by DB member/team for shared DB use
+- [x] Live DB schema safety check completed before applying additive SQL
+- [x] Additive DB update applied to the shared DB
+- [x] Laravel migrations adjusted to existing DB style
+- [x] Default Laravel `create_users_table` migration handled safely
+- [x] Laravel migration tracker fixed and current backend migrations recorded
 
 Important database warning:
 
-Do not run `php artisan migrate` yet. The shared DB already has a custom `users` table using `user_id`, while the default Laravel migration expects `id`.
+Do not restore the default Laravel `users` migration. The shared DB already has a custom `users` table using `user_id`, `first_name`, and `last_name`.
 
 ## Master Build Order Checklist
 
@@ -114,29 +115,30 @@ Status: done for backend foundation. A test HQ Admin login now exists in the sha
 
 ### 3. Database Migrations / DB Alignment
 
-- [ ] Review latest additive DB update SQL
-- [ ] Test latest additive DB update SQL on a local copy first
-- [ ] Decide which changes are needed for version 1
-- [ ] Convert approved SQL changes to Laravel migrations
-- [ ] Avoid duplicate tables
-- [ ] Use existing custom primary keys
-- [ ] Add missing household device fields
-- [ ] Add household status history table or align with existing logs
-- [ ] Add weather logs if approved
-- [ ] Add resource validation fields/tables if approved
-- [ ] Add integration logs if approved
+- [x] Review latest additive DB update SQL
+- [x] Run live schema safety check before applying SQL
+- [x] Decide which changes are needed for version 1
+- [x] Apply approved additive SQL to shared DB
+- [x] Avoid duplicate tables
+- [x] Use existing custom primary keys and table names
+- [x] Add missing household device fields
+- [x] Add household status history table
+- [x] Add weather logs table
+- [x] Add resource validation fields/table
+- [x] Adjust Laravel default migrations to avoid breaking the shared DB
+- [x] Confirm `php artisan migrate:status` shows current backend migrations as ran
 
-Status: blocked until review/approval.
+Status: done for current DB alignment. Future module migrations should follow the shared DB naming and key style.
 
 ### 4. Seeders
 
-- [ ] Create safe seeders only after auth models match DB
-- [ ] Seed missing roles only if they do not already exist
-- [ ] Seed admin/HQ/rescuer/household test users only with approval
-- [ ] Seed sample active disaster event
-- [ ] Seed sample household/status data only in a safe test plan
+- [x] Create safe seeders only after auth models match DB
+- [x] Seed missing roles only if they do not already exist
+- [x] Seed admin/HQ/rescuer/household test users only with approval
+- [x] Seed sample active disaster event
+- [x] Seed sample household/status data only in a safe test plan
 
-Status: not started.
+Status: temporary login seeders and safe sample disaster/status seeders are done.
 
 ### 5. Web App Shell
 
@@ -154,144 +156,160 @@ Status: mostly done. Web shell and login are built; real module APIs/pages will 
 
 ### 6. Shared Web Components
 
-- [ ] `Button`
-- [ ] `IconButton`
-- [ ] `Badge`
-- [ ] `StatCard`
-- [ ] `DataTable`
-- [ ] `FilterBar`
-- [ ] `Modal`
-- [ ] `ActionMenu`
-- [ ] `EmptyState`
-- [ ] `LoadingState`
+- [x] `Button`
+- [x] `IconButton`
+- [x] `Badge`
+- [x] `StatCard`
+- [x] `DataTable`
+- [x] `FilterBar`
+- [x] `Modal`
+- [x] `ActionMenu`
+- [x] `EmptyState`
+- [x] `LoadingState`
 
-Status: not started.
+Status: done for the beginner shared component set. Add specialized controls only when a module really needs them.
+
+### 6.1 Barangay Profile / Deployment Settings
+
+- [x] Confirm existing shared DB has `barangays` and `addresses.barangay_id`
+- [x] Create review-only SQL proposal for `barangay_profiles`
+- [x] Add backend Barangay Profile service with `.env` fallback
+- [x] Connect Dashboard, Weather, and Mapping to the shared profile service
+- [ ] Apply `barangay_profiles` table only after DB member approval
+- [ ] Build HQ/Admin Barangay Profile settings UI
+- [ ] Filter Household, Broadcast, Dispatch, Resources, and Reports by active barangay
+
+Status: foundation started. No DB schema was changed. Current proposal: `docs/sql_proposals/initial/2026_06_03_g10_barangay_profile_review.sql`. Design note: `docs/RESQPERATION_BARANGAY_PROFILE_SCOPE.md`.
 
 ### 7. Dashboard
 
-- [ ] Backend summary endpoint
-- [ ] Backend recent activity endpoint
-- [ ] Dashboard page
-- [ ] Summary cards
-- [ ] Recent activity list
-- [ ] Weather summary placeholder
-- [ ] Map preview placeholder
+- [x] Backend summary endpoint
+- [x] Backend recent activity endpoint
+- [x] Dashboard page
+- [x] Summary cards
+- [x] Recent activity list
+- [x] Weather summary empty/live state
+- [x] Map preview empty/live state
+- [x] No hardcoded Typhoon Carina/sample prototype banner
 
-Status: not started.
+Status: done for the first live HQ/Admin dashboard. The page now uses `/api/v1/dashboard` and shows standby/empty states when there is no active event.
 
 ### 8. Household Status
 
-- [ ] Backend household list endpoint with pagination
-- [ ] Backend household detail endpoint
-- [ ] Backend household status history endpoint
-- [ ] Backend status report endpoint for household/rescuer only
-- [ ] Prevent HQ/admin from manually changing household status
-- [ ] Web summary cards:
+- [x] Backend household list endpoint with pagination
+- [x] Backend household detail endpoint
+- [x] Backend household status history endpoint
+- [x] Backend status report endpoint for household/rescuer only
+- [x] Prevent HQ/admin from manually changing household status
+- [x] Web summary cards:
   - unchecked
   - safe total
   - safe only
   - evacuated
   - unsafe
-- [ ] Household table
-- [ ] Members table in detail modal
-- [ ] Device battery and location display
-- [ ] Search/filter by household, purok, status, and device risk
+- [x] Household table
+- [x] Members table in detail modal
+- [x] Device battery and location display
+- [x] Search/filter by household, purok, status, and device risk
 
-Status: not started.
+Status: done for the first live HQ/Admin Household Status module. The web page uses `/api/v1/households`, loads details/history only when a household is opened, and does not expose any HQ/Admin manual status edit action. Status updates are accepted only through the household/rescuer API route.
 
 ### 9. Rescue Dispatch
 
-- [ ] Rescue team API
-- [ ] Dispatch list API
-- [ ] Create dispatch API
-- [ ] Update dispatch status API
-- [ ] Complete dispatch API
-- [ ] Rescuer location update API
-- [ ] Dispatch web page
-- [ ] Create/update modals
+- [x] Rescue team API
+- [x] Dispatch list API
+- [x] Create dispatch API
+- [x] Update dispatch status API
+- [x] Complete dispatch API
+- [x] Rescuer location update API
+- [x] Dispatch web page
+- [x] Create/update modals
 
-Status: not started.
+Status: done for the first live HQ/Admin Rescue Dispatch module. The backend uses the approved shared DB mapping: `rescue_teams`, `responders`, `responder_assignments`, `responder_routes`, `route_coordinates`, and `responder_location_logs`. No migrations were run and no schema was changed. Current shared DB note: `rescue_teams` has no formal team rows yet, so the page displays the existing temporary responder as an unassigned responder pool until HQ/Admin registers actual teams.
 
 ### 10. Disaster Broadcasting
 
-- [ ] Disaster event API
-- [ ] Broadcast log API
-- [ ] Broadcast page
-- [ ] Save broadcast logs first
+- [x] Disaster event API
+- [x] Broadcast log API
+- [x] Broadcast page
+- [x] Save broadcast logs first
+- [x] Apply approved broadcast metadata columns to shared DB
 - [ ] Add Expo push later after mobile works
 
-Status: not started.
+Status: v1 done for the live HQ/Admin Disaster Broadcasting module. The web page now uses the Laravel API instead of the placeholder prototype, supports active-event lifecycle display, declaration/update compose flow, recipient scope notes, direct-impact purok selection, the 4-status mobile button rule, and active-event broadcast logs. On 2026-06-03, the approved nullable metadata columns from `docs/sql_proposals/initial/2026_06_03_g10_disaster_broadcast_metadata_review.sql` were applied to the shared DB with guarded column checks. No Laravel migrations were run. Expo push is still deferred until the mobile notification workflow is ready.
 
 ### 11. Weather Updates
 
-- [ ] Weather log table/DB alignment approved
-- [ ] Laravel weather refresh endpoint
-- [ ] Open-Meteo fetch through Laravel
-- [ ] PAGASA advisory support
-- [ ] Weather page
-- [ ] Store weather snapshots for archive and SitRep
+- [x] Weather log table/DB alignment approved
+- [x] Laravel weather refresh endpoint
+- [x] Open-Meteo fetch through Laravel
+- [x] PAGASA advisory support
+- [x] Weather page
+- [x] Store weather snapshots for archive and SitRep
+- [x] Automatic Open-Meteo refresh command and scheduler
+- [x] PAGASA official-warning confirmation note
 
-Status: not started.
+Status: v1 done for the live HQ/Admin Weather Updates module. React displays saved Laravel weather logs only; it does not call weather providers directly. Laravel now provides `/api/v1/weather`, `/api/v1/weather/refresh`, `/api/v1/disaster-events/{eventId}/weather-logs`, and `/api/v1/disaster-events/{eventId}/weather-logs/refresh`. The `weather:refresh` Artisan command fetches structured Open-Meteo data, stores it in `weather_logs`, and is scheduled every 3 hours through Laravel Scheduler. Snapshots are linked to the active disaster event when one exists; otherwise they are saved as general monitoring snapshots. PAGASA is included through official advisory links and the page states: "Confirm official warnings through PAGASA before broadcasting." No migrations were run. If PAGASA approves the Ten-Day API token later, Laravel can add it as another backend source without changing the frontend workflow.
 
 ### 12. Mapping
 
-- [ ] Map household geotag endpoint
-- [ ] Evacuation site endpoint
-- [ ] Dispatch route/team endpoint
-- [ ] Leaflet page
-- [ ] Household markers
-- [ ] Evacuation site markers
-- [ ] Rescue team markers
-- [ ] Route display on demand
+- [x] Map household geotag endpoint
+- [x] Evacuation site endpoint
+- [x] Dispatch route/team endpoint
+- [x] Leaflet page
+- [x] Household markers
+- [x] Evacuation site markers
+- [x] Rescue team markers
+- [x] Route display on demand
 
-Status: not started.
+Status: v1 done for the live HQ/Admin Mapping module. The backend uses existing shared DB tables only: `geotagged_locations`, `households`, `household_disasters`, `household_statuses`, `evacuation_centers`, `responder_location_logs`, `responders`, `rescue_teams`, `responder_assignments`, `responder_routes`, and `route_coordinates`. No migrations were run and no schema was changed. React now uses Leaflet/OpenStreetMap tiles, automatically focuses on Barangay Guadalupe, hides operational status layers when there is no active disaster event, and shows household GPS markers, evacuation pins, rescue team markers, stored route lines, and on-demand route display during an active event. Live DB payload testing is still pending because the shared DB server was offline during this step.
 
 ### 13. Rescuer Accounts
 
-- [ ] Align responder/rescuer tables with auth
-- [ ] Create rescuer API
-- [ ] Edit rescuer API
-- [ ] Deactivate rescuer API
-- [ ] Rescuer accounts page
-- [ ] Create account modal
-- [ ] View/edit/deactivate actions
+- [x] Align responder/rescuer tables with auth
+- [x] Create rescuer API
+- [x] Edit rescuer API
+- [x] Deactivate rescuer API
+- [x] Rescuer accounts page
+- [x] Create account modal
+- [x] View/edit/deactivate actions
 
-Status: not started.
+Status: v1 done for the live HQ/Admin Rescuer Accounts module. The backend reuses existing shared DB tables only: `users`, `roles`, `responders`, `rescue_teams`, and `audit_logs`. No migrations were run and no schema was changed. HQ/Admin can load the verified roster, create a rescuer login, assign a team, update account/contact/training/equipment details, and deactivate the account while keeping the responder record for audit and dispatch history. New HQ-created rescuer login IDs follow the team-code DB format `RTR-{TEAM_CODE}-#####`, such as `RTR-SAR-24001`, while the existing numeric temporary test account remains supported. The frontend uses feature-based component splitting for the notice, stats, filters, roster table, team grid, and account modal. Rollback-only CRUD testing passed, so no temporary rescuer test record was left in the shared DB.
 
 ### 14. Resources and Requests
 
-- [ ] Align existing `resource_requests` table
-- [ ] Add request validation workflow after approval
-- [ ] Add shared DB request source/reference fields after approval
-- [ ] Add tracking-ready fields after approval
-- [ ] Request queue page
-- [ ] Validation modal
-- [ ] Mark ready for tracking / return actions
+- [x] Align existing `resource_requests` table
+- [x] Add request validation workflow after approval
+- [x] Add shared DB request source/reference fields after approval
+- [x] Add tracking-ready fields after approval
+- [x] Request queue page
+- [x] Validation modal
+- [x] Mark ready for tracking / return actions
 
-Status: not started.
+Status: v1 done for the live HQ/Admin Resources & Requests module. The backend reuses the existing shared DB tables only: `resource_requests`, `request_validations`, `resource_request_status`, `urgency_levels`, and `evacuation_centers`. No migrations were run and no schema was changed. RESQPERATION can load the live validation queue, create a manual HQ request, save validation decisions, return incomplete or duplicate requests, and forward verified requests with a TrackingAid handoff reference. The frontend uses feature-based component splitting for the notice, stats, filters, queue table, validation modal, and TrackingAid mirror. Rollback-only API testing passed for list, create, validate, and forward, so no temporary resource request was left in the shared DB.
 
 ### 15. Situation Reporting
 
-- [ ] Event dropdown
-- [ ] Situation summary endpoint
-- [ ] Generate report endpoint
-- [ ] Saved report page
+- [x] Event dropdown
+- [x] Situation summary endpoint
+- [x] Generate report endpoint
+- [x] Saved report page
 - [ ] PDF export later
 
-Status: not started.
+Status: v1 done for live HQ/Admin Situation Reporting. The backend reuses the existing shared DB tables only: `situation_reports`, `disaster_events`, `household_disasters`, `household_status_logs`, `responder_assignments`, `weather_logs`, `resource_requests`, and `evacuation_centers`. No migrations were run and no schema was changed. HQ/Admin must select a disaster event before the SitRep preview appears. The summary endpoint collects event, household, casualty, evacuation, dispatch, weather, and resource/request data from the shared DB. The generate endpoint saves a locked JSON snapshot in `situation_reports.summary`. The frontend uses feature-based component splitting for the event selector, action menu, SitRep preview, generation modal, and saved report list. Rollback-only API testing passed for workspace load, event summary, and generated report save, so no temporary SitRep was left in the shared DB. PDF export is intentionally left for the later PDF package step.
 
 ### 16. Archive
 
-- [ ] Archive tabs
-- [ ] Disaster event archive endpoint
-- [ ] Household status archive endpoint
-- [ ] Dispatch archive endpoint
-- [ ] Resource request archive endpoint
-- [ ] Situation report archive endpoint
-- [ ] CSV export first
+- [x] Archive tabs
+- [x] Disaster event archive endpoint
+- [x] Household status archive endpoint
+- [x] Dispatch archive endpoint
+- [x] Resource request archive endpoint
+- [x] Situation report archive endpoint
+- [x] CSV export first
 - [ ] PDF export later
 
-Status: not started.
+Status: v1 done for live HQ/Admin Archive. The backend reuses existing shared DB records only: `disaster_events`, `disaster_broadcasts`, `weather_logs`, `household_status_logs`, `household_disasters`, `responder_assignments`, `resource_requests`, `request_validations`, `situation_reports`, `incident_archives`, and related lookup tables. No migrations were run and no schema was changed. Archive endpoints now support tab-specific loading, search, event, purok, status filters, pagination, and CSV export. The frontend uses feature-based component splitting for tabs, filters, download menu, archive table, and record modal. Live DB read-only testing passed for all five archive categories and CSV export. PDF export is intentionally left for the later PDF package step.
 
 ### 17. Mobile Household
 
@@ -352,27 +370,17 @@ Status: not started.
 The current development task is:
 
 ```text
-Start Dashboard API/page.
+Start Resources and Requests API/page.
 ```
 
-Completed:
+Latest completed module:
 
-- `User` model now uses `user_id`.
-- `Role` model now uses `role_id`.
-- Login accepts username or email.
-- Auth endpoints exist:
-
-```text
-POST /api/v1/auth/login
-POST /api/v1/auth/logout
-GET  /api/v1/auth/me
-```
-- Web login and HQ/Admin app shell are built.
-- Mobile login routes household/rescuer users to their role folders only.
-- Auth was verified through real HTTP login, `/auth/me`, and logout using the HQ Admin test account.
+- Rescuer Accounts v1 is connected to existing `users`, `roles`, `responders`, `rescue_teams`, and `audit_logs`.
+- No migration or schema change was run for Rescuer Accounts.
+- Rollback-only create/update/deactivate testing passed without leaving a test record in the shared DB.
 
 Still needed:
 
-1. Keep migrations paused while the DB member works.
-2. Manually try the web login screen in the browser.
-3. Start real module development with Dashboard API/page.
+1. Start section 14: Resources and Requests.
+2. Keep any DB changes review-only first.
+3. Continue using feature-based component splitting for large pages.

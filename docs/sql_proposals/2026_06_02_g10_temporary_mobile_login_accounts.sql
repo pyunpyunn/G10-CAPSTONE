@@ -46,7 +46,8 @@ WHERE NOT EXISTS (
 -- Household mobile user.
 INSERT INTO users (
     user_id,
-    name,
+    first_name,
+    last_name,
     username,
     email,
     password,
@@ -61,7 +62,8 @@ INSERT INTO users (
 )
 SELECT
     'USR-HH-2024035501',
-    'Temporary Household User',
+    'Temporary Household',
+    'User',
     '2024035501',
     'household.temp@resqperation.local',
     @temporary_password_hash,
@@ -83,7 +85,8 @@ LIMIT 1;
 -- Rescuer mobile user.
 INSERT INTO users (
     user_id,
-    name,
+    first_name,
+    last_name,
     username,
     email,
     password,
@@ -98,7 +101,8 @@ INSERT INTO users (
 )
 SELECT
     'USR-RSC-2024035502',
-    'Temporary Rescuer User',
+    'Temporary Rescuer',
+    'User',
     '2024035502',
     'rescuer.temp@resqperation.local',
     @temporary_password_hash,
@@ -118,9 +122,11 @@ WHERE roles.role_key = 'rescuer'
 LIMIT 1;
 
 -- Optional responder profile for the rescuer login.
--- This follows the current all.sql responders columns and does not require the additive responder user_id column.
+-- This connects the responder profile to the temporary rescuer user.
 INSERT INTO responders (
     responder_id,
+    user_id,
+    responder_code,
     created_by_admin_id,
     team_id,
     username,
@@ -137,6 +143,8 @@ INSERT INTO responders (
 )
 SELECT
     2024035502,
+    'USR-RSC-2024035502',
+    'RSC-2024035502',
     'USR-HQ-2024035500',
     NULL,
     '2024035502',
