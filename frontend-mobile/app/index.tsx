@@ -2,20 +2,27 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { type Href, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { clearToken } from '@/api/client';
 import { loginMobile } from '@/api/auth';
+import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 
 export default function MobileLoginScreen() {
   const router = useRouter();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleLogin() {
@@ -44,6 +51,7 @@ export default function MobileLoginScreen() {
       Alert.alert('Use web dashboard', 'This account is for HQ/Admin web access.');
     } catch (error: any) {
       const message =
+        error?.userMessage ||
         error?.response?.data?.message ||
         error?.response?.data?.errors?.login?.[0] ||
         'Unable to sign in. Please check your account ID and password.';
@@ -55,100 +63,215 @@ export default function MobileLoginScreen() {
   }
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.card}>
-        <View style={styles.brandMark}>
-          <Text style={styles.brandLetter}>R</Text>
-        </View>
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
+          <View style={styles.brandRow}>
+            <View style={styles.brandMark}>
+              <Text style={styles.brandLetter}>R</Text>
+            </View>
+            <View>
+              <Text style={styles.brandName}>RESQPERATION</Text>
+              <Text style={styles.brandRole}>Mobile access</Text>
+            </View>
+          </View>
 
-        <Text style={styles.title}>RESQPERATION Mobile</Text>
-        <Text style={styles.copy}>
-          Household and rescuer accounts only. HQ/Admin users should use the web dashboard.
-        </Text>
+          <View style={styles.card}>
+            <View style={styles.headerBlock}>
+              <Text style={styles.title}>Sign in</Text>
+            </View>
 
-        <TextInput
-          style={styles.input}
-          value={login}
-          onChangeText={setLogin}
-          placeholder="Account ID or email"
-          autoCapitalize="none"
-        />
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Account ID</Text>
+              <View style={styles.inputShell}>
+                <Ionicons name="person-outline" size={19} color={palette.textSoft} />
+                <TextInput
+                  style={styles.input}
+                  value={login}
+                  onChangeText={setLogin}
+                  placeholder="Example: 2024035501"
+                  placeholderTextColor="#7d8da0"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+            </View>
 
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Password"
-          secureTextEntry
-        />
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.inputShell}>
+                <Ionicons name="lock-closed-outline" size={19} color={palette.textSoft} />
+                <TextInput
+                  style={styles.input}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Enter password"
+                  placeholderTextColor="#7d8da0"
+                  secureTextEntry={!showPassword}
+                />
+                <Pressable
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword((current) => !current)}
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={21}
+                    color={palette.navActive}
+                  />
+                </Pressable>
+              </View>
+            </View>
 
-        <Pressable style={styles.button} onPress={handleLogin} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Sign in</Text>
-          )}
-        </Pressable>
-      </View>
-    </View>
+            <Pressable style={[styles.button, loading && styles.buttonDisabled]} onPress={handleLogin} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="log-in-outline" size={19} color="#fff" />
+                  <Text style={styles.buttonText}>Login</Text>
+                </>
+              )}
+            </Pressable>
+
+            <Pressable
+              style={styles.forgotButton}
+              onPress={() => Alert.alert('Password help', 'Please contact HQ/Admin to reset your mobile account password.')}
+            >
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safe: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#f5f7fb',
+    backgroundColor: palette.page,
   },
-  card: {
-    gap: 14,
-    borderRadius: 12,
-    padding: 22,
-    backgroundColor: '#ffffff',
+  keyboard: {
+    flex: 1,
+  },
+  screen: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    gap: spacing.lg,
+    padding: spacing.lg,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   brandMark: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 22,
-    backgroundColor: '#287c77',
+    borderWidth: 1,
+    borderColor: '#8bd5dc',
+    borderRadius: 24,
+    backgroundColor: '#4bbbc4',
   },
   brandLetter: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '900',
   },
-  title: {
-    color: '#172033',
-    fontSize: 24,
+  brandName: {
+    color: palette.nav,
+    fontSize: 21,
     fontWeight: '900',
   },
-  copy: {
-    color: '#64748b',
-    fontSize: 14,
-    lineHeight: 20,
+  brandRole: {
+    marginTop: 2,
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
-  input: {
-    minHeight: 48,
+  card: {
+    gap: spacing.md,
     borderWidth: 1,
-    borderColor: '#dbe3ec',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    color: '#172033',
+    borderColor: palette.border,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    backgroundColor: palette.card,
+    ...shadow,
+  },
+  headerBlock: {
+    gap: spacing.xs,
+  },
+  title: {
+    color: palette.text,
+    fontSize: 31,
+    fontWeight: '900',
+  },
+  fieldGroup: {
+    gap: 7,
+  },
+  label: {
+    color: palette.text,
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  inputShell: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
     backgroundColor: '#ffffff',
   },
-  button: {
-    minHeight: 48,
+  input: {
+    flex: 1,
+    minHeight: 50,
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  eyeButton: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
-    backgroundColor: '#1f3547',
+    borderRadius: radius.md,
+  },
+  button: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: palette.navActive,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   buttonText: {
     color: '#ffffff',
     fontSize: 15,
+    fontWeight: '900',
+  },
+  forgotButton: {
+    alignSelf: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  forgotText: {
+    color: palette.navActive,
+    fontSize: 13,
     fontWeight: '900',
   },
 });

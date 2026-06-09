@@ -9,6 +9,7 @@ import NotificationList from '../components/notifications/NotificationList'
 import NotificationSummary from '../components/notifications/NotificationSummary'
 import NotificationToolbar from '../components/notifications/NotificationToolbar'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import {
   deleteItems,
   markItemsRead,
@@ -171,6 +172,8 @@ export default function NotificationsPage() {
 
   return (
     <section className="page active notifications-page">
+      <PageHeader title="Notifications" />
+
       <NotificationToolbar
         statusFilter={statusFilter}
         onFilterChange={changeFilter}

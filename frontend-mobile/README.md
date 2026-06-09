@@ -1,50 +1,72 @@
-# Welcome to your Expo app 👋
+# RESQPERATION Mobile App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo React Native app for the household and rescuer mobile roles.
 
-## Get started
+The mobile app does not connect directly to MySQL. It connects to Laravel through the API, and Laravel connects to the shared MySQL database.
 
-1. Install dependencies
+## Current API Connection
 
-   ```bash
-   npm install
-   ```
+`frontend-mobile/.env`
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```env
+EXPO_PUBLIC_API_BASE_URL=http://192.168.112.109:8000/api/v1
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+This IP is the laptop Wi-Fi IP. If the laptop IP changes, update this value.
 
-## Learn more
+## Required Backend Command For Phone Testing
 
-To learn more about developing your project with Expo, look at the following resources:
+Run Laravel with `0.0.0.0`, not only `127.0.0.1`.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+cd backend-laravel
+php artisan serve --host=0.0.0.0 --port=8000
+```
 
-## Join the community
+Reason: Expo Go on a phone must reach the backend through the laptop network IP.
 
-Join our community of developers creating universal apps.
+## Start Mobile App
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+cd frontend-mobile
+npm install
+npx expo start
+```
+
+Open the QR code in Expo Go.
+
+## Temporary Mobile Accounts
+
+| Role | Account ID | Password |
+| --- | --- | --- |
+| Household Resident | `2024035501` | `password` |
+| Household Resident Setup Test | `2024035503` | `password` |
+| Rescuer Temp SAR Test | `BDRRM-SAR-001` | `password` |
+| Rescuer Medical Test | `BDRRM-MED-001` | `password` |
+| Rescuer SAR Test | `BDRRM-SAR-002` | `password` |
+
+Rescuer mobile login uses the BDRRM account ID format. The sequence is counted per team code:
+
+```text
+BDRRM-SAR-001
+BDRRM-MED-001
+BDRRM-SAR-002
+```
+
+The rescuer profile also has a separate editable username, such as `vinzon.arellano` or `vince.pacillan`.
+
+Actual mobile login is DB-driven. Household accounts from SafeTrack work in RESQPERATION when they are already saved in the shared `users` table with a `household_resident` role, a valid password hash, and a linked `household_id`. The login field can accept the household `username`, `email`, `user_id`, or `household_id`.
+
+## Verified API Flow
+
+- Household login uses `/api/v1/auth/login`
+- Household app loads `/api/v1/household/overview`
+- Rescuer login uses `/api/v1/auth/login`
+- Rescuer app loads `/api/v1/rescuer/overview`
+
+If login fails on the phone but works on the browser/laptop, check:
+
+- phone and laptop are on the same Wi-Fi
+- Laravel is running with `--host=0.0.0.0`
+- Windows Firewall allows port `8000`
+- `EXPO_PUBLIC_API_BASE_URL` uses the current laptop Wi-Fi IP

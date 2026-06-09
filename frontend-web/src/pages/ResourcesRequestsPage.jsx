@@ -15,6 +15,7 @@ import ResourceRequestStats from '../components/resources/ResourceRequestStats'
 import ResourceValidationModal from '../components/resources/ResourceValidationModal'
 import TrackingAidMirror from '../components/resources/TrackingAidMirror'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import {
   buildCreatePayload,
   buildForwardPayload,
@@ -240,9 +241,10 @@ export default function ResourcesRequestsPage() {
 
   return (
     <section className="page active resources-page">
-      <div className="page-ops-row">
-        <div className="left" />
-        <div className="right">
+      <PageHeader
+        title="Resources & Requests"
+        actions={
+          <>
           <button className="btn btn-secondary btn-sm" type="button" onClick={handleSyncEvaTrack}>
             <RefreshCcw size={14} />
             Sync EvaTrack
@@ -251,8 +253,9 @@ export default function ResourcesRequestsPage() {
             <PackageCheck size={14} />
             Validate request
           </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {isLoading && <LoadingState message="Loading resource requests..." />}
       {error && <div className="form-error">{error}</div>}

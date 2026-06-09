@@ -51,8 +51,6 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => getStats(dashboard), [dashboard])
   const hasActiveEvent = Boolean(dashboard?.active_event)
-  const barangayName = dashboard?.barangay_profile?.name || 'Registered barangay'
-
   async function loadDashboard() {
     setIsLoading(true)
     setError('')
@@ -99,7 +97,6 @@ export default function DashboardPage() {
     <section className="page active">
       <PageHeader
         title="Dashboard"
-        subtitle={`${barangayName} - command overview`}
         actions={
           <>
             <button className="btn btn-secondary btn-sm" type="button" onClick={loadDashboard}>

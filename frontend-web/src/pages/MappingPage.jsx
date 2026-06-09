@@ -160,7 +160,6 @@ export default function MappingPage() {
     <section className="page mapping-page active">
       <PageHeader
         title="Mapping"
-        subtitle={`${workspace.barangay.name} geotag and dispatch view`}
         actions={
           <>
             <button className="btn btn-secondary btn-sm" type="button" onClick={reloadMap}>

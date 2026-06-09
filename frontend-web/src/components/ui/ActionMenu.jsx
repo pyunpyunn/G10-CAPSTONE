@@ -11,7 +11,7 @@ export default function ActionMenu({ label = 'Actions', actions = [], buttonClas
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
       const menuWidth = 168
-      const menuHeight = 126
+      const menuHeight = Math.max(126, actions.length * 42 + 16)
       const left = Math.min(Math.max(12, rect.right - menuWidth), window.innerWidth - menuWidth - 12)
       const hasRoomBelow = window.innerHeight - rect.bottom > menuHeight + 12
       const top = hasRoomBelow ? rect.bottom + 6 : Math.max(12, rect.top - menuHeight - 6)
@@ -29,18 +29,29 @@ export default function ActionMenu({ label = 'Actions', actions = [], buttonClas
       </button>
       {isOpen && createPortal(
         <div className="action-menu-list action-menu-floating" style={{ top: position.top, left: position.left }}>
-          {actions.map((action) => (
+          {actions.map((action) => {
+            const Icon = action.icon
+
+            return (
             <button
               type="button"
               key={action.label}
+              className={action.danger ? 'is-danger' : ''}
+              disabled={action.disabled}
               onClick={() => {
+                if (action.disabled) {
+                  return
+                }
+
                 setIsOpen(false)
                 action.onClick()
               }}
             >
+              {Icon && <Icon size={14} />}
               {action.label}
             </button>
-          ))}
+            )
+          })}
         </div>,
         document.body,
       )}

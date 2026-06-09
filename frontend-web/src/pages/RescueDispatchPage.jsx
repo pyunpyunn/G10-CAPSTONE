@@ -219,7 +219,6 @@ export default function RescueDispatchPage() {
     <section className="page active dispatch-page">
       <PageHeader
         title="Rescue Dispatch"
-        subtitle="Assign response units, monitor field status, and record on-scene outcomes."
         actions={
           <>
             <button className="btn btn-secondary btn-sm" type="button" onClick={loadDispatch}>

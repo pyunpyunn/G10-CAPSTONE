@@ -1,4 +1,4 @@
-import { api, saveToken } from './client';
+import { api, clearToken, saveToken } from './client';
 
 type Role = {
   role_key: string;
@@ -27,4 +27,12 @@ export async function loginMobile(login: string, password: string) {
   await saveToken(response.data.token);
 
   return response.data.user;
+}
+
+export async function logoutMobile() {
+  try {
+    await api.post('/auth/logout');
+  } finally {
+    await clearToken();
+  }
 }

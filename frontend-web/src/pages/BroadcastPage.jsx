@@ -238,7 +238,6 @@ export default function BroadcastPage() {
     <section className="page broadcast-page active">
       <PageHeader
         title="Disaster Broadcasting"
-        subtitle="Official alerts, event declaration, and mobile status buttons"
         actions={
           <>
             <button className="btn btn-secondary btn-sm" type="button" onClick={loadWorkspace}>

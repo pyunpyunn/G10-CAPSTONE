@@ -94,7 +94,6 @@ export default function WeatherPage() {
     <section className="page weather-page active">
       <PageHeader
         title="Weather Updates"
-        subtitle="Auto-saved Open-Meteo forecast snapshots with PAGASA official advisory confirmation"
         actions={
           <>
             <button className="btn btn-secondary btn-sm" type="button" onClick={loadWeather}>

@@ -14,6 +14,7 @@ import RescuerRosterTable from '../components/rescuers/RescuerRosterTable'
 import RescuerStats from '../components/rescuers/RescuerStats'
 import RescuerTeamGrid from '../components/rescuers/RescuerTeamGrid'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import {
   buildRescuerPayload,
   downloadCsv,
@@ -192,9 +193,10 @@ export default function RescuerAccountsPage() {
 
   return (
     <section className="page active rescuer-page">
-      <div className="page-ops-row">
-        <div className="left" />
-        <div className="right">
+      <PageHeader
+        title="Rescuer Accounts"
+        actions={
+          <>
           <button className="btn btn-secondary btn-sm" type="button" onClick={exportRoster}>
             <FileCheck2 size={14} />
             Export roster
@@ -203,8 +205,9 @@ export default function RescuerAccountsPage() {
             <UserPlus size={14} />
             Create verified account
           </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {isLoading && <LoadingState message="Loading verified rescuer roster..." />}
       {error && <div className="form-error">{error}</div>}

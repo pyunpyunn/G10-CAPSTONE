@@ -1,14 +1,14 @@
-import { KeyRound, Pencil } from 'lucide-react'
+import { KeyRound, Pencil, Settings, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { changePassword, getProfile, updateProfile } from '../api/profileApi'
+import ActionMenu from '../components/ui/ActionMenu'
+import DeleteAccountModal from '../components/profile/DeleteAccountModal'
 import PasswordModal from '../components/profile/PasswordModal'
-import ProfileActivityList from '../components/profile/ProfileActivityList'
 import ProfileEditModal from '../components/profile/ProfileEditModal'
 import ProfileIdentity from '../components/profile/ProfileIdentity'
-import ProfilePermissionList from '../components/profile/ProfilePermissionList'
-import ProfileSummary from '../components/profile/ProfileSummary'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import {
   passwordForm,
   profileErrorMessage,
@@ -23,6 +23,7 @@ export default function ProfilePage() {
   const [message, setMessage] = useState('')
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isPasswordOpen, setIsPasswordOpen] = useState(false)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [profileForm, setProfileForm] = useState(profileFormFromIdentity())
   const [passwordValues, setPasswordValues] = useState(passwordForm())
   const [profileFormError, setProfileFormError] = useState('')
@@ -64,6 +65,11 @@ export default function ProfilePage() {
     setPasswordError('')
     setMessage('')
     setIsPasswordOpen(true)
+  }
+
+  function openDeleteModal() {
+    setMessage('')
+    setIsDeleteOpen(true)
   }
 
   async function submitProfile(event) {
@@ -112,42 +118,35 @@ export default function ProfilePage() {
     }
   }
 
+  const profileActions = [
+    { label: 'Edit profile', icon: Pencil, onClick: openEditModal, disabled: !payload },
+    { label: 'Change password', icon: KeyRound, onClick: openPasswordModal, disabled: !payload },
+    { label: 'Delete account forever', icon: Trash2, onClick: openDeleteModal, danger: true, disabled: !payload },
+  ]
+
   return (
     <section className="page active profile-page">
-      <div className="page-ops-row">
-        <div className="left">
-          <span className="ops-label">Account settings</span>
-        </div>
-        <div className="right">
-          <button className="btn btn-secondary btn-sm" type="button" disabled={!payload} onClick={openPasswordModal}>
-            <KeyRound size={14} />
-            Change password
-          </button>
-          <button className="btn btn-primary btn-sm" type="button" disabled={!payload} onClick={openEditModal}>
-            <Pencil size={14} />
-            Edit profile
-          </button>
-        </div>
-      </div>
+      <PageHeader title="Profile" />
 
       {message && <div className="profile-page-message">{message}</div>}
       {isLoading && <LoadingState message="Loading profile..." />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && payload && (
-        <>
-          <ProfileSummary summary={payload.summary || []} />
-          <div className="profile-layout">
-            <ProfileIdentity
-              identity={payload.identity || {}}
-              barangayProfile={payload.barangay_profile || {}}
-            />
-            <div className="profile-stack">
-              <ProfilePermissionList permissions={payload.permissions || []} />
-              <ProfileActivityList activity={payload.activity || []} />
-            </div>
-          </div>
-        </>
+        <div className="profile-layout profile-layout-focused profile-layout-single">
+          <ProfileIdentity
+            identity={payload.identity || {}}
+            barangayProfile={payload.barangay_profile || {}}
+            settingsMenu={(
+              <ActionMenu
+                label="Profile settings"
+                buttonClassName="profile-settings-button"
+                icon={<Settings size={17} />}
+                actions={profileActions}
+              />
+            )}
+          />
+        </div>
       )}
 
       <ProfileEditModal
@@ -168,6 +167,12 @@ export default function ProfilePage() {
         isSaving={isSaving}
         onClose={() => setIsPasswordOpen(false)}
         onSubmit={submitPassword}
+      />
+
+      <DeleteAccountModal
+        isOpen={isDeleteOpen}
+        identity={payload?.identity || {}}
+        onClose={() => setIsDeleteOpen(false)}
       />
     </section>
   )

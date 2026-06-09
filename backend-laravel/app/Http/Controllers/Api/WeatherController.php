@@ -3,76 +3,36 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\WeatherSnapshotService;
+use App\Services\WeatherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
 
 class WeatherController extends Controller
 {
-    private WeatherSnapshotService $weather;
+    private WeatherService $service;
 
-    public function __construct(WeatherSnapshotService $weather)
+    public function __construct(WeatherService $service)
     {
-        $this->weather = $weather;
+        $this->service = $service;
     }
 
     public function workspace(): JsonResponse
     {
-        $activeEvent = $this->weather->getActiveEvent();
-
-        return response()->json([
-            'data' => $this->weather->pageData($activeEvent?->event_id),
-        ]);
+        return $this->service->workspace();
     }
 
     public function index(string $eventId): JsonResponse
     {
-        if (! $this->weather->findEvent($eventId)) {
-            return response()->json([
-                'message' => 'Disaster event record was not found.',
-            ], 404);
-        }
-
-        return response()->json([
-            'data' => [
-                'logs' => $this->weather->getWeatherLogs($eventId),
-            ],
-        ]);
+        return $this->service->index($eventId);
     }
 
     public function refreshWorkspace(Request $request): JsonResponse
     {
-        $activeEvent = $this->weather->getActiveEvent();
-
-        return $this->saveRefresh($activeEvent?->event_id);
+        return $this->service->refreshWorkspace($request);
     }
 
     public function refreshEvent(Request $request, string $eventId): JsonResponse
     {
-        if (! $this->weather->findEvent($eventId)) {
-            return response()->json([
-                'message' => 'Disaster event record was not found.',
-            ], 404);
-        }
-
-        return $this->saveRefresh($eventId);
-    }
-
-    private function saveRefresh(?string $eventId): JsonResponse
-    {
-        try {
-            $result = $this->weather->saveLatestSnapshot($eventId);
-        } catch (RuntimeException $exception) {
-            return response()->json([
-                'message' => $exception->getMessage(),
-            ], 502);
-        }
-
-        return response()->json([
-            'message' => $result['message'],
-            'data' => $result['data'],
-        ], $result['status']);
+        return $this->service->refreshEvent($request, $eventId);
     }
 }
-

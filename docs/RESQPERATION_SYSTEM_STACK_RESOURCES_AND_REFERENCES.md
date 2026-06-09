@@ -504,20 +504,24 @@ Temporary development logins:
 ```text
 HQ/Admin:           2024035500 / password
 Household Mobile:   2024035501 / password
-Rescuer Mobile:     2024035502 / password
+Rescuer Mobile:     BDRRM-SAR-001 / password
 ```
 
 New HQ-created rescuer account format:
 
 ```text
-RTR-{TEAM_CODE}-#####
-Example: RTR-SAR-24001
+BDRRM-{TEAM_CODE}-###
+Example: BDRRM-SAR-001
 ```
+
+The sequence is counted per team code. Example: first MED is `BDRRM-MED-001`, first SAR is `BDRRM-SAR-001`, second SAR is `BDRRM-SAR-002`.
+
+Rescuer profile usernames are separate human-readable handles stored in `users.username`, such as `vinzon.arellano`. The BDRRM value stays in `responders.responder_code` and `responders.username`.
 
 New internal rescuer user ID format:
 
 ```text
-USR-RESCUER-RTR-{TEAM_CODE}-#####
+USR-RESCUER-BDRRM-{TEAM_CODE}-###
 ```
 
 ## External APIs, Data Sources, and Providers
@@ -1217,4 +1221,3 @@ The strongest technical justifications are:
 - Privacy notice and consent text for location/device data.
 - Backup procedure for shared MySQL.
 - User manual or operations guide for HQ/Admin.
-

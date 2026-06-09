@@ -1,14 +1,13 @@
 import { Database, Download, Filter, RefreshCcw } from 'lucide-react'
+import PageHeader from '../components/ui/PageHeader'
 
 export default function PlaceholderPage({ page }) {
   return (
     <section className="page active">
-      <div className="pg-head">
-        <div>
-          <h1 className="pg-title">{page.title}</h1>
-          <p className="pg-sub">{page.summary}</p>
-        </div>
-        <div className="pg-actions">
+      <PageHeader
+        title={page.title}
+        actions={
+          <>
           <button className="btn btn-secondary btn-sm" type="button">
             <RefreshCcw size={14} />
             Refresh
@@ -21,15 +20,9 @@ export default function PlaceholderPage({ page }) {
             <Download size={14} />
             Export
           </button>
-        </div>
-      </div>
-
-      <div className="page-ops-row">
-        <div className="left">
-          <span className="status-pill">{page.kicker}</span>
-          <span className="muted-note">Prototype-matched module area. Backend data will be connected per checklist.</span>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="panel module-preview-panel">
         <div className="panel-head">

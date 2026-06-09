@@ -86,7 +86,6 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
           <div className="event-copy">
             <span className="event-kicker">No active disaster</span>
             <strong className="event-name">Dashboard is on standby</strong>
-            <span className="event-note">Declare or broadcast an event to start monitoring household reports.</span>
           </div>
         </div>
         <button className="event-action" type="button" onClick={onOpenBroadcast}>Declare event -&gt;</button>

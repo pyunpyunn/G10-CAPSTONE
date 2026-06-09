@@ -7,16 +7,13 @@ export function getStats(dashboard) {
     evacuated: 0,
     unsafe: 0,
   }
-  const hasActiveEvent = Boolean(dashboard?.active_event)
-  const inactiveSub = hasActiveEvent ? '' : 'No active event'
-
   return [
-    { label: 'Total households', value: households.total, sub: 'Registered records' },
-    { label: 'Unchecked', value: households.unchecked, sub: hasActiveEvent ? 'No event report yet' : inactiveSub, tone: 'slate' },
-    { label: 'Safe total', value: households.safe_total, sub: hasActiveEvent ? 'Safe only + evacuated' : inactiveSub, tone: 'green' },
-    { label: 'Safe only', value: households.safe_only, sub: hasActiveEvent ? 'Reported safe at location' : inactiveSub, tone: 'green' },
-    { label: 'Evacuated', value: households.evacuated, sub: hasActiveEvent ? 'At evacuation area' : inactiveSub, tone: 'blue' },
-    { label: 'Unsafe', value: households.unsafe, sub: hasActiveEvent ? 'Needs dispatch focus' : inactiveSub, tone: 'red' },
+    { label: 'Total households', value: households.total },
+    { label: 'Unchecked', value: households.unchecked, tone: 'slate' },
+    { label: 'Safe total', value: households.safe_total, tone: 'green' },
+    { label: 'Safe only', value: households.safe_only, tone: 'green' },
+    { label: 'Evacuated', value: households.evacuated, tone: 'blue' },
+    { label: 'Unsafe', value: households.unsafe, tone: 'red' },
   ]
 }
 

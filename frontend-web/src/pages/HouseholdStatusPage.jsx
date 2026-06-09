@@ -186,7 +186,6 @@ export default function HouseholdStatusPage() {
     <section className="page active household-page">
       <PageHeader
         title="Household Status"
-        subtitle="Review latest reports, household members, synced devices, battery level, and last known location."
         actions={
           <>
             <button className="btn btn-secondary btn-sm" type="button" onClick={loadHouseholds}>

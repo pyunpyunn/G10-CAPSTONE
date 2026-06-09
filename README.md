@@ -41,18 +41,30 @@ For local development testing:
 | --- | --- | --- | --- |
 | HQ/Admin | `2024035500` | `password` | Web |
 | Household Resident | `2024035501` | `password` | Mobile |
-| Rescuer | `2024035502` | `password` | Mobile |
+| Household Resident Setup Test | `2024035503` | `password` | Mobile |
+| Rescuer Temp SAR Test | `BDRRM-SAR-001` | `password` | Mobile |
+| Rescuer Medical Test | `BDRRM-MED-001` | `password` | Mobile |
+| Rescuer SAR Test | `BDRRM-SAR-002` | `password` | Mobile |
 
 ID note:
 
-- The temporary seeded test accounts still use the old 10-digit numeric `username` pattern.
-- New HQ-created rescuer accounts now follow the shared DB format `RTR-{TEAM_CODE}-#####`, such as `RTR-SAR-24001`.
+- Login credentials are not hardcoded in the app. The backend checks the shared MySQL `users` table password hash, then falls back to the linked `responders` account ID for rescuer login.
+- Shared SafeTrack household accounts can log in when their account exists in `users` with `role_key = household_resident`, a valid `password`, and a linked `household_id`.
+- The login field accepts DB-backed identifiers: `username`, `email`, `user_id`, linked `household_id`, or rescuer `BDRRM` account ID.
+- Household and HQ/Admin temporary test accounts still use the old 10-digit numeric `username` pattern.
+- Rescuer accounts follow one shared DB format only: `BDRRM-{TEAM_CODE}-###`, such as `BDRRM-SAR-001`.
+- The sequence is per team code. Example: the first Medical / First Aid account is `BDRRM-MED-001`; the second SAR account is `BDRRM-SAR-002`.
+- Rescuer mobile profile usernames are human-readable handles, such as `vinzon.arellano`. The BDRRM account ID remains the official account/login ID.
 - New rescuer internal `user_id` values use the shared readable prefix:
-  - `USR-RESCUER-RTR-SAR-24001`
+  - `USR-RESCUER-BDRRM-SAR-001`
+- Rescuer mobile login uses the BDRRM account ID:
+  - `BDRRM-SAR-001`
+  - `BDRRM-MED-001`
+  - `BDRRM-SAR-002`
 - Older temporary internal `user_id` values remain valid for development testing:
   - `USR-HQ-2024035500`
   - `USR-HH-2024035501`
-  - `USR-RSC-2024035502`
+  - `USR-HH-2024035503`
 - Temporary mobile account SQL proposal: `docs/sql_proposals/2026_06_02_g10_temporary_mobile_login_accounts.sql`
 
 ## Set Up Feature Checklist
@@ -140,7 +152,7 @@ Backend:
 
 ```bash
 cd backend-laravel
-php artisan serve --host=127.0.0.1 --port=8000
+php artisan serve --host=0.0.0.0 --port=8000
 php artisan test
 php artisan route:list
 php artisan config:clear
@@ -176,11 +188,20 @@ npx tsc --noEmit
 npm run lint
 ```
 
+Mobile API connection:
+
+```env
+EXPO_PUBLIC_API_BASE_URL=http://192.168.112.109:8000/api/v1
+```
+
+For Expo Go on Android/iPhone, the Laravel backend must run with `--host=0.0.0.0` so the phone can reach the API through the laptop Wi-Fi IP.
+
 Local development URLs:
 
 ```text
 Web app: http://127.0.0.1:5175/login
 Backend API: http://127.0.0.1:8000/api/v1
+Mobile API: http://192.168.112.109:8000/api/v1
 ```
 
 

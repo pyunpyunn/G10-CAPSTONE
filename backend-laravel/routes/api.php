@@ -5,11 +5,13 @@ use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DisasterBroadcastController;
 use App\Http\Controllers\Api\HouseholdStatusController;
+use App\Http\Controllers\Api\HouseholdMobileController;
 use App\Http\Controllers\Api\MappingController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ResourceRequestController;
 use App\Http\Controllers\Api\RescuerAccountController;
+use App\Http\Controllers\Api\RescuerMobileController;
 use App\Http\Controllers\Api\RescueDispatchController;
 use App\Http\Controllers\Api\SituationReportController;
 use App\Http\Controllers\Api\WeatherController;
@@ -30,6 +32,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/notifications/clear-all', [NotificationController::class, 'clearAll']);
             Route::get('/profile', [ProfileController::class, 'show']);
             Route::patch('/profile', [ProfileController::class, 'update']);
+            Route::patch('/profile/barangay', [ProfileController::class, 'updateBarangay']);
             Route::patch('/profile/password', [ProfileController::class, 'changePassword']);
             Route::post('/dashboard/active-event/close', [DashboardController::class, 'closeActiveEvent']);
             Route::get('/disaster-events', [DisasterBroadcastController::class, 'index']);
@@ -80,12 +83,38 @@ Route::prefix('v1')->group(function () {
             Route::post('/households/{householdId}/status-logs', [HouseholdStatusController::class, 'storeStatusLog']);
         });
 
+        Route::middleware('role:household_resident')->group(function () {
+            Route::get('/household/overview', [HouseholdMobileController::class, 'overview']);
+            Route::post('/household/setup', [HouseholdMobileController::class, 'completeSetup']);
+            Route::post('/household/device-location', [HouseholdMobileController::class, 'updateDeviceLocation']);
+            Route::patch('/household/members/{memberId}', [HouseholdMobileController::class, 'updateMember']);
+            Route::post('/household/status', [HouseholdMobileController::class, 'storeStatus']);
+            Route::get('/household/status-history', [HouseholdMobileController::class, 'statusHistory']);
+            Route::get('/household/qr', [HouseholdMobileController::class, 'qr']);
+            Route::get('/household/trusted-households', [HouseholdMobileController::class, 'trustedHouseholds']);
+            Route::get('/household/trusted-households/lookup/{householdId}', [HouseholdMobileController::class, 'lookupTrustedHousehold']);
+            Route::post('/household/trusted-households', [HouseholdMobileController::class, 'storeTrustedHousehold']);
+        });
+
         Route::middleware('role:super_admin,admin,rescuer')->group(function () {
             Route::patch('/dispatches/{assignmentId}', [RescueDispatchController::class, 'update']);
         });
 
         Route::middleware('role:rescuer')->group(function () {
             Route::patch('/dispatches/{assignmentId}/location', [RescueDispatchController::class, 'updateLocation']);
+
+            Route::get('/rescuer/profile', [RescuerMobileController::class, 'profile']);
+            Route::patch('/rescuer/profile', [RescuerMobileController::class, 'updateProfile']);
+            Route::get('/rescuer/overview', [RescuerMobileController::class, 'overview']);
+            Route::get('/rescuer/assignments', [RescuerMobileController::class, 'assignments']);
+            Route::get('/rescuer/assignments/{assignmentId}', [RescuerMobileController::class, 'assignment']);
+            Route::patch('/rescuer/assignments/{assignmentId}/status', [RescuerMobileController::class, 'updateAssignmentStatus']);
+            Route::post('/rescuer/assignments/{assignmentId}/location', [RescuerMobileController::class, 'storeLocation']);
+            Route::get('/rescuer/field-reports', [RescuerMobileController::class, 'fieldReports']);
+            Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport']);
+            Route::get('/rescuer/resource-requests', [RescuerMobileController::class, 'resourceRequests']);
+            Route::post('/rescuer/resource-requests', [RescuerMobileController::class, 'storeResourceRequest']);
+            Route::patch('/rescuer/resource-requests/{requestId}/cancel', [RescuerMobileController::class, 'cancelResourceRequest']);
         });
     });
 });

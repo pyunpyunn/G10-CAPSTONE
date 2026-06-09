@@ -7,10 +7,10 @@
 -- IMPORTANT:
 -- 1. Review before running on the shared DB.
 -- 2. This script does not delete, drop, or rename anything.
--- 3. Login IDs follow the existing temporary HQ/Admin login pattern:
+-- 3. Login IDs follow the agreed role format:
 --    2024035500 = HQ/Admin
 --    2024035501 = Household
---    2024035502 = Rescuer
+--    BDRRM-SAR-001 = Rescuer
 -- 4. Temporary password for both accounts is: password
 
 -- BCrypt hash for password: password
@@ -100,10 +100,10 @@ INSERT INTO users (
     deleted_at
 )
 SELECT
-    'USR-RSC-2024035502',
+    'USR-RESCUER-BDRRM-SAR-001',
     'Temporary Rescuer',
     'User',
-    '2024035502',
+    'temporary.rescuer.user',
     'rescuer.temp@resqperation.local',
     @temporary_password_hash,
     roles.role_id,
@@ -117,7 +117,7 @@ SELECT
 FROM roles
 WHERE roles.role_key = 'rescuer'
   AND NOT EXISTS (
-      SELECT 1 FROM users WHERE username = '2024035502'
+      SELECT 1 FROM users WHERE user_id = 'USR-RESCUER-BDRRM-SAR-001'
   )
 LIMIT 1;
 
@@ -143,11 +143,11 @@ INSERT INTO responders (
 )
 SELECT
     2024035502,
-    'USR-RSC-2024035502',
-    'RSC-2024035502',
+    'USR-RESCUER-BDRRM-SAR-001',
+    'BDRRM-SAR-001',
     'USR-HQ-2024035500',
-    NULL,
-    '2024035502',
+    (SELECT team_id FROM rescue_teams WHERE team_code = 'SAR' LIMIT 1),
+    'BDRRM-SAR-001',
     @temporary_password_hash,
     'Temporary Rescuer User',
     'Responder',
@@ -159,5 +159,5 @@ SELECT
     0,
     NOW()
 WHERE NOT EXISTS (
-    SELECT 1 FROM responders WHERE username = '2024035502'
+    SELECT 1 FROM responders WHERE username = 'BDRRM-SAR-001'
 );

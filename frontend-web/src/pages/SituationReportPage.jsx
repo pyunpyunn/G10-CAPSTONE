@@ -12,6 +12,7 @@ import SituationEventPanel from '../components/situation/SituationEventPanel'
 import SitrepGenerateModal from '../components/situation/SitrepGenerateModal'
 import SitrepPreview from '../components/situation/SitrepPreview'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import {
   buildGeneratePayload,
   downloadSituationCsv,
@@ -170,6 +171,8 @@ export default function SituationReportPage() {
 
   return (
     <section className="page active situation-page">
+      <PageHeader title="Situation Reporting" />
+
       {isLoading && <LoadingState message="Loading Situation Reporting..." />}
       {error && <div className="form-error">{error}</div>}
 

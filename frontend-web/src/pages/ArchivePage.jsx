@@ -6,6 +6,7 @@ import ArchiveRecordModal from '../components/archive/ArchiveRecordModal'
 import ArchiveTable from '../components/archive/ArchiveTable'
 import ArchiveTabs from '../components/archive/ArchiveTabs'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import {
   ARCHIVE_TABS,
   archiveErrorMessage,
@@ -103,16 +104,14 @@ export default function ArchivePage() {
 
   return (
     <section className="page active archive-page">
-      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} />
-
-      <div className="page-ops-row">
-        <div className="left">
-          <span className="ops-label">Archive records</span>
-        </div>
-        <div className="right">
+      <PageHeader
+        title="Archive"
+        actions={
           <ArchiveDownloadMenu disabled={!payload || isLoading} onDownload={downloadCategory} />
-        </div>
-      </div>
+        }
+      />
+
+      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} />
 
       {isLoading && <LoadingState message="Loading archive records..." />}
       {error && <div className="form-error">{error}</div>}

@@ -86,6 +86,9 @@ class BarangayProfileService
             'name' => $name,
             'city_name' => $profile->city_name,
             'province_name' => $profile->province_name,
+            'office_address' => $profile->office_address,
+            'contact_number' => $profile->contact_number,
+            'email' => $profile->email,
             'center' => [
                 'latitude' => (float) $profile->center_latitude,
                 'longitude' => (float) $profile->center_longitude,
@@ -119,6 +122,9 @@ class BarangayProfileService
             'name' => $name,
             'city_name' => env('SYSTEM_CITY_NAME'),
             'province_name' => env('SYSTEM_PROVINCE_NAME'),
+            'office_address' => env('SYSTEM_OFFICE_ADDRESS'),
+            'contact_number' => env('SYSTEM_CONTACT_NUMBER'),
+            'email' => env('SYSTEM_EMAIL'),
             'center' => [
                 'latitude' => $latitude,
                 'longitude' => $longitude,
@@ -150,4 +156,3 @@ class BarangayProfileService
         return $json ? $this->decodeBounds($json) : self::DEFAULT_BOUNDS;
     }
 }
-

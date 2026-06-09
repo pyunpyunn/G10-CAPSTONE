@@ -3,7 +3,7 @@ export default function StatCard({ label, value, sub, tone }) {
     <div className={`stat-card ${tone ? `c-${tone}` : ''}`}>
       <div className="lbl">{label}</div>
       <div className="val">{value}</div>
-      <div className="sub">{sub}</div>
+      {sub && <div className="sub">{sub}</div>}
     </div>
   )
 }
