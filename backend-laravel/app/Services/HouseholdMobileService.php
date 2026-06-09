@@ -1439,16 +1439,31 @@ class HouseholdMobileService
 
         $value = trim($relationship);
         $key = Str::of($value)->lower()->replace(['/', '-'], ' ')->snake()->toString();
+        $keys = collect([$key]);
 
-        $query = DB::table('relationships')
-            ->whereRaw('LOWER(relationship_label) = ?', [Str::lower($value)])
-            ->orWhere('relationship_key', $key);
-
-        if (Str::contains($key, 'relative')) {
-            $query->orWhere('relationship_key', 'other');
+        if (in_array($key, ['son', 'daughter', 'son_daughter'], true)) {
+            $keys->push('child');
         }
 
-        return $query->value('relationship_id') ? (int) $query->value('relationship_id') : null;
+        if (in_array($key, ['father', 'mother', 'father_mother'], true)) {
+            $keys->push('parent');
+        }
+
+        if (in_array($key, ['brother', 'sister', 'brother_sister'], true)) {
+            $keys->push('sibling');
+        }
+
+        if (Str::contains($key, 'relative')) {
+            $keys->push('other');
+        }
+
+        $id = DB::table('relationships')
+            ->whereRaw('LOWER(relationship_label) = ?', [Str::lower($value)])
+            ->orWhereIn('relationship_key', $keys->unique()->values()->all())
+            ->orderBy('relationship_id')
+            ->value('relationship_id');
+
+        return $id ? (int) $id : null;
     }
 
     private function genderId(?string $gender): ?int
@@ -1477,14 +1492,14 @@ class HouseholdMobileService
         }
 
         if (Str::startsWith($value, 'm')) {
-            return 'Male';
+            return 'M';
         }
 
         if (Str::startsWith($value, 'f')) {
-            return 'Female';
+            return 'F';
         }
 
-        return 'Other';
+        return 'O';
     }
 
     private function label(?string $value): string

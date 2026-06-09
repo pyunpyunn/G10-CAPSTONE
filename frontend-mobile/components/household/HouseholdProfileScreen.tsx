@@ -64,6 +64,8 @@ export function HouseholdProfileScreen({
     try {
       await onSaveDeviceUser(selectedMemberId);
       Alert.alert('Device user saved', 'This mobile device is now assigned to the selected household member.');
+    } catch {
+      // Parent screen already shows the API error message.
     } finally {
       setSavingMember(false);
     }
@@ -94,6 +96,8 @@ export function HouseholdProfileScreen({
         special_needs: memberForm.special_needs.trim() || null,
       });
       Alert.alert('Member saved', 'Family member information was updated.');
+    } catch {
+      // Parent screen already shows the API error message.
     } finally {
       setSavingMemberInfo(false);
     }
@@ -128,6 +132,8 @@ export function HouseholdProfileScreen({
       });
 
       Alert.alert('Geotag updated', 'Your household geotag was saved to the shared database.');
+    } catch {
+      // Parent screen already shows the API error message.
     } finally {
       setSavingGeotag(false);
     }
