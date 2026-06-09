@@ -88,6 +88,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/household/setup', [HouseholdMobileController::class, 'completeSetup']);
             Route::post('/household/device-location', [HouseholdMobileController::class, 'updateDeviceLocation']);
             Route::patch('/household/members/{memberId}', [HouseholdMobileController::class, 'updateMember']);
+            Route::post('/household/members/{memberId}/status', [HouseholdMobileController::class, 'storeMemberStatus']);
             Route::post('/household/status', [HouseholdMobileController::class, 'storeStatus']);
             Route::get('/household/status-history', [HouseholdMobileController::class, 'statusHistory']);
             Route::get('/household/qr', [HouseholdMobileController::class, 'qr']);

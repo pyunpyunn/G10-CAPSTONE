@@ -38,7 +38,7 @@ class HouseholdMobileService
 
         $activeEvent = $this->activeEvent();
         $devices = $this->devices($householdId);
-        $members = $this->members($householdId, $devices, $user);
+        $members = $this->members($householdId, $devices, $user, $activeEvent['event_id'] ?? null);
         $geotag = $this->geotag($householdId);
 
         return response()->json([
@@ -257,6 +257,115 @@ class HouseholdMobileService
         ]);
     }
 
+    public function storeMemberStatus(Request $request, string $memberId): JsonResponse
+    {
+        $user = $request->user();
+        $householdId = $this->householdId($user);
+
+        if (! $householdId) {
+            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
+        }
+
+        foreach (['household_status_logs', 'household_statuses', 'household_members'] as $table) {
+            if (! Schema::hasTable($table)) {
+                return $this->missingTableResponse($table);
+            }
+        }
+
+        $activeEvent = $this->activeEvent();
+
+        if (! $activeEvent) {
+            return response()->json([
+                'message' => 'Family member status can only be saved during an active disaster event.',
+            ], 409);
+        }
+
+        $member = $this->householdMember($householdId, $memberId);
+
+        if (! $member) {
+            return response()->json(['message' => 'Household member was not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'status_key' => ['required', Rule::in(['safe', 'evacuated', 'unsafe', 'needs_help'])],
+            'device_uuid' => ['nullable', 'string', 'max:150'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'location_label' => ['nullable', 'string', 'max:255'],
+            'location_accuracy_m' => ['nullable', 'numeric', 'min:0'],
+            'battery_level' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'signal_strength' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ], [
+            'status_key.required' => 'Choose a family member status first.',
+            'status_key.in' => 'Choose a valid family member status.',
+        ]);
+
+        $status = $this->resolveStatus($validated['status_key']);
+
+        if (! $status) {
+            throw ValidationException::withMessages([
+                'status_key' => ['Selected status is not available in the shared database.'],
+            ]);
+        }
+
+        $now = now();
+        $statusLogId = null;
+        $deviceId = $this->deviceIdForUuid($householdId, $validated['device_uuid'] ?? null);
+        $memberName = $this->personName($member->name ?? null, $member->first_name ?? null, $member->last_name ?? null, 'Household member');
+
+        DB::transaction(function () use ($request, $householdId, $user, $activeEvent, $validated, $status, $now, &$statusLogId, $deviceId, $memberId, $memberName): void {
+            $notes = [
+                'report_type' => 'member_status',
+                'member_id' => $memberId,
+                'member_name' => $memberName,
+                'member_notes' => $validated['notes'] ?? null,
+            ];
+
+            $statusLogId = DB::table('household_status_logs')->insertGetId($this->filterColumns('household_status_logs', [
+                'disaster_id' => $activeEvent['event_id'],
+                'household_id' => $householdId,
+                'status_id' => $status['status_id'],
+                'source' => 'household_member_mobile',
+                'submitted_by_user_id' => $user?->user_id,
+                'device_token_id' => $deviceId,
+                'latitude' => $validated['latitude'] ?? null,
+                'longitude' => $validated['longitude'] ?? null,
+                'location_label' => $validated['location_label'] ?? null,
+                'location_accuracy_m' => $validated['location_accuracy_m'] ?? null,
+                'battery_level' => $validated['battery_level'] ?? null,
+                'signal_strength' => $validated['signal_strength'] ?? null,
+                'notes' => json_encode($notes, JSON_UNESCAPED_SLASHES),
+                'submitted_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]), 'status_log_id');
+
+            $this->writeAuditLog($request, 'mobile_member_status', 'household_status_logs', (string) $statusLogId, array_merge($validated, [
+                'member_id' => $memberId,
+                'member_name' => $memberName,
+            ]));
+        });
+
+        return response()->json([
+            'message' => 'Family member status saved.',
+            'data' => [
+                'status_log_id' => $statusLogId,
+                'member_status' => [
+                    'status_log_id' => $statusLogId,
+                    'member_id' => $memberId,
+                    'member_name' => $memberName,
+                    'status_id' => $status['status_id'],
+                    'status_key' => $validated['status_key'],
+                    'status_label' => $this->mobileStatusLabel($status['status_key'], $status['status_label']),
+                    'notes' => $validated['notes'] ?? null,
+                    'submitted_at' => $now->toDateTimeString(),
+                    'submitted_label' => $this->dateLabel($now->toDateTimeString()),
+                ],
+            ],
+        ], 201);
+    }
+
     public function storeStatus(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -407,7 +516,7 @@ class HouseholdMobileService
                 'household_id' => $household->household_id,
                 'family_name' => $this->familyName($household->household_name ?? $household->household_code ?? $household->household_id),
                 'household_code' => $household->household_code ?? null,
-                'members' => $this->members($trustedHouseholdId, $devices, null)
+                'members' => $this->members($trustedHouseholdId, $devices, null, $this->activeEvent()['event_id'] ?? null)
                     ->map(fn (array $member): array => [
                         'member_id' => $member['member_id'],
                         'name' => $member['name'],
@@ -517,6 +626,26 @@ class HouseholdMobileService
         }
 
         return null;
+    }
+
+    private function householdMember(string $householdId, string $memberId): ?object
+    {
+        $memberKeyColumn = $this->memberKeyColumn();
+
+        if (! $memberKeyColumn) {
+            return null;
+        }
+
+        return DB::table('household_members')
+            ->where('household_id', $householdId)
+            ->where($memberKeyColumn, $memberId)
+            ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->first([
+                $this->firstExistingColumnSelect('household_members', ['member_id', 'id'], 'member_id'),
+                $this->firstExistingColumnSelect('household_members', ['name', 'full_name'], 'name'),
+                $this->optionalColumnSelect('household_members', 'first_name', 'first_name'),
+                $this->optionalColumnSelect('household_members', 'last_name', 'last_name'),
+            ]);
     }
 
     private function resolveTrustedHouseholdId(string $value): ?string
@@ -840,12 +969,13 @@ class HouseholdMobileService
             ->all();
     }
 
-    private function members(string $householdId, $devices, $fallbackUser)
+    private function members(string $householdId, $devices, $fallbackUser, ?string $eventId = null)
     {
         $devicesByMember = collect($devices)
             ->filter(fn (array $device): bool => ! empty($device['member_id']))
             ->groupBy('member_id')
             ->map(fn ($memberDevices) => $memberDevices->first());
+        $statusesByMember = $this->memberStatusRows($householdId, $eventId);
 
         if (! Schema::hasTable('household_members')) {
             return collect([[
@@ -853,6 +983,7 @@ class HouseholdMobileService
                 'name' => $fallbackUser?->full_name ?? $fallbackUser?->username ?? 'Household user',
                 'relationship' => 'Household member',
                 'device' => collect($devices)->first(),
+                'current_status' => null,
             ]]);
         }
 
@@ -884,6 +1015,7 @@ class HouseholdMobileService
             ->get($memberColumns)
             ->map(function (object $member) use ($devicesByMember): array {
                 $device = $devicesByMember->get($member->member_id);
+                $memberStatus = $statusesByMember[(string) $member->member_id] ?? null;
 
                 return [
                     'member_id' => $member->member_id,
@@ -898,6 +1030,7 @@ class HouseholdMobileService
                     'gender' => $member->gender ?? null,
                     'special_needs' => $member->special_needs ?? null,
                     'device' => $device ?: null,
+                    'current_status' => $memberStatus,
                 ];
             })
             ->values();
@@ -911,7 +1044,74 @@ class HouseholdMobileService
             'name' => $fallbackUser?->full_name ?? $fallbackUser?->username ?? 'Household user',
             'relationship' => 'Household member',
             'device' => collect($devices)->first(),
+            'current_status' => null,
         ]]);
+    }
+
+    private function memberStatusRows(string $householdId, ?string $eventId): array
+    {
+        if (! Schema::hasTable('household_status_logs')) {
+            return [];
+        }
+
+        $query = DB::table('household_status_logs as hsl')
+            ->where('hsl.household_id', $householdId);
+
+        if ($eventId && Schema::hasColumn('household_status_logs', 'disaster_id')) {
+            $query->where('hsl.disaster_id', $eventId);
+        }
+
+        if (Schema::hasColumn('household_status_logs', 'source')) {
+            $query->where('hsl.source', 'household_member_mobile');
+        }
+
+        $columns = [
+            $this->optionalColumnSelect('household_status_logs', 'status_log_id', 'status_log_id', 'hsl'),
+            $this->optionalColumnSelect('household_status_logs', 'notes', 'notes', 'hsl'),
+            $this->optionalColumnSelect('household_status_logs', 'submitted_at', 'submitted_at', 'hsl'),
+        ];
+
+        if (Schema::hasTable('household_statuses')) {
+            $query->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id');
+            $columns[] = 'hs.status_id';
+            $columns[] = 'hs.status_key';
+            $columns[] = $this->householdStatusLabelSelect('hs', 'status_label');
+        } else {
+            $columns[] = DB::raw('NULL as status_id');
+            $columns[] = DB::raw('NULL as status_key');
+            $columns[] = DB::raw('NULL as status_label');
+        }
+
+        $orderColumn = Schema::hasColumn('household_status_logs', 'submitted_at')
+            ? 'hsl.submitted_at'
+            : 'hsl.status_log_id';
+
+        return $query
+            ->orderByDesc($orderColumn)
+            ->limit(200)
+            ->get($columns)
+            ->reduce(function (array $statuses, object $log): array {
+                $notes = $this->decodeJson($log->notes ?? null);
+                $memberId = $notes['member_id'] ?? null;
+
+                if (! $memberId || isset($statuses[(string) $memberId])) {
+                    return $statuses;
+                }
+
+                $statuses[(string) $memberId] = [
+                    'status_log_id' => $log->status_log_id,
+                    'member_id' => $memberId,
+                    'member_name' => $notes['member_name'] ?? null,
+                    'status_id' => $log->status_id,
+                    'status_key' => $this->mobileStatusKey($log->status_key),
+                    'status_label' => $this->mobileStatusLabel($log->status_key, $log->status_label),
+                    'notes' => $notes['member_notes'] ?? null,
+                    'submitted_at' => $log->submitted_at,
+                    'submitted_label' => $this->dateLabel($log->submitted_at),
+                ];
+
+                return $statuses;
+            }, []);
     }
 
     private function currentStatus(string $householdId, ?string $eventId): ?array
@@ -978,6 +1178,14 @@ class HouseholdMobileService
         $query = DB::table('household_status_logs as hsl')
             ->where('hsl.household_id', $householdId)
             ->when($eventId && Schema::hasColumn('household_status_logs', 'disaster_id'), fn ($query) => $query->where('hsl.disaster_id', $eventId));
+
+        if (Schema::hasColumn('household_status_logs', 'source')) {
+            $query->where(function ($sourceQuery): void {
+                $sourceQuery
+                    ->whereNull('hsl.source')
+                    ->orWhere('hsl.source', '!=', 'household_member_mobile');
+            });
+        }
 
         $columns = [
             $this->optionalColumnSelect('household_status_logs', 'status_log_id', 'status_log_id', 'hsl'),
@@ -1053,7 +1261,7 @@ class HouseholdMobileService
                     'validation_status' => $row->validation_status ?? 'pending',
                     'member_relationships' => $this->decodeJson($row->member_relationships),
                     'current_status' => $isValidated ? $this->currentStatus($trustedHouseholdId, $activeEvent['event_id'] ?? null) : null,
-                    'members' => $isValidated ? $this->members($trustedHouseholdId, $devices, null)->values() : [],
+                    'members' => $isValidated ? $this->members($trustedHouseholdId, $devices, null, $activeEvent['event_id'] ?? null)->values() : [],
                     'devices' => $devices->values(),
                     'created_at' => $row->created_at,
                 ];

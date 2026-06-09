@@ -36,6 +36,11 @@ class HouseholdMobileController extends Controller
         return $this->service->updateMember($request, $memberId);
     }
 
+    public function storeMemberStatus(Request $request, string $memberId): JsonResponse
+    {
+        return $this->service->storeMemberStatus($request, $memberId);
+    }
+
     public function storeStatus(Request $request): JsonResponse
     {
         return $this->service->storeStatus($request);

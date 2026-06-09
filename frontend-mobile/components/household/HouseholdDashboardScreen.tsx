@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
@@ -17,6 +18,7 @@ type DashboardProps = {
   onOpenQr: () => void;
   onAddTrusted: () => void;
   onOpenTrusted: (household: any) => void;
+  onSaveMemberStatus?: (memberId: string, status: string) => Promise<void>;
   onBackFamily: () => void;
 };
 
@@ -33,6 +35,7 @@ export function HouseholdDashboardScreen({
   onOpenQr,
   onAddTrusted,
   onOpenTrusted,
+  onSaveMemberStatus,
   onBackFamily,
 }: DashboardProps) {
   const activeEvent = overview.active_event;
@@ -161,7 +164,16 @@ export function HouseholdDashboardScreen({
         {members.length === 0 ? (
           <HouseholdEmpty icon="people-outline" title="No members listed" />
         ) : (
-          members.map((member: any) => <MemberRow key={member.member_id || member.name} member={member} />)
+          members.map((member: any) => (
+            <MemberRow
+              key={member.member_id || member.name}
+              member={member}
+              activeEvent={activeEvent}
+              statusOptions={statusOptions}
+              canEditStatus={!viewingTrusted}
+              onSaveMemberStatus={onSaveMemberStatus}
+            />
+          ))
         )}
       </View>
 
@@ -223,7 +235,15 @@ export function HouseholdTrustedScreen({
           {members.length === 0 ? (
             <HouseholdEmpty icon="people-outline" title="No members listed" />
           ) : (
-            members.map((member: any) => <MemberRow key={member.member_id || member.name} member={member} />)
+            members.map((member: any) => (
+              <MemberRow
+                key={member.member_id || member.name}
+                member={member}
+                activeEvent={activeEvent}
+                statusOptions={defaultStatusOptions}
+                canEditStatus={false}
+              />
+            ))
           )}
         </View>
       </View>
@@ -306,13 +326,48 @@ function TrustedHouseholdList({
   );
 }
 
-function MemberRow({ member }: { member: any }) {
+function MemberRow({
+  member,
+  activeEvent,
+  statusOptions,
+  canEditStatus = false,
+  onSaveMemberStatus,
+}: {
+  member: any;
+  activeEvent?: any;
+  statusOptions: any[];
+  canEditStatus?: boolean;
+  onSaveMemberStatus?: (memberId: string, status: string) => Promise<void>;
+}) {
   const device = member.device;
+  const currentStatus = member.current_status || null;
+  const [selectedStatus, setSelectedStatus] = useState(currentStatus?.status_key || 'safe');
+  const [saving, setSaving] = useState(false);
   const batteryText = device?.battery_level === null || device?.battery_level === undefined
     ? 'Battery not sent'
     : `${device.battery_level}% battery`;
   const activityText = device?.is_active ? 'Active' : 'Inactive';
   const locationText = device?.last_location_label || 'No location yet';
+
+  useEffect(() => {
+    setSelectedStatus(currentStatus?.status_key || 'safe');
+  }, [currentStatus?.status_key]);
+
+  async function handleSave() {
+    if (!member.member_id || !onSaveMemberStatus) {
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await onSaveMemberStatus(String(member.member_id), selectedStatus);
+    } catch {
+      // Parent screen already displays the API error.
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <View style={styles.memberRow}>
@@ -327,6 +382,52 @@ function MemberRow({ member }: { member: any }) {
             ? `${batteryText} · ${activityText} · ${locationText}`
             : 'No device registered'}
         </Text>
+        {activeEvent ? (
+          <View style={styles.memberStatusBox}>
+            <View style={styles.memberStatusTop}>
+              <Text style={styles.memberStatusLabel}>Status</Text>
+              <HouseholdBadge
+                label={currentStatus?.status_label || 'Unchecked'}
+                tone={currentStatus?.status_key || 'neutral'}
+              />
+            </View>
+            {currentStatus?.submitted_label ? (
+              <Text style={styles.memberStatusTime}>{currentStatus.submitted_label}</Text>
+            ) : null}
+            {canEditStatus ? (
+              <>
+                <View style={styles.memberStatusGrid}>
+                  {statusOptions.map((status: any) => {
+                    const isSelected = selectedStatus === status.key;
+
+                    return (
+                      <Pressable
+                        key={status.key}
+                        style={[
+                          styles.memberStatusChoice,
+                          { borderColor: statusColor(status.key) },
+                          isSelected && { backgroundColor: statusColor(status.key) },
+                        ]}
+                        onPress={() => setSelectedStatus(status.key)}
+                      >
+                        <Text style={[styles.memberStatusChoiceText, isSelected && styles.memberStatusChoiceTextActive]}>
+                          {status.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <HouseholdButton
+                  label={saving ? 'Saving...' : 'Save member status'}
+                  icon="save-outline"
+                  tone="light"
+                  disabled={saving}
+                  onPress={handleSave}
+                />
+              </>
+            ) : null}
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -571,6 +672,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '700',
+  },
+  memberStatusBox: {
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: palette.secondary,
+  },
+  memberStatusTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  memberStatusLabel: {
+    color: palette.textSoft,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  memberStatusTime: {
+    color: palette.textSoft,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  memberStatusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  memberStatusChoice: {
+    minWidth: '47%',
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: palette.card,
+  },
+  memberStatusChoiceText: {
+    color: palette.text,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  memberStatusChoiceTextActive: {
+    color: '#fff',
   },
   trustedRow: {
     flexDirection: 'row',

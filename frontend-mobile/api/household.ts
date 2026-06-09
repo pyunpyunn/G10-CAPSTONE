@@ -45,6 +45,11 @@ export async function updateHouseholdMember(memberId: string, payload: any) {
   return response.data.data;
 }
 
+export async function saveHouseholdMemberStatus(memberId: string, payload: any) {
+  const response = await api.post(`/household/members/${memberId}/status`, payload);
+  return response.data.data;
+}
+
 export async function saveHouseholdStatus(payload: any) {
   const response = await api.post('/household/status', payload);
   return response.data;

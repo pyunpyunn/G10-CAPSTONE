@@ -21,6 +21,7 @@ import {
   createTrustedHousehold,
   getHouseholdOverview,
   lookupTrustedHousehold,
+  saveHouseholdMemberStatus,
   saveHouseholdStatus,
   updateHouseholdDeviceLocation,
   updateHouseholdMember,
@@ -299,6 +300,39 @@ export default function HouseholdHomeScreen() {
     }
   }
 
+  async function handleSaveMemberStatus(memberId: string, statusKey: string) {
+    if (!overview?.active_event) {
+      Alert.alert('No active disaster', 'Family member status can only be saved during an active disaster event.');
+      return;
+    }
+
+    const locationPayload: any = {};
+
+    if (currentDevice?.latitude && currentDevice?.longitude) {
+      locationPayload.latitude = currentDevice.latitude;
+      locationPayload.longitude = currentDevice.longitude;
+      locationPayload.location_label = currentDevice.last_location_label;
+    } else if (overview?.geotag?.latitude && overview?.geotag?.longitude) {
+      locationPayload.latitude = overview.geotag.latitude;
+      locationPayload.longitude = overview.geotag.longitude;
+      locationPayload.location_label = overview.geotag.location_label;
+      locationPayload.location_accuracy_m = overview.geotag.accuracy_m;
+    }
+
+    try {
+      await saveHouseholdMemberStatus(memberId, {
+        status_key: statusKey,
+        device_uuid: deviceUuid,
+        battery_level: realBatteryLevel ?? undefined,
+        ...locationPayload,
+      });
+      await loadOverview(true);
+    } catch (error: any) {
+      Alert.alert('Unable to save member status', errorMessage(error));
+      throw error;
+    }
+  }
+
   function openTrusted(household: any) {
     const status = String(household.validation_status || '').toLowerCase();
 
@@ -463,6 +497,7 @@ export default function HouseholdHomeScreen() {
         onOpenQr={() => setShowQr(true)}
         onAddTrusted={openAddTrusted}
         onOpenTrusted={openTrusted}
+        onSaveMemberStatus={handleSaveMemberStatus}
         onBackFamily={() => {
           setViewingTrusted(null);
           setActiveTab('trusted');
