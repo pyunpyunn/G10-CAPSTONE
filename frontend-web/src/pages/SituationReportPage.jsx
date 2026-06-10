@@ -173,7 +173,7 @@ export default function SituationReportPage() {
     <section className="page active situation-page">
       <PageHeader title="Situation Reporting" />
 
-      {isLoading && <LoadingState message="Loading Situation Reporting..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && workspace && (
@@ -186,7 +186,7 @@ export default function SituationReportPage() {
           />
 
           {message && <div className="rr-message sr-message">{message}</div>}
-          {isSummaryLoading && <LoadingState message="Loading selected event summary..." />}
+          {isSummaryLoading && <LoadingState />}
 
           {!summary && !isSummaryLoading && (
             <div className="sitrep-empty-state">Choose a disaster event log to load the SitRep summary.</div>

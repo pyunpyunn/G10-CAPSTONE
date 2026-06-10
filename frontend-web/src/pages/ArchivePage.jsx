@@ -113,7 +113,7 @@ export default function ArchivePage() {
 
       <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} />
 
-      {isLoading && <LoadingState message="Loading archive records..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && (

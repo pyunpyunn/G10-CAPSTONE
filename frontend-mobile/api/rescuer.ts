@@ -37,11 +37,11 @@ export async function updateRescuerProfile(payload: any) {
 export async function updateAssignmentStatus(
   assignmentId: number,
   status: string,
-  outcomeNotes?: string
+  payload: any = {}
 ) {
   const response = await api.patch(`/rescuer/assignments/${assignmentId}/status`, {
     status,
-    outcome_notes: outcomeNotes,
+    ...payload,
   });
 
   return response.data.data;

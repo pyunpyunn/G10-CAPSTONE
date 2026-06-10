@@ -99,9 +99,16 @@ export default function RescueDispatchPage() {
     ? teams
     : teams.filter((team) => team.status_key === teamFilter)
 
+  function firstDispatchableHousehold(area) {
+    return area?.recommended_households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
+      || area?.households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
+      || null
+  }
+
   function openNewDispatch() {
     const firstRisk = riskAreas[0]
     const firstOption = firstAssignmentOption(teams, responders)
+    const firstHousehold = firstDispatchableHousehold(firstRisk)
 
     setEditingDispatch(null)
     setSelectedRiskId(firstRisk?.id || '')
@@ -109,6 +116,7 @@ export default function RescueDispatchPage() {
     setForm({
       ...defaultForm(),
       assigned_area: firstRisk?.area_name || '',
+      household_id: firstHousehold?.household_id || '',
       households_to_cover: firstRisk?.to_cover || 0,
       priority_level: firstRisk?.priority || 'high',
     })
@@ -136,6 +144,7 @@ export default function RescueDispatchPage() {
     setAssignmentOption(dispatch.team_id ? `team:${dispatch.team_id}` : `responder:${dispatch.responder_id}`)
     setForm({
       assigned_area: dispatch.assigned_area || '',
+      household_id: dispatch.household_id || '',
       households_to_cover: dispatch.households_to_cover || 0,
       responder_count: dispatch.responder_count || 1,
       priority_level: dispatch.priority_level || 'monitor',
@@ -155,12 +164,26 @@ export default function RescueDispatchPage() {
   }
 
   function selectRiskArea(area) {
+    const firstHousehold = firstDispatchableHousehold(area)
+
     setSelectedRiskId(area.id)
     setForm((current) => ({
       ...current,
       assigned_area: area.area_name,
+      household_id: firstHousehold?.household_id || '',
       households_to_cover: area.to_cover,
       priority_level: area.priority,
+    }))
+  }
+
+  function selectRiskHousehold(area, household) {
+    setSelectedRiskId(area.id)
+    setForm((current) => ({
+      ...current,
+      assigned_area: area.area_name,
+      household_id: household.household_id,
+      households_to_cover: Math.max(1, current.households_to_cover || area.to_cover || 1),
+      priority_level: household.priority_level || area.priority || current.priority_level,
     }))
   }
 
@@ -190,6 +213,11 @@ export default function RescueDispatchPage() {
 
     if (!form.assigned_area.trim()) {
       setFormError('Assigned area is required.')
+      return
+    }
+
+    if (!editingDispatch && !form.household_id) {
+      setFormError('Select a household with GPS from the affected area list. This is required for routed dispatch.')
       return
     }
 
@@ -237,7 +265,7 @@ export default function RescueDispatchPage() {
         }
       />
 
-      {isLoading && <LoadingState message="Loading dispatch teams..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && (
@@ -306,6 +334,7 @@ export default function RescueDispatchPage() {
           riskAreas={riskAreas}
           selectedRiskId={selectedRiskId}
           onSelectRiskArea={selectRiskArea}
+          onSelectRiskHousehold={selectRiskHousehold}
           onSubmit={submitDispatch}
         />
       </Modal>

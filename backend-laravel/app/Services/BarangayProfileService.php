@@ -8,10 +8,10 @@ use Illuminate\Support\Facades\Schema;
 class BarangayProfileService
 {
     private const DEFAULT_BARANGAY = 'Mambaling';
-    private const DEFAULT_CENTER = [10.2898, 123.8790];
+    private const DEFAULT_CENTER = [10.2922, 123.8763];
     private const DEFAULT_BOUNDS = [
-        [10.2805, 123.8688],
-        [10.2987, 123.8890],
+        [10.2820, 123.8700],
+        [10.2972, 123.8842],
     ];
 
     public function current(): array
@@ -159,7 +159,7 @@ class BarangayProfileService
                 'longitude' => $center[1],
             ],
             'bounds' => $this->knownBounds($barangay->barangay_name),
-            'map_zoom' => (int) env('SYSTEM_MAP_ZOOM', env('MAP_BARANGAY_ZOOM', 16)),
+            'map_zoom' => (int) env('SYSTEM_MAP_ZOOM', env('MAP_BARANGAY_ZOOM', 17)),
             'weather_name' => env('WEATHER_LOCATION_NAME', $name),
             'weather' => [
                 'latitude' => (float) env('WEATHER_LATITUDE', $center[0]),
@@ -195,7 +195,7 @@ class BarangayProfileService
                 'longitude' => $longitude,
             ],
             'bounds' => $this->environmentBounds(),
-            'map_zoom' => (int) env('SYSTEM_MAP_ZOOM', env('MAP_BARANGAY_ZOOM', 16)),
+            'map_zoom' => (int) env('SYSTEM_MAP_ZOOM', env('MAP_BARANGAY_ZOOM', 17)),
             'weather_name' => env('WEATHER_LOCATION_NAME', $name),
             'weather' => [
                 'latitude' => (float) env('WEATHER_LATITUDE', $latitude),

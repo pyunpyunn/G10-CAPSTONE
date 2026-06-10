@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { logoutMobile } from '@/api/auth';
@@ -86,8 +87,20 @@ export default function RescuerHomeScreen() {
 
   async function handleStatusChange(assignmentId: number, status: string) {
     try {
-      await updateAssignmentStatus(assignmentId, status);
+      const payload = ['accepted', 'en_route'].includes(status)
+        ? await currentLocationPayload()
+        : {};
+
+      if (payload === null) {
+        return;
+      }
+
+      await updateAssignmentStatus(assignmentId, status, payload);
       await loadOverview(true);
+
+      if (['accepted', 'en_route'].includes(status)) {
+        setActiveTab('map');
+      }
     } catch (error: any) {
       Alert.alert('Unable to update assignment', errorMessage(error));
     }
@@ -95,6 +108,25 @@ export default function RescuerHomeScreen() {
 
   async function handleSendLocation(assignmentId: number, payload: any) {
     await sendAssignmentLocation(assignmentId, payload);
+  }
+
+  async function currentLocationPayload() {
+    const permission = await Location.requestForegroundPermissionsAsync();
+
+    if (permission.status !== 'granted') {
+      Alert.alert('Location required', 'Enable location access so the app can create your road route and HQ can track your rescue movement.');
+      return null;
+    }
+
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+    });
+
+    return {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+      accuracy_m: location.coords.accuracy,
+    };
   }
 
   async function handleSubmitFieldReport(payload: any) {

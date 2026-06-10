@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import MapView, { Circle, Marker } from 'react-native-maps';
+import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineTime } from '@/utils/time';
 import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
@@ -14,19 +14,35 @@ type RescueMapProps = {
 };
 
 const defaultRegion = {
-  latitude: 10.3157,
-  longitude: 123.8854,
+  latitude: 10.2898,
+  longitude: 123.879,
   latitudeDelta: 0.035,
   longitudeDelta: 0.035,
 };
 
 export function RescueMapScreen({ assignments, activeAssignment, onSendLocation }: RescueMapProps) {
   const watcher = useRef<Location.LocationSubscription | null>(null);
+  const autoStartedAssignment = useRef<number | null>(null);
   const [tracking, setTracking] = useState(false);
   const [position, setPosition] = useState<any>(null);
   const [lastUpdated, setLastUpdated] = useState('');
   const [locError, setLocError] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const routeCoordinates = useMemo(() => normalizeRoute(activeAssignment?.route?.coordinates), [activeAssignment?.route?.coordinates]);
+  const trailCoordinates = useMemo(() => normalizeRoute(activeAssignment?.route?.trail_coordinates), [activeAssignment?.route?.trail_coordinates]);
+  const activeTarget = activeAssignment?.latitude && activeAssignment?.longitude
+    ? {
+        latitude: Number(activeAssignment.latitude),
+        longitude: Number(activeAssignment.longitude),
+      }
+    : null;
+  const mapRegion = position
+    ? { ...position, latitudeDelta: 0.018, longitudeDelta: 0.018 }
+    : routeCoordinates[0]
+      ? { ...routeCoordinates[0], latitudeDelta: 0.025, longitudeDelta: 0.025 }
+      : activeTarget
+        ? { ...activeTarget, latitudeDelta: 0.025, longitudeDelta: 0.025 }
+        : defaultRegion;
 
   useEffect(() => {
     return () => {
@@ -34,7 +50,11 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
     };
   }, []);
 
-  async function startTracking() {
+  const startTracking = useCallback(async () => {
+    if (tracking) {
+      return;
+    }
+
     const permission = await Location.requestForegroundPermissionsAsync();
 
     if (permission.status !== 'granted') {
@@ -74,7 +94,18 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
         }
       }
     );
-  }
+  }, [activeAssignment?.assignment_id, onSendLocation, tracking]);
+
+  useEffect(() => {
+    const shouldAutoTrack = activeAssignment?.assignment_id
+      && ['accepted', 'en_route'].includes(activeAssignment.status_key)
+      && autoStartedAssignment.current !== activeAssignment.assignment_id;
+
+    if (shouldAutoTrack) {
+      autoStartedAssignment.current = activeAssignment.assignment_id;
+      startTracking();
+    }
+  }, [activeAssignment?.assignment_id, activeAssignment?.status_key, startTracking]);
 
   function stopTracking() {
     watcher.current?.remove();
@@ -140,7 +171,15 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
           </View>
         ) : null}
 
-        <MapView style={styles.map} initialRegion={defaultRegion}>
+        <MapView style={styles.map} region={mapRegion}>
+          {routeCoordinates.length >= 2 ? (
+            <Polyline coordinates={routeCoordinates} strokeColor={palette.evacuated} strokeWidth={5} />
+          ) : null}
+
+          {trailCoordinates.length >= 2 ? (
+            <Polyline coordinates={trailCoordinates} strokeColor={palette.safe} strokeWidth={3} />
+          ) : null}
+
           {mappedAssignments.map((assignment) => (
             <Marker
               key={assignment.assignment_id}
@@ -153,6 +192,15 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
               pinColor={assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated}
             />
           ))}
+
+          {activeTarget ? (
+            <Marker
+              coordinate={activeTarget}
+              title="Dispatch destination"
+              description={activeAssignment?.assigned_area || activeAssignment?.household_id}
+              pinColor={palette.unsafe}
+            />
+          ) : null}
 
           {position ? (
             <>
@@ -172,6 +220,19 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
             icon="location-outline"
             title="No mapped assignments"
           />
+        ) : null}
+
+        {activeAssignment ? (
+          <View style={styles.routeInfo}>
+            <Ionicons name="navigate-outline" size={18} color={palette.evacuated} />
+            <Text style={styles.routeInfoText}>
+              {routeCoordinates.length >= 2
+                ? `${activeAssignment.route?.distance_km || '-'} km · ${activeAssignment.route?.duration_min || '-'} min road route`
+                : activeTarget
+                  ? 'Waiting for road route. Tap Track Me or Accept/En route with GPS enabled.'
+                  : 'This assignment has no household geotag target yet.'}
+            </Text>
+          </View>
         ) : null}
       </View>
 
@@ -198,6 +259,15 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
       </View>
     </View>
   );
+}
+
+function normalizeRoute(points: any[] = []) {
+  return points
+    .map((point) => ({
+      latitude: Number(point.latitude ?? point.lat ?? point[0]),
+      longitude: Number(point.longitude ?? point.lng ?? point[1]),
+    }))
+    .filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
 }
 
 const styles = StyleSheet.create({
@@ -248,6 +318,20 @@ const styles = StyleSheet.create({
     height: 340,
     overflow: 'hidden',
     borderRadius: radius.md,
+  },
+  routeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: palette.secondary,
+  },
+  routeInfoText: {
+    flex: 1,
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
   },
   smallText: {
     color: palette.textSoft,

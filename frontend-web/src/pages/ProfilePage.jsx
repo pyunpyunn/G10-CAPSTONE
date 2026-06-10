@@ -129,7 +129,7 @@ export default function ProfilePage() {
       <PageHeader title="Profile" />
 
       {message && <div className="profile-page-message">{message}</div>}
-      {isLoading && <LoadingState message="Loading profile..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && payload && (

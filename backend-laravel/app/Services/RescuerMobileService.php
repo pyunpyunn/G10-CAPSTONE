@@ -12,6 +12,13 @@ use Illuminate\Validation\ValidationException;
 
 class RescuerMobileService
 {
+    private RoutingService $routingService;
+
+    public function __construct(RoutingService $routingService)
+    {
+        $this->routingService = $routingService;
+    }
+
     public function profile(Request $request): JsonResponse
     {
         $user = $request->user()?->load('role');
@@ -171,6 +178,11 @@ class RescuerMobileService
         $validated = $request->validate([
             'status' => ['required', Rule::in(['accepted', 'en_route', 'on_scene', 'completed', 'cancelled'])],
             'outcome_notes' => ['nullable', 'string', 'max:1000'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'battery_level' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'signal_strength' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'accuracy_m' => ['nullable', 'numeric', 'min:0'],
         ], [
             'status.required' => 'Select the mission status.',
             'status.in' => 'Select a valid mission status.',
@@ -218,6 +230,12 @@ class RescuerMobileService
             ->where('assignment_id', $assignmentId)
             ->update($updates);
 
+        if ($this->hasPoint($validated)) {
+            $this->saveResponderLocation($responder, $validated, $now);
+            $this->saveRouteCoordinate($assignmentId, $validated, $now);
+            $this->savePlannedRoadRoute($assignmentId, $assignment, $validated, $now);
+        }
+
         $this->updateResponderDuty($responder?->responder_id, $responder?->team_id, $status);
         $this->writeAuditLog($request, 'mobile_update_assignment', 'responder_assignments', (string) $assignmentId, $updates);
 
@@ -225,6 +243,7 @@ class RescuerMobileService
             'message' => 'Assignment status updated.',
             'data' => [
                 'assignment' => $this->formatAssignment($this->findAssignment($assignmentId, $responder?->responder_id)),
+                'route' => $this->routeForAssignment($assignmentId),
             ],
         ]);
     }
@@ -256,21 +275,9 @@ class RescuerMobileService
         }
 
         $now = now();
-        $logId = $this->nextId('responder_location_logs', 'log_id');
-
-        DB::table('responder_location_logs')->insert($this->filterColumns('responder_location_logs', [
-            'log_id' => $logId,
-            'responder_id' => $responder->responder_id,
-            'latitude' => $validated['latitude'],
-            'longitude' => $validated['longitude'],
-            'battery_level' => $validated['battery_level'] ?? null,
-            'signal_strength' => $validated['signal_strength'] ?? null,
-            'logged_at' => $now,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]));
-
+        $logId = $this->saveResponderLocation($responder, $validated, $now);
         $this->saveRouteCoordinate($assignmentId, $validated, $now);
+        $this->savePlannedRoadRoute($assignmentId, $assignment, $validated, $now);
         $this->updateResponderDuty($responder->responder_id, $responder->team_id, 'deployed');
         $this->writeAuditLog($request, 'mobile_location_update', 'responder_location_logs', (string) $logId, $validated);
 
@@ -646,7 +653,8 @@ class RescuerMobileService
             return null;
         }
 
-        $coordinates = Schema::hasTable('route_coordinates')
+        $plannedCoordinates = $this->plannedRouteCoordinates($route->route_polyline ?? null);
+        $trailCoordinates = Schema::hasTable('route_coordinates')
             ? DB::table('route_coordinates')
                 ->where('route_id', $route->route_id)
                 ->orderBy('sequence_order')
@@ -658,7 +666,11 @@ class RescuerMobileService
         return [
             'route_id' => $route->route_id,
             'route_status' => $route->route_status ?? 'active',
-            'coordinates' => $coordinates,
+            'route_name' => $route->route_name ?? 'Road route',
+            'distance_km' => $route->estimated_distance_km ?? null,
+            'duration_min' => $route->estimated_duration_min ?? null,
+            'coordinates' => $plannedCoordinates,
+            'trail_coordinates' => $trailCoordinates,
         ];
     }
 
@@ -902,6 +914,7 @@ class RescuerMobileService
             'en_route_at' => $row->en_route_at,
             'arrived_at' => $row->arrived_at,
             'completed_at' => $row->completed_at,
+            'route' => $this->routeForAssignment((int) $row->assignment_id),
         ];
     }
 
@@ -1033,6 +1046,127 @@ class RescuerMobileService
             'accuracy_m' => $validated['accuracy_m'] ?? null,
             'recorded_at' => $now,
         ]));
+    }
+
+    private function saveResponderLocation(?object $responder, array $validated, $now): int
+    {
+        if (! $responder || ! Schema::hasTable('responder_location_logs')) {
+            return 0;
+        }
+
+        $logId = $this->nextId('responder_location_logs', 'log_id');
+
+        DB::table('responder_location_logs')->insert($this->filterColumns('responder_location_logs', [
+            'log_id' => $logId,
+            'responder_id' => $responder->responder_id,
+            'latitude' => $validated['latitude'],
+            'longitude' => $validated['longitude'],
+            'battery_level' => $validated['battery_level'] ?? null,
+            'signal_strength' => $validated['signal_strength'] ?? null,
+            'logged_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]));
+
+        return $logId;
+    }
+
+    private function savePlannedRoadRoute(int $assignmentId, object $assignment, array $start, $now): void
+    {
+        if (! Schema::hasTable('responder_routes') || ! $this->hasPoint($start)) {
+            return;
+        }
+
+        $target = $this->assignmentTarget($assignment);
+
+        if (! $target) {
+            return;
+        }
+
+        $route = $this->routingService->drivingRoute(
+            (float) $start['latitude'],
+            (float) $start['longitude'],
+            $target['latitude'],
+            $target['longitude'],
+        );
+
+        if (! $route) {
+            return;
+        }
+
+        $existingRoute = DB::table('responder_routes')
+            ->where('assignment_id', $assignmentId)
+            ->orderByDesc('created_at')
+            ->first();
+
+        $data = $this->filterColumns('responder_routes', [
+            'assignment_id' => $assignmentId,
+            'route_name' => 'Road route to '.($assignment->assigned_area ?: $assignment->household_id ?: 'assigned location'),
+            'route_status' => 'active',
+            'start_latitude' => $start['latitude'],
+            'start_longitude' => $start['longitude'],
+            'end_latitude' => $target['latitude'],
+            'end_longitude' => $target['longitude'],
+            'estimated_distance_km' => $route['distance_km'],
+            'estimated_duration_min' => $route['duration_min'],
+            'route_polyline' => json_encode($route['coordinates'], JSON_UNESCAPED_SLASHES),
+            'updated_at' => $now,
+        ]);
+
+        if ($existingRoute) {
+            DB::table('responder_routes')
+                ->where('route_id', $existingRoute->route_id)
+                ->update($data);
+
+            return;
+        }
+
+        DB::table('responder_routes')->insert(array_merge($data, $this->filterColumns('responder_routes', [
+            'route_id' => $this->nextId('responder_routes', 'route_id'),
+            'created_at' => $now,
+        ])));
+    }
+
+    private function assignmentTarget(object $assignment): ?array
+    {
+        if ($assignment->household_latitude === null || $assignment->household_longitude === null) {
+            return null;
+        }
+
+        return [
+            'latitude' => (float) $assignment->household_latitude,
+            'longitude' => (float) $assignment->household_longitude,
+        ];
+    }
+
+    private function hasPoint(array $data): bool
+    {
+        return array_key_exists('latitude', $data)
+            && array_key_exists('longitude', $data)
+            && $data['latitude'] !== null
+            && $data['longitude'] !== null;
+    }
+
+    private function plannedRouteCoordinates(?string $polyline): array
+    {
+        if (! $polyline) {
+            return [];
+        }
+
+        $decoded = json_decode($polyline, true);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        return collect($decoded)
+            ->map(fn (array $point): array => [
+                'latitude' => (float) ($point['lat'] ?? $point['latitude'] ?? $point[0] ?? 0),
+                'longitude' => (float) ($point['lng'] ?? $point['longitude'] ?? $point[1] ?? 0),
+            ])
+            ->filter(fn (array $point): bool => $point['latitude'] !== 0.0 && $point['longitude'] !== 0.0)
+            ->values()
+            ->all();
     }
 
     private function updateResponderDuty(?int $responderId, ?int $teamId, string $status): void

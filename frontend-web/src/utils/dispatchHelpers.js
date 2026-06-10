@@ -24,6 +24,7 @@ export const priorityOptions = [
 export function buildRequestBody(option, form) {
   const body = {
     assigned_area: form.assigned_area,
+    household_id: form.household_id || null,
     households_to_cover: Number(form.households_to_cover) || 0,
     responder_count: Number(form.responder_count) || 1,
     priority_level: form.priority_level,
@@ -63,6 +64,7 @@ export function setFormNumber(setForm, key, value) {
 export function defaultForm() {
   return {
     assigned_area: '',
+    household_id: '',
     households_to_cover: 0,
     responder_count: 1,
     priority_level: 'high',
@@ -80,13 +82,13 @@ export function defaultForm() {
 }
 
 export function firstAssignmentOption(teams, responders) {
-  const team = teams.find((item) => item.team_id)
+  const team = teams.find((item) => item.team_id && item.is_available)
 
   if (team) {
     return `team:${team.team_id}`
   }
 
-  const responder = responders[0]
+  const responder = responders.find((item) => item.is_available)
 
   return responder ? `responder:${responder.responder_id}` : ''
 }

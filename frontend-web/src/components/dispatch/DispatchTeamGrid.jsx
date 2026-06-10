@@ -20,6 +20,7 @@ function TeamCard({ team, onOpenUpdate, onOpenNew }) {
   const assigned = team.assigned_households || 0
   const coverage = team.coverage_percent || 0
   const hasActiveAssignment = Boolean(team.active_assignment_id)
+  const canDispatch = hasActiveAssignment || team.is_available
 
   return (
     <article className={`dp-team-card status-${team.status_key}`}>
@@ -57,8 +58,13 @@ function TeamCard({ team, onOpenUpdate, onOpenNew }) {
 
       <div className="dp-team-footer">
         <span className="dp-team-area">{team.assigned_area} {team.assigned_time ? `- ${team.assigned_time}` : ''}</span>
-        <button className={`btn btn-${hasActiveAssignment ? 'secondary' : 'primary'} btn-sm`} type="button" onClick={() => (hasActiveAssignment ? onOpenUpdate(team) : onOpenNew())}>
-          {hasActiveAssignment ? 'Update' : 'Dispatch'}
+        <button
+          className={`btn btn-${hasActiveAssignment ? 'secondary' : 'primary'} btn-sm`}
+          type="button"
+          disabled={!canDispatch}
+          onClick={() => (hasActiveAssignment ? onOpenUpdate(team) : onOpenNew())}
+        >
+          {hasActiveAssignment ? 'Update' : team.is_available ? 'Dispatch' : 'No available responder'}
         </button>
       </div>
     </article>

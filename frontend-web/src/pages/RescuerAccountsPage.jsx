@@ -209,7 +209,7 @@ export default function RescuerAccountsPage() {
         }
       />
 
-      {isLoading && <LoadingState message="Loading verified rescuer roster..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && (

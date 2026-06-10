@@ -11,8 +11,8 @@ type RouteProps = {
 };
 
 const defaultRegion = {
-  latitude: 10.3157,
-  longitude: 123.8854,
+  latitude: 10.2898,
+  longitude: 123.879,
   latitudeDelta: 0.035,
   longitudeDelta: 0.035,
 };
@@ -20,6 +20,8 @@ const defaultRegion = {
 export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) {
   const centers = useMemo(() => evacuationCenters || [], [evacuationCenters]);
   const [selectedId, setSelectedId] = useState<string>('');
+  const [roadRoute, setRoadRoute] = useState<any>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
 
   useEffect(() => {
     if (!selectedId && centers.length) {
@@ -27,30 +29,71 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
     }
   }, [centers, selectedId]);
 
-  const householdPoint = geotag
-    ? {
-        latitude: Number(geotag.latitude),
-        longitude: Number(geotag.longitude),
-      }
-    : null;
+  const householdPoint = useMemo(() => (
+    geotag
+      ? {
+          latitude: Number(geotag.latitude),
+          longitude: Number(geotag.longitude),
+        }
+      : null
+  ), [geotag]);
 
   const selectedCenter = useMemo(() => {
     return centers.find((center) => String(center.evacuation_center_id) === selectedId) || centers[0] || null;
   }, [centers, selectedId]);
 
-  const selectedPoint = selectedCenter
-    ? {
-        latitude: Number(selectedCenter.latitude),
-        longitude: Number(selectedCenter.longitude),
-      }
-    : null;
+  const selectedPoint = useMemo(() => (
+    selectedCenter
+      ? {
+          latitude: Number(selectedCenter.latitude),
+          longitude: Number(selectedCenter.longitude),
+        }
+      : null
+  ), [selectedCenter]);
 
   const mapRegion = householdPoint
     ? { ...householdPoint, latitudeDelta: 0.025, longitudeDelta: 0.025 }
     : defaultRegion;
 
-  const distanceLabel =
-    householdPoint && selectedPoint
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadRoute() {
+      if (!householdPoint || !selectedPoint) {
+        setRoadRoute(null);
+        return;
+      }
+
+      setRouteLoading(true);
+
+      try {
+        const route = await fetchRoadRoute(householdPoint, selectedPoint);
+
+        if (!ignore) {
+          setRoadRoute(route);
+        }
+      } catch {
+        if (!ignore) {
+          setRoadRoute(null);
+        }
+      } finally {
+        if (!ignore) {
+          setRouteLoading(false);
+        }
+      }
+    }
+
+    loadRoute();
+
+    return () => {
+      ignore = true;
+    };
+  }, [householdPoint, selectedPoint]);
+
+  const routeLine = roadRoute?.coordinates?.length >= 2 ? roadRoute.coordinates : [];
+  const distanceLabel = roadRoute
+    ? `${roadRoute.distance_km} km · ${roadRoute.duration_min} min by road`
+    : householdPoint && selectedPoint
       ? `${distanceKm(householdPoint, selectedPoint).toFixed(2)} km direct distance`
       : 'Route distance unavailable';
 
@@ -83,8 +126,8 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
             />
           ))}
 
-          {householdPoint && selectedPoint ? (
-            <Polyline coordinates={[householdPoint, selectedPoint]} strokeColor={palette.safe} strokeWidth={4} />
+          {routeLine.length >= 2 ? (
+            <Polyline coordinates={routeLine} strokeColor={palette.safe} strokeWidth={5} />
           ) : null}
         </MapView>
 
@@ -106,7 +149,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
             <View style={styles.centerText}>
               <Text style={styles.centerTitle}>{selectedCenter.name}</Text>
               <Text style={styles.centerMeta}>{selectedCenter.address || selectedCenter.center_type}</Text>
-              <Text style={styles.distanceText}>{distanceLabel}</Text>
+              <Text style={styles.distanceText}>{routeLoading ? 'Loading road route...' : distanceLabel}</Text>
             </View>
           </View>
         ) : (
@@ -165,6 +208,32 @@ function distanceKm(start: { latitude: number; longitude: number }, end: { latit
 
 function toRadians(value: number) {
   return (value * Math.PI) / 180;
+}
+
+async function fetchRoadRoute(
+  start: { latitude: number; longitude: number },
+  end: { latitude: number; longitude: number }
+) {
+  const startPoint = `${start.longitude},${start.latitude}`;
+  const endPoint = `${end.longitude},${end.latitude}`;
+  const response = await fetch(
+    `https://router.project-osrm.org/route/v1/driving/${startPoint};${endPoint}?overview=full&geometries=geojson`
+  );
+  const data = await response.json();
+  const route = data.routes?.[0];
+
+  if (!route) {
+    return null;
+  }
+
+  return {
+    distance_km: Number((route.distance / 1000).toFixed(2)),
+    duration_min: Math.max(1, Math.round(route.duration / 60)),
+    coordinates: route.geometry.coordinates.map((point: number[]) => ({
+      latitude: point[1],
+      longitude: point[0],
+    })),
+  };
 }
 
 const styles = StyleSheet.create({
