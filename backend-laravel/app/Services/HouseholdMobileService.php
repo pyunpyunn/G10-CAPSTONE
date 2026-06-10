@@ -45,7 +45,7 @@ class HouseholdMobileService
             'data' => [
                 'profile' => [
                     'user' => $this->formatUser($user),
-                    'household' => $this->formatHousehold($household),
+                    'household' => $this->formatHousehold($household, $members->count()),
                 ],
                 'setup' => [
                     'is_setup_complete' => $this->isSetupComplete($householdId, $user?->user_id),
@@ -1575,7 +1575,7 @@ class HouseholdMobileService
         ];
     }
 
-    private function formatHousehold(object $household): array
+    private function formatHousehold(object $household, int $actualMemberCount = 0): array
     {
         return [
             'household_id' => $household->household_id,
@@ -1584,7 +1584,7 @@ class HouseholdMobileService
             'family_name' => $this->familyName($household->household_name ?? $household->household_id),
             'contact_number' => $household->contact_number ?? null,
             'emergency_contact' => $household->emergency_contact ?? null,
-            'member_count' => (int) ($household->member_count ?? 0),
+            'member_count' => $actualMemberCount,
             'address' => $household->full_address ?? 'No address recorded',
             'purok' => $household->purok_sitio ?? 'Not recorded',
             'barangay' => $household->barangay_name ?? 'Not recorded',

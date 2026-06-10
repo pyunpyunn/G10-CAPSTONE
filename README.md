@@ -88,16 +88,18 @@ ID note:
 - [x] Shared React web components created
 - [x] HQ/Admin dashboard API connected to live database data
 - [x] Barangay Profile foundation for shared dashboard/weather/map focus
-- [ ] Disaster Broadcasting module backend and frontend
+- [x] Disaster Broadcasting module backend and frontend
 - [x] Weather Updates module with Open-Meteo auto snapshots and PAGASA advisory links
-- [ ] Mapping module with actual map and geotagged records
-- [ ] Household Status module backend and frontend
-- [ ] Rescue Dispatch module backend and frontend
+- [x] Mapping module with actual map and geotagged records
+- [x] Household Status module backend and frontend
+- [x] Rescue Dispatch module backend and frontend
 - [x] Rescuer Accounts module backend and frontend
 - [x] Resources & Requests module backend and frontend
 - [x] Situation Reporting module backend and frontend
 - [x] Archive module backend and frontend
 - [ ] Push notification sending and receiving
+
+Checklist note: checked module items mean the backend routes, frontend pages, and current build/lint/test checks are present. Push notification delivery is still pending.
 
 ## Current Structure Notes
 

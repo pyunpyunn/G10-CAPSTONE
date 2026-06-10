@@ -16,14 +16,14 @@ export const markerGroups = {
 export const defaultWorkspace = {
   active_event: null,
   barangay: {
-    name: 'Barangay Guadalupe',
+    name: 'Barangay Mambaling',
     center: {
-      latitude: 10.3157,
-      longitude: 123.8854,
+      latitude: 10.2898,
+      longitude: 123.879,
     },
     bounds: [
-      [10.3028, 123.872],
-      [10.3293, 123.8996],
+      [10.2805, 123.8688],
+      [10.2987, 123.889],
     ],
     zoom: 16,
     tile_provider: 'OpenStreetMap Standard',

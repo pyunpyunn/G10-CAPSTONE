@@ -489,19 +489,12 @@ export default function HouseholdHomeScreen() {
         pendingStatus={pendingStatus}
         editingStatus={editingStatus}
         showHistory={showHistory}
-        viewingTrusted={viewingTrusted}
         onSelectStatus={setPendingStatus}
         onSaveStatus={handleSaveStatus}
         onEditStatus={() => setEditingStatus(true)}
         onToggleHistory={() => setShowHistory((value) => !value)}
         onOpenQr={() => setShowQr(true)}
-        onAddTrusted={openAddTrusted}
-        onOpenTrusted={openTrusted}
         onSaveMemberStatus={handleSaveMemberStatus}
-        onBackFamily={() => {
-          setViewingTrusted(null);
-          setActiveTab('trusted');
-        }}
       />
     );
   }

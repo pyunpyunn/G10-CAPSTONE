@@ -10,15 +10,20 @@ type DashboardProps = {
   pendingStatus: string;
   editingStatus: boolean;
   showHistory: boolean;
-  viewingTrusted: any;
   onSelectStatus: (status: string) => void;
   onSaveStatus: () => void;
   onEditStatus: () => void;
   onToggleHistory: () => void;
   onOpenQr: () => void;
+  onSaveMemberStatus?: (memberId: string, status: string) => Promise<void>;
+};
+
+type TrustedScreenProps = {
+  overview: any;
+  viewingTrusted: any;
+  onOpenQr: () => void;
   onAddTrusted: () => void;
   onOpenTrusted: (household: any) => void;
-  onSaveMemberStatus?: (memberId: string, status: string) => Promise<void>;
   onBackFamily: () => void;
 };
 
@@ -27,23 +32,17 @@ export function HouseholdDashboardScreen({
   pendingStatus,
   editingStatus,
   showHistory,
-  viewingTrusted,
   onSelectStatus,
   onSaveStatus,
   onEditStatus,
   onToggleHistory,
   onOpenQr,
-  onAddTrusted,
-  onOpenTrusted,
   onSaveMemberStatus,
-  onBackFamily,
 }: DashboardProps) {
   const activeEvent = overview.active_event;
   const currentStatus = overview.current_status;
-  const members = viewingTrusted ? trustedMembers(viewingTrusted) : overview.members || [];
-  const trusted = overview.trusted?.households || [];
+  const members = overview.members || [];
   const statusOptions = overview.status_options?.length ? overview.status_options : defaultStatusOptions;
-  const trustedStatus = viewingTrusted?.current_status || null;
 
   return (
     <View style={styles.stack}>
@@ -138,29 +137,9 @@ export function HouseholdDashboardScreen({
 
       <View style={styles.card}>
         <HouseholdSection
-          title={viewingTrusted ? `${viewingTrusted.family_name} household` : 'Family members'}
-          action={
-            viewingTrusted ? (
-              <HouseholdButton label="Back" icon="arrow-back-outline" tone="light" onPress={onBackFamily} />
-            ) : (
-              <HouseholdButton label="QR" icon="qr-code-outline" tone="light" onPress={onOpenQr} />
-            )
-          }
+          title="Family members"
+          action={<HouseholdButton label="QR" icon="qr-code-outline" tone="light" onPress={onOpenQr} />}
         />
-        {viewingTrusted && activeEvent ? (
-          <View style={styles.trustedStatusBox}>
-            <View>
-              <Text style={styles.lastSavedLabel}>Trusted household status</Text>
-              <Text style={styles.lastSavedValue}>
-                {trustedStatus ? `${trustedStatus.status_label} · ${trustedStatus.last_saved_label}` : 'No status saved yet'}
-              </Text>
-            </View>
-            <HouseholdBadge
-              label={trustedStatus ? trustedStatus.status_label : 'Unchecked'}
-              tone={trustedStatus?.status_key || 'neutral'}
-            />
-          </View>
-        ) : null}
         {members.length === 0 ? (
           <HouseholdEmpty icon="people-outline" title="No members listed" />
         ) : (
@@ -170,27 +149,12 @@ export function HouseholdDashboardScreen({
               member={member}
               activeEvent={activeEvent}
               statusOptions={statusOptions}
-              canEditStatus={!viewingTrusted}
+              canEditStatus
               onSaveMemberStatus={onSaveMemberStatus}
             />
           ))
         )}
       </View>
-
-      {!viewingTrusted ? (
-        <View style={styles.card}>
-          <HouseholdSection
-            title="Trusted households"
-            action={<HouseholdButton label="Add" icon="add-outline" tone="light" onPress={onAddTrusted} />}
-          />
-          <TrustedHouseholdList
-            overview={overview}
-            trusted={trusted}
-            activeEvent={activeEvent}
-            onOpenTrusted={onOpenTrusted}
-          />
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -202,10 +166,7 @@ export function HouseholdTrustedScreen({
   onAddTrusted,
   onOpenTrusted,
   onBackFamily,
-}: Pick<
-  DashboardProps,
-  'overview' | 'viewingTrusted' | 'onOpenQr' | 'onAddTrusted' | 'onOpenTrusted' | 'onBackFamily'
->) {
+}: TrustedScreenProps) {
   const activeEvent = overview.active_event;
   const members = viewingTrusted ? trustedMembers(viewingTrusted) : [];
   const trustedStatus = viewingTrusted?.current_status || null;

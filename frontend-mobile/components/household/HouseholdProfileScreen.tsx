@@ -330,7 +330,7 @@ export function HouseholdProfileScreen({
         <HouseholdSection title="Household information" />
         <InfoRow label="Barangay" value={household.barangay || 'Not recorded'} />
         <InfoRow label="Address" value={household.address || 'Not recorded'} />
-        <InfoRow label="Members" value={String(household.member_count || members.length || 0)} />
+        <InfoRow label="Members" value={String(members.length || household.member_count || 0)} />
         <InfoRow label="Contact" value={household.contact_number || user.contact_number || 'Not recorded'} />
       </View>
 
