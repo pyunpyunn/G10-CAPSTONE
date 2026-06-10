@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import MapView, { Marker } from 'react-native-maps';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { reverseGeocodeAddress } from '@/utils/geocoding';
 import { HouseholdBadge, HouseholdButton, HouseholdSection } from './HouseholdUI';
@@ -25,6 +27,13 @@ const relationships = [
   'Other',
 ];
 
+const defaultRegion = {
+  latitude: 10.3157,
+  longitude: 123.8854,
+  latitudeDelta: 0.025,
+  longitudeDelta: 0.025,
+};
+
 export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: SetupProps) {
   const household = overview.profile?.household || {};
   const members = overview.members || [];
@@ -38,6 +47,7 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
   const [province, setProvince] = useState<string>(household.province === 'Not recorded' ? '' : household.province || '');
   const [memberId, setMemberId] = useState(members[0]?.member_id || '');
   const [relationship, setRelationship] = useState('Head of household');
+  const [photoUri, setPhotoUri] = useState('');
   const [saving, setSaving] = useState(false);
   const [findingAddress, setFindingAddress] = useState(false);
 
@@ -59,7 +69,7 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
       setCity(address.city);
       setProvince(address.province);
     } catch {
-      setLocationLabel('Selected GPS location');
+      setLocationLabel('Selected map location');
     } finally {
       setFindingAddress(false);
     }
@@ -69,7 +79,7 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
     const permission = await Location.requestForegroundPermissionsAsync();
 
     if (permission.status !== 'granted') {
-      Alert.alert('Location required', 'Allow location access on mobile, or open the app in Expo Go to pin on the native map.');
+      Alert.alert('Location required', 'Allow location access or pin the household location on the map.');
       return;
     }
 
@@ -81,9 +91,21 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
     });
   }
 
+  async function pickPhoto() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.75,
+    });
+
+    if (!result.canceled) {
+      setPhotoUri(result.assets[0]?.uri || '');
+    }
+  }
+
   async function handleSave() {
     if (!pin) {
-      Alert.alert('Location required', 'Use GPS on this device or complete setup in Expo Go on Android/iPhone.');
+      Alert.alert('Location required', 'Use your current location or tap the map to pin your household.');
       return;
     }
 
@@ -116,7 +138,7 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
         device_uuid: deviceUuid,
         device_name: 'Household mobile',
         platform: 'expo',
-        photo_uri: null,
+        photo_uri: photoUri || null,
       });
     } finally {
       setSaving(false);
@@ -135,14 +157,14 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
           title="Location"
           action={<HouseholdButton label="Use GPS" icon="locate-outline" tone="light" onPress={useCurrentLocation} />}
         />
-        <View style={styles.webMapFallback}>
-          <Ionicons name="map-outline" size={30} color={palette.navActive} />
-          <Text style={styles.fallbackTitle}>Map pinning is mobile-only</Text>
-          <Text style={styles.fallbackText}>
-            Open this setup screen in Expo Go on Android or iPhone to tap the native map. Web can use GPS only.
-          </Text>
-          <HouseholdBadge label={findingAddress ? 'Finding address...' : pin ? 'GPS selected' : 'No GPS selected'} tone={pin ? 'info' : 'neutral'} />
-        </View>
+        <MapView
+          style={styles.map}
+          initialRegion={pin ? { ...pin, latitudeDelta: 0.018, longitudeDelta: 0.018 } : defaultRegion}
+          onPress={(event) => applyPinnedCoordinate({ ...event.nativeEvent.coordinate, accuracy_m: null })}
+        >
+          {pin ? <Marker coordinate={pin} title="Household pin" /> : null}
+        </MapView>
+        <Text style={styles.mapHint}>{findingAddress ? 'Finding address...' : pin ? 'Pin selected' : 'Use GPS or tap map'}</Text>
       </View>
 
       <View style={styles.card}>
@@ -193,6 +215,16 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
             </Pressable>
           ))}
         </View>
+
+        <View style={styles.photoRow}>
+          <View style={styles.photoPreview}>
+            {photoUri ? <Image source={{ uri: photoUri }} style={styles.photo} /> : <Ionicons name="image-outline" size={26} color={palette.navMuted} />}
+          </View>
+          <View style={styles.photoActions}>
+            <Text style={styles.photoTitle}>Family photo</Text>
+            <HouseholdButton label={photoUri ? 'Change photo' : 'Upload photo'} icon="image-outline" tone="light" onPress={pickPhoto} />
+          </View>
+        </View>
       </View>
 
       <HouseholdButton
@@ -229,30 +261,14 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     backgroundColor: palette.card,
   },
-  webMapFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 220,
-    borderWidth: 1,
-    borderColor: palette.border,
+  map: {
+    height: 280,
     borderRadius: radius.md,
-    padding: spacing.lg,
-    backgroundColor: palette.secondary,
   },
-  fallbackTitle: {
-    color: palette.text,
-    fontSize: 15,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  fallbackText: {
-    maxWidth: 320,
+  mapHint: {
     color: palette.textSoft,
     fontSize: 12,
     fontWeight: '800',
-    lineHeight: 18,
-    textAlign: 'center',
   },
   input: {
     minHeight: 46,
@@ -316,5 +332,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
+  },
+  photoRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'center',
+  },
+  photoPreview: {
+    width: 82,
+    height: 82,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.lg,
+    backgroundColor: palette.secondary,
+    overflow: 'hidden',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+  },
+  photoActions: {
+    flex: 1,
+    gap: 6,
+  },
+  photoTitle: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '900',
   },
 });

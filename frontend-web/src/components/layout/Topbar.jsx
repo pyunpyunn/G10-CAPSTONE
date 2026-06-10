@@ -2,6 +2,7 @@ import { Bell, CheckCircle2, Eye } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getNotifications, markNotificationsRead } from '../../api/notificationApi'
+import resqperationLogo from '../../assets/resqperation-logo.png'
 
 export default function Topbar({ user }) {
   const navigate = useNavigate()
@@ -71,7 +72,7 @@ export default function Topbar({ user }) {
   return (
     <header className="topbar">
       <div className="header-brand" aria-label="RESQPERATION">
-        <div className="header-brand-mark">R</div>
+        <img className="header-brand-logo" src={resqperationLogo} alt="" aria-hidden="true" />
         <strong>RESQPERATION</strong>
       </div>
 

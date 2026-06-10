@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
 
 type RouteProps = {
   geotag: any;
   evacuationCenters: any[];
+};
+
+const defaultRegion = {
+  latitude: 10.3157,
+  longitude: 123.8854,
+  latitudeDelta: 0.035,
+  longitudeDelta: 0.035,
 };
 
 export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) {
@@ -37,6 +45,10 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
       }
     : null;
 
+  const mapRegion = householdPoint
+    ? { ...householdPoint, latitudeDelta: 0.025, longitudeDelta: 0.025 }
+    : defaultRegion;
+
   const distanceLabel =
     householdPoint && selectedPoint
       ? `${distanceKm(householdPoint, selectedPoint).toFixed(2)} km direct distance`
@@ -50,16 +62,38 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
           action={<HouseholdBadge label={selectedCenter ? 'Route ready' : 'No center'} tone={selectedCenter ? 'info' : 'neutral'} />}
         />
 
-        <View style={styles.webMapFallback}>
-          <Ionicons name="map-outline" size={30} color={palette.navActive} />
-          <Text style={styles.fallbackTitle}>Native route map available on mobile</Text>
-          <Text style={styles.fallbackText}>
-            Open this screen in Expo Go on Android or iPhone to view household pins, route lines, and evacuation markers.
-          </Text>
-          <HouseholdBadge label={householdPoint ? 'Household geotag ready' : 'No household geotag'} tone={householdPoint ? 'info' : 'neutral'} />
-        </View>
+        <MapView style={styles.map} initialRegion={mapRegion}>
+          {householdPoint ? (
+            <>
+              <Marker coordinate={householdPoint} title="Your household" description={geotag.location_label} pinColor={palette.navActive} />
+              <Circle center={householdPoint} radius={geotag.accuracy_m || 35} strokeColor="#1f3e5a55" fillColor="#1f3e5a18" />
+            </>
+          ) : null}
 
-        {!householdPoint ? <HouseholdEmpty icon="location-outline" title="No household geotag yet" /> : null}
+          {centers.map((center) => (
+            <Marker
+              key={center.evacuation_center_id}
+              coordinate={{
+                latitude: Number(center.latitude),
+                longitude: Number(center.longitude),
+              }}
+              title={center.name}
+              description={center.address || center.center_type}
+              pinColor={String(center.evacuation_center_id) === selectedId ? palette.safe : palette.evacuated}
+            />
+          ))}
+
+          {householdPoint && selectedPoint ? (
+            <Polyline coordinates={[householdPoint, selectedPoint]} strokeColor={palette.safe} strokeWidth={4} />
+          ) : null}
+        </MapView>
+
+        {!householdPoint ? (
+          <HouseholdEmpty
+            icon="location-outline"
+            title="No household geotag yet"
+          />
+        ) : null}
       </View>
 
       <View style={styles.card}>
@@ -145,30 +179,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: palette.card,
   },
-  webMapFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 240,
-    borderWidth: 1,
-    borderColor: palette.border,
+  map: {
+    height: 340,
+    overflow: 'hidden',
     borderRadius: radius.md,
-    padding: spacing.lg,
-    backgroundColor: palette.secondary,
-  },
-  fallbackTitle: {
-    color: palette.text,
-    fontSize: 15,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  fallbackText: {
-    maxWidth: 320,
-    color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 18,
-    textAlign: 'center',
   },
   selectedBox: {
     flexDirection: 'row',
