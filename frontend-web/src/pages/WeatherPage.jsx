@@ -108,7 +108,7 @@ export default function WeatherPage() {
         }
       />
 
-      {isLoading && <LoadingState message="Loading weather updates..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
       {refreshMessage && <div className="wx-save-message">{refreshMessage}</div>}
 

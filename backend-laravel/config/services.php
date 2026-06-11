@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'osrm' => [
+        'base_url' => env('OSRM_BASE_URL', 'https://router.project-osrm.org'),
+        'ssl_verify' => env('OSRM_SSL_VERIFY', false),
+    ],
+
 ];

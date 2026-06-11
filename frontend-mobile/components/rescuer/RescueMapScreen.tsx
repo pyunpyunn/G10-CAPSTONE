@@ -15,6 +15,8 @@ export function RescueMapScreen({ assignments, activeAssignment }: RescueMapProp
   const activeCount = assignments.filter((item) =>
     ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(item.status_key)
   ).length;
+  const hasActiveTarget = Boolean(activeAssignment?.latitude && activeAssignment?.longitude);
+  const hasRoute = Array.isArray(activeAssignment?.route?.coordinates) && activeAssignment.route.coordinates.length >= 2;
 
   return (
     <View style={styles.stack}>
@@ -41,6 +43,19 @@ export function RescueMapScreen({ assignments, activeAssignment }: RescueMapProp
 
         {mappedAssignments.length === 0 ? (
           <EmptyState icon="location-outline" title="No mapped assignments" />
+        ) : null}
+
+        {activeAssignment ? (
+          <View style={styles.routeInfo}>
+            <Ionicons name="navigate-outline" size={18} color={palette.evacuated} />
+            <Text style={styles.routeInfoText}>
+              {hasRoute
+                ? `${activeAssignment.route?.distance_km || '-'} km · ${activeAssignment.route?.duration_min || '-'} min road route`
+                : hasActiveTarget
+                  ? 'Waiting for road route. Open this screen on mobile with GPS enabled.'
+                  : 'This assignment has no household geotag target yet.'}
+            </Text>
+          </View>
         ) : null}
       </View>
 
@@ -110,6 +125,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 18,
     textAlign: 'center',
+  },
+  routeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: palette.secondary,
+  },
+  routeInfoText: {
+    flex: 1,
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
   },
   smallText: {
     color: palette.textSoft,

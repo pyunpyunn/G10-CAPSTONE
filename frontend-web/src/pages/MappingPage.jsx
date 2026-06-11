@@ -181,7 +181,7 @@ export default function MappingPage() {
         }
       />
 
-      {isLoading && <LoadingState message="Loading mapping workspace..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && (

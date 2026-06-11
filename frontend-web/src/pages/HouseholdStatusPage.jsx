@@ -208,7 +208,7 @@ export default function HouseholdStatusPage() {
         <span>Latest row per household - History on open</span>
       </div>
 
-      {isLoading && <LoadingState message="Loading household status..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && (
@@ -263,7 +263,7 @@ export default function HouseholdStatusPage() {
           )
         }
       >
-        {isDetailLoading && <LoadingState message="Loading household details..." />}
+        {isDetailLoading && <LoadingState />}
         {detailError && <div className="form-error">{detailError}</div>}
         {!isDetailLoading && detail?.household && (
           <HouseholdDetailContent detail={detail} history={history} />

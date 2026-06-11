@@ -81,7 +81,12 @@ function ResponderAvailability({ responders }) {
             <tbody>
               {responders.map((responder) => (
                 <tr key={responder.responder_id}>
-                  <td><strong>{responder.full_name}</strong></td>
+                  <td>
+                    <strong>{responder.full_name}</strong>
+                    {responder.active_assignment_code && (
+                      <div className="dp-table-muted">{responder.active_assignment_code} · {responder.active_assigned_area}</div>
+                    )}
+                  </td>
                   <td>{responder.team_name}</td>
                   <td><DispatchStatusBadge status={responder.status} /></td>
                 </tr>

@@ -257,7 +257,7 @@ export default function ResourcesRequestsPage() {
         }
       />
 
-      {isLoading && <LoadingState message="Loading resource requests..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && (

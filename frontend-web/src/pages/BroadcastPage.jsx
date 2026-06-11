@@ -268,7 +268,7 @@ export default function BroadcastPage() {
         onConfirm={handleCloseActiveEvent}
       />
 
-      {isLoading && <LoadingState message="Loading disaster broadcasting..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && workspace && (

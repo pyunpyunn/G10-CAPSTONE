@@ -184,7 +184,7 @@ export default function NotificationsPage() {
       />
 
       {message && <div className="notification-page-message">{message}</div>}
-      {isLoading && <LoadingState message="Loading notifications..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && (

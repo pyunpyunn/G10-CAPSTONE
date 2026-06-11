@@ -127,7 +127,7 @@ export default function DashboardPage() {
         onConfirm={handleCloseActiveEvent}
       />
 
-      {isLoading && <LoadingState message="Loading dashboard..." />}
+      {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && dashboard && (

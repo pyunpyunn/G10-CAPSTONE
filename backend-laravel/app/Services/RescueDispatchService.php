@@ -103,11 +103,18 @@ class RescueDispatchService
         }
 
         $validated = $this->validateDispatch($request);
+
+        if (empty($validated['household_id'])) {
+            throw ValidationException::withMessages([
+                'household_id' => ['Select a GPS-tagged household target before creating a routed dispatch.'],
+            ]);
+        }
+
         $responderId = $this->resolveResponderId($validated);
 
         if (! $responderId) {
             throw ValidationException::withMessages([
-                'responder_id' => ['Select a responder or a team with at least one assigned responder.'],
+                'responder_id' => ['Select an available responder or a team with at least one available responder.'],
             ]);
         }
 
@@ -115,6 +122,9 @@ class RescueDispatchService
             $now = now();
             $assignmentId = $this->nextId('responder_assignments', 'assignment_id');
             $status = $this->dbStatus($validated['status'] ?? 'dispatched');
+
+            $this->ensureResponderCanReceiveDispatch($responderId);
+            $this->ensureHouseholdCanReceiveDispatch($validated['household_id'] ?? null);
 
             DB::table('responder_assignments')->insert([
                 'assignment_id' => $assignmentId,
@@ -458,6 +468,12 @@ class RescueDispatchService
                 ->count();
 
             if ($unassignedResponders > 0) {
+                $availableResponderId = $this->availableResponderQuery()
+                    ->where(function ($query): void {
+                        $query->whereNull('r.team_id')->orWhere('r.team_id', 0);
+                    })
+                    ->value('r.responder_id');
+
                 $cards->push([
                     'team_id' => null,
                     'team_code' => 'POOL',
@@ -470,7 +486,9 @@ class RescueDispatchService
                     'assigned_households' => 0,
                     'assigned_area' => 'No dispatch area yet',
                     'active_assignment_id' => null,
-                    'active_responder_id' => DB::table('responders')->whereNull('deleted_at')->value('responder_id'),
+                    'active_responder_id' => $availableResponderId ? (int) $availableResponderId : null,
+                    'available_responder_id' => $availableResponderId ? (int) $availableResponderId : null,
+                    'is_available' => (bool) $availableResponderId,
                     'outcomes' => $this->formatOutcomes([]),
                     'coverage_percent' => 0,
                     'assigned_time' => null,
@@ -502,6 +520,10 @@ class RescueDispatchService
         $outcomes = $this->decodeJson($activeAssignment?->outcome_notes);
         $route = $this->decodeJson($activeAssignment?->route_notes);
         $status = $this->formatStatus($activeAssignment?->status ?: $team->duty_status);
+        $availableResponderId = $this->availableResponderQuery()
+            ->where('r.team_id', $team->team_id)
+            ->orderBy('r.responder_id')
+            ->value('r.responder_id');
 
         return [
             'team_id' => $team->team_id,
@@ -516,6 +538,8 @@ class RescueDispatchService
             'assigned_area' => $activeAssignment?->assigned_area ?: 'No dispatch area yet',
             'active_assignment_id' => $activeAssignment?->assignment_id,
             'active_responder_id' => $activeAssignment?->responder_id,
+            'available_responder_id' => $availableResponderId ? (int) $availableResponderId : null,
+            'is_available' => ! $activeAssignment && (bool) $availableResponderId,
             'outcomes' => $this->formatOutcomes($outcomes),
             'coverage_percent' => $this->coveragePercent($outcomes, (int) ($route['households_to_cover'] ?? 0)),
             'assigned_time' => $this->formatTime($activeAssignment?->assigned_at),
@@ -541,18 +565,33 @@ class RescueDispatchService
                 'rt.team_name',
                 'rt.team_code',
             ])
-            ->map(fn (object $responder): array => [
-                'responder_id' => $responder->responder_id,
-                'user_id' => $responder->user_id,
-                'team_id' => $responder->team_id,
-                'full_name' => $responder->full_name ?: 'Unnamed responder',
-                'title' => $responder->title ?: 'Responder',
-                'contact_number' => $responder->contact_number,
-                'team_name' => $responder->team_name ?: 'Unassigned',
-                'team_code' => $responder->team_code,
-                'status' => $this->formatStatus($responder->is_deployed ? 'dispatched' : $responder->duty_status),
-                'last_active_at' => $this->formatDateTime($responder->last_active_at),
-            ])
+            ->map(function (object $responder): array {
+                $activeAssignment = $this->activeAssignmentForResponder((int) $responder->responder_id);
+                $status = $activeAssignment
+                    ? $this->formatStatus($activeAssignment->status)
+                    : $this->formatStatus($responder->duty_status);
+                $dutyKey = $this->statusKey($responder->duty_status);
+                $isAvailable = ! $activeAssignment
+                    && ! (bool) $responder->is_deployed
+                    && ! in_array($dutyKey, ['deployed', 'dispatched', 'accepted', 'en_route', 'on_scene', 'off_duty'], true);
+
+                return [
+                    'responder_id' => $responder->responder_id,
+                    'user_id' => $responder->user_id,
+                    'team_id' => $responder->team_id,
+                    'full_name' => $responder->full_name ?: 'Unnamed responder',
+                    'title' => $responder->title ?: 'Responder',
+                    'contact_number' => $responder->contact_number,
+                    'team_name' => $responder->team_name ?: 'Unassigned',
+                    'team_code' => $responder->team_code,
+                    'status' => $status,
+                    'is_available' => $isAvailable,
+                    'active_assignment_id' => $activeAssignment?->assignment_id,
+                    'active_assignment_code' => $activeAssignment?->assignment_code,
+                    'active_assigned_area' => $activeAssignment?->assigned_area,
+                    'last_active_at' => $this->formatDateTime($responder->last_active_at),
+                ];
+            })
             ->values();
     }
 
@@ -604,22 +643,50 @@ class RescueDispatchService
             ->whereNotNull('h.household_id')
             ->select([
                 'h.household_id',
+                'h.household_code',
                 'h.household_name',
+                'a.full_address',
+                'a.street_address',
+                'a.house_number',
                 DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(a.barangay_name, ''), 'Unassigned') as area_name"),
                 'hs.status_key',
+                'hs.status_label',
                 'hd.needs_dispatch',
                 'hd.priority_level',
+                'hd.last_battery_level',
+                'hd.last_reported_at',
+                DB::raw("EXISTS (
+                    SELECT 1 FROM geotagged_locations gl
+                    WHERE gl.household_id = h.household_id
+                    AND gl.latitude IS NOT NULL
+                    AND gl.longitude IS NOT NULL
+                ) as has_geotag"),
             ])
             ->get();
 
+        $busyHouseholdIds = DB::table('responder_assignments')
+            ->where('disaster_id', $eventId)
+            ->whereNotNull('household_id')
+            ->whereIn('status', $this->activeAssignmentStatuses())
+            ->pluck('assignment_id', 'household_id');
+
         return $rows
             ->groupBy('area_name')
-            ->map(function ($items, string $area): array {
+            ->map(function ($items, string $area) use ($busyHouseholdIds): array {
                 $total = $items->count();
                 $unsafe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'], true) || (bool) $item->needs_dispatch)->count();
                 $unchecked = $items->whereNull('status_key')->count();
                 $toCover = $unsafe + $unchecked;
                 $priority = $unsafe > 0 ? 'critical' : ($unchecked > 0 ? 'high' : 'watch');
+                $households = $items
+                    ->sortBy(fn (object $item): string => sprintf(
+                        '%d%d%s',
+                        $item->needs_dispatch ? 0 : 1,
+                        $item->has_geotag ? 0 : 1,
+                        strtolower($item->household_name ?: $item->household_id)
+                    ))
+                    ->map(fn (object $item): array => $this->formatRiskHousehold($item, $busyHouseholdIds))
+                    ->values();
 
                 return [
                     'id' => str($area)->slug('-')->toString() ?: 'unassigned',
@@ -629,16 +696,14 @@ class RescueDispatchService
                     'priority' => $priority,
                     'priority_label' => $this->label($priority),
                     'total_households' => $total,
+                    'geotagged_households' => $households->where('has_geotag', true)->count(),
                     'unsafe_households' => $unsafe,
                     'unchecked_households' => $unchecked,
                     'to_cover' => $toCover,
-                    'recommended_households' => $items
-                        ->filter(fn (object $item): bool => $item->status_key === null || in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'], true))
-                        ->take(8)
-                        ->map(fn (object $item): array => [
-                            'household_id' => $item->household_id,
-                            'household_name' => $item->household_name ?: $item->household_id,
-                        ])
+                    'households' => $households,
+                    'recommended_households' => $households
+                        ->filter(fn (array $item): bool => $item['needs_dispatch'] || $item['status_key'] === 'unchecked' || in_array($item['status_key'], ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'], true))
+                        ->take(10)
                         ->values(),
                 ];
             })
@@ -762,14 +827,19 @@ class RescueDispatchService
             ->value('leader_responder_id');
 
         if ($leaderId) {
-            return (int) $leaderId;
+            $leaderIsAvailable = $this->availableResponderQuery()
+                ->where('r.responder_id', $leaderId)
+                ->exists();
+
+            if ($leaderIsAvailable) {
+                return (int) $leaderId;
+            }
         }
 
-        return DB::table('responders')
-            ->where('team_id', $validated['team_id'])
-            ->whereNull('deleted_at')
-            ->orderBy('responder_id')
-            ->value('responder_id');
+        return $this->availableResponderQuery()
+            ->where('r.team_id', $validated['team_id'])
+            ->orderBy('r.responder_id')
+            ->value('r.responder_id');
     }
 
     private function authorizeRescuerForDispatch(Request $request, object $dispatch): void
@@ -814,6 +884,122 @@ class RescueDispatchService
                     'updated_at' => $now,
                 ]);
         }
+    }
+
+    private function activeAssignmentStatuses(): array
+    {
+        return ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'];
+    }
+
+    private function activeAssignmentForResponder(int $responderId): ?object
+    {
+        return DB::table('responder_assignments')
+            ->where('responder_id', $responderId)
+            ->whereIn('status', $this->activeAssignmentStatuses())
+            ->orderByDesc('assigned_at')
+            ->first();
+    }
+
+    private function availableResponderQuery()
+    {
+        return DB::table('responders as r')
+            ->whereNull('r.deleted_at')
+            ->where(function ($query): void {
+                $query->whereNull('r.is_deployed')->orWhere('r.is_deployed', false);
+            })
+            ->where(function ($query): void {
+                $query->whereNull('r.duty_status')
+                    ->orWhereNotIn('r.duty_status', ['deployed', 'dispatched', 'accepted', 'en_route', 'on_scene', 'off_duty']);
+            })
+            ->whereNotExists(function ($query): void {
+                $query->select(DB::raw(1))
+                    ->from('responder_assignments as active_ra')
+                    ->whereColumn('active_ra.responder_id', 'r.responder_id')
+                    ->whereIn('active_ra.status', $this->activeAssignmentStatuses());
+            });
+    }
+
+    private function ensureResponderCanReceiveDispatch(int $responderId): void
+    {
+        $activeAssignment = $this->activeAssignmentForResponder($responderId);
+
+        if (! $activeAssignment) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'responder_id' => [
+                'This responder already has an active dispatch ('.$activeAssignment->assignment_code.'). Complete or cancel that assignment before assigning another one.',
+            ],
+        ]);
+    }
+
+    private function ensureHouseholdCanReceiveDispatch(?string $householdId): void
+    {
+        if (! $householdId) {
+            return;
+        }
+
+        $householdExists = DB::table('households')
+            ->where('household_id', $householdId)
+            ->whereNull('deleted_at')
+            ->exists();
+
+        if (! $householdExists) {
+            throw ValidationException::withMessages([
+                'household_id' => ['Select a valid household from the affected area list.'],
+            ]);
+        }
+
+        $hasGeotag = DB::table('geotagged_locations')
+            ->where('household_id', $householdId)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->exists();
+
+        if (! $hasGeotag) {
+            throw ValidationException::withMessages([
+                'household_id' => ['Select a household with saved GPS coordinates. Routing cannot be generated for households without a geotag.'],
+            ]);
+        }
+
+        $activeAssignment = DB::table('responder_assignments')
+            ->where('household_id', $householdId)
+            ->whereIn('status', $this->activeAssignmentStatuses())
+            ->orderByDesc('assigned_at')
+            ->first();
+
+        if (! $activeAssignment) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'household_id' => [
+                'This household is already assigned to '.$activeAssignment->assignment_code.'. Complete or cancel that dispatch before creating another one for the same household.',
+            ],
+        ]);
+    }
+
+    private function formatRiskHousehold(object $item, $busyHouseholdIds): array
+    {
+        $statusKey = $item->status_key ?: 'unchecked';
+        $busyAssignmentId = $busyHouseholdIds[$item->household_id] ?? null;
+
+        return [
+            'household_id' => $item->household_id,
+            'household_code' => $item->household_code,
+            'household_name' => $item->household_name ?: $item->household_code ?: $item->household_id,
+            'address' => $item->full_address ?: trim(($item->house_number ? $item->house_number.' ' : '').($item->street_address ?: '')),
+            'status_key' => $statusKey,
+            'status_label' => $item->status_label ?: 'Unchecked',
+            'priority_level' => $item->priority_level ?: 'watch',
+            'needs_dispatch' => (bool) $item->needs_dispatch,
+            'has_geotag' => (bool) $item->has_geotag,
+            'last_battery_level' => $item->last_battery_level,
+            'last_reported_at' => $this->formatDateTime($item->last_reported_at),
+            'active_assignment_id' => $busyAssignmentId ? (int) $busyAssignmentId : null,
+            'is_available_for_dispatch' => ! $busyAssignmentId,
+        ];
     }
 
     private function routeNotesJson(array $validated, ?string $existing = null): string

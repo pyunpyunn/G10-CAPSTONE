@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\QueryException;
+use PDOException;
 use Illuminate\Validation\ValidationException;
 
 class AuthService
@@ -18,10 +20,20 @@ class AuthService
     {
         $login = trim($request->string('login')->toString());
 
-        $user = $this->userFromSharedUserTable($login);
+        if ($response = $this->databaseUnavailableResponse()) {
+            return $response;
+        }
 
-        if (! $user) {
-            $user = $this->userFromResponderLogin($login);
+        try {
+            $user = $this->userFromSharedUserTable($login);
+
+            if (! $user) {
+                $user = $this->userFromResponderLogin($login);
+            }
+        } catch (QueryException|PDOException) {
+            return response()->json([
+                'message' => 'The database is not reachable right now. Make sure the shared MySQL laptop is online, or switch Laravel to a working local database.',
+            ], 503);
         }
 
         if (! $user || ! $user->password || ! Hash::check($request->password, $user->password)) {
@@ -183,5 +195,39 @@ class AuthService
         }
 
         return $query->exists();
+    }
+
+    private function databaseUnavailableResponse(): ?JsonResponse
+    {
+        $connectionName = config('database.default');
+        $connection = config("database.connections.$connectionName", []);
+        $driver = $connection['driver'] ?? null;
+
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            return null;
+        }
+
+        $host = (string) ($connection['host'] ?? '');
+        $port = (int) ($connection['port'] ?? 3306);
+
+        if ($host === '') {
+            return null;
+        }
+
+        $timeout = max(1.0, (float) env('DB_CONNECT_TIMEOUT', 2));
+        $target = str_contains($host, ':')
+            ? "tcp://[$host]:$port"
+            : "tcp://$host:$port";
+        $socket = @stream_socket_client($target, $errno, $error, $timeout);
+
+        if ($socket === false) {
+            return response()->json([
+                'message' => "The database is not reachable at $host:$port. Make sure the shared MySQL laptop is online, or update DB_HOST to a working database.",
+            ], 503);
+        }
+
+        fclose($socket);
+
+        return null;
     }
 }

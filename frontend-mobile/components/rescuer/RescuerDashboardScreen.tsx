@@ -80,10 +80,33 @@ export function RescuerDashboardScreen({
             <Text style={styles.note}>{activeAssignment.dispatch_notes}</Text>
           ) : null}
           <View style={styles.buttonGrid}>
-            <ActionButton label="Accept" icon="checkmark-outline" tone="light" onPress={() => onStatusChange(activeAssignment.assignment_id, 'accepted')} />
-            <ActionButton label="En route" icon="navigate-outline" tone="light" onPress={() => onStatusChange(activeAssignment.assignment_id, 'en_route')} />
-            <ActionButton label="On-scene" icon="location-outline" tone="light" onPress={() => onStatusChange(activeAssignment.assignment_id, 'on_scene')} />
-            <ActionButton label="Complete" icon="flag-outline" onPress={() => onStatusChange(activeAssignment.assignment_id, 'completed')} />
+            <ActionButton
+              label="Accept"
+              icon="checkmark-outline"
+              tone="light"
+              disabled={activeAssignment.status_key !== 'dispatched'}
+              onPress={() => onStatusChange(activeAssignment.assignment_id, 'accepted')}
+            />
+            <ActionButton
+              label="En route"
+              icon="navigate-outline"
+              tone="light"
+              disabled={!['accepted', 'dispatched'].includes(activeAssignment.status_key)}
+              onPress={() => onStatusChange(activeAssignment.assignment_id, 'en_route')}
+            />
+            <ActionButton
+              label="On-scene"
+              icon="location-outline"
+              tone="light"
+              disabled={!['accepted', 'en_route'].includes(activeAssignment.status_key)}
+              onPress={() => onStatusChange(activeAssignment.assignment_id, 'on_scene')}
+            />
+            <ActionButton
+              label="Complete"
+              icon="flag-outline"
+              disabled={activeAssignment.status_key !== 'on_scene'}
+              onPress={() => onStatusChange(activeAssignment.assignment_id, 'completed')}
+            />
           </View>
         </View>
       ) : (

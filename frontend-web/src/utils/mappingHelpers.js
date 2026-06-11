@@ -18,14 +18,14 @@ export const defaultWorkspace = {
   barangay: {
     name: 'Barangay Mambaling',
     center: {
-      latitude: 10.2898,
-      longitude: 123.879,
+      latitude: 10.2922,
+      longitude: 123.8763,
     },
     bounds: [
-      [10.2805, 123.8688],
-      [10.2987, 123.889],
+      [10.2820, 123.8700],
+      [10.2972, 123.8842],
     ],
-    zoom: 16,
+    zoom: 17,
     tile_provider: 'OpenStreetMap Standard',
     tile_url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   },

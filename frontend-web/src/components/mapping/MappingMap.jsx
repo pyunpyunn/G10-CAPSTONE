@@ -38,8 +38,12 @@ export default function MappingMap({
       <MapContainer
         center={mapCenter}
         zoom={workspace.barangay.zoom}
-        minZoom={14}
+        minZoom={15}
         maxZoom={19}
+        maxBounds={mapBounds}
+        maxBoundsViscosity={1}
+        zoomSnap={0.25}
+        zoomDelta={0.5}
         scrollWheelZoom
         className="mapping-leaflet"
       >
@@ -90,13 +94,7 @@ export default function MappingMap({
         ))}
 
         {hasActiveEvent && layers.routes && visibleRoutes.map((route) => (
-          <Polyline
-            pathOptions={{ color: '#2a5a90', weight: selectedRoute ? 5 : 4, opacity: selectedRoute ? 0.9 : 0.65 }}
-            positions={route.coordinates}
-            key={route.route_id}
-          >
-            <Tooltip sticky>{route.route_name}</Tooltip>
-          </Polyline>
+          <RouteLine route={route} isSelected={Boolean(selectedRoute)} key={route.route_id} />
         ))}
       </MapContainer>
 
@@ -134,6 +132,90 @@ export default function MappingMap({
       </div>
     </section>
   )
+}
+
+function RouteLine({ route, isSelected }) {
+  const coordinates = Array.isArray(route.coordinates) ? route.coordinates : []
+
+  if (coordinates.length < 2) {
+    return null
+  }
+
+  return (
+    <>
+      <Polyline
+        pathOptions={{
+          color: '#e8f6ff',
+          weight: isSelected ? 11 : 9,
+          opacity: 0.96,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }}
+        positions={coordinates}
+      />
+      <Polyline
+        pathOptions={{
+          color: isSelected ? '#70a7bd' : '#8cbfd0',
+          weight: isSelected ? 5 : 4,
+          opacity: isSelected ? 0.95 : 0.78,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }}
+        positions={coordinates}
+      >
+        <Tooltip sticky>{route.route_name}</Tooltip>
+      </Polyline>
+      {routeArrows(coordinates).map((arrow) => (
+        <Marker
+          icon={routeArrowIcon(arrow.angle, isSelected)}
+          position={arrow.position}
+          interactive={false}
+          key={`${route.route_id}-arrow-${arrow.index}`}
+        />
+      ))}
+    </>
+  )
+}
+
+function routeArrows(coordinates) {
+  const points = [0.25, 0.5, 0.75]
+
+  return points
+    .map((percentPoint, index) => {
+      const pointIndex = Math.min(
+        coordinates.length - 2,
+        Math.max(0, Math.floor((coordinates.length - 1) * percentPoint))
+      )
+      const start = coordinates[pointIndex]
+      const end = coordinates[pointIndex + 1]
+
+      if (!start || !end) {
+        return null
+      }
+
+      return {
+        index,
+        position: end,
+        angle: routeAngle(start, end),
+      }
+    })
+    .filter(Boolean)
+}
+
+function routeAngle(start, end) {
+  const deltaLat = Number(end[0]) - Number(start[0])
+  const deltaLng = Number(end[1]) - Number(start[1])
+
+  return Math.atan2(-deltaLat, deltaLng) * (180 / Math.PI)
+}
+
+function routeArrowIcon(angle, isSelected) {
+  return L.divIcon({
+    className: `map-route-arrow ${isSelected ? 'selected' : ''}`,
+    html: `<span style="transform: rotate(${angle}deg)"></span>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  })
 }
 
 function HouseholdMarker({ household }) {
@@ -180,7 +262,8 @@ function FitBarangay({ center, bounds, zoom }) {
 
   useEffect(() => {
     if (bounds?.length === 2) {
-      map.fitBounds(bounds, { padding: [22, 22], maxZoom: zoom })
+      map.setMaxBounds(bounds)
+      map.fitBounds(bounds, { padding: [8, 8], maxZoom: zoom })
       return
     }
 

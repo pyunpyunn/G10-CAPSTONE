@@ -24,6 +24,7 @@ import {
 import { statusTone } from '../../utils/dashboardHelpers'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
+import LoadingState from '../ui/LoadingState'
 
 export default function DashboardOverview({
   dashboard,
@@ -125,7 +126,7 @@ function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
 
       <div className="dashboard-map-preview">
         {isLoading ? (
-          <div className="dashboard-map-loading">Loading map...</div>
+          <LoadingState />
         ) : (
           <MapContainer
             center={mapCenter}
