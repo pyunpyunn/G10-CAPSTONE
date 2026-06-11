@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { reverseGeocodeAddress } from '@/utils/geocoding';
@@ -52,6 +53,13 @@ export function HouseholdProfileScreen({
   }, [selectedMember]);
 
   const deviceUser = selectedMember?.name || currentDevice?.member_name || 'No member selected';
+  const householdName = household.household_name || 'Household';
+  const householdIdentifier = household.household_id || user.username || 'No household ID';
+  const memberCount = members.length || Number(household.member_count || 0);
+  const batteryValue = realBatteryLevel !== null && realBatteryLevel !== undefined ? `${realBatteryLevel}%` : 'Not sent';
+  const connectionValue = connectionLabel || 'Offline';
+  const lastLocationValue = currentDevice?.last_location_label || geotag?.location_label || 'Not recorded';
+  const hasGeotag = Boolean(geotag?.latitude && geotag?.longitude);
 
   async function handleSaveDeviceUser() {
     if (!selectedMemberId) {
@@ -142,26 +150,49 @@ export function HouseholdProfileScreen({
   return (
     <View style={styles.stack}>
       <View style={styles.hero}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials(household.household_name || user.full_name || 'H')}</Text>
+        <View style={styles.heroTop}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials(householdName || user.full_name || 'H')}</Text>
+          </View>
+          <View style={styles.heroText}>
+            <Text style={styles.role}>Household account</Text>
+            <Text style={styles.name}>{householdName}</Text>
+            <Text style={styles.meta}>{householdIdentifier}</Text>
+          </View>
+          <HouseholdBadge label={overview.active_event ? 'Disaster mode' : 'Standby'} tone={overview.active_event ? 'danger' : 'safe'} />
         </View>
-        <View style={styles.heroText}>
-          <Text style={styles.role}>Household account</Text>
-          <Text style={styles.name}>{household.household_name || 'Household'}</Text>
-          <Text style={styles.meta}>{household.household_id || user.username || 'No household ID'}</Text>
+
+        <View style={styles.heroStats}>
+          <HeroStat icon="people-outline" label="Members" value={String(memberCount)} />
+          <HeroStat icon="phone-portrait-outline" label="Device user" value={deviceUser} />
+          <HeroStat icon="location-outline" label="Geotag" value={hasGeotag ? 'Saved' : 'Missing'} />
         </View>
-        <HouseholdBadge label={overview.active_event ? 'Disaster mode' : 'Standby'} tone={overview.active_event ? 'danger' : 'safe'} />
       </View>
 
       <View style={styles.card}>
-        <HouseholdSection title="This device" />
-        <InfoRow label="Logged device user" value={deviceUser} />
-        <InfoRow label="Device ID" value={shortDeviceId(deviceUuid)} />
-        <InfoRow label="Battery" value={realBatteryLevel !== null && realBatteryLevel !== undefined ? `${realBatteryLevel}%` : 'Not sent'} />
-        <InfoRow label="Connection" value={connectionLabel || 'Offline'} />
-        <InfoRow label="Last location" value={currentDevice?.last_location_label || geotag?.location_label || 'Not recorded'} />
+        <HouseholdSection
+          title="Device owner"
+          action={<HouseholdBadge label={connectionValue} tone={connectionValue === 'Offline' ? 'warning' : 'active'} />}
+        />
 
-        <Text style={styles.selectorLabel}>Assign this device to one member</Text>
+        <View style={styles.devicePanel}>
+          <View style={styles.deviceIcon}>
+            <Ionicons name="phone-portrait-outline" size={24} color={palette.navActive} />
+          </View>
+          <View style={styles.panelText}>
+            <Text style={styles.panelLabel}>Assigned member</Text>
+            <Text style={styles.panelTitle}>{deviceUser}</Text>
+            <Text style={styles.panelMeta}>{shortDeviceId(deviceUuid)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.metricGrid}>
+          <MetricTile icon="battery-half-outline" label="Battery" value={batteryValue} />
+          <MetricTile icon="wifi-outline" label="Connection" value={connectionValue} />
+          <MetricTile icon="navigate-outline" label="Last location" value={lastLocationValue} />
+        </View>
+
+        <Text style={styles.selectorLabel}>Assign this device</Text>
         {members.length === 0 ? (
           <HouseholdEmpty icon="people-outline" title="No family members found" />
         ) : (
@@ -175,8 +206,12 @@ export function HouseholdProfileScreen({
                   style={[styles.memberChoice, isSelected && styles.memberChoiceActive]}
                   onPress={() => setSelectedMemberId(String(member.member_id))}
                 >
-                  <Text style={[styles.memberName, isSelected && styles.memberTextActive]}>{member.name}</Text>
-                  <Text style={[styles.memberRelation, isSelected && styles.memberTextActive]}>{member.relationship || 'Member'}</Text>
+                  <View style={styles.memberChoiceTop}>
+                    <MemberInitialAvatar name={member.name} selected={isSelected} />
+                    {isSelected ? <Ionicons name="checkmark-circle" size={20} color="#fff" /> : null}
+                  </View>
+                  <Text style={[styles.memberName, isSelected && styles.memberTextActive]} numberOfLines={1}>{member.name}</Text>
+                  <Text style={[styles.memberRelation, isSelected && styles.memberTextActive]} numberOfLines={1}>{member.relationship || 'Member'}</Text>
                 </Pressable>
               );
             })}
@@ -192,106 +227,125 @@ export function HouseholdProfileScreen({
       </View>
 
       <View style={styles.card}>
-        <HouseholdSection title="Member information" />
+        <HouseholdSection
+          title="Member profile"
+          action={selectedMember ? <HouseholdBadge label={selectedMember.relationship || 'Member'} tone="info" /> : undefined}
+        />
         {selectedMember ? (
           <>
-            <View style={styles.statusPanel}>
-              <InfoRow label="Device check" value={deviceCheckLabel(selectedMember)} />
-              <InfoRow label="Last location" value={selectedMember.device?.last_location_label || 'No device location'} />
-              <InfoRow label="Last seen" value={selectedMember.device?.last_seen_label || 'Not recorded'} />
-            </View>
-
-            <View style={styles.twoColumn}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.formLabel}>First name</Text>
-                <TextInput
-                  style={styles.input}
-                  value={memberForm.first_name}
-                  onChangeText={(value) => setMemberForm((current) => ({ ...current, first_name: value }))}
-                  placeholder="First name"
-                  placeholderTextColor="#7d8da0"
-                />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.formLabel}>MI.</Text>
-                <TextInput
-                  style={styles.input}
-                  value={memberForm.middle_name}
-                  onChangeText={(value) => setMemberForm((current) => ({ ...current, middle_name: value }))}
-                  placeholder="MI."
-                  placeholderTextColor="#7d8da0"
-                />
+            <View style={styles.memberProfileHeader}>
+              <MemberInitialAvatar name={selectedMember.name} selected size="large" />
+              <View style={styles.panelText}>
+                <Text style={styles.panelLabel}>Editing</Text>
+                <Text style={styles.panelTitle}>{selectedMember.name || 'Household member'}</Text>
+                <Text style={styles.panelMeta}>{selectedMember.relationship || 'Member'}</Text>
               </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.formLabel}>Last name</Text>
-              <TextInput
-                style={styles.input}
-                value={memberForm.last_name}
-                onChangeText={(value) => setMemberForm((current) => ({ ...current, last_name: value }))}
-                placeholder="Last name"
-                placeholderTextColor="#7d8da0"
-              />
+            <View style={styles.metricGrid}>
+              <MetricTile icon="pulse-outline" label="Device check" value={deviceCheckLabel(selectedMember)} />
+              <MetricTile icon="location-outline" label="Location" value={selectedMember.device?.last_location_label || 'No device location'} />
+              <MetricTile icon="time-outline" label="Last seen" value={selectedMember.device?.last_seen_label || 'Not recorded'} />
             </View>
 
-            <View style={styles.twoColumn}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.formLabel}>Relationship</Text>
-                <TextInput
-                  style={styles.input}
-                  value={memberForm.relationship}
-                  onChangeText={(value) => setMemberForm((current) => ({ ...current, relationship: value }))}
-                  placeholder="Relationship"
-                  placeholderTextColor="#7d8da0"
-                />
+            <View style={styles.formCluster}>
+              <View style={styles.twoColumn}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.formLabel}>First name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={memberForm.first_name}
+                    onChangeText={(value) => setMemberForm((current) => ({ ...current, first_name: value }))}
+                    placeholder="First name"
+                    placeholderTextColor="#7d8da0"
+                    autoCapitalize="words"
+                  />
+                </View>
+                <View style={styles.inputGroupSmall}>
+                  <Text style={styles.formLabel}>MI.</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={memberForm.middle_name}
+                    onChangeText={(value) => setMemberForm((current) => ({ ...current, middle_name: value }))}
+                    placeholder="MI."
+                    placeholderTextColor="#7d8da0"
+                    autoCapitalize="words"
+                  />
+                </View>
               </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.formLabel}>Gender</Text>
-                <TextInput
-                  style={styles.input}
-                  value={memberForm.gender}
-                  onChangeText={(value) => setMemberForm((current) => ({ ...current, gender: value }))}
-                  placeholder="Gender"
-                  placeholderTextColor="#7d8da0"
-                />
-              </View>
-            </View>
 
-            <View style={styles.twoColumn}>
               <View style={styles.inputGroup}>
-                <Text style={styles.formLabel}>Age</Text>
+                <Text style={styles.formLabel}>Last name</Text>
                 <TextInput
                   style={styles.input}
-                  value={memberForm.age}
-                  onChangeText={(value) => setMemberForm((current) => ({ ...current, age: value.replace(/[^0-9]/g, '') }))}
-                  keyboardType="number-pad"
-                  placeholder="Age"
+                  value={memberForm.last_name}
+                  onChangeText={(value) => setMemberForm((current) => ({ ...current, last_name: value }))}
+                  placeholder="Last name"
                   placeholderTextColor="#7d8da0"
+                  autoCapitalize="words"
                 />
               </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.formLabel}>Birth date</Text>
-                <TextInput
-                  style={styles.input}
-                  value={memberForm.birth_date}
-                  onChangeText={(value) => setMemberForm((current) => ({ ...current, birth_date: value }))}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#7d8da0"
-                />
-              </View>
-            </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.formLabel}>Special needs</Text>
-              <TextInput
-                style={[styles.input, styles.multilineInput]}
-                value={memberForm.special_needs}
-                onChangeText={(value) => setMemberForm((current) => ({ ...current, special_needs: value }))}
-                placeholder="None, PWD, senior, pregnant, medication needs..."
-                placeholderTextColor="#7d8da0"
-                multiline
-              />
+              <View style={styles.twoColumn}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.formLabel}>Relationship</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={memberForm.relationship}
+                    onChangeText={(value) => setMemberForm((current) => ({ ...current, relationship: value }))}
+                    placeholder="Relationship"
+                    placeholderTextColor="#7d8da0"
+                    autoCapitalize="words"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.formLabel}>Gender</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={memberForm.gender}
+                    onChangeText={(value) => setMemberForm((current) => ({ ...current, gender: value }))}
+                    placeholder="Gender"
+                    placeholderTextColor="#7d8da0"
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.twoColumn}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.formLabel}>Age</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={memberForm.age}
+                    onChangeText={(value) => setMemberForm((current) => ({ ...current, age: value.replace(/[^0-9]/g, '') }))}
+                    keyboardType="number-pad"
+                    placeholder="Age"
+                    placeholderTextColor="#7d8da0"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.formLabel}>Birth date</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={memberForm.birth_date}
+                    onChangeText={(value) => setMemberForm((current) => ({ ...current, birth_date: value }))}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#7d8da0"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.formLabel}>Special needs</Text>
+                <TextInput
+                  style={[styles.input, styles.multilineInput]}
+                  value={memberForm.special_needs}
+                  onChangeText={(value) => setMemberForm((current) => ({ ...current, special_needs: value }))}
+                  placeholder="None, PWD, senior, pregnant, medication needs..."
+                  placeholderTextColor="#7d8da0"
+                  multiline
+                />
+              </View>
             </View>
 
             <HouseholdButton
@@ -307,12 +361,23 @@ export function HouseholdProfileScreen({
       </View>
 
       <View style={styles.card}>
-        <HouseholdSection title="Household geotag" />
+        <HouseholdSection
+          title="Household geotag"
+          action={<HouseholdBadge label={hasGeotag ? 'Saved' : 'Missing'} tone={hasGeotag ? 'safe' : 'warning'} />}
+        />
         {geotag ? (
           <>
-            <InfoRow label="Location" value={geotag.location_label || 'Household geotag'} />
-            <InfoRow label="Coordinates" value={`${Number(geotag.latitude).toFixed(6)}, ${Number(geotag.longitude).toFixed(6)}`} />
-            <InfoRow label="Updated" value={geotag.updated_label || 'Not recorded'} />
+            <View style={styles.locationPanel}>
+              <View style={styles.locationIcon}>
+                <Ionicons name="location-outline" size={23} color={palette.safe} />
+              </View>
+              <View style={styles.panelText}>
+                <Text style={styles.panelLabel}>Saved address</Text>
+                <Text style={styles.panelTitle}>{geotag.location_label || 'Household geotag'}</Text>
+                <Text style={styles.panelMeta}>{coordinatesLabel(geotag)}</Text>
+              </View>
+            </View>
+            <InfoRow icon="time-outline" label="Updated" value={geotag.updated_label || 'Not recorded'} />
           </>
         ) : (
           <HouseholdEmpty icon="location-outline" title="No geotag saved yet" />
@@ -327,11 +392,11 @@ export function HouseholdProfileScreen({
       </View>
 
       <View style={styles.card}>
-        <HouseholdSection title="Household information" />
-        <InfoRow label="Barangay" value={household.barangay || 'Not recorded'} />
-        <InfoRow label="Address" value={household.address || 'Not recorded'} />
-        <InfoRow label="Members" value={String(members.length || household.member_count || 0)} />
-        <InfoRow label="Contact" value={household.contact_number || user.contact_number || 'Not recorded'} />
+        <HouseholdSection title="Household details" />
+        <InfoRow icon="business-outline" label="Barangay" value={household.barangay || 'Not recorded'} />
+        <InfoRow icon="home-outline" label="Address" value={household.address || 'Not recorded'} />
+        <InfoRow icon="people-outline" label="Members" value={String(memberCount)} />
+        <InfoRow icon="call-outline" label="Contact" value={household.contact_number || user.contact_number || 'Not recorded'} />
       </View>
 
       <HouseholdButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
@@ -339,10 +404,55 @@ export function HouseholdProfileScreen({
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function HeroStat({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
+  return (
+    <View style={styles.heroStat}>
+      <Ionicons name={icon} size={16} color="#fff" />
+      <Text style={styles.heroStatLabel}>{label}</Text>
+      <Text style={styles.heroStatValue} numberOfLines={1}>{value}</Text>
+    </View>
+  );
+}
+
+function MetricTile({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
+  return (
+    <View style={styles.metricTile}>
+      <Ionicons name={icon} size={17} color={palette.navActive} />
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue} numberOfLines={2}>{value}</Text>
+    </View>
+  );
+}
+
+function MemberInitialAvatar({
+  name,
+  selected = false,
+  size = 'normal',
+}: {
+  name: string;
+  selected?: boolean;
+  size?: 'normal' | 'large';
+}) {
+  return (
+    <View style={[
+      styles.choiceAvatar,
+      size === 'large' && styles.choiceAvatarLarge,
+      selected && styles.choiceAvatarSelected,
+    ]}>
+      <Text style={[styles.choiceAvatarText, size === 'large' && styles.choiceAvatarTextLarge, selected && styles.choiceAvatarTextSelected]}>
+        {String(name || 'H')[0]?.toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
+function InfoRow({ icon, label, value }: { icon?: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
+      <View style={styles.infoLabelWrap}>
+        {icon ? <Ionicons name={icon} size={16} color={palette.textSoft} /> : null}
+        <Text style={styles.infoLabel}>{label}</Text>
+      </View>
       <Text style={styles.infoValue}>{value}</Text>
     </View>
   );
@@ -360,6 +470,14 @@ function initials(value: string) {
 function shortDeviceId(value: string) {
   if (!value) return 'Not recorded';
   return value.length > 18 ? `${value.slice(0, 9)}...${value.slice(-5)}` : value;
+}
+
+function coordinatesLabel(geotag: any) {
+  if (!geotag?.latitude || !geotag?.longitude) {
+    return 'Coordinates not recorded';
+  }
+
+  return `${Number(geotag.latitude).toFixed(6)}, ${Number(geotag.longitude).toFixed(6)}`;
 }
 
 function memberFormFrom(member: any) {
@@ -400,13 +518,16 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   hero: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.md,
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: palette.navActive,
     ...shadow,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   avatar: {
     width: 62,
@@ -425,6 +546,7 @@ const styles = StyleSheet.create({
   },
   heroText: {
     flex: 1,
+    minWidth: 0,
   },
   role: {
     color: palette.navMuted,
@@ -444,13 +566,105 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  card: {
+  heroStats: {
+    flexDirection: 'row',
     gap: spacing.sm,
+  },
+  heroStat: {
+    flex: 1,
+    minHeight: 72,
+    justifyContent: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#ffffff33',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: '#ffffff14',
+  },
+  heroStatLabel: {
+    color: palette.navMuted,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  heroStatValue: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  card: {
+    gap: spacing.md,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: palette.card,
+  },
+  devicePanel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: palette.secondary,
+  },
+  deviceIcon: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    backgroundColor: '#fff',
+  },
+  panelText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  panelLabel: {
+    color: palette.textSoft,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  panelTitle: {
+    marginTop: 3,
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  panelMeta: {
+    marginTop: 3,
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  metricTile: {
+    flex: 1,
+    minHeight: 86,
+    gap: 5,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: '#f8fafc',
+  },
+  metricLabel: {
+    color: palette.textSoft,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  metricValue: {
+    color: palette.text,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '900',
   },
   infoRow: {
     flexDirection: 'row',
@@ -460,6 +674,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: palette.border,
     paddingTop: spacing.sm,
+  },
+  infoLabelWrap: {
+    flex: 0.9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
   infoLabel: {
     color: palette.textSoft,
@@ -473,10 +693,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'right',
   },
-  statusPanel: {
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: palette.border,
+  memberProfileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     borderRadius: radius.md,
     padding: spacing.md,
     backgroundColor: palette.secondary,
@@ -485,8 +705,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
+  formCluster: {
+    gap: spacing.sm,
+  },
   inputGroup: {
     flex: 1,
+    gap: 6,
+  },
+  inputGroupSmall: {
+    width: 92,
     gap: 6,
   },
   formLabel: {
@@ -524,7 +751,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   memberChoice: {
-    flexBasis: '48%',
+    flexBasis: '47%',
+    flexGrow: 1,
+    minHeight: 104,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: radius.md,
@@ -534,6 +763,42 @@ const styles = StyleSheet.create({
   memberChoiceActive: {
     borderColor: palette.navActive,
     backgroundColor: palette.navActive,
+  },
+  memberChoiceTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  choiceAvatar: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 17,
+    backgroundColor: palette.secondary,
+  },
+  choiceAvatarLarge: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  choiceAvatarSelected: {
+    borderColor: '#ffffff80',
+    backgroundColor: '#ffffff24',
+  },
+  choiceAvatarText: {
+    color: palette.navActive,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  choiceAvatarTextLarge: {
+    fontSize: 18,
+  },
+  choiceAvatarTextSelected: {
+    color: '#fff',
   },
   memberName: {
     color: palette.text,
@@ -548,5 +813,23 @@ const styles = StyleSheet.create({
   },
   memberTextActive: {
     color: '#fff',
+  },
+  locationPanel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: '#3a7d5733',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: '#f2fbf6',
+  },
+  locationIcon: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    backgroundColor: '#3a7d5718',
   },
 });
