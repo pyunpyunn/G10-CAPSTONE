@@ -14,7 +14,6 @@ import * as Location from 'expo-location';
 import * as Network from 'expo-network';
 import { type Href, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as SecureStore from 'expo-secure-store';
 import { logoutMobile } from '@/api/auth';
 import {
   completeHouseholdSetup,
@@ -39,6 +38,7 @@ import { HouseholdRouteScreen } from '@/components/household/HouseholdRouteScree
 import { HouseholdSetupScreen } from '@/components/household/HouseholdSetupScreen';
 import { HouseholdLoading } from '@/components/household/HouseholdUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
+import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 
 const deviceUuidKey = 'resq_household_device_uuid';
 const trustedPinKey = 'resq_household_trusted_pin';
@@ -77,14 +77,14 @@ export default function HouseholdHomeScreen() {
   const [trustedLoading, setTrustedLoading] = useState(false);
 
   const loadLocalKeys = useCallback(async () => {
-    const existingDeviceUuid = await SecureStore.getItemAsync(deviceUuidKey);
-    const existingPin = await SecureStore.getItemAsync(trustedPinKey);
+    const existingDeviceUuid = await getStoredItem(deviceUuidKey);
+    const existingPin = await getStoredItem(trustedPinKey);
 
     if (existingDeviceUuid) {
       setDeviceUuid(existingDeviceUuid);
     } else {
       const nextUuid = `hh-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      await SecureStore.setItemAsync(deviceUuidKey, nextUuid);
+      await setStoredItem(deviceUuidKey, nextUuid);
       setDeviceUuid(nextUuid);
     }
 
@@ -369,7 +369,7 @@ export default function HouseholdHomeScreen() {
     }
 
     if (!trustedPin) {
-      await SecureStore.setItemAsync(trustedPinKey, pin);
+      await setStoredItem(trustedPinKey, pin);
       setTrustedPin(pin);
       setShowPin(false);
 

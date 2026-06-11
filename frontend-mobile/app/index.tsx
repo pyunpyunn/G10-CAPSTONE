@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -70,9 +71,11 @@ export default function MobileLoginScreen() {
       >
         <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
           <View style={styles.brandRow}>
-            <View style={styles.brandMark}>
-              <Text style={styles.brandLetter}>R</Text>
-            </View>
+            <Image
+              source={require('@/assets/images/resqperation-logo.png')}
+              style={styles.brandLogo}
+              resizeMode="contain"
+            />
             <View>
               <Text style={styles.brandName}>RESQPERATION</Text>
               <Text style={styles.brandRole}>Mobile access</Text>
@@ -169,20 +172,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  brandMark: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#8bd5dc',
-    borderRadius: 24,
-    backgroundColor: '#4bbbc4',
-  },
-  brandLetter: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '900',
+  brandLogo: {
+    width: 72,
+    height: 42,
   },
   brandName: {
     color: palette.nav,

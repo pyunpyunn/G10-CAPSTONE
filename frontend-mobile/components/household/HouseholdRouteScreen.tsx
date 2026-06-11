@@ -9,18 +9,9 @@ type RouteProps = {
   evacuationCenters: any[];
 };
 
-const defaultRegion = {
-  latitude: 10.3157,
-  longitude: 123.8854,
-  latitudeDelta: 0.035,
-  longitudeDelta: 0.035,
-};
-
 export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) {
   const centers = useMemo(() => evacuationCenters || [], [evacuationCenters]);
   const [selectedId, setSelectedId] = useState<string>('');
-  const [roadRoute, setRoadRoute] = useState<any>(null);
-  const [routeLoading, setRouteLoading] = useState(false);
 
   useEffect(() => {
     if (!selectedId && centers.length) {
@@ -50,10 +41,6 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
       : null
   ), [selectedCenter]);
 
-  const mapRegion = householdPoint
-    ? { ...householdPoint, latitudeDelta: 0.025, longitudeDelta: 0.025 }
-    : defaultRegion;
-
   const distanceLabel =
     householdPoint && selectedPoint
       ? `${distanceKm(householdPoint, selectedPoint).toFixed(2)} km direct distance`
@@ -67,31 +54,18 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
           action={<HouseholdBadge label={selectedCenter ? 'Route ready' : 'No center'} tone={selectedCenter ? 'info' : 'neutral'} />}
         />
 
-        <MapView style={styles.map} initialRegion={mapRegion}>
+        <View style={styles.webMapFallback}>
+          <Ionicons name="map-outline" size={30} color={palette.navActive} />
+          <Text style={styles.fallbackTitle}>Native route map available on mobile</Text>
+          <Text style={styles.fallbackText}>
+            Open this screen in Expo Go on Android or iPhone to view household pins, evacuation centers, and route lines.
+          </Text>
           {householdPoint ? (
-            <>
-              <Marker coordinate={householdPoint} title="Your household" description={geotag.location_label} pinColor={palette.navActive} />
-              <Circle center={householdPoint} radius={geotag.accuracy_m || 35} strokeColor="#1f3e5a55" fillColor="#1f3e5a18" />
-            </>
-          ) : null}
-
-          {centers.map((center) => (
-            <Marker
-              key={center.evacuation_center_id}
-              coordinate={{
-                latitude: Number(center.latitude),
-                longitude: Number(center.longitude),
-              }}
-              title={center.name}
-              description={center.address || center.center_type}
-              pinColor={String(center.evacuation_center_id) === selectedId ? palette.safe : palette.evacuated}
-            />
-          ))}
-
-          {householdPoint && selectedPoint ? (
-            <Polyline coordinates={[householdPoint, selectedPoint]} strokeColor={palette.safe} strokeWidth={4} />
-          ) : null}
-        </MapView>
+            <HouseholdBadge label="Household geotag ready" tone="info" />
+          ) : (
+            <HouseholdBadge label="No household geotag" tone="neutral" />
+          )}
+        </View>
 
         {!householdPoint ? <HouseholdEmpty icon="location-outline" title="No household geotag yet" /> : null}
       </View>
@@ -106,7 +80,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
             <View style={styles.centerText}>
               <Text style={styles.centerTitle}>{selectedCenter.name}</Text>
               <Text style={styles.centerMeta}>{selectedCenter.address || selectedCenter.center_type}</Text>
-              <Text style={styles.distanceText}>{routeLoading ? 'Loading road route...' : distanceLabel}</Text>
+              <Text style={styles.distanceText}>{distanceLabel}</Text>
             </View>
           </View>
         ) : (
@@ -165,32 +139,6 @@ function distanceKm(start: { latitude: number; longitude: number }, end: { latit
 
 function toRadians(value: number) {
   return (value * Math.PI) / 180;
-}
-
-async function fetchRoadRoute(
-  start: { latitude: number; longitude: number },
-  end: { latitude: number; longitude: number }
-) {
-  const startPoint = `${start.longitude},${start.latitude}`;
-  const endPoint = `${end.longitude},${end.latitude}`;
-  const response = await fetch(
-    `https://router.project-osrm.org/route/v1/driving/${startPoint};${endPoint}?overview=full&geometries=geojson`
-  );
-  const data = await response.json();
-  const route = data.routes?.[0];
-
-  if (!route) {
-    return null;
-  }
-
-  return {
-    distance_km: Number((route.distance / 1000).toFixed(2)),
-    duration_min: Math.max(1, Math.round(route.duration / 60)),
-    coordinates: route.geometry.coordinates.map((point: number[]) => ({
-      latitude: point[1],
-      longitude: point[0],
-    })),
-  };
 }
 
 const styles = StyleSheet.create({

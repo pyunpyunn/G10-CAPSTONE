@@ -3,7 +3,7 @@
     "name": "frontend-mobile",
     "slug": "frontend-mobile",
     "version": "1.0.0",
-    "platforms": ["ios", "android"],
+    "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontendmobile",
@@ -23,7 +23,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [

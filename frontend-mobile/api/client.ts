@@ -1,10 +1,41 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
+import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
 
 const tokenKey = 'resqperation_mobile_token';
 
+function getApiBaseUrl() {
+  const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+  if (configuredUrl && !isLocalhostUrl(configuredUrl)) {
+    return configuredUrl;
+  }
+
+  const expoHost = getExpoHost();
+
+  if (expoHost) {
+    return `http://${expoHost}:8000/api/v1`;
+  }
+
+  return configuredUrl || 'http://127.0.0.1:8000/api/v1';
+}
+
+function isLocalhostUrl(url: string) {
+  return url.includes('127.0.0.1') || url.includes('localhost');
+}
+
+function getExpoHost() {
+  const constants = Constants as any;
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    constants.manifest2?.extra?.expoClient?.hostUri ||
+    constants.manifest?.debuggerHost;
+
+  return typeof hostUri === 'string' ? hostUri.split(':')[0] : '';
+}
+
 export const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api/v1',
+  baseURL: getApiBaseUrl(),
   timeout: 12000,
   headers: {
     Accept: 'application/json',
@@ -12,7 +43,7 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync(tokenKey);
+  const token = await getStoredItem(tokenKey);
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -35,9 +66,9 @@ api.interceptors.response.use(
 );
 
 export async function saveToken(token: string) {
-  await SecureStore.setItemAsync(tokenKey, token);
+  await setStoredItem(tokenKey, token);
 }
 
 export async function clearToken() {
-  await SecureStore.deleteItemAsync(tokenKey);
+  await deleteStoredItem(tokenKey);
 }
