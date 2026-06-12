@@ -9,9 +9,9 @@ export default function ArchiveDownloadMenu({ disabled = false, onDownload }) {
       </summary>
       {!disabled && (
         <div className="download-menu-list">
-          <button className="btn btn-secondary btn-sm" type="button" onClick={() => onDownload('csv')}>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={() => onDownload('excel')}>
             <Download size={14} />
-            CSV file
+            Excel file
           </button>
           <button className="btn btn-secondary btn-sm" type="button" onClick={() => onDownload('pdf')}>
             <Download size={14} />

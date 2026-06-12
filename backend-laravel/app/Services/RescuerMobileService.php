@@ -491,6 +491,197 @@ class RescuerMobileService
         ]);
     }
 
+    public function radioFeed(Request $request): JsonResponse
+    {
+        if (! Schema::hasTable('responder_communication_logs')) {
+            return $this->missingTableResponse('responder_communication_logs');
+        }
+
+        $validated = $request->validate([
+            'channel' => ['nullable', Rule::in(['command', 'team', 'event'])],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:20'],
+        ]);
+
+        $user = $request->user();
+        $responder = $this->responderForUser($user);
+
+        if (! $responder) {
+            return response()->json([
+                'message' => 'Rescuer profile was not found for this account.',
+            ], 404);
+        }
+
+        $channel = $validated['channel'] ?? 'team';
+        $page = max(1, (int) ($validated['page'] ?? 1));
+        $perPage = min(20, max(1, (int) ($validated['per_page'] ?? 5)));
+        $logs = collect($this->radioRowsForScope($responder))
+            ->filter(fn (array $log): bool => ($log['channel'] ?? 'team') === $channel)
+            ->values();
+        $total = $logs->count();
+        $items = $logs->forPage($page, $perPage)->values()->all();
+
+        return response()->json([
+            'data' => [
+                'channel' => $channel,
+                'active_transmission' => $this->activeRadioTransmission($responder),
+                'logs' => [
+                    'data' => $items,
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'has_more' => ($page * $perPage) < $total,
+                ],
+                'audio_note' => 'Live voice streaming needs the future WebRTC/LiveKit server. Current version saves PTT metadata and team activity.',
+            ],
+        ]);
+    }
+
+    public function startRadioTransmission(Request $request): JsonResponse
+    {
+        if (! Schema::hasTable('responder_communication_logs')) {
+            return $this->missingTableResponse('responder_communication_logs');
+        }
+
+        $validated = $request->validate([
+            'channel' => ['required', Rule::in(['command', 'team', 'event'])],
+            'assignment_id' => ['nullable', 'integer'],
+        ]);
+
+        $user = $request->user();
+        $responder = $this->responderForUser($user);
+
+        if (! $responder) {
+            return response()->json([
+                'message' => 'Rescuer profile was not found for this account.',
+            ], 404);
+        }
+
+        $transmissionId = 'PTT-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(5));
+        $message = $this->radioMessage($request, $responder, [
+            'type' => 'ptt_start',
+            'channel' => $validated['channel'],
+            'transmission_id' => $transmissionId,
+            'assignment_id' => $validated['assignment_id'] ?? null,
+            'audio_status' => 'metadata_only_until_live_audio_server_is_connected',
+        ]);
+
+        $this->insertRadioLog($responder, $message);
+
+        return response()->json([
+            'message' => 'PTT transmission started.',
+            'data' => [
+                'transmission_id' => $transmissionId,
+                'active_transmission' => $this->activeRadioTransmission($responder),
+            ],
+        ], 201);
+    }
+
+    public function heartbeatRadioTransmission(Request $request): JsonResponse
+    {
+        if (! Schema::hasTable('responder_communication_logs')) {
+            return $this->missingTableResponse('responder_communication_logs');
+        }
+
+        $validated = $request->validate([
+            'channel' => ['required', Rule::in(['command', 'team', 'event'])],
+            'transmission_id' => ['required', 'string', 'max:80'],
+            'duration_seconds' => ['nullable', 'integer', 'min:0', 'max:3600'],
+        ]);
+
+        $responder = $this->responderForUser($request->user());
+
+        if (! $responder) {
+            return response()->json([
+                'message' => 'Rescuer profile was not found for this account.',
+            ], 404);
+        }
+
+        $this->insertRadioLog($responder, $this->radioMessage($request, $responder, [
+            'type' => 'ptt_heartbeat',
+            'channel' => $validated['channel'],
+            'transmission_id' => $validated['transmission_id'],
+            'duration_seconds' => $validated['duration_seconds'] ?? 0,
+            'audio_status' => 'metadata_only_until_live_audio_server_is_connected',
+        ]));
+
+        return response()->json([
+            'message' => 'PTT heartbeat saved.',
+            'data' => [
+                'active_transmission' => $this->activeRadioTransmission($responder),
+            ],
+        ]);
+    }
+
+    public function stopRadioTransmission(Request $request): JsonResponse
+    {
+        if (! Schema::hasTable('responder_communication_logs')) {
+            return $this->missingTableResponse('responder_communication_logs');
+        }
+
+        $validated = $request->validate([
+            'channel' => ['required', Rule::in(['command', 'team', 'event'])],
+            'transmission_id' => ['required', 'string', 'max:80'],
+            'duration_seconds' => ['nullable', 'integer', 'min:0', 'max:3600'],
+        ]);
+
+        $responder = $this->responderForUser($request->user());
+
+        if (! $responder) {
+            return response()->json([
+                'message' => 'Rescuer profile was not found for this account.',
+            ], 404);
+        }
+
+        $this->insertRadioLog($responder, $this->radioMessage($request, $responder, [
+            'type' => 'ptt_end',
+            'channel' => $validated['channel'],
+            'transmission_id' => $validated['transmission_id'],
+            'duration_seconds' => $validated['duration_seconds'] ?? 0,
+            'audio_status' => 'metadata_only_until_live_audio_server_is_connected',
+        ]));
+
+        return response()->json([
+            'message' => 'PTT transmission stopped.',
+            'data' => [
+                'active_transmission' => $this->activeRadioTransmission($responder),
+            ],
+        ]);
+    }
+
+    public function storeRadioSignal(Request $request): JsonResponse
+    {
+        if (! Schema::hasTable('responder_communication_logs')) {
+            return $this->missingTableResponse('responder_communication_logs');
+        }
+
+        $validated = $request->validate([
+            'channel' => ['required', Rule::in(['command', 'team', 'event'])],
+            'signal' => ['required', Rule::in(['Copy', 'Need backup', 'On-scene', 'Clear'])],
+        ]);
+
+        $responder = $this->responderForUser($request->user());
+
+        if (! $responder) {
+            return response()->json([
+                'message' => 'Rescuer profile was not found for this account.',
+            ], 404);
+        }
+
+        $this->insertRadioLog($responder, $this->radioMessage($request, $responder, [
+            'type' => 'quick_signal',
+            'channel' => $validated['channel'],
+            'signal' => $validated['signal'],
+        ]));
+
+        return response()->json([
+            'message' => 'Radio signal saved.',
+            'data' => [
+                'active_transmission' => $this->activeRadioTransmission($responder),
+            ],
+        ], 201);
+    }
+
     private function responderForUser($user): ?object
     {
         if (! $user || ! Schema::hasTable('responders')) {
@@ -1356,6 +1547,178 @@ class RescuerMobileService
         }
 
         return 'Field location';
+    }
+
+    private function insertRadioLog(object $responder, array $message): int
+    {
+        $communicationId = $this->nextId('responder_communication_logs', 'communication_id');
+        $activeEvent = $this->activeEvent();
+        $now = now();
+
+        DB::table('responder_communication_logs')->insert($this->filterColumns('responder_communication_logs', [
+            'communication_id' => $communicationId,
+            'responder_id' => $responder->responder_id,
+            'team_id' => $responder->team_id,
+            'team_name' => $responder->team_name,
+            'disaster_id' => $activeEvent['event_id'] ?? null,
+            'message' => json_encode($message, JSON_UNESCAPED_SLASHES),
+            'timestamp' => $now,
+        ]));
+
+        return $communicationId;
+    }
+
+    private function radioMessage(Request $request, object $responder, array $values): array
+    {
+        $activeEvent = $this->activeEvent();
+        $channel = (string) ($values['channel'] ?? 'team');
+
+        return array_merge([
+            'channel' => $channel,
+            'channel_label' => $this->radioChannelLabel($channel),
+            'responder_id' => $responder->responder_id,
+            'responder_name' => $responder->full_name ?: 'Responder',
+            'responder_code' => $responder->responder_code,
+            'team_id' => $responder->team_id,
+            'team_name' => $responder->team_name ?: 'Unassigned team',
+            'event_id' => $activeEvent['event_id'] ?? null,
+            'event_name' => $activeEvent['name'] ?? 'No active event',
+            'saved_by_user_id' => $request->user()?->user_id,
+        ], $values);
+    }
+
+    private function radioRowsForScope(object $responder): array
+    {
+        $activeEvent = $this->activeEvent();
+        $query = DB::table('responder_communication_logs')
+            ->where('team_id', $responder->team_id);
+
+        if ($activeEvent) {
+            $query->where('disaster_id', $activeEvent['event_id']);
+        } else {
+            $query->whereNull('disaster_id');
+        }
+
+        return $query
+            ->orderByDesc('timestamp')
+            ->orderByDesc('communication_id')
+            ->limit(120)
+            ->get()
+            ->map(fn (object $row): array => $this->formatRadioLog($row))
+            ->values()
+            ->all();
+    }
+
+    private function activeRadioTransmission(object $responder): ?array
+    {
+        $recentLogs = collect($this->radioRowsForScope($responder))
+            ->filter(fn (array $log): bool => in_array($log['type'], ['ptt_start', 'ptt_heartbeat', 'ptt_end'], true))
+            ->values();
+
+        $endedIds = $recentLogs
+            ->where('type', 'ptt_end')
+            ->pluck('transmission_id')
+            ->filter()
+            ->unique()
+            ->all();
+
+        $latestOpen = $recentLogs
+            ->filter(fn (array $log): bool => in_array($log['type'], ['ptt_start', 'ptt_heartbeat'], true))
+            ->first(fn (array $log): bool => $log['transmission_id'] && ! in_array($log['transmission_id'], $endedIds, true));
+
+        if (! $latestOpen) {
+            return null;
+        }
+
+        $secondsSinceLastSignal = now()->diffInSeconds(
+            \Illuminate\Support\Carbon::parse($latestOpen['raw_timestamp'])
+        );
+
+        if ($secondsSinceLastSignal > 12) {
+            return null;
+        }
+
+        return [
+            'transmission_id' => $latestOpen['transmission_id'],
+            'channel' => $latestOpen['channel'],
+            'channel_label' => $latestOpen['channel_label'],
+            'responder_id' => $latestOpen['responder_id'],
+            'responder_name' => $latestOpen['responder_name'],
+            'responder_code' => $latestOpen['responder_code'],
+            'team_name' => $latestOpen['team_name'],
+            'duration_seconds' => $latestOpen['duration_seconds'],
+            'is_self' => (int) $latestOpen['responder_id'] === (int) $responder->responder_id,
+            'audio_status' => $latestOpen['audio_status'],
+            'last_seen_at' => $latestOpen['timestamp'],
+        ];
+    }
+
+    private function formatRadioLog(object $row): array
+    {
+        $message = $this->decodeJson($row->message ?? null);
+        $type = (string) ($message['type'] ?? 'message');
+        $channel = (string) ($message['channel'] ?? 'team');
+
+        return [
+            'id' => $row->communication_id,
+            'communication_id' => $row->communication_id,
+            'type' => $type,
+            'type_label' => $this->radioTypeLabel($type, $message),
+            'channel' => $channel,
+            'channel_label' => (string) ($message['channel_label'] ?? $this->radioChannelLabel($channel)),
+            'transmission_id' => $message['transmission_id'] ?? null,
+            'signal' => $message['signal'] ?? null,
+            'duration_seconds' => (int) ($message['duration_seconds'] ?? 0),
+            'responder_id' => $row->responder_id,
+            'responder_name' => (string) ($message['responder_name'] ?? 'Responder'),
+            'responder_code' => $message['responder_code'] ?? null,
+            'team_id' => $row->team_id,
+            'team_name' => $row->team_name ?: ($message['team_name'] ?? 'Assigned team'),
+            'event_id' => $row->disaster_id,
+            'event_name' => (string) ($message['event_name'] ?? 'No active event'),
+            'audio_status' => (string) ($message['audio_status'] ?? 'metadata_only'),
+            'message' => $this->radioDisplayMessage($type, $message),
+            'timestamp' => $this->formatMobileDateTime($row->timestamp),
+            'raw_timestamp' => $row->timestamp,
+        ];
+    }
+
+    private function radioDisplayMessage(string $type, array $message): string
+    {
+        $name = (string) ($message['responder_name'] ?? 'Responder');
+
+        return match ($type) {
+            'ptt_start' => $name . ' started PTT',
+            'ptt_heartbeat' => $name . ' is transmitting',
+            'ptt_end' => $name . ' ended PTT after ' . ((int) ($message['duration_seconds'] ?? 0)) . 's',
+            'quick_signal' => $name . ' sent "' . ((string) ($message['signal'] ?? 'Signal')) . '"',
+            default => (string) ($message['text'] ?? $name . ' sent a radio log'),
+        };
+    }
+
+    private function radioTypeLabel(string $type, array $message): string
+    {
+        return match ($type) {
+            'ptt_start' => 'PTT started',
+            'ptt_heartbeat' => 'PTT active',
+            'ptt_end' => 'PTT ended',
+            'quick_signal' => (string) ($message['signal'] ?? 'Signal'),
+            default => 'Radio log',
+        };
+    }
+
+    private function radioChannelLabel(string $channel): string
+    {
+        return match ($channel) {
+            'command' => 'HQ Command',
+            'event' => 'Event',
+            default => 'Team',
+        };
+    }
+
+    private function formatMobileDateTime(mixed $value): string
+    {
+        return $value ? \Illuminate\Support\Carbon::parse($value)->timezone('Asia/Manila')->format('M d, g:i A') : 'Not recorded';
     }
 
     private function writeAuditLog(Request $request, string $action, string $table, string $referenceId, array $values): void

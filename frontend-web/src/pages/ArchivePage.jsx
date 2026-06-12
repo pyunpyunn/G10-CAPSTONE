@@ -12,9 +12,13 @@ import {
   archiveErrorMessage,
   archiveFileName,
   archiveParams,
-  downloadBlob,
-  downloadRecordCsv,
 } from '../utils/archiveHelpers'
+import {
+  detailsToRows,
+  downloadExcelWorkbook,
+  downloadPdfReport,
+  parseCsvText,
+} from '../utils/exportFileHelpers'
 
 export default function ArchivePage() {
   const [activeCategory, setActiveCategory] = useState('disaster-events')
@@ -71,30 +75,37 @@ export default function ArchivePage() {
   }
 
   async function downloadCategory(type) {
-    if (type === 'pdf') {
-      setMessage('Archive PDF export is reserved for the PDF package step. Use CSV export for now.')
-      return
-    }
-
     setMessage('')
 
     try {
       const blob = await exportArchive(activeCategory, 'csv', currentParams())
-      downloadBlob(archiveFileName(activeCategory, 'csv'), blob)
-      setMessage('Archive CSV downloaded.')
+      const rows = parseCsvText(await blob.text())
+
+      if (type === 'pdf') {
+        downloadPdfReport(archiveFileName(activeCategory, 'pdf'), `${categoryLabel} archive`, rows)
+        setMessage('Archive PDF downloaded.')
+        return
+      }
+
+      downloadExcelWorkbook(archiveFileName(activeCategory, 'xls'), `${categoryLabel} archive`, rows)
+      setMessage('Archive Excel downloaded.')
     } catch (downloadError) {
-      setMessage(archiveErrorMessage(downloadError, 'Archive CSV cannot be downloaded right now.'))
+      setMessage(archiveErrorMessage(downloadError, 'Archive export cannot be downloaded right now.'))
     }
   }
 
   function downloadSelectedRecord(type) {
+    const rows = detailsToRows(selectedRecord?.details || [])
+    const fileBase = `resqperation-archive-record-${selectedRecord?.id || 'details'}`
+
     if (type === 'pdf') {
-      setMessage('Archive record PDF export is reserved for the PDF package step. Use CSV export for now.')
+      downloadPdfReport(`${fileBase}.pdf`, recordExportTitle(selectedRecord, categoryLabel), rows)
+      setMessage('Archive record PDF downloaded.')
       return
     }
 
-    downloadRecordCsv(selectedRecord)
-    setMessage('Archive record CSV downloaded.')
+    downloadExcelWorkbook(`${fileBase}.xls`, recordExportTitle(selectedRecord, categoryLabel), rows)
+    setMessage('Archive record Excel downloaded.')
   }
 
   const categoryLabel = ARCHIVE_TABS.find((tab) => tab.key === activeCategory)?.label || 'Archive record'
@@ -149,4 +160,8 @@ export default function ArchivePage() {
       />
     </section>
   )
+}
+
+function recordExportTitle(record, categoryLabel) {
+  return `${categoryLabel} - ${record?.id || 'Record details'}`
 }

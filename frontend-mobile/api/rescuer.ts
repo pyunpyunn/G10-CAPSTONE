@@ -66,3 +66,28 @@ export async function cancelResourceRequest(requestId: string) {
   const response = await api.patch(`/rescuer/resource-requests/${requestId}/cancel`);
   return response.data;
 }
+
+export async function getRadioFeed(params: any = {}) {
+  const response = await api.get('/rescuer/radio', { params });
+  return response.data.data;
+}
+
+export async function startRadioTransmission(payload: any) {
+  const response = await api.post('/rescuer/radio/start', payload);
+  return response.data.data;
+}
+
+export async function heartbeatRadioTransmission(payload: any) {
+  const response = await api.post('/rescuer/radio/heartbeat', payload);
+  return response.data.data;
+}
+
+export async function stopRadioTransmission(payload: any) {
+  const response = await api.post('/rescuer/radio/stop', payload);
+  return response.data.data;
+}
+
+export async function sendRadioSignal(payload: any) {
+  const response = await api.post('/rescuer/radio/signal', payload);
+  return response.data.data;
+}

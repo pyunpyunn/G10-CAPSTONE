@@ -71,6 +71,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/archive/disaster-events', [ArchiveController::class, 'disasterEvents']);
             Route::get('/archive/household-status-logs', [ArchiveController::class, 'householdStatusLogs']);
             Route::get('/archive/dispatch-logs', [ArchiveController::class, 'dispatchLogs']);
+            Route::get('/archive/radio-communication-logs', [ArchiveController::class, 'radioCommunicationLogs']);
             Route::get('/archive/resource-requests', [ArchiveController::class, 'resourceRequests']);
             Route::get('/archive/situation-reports', [ArchiveController::class, 'situationReports']);
             Route::get('/archive/export', [ArchiveController::class, 'export']);
@@ -117,6 +118,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/rescuer/resource-requests', [RescuerMobileController::class, 'resourceRequests']);
             Route::post('/rescuer/resource-requests', [RescuerMobileController::class, 'storeResourceRequest']);
             Route::patch('/rescuer/resource-requests/{requestId}/cancel', [RescuerMobileController::class, 'cancelResourceRequest']);
+            Route::get('/rescuer/radio', [RescuerMobileController::class, 'radioFeed']);
+            Route::post('/rescuer/radio/start', [RescuerMobileController::class, 'startRadioTransmission']);
+            Route::post('/rescuer/radio/heartbeat', [RescuerMobileController::class, 'heartbeatRadioTransmission']);
+            Route::post('/rescuer/radio/stop', [RescuerMobileController::class, 'stopRadioTransmission']);
+            Route::post('/rescuer/radio/signal', [RescuerMobileController::class, 'storeRadioSignal']);
         });
     });
 });

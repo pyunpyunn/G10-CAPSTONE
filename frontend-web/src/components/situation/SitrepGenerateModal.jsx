@@ -77,7 +77,7 @@ export default function SitrepGenerateModal({
             <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={onClose}>Cancel</button>
             <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={onPreviewPdf}>
               <Download size={14} />
-              Preview PDF
+              Export PDF
             </button>
             <button className="btn btn-primary btn-sm" type="submit" disabled={isSaving}>
               <FileCheck2 size={14} />

@@ -42,7 +42,7 @@ export async function exportArchive(category, type, params = {}) {
       category,
       type,
     },
-    responseType: type === 'csv' ? 'blob' : 'json',
+    responseType: 'blob',
   })
 
   return response.data

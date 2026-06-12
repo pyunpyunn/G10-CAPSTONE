@@ -48,13 +48,26 @@
 }
 
 .screen-loader {
-  display: grid;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
   min-height: 100vh;
-  place-items: center;
+  padding-top: 28px;
   color: var(--muted);
   background: var(--bg);
   font-size: 14px;
   font-weight: 800;
+}
+
+.screen-loader::before {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(112, 167, 189, 0.16);
+  border-top-color: var(--chart-evacuated);
+  border-radius: 50%;
+  animation: pageLoadingSpin 820ms linear infinite;
+  content: "";
 }
 
 .brand-mark,
@@ -1601,6 +1614,8 @@
   right: 0;
   bottom: 0;
   left: var(--left-column);
+  display: flex;
+  align-items: stretch;
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -1610,7 +1625,11 @@
 }
 
 .page {
-  display: block;
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  flex: 1 0 auto;
+  flex-direction: column;
   min-height: calc(100vh - var(--header-height));
   padding: 32px 28px;
 }
@@ -1934,19 +1953,24 @@
 }
 
 .page-loading-card {
+  position: fixed;
+  top: calc(var(--header-height) + 24px);
+  left: calc(var(--left-column, var(--left-collapsed)) + ((100vw - var(--left-column, var(--left-collapsed))) / 2));
+  z-index: 45;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  width: fit-content;
-  min-height: 44px;
-  margin: 22px auto 10px;
+  min-height: 38px;
+  margin: 0;
   border: 0;
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 7px 12px;
   color: var(--color-text-2);
   background: transparent;
   box-shadow: none;
+  pointer-events: none;
+  transform: translateX(-50%);
 }
 
 .page-loading-spinner {
@@ -1962,6 +1986,17 @@
   color: var(--color-text-1);
   font-size: 13px;
   font-weight: 900;
+}
+
+.page-loading-card.inline {
+  position: static;
+  top: auto;
+  left: auto;
+  z-index: auto;
+  width: fit-content;
+  margin: 14px auto;
+  pointer-events: auto;
+  transform: none;
 }
 
 @keyframes pageLoadingSpin {
@@ -5043,10 +5078,15 @@ th {
 
 .archive-page {
   display: grid;
+  align-content: start;
+  grid-auto-rows: max-content;
   gap: 0;
 }
 
 .archive-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 18px;
@@ -5055,6 +5095,7 @@ th {
   padding: 0 0 8px;
   margin-bottom: 12px;
   border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-page);
 }
 
 .archive-tab {
@@ -5380,10 +5421,15 @@ th {
 /* Household Status */
 .household-page {
   display: grid;
+  align-content: start;
+  grid-auto-rows: max-content;
   gap: 14px;
 }
 
 .hh-readonly-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;

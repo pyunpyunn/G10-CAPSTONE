@@ -75,4 +75,29 @@ class RescuerMobileController extends Controller
     {
         return $this->service->cancelResourceRequest($request, $requestId);
     }
+
+    public function radioFeed(Request $request): JsonResponse
+    {
+        return $this->service->radioFeed($request);
+    }
+
+    public function startRadioTransmission(Request $request): JsonResponse
+    {
+        return $this->service->startRadioTransmission($request);
+    }
+
+    public function heartbeatRadioTransmission(Request $request): JsonResponse
+    {
+        return $this->service->heartbeatRadioTransmission($request);
+    }
+
+    public function stopRadioTransmission(Request $request): JsonResponse
+    {
+        return $this->service->stopRadioTransmission($request);
+    }
+
+    public function storeRadioSignal(Request $request): JsonResponse
+    {
+        return $this->service->storeRadioSignal($request);
+    }
 }

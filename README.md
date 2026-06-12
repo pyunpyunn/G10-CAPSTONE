@@ -130,23 +130,16 @@ Important development rule:
 
 ## Key Documentation
 
-- `docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md`
-- `docs/RESQPERATION_G10_DB_READINESS_CHECK.md`
-- `docs/RESQPERATION_G10_SAFE_SAMPLE_SEED_PLAN.md`
-- `docs/RESQPERATION_G10_DEVELOPMENT_READINESS_AUDIT.md`
-- `docs/RESQPERATION_G10_BEGINNER_MODULE_PROMPTS.md`
-- `docs/RESQPERATION_BARANGAY_PROFILE_SCOPE.md`
-- `docs/sql_proposals/2026_06_01_g10_all_sql_additive_update.sql`
-- `docs/sql_proposals/2026_06_01_g10_existing_db_gap_review.sql` - superseded historical proposal
-- `docs/sql_proposals/initial/2026_06_03_g10_barangay_profile_review.sql` - review-only Barangay Profile proposal
+All project documentation is inside `docs/`. Start with the index, then open the specific guide needed for development or defense.
 
-Private local references:
+- `docs/DOCUMENTATION_INDEX.md` - start here for all project documentation.
+- `docs/RESQPERATION_FINAL_DEFENSE_STUDY_GUIDE_AND_DIAGRAMS.md` - final-defense study guide and system diagrams.
+- `docs/RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, and TrackingAid/MappingAid integration draft.
+- `docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md` - current build checklist.
+- `docs/RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - shared MySQL / local SQLite switching guide.
+- `docs/sql_proposals/` - review-only SQL proposals.
 
-- `FOR DEV/RESQPERATION_UPDATED_STEP_GUIDE.md`
-- `FOR DEV/RESQPERATION_REQUIREMENTS_BREAKDOWN.md`
-- `FOR DEV/RESQPERATION_ACTUAL_DEVELOPMENT_PLAN.md`
-- `FOR DEV/API_REFERENCE.md`
-- `FOR DEV/RESQPERATION_PROTOTYPE_MODULES/README.md`
+Local-only prototype/reference folders such as `FOR DEV/` and `prototype/` are ignored from GitHub and should not be treated as deployable source code.
 
 ## Useful Commands
 

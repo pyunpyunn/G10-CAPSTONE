@@ -15,7 +15,8 @@ import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import {
   buildGeneratePayload,
-  downloadSituationCsv,
+  downloadSituationExcel,
+  downloadSituationPdf,
   emptyGenerateForm,
   situationErrorMessage,
 } from '../utils/situationReportHelpers'
@@ -155,7 +156,23 @@ export default function SituationReportPage() {
   }
 
   function handlePdfPreview() {
-    setMessage('PDF export is reserved for the PDF package step. Use CSV or saved snapshot review for now.')
+    if (!summary) {
+      setMessage('Select a disaster event first.')
+      return
+    }
+
+    downloadSituationPdf(summary)
+    setMessage('SitRep PDF downloaded.')
+  }
+
+  function handleExcelExport() {
+    if (!summary) {
+      setMessage('Select a disaster event first.')
+      return
+    }
+
+    downloadSituationExcel(summary)
+    setMessage('SitRep Excel downloaded.')
   }
 
   const events = workspace?.events || []
@@ -186,7 +203,7 @@ export default function SituationReportPage() {
           />
 
           {message && <div className="rr-message sr-message">{message}</div>}
-          {isSummaryLoading && <LoadingState />}
+          {isSummaryLoading && <LoadingState inline />}
 
           {!summary && !isSummaryLoading && (
             <div className="sitrep-empty-state">Choose a disaster event log to load the SitRep summary.</div>
@@ -201,7 +218,7 @@ export default function SituationReportPage() {
                   onGenerate={openGenerateModal}
                   onArchive={handleArchiveCurrent}
                   onViewArchive={() => navigate('/archive')}
-                  onExportCsv={() => downloadSituationCsv(summary)}
+                  onExportExcel={handleExcelExport}
                   onExportPdf={handlePdfPreview}
                 />
               </div>

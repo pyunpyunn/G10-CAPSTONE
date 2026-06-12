@@ -17,7 +17,6 @@ import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import {
   buildRescuerPayload,
-  downloadCsv,
   emptyRescuerForm,
   exportRosterRows,
   accountIdForTeam,
@@ -25,6 +24,10 @@ import {
   formFromRescuer,
   rescuerErrorMessage,
 } from '../utils/rescuerHelpers'
+import {
+  downloadExcelWorkbook,
+  downloadPdfReport,
+} from '../utils/exportFileHelpers'
 
 export default function RescuerAccountsPage() {
   const [payload, setPayload] = useState(null)
@@ -187,8 +190,15 @@ export default function RescuerAccountsPage() {
     }
   }
 
-  function exportRoster() {
-    downloadCsv('resqperation-rescuer-roster.csv', exportRosterRows(rescuers))
+  function exportRoster(type) {
+    const rows = exportRosterRows(rescuers)
+
+    if (type === 'pdf') {
+      downloadPdfReport('resqperation-rescuer-roster.pdf', 'ResQperation Rescuer Roster', rows)
+      return
+    }
+
+    downloadExcelWorkbook('resqperation-rescuer-roster.xls', 'ResQperation Rescuer Roster', rows)
   }
 
   return (
@@ -197,9 +207,13 @@ export default function RescuerAccountsPage() {
         title="Rescuer Accounts"
         actions={
           <>
-          <button className="btn btn-secondary btn-sm" type="button" onClick={exportRoster}>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={() => exportRoster('excel')}>
             <FileCheck2 size={14} />
-            Export roster
+            Export Excel
+          </button>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={() => exportRoster('pdf')}>
+            <FileCheck2 size={14} />
+            Export PDF
           </button>
           <button className="btn btn-primary btn-sm" type="button" onClick={openCreateModal}>
             <UserPlus size={14} />

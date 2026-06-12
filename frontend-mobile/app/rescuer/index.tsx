@@ -26,13 +26,14 @@ import type { RescuerOverview } from '@/api/rescuer';
 import { FieldReportScreen } from '@/components/rescuer/FieldReportScreen';
 import { RescuerDashboardScreen } from '@/components/rescuer/RescuerDashboardScreen';
 import { RescuerHeader } from '@/components/rescuer/RescuerHeader';
+import { RadioCommunicationScreen } from '@/components/rescuer/RadioCommunicationScreen';
 import { RescueMapScreen } from '@/components/rescuer/RescueMapScreen';
 import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScreen';
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
 import { LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 
-type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile';
+type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 
 const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; special?: boolean }[] = [
   { key: 'dashboard', label: 'Home', icon: 'home-outline' },
@@ -226,14 +227,17 @@ export default function RescuerHomeScreen() {
       );
     }
 
+    if (activeTab === 'radio') {
+      return <RadioCommunicationScreen overview={overview} />;
+    }
+
     return <ResponderProfileScreen profile={overview.profile} onSaveProfile={handleUpdateProfile} onLogout={handleLogout} />;
   }
 
   return (
     <SafeAreaView style={styles.safe}>
       <RescuerHeader
-        onRefresh={() => loadOverview(true)}
-        onLogout={handleLogout}
+        onOpenRadio={() => setActiveTab('radio')}
       />
 
       <ScrollView
@@ -241,6 +245,16 @@ export default function RescuerHomeScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
+        <View style={styles.pageTopBar}>
+          <Pressable
+            style={[styles.refreshButton, (refreshing || loading) && styles.refreshButtonDisabled]}
+            onPress={() => loadOverview(true)}
+            disabled={refreshing || loading}
+          >
+            <Ionicons name="refresh-outline" size={18} color={palette.navActive} />
+            <Text style={styles.refreshText}>Refresh</Text>
+          </Pressable>
+        </View>
         {renderContent()}
       </ScrollView>
 
@@ -296,6 +310,31 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     paddingBottom: 100,
+  },
+  pageTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: spacing.sm,
+  },
+  refreshButton: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: palette.card,
+  },
+  refreshButtonDisabled: {
+    opacity: 0.55,
+  },
+  refreshText: {
+    color: palette.nav,
+    fontSize: 13,
+    fontWeight: '900',
   },
   tabBar: {
     position: 'absolute',

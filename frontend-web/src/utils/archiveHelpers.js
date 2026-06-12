@@ -93,31 +93,3 @@ export function archiveFileName(category, type = 'csv') {
 
   return `resqperation-${category}-archive-${date}.${type}`
 }
-
-export function downloadBlob(fileName, blob) {
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-
-  link.href = url
-  link.download = fileName
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  window.URL.revokeObjectURL(url)
-}
-
-export function downloadRecordCsv(record) {
-  const details = record?.details || []
-  const rows = [['Field', 'Value'], ...details.map((item) => [item.label, item.value])]
-  const csv = rows.map((row) => row.map(csvValue).join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const fileName = `resqperation-archive-record-${record?.id || 'details'}.csv`
-
-  downloadBlob(fileName, blob)
-}
-
-function csvValue(value) {
-  const text = String(value ?? '')
-
-  return `"${text.replace(/"/g, '""')}"`
-}

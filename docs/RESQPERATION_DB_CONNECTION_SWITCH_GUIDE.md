@@ -2,9 +2,9 @@
 
 Use this guide when the shared MySQL database laptop is offline, then switch back when it is available again.
 
-## Current Mode: Shared MySQL Connected
+## Current Mode: Shared MySQL
 
-The backend is currently connected to the shared MySQL database.
+The backend is currently connected to the shared MySQL database because the DB member's laptop/server is reachable again.
 
 Current backend settings in `backend-laravel/.env`:
 
@@ -13,12 +13,12 @@ DB_CONNECTION=mysql
 DB_HOST=192.168.112.68
 DB_PORT=3306
 DB_DATABASE=klint
-DB_USERNAME=groupmate
-DB_PASSWORD=check backend-laravel/.env
 SESSION_DRIVER=file
 QUEUE_CONNECTION=sync
 CACHE_STORE=file
 ```
+
+The shared MySQL password stays only in `backend-laravel/.env`. Do not commit or paste the full `.env` file.
 
 Why `SESSION_DRIVER=file`, `QUEUE_CONNECTION=sync`, and `CACHE_STORE=file` stay like this:
 
@@ -26,7 +26,7 @@ Why `SESSION_DRIVER=file`, `QUEUE_CONNECTION=sync`, and `CACHE_STORE=file` stay 
 - Laravel sessions/cache/queue do not depend on database support tables during development.
 - If the shared DB becomes unreachable again, the app is less likely to timeout on session/cache operations.
 
-## Run The System In Offline Mode
+## Run The System In Current Shared DB Mode
 
 Backend:
 
@@ -70,6 +70,36 @@ php artisan cache:clear
 Then stop and restart `php artisan serve`.
 
 If the error still shows `mysql:host=192...`, Laravel is still using an old cached config or a server process that was started before the `.env` change.
+
+## How To Temporarily Disconnect From The Shared DB
+
+Only use this when the shared MySQL laptop/server is offline.
+
+1. Open `backend-laravel/.env`.
+2. Change:
+
+```env
+DB_CONNECTION=sqlite
+```
+
+3. Keep these local-safe settings:
+
+```env
+SESSION_DRIVER=file
+QUEUE_CONNECTION=sync
+CACHE_STORE=file
+```
+
+4. Clear config and restart Laravel:
+
+```bash
+cd backend-laravel
+php artisan config:clear
+php artisan cache:clear
+php artisan serve --host=0.0.0.0 --port=8000
+```
+
+Offline SQLite is only for temporary UI/API testing. Some modules can fail if the SQLite file does not have the same tables as the shared MySQL database.
 
 ## How To Reconnect To The Shared DB
 

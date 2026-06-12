@@ -3,11 +3,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 
 type HeaderProps = {
-  onRefresh: () => void;
-  onLogout: () => void;
+  onOpenRadio?: () => void;
 };
 
-export function RescuerHeader({ onRefresh, onLogout }: HeaderProps) {
+export function RescuerHeader({ onOpenRadio }: HeaderProps) {
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
@@ -16,12 +15,11 @@ export function RescuerHeader({ onRefresh, onLogout }: HeaderProps) {
         </View>
         <Text style={styles.brand}>RESQPERATION</Text>
         <View style={styles.actions}>
-          <Pressable style={styles.iconButton} onPress={onRefresh}>
-            <Ionicons name="refresh-outline" size={20} color={palette.navText} />
-          </Pressable>
-          <Pressable style={styles.iconButton} onPress={onLogout}>
-            <Ionicons name="log-out-outline" size={20} color={palette.navText} />
-          </Pressable>
+          {onOpenRadio ? (
+            <Pressable style={styles.iconButton} onPress={onOpenRadio}>
+              <Ionicons name="radio-outline" size={20} color={palette.navText} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </View>
@@ -30,9 +28,10 @@ export function RescuerHeader({ onRefresh, onLogout }: HeaderProps) {
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop: spacing.xs,
+    minHeight: 72,
+    paddingTop: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xs,
+    paddingBottom: spacing.md,
     backgroundColor: palette.nav,
   },
   brandRow: {

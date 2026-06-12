@@ -32,6 +32,11 @@ class ArchiveController extends Controller
         return $this->service->dispatchLogs($request);
     }
 
+    public function radioCommunicationLogs(Request $request): JsonResponse
+    {
+        return $this->service->radioCommunicationLogs($request);
+    }
+
     public function resourceRequests(Request $request): JsonResponse
     {
         return $this->service->resourceRequests($request);

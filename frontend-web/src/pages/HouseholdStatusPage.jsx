@@ -18,9 +18,12 @@ import LoadingState from '../components/ui/LoadingState'
 import Modal from '../components/ui/Modal'
 import PageHeader from '../components/ui/PageHeader'
 import {
-  csvValue,
   emptySummary,
 } from '../utils/householdStatusHelpers'
+import {
+  downloadExcelWorkbook,
+  downloadPdfReport,
+} from '../utils/exportFileHelpers'
 
 export default function HouseholdStatusPage() {
   const navigate = useNavigate()
@@ -148,38 +151,20 @@ export default function HouseholdStatusPage() {
     setPage(1)
   }
 
-  function exportCurrentPage() {
+  function exportCurrentPage(type) {
     if (households.length === 0) {
       return
     }
 
-    const headers = ['Household ID', 'Household', 'Purok', 'People', 'Status', 'Source', 'Report Time', 'Devices', 'Battery', 'Last Location', 'Priority']
-    const rows = households.map((household) => [
-      household.household_id,
-      household.household_name,
-      household.purok,
-      household.people,
-      household.status?.label,
-      household.source?.label,
-      household.source?.datetime,
-      `${household.device?.active || 0}/${household.device?.total || 0}`,
-      household.device?.lowest_battery !== null && household.device?.lowest_battery !== undefined ? `${household.device.lowest_battery}%` : '',
-      household.location?.label,
-      household.priority?.label,
-    ])
-    const csv = [headers, ...rows]
-      .map((row) => row.map(csvValue).join(','))
-      .join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
+    const rows = householdExportRows(households)
+    const title = `Household Status - Page ${page}`
 
-    link.href = url
-    link.download = `household-status-page-${page}.csv`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    if (type === 'pdf') {
+      downloadPdfReport(`household-status-page-${page}.pdf`, title, rows)
+      return
+    }
+
+    downloadExcelWorkbook(`household-status-page-${page}.xls`, title, rows)
   }
 
   return (
@@ -192,9 +177,13 @@ export default function HouseholdStatusPage() {
               <RefreshCcw size={14} />
               Refresh
             </button>
-            <button className="btn btn-secondary btn-sm" type="button" disabled={households.length === 0} onClick={exportCurrentPage}>
+            <button className="btn btn-secondary btn-sm" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('excel')}>
               <FileDown size={14} />
-              Export CSV
+              Export Excel
+            </button>
+            <button className="btn btn-secondary btn-sm" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('pdf')}>
+              <FileDown size={14} />
+              Export PDF
             </button>
           </>
         }
@@ -263,7 +252,7 @@ export default function HouseholdStatusPage() {
           )
         }
       >
-        {isDetailLoading && <LoadingState />}
+        {isDetailLoading && <LoadingState inline />}
         {detailError && <div className="form-error">{detailError}</div>}
         {!isDetailLoading && detail?.household && (
           <HouseholdDetailContent detail={detail} history={history} />
@@ -271,4 +260,23 @@ export default function HouseholdStatusPage() {
       </Modal>
     </section>
   )
+}
+
+function householdExportRows(households) {
+  const headers = ['Household ID', 'Household', 'Purok', 'People', 'Status', 'Source', 'Report Time', 'Devices', 'Battery', 'Last Location', 'Priority']
+  const rows = households.map((household) => [
+    household.household_id,
+    household.household_name,
+    household.purok,
+    household.people,
+    household.status?.label,
+    household.source?.label,
+    household.source?.datetime,
+    `${household.device?.active || 0}/${household.device?.total || 0}`,
+    household.device?.lowest_battery !== null && household.device?.lowest_battery !== undefined ? `${household.device.lowest_battery}%` : '',
+    household.location?.label,
+    household.priority?.label,
+  ])
+
+  return [headers, ...rows]
 }

@@ -15,6 +15,7 @@ class ArchiveService
         'disaster-events' => 'Disaster Event',
         'household-status-logs' => 'Household Status Logs',
         'dispatch-logs' => 'Rescue Dispatch Logs',
+        'radio-communication-logs' => 'Radio Communication Logs',
         'resource-requests' => 'Resources & Requests',
         'situation-reports' => 'Situation Reporting',
     ];
@@ -45,6 +46,13 @@ class ArchiveService
         [$paginator, $records] = $this->dispatchRows($request);
 
         return $this->archiveResponse('dispatch-logs', $paginator, $records);
+    }
+
+    public function radioCommunicationLogs(Request $request): JsonResponse
+    {
+        [$paginator, $records] = $this->radioCommunicationRows($request);
+
+        return $this->archiveResponse('radio-communication-logs', $paginator, $records);
     }
 
     public function resourceRequests(Request $request): JsonResponse
@@ -122,6 +130,7 @@ class ArchiveService
         return match ($category) {
             'household-status-logs' => $this->householdStatusRows($request, $perPage),
             'dispatch-logs' => $this->dispatchRows($request, $perPage),
+            'radio-communication-logs' => $this->radioCommunicationRows($request, $perPage),
             'resource-requests' => $this->resourceRequestRows($request, $perPage),
             'situation-reports' => $this->situationReportRows($request, $perPage),
             default => $this->disasterEventRows($request, $perPage),
@@ -326,6 +335,48 @@ class ArchiveService
 
         $records = collect($paginator->items())
             ->map(fn (object $row): array => $this->formatResourceRequest($row))
+            ->values()
+            ->all();
+
+        return [$paginator, $records];
+    }
+
+    private function radioCommunicationRows(Request $request, int $perPage = 25): array
+    {
+        $query = DB::table('responder_communication_logs as rcl')
+            ->leftJoin('disaster_events as de', 'de.event_id', '=', 'rcl.disaster_id')
+            ->leftJoin('responders as r', 'r.responder_id', '=', 'rcl.responder_id')
+            ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'rcl.team_id')
+            ->select([
+                'rcl.*',
+                'de.name as event_name',
+                'de.started_at as event_started_at',
+                'de.ended_at as event_ended_at',
+                'r.full_name as responder_name',
+                'r.responder_code',
+                'rt.team_code',
+                'rt.team_type',
+            ]);
+
+        $this->applySearch($query, $request, [
+            'rcl.communication_id',
+            'rcl.team_name',
+            'rcl.message',
+            'de.name',
+            'r.full_name',
+            'r.responder_code',
+            'rt.team_code',
+        ]);
+        $this->applyEventFilter($query, $request, 'rcl.disaster_id');
+        $this->applyRadioStatusFilter($query, $request);
+
+        $paginator = $query
+            ->orderByDesc('rcl.timestamp')
+            ->orderByDesc('rcl.communication_id')
+            ->paginate($this->perPage($request, $perPage));
+
+        $records = collect($paginator->items())
+            ->map(fn (object $row): array => $this->formatRadioCommunication($row))
             ->values()
             ->all();
 
@@ -613,6 +664,68 @@ class ArchiveService
         ];
 
         return $record;
+    }
+
+    private function formatRadioCommunication(object $row): array
+    {
+        $message = $this->decodeJson($row->message);
+        $type = (string) ($message['type'] ?? 'message');
+        $channel = (string) ($message['channel'] ?? 'team');
+        $typeLabel = $this->radioTypeLabel($type, $message);
+        $responderName = $row->responder_name ?: ($message['responder_name'] ?? 'Responder');
+        $eventName = $row->event_name ?: ($message['event_name'] ?? 'No active event');
+        $teamName = $row->team_name ?: ($message['team_name'] ?? 'Assigned team');
+
+        return [
+            'id' => $row->communication_id,
+            'event_id' => $row->disaster_id,
+            'event_name' => $eventName,
+            'status_key' => $type,
+            'datetime' => $this->formatDateTime($row->timestamp),
+            'event' => [
+                'title' => $eventName,
+                'meta' => $row->disaster_id ? 'Event ID '.$row->disaster_id : 'General radio log',
+            ],
+            'team_route' => [
+                'title' => $teamName,
+                'meta' => trim(($row->team_code ?: 'Team').' - '.$responderName),
+            ],
+            'channel' => [
+                'title' => $this->radioChannelLabel($channel),
+                'meta' => $typeLabel,
+            ],
+            'transmission' => [
+                'title' => $this->radioDisplayMessage($type, $message, $responderName),
+                'meta' => $message['transmission_id'] ?? 'Signal / metadata log',
+            ],
+            'status' => [
+                'label' => $typeLabel,
+                'tone' => $this->statusTone($type),
+            ],
+            'details' => $this->details([
+                'Communication ID' => $row->communication_id,
+                'Date / time' => $this->formatDateTime($row->timestamp),
+                'Event' => $eventName,
+                'Responder' => $responderName,
+                'Responder code' => $row->responder_code ?: ($message['responder_code'] ?? 'Not recorded'),
+                'Team' => $teamName,
+                'Channel' => $this->radioChannelLabel($channel),
+                'Type' => $typeLabel,
+                'Transmission ID' => $message['transmission_id'] ?? 'Not recorded',
+                'Duration' => isset($message['duration_seconds']) ? ((int) $message['duration_seconds']).' seconds' : 'Not recorded',
+                'Signal' => $message['signal'] ?? 'Not recorded',
+                'Audio status' => $message['audio_status'] ?? 'Metadata only',
+            ]),
+            'export' => [
+                'datetime' => $this->formatDateTime($row->timestamp),
+                'event' => $eventName,
+                'reference' => 'COM-'.$row->communication_id,
+                'team_responder' => $teamName.' - '.$responderName,
+                'channel' => $this->radioChannelLabel($channel),
+                'transmission' => $this->radioDisplayMessage($type, $message, $responderName),
+                'status' => $typeLabel,
+            ],
+        ];
     }
 
     private function formatSituationReport(object $row): array
@@ -982,6 +1095,15 @@ class ArchiveService
                 'status' => 'Status',
                 'outcome' => 'Outcome',
             ],
+            'radio-communication-logs' => [
+                'datetime' => 'Date / time',
+                'event' => 'Event',
+                'reference' => 'Reference',
+                'team_responder' => 'Team / responder',
+                'channel' => 'Channel',
+                'transmission' => 'Transmission',
+                'status' => 'Status',
+            ],
             'resource-requests' => [
                 'datetime' => 'Date / time',
                 'event' => 'Event',
@@ -1076,9 +1198,51 @@ class ArchiveService
         return match ($key) {
             'safe', 'evacuated', 'verified', 'forwarded', 'fulfilled', 'completed', 'on_scene', 'returned_home', 'generated' => 'green',
             'active', 'dispatched', 'en_route', 'needs_validation', 'pending', 'assigned' => 'amber',
-            'unsafe', 'injured', 'missing', 'not_evacuated', 'displaced', 'returned', 'cancelled', 'failed', 'critical' => 'red',
+            'unsafe', 'injured', 'missing', 'not_evacuated', 'displaced', 'returned', 'cancelled', 'failed', 'critical', 'ptt_start', 'ptt_heartbeat' => 'red',
             'reviewed', 'archived' => 'purple',
             default => 'gray',
+        };
+    }
+
+    private function applyRadioStatusFilter(object $query, Request $request): void
+    {
+        $status = $this->statusKey($request->query('status', 'all'));
+
+        if ($status === 'all') {
+            return;
+        }
+
+        $query->where('rcl.message', 'like', '%"type":"'.$status.'"%');
+    }
+
+    private function radioDisplayMessage(string $type, array $message, string $responderName): string
+    {
+        return match ($type) {
+            'ptt_start' => $responderName.' started PTT',
+            'ptt_heartbeat' => $responderName.' was transmitting',
+            'ptt_end' => $responderName.' ended PTT after '.((int) ($message['duration_seconds'] ?? 0)).'s',
+            'quick_signal' => $responderName.' sent "'.((string) ($message['signal'] ?? 'Signal')).'"',
+            default => (string) ($message['text'] ?? $responderName.' sent a radio log'),
+        };
+    }
+
+    private function radioTypeLabel(string $type, array $message): string
+    {
+        return match ($type) {
+            'ptt_start' => 'PTT started',
+            'ptt_heartbeat' => 'PTT active',
+            'ptt_end' => 'PTT ended',
+            'quick_signal' => (string) ($message['signal'] ?? 'Signal'),
+            default => 'Radio log',
+        };
+    }
+
+    private function radioChannelLabel(string $channel): string
+    {
+        return match ($channel) {
+            'command' => 'HQ Command',
+            'event' => 'Event',
+            default => 'Team',
         };
     }
 
