@@ -61,6 +61,7 @@ function recordTitle(record) {
   return record?.event?.title
     || record?.household?.title
     || record?.team_route?.title
+    || record?.transmission?.title
     || record?.request?.title
     || record?.sitrep?.title
     || 'Archive record'

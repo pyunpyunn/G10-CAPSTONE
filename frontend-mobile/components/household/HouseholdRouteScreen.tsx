@@ -105,31 +105,38 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
           action={<HouseholdBadge label={selectedCenter ? 'Route ready' : 'No center'} tone={selectedCenter ? 'info' : 'neutral'} />}
         />
 
-        <MapView style={styles.map} initialRegion={mapRegion}>
-          {householdPoint ? (
-            <>
-              <Marker coordinate={householdPoint} title="Your household" description={geotag.location_label} pinColor={palette.navActive} />
-              <Circle center={householdPoint} radius={geotag.accuracy_m || 35} strokeColor="#1f3e5a55" fillColor="#1f3e5a18" />
-            </>
-          ) : null}
+        <View style={styles.mapWrap}>
+          <MapView style={styles.map} initialRegion={mapRegion}>
+            {householdPoint ? (
+              <>
+                <Marker coordinate={householdPoint} title="Your household" description={geotag.location_label} pinColor={palette.navActive} />
+                <Circle center={householdPoint} radius={geotag.accuracy_m || 35} strokeColor="#1f3e5a55" fillColor="#1f3e5a18" />
+              </>
+            ) : null}
 
-          {centers.map((center) => (
-            <Marker
-              key={center.evacuation_center_id}
-              coordinate={{
-                latitude: Number(center.latitude),
-                longitude: Number(center.longitude),
-              }}
-              title={center.name}
-              description={center.address || center.center_type}
-              pinColor={String(center.evacuation_center_id) === selectedId ? palette.safe : palette.evacuated}
-            />
-          ))}
+            {centers.map((center) => (
+              <Marker
+                key={center.evacuation_center_id}
+                coordinate={{
+                  latitude: Number(center.latitude),
+                  longitude: Number(center.longitude),
+                }}
+                title={center.name}
+                description={center.address || center.center_type}
+                pinColor={String(center.evacuation_center_id) === selectedId ? palette.safe : palette.evacuated}
+              />
+            ))}
 
-          {routeLine.length >= 2 ? (
-            <Polyline coordinates={routeLine} strokeColor={palette.safe} strokeWidth={5} />
-          ) : null}
-        </MapView>
+            {routeLine.length >= 2 ? (
+              <Polyline coordinates={routeLine} strokeColor={palette.safe} strokeWidth={5} />
+            ) : null}
+          </MapView>
+          <View style={styles.legend}>
+            <LegendItem color={palette.navActive} label="Household" />
+            <LegendItem color={palette.safe} label="Selected center" />
+            <LegendLine label="Route" />
+          </View>
+        </View>
 
         {!householdPoint ? (
           <HouseholdEmpty
@@ -210,6 +217,24 @@ function toRadians(value: number) {
   return (value * Math.PI) / 180;
 }
 
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <Text style={styles.legendText}>{label}</Text>
+    </View>
+  );
+}
+
+function LegendLine({ label }: { label: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={styles.legendLine} />
+      <Text style={styles.legendText}>{label}</Text>
+    </View>
+  );
+}
+
 async function fetchRoadRoute(
   start: { latitude: number; longitude: number },
   end: { latitude: number; longitude: number }
@@ -248,10 +273,44 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: palette.card,
   },
-  map: {
-    height: 340,
+  mapWrap: {
     overflow: 'hidden',
     borderRadius: radius.md,
+  },
+  map: {
+    height: 340,
+  },
+  legend: {
+    position: 'absolute',
+    right: spacing.sm,
+    bottom: spacing.sm,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: '#ffffffe8',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendLine: {
+    width: 18,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: palette.safe,
+  },
+  legendText: {
+    color: palette.text,
+    fontSize: 11,
+    fontWeight: '900',
   },
   selectedBox: {
     flexDirection: 'row',

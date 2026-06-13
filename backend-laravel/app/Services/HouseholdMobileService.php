@@ -319,6 +319,8 @@ class HouseholdMobileService
                 'report_type' => 'member_status',
                 'member_id' => $memberId,
                 'member_name' => $memberName,
+                'mobile_status_key' => $validated['status_key'],
+                'mobile_status_label' => $this->mobileStatusLabel($validated['status_key'], null),
                 'member_notes' => $validated['notes'] ?? null,
             ];
 
@@ -357,7 +359,7 @@ class HouseholdMobileService
                     'member_name' => $memberName,
                     'status_id' => $status['status_id'],
                     'status_key' => $validated['status_key'],
-                    'status_label' => $this->mobileStatusLabel($status['status_key'], $status['status_label']),
+                    'status_label' => $this->mobileStatusLabel($validated['status_key'], null),
                     'notes' => $validated['notes'] ?? null,
                     'submitted_at' => $now->toDateTimeString(),
                     'submitted_label' => $this->dateLabel($now->toDateTimeString()),
@@ -411,6 +413,8 @@ class HouseholdMobileService
                 'status_key' => ['Selected status is not available in the shared database.'],
             ]);
         }
+
+        $validated['notes'] = $this->statusNotesJson($validated['status_key'], $validated['notes'] ?? null);
 
         $now = now();
         $statusLogId = null;
@@ -1013,7 +1017,7 @@ class HouseholdMobileService
 
         $members = $membersQuery
             ->get($memberColumns)
-            ->map(function (object $member) use ($devicesByMember): array {
+            ->map(function (object $member) use ($devicesByMember, $statusesByMember): array {
                 $device = $devicesByMember->get($member->member_id);
                 $memberStatus = $statusesByMember[(string) $member->member_id] ?? null;
 
@@ -1098,13 +1102,15 @@ class HouseholdMobileService
                     return $statuses;
                 }
 
+                $displayStatusKey = $this->displayStatusKey($log->status_key, $notes);
+
                 $statuses[(string) $memberId] = [
                     'status_log_id' => $log->status_log_id,
                     'member_id' => $memberId,
                     'member_name' => $notes['member_name'] ?? null,
                     'status_id' => $log->status_id,
-                    'status_key' => $this->mobileStatusKey($log->status_key),
-                    'status_label' => $this->mobileStatusLabel($log->status_key, $log->status_label),
+                    'status_key' => $displayStatusKey,
+                    'status_label' => $this->displayStatusLabel($displayStatusKey, $log->status_label),
                     'notes' => $notes['member_notes'] ?? null,
                     'submitted_at' => $log->submitted_at,
                     'submitted_label' => $this->dateLabel($log->submitted_at),
@@ -1158,11 +1164,14 @@ class HouseholdMobileService
             return null;
         }
 
+        $notes = $this->decodeJson($row->last_status_notes ?? null);
+        $displayStatusKey = $this->displayStatusKey($row->status_key, $notes);
+
         return [
             'status_id' => $row->status_id,
-            'status_key' => $this->mobileStatusKey($row->status_key),
-            'status_label' => $this->mobileStatusLabel($row->status_key, $row->status_label),
-            'notes' => $row->last_status_notes,
+            'status_key' => $displayStatusKey,
+            'status_label' => $this->displayStatusLabel($displayStatusKey, $row->status_label),
+            'notes' => $notes['user_notes'] ?? $row->last_status_notes,
             'battery_level' => $row->last_battery_level,
             'last_saved_at' => $row->last_reported_at,
             'last_saved_label' => $this->dateLabel($row->last_reported_at),
@@ -1212,16 +1221,21 @@ class HouseholdMobileService
             ->orderByDesc($orderColumn)
             ->limit(30)
             ->get($columns)
-            ->map(fn (object $log): array => [
-                'status_log_id' => $log->status_log_id,
-                'status_key' => $this->mobileStatusKey($log->status_key),
-                'status_label' => $this->mobileStatusLabel($log->status_key, $log->status_label),
-                'location_label' => $log->location_label,
-                'battery_level' => $log->battery_level,
-                'notes' => $log->notes,
-                'submitted_at' => $log->submitted_at,
-                'submitted_label' => $this->dateLabel($log->submitted_at),
-            ])
+            ->map(function (object $log): array {
+                $notes = $this->decodeJson($log->notes ?? null);
+                $displayStatusKey = $this->displayStatusKey($log->status_key, $notes);
+
+                return [
+                    'status_log_id' => $log->status_log_id,
+                    'status_key' => $displayStatusKey,
+                    'status_label' => $this->displayStatusLabel($displayStatusKey, $log->status_label),
+                    'location_label' => $log->location_label,
+                    'battery_level' => $log->battery_level,
+                    'notes' => $notes['user_notes'] ?? $log->notes,
+                    'submitted_at' => $log->submitted_at,
+                    'submitted_label' => $this->dateLabel($log->submitted_at),
+                ];
+            })
             ->values()
             ->all();
     }
@@ -1295,11 +1309,18 @@ class HouseholdMobileService
             'safe' => ['safe', 'active', 'returned'],
             'evacuated' => ['evacuated', 'relocated'],
             'unsafe' => ['unsafe', 'not_evacuated', 'displaced'],
-            'needs_help' => ['injured', 'missing', 'not_evacuated', 'unsafe'],
+            'needs_help' => ['needs_help', 'need_help', 'needs_assistance', 'injured', 'missing', 'not_evacuated', 'unsafe'],
         ];
 
+        $candidates = $map[$mobileKey] ?? [$mobileKey];
+        $orderSql = collect($candidates)
+            ->values()
+            ->map(fn (string $key, int $index): string => 'WHEN status_key = ? THEN '.$index)
+            ->implode(' ');
+
         $row = DB::table('household_statuses')
-            ->whereIn('status_key', $map[$mobileKey] ?? [$mobileKey])
+            ->whereIn('status_key', $candidates)
+            ->orderByRaw('CASE '.$orderSql.' ELSE 999 END', $candidates)
             ->orderBy('status_id')
             ->first([
                 'status_id',
@@ -1595,6 +1616,10 @@ class HouseholdMobileService
 
     private function mobileStatusKey(?string $statusKey): string
     {
+        if (in_array($statusKey, ['needs_help', 'need_help', 'needs_assistance'], true)) {
+            return 'needs_help';
+        }
+
         if (in_array($statusKey, ['safe', 'active', 'returned'], true)) {
             return 'safe';
         }
@@ -1623,6 +1648,32 @@ class HouseholdMobileService
             'needs_help' => 'Needs help',
             default => $statusLabel ?: 'Unchecked',
         };
+    }
+
+    private function displayStatusKey(?string $databaseStatusKey, array $notes = []): string
+    {
+        $mobileStatusKey = $notes['mobile_status_key'] ?? null;
+
+        if (in_array($mobileStatusKey, ['safe', 'evacuated', 'unsafe', 'needs_help'], true)) {
+            return $mobileStatusKey;
+        }
+
+        return $this->mobileStatusKey($databaseStatusKey);
+    }
+
+    private function displayStatusLabel(string $displayStatusKey, ?string $databaseStatusLabel): string
+    {
+        return $this->mobileStatusLabel($displayStatusKey, $databaseStatusLabel);
+    }
+
+    private function statusNotesJson(string $mobileStatusKey, ?string $userNotes): string
+    {
+        return json_encode([
+            'report_type' => 'household_status',
+            'mobile_status_key' => $mobileStatusKey,
+            'mobile_status_label' => $this->mobileStatusLabel($mobileStatusKey, null),
+            'user_notes' => $userNotes,
+        ], JSON_UNESCAPED_SLASHES);
     }
 
     private function familyName(string $name): string

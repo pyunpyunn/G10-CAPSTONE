@@ -162,6 +162,7 @@ export function HouseholdProfileScreen({
         <InfoRow label="Last location" value={currentDevice?.last_location_label || geotag?.location_label || 'Not recorded'} />
 
         <Text style={styles.selectorLabel}>Assign this device to one member</Text>
+        <Text style={styles.helperText}>Only one member should use this device profile so battery and location logs stay accurate.</Text>
         {members.length === 0 ? (
           <HouseholdEmpty icon="people-outline" title="No family members found" />
         ) : (
@@ -199,6 +200,7 @@ export function HouseholdProfileScreen({
               <InfoRow label="Device check" value={deviceCheckLabel(selectedMember)} />
               <InfoRow label="Last location" value={selectedMember.device?.last_location_label || 'No device location'} />
               <InfoRow label="Last seen" value={selectedMember.device?.last_seen_label || 'Not recorded'} />
+              {selectedMember.special_needs ? <InfoRow label="Priority info" value={selectedMember.special_needs} /> : null}
             </View>
 
             <View style={styles.twoColumn}>
@@ -517,6 +519,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
+  },
+  helperText: {
+    color: palette.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '800',
   },
   memberGrid: {
     flexDirection: 'row',

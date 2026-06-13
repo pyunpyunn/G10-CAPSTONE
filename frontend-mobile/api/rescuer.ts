@@ -87,6 +87,31 @@ export async function stopRadioTransmission(payload: any) {
   return response.data.data;
 }
 
+export async function uploadRadioClip(payload: any) {
+  const formData = new FormData();
+  formData.append('channel', payload.channel || 'team');
+
+  if (payload.assignment_id) {
+    formData.append('assignment_id', String(payload.assignment_id));
+  }
+
+  formData.append('duration_seconds', String(payload.duration_seconds || 0));
+  formData.append('audio', {
+    uri: payload.uri,
+    name: payload.name || 'resqperation-ptt.m4a',
+    type: payload.type || 'audio/mp4',
+  } as any);
+
+  const response = await api.post('/rescuer/radio/clip', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 30000,
+  });
+
+  return response.data.data;
+}
+
 export async function sendRadioSignal(payload: any) {
   const response = await api.post('/rescuer/radio/signal', payload);
   return response.data.data;

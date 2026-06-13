@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioRecorder,
+} from 'expo-audio';
+import { storageUrl } from '@/api/client';
 import {
   getRadioFeed,
-  heartbeatRadioTransmission,
-  sendRadioSignal,
   startRadioTransmission,
   stopRadioTransmission,
+  uploadRadioClip,
 } from '@/api/rescuer';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { SectionHeader, StatusBadge } from './RescuerUI';
@@ -19,59 +27,60 @@ type RadioLog = {
   id: number | string;
   type: string;
   type_label: string;
-  channel_label: string;
   transmission_id?: string | null;
-  signal?: string | null;
   duration_seconds: number;
+  responder_id?: number | string | null;
   responder_name: string;
+  responder_code?: string | null;
   team_name: string;
-  audio_status: string;
+  audio_path?: string | null;
+  audio_url?: string | null;
   message: string;
   timestamp: string;
+  raw_timestamp?: string;
+};
+
+type TeamMember = {
+  responder_id: number | string;
+  responder_code?: string | null;
+  full_name: string;
+  initials: string;
+  team_name?: string | null;
+  is_self?: boolean;
+  is_transmitting?: boolean;
 };
 
 type ActiveTransmission = {
   transmission_id: string;
-  channel_label: string;
+  responder_id?: number | string | null;
   responder_name: string;
-  responder_code?: string | null;
   team_name: string;
-  duration_seconds: number;
   is_self: boolean;
-  audio_status: string;
   last_seen_at: string;
 };
 
-const radioChannels = [
-  { key: 'team', label: 'Team', icon: 'people-outline' },
-  { key: 'command', label: 'HQ Command', icon: 'radio-outline' },
-  { key: 'event', label: 'Event', icon: 'warning-outline' },
-] as const;
-
-type RadioChannel = (typeof radioChannels)[number]['key'];
-
-const quickSignals = ['Copy', 'Need backup', 'On-scene', 'Clear'];
-
 export function RadioCommunicationScreen({ overview }: RadioProps) {
-  const [activeChannel, setActiveChannel] = useState<RadioChannel>('team');
-  const [isTalking, setIsTalking] = useState(false);
-  const [talkSeconds, setTalkSeconds] = useState(0);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const player = useAudioPlayer(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
   const [logs, setLogs] = useState<RadioLog[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [activeTransmission, setActiveTransmission] = useState<ActiveTransmission | null>(null);
   const [currentTransmissionId, setCurrentTransmissionId] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [nowPlayingId, setNowPlayingId] = useState<string | number | null>(null);
+  const [playedVersion, setPlayedVersion] = useState(0);
   const [error, setError] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const talkingRef = useRef(false);
   const secondsRef = useRef(0);
+  const playedLogIdsRef = useRef<Set<string | number>>(new Set());
 
   const profile = overview?.profile || {};
   const responder = profile.responder || {};
-  const activeEvent = overview?.active_event;
   const activeAssignment = useMemo(
     () =>
       (overview?.assignments || []).find((assignment: any) =>
@@ -79,22 +88,39 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
       ),
     [overview?.assignments]
   );
-
-  const selectedChannel = radioChannels.find((channel) => channel.key === activeChannel) || radioChannels[0];
   const activeAssignmentId = Number(activeAssignment?.assignment_id);
+
+  const membersWithQueues = teamMemberQueues(
+    teamMembers,
+    logs,
+    responder,
+    activeTransmission,
+    playedLogIdsRef.current,
+    playedVersion
+  );
+
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      allowsRecording: false,
+      shouldPlayInBackground: false,
+      shouldRouteThroughEarpiece: false,
+      interruptionMode: 'doNotMix',
+    }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     loadRadioFeed(1, true);
 
     const feedTimer = setInterval(() => {
       loadRadioFeed(1, true, true);
-    }, 5000);
+    }, 4000);
 
     return () => {
       clearInterval(feedTimer);
-      clearTalkTimers();
+      clearRecordTimer();
     };
-  }, [activeChannel]);
+  }, []);
 
   async function loadRadioFeed(nextPage = 1, replace = true, silent = false) {
     if (!silent && replace) {
@@ -103,20 +129,20 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
 
     try {
       const data = await getRadioFeed({
-        channel: activeChannel,
+        channel: 'team',
         page: nextPage,
-        per_page: 5,
+        per_page: 20,
       });
-
       const nextLogs = data?.logs?.data || [];
 
       setLogs((current) => (replace ? nextLogs : [...current, ...nextLogs]));
+      setTeamMembers(data?.team_members || []);
       setActiveTransmission(data?.active_transmission || null);
       setPage(data?.logs?.current_page || nextPage);
       setHasMore(Boolean(data?.logs?.has_more));
       setError('');
     } catch (radioError: any) {
-      setError(radioError?.response?.data?.message || 'Radio feed cannot be loaded right now.');
+      setError(radioError?.response?.data?.message || 'Radio feed cannot be loaded.');
     } finally {
       if (!silent && replace) {
         setIsLoadingLogs(false);
@@ -124,181 +150,255 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
     }
   }
 
-  function clearTalkTimers() {
+  async function playMemberNextClip(member: TeamMember) {
+    const memberId = String(member.responder_id);
+    const nextClip = logs
+      .filter((log) =>
+        log.type === 'ptt_audio'
+        && String(log.responder_id) === memberId
+        && !playedLogIdsRef.current.has(log.id)
+      )
+      .slice()
+      .reverse()[0];
+
+    if (!nextClip) {
+      return;
+    }
+
+    await playClip(nextClip);
+  }
+
+  async function playClip(log: RadioLog) {
+    const remoteUrl = log.audio_path ? storageUrl(log.audio_path) : log.audio_url;
+
+    if (!remoteUrl) {
+      return;
+    }
+
+    try {
+      setError('');
+      setNowPlayingId(log.id);
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: false,
+        shouldPlayInBackground: false,
+        shouldRouteThroughEarpiece: false,
+        interruptionMode: 'doNotMix',
+      });
+      const localUri = await cachedAudioUri(log, remoteUrl);
+      player.replace({ uri: localUri });
+      player.play();
+      playedLogIdsRef.current.add(log.id);
+      setPlayedVersion((current) => current + 1);
+    } catch {
+      setError('Voice message cannot be played. Check Wi-Fi and audio format.');
+      setNowPlayingId(null);
+    }
+  }
+
+  async function cachedAudioUri(log: RadioLog, remoteUrl: string) {
+    if (!FileSystem.cacheDirectory) {
+      return remoteUrl;
+    }
+
+    const extension = audioExtension(log, remoteUrl);
+    const fileUri = `${FileSystem.cacheDirectory}resq-radio-${log.id}.${extension}`;
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+
+    if (fileInfo.exists) {
+      return fileUri;
+    }
+
+    const downloaded = await FileSystem.downloadAsync(remoteUrl, fileUri);
+
+    if (downloaded.status < 200 || downloaded.status >= 300) {
+      throw new Error('Audio download failed.');
+    }
+
+    return downloaded.uri;
+  }
+
+  function audioExtension(log: RadioLog, remoteUrl: string) {
+    const source = log.audio_path || remoteUrl;
+    const extension = source.split('?')[0].split('.').pop()?.toLowerCase() || 'm4a';
+    const supported = ['m4a', 'mp4', 'aac', 'mp3', 'wav'];
+
+    return supported.includes(extension) ? extension : 'm4a';
+  }
+
+  function clearRecordTimer() {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-
-    if (heartbeatRef.current) {
-      clearInterval(heartbeatRef.current);
-      heartbeatRef.current = null;
-    }
-  }
-
-  async function startTalking() {
-    if (isTalking || isActionLoading) return;
-
-    talkingRef.current = true;
-    secondsRef.current = 0;
-    setTalkSeconds(0);
-    setIsTalking(true);
-    setIsActionLoading(true);
-    startLocalTimer();
-
-    try {
-      const data = await startRadioTransmission({
-        channel: activeChannel,
-        assignment_id: Number.isFinite(activeAssignmentId) ? activeAssignmentId : null,
-      });
-      const transmissionId = data?.transmission_id || '';
-
-      setCurrentTransmissionId(transmissionId);
-      setActiveTransmission(data?.active_transmission || null);
-      startHeartbeat(transmissionId);
-      setError('');
-    } catch (radioError: any) {
-      clearTalkTimers();
-      talkingRef.current = false;
-      setIsTalking(false);
-      setCurrentTransmissionId('');
-      setError(radioError?.response?.data?.message || 'PTT could not start.');
-    } finally {
-      setIsActionLoading(false);
-    }
   }
 
   function startLocalTimer() {
+    secondsRef.current = 0;
+    setRecordSeconds(0);
     timerRef.current = setInterval(() => {
       secondsRef.current += 1;
-      setTalkSeconds(secondsRef.current);
+      setRecordSeconds(secondsRef.current);
     }, 1000);
   }
 
-  function startHeartbeat(transmissionId: string) {
-    if (!transmissionId) return;
-
-    heartbeatRef.current = setInterval(() => {
-      heartbeatRadioTransmission({
-        channel: activeChannel,
-        transmission_id: transmissionId,
-        duration_seconds: secondsRef.current,
-      }).catch(() => {
-        setError('Radio signal heartbeat was not saved.');
-      });
-    }, 5000);
-  }
-
-  async function stopTalking() {
-    if (!talkingRef.current) return;
-
-    clearTalkTimers();
-    talkingRef.current = false;
-    setIsTalking(false);
-
-    const transmissionId = currentTransmissionId;
-    const duration = secondsRef.current;
-
-    secondsRef.current = 0;
-    setTalkSeconds(0);
-    setCurrentTransmissionId('');
-
-    if (!transmissionId) {
-      await loadRadioFeed(1, true, true);
+  async function startRecording() {
+    if (isRecording || isActionLoading) {
       return;
     }
 
     setIsActionLoading(true);
 
     try {
-      const data = await stopRadioTransmission({
-        channel: activeChannel,
-        transmission_id: transmissionId,
-        duration_seconds: duration,
+      const permission = await requestRecordingPermissionsAsync();
+
+      if (!permission.granted) {
+        setError('Microphone permission is required for team radio.');
+        return;
+      }
+
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: true,
+        shouldPlayInBackground: false,
+        shouldRouteThroughEarpiece: false,
+        interruptionMode: 'doNotMix',
+      });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+
+      const data = await startRadioTransmission({
+        channel: 'team',
+        assignment_id: Number.isFinite(activeAssignmentId) ? activeAssignmentId : null,
       });
 
+      setCurrentTransmissionId(data?.transmission_id || '');
       setActiveTransmission(data?.active_transmission || null);
-      await loadRadioFeed(1, true, true);
+      setIsRecording(true);
+      startLocalTimer();
       setError('');
     } catch (radioError: any) {
-      setError(radioError?.response?.data?.message || 'PTT stop log could not be saved.');
+      setError(radioError?.response?.data?.message || 'Voice recording cannot start.');
     } finally {
       setIsActionLoading(false);
     }
   }
 
-  async function sendSignal(signal: string) {
-    if (isActionLoading) return;
+  async function stopRecordingAndSend() {
+    if (!isRecording || isActionLoading) {
+      return;
+    }
 
     setIsActionLoading(true);
+    clearRecordTimer();
+
+    const duration = secondsRef.current;
+    const transmissionId = currentTransmissionId;
+    secondsRef.current = 0;
+    setRecordSeconds(0);
+    setIsRecording(false);
+    setCurrentTransmissionId('');
 
     try {
-      const data = await sendRadioSignal({
-        channel: activeChannel,
-        signal,
+      await recorder.stop();
+      const uri = recorder.uri;
+
+      if (!uri) {
+        throw new Error('No voice file was recorded.');
+      }
+
+      await uploadRadioClip({
+        channel: 'team',
+        assignment_id: Number.isFinite(activeAssignmentId) ? activeAssignmentId : null,
+        duration_seconds: duration,
+        uri,
+        name: 'resqperation-ptt.m4a',
+        type: 'audio/mp4',
       });
 
-      setActiveTransmission(data?.active_transmission || null);
+      if (transmissionId) {
+        await stopRadioTransmission({
+          channel: 'team',
+          transmission_id: transmissionId,
+          duration_seconds: duration,
+        });
+      }
+
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: false,
+        shouldPlayInBackground: false,
+        shouldRouteThroughEarpiece: false,
+        interruptionMode: 'doNotMix',
+      });
       await loadRadioFeed(1, true, true);
       setError('');
     } catch (radioError: any) {
-      setError(radioError?.response?.data?.message || 'Radio signal could not be saved.');
+      setError(radioError?.response?.data?.message || radioError?.message || 'Voice message could not be sent.');
     } finally {
       setIsActionLoading(false);
     }
   }
 
-  function initials(name: string) {
-    return name
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join('') || 'R';
+  async function toggleRecording() {
+    if (isRecording) {
+      await stopRecordingAndSend();
+    } else {
+      await startRecording();
+    }
   }
 
   return (
     <View style={styles.stack}>
       <View style={styles.card}>
         <SectionHeader
-          title="Radio communication"
-          action={<StatusBadge label={isTalking ? 'Transmitting' : 'Standby'} tone={isTalking ? 'urgent' : 'safe'} />}
+          title="Team radio"
+          action={<StatusBadge label={isRecording ? 'Recording' : 'Ready'} tone={isRecording ? 'urgent' : 'safe'} />}
         />
 
-        <View style={styles.contextRow}>
-          <View style={styles.contextItem}>
-            <Text style={styles.contextLabel}>Team</Text>
-            <Text style={styles.contextValue}>{responder.team_name || 'Unassigned'}</Text>
+        {isLoadingLogs ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator color={palette.navActive} />
+            <Text style={styles.emptyText}>Loading...</Text>
           </View>
-          <View style={styles.contextItem}>
-            <Text style={styles.contextLabel}>Event</Text>
-            <Text style={styles.contextValue}>{activeEvent?.name || 'No active event'}</Text>
-          </View>
-        </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.memberRow}>
+            {membersWithQueues.map((member: TeamMember & { queued_count?: number }) => {
+              const hasQueue = Number(member.queued_count || 0) > 0;
+              const isLive = Boolean(member.is_transmitting);
 
-        <View style={styles.channelRow}>
-          {radioChannels.map((channel) => {
-            const isActive = channel.key === activeChannel;
-
-            return (
-              <Pressable
-                key={channel.key}
-                style={[styles.channelButton, isActive && styles.activeChannel]}
-                onPress={() => setActiveChannel(channel.key)}
-              >
-                <Ionicons
-                  name={channel.icon}
-                  size={16}
-                  color={isActive ? '#fff' : palette.navActive}
-                />
-                <Text style={[styles.channelText, isActive && styles.activeChannelText]}>{channel.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+              return (
+                <Pressable
+                  key={String(member.responder_id)}
+                  style={styles.memberItem}
+                  onPress={() => playMemberNextClip(member)}
+                >
+                  <View style={[styles.avatarRing, isLive && styles.avatarRingLive]}>
+                    <View style={[styles.memberAvatar, hasQueue && styles.memberAvatarQueued]}>
+                      <Text style={styles.memberInitials}>{member.initials || initials(member.full_name)}</Text>
+                    </View>
+                    {hasQueue ? (
+                      <View style={styles.countBadge}>
+                        <Text style={styles.countText}>{member.queued_count}</Text>
+                      </View>
+                    ) : null}
+                    {isLive ? (
+                      <View style={styles.liveBadge}>
+                        <Ionicons name="call" size={11} color="#fff" />
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text numberOfLines={1} style={styles.memberName}>
+                    {member.is_self ? 'You' : firstName(member.full_name)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
       </View>
 
-      {activeTransmission && (
+      {activeTransmission ? (
         <View style={styles.activeFloat}>
           <View style={styles.activeAvatar}>
             <Text style={styles.activeAvatarText}>{initials(activeTransmission.responder_name)}</Text>
@@ -307,79 +407,134 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
             <Text style={styles.activeTitle}>
               {activeTransmission.is_self ? 'You are transmitting' : `${activeTransmission.responder_name} is transmitting`}
             </Text>
-            <Text style={styles.activeMeta}>
-              {activeTransmission.channel_label} - {activeTransmission.team_name}
-            </Text>
-            <Text style={styles.audioPending}>Live audio server pending</Text>
+            <Text style={styles.activeMeta}>{activeTransmission.team_name}</Text>
           </View>
           <Ionicons name="volume-high-outline" size={20} color={palette.navActive} />
         </View>
-      )}
+      ) : null}
 
-      <View style={[styles.transmitCard, isTalking && styles.transmitCardActive]}>
-        <Text style={styles.channelLabel}>{selectedChannel.label}</Text>
+      <View style={[styles.transmitCard, isRecording && styles.transmitCardActive]}>
         <Pressable
-          style={[styles.talkButton, isTalking && styles.talkButtonActive]}
-          onPressIn={startTalking}
-          onPressOut={stopTalking}
-          disabled={isActionLoading && !isTalking}
+          style={[styles.talkButton, isRecording && styles.talkButtonActive]}
+          onPress={toggleRecording}
+          disabled={isActionLoading && !isRecording}
         >
-          {isActionLoading && !isTalking ? (
+          {isActionLoading && !isRecording ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Ionicons name={isTalking ? 'mic' : 'mic-outline'} size={42} color="#fff" />
+            <Ionicons name={isRecording ? 'stop' : 'call'} size={42} color="#fff" />
           )}
         </Pressable>
-        <Text style={styles.talkText}>{isTalking ? `Transmitting ${talkSeconds}s` : 'Hold to talk'}</Text>
-        <Text style={styles.talkMeta}>{activeAssignment?.assigned_area || activeAssignment?.household_id || 'No active assignment linked'}</Text>
+        <Text style={styles.talkText}>
+          {isRecording ? `Tap again to send (${recordSeconds}s)` : 'Tap to talk'}
+        </Text>
+        <Text style={styles.talkMeta}>
+          {activeAssignment?.assigned_area || activeAssignment?.household_id || 'Team channel'}
+        </Text>
       </View>
 
       <View style={styles.card}>
-        <SectionHeader title="Quick signals" />
-        <View style={styles.signalGrid}>
-          {quickSignals.map((signal) => (
-            <Pressable key={signal} style={styles.signalButton} onPress={() => sendSignal(signal)} disabled={isActionLoading}>
-              <Text style={styles.signalText}>{signal}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <SectionHeader title="Recent radio log" />
+        <SectionHeader title="Voice logs" />
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        {isLoadingLogs ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator color={palette.navActive} />
-            <Text style={styles.emptyText}>Loading...</Text>
-          </View>
-        ) : logs.length === 0 ? (
-          <Text style={styles.emptyText}>No transmissions yet.</Text>
+        {logs.length === 0 ? (
+          <Text style={styles.emptyText}>No voice messages yet.</Text>
         ) : (
-          logs.map((log) => (
-            <View key={log.id} style={styles.logItem}>
-              <View style={[styles.logDot, log.type !== 'quick_signal' && styles.sentDot]} />
-              <View style={styles.logCopy}>
-                <Text style={styles.logMessage}>{log.message}</Text>
-                <Text style={styles.logMeta}>{log.channel_label} - {log.timestamp}</Text>
+          logs
+            .filter((log) => log.type === 'ptt_audio')
+            .map((log) => (
+              <View key={log.id} style={styles.logItem}>
+                <View style={styles.voiceDot} />
+                <View style={styles.logCopy}>
+                  <Text style={styles.logMessage}>{log.responder_name || 'Responder'}</Text>
+                  <Text style={styles.logMeta}>{log.timestamp}</Text>
+                </View>
+                <Pressable style={styles.playButton} onPress={() => playClip(log)}>
+                  <Ionicons name={nowPlayingId === log.id ? 'volume-high' : 'play'} size={15} color={palette.navActive} />
+                </Pressable>
               </View>
-            </View>
-          ))
+            ))
         )}
 
-        {hasMore && (
+        {hasMore ? (
           <Pressable style={styles.moreButton} onPress={() => loadRadioFeed(page + 1, false)} disabled={isLoadingLogs}>
             <Text style={styles.moreText}>View more</Text>
           </Pressable>
-        )}
-      </View>
-
-      <View style={styles.note}>
-        <Ionicons name="information-circle-outline" size={18} color={palette.textSoft} />
-        <Text style={styles.noteText}>Current version saves PTT activity and signals. Real voice playback needs the later LiveKit/WebRTC setup.</Text>
+        ) : null}
       </View>
     </View>
   );
+}
+
+function initials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'R';
+}
+
+function firstName(name: string) {
+  return name.split(' ').filter(Boolean)[0] || 'Responder';
+}
+
+function teamMemberQueues(
+  teamMembers: TeamMember[],
+  logs: RadioLog[],
+  responder: any,
+  activeTransmission: ActiveTransmission | null,
+  playedLogIds: Set<string | number>,
+  playedVersion: number
+) {
+  void playedVersion;
+
+  const memberMap = new Map<string, TeamMember>();
+
+  teamMembers.forEach((member) => {
+    memberMap.set(String(member.responder_id), member);
+  });
+
+  logs.forEach((log) => {
+    if (!log.responder_id || memberMap.has(String(log.responder_id))) {
+      return;
+    }
+
+    memberMap.set(String(log.responder_id), {
+      responder_id: log.responder_id,
+      responder_code: log.responder_code,
+      full_name: log.responder_name || 'Responder',
+      initials: initials(log.responder_name || 'Responder'),
+      team_name: log.team_name,
+    });
+  });
+
+  if (responder?.responder_id && !memberMap.has(String(responder.responder_id))) {
+    memberMap.set(String(responder.responder_id), {
+      responder_id: responder.responder_id,
+      responder_code: responder.responder_code,
+      full_name: responder.full_name || 'Responder',
+      initials: initials(responder.full_name || 'Responder'),
+      team_name: responder.team_name,
+      is_self: true,
+    });
+  }
+
+  return Array.from(memberMap.values()).map((member) => {
+    const memberId = String(member.responder_id);
+    const queuedCount = logs.filter((log) =>
+      log.type === 'ptt_audio'
+      && String(log.responder_id) === memberId
+      && !playedLogIds.has(log.id)
+    ).length;
+    const isTransmitting = activeTransmission
+      && String(activeTransmission.responder_id || '') === memberId;
+
+    return {
+      ...member,
+      queued_count: queuedCount,
+      is_transmitting: Boolean(isTransmitting),
+    };
+  });
 }
 
 const styles = StyleSheet.create({
@@ -394,65 +549,96 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     backgroundColor: palette.card,
   },
-  contextRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+  memberRow: {
+    gap: spacing.md,
+    paddingVertical: 2,
   },
-  contextItem: {
-    flex: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: palette.secondary,
-  },
-  contextLabel: {
-    color: palette.textSoft,
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  contextValue: {
-    marginTop: 4,
-    color: palette.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  channelRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  channelButton: {
-    minHeight: 42,
-    flexDirection: 'row',
+  memberItem: {
+    width: 70,
     alignItems: 'center',
     gap: 7,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    backgroundColor: palette.card,
   },
-  activeChannel: {
-    borderColor: palette.navActive,
+  avatarRing: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    borderRadius: 29,
+  },
+  avatarRingLive: {
+    borderColor: palette.unsafe,
+    backgroundColor: '#f5e8e8',
+  },
+  memberAvatar: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 24,
     backgroundColor: palette.navActive,
   },
-  channelText: {
-    color: palette.nav,
-    fontSize: 12,
+  memberAvatarQueued: {
+    opacity: 0.45,
+  },
+  memberInitials: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '900',
   },
-  activeChannelText: {
+  countBadge: {
+    position: 'absolute',
+    top: -1,
+    right: -1,
+    minWidth: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: palette.card,
+    borderRadius: 11,
+    backgroundColor: palette.unsafe,
+  },
+  countText: {
     color: '#fff',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  liveBadge: {
+    position: 'absolute',
+    bottom: 1,
+    right: 1,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: palette.card,
+    borderRadius: 10,
+    backgroundColor: palette.unsafe,
+  },
+  memberName: {
+    width: 64,
+    color: palette.text,
+    fontSize: 11,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   activeFloat: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     borderWidth: 1,
-    borderColor: '#88b0d6',
+    borderColor: '#d19090',
     borderRadius: radius.lg,
     padding: spacing.md,
-    backgroundColor: '#e7eff9',
+    backgroundColor: '#f5e8e8',
     ...shadow,
   },
   activeAvatar: {
@@ -461,7 +647,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 20,
-    backgroundColor: palette.navActive,
+    backgroundColor: palette.unsafe,
   },
   activeAvatarText: {
     color: '#fff',
@@ -482,12 +668,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  audioPending: {
-    marginTop: 2,
-    color: palette.evacuated,
-    fontSize: 11,
-    fontWeight: '900',
-  },
   transmitCard: {
     alignItems: 'center',
     gap: spacing.sm,
@@ -499,64 +679,28 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   transmitCardActive: {
-    borderColor: '#d19090',
-    backgroundColor: palette.unsafe,
-  },
-  channelLabel: {
-    color: palette.navMuted,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
+    borderColor: palette.unsafe,
   },
   talkButton: {
-    width: 118,
-    height: 118,
+    width: 96,
+    height: 96,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 8,
-    borderColor: '#ffffff33',
-    borderRadius: 59,
+    borderRadius: 48,
     backgroundColor: palette.navActive,
   },
   talkButtonActive: {
-    backgroundColor: '#b92828',
+    backgroundColor: palette.unsafe,
   },
   talkText: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '900',
   },
   talkMeta: {
-    color: palette.navMuted,
+    color: '#b7c8dc',
     fontSize: 12,
     fontWeight: '800',
-    textAlign: 'center',
-  },
-  signalGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  signalButton: {
-    flexGrow: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: palette.secondary,
-  },
-  signalText: {
-    color: palette.nav,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
   },
   emptyText: {
     color: palette.textSoft,
@@ -576,14 +720,11 @@ const styles = StyleSheet.create({
     borderTopColor: palette.border,
     paddingTop: spacing.md,
   },
-  logDot: {
+  voiceDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: palette.textSoft,
-  },
-  sentDot: {
-    backgroundColor: palette.safe,
+    backgroundColor: palette.navActive,
   },
   logCopy: {
     flex: 1,
@@ -596,37 +737,30 @@ const styles = StyleSheet.create({
   logMeta: {
     marginTop: 3,
     color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
   },
-  moreButton: {
-    minHeight: 42,
+  playButton: {
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
+    borderColor: palette.border,
+    borderRadius: 17,
+    backgroundColor: palette.card,
+  },
+  moreButton: {
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.pill,
+    paddingVertical: 10,
     backgroundColor: palette.card,
   },
   moreText: {
     color: palette.nav,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  note: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: palette.secondary,
-  },
-  noteText: {
-    flex: 1,
-    color: palette.textSoft,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '900',
   },
 });

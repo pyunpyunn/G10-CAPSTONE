@@ -17,7 +17,7 @@ export function RescuerHeader({ onOpenRadio }: HeaderProps) {
         <View style={styles.actions}>
           {onOpenRadio ? (
             <Pressable style={styles.iconButton} onPress={onOpenRadio}>
-              <Ionicons name="radio-outline" size={20} color={palette.navText} />
+              <Ionicons name="call-outline" size={20} color={palette.navText} />
             </Pressable>
           ) : null}
         </View>

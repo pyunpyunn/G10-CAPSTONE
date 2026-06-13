@@ -1,4 +1,4 @@
-import { Info, ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import {
   BatteryDisplay,
   StatusBadge,
@@ -9,11 +9,6 @@ export default function HouseholdDetailContent({ detail, history }) {
 
   return (
     <div>
-      <div className="one-account-rule">
-        <Info size={16} />
-        <span><strong>Read-only status.</strong> HQ can review, request field checks, and create dispatch requests. Status changes come from household mobile reports or responder field reports.</span>
-      </div>
-
       <div className={`hh-status-callout ${household.status?.key || 'unchecked'}`}>
         <div className="hh-status-main">
           <span className="hh-status-icon"><ShieldCheck size={18} /></span>
@@ -35,7 +30,6 @@ export default function HouseholdDetailContent({ detail, history }) {
       </div>
 
       <FamilyMembersTable members={detail.members} />
-      <MobileDevicesTable devices={detail.devices} />
       <StatusHistoryTable history={history} />
     </div>
   )
@@ -52,7 +46,8 @@ function FamilyMembersTable({ members }) {
             <th>Risk</th>
             <th>Device</th>
             <th>Battery</th>
-            <th>Last allowed location</th>
+            <th>Signal</th>
+            <th>Last known location</th>
             <th>Last seen</th>
           </tr>
         </thead>
@@ -68,50 +63,14 @@ function FamilyMembersTable({ members }) {
                 </td>
                 <td>{member.relation}</td>
                 <td>{member.risk_flags}</td>
-                <td>{member.device_name}</td>
-                <td>{member.battery_level !== null && member.battery_level !== undefined ? `${member.battery_level}%` : 'No battery'}</td>
-                <td>{member.last_allowed_location}</td>
-                <td>{member.last_seen_at || 'No device seen'}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </DetailSection>
-  )
-}
-
-function MobileDevicesTable({ devices }) {
-  return (
-    <DetailSection title="Mobile devices" note={`${devices.length} records`}>
-      <table className="hh-detail-table">
-        <thead>
-          <tr>
-            <th>Device</th>
-            <th>User</th>
-            <th>Battery</th>
-            <th>Signal</th>
-            <th>Last known location</th>
-            <th>Allowed location</th>
-            <th>Updated</th>
-          </tr>
-        </thead>
-        <tbody>
-          {devices.length === 0 ? (
-            <EmptyTableRow colSpan={7} text="No mobile devices are synced for this household yet." />
-          ) : (
-            devices.map((device) => (
-              <tr key={device.id}>
                 <td>
-                  <div className="hh-household-name">{device.device_name}</div>
-                  <div className="hh-household-meta">{device.platform} - {device.app_role}</div>
+                  <div className="hh-household-name">{member.device_name}</div>
+                  <div className="hh-household-meta">{member.device_platform || 'Mobile'} - {member.last_allowed_location}</div>
                 </td>
-                <td>{device.member_name}</td>
-                <td><BatteryDisplay value={device.battery_level} tone={device.battery_tone} /></td>
-                <td>{device.signal_strength !== null ? `${device.signal_strength}%` : 'No signal'}</td>
-                <td>{device.last_location_label}</td>
-                <td>{device.allowed_location}</td>
-                <td>{device.last_seen_at || 'No update'}</td>
+                <td><BatteryDisplay value={member.battery_level} tone={member.battery_tone} /></td>
+                <td>{member.signal_strength !== null && member.signal_strength !== undefined ? `${member.signal_strength}%` : 'No signal'}</td>
+                <td>{member.last_location_label || 'No location yet'}</td>
+                <td>{member.last_seen_at || 'No device seen'}</td>
               </tr>
             ))
           )}
@@ -131,12 +90,11 @@ function StatusHistoryTable({ history }) {
             <th>Status</th>
             <th>Submitted by</th>
             <th>Source</th>
-            <th>Note</th>
           </tr>
         </thead>
         <tbody>
           {history.length === 0 ? (
-            <EmptyTableRow colSpan={5} text="No status history for this active event yet." />
+            <EmptyTableRow colSpan={4} text="No status history for this active event yet." />
           ) : (
             history.map((log) => (
               <tr key={log.status_log_id}>
@@ -144,7 +102,6 @@ function StatusHistoryTable({ history }) {
                 <td><StatusBadge status={log.status} /></td>
                 <td>{log.submitted_by}</td>
                 <td>{log.source}</td>
-                <td>{log.notes || log.location_label || 'No note'}</td>
               </tr>
             ))
           )}

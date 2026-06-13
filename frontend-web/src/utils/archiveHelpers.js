@@ -2,6 +2,7 @@ export const ARCHIVE_TABS = [
   { key: 'disaster-events', label: 'Disaster Event' },
   { key: 'household-status-logs', label: 'Household Status Logs' },
   { key: 'dispatch-logs', label: 'Rescue Dispatch Logs' },
+  { key: 'radio-communication-logs', label: 'Radio Logs' },
   { key: 'resource-requests', label: 'Resources & Requests' },
   { key: 'situation-reports', label: 'Situation Reporting' },
 ]
@@ -18,6 +19,10 @@ export const ARCHIVE_TABLE_COPY = {
   'dispatch-logs': {
     title: 'Rescue dispatch status logs',
     subtitle: 'Team routes, status changes, areas covered, and outcomes',
+  },
+  'radio-communication-logs': {
+    title: 'Radio communication logs',
+    subtitle: 'Team voice clips and field signals saved during the event',
   },
   'resource-requests': {
     title: 'Resources and requests archive',
@@ -53,6 +58,14 @@ export const ARCHIVE_COLUMNS = {
     { key: 'purok', label: 'Purok' },
     { key: 'status', label: 'Status' },
     { key: 'outcome', label: 'Outcome entry' },
+  ],
+  'radio-communication-logs': [
+    { key: 'datetime', label: 'Date / time' },
+    { key: 'event', label: 'Event' },
+    { key: 'transmission', label: 'Transmission' },
+    { key: 'team', label: 'Team' },
+    { key: 'channel', label: 'Channel' },
+    { key: 'status', label: 'Status' },
   ],
   'resource-requests': [
     { key: 'datetime', label: 'Date / time' },

@@ -122,6 +122,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/rescuer/radio/start', [RescuerMobileController::class, 'startRadioTransmission']);
             Route::post('/rescuer/radio/heartbeat', [RescuerMobileController::class, 'heartbeatRadioTransmission']);
             Route::post('/rescuer/radio/stop', [RescuerMobileController::class, 'stopRadioTransmission']);
+            Route::post('/rescuer/radio/clip', [RescuerMobileController::class, 'storeRadioClip']);
             Route::post('/rescuer/radio/signal', [RescuerMobileController::class, 'storeRadioSignal']);
         });
     });

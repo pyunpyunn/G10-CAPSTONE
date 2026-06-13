@@ -1,5 +1,5 @@
 import { Bell, CheckCircle2, Eye } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getNotifications, markNotificationsRead } from '../../api/notificationApi'
 
@@ -8,6 +8,8 @@ export default function Topbar({ user }) {
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const popoverRef = useRef(null)
+  const bellButtonRef = useRef(null)
   const roleName = user?.role?.role_name || 'HQ'
   const displayName = user?.full_name || 'HQ Admin'
   const initials = getInitials(user?.full_name)
@@ -53,6 +55,27 @@ export default function Topbar({ user }) {
     }
   }, [])
 
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined
+    }
+
+    function closeOnOutsideClick(event) {
+      const clickedPopover = popoverRef.current?.contains(event.target)
+      const clickedBell = bellButtonRef.current?.contains(event.target)
+
+      if (!clickedPopover && !clickedBell) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick)
+
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick)
+    }
+  }, [isOpen])
+
   async function markAllRead() {
     try {
       await markNotificationsRead([])
@@ -68,6 +91,16 @@ export default function Topbar({ user }) {
     navigate('/notifications')
   }
 
+  async function openNotification(item) {
+    try {
+      await markNotificationsRead([item.id])
+      window.dispatchEvent(new Event('notifications:changed'))
+    } finally {
+      setIsOpen(false)
+      navigate(item.action_url || '/notifications')
+    }
+  }
+
   return (
     <header className="topbar">
       <div className="header-brand" aria-label="RESQPERATION">
@@ -78,6 +111,7 @@ export default function Topbar({ user }) {
       <div className="header-actions" aria-label="Header actions">
         <button
           className="header-action"
+          ref={bellButtonRef}
           type="button"
           title="Notifications"
           aria-label={`${unreadLabel} unread notifications`}
@@ -105,7 +139,7 @@ export default function Topbar({ user }) {
       </div>
 
       {isOpen && (
-        <div className="notification-popover" role="dialog" aria-label="Recent notifications">
+        <div className="notification-popover" ref={popoverRef} role="dialog" aria-label="Recent notifications">
           <div className="notification-popover-head">
             <div className="notification-popover-title">
               <Bell size={16} />
@@ -117,18 +151,23 @@ export default function Topbar({ user }) {
             {notifications.length === 0 ? (
               <div className="notification-empty">
                 <strong>No notifications yet</strong>
-                <span>Broadcast delivery, household alerts, and request notices will appear here after those modules are connected.</span>
+                <span>Actionable alerts will appear here.</span>
               </div>
             ) : (
               notifications.map((item) => (
-                <article className={`notification-preview-item ${item.read ? 'is-read' : ''}`} key={item.id}>
+                <button
+                  className={`notification-preview-item ${item.read ? 'is-read' : ''}`}
+                  key={item.id}
+                  type="button"
+                  onClick={() => openNotification(item)}
+                >
                   <span className="notification-preview-dot" aria-hidden="true" />
                   <div>
                     <div className="notification-preview-title">{item.title}</div>
                     <div className="notification-preview-body">{item.body}</div>
                     <div className="notification-preview-time">{item.time} - {item.type}</div>
                   </div>
-                </article>
+                </button>
               ))
             )}
           </div>

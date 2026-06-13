@@ -1220,6 +1220,7 @@ class ArchiveService
         return match ($type) {
             'ptt_start' => $responderName.' started PTT',
             'ptt_heartbeat' => $responderName.' was transmitting',
+            'ptt_audio' => $responderName.' sent a voice clip',
             'ptt_end' => $responderName.' ended PTT after '.((int) ($message['duration_seconds'] ?? 0)).'s',
             'quick_signal' => $responderName.' sent "'.((string) ($message['signal'] ?? 'Signal')).'"',
             default => (string) ($message['text'] ?? $responderName.' sent a radio log'),
@@ -1231,6 +1232,7 @@ class ArchiveService
         return match ($type) {
             'ptt_start' => 'PTT started',
             'ptt_heartbeat' => 'PTT active',
+            'ptt_audio' => 'Voice clip',
             'ptt_end' => 'PTT ended',
             'quick_signal' => (string) ($message['signal'] ?? 'Signal'),
             default => 'Radio log',

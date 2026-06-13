@@ -1,8 +1,9 @@
 import { Battery, Smartphone } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
-import { tableRange } from '../../utils/householdStatusHelpers'
 
-export default function HouseholdTable({ households, meta, onOpen, onPageChange }) {
+export default function HouseholdTable({ households, meta, selectedPurok, onOpen, onPageChange, onDispatchPurok }) {
+  const hasPurokFilter = selectedPurok && selectedPurok !== 'all'
+
   if (households.length === 0) {
     return (
       <div className="hh-tbl-wrap">
@@ -15,7 +16,11 @@ export default function HouseholdTable({ households, meta, onOpen, onPageChange 
     <div className="hh-tbl-wrap">
       <div className="hh-tbl-topbar">
         <span className="hh-tbl-label">Households</span>
-        <span className="hh-tbl-count">{tableRange(meta)} - latest status row only</span>
+        {hasPurokFilter && (
+          <button className="btn btn-primary btn-sm" type="button" onClick={() => onDispatchPurok(selectedPurok)}>
+            Dispatch team to this purok
+          </button>
+        )}
       </div>
       <div className="hh-table-scroll">
         <table className="hh-monitor-table">
@@ -28,7 +33,6 @@ export default function HouseholdTable({ households, meta, onOpen, onPageChange 
               <th>Source / time</th>
               <th>Device</th>
               <th>Last known location</th>
-              <th>Priority</th>
               <th></th>
             </tr>
           </thead>
@@ -53,11 +57,10 @@ export default function HouseholdTable({ households, meta, onOpen, onPageChange 
                   <div className="hh-location-title">{household.location?.label}</div>
                   <div className="hh-location-note">{household.location?.note}</div>
                 </td>
-                <td><PriorityPill priority={household.priority} /></td>
                 <td>
                   <div className="hh-action-set">
-                    <button className={`btn btn-${household.priority?.key === 'urgent' ? 'danger' : 'secondary'} btn-sm`} type="button" onClick={() => onOpen(household.household_id)}>
-                      {household.priority?.key === 'urgent' ? 'Dispatch' : 'Review'}
+                    <button className="btn btn-secondary btn-sm" type="button" onClick={() => onOpen(household.household_id)}>
+                      Review
                     </button>
                   </div>
                 </td>
@@ -78,15 +81,14 @@ export function DeviceCell({ device }) {
   const battery = device?.lowest_battery
 
   return (
-    <div className="hh-device-stack">
+      <div className="hh-device-stack">
       <div className="hh-device-line">
         <Smartphone size={14} />
-        {device?.total > 0 ? `${device.active} active / ${device.total} synced` : 'No synced device'}
+        {`${device?.active || 0} active / ${device?.total || 0} synced`}
       </div>
       <div className="hh-device-line">
         <BatteryDisplay value={battery} tone={device?.battery_tone} />
       </div>
-      <div className={`hh-device-risk ${device?.risk?.key || 'none'}`}>{device?.risk?.label || 'No device data'}</div>
     </div>
   )
 }
@@ -122,7 +124,7 @@ function Pagination({ meta, onPageChange }) {
 
   return (
     <div className="hh-pagination">
-      <span className="hh-pagination-info">Page <strong>{current}</strong> of {last} - {meta.per_page || 20} per page</span>
+      <span className="hh-pagination-info">Page <strong>{current}</strong> of {last} - {meta.per_page || 10} per page</span>
       <div className="hh-pagination-btns">
         <button className="pg-btn" type="button" disabled={!canGoPrevious} onClick={() => onPageChange(current - 1)}>{'<'}</button>
         <button className="pg-btn active" type="button">{current}</button>

@@ -20,12 +20,14 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 - `RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - switch between shared MySQL and local SQLite.
 - `sql_proposals/` - review-only SQL scripts. Do not run on shared DB without DB member approval.
 - `sql_proposals/initial/2026_06_12_g10_trackingaid_mappingaid_integration_draft.sql` - draft only for future TrackingAid/MappingAid shared DB integration.
+- `sql_proposals/initial/2026_06_13_mambaling_household_geotag_update.sql` - review-only Mambaling household geotag update.
 
 ## Final Defense Docs
 
 - `RESQPERATION_FINAL_DEFENSE_STUDY_GUIDE_AND_DIAGRAMS.md` - topics to study, system concept, and Mermaid diagrams.
 - `RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, and TrackingAid/MappingAid draft integration plan.
 - `RESQPERATION_RESCUER_RADIO_PTT_PLAN.md` - rescuer radio / push-to-talk plan and implementation resources.
+- `RESQPERATION_RESCUER_RADIO_COMMUNICATION.md` - implemented rescuer radio voice-clip workflow and test guide.
 - `RESQPERATION_SYSTEM_STACK_RESOURCES_AND_REFERENCES.md` - stack, resources, references, and legal basis.
 
 ## Scope and References
@@ -34,6 +36,8 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 - `RESQPERATION_PAGASA_TENDAY_API_REQUEST_LETTER.md` - PAGASA API request draft.
 - `RESQPERATION_RESOURCES.txt` - collected resources.
 - `RESQPERATION_MOBILE_UI_TEXT_REVIEW.md` - mobile text reduction review.
+- `RESQPERATION_UI_TEXT_AND_OPERATION_RULES_NOTE.md` - short UI labels and operational rules moved out of screens.
+- `RESQPERATION_MAMBALING_GEOTAG_UPDATE_NOTE.md` - Mambaling geotag SQL proposal notes.
 - `ResQperation_File_Tree.md` - generated file tree snapshot.
 
 ## Module README Backups

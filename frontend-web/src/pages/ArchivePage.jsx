@@ -7,6 +7,7 @@ import ArchiveTable from '../components/archive/ArchiveTable'
 import ArchiveTabs from '../components/archive/ArchiveTabs'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
+import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   ARCHIVE_TABS,
   archiveErrorMessage,
@@ -112,6 +113,9 @@ export default function ArchivePage() {
   const records = payload?.records?.data || []
   const pagination = payload?.records || {}
   const filters = payload?.filters || {}
+  const isInitialLoading = isLoading && !payload
+  const isRefreshing = isLoading && Boolean(payload)
+  const hasBlockingError = error && !payload
 
   return (
     <section className="page active archive-page">
@@ -124,10 +128,10 @@ export default function ArchivePage() {
 
       <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} />
 
-      {isLoading && <LoadingState />}
+      {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
-      {!isLoading && !error && (
+      {!isInitialLoading && !hasBlockingError && payload && (
         <>
           <ArchiveFilters
             search={search}
@@ -143,12 +147,14 @@ export default function ArchivePage() {
 
           {message && <div className="rr-message archive-message">{message}</div>}
 
-          <ArchiveTable
-            category={activeCategory}
-            records={records}
-            pagination={pagination}
-            onView={setSelectedRecord}
-          />
+          <RefreshOverlay active={isRefreshing}>
+            <ArchiveTable
+              category={activeCategory}
+              records={records}
+              pagination={pagination}
+              onView={setSelectedRecord}
+            />
+          </RefreshOverlay>
         </>
       )}
 

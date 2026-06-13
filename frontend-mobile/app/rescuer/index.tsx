@@ -96,7 +96,13 @@ export default function RescuerHomeScreen() {
         return;
       }
 
-      await updateAssignmentStatus(assignmentId, status, payload);
+      if (status === 'en_route') {
+        await updateAssignmentStatus(assignmentId, 'en_route', payload);
+        await updateAssignmentStatus(assignmentId, 'on_scene', payload);
+      } else {
+        await updateAssignmentStatus(assignmentId, status, payload);
+      }
+
       await loadOverview(true);
 
       if (['accepted', 'en_route'].includes(status)) {

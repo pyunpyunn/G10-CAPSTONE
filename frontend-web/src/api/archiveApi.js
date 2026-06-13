@@ -4,6 +4,7 @@ const archiveEndpoints = {
   'disaster-events': '/archive/disaster-events',
   'household-status-logs': '/archive/household-status-logs',
   'dispatch-logs': '/archive/dispatch-logs',
+  'radio-communication-logs': '/archive/radio-communication-logs',
   'resource-requests': '/archive/resource-requests',
   'situation-reports': '/archive/situation-reports',
 }

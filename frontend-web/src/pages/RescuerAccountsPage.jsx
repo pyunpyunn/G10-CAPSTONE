@@ -9,12 +9,11 @@ import {
 } from '../api/rescuerApi'
 import RescuerAccountModal from '../components/rescuers/RescuerAccountModal'
 import RescuerFilters from '../components/rescuers/RescuerFilters'
-import RescuerNotice from '../components/rescuers/RescuerNotice'
 import RescuerRosterTable from '../components/rescuers/RescuerRosterTable'
-import RescuerStats from '../components/rescuers/RescuerStats'
 import RescuerTeamGrid from '../components/rescuers/RescuerTeamGrid'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
+import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   buildRescuerPayload,
   emptyRescuerForm,
@@ -76,11 +75,13 @@ export default function RescuerAccountsPage() {
 
   const rescuers = payload?.rescuers?.data || []
   const pagination = payload?.rescuers || {}
-  const summary = payload?.summary || {}
   const teams = payload?.teams || []
   const teamOptions = payload?.team_options || []
   const accountIdOptions = payload?.account_id_options || []
   const filters = payload?.filters || {}
+  const isInitialLoading = isLoading && !payload
+  const isRefreshing = isLoading && Boolean(payload)
+  const hasBlockingError = error && !payload
 
   async function loadRescuers() {
     setIsLoading(true)
@@ -223,14 +224,11 @@ export default function RescuerAccountsPage() {
         }
       />
 
-      {isLoading && <LoadingState />}
+      {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
-      {!isLoading && !error && (
+      {!isInitialLoading && !hasBlockingError && payload && (
         <>
-          <RescuerNotice />
-          <RescuerStats summary={summary} />
-
           <RescuerFilters
             search={search}
             onSearchChange={setSearch}
@@ -241,13 +239,15 @@ export default function RescuerAccountsPage() {
             onChipChange={setActiveChip}
           />
 
-          <RescuerRosterTable
-            rescuers={rescuers}
-            pagination={pagination}
-            onView={openViewModal}
-            onEdit={openEditModal}
-            onDeactivate={handleDeactivate}
-          />
+          <RefreshOverlay active={isRefreshing}>
+            <RescuerRosterTable
+              rescuers={rescuers}
+              pagination={pagination}
+              onView={openViewModal}
+              onEdit={openEditModal}
+              onDeactivate={handleDeactivate}
+            />
+          </RefreshOverlay>
           <RescuerTeamGrid teams={teams} />
         </>
       )}

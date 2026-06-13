@@ -96,6 +96,11 @@ class RescuerMobileController extends Controller
         return $this->service->stopRadioTransmission($request);
     }
 
+    public function storeRadioClip(Request $request): JsonResponse
+    {
+        return $this->service->storeRadioClip($request);
+    }
+
     public function storeRadioSignal(Request $request): JsonResponse
     {
         return $this->service->storeRadioSignal($request);

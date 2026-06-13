@@ -8,6 +8,7 @@ import MappingSidebar from '../components/mapping/MappingSidebar'
 import MappingSummary from '../components/mapping/MappingSummary'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
+import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   apiErrorMessage,
   defaultWorkspace,
@@ -16,6 +17,7 @@ import {
 export default function MappingPage() {
   const [workspace, setWorkspace] = useState(defaultWorkspace)
   const [isLoading, setIsLoading] = useState(true)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [error, setError] = useState('')
   const [purok, setPurok] = useState('all')
   const [status, setStatus] = useState('all')
@@ -73,11 +75,13 @@ export default function MappingPage() {
 
         if (!ignore) {
           setWorkspace({ ...defaultWorkspace, ...data })
+          setHasLoaded(true)
         }
       } catch (loadError) {
         if (!ignore) {
           setWorkspace(defaultWorkspace)
           setError(apiErrorMessage(loadError))
+          setHasLoaded(true)
         }
       } finally {
         if (!ignore) {
@@ -102,9 +106,11 @@ export default function MappingPage() {
     try {
       const data = await getMappingOverview({ purok, status })
       setWorkspace({ ...defaultWorkspace, ...data })
+      setHasLoaded(true)
     } catch (loadError) {
       setWorkspace(defaultWorkspace)
       setError(apiErrorMessage(loadError))
+      setHasLoaded(true)
     } finally {
       setIsLoading(false)
     }
@@ -156,6 +162,9 @@ export default function MappingPage() {
     setSelectedRoute(route)
   }
 
+  const isInitialLoading = isLoading && !hasLoaded
+  const isRefreshing = isLoading && hasLoaded
+
   return (
     <section className="page mapping-page active">
       <PageHeader
@@ -181,10 +190,10 @@ export default function MappingPage() {
         }
       />
 
-      {isLoading && <LoadingState />}
+      {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
-      {!isLoading && (
+      {hasLoaded && (
         <>
           <MappingEventStrip activeEvent={workspace.active_event} />
           <MappingSummary summary={workspace.summary} hasActiveEvent={hasActiveEvent} />
@@ -192,19 +201,21 @@ export default function MappingPage() {
 
           <div className="mapping-layout">
             <main className="mapping-main">
-              <MappingMap
-                workspace={workspace}
-                hasActiveEvent={hasActiveEvent}
-                layers={layers}
-                households={households}
-                evacuationSites={evacuationSites}
-                rescueTeams={rescueTeams}
-                visibleRoutes={visibleRoutes}
-                selectedRoute={selectedRoute}
-                mapCenter={mapCenter}
-                mapBounds={mapBounds}
-                onChangeLayer={changeLayer}
-              />
+              <RefreshOverlay active={isRefreshing}>
+                <MappingMap
+                  workspace={workspace}
+                  hasActiveEvent={hasActiveEvent}
+                  layers={layers}
+                  households={households}
+                  evacuationSites={evacuationSites}
+                  rescueTeams={rescueTeams}
+                  visibleRoutes={visibleRoutes}
+                  selectedRoute={selectedRoute}
+                  mapCenter={mapCenter}
+                  mapBounds={mapBounds}
+                  onChangeLayer={changeLayer}
+                />
+              </RefreshOverlay>
             </main>
 
             <MappingSidebar

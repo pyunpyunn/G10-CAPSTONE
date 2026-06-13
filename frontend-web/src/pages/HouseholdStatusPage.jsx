@@ -4,7 +4,6 @@ import {
   MapPin,
   RefreshCcw,
   Route,
-  ShieldCheck,
   Users,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -17,6 +16,7 @@ import HouseholdTable from '../components/households/HouseholdTable'
 import LoadingState from '../components/ui/LoadingState'
 import Modal from '../components/ui/Modal'
 import PageHeader from '../components/ui/PageHeader'
+import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   emptySummary,
 } from '../utils/householdStatusHelpers'
@@ -46,6 +46,9 @@ export default function HouseholdStatusPage() {
   const meta = payload?.households?.meta || {}
   const puroks = payload?.filters?.puroks || []
   const hasActiveEvent = Boolean(payload?.active_event)
+  const isInitialLoading = isLoading && !payload
+  const isRefreshing = isLoading && Boolean(payload)
+  const hasBlockingError = error && !payload
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -69,7 +72,7 @@ export default function HouseholdStatusPage() {
           purok,
           status,
           page,
-          per_page: 20,
+          per_page: 10,
         })
 
         if (!ignore) {
@@ -103,7 +106,7 @@ export default function HouseholdStatusPage() {
         purok,
         status,
         page,
-        per_page: 20,
+        per_page: 10,
       })
       setPayload(data)
     } catch {
@@ -189,18 +192,10 @@ export default function HouseholdStatusPage() {
         }
       />
 
-      <div className="hh-readonly-banner">
-        <span>
-          <ShieldCheck size={15} />
-          HQ reviews reports only. Status is updated by household mobile reports or authenticated responder field reports.
-        </span>
-        <span>Latest row per household - History on open</span>
-      </div>
-
-      {isLoading && <LoadingState />}
+      {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
-      {!isLoading && !error && (
+      {!isInitialLoading && !hasBlockingError && payload && (
         <>
           {!hasActiveEvent && (
             <div className="standby-strip hh-standby-strip">
@@ -221,7 +216,16 @@ export default function HouseholdStatusPage() {
             onStatusChange={changeStatusFilter}
           />
 
-          <HouseholdTable households={households} meta={meta} onOpen={openHousehold} onPageChange={setPage} />
+          <RefreshOverlay active={isRefreshing}>
+            <HouseholdTable
+              households={households}
+              meta={meta}
+              selectedPurok={purok}
+              onOpen={openHousehold}
+              onPageChange={setPage}
+              onDispatchPurok={() => navigate('/dispatch')}
+            />
+          </RefreshOverlay>
           <HouseholdOpsPanels activities={payload?.recent_activity || []} rows={payload?.purok_summary || []} />
         </>
       )}
@@ -263,7 +267,7 @@ export default function HouseholdStatusPage() {
 }
 
 function householdExportRows(households) {
-  const headers = ['Household ID', 'Household', 'Purok', 'People', 'Status', 'Source', 'Report Time', 'Devices', 'Battery', 'Last Location', 'Priority']
+  const headers = ['Household ID', 'Household', 'Purok', 'People', 'Status', 'Source', 'Report Time', 'Devices', 'Battery', 'Last Location']
   const rows = households.map((household) => [
     household.household_id,
     household.household_name,
@@ -275,7 +279,6 @@ function householdExportRows(households) {
     `${household.device?.active || 0}/${household.device?.total || 0}`,
     household.device?.lowest_battery !== null && household.device?.lowest_battery !== undefined ? `${household.device.lowest_battery}%` : '',
     household.location?.label,
-    household.priority?.label,
   ])
 
   return [headers, ...rows]

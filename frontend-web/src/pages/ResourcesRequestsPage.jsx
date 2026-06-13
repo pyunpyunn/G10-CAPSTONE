@@ -16,6 +16,7 @@ import ResourceValidationModal from '../components/resources/ResourceValidationM
 import TrackingAidMirror from '../components/resources/TrackingAidMirror'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
+import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   buildCreatePayload,
   buildForwardPayload,
@@ -95,6 +96,9 @@ export default function ResourcesRequestsPage() {
   const requests = payload?.requests?.data || []
   const pagination = payload?.requests || {}
   const options = payload?.options || {}
+  const isInitialLoading = isLoading && !payload
+  const isRefreshing = isLoading && Boolean(payload)
+  const hasBlockingError = error && !payload
 
   function openCreateModal() {
     setModalMode('create')
@@ -257,10 +261,10 @@ export default function ResourcesRequestsPage() {
         }
       />
 
-      {isLoading && <LoadingState />}
+      {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
-      {!isLoading && !error && (
+      {!isInitialLoading && !hasBlockingError && payload && (
         <>
           <ResourceRequestNotice note={payload?.scope_note} />
           <ResourceRequestStats summary={payload?.summary} />
@@ -278,14 +282,16 @@ export default function ResourcesRequestsPage() {
           {message && <div className="rr-message">{message}</div>}
 
           <div className="rr-layout">
-            <ResourceRequestQueueTable
-              requests={requests}
-              pagination={pagination}
-              onView={(request) => openExistingModal(request, 'view')}
-              onValidate={(request) => openExistingModal(request, 'edit')}
-              onForward={handleRowForward}
-              onReturn={(request) => openExistingModal(request, 'edit', 'returned', 'Add the return reason before saving.')}
-            />
+            <RefreshOverlay active={isRefreshing}>
+              <ResourceRequestQueueTable
+                requests={requests}
+                pagination={pagination}
+                onView={(request) => openExistingModal(request, 'view')}
+                onValidate={(request) => openExistingModal(request, 'edit')}
+                onForward={handleRowForward}
+                onReturn={(request) => openExistingModal(request, 'edit', 'returned', 'Add the return reason before saving.')}
+              />
+            </RefreshOverlay>
             <TrackingAidMirror items={payload?.tracking_mirror || []} />
           </div>
         </>

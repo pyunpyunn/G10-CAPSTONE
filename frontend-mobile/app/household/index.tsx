@@ -13,7 +13,7 @@ import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import * as Network from 'expo-network';
 import { type Href, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { logoutMobile } from '@/api/auth';
 import {
@@ -55,6 +55,7 @@ const tabs: { key: TabButtonKey; label: string; icon: keyof typeof Ionicons.glyp
 
 export default function HouseholdHomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [overview, setOverview] = useState<HouseholdOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -494,6 +495,7 @@ export default function HouseholdHomeScreen() {
         onEditStatus={() => setEditingStatus(true)}
         onToggleHistory={() => setShowHistory((value) => !value)}
         onOpenQr={() => setShowQr(true)}
+        onOpenMap={() => setActiveTab('route')}
         onSaveMemberStatus={handleSaveMemberStatus}
       />
     );
@@ -516,14 +518,17 @@ export default function HouseholdHomeScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, overview.setup?.is_setup_complete && styles.contentWithTabs]}
+        contentContainerStyle={[
+          styles.content,
+          overview.setup?.is_setup_complete && { paddingBottom: 104 + insets.bottom },
+        ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
         {renderContent()}
       </ScrollView>
 
       {overview.setup?.is_setup_complete ? (
-        <View style={styles.tabBar}>
+        <View style={[styles.tabBar, { bottom: Math.max(insets.bottom + 8, spacing.md) }]}>
           {tabs.map((tab) => {
             const isQrAction = tab.key === 'qr';
             const isActive = !isQrAction && activeTab === tab.key;
@@ -611,9 +616,6 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     paddingBottom: spacing.xl,
-  },
-  contentWithTabs: {
-    paddingBottom: 100,
   },
   tabBar: {
     position: 'absolute',

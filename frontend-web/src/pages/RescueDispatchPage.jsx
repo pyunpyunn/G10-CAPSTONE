@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import {
-  Clock,
   RefreshCcw,
   Route,
 } from 'lucide-react'
@@ -98,27 +97,29 @@ export default function RescueDispatchPage() {
   const filteredTeams = teamFilter === 'all'
     ? teams
     : teams.filter((team) => team.status_key === teamFilter)
-
-  function firstDispatchableHousehold(area) {
-    return area?.recommended_households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
-      || area?.households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
-      || null
-  }
+  const isInitialLoading = isLoading && !payload
+  const isRefreshing = isLoading && Boolean(payload)
+  const hasBlockingError = error && !payload
 
   function openNewDispatch() {
-    const firstRisk = riskAreas[0]
-    const firstOption = firstAssignmentOption(teams, responders)
-    const firstHousehold = firstDispatchableHousehold(firstRisk)
+    openDispatchForArea(null)
+  }
+
+  function openDispatchForArea(area) {
+    const firstOption = firstAssignmentOption(teams)
 
     setEditingDispatch(null)
-    setSelectedRiskId(firstRisk?.id || '')
+    setSelectedRiskId(area?.id || '')
     setAssignmentOption(firstOption)
     setForm({
       ...defaultForm(),
-      assigned_area: firstRisk?.area_name || '',
-      household_id: firstHousehold?.household_id || '',
-      households_to_cover: firstRisk?.to_cover || 0,
-      priority_level: firstRisk?.priority || 'high',
+      assigned_area: area?.area_name || '',
+      household_id: '',
+      households_to_cover: area?.to_cover || 0,
+      safe_count: area?.safe_households || 0,
+      unsafe_count: area?.unsafe_households || 0,
+      pending_count: area?.unchecked_households || 0,
+      priority_level: area?.priority || 'high',
     })
     setFormError('')
     setIsModalOpen(true)
@@ -131,7 +132,7 @@ export default function RescueDispatchPage() {
       setAssignmentOption(team.active_responder_id ? `responder:${team.active_responder_id}` : '')
       setForm({
         ...defaultForm(),
-        assigned_area: team.assigned_area === 'No dispatch area yet' ? '' : team.assigned_area,
+        assigned_area: ['No dispatch area yet', 'No active dispatch'].includes(team.assigned_area) ? '' : team.assigned_area,
         households_to_cover: team.assigned_households || 0,
       })
       setEditingDispatch(null)
@@ -147,6 +148,7 @@ export default function RescueDispatchPage() {
       household_id: dispatch.household_id || '',
       households_to_cover: dispatch.households_to_cover || 0,
       responder_count: dispatch.responder_count || 1,
+      selected_responder_ids: dispatch.selected_responder_ids || (dispatch.responder_id ? [dispatch.responder_id] : []),
       priority_level: dispatch.priority_level || 'monitor',
       status: dispatch.status?.key || 'dispatched',
       dispatch_notes: dispatch.dispatch_notes || '',
@@ -164,26 +166,16 @@ export default function RescueDispatchPage() {
   }
 
   function selectRiskArea(area) {
-    const firstHousehold = firstDispatchableHousehold(area)
-
     setSelectedRiskId(area.id)
     setForm((current) => ({
       ...current,
       assigned_area: area.area_name,
-      household_id: firstHousehold?.household_id || '',
+      household_id: '',
       households_to_cover: area.to_cover,
+      safe_count: area.safe_households || 0,
+      unsafe_count: area.unsafe_households || 0,
+      pending_count: area.unchecked_households || 0,
       priority_level: area.priority,
-    }))
-  }
-
-  function selectRiskHousehold(area, household) {
-    setSelectedRiskId(area.id)
-    setForm((current) => ({
-      ...current,
-      assigned_area: area.area_name,
-      household_id: household.household_id,
-      households_to_cover: Math.max(1, current.households_to_cover || area.to_cover || 1),
-      priority_level: household.priority_level || area.priority || current.priority_level,
     }))
   }
 
@@ -207,7 +199,7 @@ export default function RescueDispatchPage() {
     }
 
     if (!assignmentOption) {
-      setFormError('Select a team or responder first.')
+      setFormError('Select an available team first.')
       return
     }
 
@@ -216,8 +208,8 @@ export default function RescueDispatchPage() {
       return
     }
 
-    if (!editingDispatch && !form.household_id) {
-      setFormError('Select a household with GPS from the affected area list. This is required for routed dispatch.')
+    if (!editingDispatch && (!form.selected_responder_ids || form.selected_responder_ids.length === 0)) {
+      setFormError('Select at least one available responder from the selected team.')
       return
     }
 
@@ -253,10 +245,6 @@ export default function RescueDispatchPage() {
               <RefreshCcw size={14} />
               Refresh
             </button>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setDispatchFilter('all')}>
-              <Clock size={14} />
-              Dispatch history
-            </button>
             <button className="btn btn-primary btn-sm" type="button" disabled={!hasActiveEvent} onClick={openNewDispatch}>
               <Route size={14} />
               New dispatch
@@ -265,10 +253,10 @@ export default function RescueDispatchPage() {
         }
       />
 
-      {isLoading && <LoadingState />}
+      {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
-      {!isLoading && !error && (
+      {!isInitialLoading && !hasBlockingError && payload && (
         <>
           {!hasActiveEvent && (
             <div className="standby-strip">
@@ -290,6 +278,7 @@ export default function RescueDispatchPage() {
               searchText={searchText}
               setSearchText={setSearchText}
               onSearch={loadDispatch}
+              isUpdating={isRefreshing}
             />
 
             <main className="dp-main-column dp-team-side-panel">
@@ -334,7 +323,6 @@ export default function RescueDispatchPage() {
           riskAreas={riskAreas}
           selectedRiskId={selectedRiskId}
           onSelectRiskArea={selectRiskArea}
-          onSelectRiskHousehold={selectRiskHousehold}
           onSubmit={submitDispatch}
         />
       </Modal>
