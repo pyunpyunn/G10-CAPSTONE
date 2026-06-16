@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             TemporaryLoginSeeder::class,
             SampleDisasterStatusSeeder::class,
+            RescueTeamRosterSeeder::class,
         ]);
     }
 }

@@ -14,14 +14,14 @@ class HouseholdStatusService
     {
         $activeEvent = $this->getActiveEvent();
         $eventId = $activeEvent?->event_id;
-        $perPage = min(max((int) $request->query('per_page', 20), 10), 50);
+        $perPage = min(max((int) $request->query('per_page', 10), 10), 50);
 
         $query = $this->householdListQuery($eventId);
         $this->applyListFilters($query, $request);
 
         $households = $query
             ->orderByRaw('CASE WHEN hd.needs_dispatch = 1 THEN 0 ELSE 1 END')
-            ->orderByRaw('CASE WHEN hs.status_key IN ("not_evacuated", "displaced", "unsafe", "missing", "injured") THEN 0 ELSE 1 END')
+            ->orderByRaw('CASE WHEN hs.status_key IN ("not_evacuated", "displaced", "unsafe", "needs_help", "need_help", "needs_assistance", "missing", "injured") THEN 0 ELSE 1 END')
             ->orderByDesc('hd.last_reported_at')
             ->orderBy('h.household_name')
             ->paginate($perPage);
@@ -133,19 +133,23 @@ class HouseholdStatusService
                 'hsl.submitted_at',
                 'hsl.created_at',
             ])
-            ->map(fn (object $log): array => [
-                'status_log_id' => $log->status_log_id,
-                'status' => $this->formatStatus($log->status_key, $log->status_label),
-                'source' => $this->sourceLabel($log->source),
-                'submitted_by' => $this->personName($log->user_name, $log->first_name, $log->last_name, $log->submitted_by_user_id),
-                'location_label' => $log->location_label,
-                'location_accuracy_m' => $log->location_accuracy_m,
-                'battery_level' => $log->battery_level,
-                'signal_strength' => $log->signal_strength,
-                'notes' => $log->notes,
-                'submitted_at' => $this->formatDateTime($log->submitted_at ?? $log->created_at),
-                'submitted_time' => $this->formatTime($log->submitted_at ?? $log->created_at),
-            ])
+            ->map(function (object $log): array {
+                $notes = $this->decodeJson($log->notes);
+
+                return [
+                    'status_log_id' => $log->status_log_id,
+                    'status' => $this->formatStatus($log->status_key, $log->status_label, $notes),
+                    'source' => $this->sourceLabel($log->source),
+                    'submitted_by' => $this->personName($log->user_name, $log->first_name, $log->last_name, $log->submitted_by_user_id),
+                    'location_label' => $log->location_label,
+                    'location_accuracy_m' => $log->location_accuracy_m,
+                    'battery_level' => $log->battery_level,
+                    'signal_strength' => $log->signal_strength,
+                    'notes' => $notes['user_notes'] ?? $notes['member_notes'] ?? $log->notes,
+                    'submitted_at' => $this->formatDateTime($log->submitted_at ?? $log->created_at),
+                    'submitted_time' => $this->formatTime($log->submitted_at ?? $log->created_at),
+                ];
+            })
             ->values();
 
         return response()->json([
@@ -360,7 +364,7 @@ class HouseholdStatusService
         }
 
         if ($status === 'unsafe') {
-            $query->whereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured']);
+            $query->whereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
         }
 
         if ($status === 'device' || $deviceRisk === 'watch') {
@@ -387,7 +391,7 @@ class HouseholdStatusService
             $query->where(function ($urgentQuery): void {
                 $urgentQuery
                     ->where('hd.needs_dispatch', true)
-                    ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'])
+                    ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'])
                     ->orWhere(function ($criticalDevice): void {
                         $criticalDevice
                             ->where('devices.device_total', '>', 0)
@@ -428,7 +432,7 @@ class HouseholdStatusService
 
         $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
-        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured']);
+        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
         $safeTotal = $safeOnly + $evacuated;
 
         $reported = DB::table('household_disasters')
@@ -456,7 +460,7 @@ class HouseholdStatusService
                 ->where(function ($query): void {
                     $query
                         ->where('hd.needs_dispatch', true)
-                        ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured']);
+                        ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
                 })
                 ->count(),
         ];
@@ -471,7 +475,7 @@ class HouseholdStatusService
             ->map(function ($items, string $purok): array {
                 $total = $items->count();
                 $reported = $items->whereNotNull('current_status_id')->count();
-                $unsafe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'], true))->count();
+                $unsafe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'], true))->count();
                 $deviceRisk = $items->filter(function (object $item): bool {
                     return (int) $item->device_total > 0 && ((int) $item->lowest_battery <= 25 || $this->isStale($item->latest_device_seen_at));
                 })->count();
@@ -683,7 +687,10 @@ class HouseholdStatusService
                     'gender' => $member->gender ?: $member->sex,
                     'risk_flags' => $this->memberRiskFlags($member),
                     'device_name' => $device['device_name'] ?? 'No assigned mobile',
+                    'device_platform' => $device['platform'] ?? null,
                     'battery_level' => $device['battery_level'] ?? null,
+                    'battery_tone' => $device['battery_tone'] ?? 'unknown',
+                    'signal_strength' => $device['signal_strength'] ?? null,
                     'last_allowed_location' => $device['allowed_location'] ?? 'No device location',
                     'last_location_label' => $device['last_location_label'] ?? null,
                     'last_seen_at' => $device['last_seen_at'] ?? null,
@@ -694,8 +701,9 @@ class HouseholdStatusService
 
     private function formatHouseholdRow(object $row, ?object $latestLog, ?object $latestDevice, ?object $accountUser, bool $hasActiveEvent): array
     {
+        $statusNotes = $this->decodeJson($row->last_status_notes ?? $latestLog?->notes);
         $status = $hasActiveEvent
-            ? $this->formatStatus($row->status_key, $row->status_label)
+            ? $this->formatStatus($row->status_key, $row->status_label, $statusNotes)
             : ['key' => 'standby', 'label' => 'No active event', 'tone' => 'gray'];
 
         if ($hasActiveEvent && ! $row->current_status_id) {
@@ -728,7 +736,7 @@ class HouseholdStatusService
                 'submitted_by' => $this->personName($row->reporter_name, $row->reporter_first_name, $row->reporter_last_name, $row->last_reported_by_user_id),
                 'time' => $this->formatTime($row->last_reported_at ?? $latestLog?->submitted_at),
                 'datetime' => $this->formatDateTime($row->last_reported_at ?? $latestLog?->submitted_at),
-                'notes' => $row->last_status_notes ?? $latestLog?->notes,
+                'notes' => $statusNotes['user_notes'] ?? $statusNotes['member_notes'] ?? ($row->last_status_notes ?? $latestLog?->notes),
             ],
             'device' => [
                 'total' => (int) $row->device_total,
@@ -808,8 +816,13 @@ class HouseholdStatusService
         ];
     }
 
-    private function formatStatus(?string $statusKey, ?string $statusLabel): array
+    private function formatStatus(?string $statusKey, ?string $statusLabel, array $notes = []): array
     {
+        if (in_array($notes['mobile_status_key'] ?? null, ['safe', 'evacuated', 'unsafe', 'needs_help'], true)) {
+            $statusKey = $notes['mobile_status_key'];
+            $statusLabel = $notes['mobile_status_label'] ?? null;
+        }
+
         if (! $statusKey) {
             return ['key' => 'unchecked', 'label' => 'Unchecked', 'tone' => 'gray'];
         }
@@ -829,7 +842,12 @@ class HouseholdStatusService
 
         if (in_array($statusKey, ['not_evacuated', 'displaced', 'unsafe'], true)) {
             $key = 'unsafe';
-            $label = 'Unsafe';
+            $label = str_contains(strtolower($label), 'help') || str_contains(strtolower($label), 'assist') ? 'Needs help' : 'Unsafe';
+        }
+
+        if (in_array($statusKey, ['needs_help', 'need_help', 'needs_assistance', 'injured', 'missing'], true)) {
+            $key = 'needs-help';
+            $label = 'Needs help';
         }
 
         return [
@@ -849,7 +867,7 @@ class HouseholdStatusService
             return 'blue';
         }
 
-        if (in_array($statusKey, ['unsafe', 'missing', 'not-evacuated', 'displaced'], true)) {
+        if (in_array($statusKey, ['unsafe', 'missing', 'not-evacuated', 'displaced', 'needs-help'], true)) {
             return 'red';
         }
 
@@ -872,7 +890,7 @@ class HouseholdStatusService
     private function deviceRisk(int $deviceTotal, int $activeDeviceTotal, mixed $battery, ?string $lastSeen, ?string $locationLabel): array
     {
         if ($deviceTotal <= 0) {
-            return ['key' => 'none', 'label' => 'No synced device'];
+            return ['key' => 'none', 'label' => 'No device data'];
         }
 
         if ($activeDeviceTotal <= 0 || ($battery !== null && (int) $battery <= 15)) {
@@ -880,7 +898,7 @@ class HouseholdStatusService
         }
 
         if (($battery !== null && (int) $battery <= 25) || $this->isStale($lastSeen) || ! $locationLabel) {
-            return ['key' => 'watch', 'label' => 'Device watch'];
+            return ['key' => 'watch', 'label' => 'Watch'];
         }
 
         return ['key' => 'stable', 'label' => 'Stable'];
@@ -892,7 +910,7 @@ class HouseholdStatusService
             return ['key' => 'standby', 'label' => 'Standby'];
         }
 
-        if ($needsDispatch || in_array($statusKey, ['unsafe', 'missing', 'injured'], true) || $deviceRisk === 'critical') {
+        if ($needsDispatch || in_array($statusKey, ['unsafe', 'needs-help', 'missing', 'injured'], true) || $deviceRisk === 'critical') {
             return ['key' => 'urgent', 'label' => 'Dispatch focus'];
         }
 
@@ -1132,6 +1150,17 @@ class HouseholdStatusService
     private function sumStatusKeys($counts, array $keys): int
     {
         return collect($keys)->sum(fn (string $key): int => (int) ($counts[$key] ?? 0));
+    }
+
+    private function decodeJson(?string $value): array
+    {
+        if (! $value) {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     private function label(?string $value): string

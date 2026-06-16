@@ -125,7 +125,6 @@ class NotificationService
             ->merge($this->resourceRequestRows())
             ->merge($this->weatherRows())
             ->merge($this->broadcastRows())
-            ->merge($this->auditRows())
             ->sortByDesc('sort_time')
             ->values()
             ->take(80);
@@ -472,7 +471,20 @@ class NotificationService
             'sort_time' => $date->timestamp,
             'read' => $read,
             'tone' => $this->priorityTone($priority),
+            'action_url' => $this->actionUrlForType($type),
         ];
+    }
+
+    private function actionUrlForType(string $type): string
+    {
+        return match ($type) {
+            'Broadcast' => '/broadcast',
+            'Household status' => '/households',
+            'Dispatch route' => '/dispatch',
+            'Resources' => '/resources',
+            'Weather' => '/weather',
+            default => '/notifications',
+        };
     }
 
     private function statusFilter(string $status): string

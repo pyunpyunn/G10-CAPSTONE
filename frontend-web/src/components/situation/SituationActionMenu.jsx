@@ -5,7 +5,7 @@ export default function SituationActionMenu({
   onGenerate,
   onArchive,
   onViewArchive,
-  onExportCsv,
+  onExportExcel,
   onExportPdf,
 }) {
   return (
@@ -30,9 +30,9 @@ export default function SituationActionMenu({
           <Download size={14} />
           Export PDF
         </button>
-        <button className="btn btn-secondary btn-sm" type="button" disabled={!hasSummary} onClick={onExportCsv}>
+        <button className="btn btn-secondary btn-sm" type="button" disabled={!hasSummary} onClick={onExportExcel}>
           <Download size={14} />
-          Export CSV
+          Export Excel
         </button>
       </div>
     </details>

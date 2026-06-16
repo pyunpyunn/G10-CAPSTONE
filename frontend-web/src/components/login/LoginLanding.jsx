@@ -289,6 +289,22 @@ function VisualPanelsSection() {
 }
 
 function ContactSection() {
+  function submitInquiry(event) {
+    event.preventDefault()
+
+    const data = new FormData(event.currentTarget)
+    const name = data.get('name') || ''
+    const organization = data.get('organization') || ''
+    const email = data.get('email') || ''
+    const message = data.get('message') || ''
+    const subject = encodeURIComponent('RESQPERATION inquiry')
+    const body = encodeURIComponent(
+      `Name: ${name}\nOrganization: ${organization}\nEmail: ${email}\n\nMessage:\n${message}`,
+    )
+
+    window.location.href = `mailto:resqperation.devteam@example.com?subject=${subject}&body=${body}`
+  }
+
   return (
     <section className="section" id="contact">
       <div className="landing-wrap">
@@ -315,14 +331,14 @@ function ContactSection() {
             </div>
           </div>
 
-          <form className="soft-card contact-form">
+          <form className="soft-card contact-form" onSubmit={submitInquiry}>
             <div className="form-row">
               <input type="text" name="name" placeholder="Name" aria-label="Name" />
               <input type="text" name="organization" placeholder="Organization" aria-label="Organization" />
             </div>
             <input type="email" name="email" placeholder="Email" aria-label="Email" />
             <textarea name="message" placeholder="Message" aria-label="Message" />
-            <button className="primary-button" type="button">Send inquiry</button>
+            <button className="primary-button" type="submit">Send inquiry</button>
           </form>
         </div>
       </div>

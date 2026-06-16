@@ -9,9 +9,21 @@ type RouteProps = {
   evacuationCenters: any[];
 };
 
+<<<<<<< HEAD
+=======
+const defaultRegion = {
+  latitude: 10.2898,
+  longitude: 123.879,
+  latitudeDelta: 0.035,
+  longitudeDelta: 0.035,
+};
+
+>>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) {
   const centers = useMemo(() => evacuationCenters || [], [evacuationCenters]);
   const [selectedId, setSelectedId] = useState<string>('');
+  const [roadRoute, setRoadRoute] = useState<any>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
 
   useEffect(() => {
     if (!selectedId && centers.length) {
@@ -40,9 +52,53 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
         }
       : null
   ), [selectedCenter]);
+<<<<<<< HEAD
+=======
 
-  const distanceLabel =
-    householdPoint && selectedPoint
+  const mapRegion = householdPoint
+    ? { ...householdPoint, latitudeDelta: 0.025, longitudeDelta: 0.025 }
+    : defaultRegion;
+>>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadRoute() {
+      if (!householdPoint || !selectedPoint) {
+        setRoadRoute(null);
+        return;
+      }
+
+      setRouteLoading(true);
+
+      try {
+        const route = await fetchRoadRoute(householdPoint, selectedPoint);
+
+        if (!ignore) {
+          setRoadRoute(route);
+        }
+      } catch {
+        if (!ignore) {
+          setRoadRoute(null);
+        }
+      } finally {
+        if (!ignore) {
+          setRouteLoading(false);
+        }
+      }
+    }
+
+    loadRoute();
+
+    return () => {
+      ignore = true;
+    };
+  }, [householdPoint, selectedPoint]);
+
+  const routeLine = roadRoute?.coordinates?.length >= 2 ? roadRoute.coordinates : [];
+  const distanceLabel = roadRoute
+    ? `${roadRoute.distance_km} km · ${roadRoute.duration_min} min by road`
+    : householdPoint && selectedPoint
       ? `${distanceKm(householdPoint, selectedPoint).toFixed(2)} km direct distance`
       : 'Route distance unavailable';
 
@@ -54,6 +110,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
           action={<HouseholdBadge label={selectedCenter ? 'Route ready' : 'No center'} tone={selectedCenter ? 'info' : 'neutral'} />}
         />
 
+<<<<<<< HEAD
         <View style={styles.webMapFallback}>
           <Ionicons name="map-outline" size={30} color={palette.navActive} />
           <Text style={styles.fallbackTitle}>Native route map available on mobile</Text>
@@ -68,6 +125,47 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
         </View>
 
         {!householdPoint ? <HouseholdEmpty icon="location-outline" title="No household geotag yet" /> : null}
+=======
+        <View style={styles.mapWrap}>
+          <MapView style={styles.map} initialRegion={mapRegion}>
+            {householdPoint ? (
+              <>
+                <Marker coordinate={householdPoint} title="Your household" description={geotag.location_label} pinColor={palette.navActive} />
+                <Circle center={householdPoint} radius={geotag.accuracy_m || 35} strokeColor="#1f3e5a55" fillColor="#1f3e5a18" />
+              </>
+            ) : null}
+
+            {centers.map((center) => (
+              <Marker
+                key={center.evacuation_center_id}
+                coordinate={{
+                  latitude: Number(center.latitude),
+                  longitude: Number(center.longitude),
+                }}
+                title={center.name}
+                description={center.address || center.center_type}
+                pinColor={String(center.evacuation_center_id) === selectedId ? palette.safe : palette.evacuated}
+              />
+            ))}
+
+            {routeLine.length >= 2 ? (
+              <Polyline coordinates={routeLine} strokeColor={palette.safe} strokeWidth={5} />
+            ) : null}
+          </MapView>
+          <View style={styles.legend}>
+            <LegendItem color={palette.navActive} label="Household" />
+            <LegendItem color={palette.safe} label="Selected center" />
+            <LegendLine label="Route" />
+          </View>
+        </View>
+
+        {!householdPoint ? (
+          <HouseholdEmpty
+            icon="location-outline"
+            title="No household geotag yet"
+          />
+        ) : null}
+>>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       </View>
 
       <View style={styles.card}>
@@ -80,7 +178,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
             <View style={styles.centerText}>
               <Text style={styles.centerTitle}>{selectedCenter.name}</Text>
               <Text style={styles.centerMeta}>{selectedCenter.address || selectedCenter.center_type}</Text>
-              <Text style={styles.distanceText}>{distanceLabel}</Text>
+              <Text style={styles.distanceText}>{routeLoading ? 'Loading road route...' : distanceLabel}</Text>
             </View>
           </View>
         ) : (
@@ -141,6 +239,50 @@ function toRadians(value: number) {
   return (value * Math.PI) / 180;
 }
 
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <Text style={styles.legendText}>{label}</Text>
+    </View>
+  );
+}
+
+function LegendLine({ label }: { label: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={styles.legendLine} />
+      <Text style={styles.legendText}>{label}</Text>
+    </View>
+  );
+}
+
+async function fetchRoadRoute(
+  start: { latitude: number; longitude: number },
+  end: { latitude: number; longitude: number }
+) {
+  const startPoint = `${start.longitude},${start.latitude}`;
+  const endPoint = `${end.longitude},${end.latitude}`;
+  const response = await fetch(
+    `https://router.project-osrm.org/route/v1/driving/${startPoint};${endPoint}?overview=full&geometries=geojson`
+  );
+  const data = await response.json();
+  const route = data.routes?.[0];
+
+  if (!route) {
+    return null;
+  }
+
+  return {
+    distance_km: Number((route.distance / 1000).toFixed(2)),
+    duration_min: Math.max(1, Math.round(route.duration / 60)),
+    coordinates: route.geometry.coordinates.map((point: number[]) => ({
+      latitude: point[1],
+      longitude: point[0],
+    })),
+  };
+}
+
 const styles = StyleSheet.create({
   stack: {
     gap: spacing.md,
@@ -153,6 +295,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: palette.card,
   },
+<<<<<<< HEAD
   webMapFallback: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -160,6 +303,10 @@ const styles = StyleSheet.create({
     minHeight: 240,
     borderWidth: 1,
     borderColor: palette.border,
+=======
+  mapWrap: {
+    overflow: 'hidden',
+>>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
     borderRadius: radius.md,
     padding: spacing.lg,
     backgroundColor: palette.secondary,
@@ -177,6 +324,41 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 18,
     textAlign: 'center',
+  },
+  map: {
+    height: 340,
+  },
+  legend: {
+    position: 'absolute',
+    right: spacing.sm,
+    bottom: spacing.sm,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: '#ffffffe8',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendLine: {
+    width: 18,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: palette.safe,
+  },
+  legendText: {
+    color: palette.text,
+    fontSize: 11,
+    fontWeight: '900',
   },
   selectedBox: {
     flexDirection: 'row',

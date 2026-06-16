@@ -258,7 +258,7 @@ function NextActions({ summary }) {
         <Meta label="Submitted by" value={summary.report.prepared_by} />
         <Meta label="Reviewed by" value={summary.report.reviewed_by} />
       </div>
-      <div className="sr-law">Archive rule: once generated and approved, the SitRep is stored with the disaster event log and remains downloadable as PDF or CSV for audit and post-disaster review.</div>
+      <div className="sr-law">Archive rule: once generated and approved, the SitRep is stored with the disaster event log and remains downloadable as PDF or Excel for audit and post-disaster review.</div>
     </DocSection>
   )
 }

@@ -30,7 +30,7 @@ export function RescuerDashboardScreen({
     <View style={styles.stack}>
       <View style={styles.identityCard}>
         <View style={styles.identityTop}>
-          <View>
+          <View style={styles.identityText}>
             <Text style={styles.kicker}>Field console</Text>
             <Text style={styles.name}>{responder.full_name || profile.user?.full_name || 'Responder'}</Text>
             <Text style={styles.meta}>
@@ -38,7 +38,9 @@ export function RescuerDashboardScreen({
               {responder.team_name || 'No team assigned'}
             </Text>
           </View>
-          <StatusBadge label={responder.duty_status || 'Stand-by'} tone={responder.duty_status || 'neutral'} />
+          <View style={styles.statusWrap}>
+            <StatusBadge label={responder.duty_status || 'Stand-by'} tone={responder.duty_status || 'neutral'} />
+          </View>
         </View>
 
         {activeEvent ? (
@@ -66,7 +68,6 @@ export function RescuerDashboardScreen({
         <StatTile label="Assigned" value={summary.total_assignments || 0} tone="neutral" />
         <StatTile label="Active" value={summary.active_assignments || 0} tone="en_route" />
         <StatTile label="Done" value={summary.completed_assignments || 0} tone="completed" />
-        <StatTile label="Urgent" value={summary.urgent_assignments || 0} tone="urgent" />
       </View>
 
       {activeAssignment ? (
@@ -80,6 +81,7 @@ export function RescuerDashboardScreen({
             <Text style={styles.note}>{activeAssignment.dispatch_notes}</Text>
           ) : null}
           <View style={styles.buttonGrid}>
+<<<<<<< HEAD
             <ActionButton
               label="Accept"
               icon="checkmark-outline"
@@ -105,6 +107,28 @@ export function RescuerDashboardScreen({
               label="Complete"
               icon="flag-outline"
               disabled={activeAssignment.status_key !== 'on_scene'}
+=======
+            {activeAssignment.status_key === 'dispatched' ? (
+              <ActionButton
+                label="Accept"
+                icon="checkmark-outline"
+                tone="light"
+                onPress={() => onStatusChange(activeAssignment.assignment_id, 'accepted')}
+              />
+            ) : null}
+            {activeAssignment.status_key === 'accepted' ? (
+              <ActionButton
+                label="En route"
+                icon="navigate-outline"
+                tone="light"
+                onPress={() => onStatusChange(activeAssignment.assignment_id, 'en_route')}
+              />
+            ) : null}
+            <ActionButton
+              label="Complete"
+              icon="flag-outline"
+              disabled={!['en_route', 'on_scene'].includes(activeAssignment.status_key)}
+>>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
               onPress={() => onStatusChange(activeAssignment.assignment_id, 'completed')}
             />
           </View>
@@ -168,9 +192,18 @@ const styles = StyleSheet.create({
   },
   identityTop: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
+  },
+  identityText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statusWrap: {
+    maxWidth: 120,
+    flexShrink: 0,
+    alignItems: 'flex-end',
   },
   kicker: {
     color: palette.navMuted,

@@ -21,6 +21,10 @@ function TeamCard({ team, onOpenUpdate, onOpenNew }) {
   const coverage = team.coverage_percent || 0
   const hasActiveAssignment = Boolean(team.active_assignment_id)
   const canDispatch = hasActiveAssignment || team.is_available
+<<<<<<< HEAD
+=======
+  const memberLabel = team.member_count === 1 ? '1 member' : `${team.member_count || 0} members`
+>>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 
   return (
     <article className={`dp-team-card status-${team.status_key}`}>
@@ -28,7 +32,7 @@ function TeamCard({ team, onOpenUpdate, onOpenNew }) {
         <div className="dp-team-icon">{initials(team.team_name)}</div>
         <div>
           <div className="dp-team-name">{team.team_name}</div>
-          <div className="dp-team-law">{team.team_type} - {team.member_count} members</div>
+          <div className="dp-team-law">{team.team_type} - {memberLabel}</div>
         </div>
         <DispatchStatusBadge status={{ key: team.status_key, label: team.status_label, tone: team.status_key === 'on_scene' ? 'green' : team.status_key === 'dispatched' ? 'purple' : 'gray' }} />
       </div>
@@ -39,7 +43,7 @@ function TeamCard({ team, onOpenUpdate, onOpenNew }) {
           <div className="dp-team-stat-lbl">HH assigned</div>
         </div>
         <div className="dp-team-stat">
-          <div className="dp-team-stat-val dp-green-text">{coverage ? `${coverage}%` : '-'}</div>
+          <div className="dp-team-stat-val dp-green-text">{coverage}%</div>
           <div className="dp-team-stat-lbl">Coverage</div>
         </div>
       </div>
@@ -54,7 +58,7 @@ function TeamCard({ team, onOpenUpdate, onOpenNew }) {
       <div className="dp-coverage-bar">
         <div className="dp-coverage-fill" style={{ width: `${coverage}%` }} />
       </div>
-      <div className="dp-coverage-lbl">{coverage ? `Coverage accuracy: ${coverage}%` : 'No field outcome yet'}</div>
+      <div className="dp-coverage-lbl">{assigned ? `Coverage accuracy: ${coverage}%` : 'No households assigned'}</div>
 
       <div className="dp-team-footer">
         <span className="dp-team-area">{team.assigned_area} {team.assigned_time ? `- ${team.assigned_time}` : ''}</span>

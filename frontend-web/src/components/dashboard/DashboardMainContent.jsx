@@ -70,7 +70,7 @@ export default function DashboardMainContent({
       <div className="sep">
         Recent activity log <span>showing latest event reports only</span>
       </div>
-      <ActivityLog activities={dashboard.recent_activity} />
+      <ActivityLog activities={dashboard.recent_activity} onViewAll={() => onOpenModule('/archive')} />
     </div>
   )
 }
@@ -207,7 +207,7 @@ function TeamDispatchTable({ teams = [] }) {
   )
 }
 
-function ActivityLog({ activities = [] }) {
+function ActivityLog({ activities = [], onViewAll }) {
   if (activities.length === 0) {
     return (
       <div className="tbl-wrap">
@@ -233,7 +233,7 @@ function ActivityLog({ activities = [] }) {
       </div>
       <div className="table-footer">
         <span>Only the latest records load first to keep 1,000+ household operations fast.</span>
-        <button className="btn btn-secondary btn-sm" type="button">View all logs</button>
+        <button className="btn btn-secondary btn-sm" type="button" onClick={onViewAll}>View all logs</button>
       </div>
     </div>
   )

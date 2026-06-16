@@ -1,3 +1,8 @@
+import {
+  downloadExcelWorkbook,
+  downloadPdfReport,
+} from './exportFileHelpers'
+
 export function emptyGenerateForm(summary) {
   return {
     report_number: summary?.report?.report_number || '',
@@ -31,12 +36,32 @@ export function situationErrorMessage(error, fallback = 'Unable to save the SitR
   return data?.message || fallback
 }
 
-export function downloadSituationCsv(summary) {
+export function downloadSituationExcel(summary) {
   if (!summary) {
     return
   }
 
-  const rows = [
+  downloadExcelWorkbook(
+    `${summary.report.report_number || 'sitrep-draft'}.xls`,
+    situationExportTitle(summary),
+    situationRows(summary),
+  )
+}
+
+export function downloadSituationPdf(summary) {
+  if (!summary) {
+    return
+  }
+
+  downloadPdfReport(
+    `${summary.report.report_number || 'sitrep-draft'}.pdf`,
+    situationExportTitle(summary),
+    situationRows(summary),
+  )
+}
+
+export function situationRows(summary) {
+  return [
     ['Section', 'Field', 'Value'],
     ['Event', 'Name', summary.event.name],
     ['Event', 'Type', summary.event.type],
@@ -54,16 +79,6 @@ export function downloadSituationCsv(summary) {
     ['Resources', 'Needs validation', summary.resources.needs_validation],
     ['Resources', 'Forwarded', summary.resources.forwarded],
   ]
-
-  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-
-  link.href = url
-  link.download = `${summary.report.report_number || 'sitrep-draft'}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
 }
 
 export function percentLabel(value) {
@@ -74,8 +89,8 @@ export function displayValue(value, fallback = '-') {
   return value || fallback
 }
 
-function csvCell(value) {
-  return `"${String(value ?? '').replaceAll('"', '""')}"`
+function situationExportTitle(summary) {
+  return `${summary.report.report_number || 'SitRep draft'} - ${summary.event.name}`
 }
 
 function emptyToNull(value) {

@@ -32,6 +32,11 @@ class ArchiveController extends Controller
         return $this->service->dispatchLogs($request);
     }
 
+    public function radioCommunicationLogs(Request $request): JsonResponse
+    {
+        return $this->service->radioCommunicationLogs($request);
+    }
+
     public function resourceRequests(Request $request): JsonResponse
     {
         return $this->service->resourceRequests($request);
@@ -45,5 +50,30 @@ class ArchiveController extends Controller
     public function export(Request $request): Response|JsonResponse
     {
         return $this->service->export($request);
+    }
+
+    public function savedGroups(Request $request): JsonResponse
+    {
+        return $this->service->savedGroups($request);
+    }
+
+    public function storeSavedGroup(Request $request): JsonResponse
+    {
+        return $this->service->storeSavedGroup($request);
+    }
+
+    public function deleteSavedGroup(string $groupId): JsonResponse
+    {
+        return $this->service->deleteSavedGroup($groupId);
+    }
+
+    public function deleteSavedGroupRecord(string $groupId, string $recordId): JsonResponse
+    {
+        return $this->service->deleteSavedGroupRecord($groupId, $recordId);
+    }
+
+    public function deleteSelected(Request $request): JsonResponse
+    {
+        return $this->service->deleteSelected($request);
     }
 }

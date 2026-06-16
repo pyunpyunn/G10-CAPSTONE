@@ -66,3 +66,53 @@ export async function cancelResourceRequest(requestId: string) {
   const response = await api.patch(`/rescuer/resource-requests/${requestId}/cancel`);
   return response.data;
 }
+
+export async function getRadioFeed(params: any = {}) {
+  const response = await api.get('/rescuer/radio', { params });
+  return response.data.data;
+}
+
+export async function startRadioTransmission(payload: any) {
+  const response = await api.post('/rescuer/radio/start', payload);
+  return response.data.data;
+}
+
+export async function heartbeatRadioTransmission(payload: any) {
+  const response = await api.post('/rescuer/radio/heartbeat', payload);
+  return response.data.data;
+}
+
+export async function stopRadioTransmission(payload: any) {
+  const response = await api.post('/rescuer/radio/stop', payload);
+  return response.data.data;
+}
+
+export async function uploadRadioClip(payload: any) {
+  const formData = new FormData();
+  formData.append('channel', payload.channel || 'team');
+
+  if (payload.assignment_id) {
+    formData.append('assignment_id', String(payload.assignment_id));
+  }
+
+  formData.append('duration_seconds', String(payload.duration_seconds || 0));
+  formData.append('audio', {
+    uri: payload.uri,
+    name: payload.name || 'resqperation-ptt.m4a',
+    type: payload.type || 'audio/mp4',
+  } as any);
+
+  const response = await api.post('/rescuer/radio/clip', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 30000,
+  });
+
+  return response.data.data;
+}
+
+export async function sendRadioSignal(payload: any) {
+  const response = await api.post('/rescuer/radio/signal', payload);
+  return response.data.data;
+}

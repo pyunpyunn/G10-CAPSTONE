@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
@@ -15,6 +15,7 @@ type DashboardProps = {
   onEditStatus: () => void;
   onToggleHistory: () => void;
   onOpenQr: () => void;
+  onOpenMap: () => void;
   onSaveMemberStatus?: (memberId: string, status: string) => Promise<void>;
 };
 
@@ -37,6 +38,7 @@ export function HouseholdDashboardScreen({
   onEditStatus,
   onToggleHistory,
   onOpenQr,
+  onOpenMap,
   onSaveMemberStatus,
 }: DashboardProps) {
   const activeEvent = overview.active_event;
@@ -123,12 +125,14 @@ export function HouseholdDashboardScreen({
               {(overview.status_history || []).length === 0 ? (
                 <Text style={styles.muted}>No status history yet.</Text>
               ) : (
-                overview.status_history.map((log: any) => (
-                  <View key={log.status_log_id} style={styles.historyRow}>
-                    <HouseholdBadge label={log.status_label} tone={log.status_key} />
-                    <Text style={styles.historyText}>{log.submitted_label}</Text>
-                  </View>
-                ))
+                <ScrollView style={styles.historyList} nestedScrollEnabled>
+                  {overview.status_history.map((log: any) => (
+                    <View key={log.status_log_id} style={styles.historyRow}>
+                      <HouseholdBadge label={log.status_label} tone={log.status_key} />
+                      <Text style={styles.historyText}>{log.submitted_label}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
               )}
             </View>
           ) : null}
@@ -150,6 +154,7 @@ export function HouseholdDashboardScreen({
               activeEvent={activeEvent}
               statusOptions={statusOptions}
               canEditStatus
+              onOpenMap={onOpenMap}
               onSaveMemberStatus={onSaveMemberStatus}
             />
           ))
@@ -292,12 +297,14 @@ function MemberRow({
   activeEvent,
   statusOptions,
   canEditStatus = false,
+  onOpenMap,
   onSaveMemberStatus,
 }: {
   member: any;
   activeEvent?: any;
   statusOptions: any[];
   canEditStatus?: boolean;
+  onOpenMap?: () => void;
   onSaveMemberStatus?: (memberId: string, status: string) => Promise<void>;
 }) {
   const device = member.device;
@@ -309,6 +316,8 @@ function MemberRow({
     : `${device.battery_level}% battery`;
   const activityText = device?.is_active ? 'Active' : 'Inactive';
   const locationText = device?.last_location_label || 'No location yet';
+  const hasLocation = Boolean(device?.latitude || device?.last_latitude || device?.longitude || device?.last_longitude);
+  const specialNeeds = parseSpecialNeeds(member.special_needs);
 
   useEffect(() => {
     setSelectedStatus(currentStatus?.status_key || 'safe');
@@ -343,6 +352,19 @@ function MemberRow({
             ? `${batteryText} · ${activityText} · ${locationText}`
             : 'No device registered'}
         </Text>
+        {specialNeeds.length > 0 ? (
+          <View style={styles.memberTags}>
+            {specialNeeds.map((tag) => (
+              <HouseholdBadge key={tag} label={tag} tone="warning" />
+            ))}
+          </View>
+        ) : null}
+        {hasLocation && onOpenMap ? (
+          <Pressable style={styles.mapLink} onPress={onOpenMap}>
+            <Ionicons name="map-outline" size={15} color={palette.navActive} />
+            <Text style={styles.mapLinkText}>View on map</Text>
+          </Pressable>
+        ) : null}
         {activeEvent ? (
           <View style={styles.memberStatusBox}>
             <View style={styles.memberStatusTop}>
@@ -439,6 +461,14 @@ function statusIcon(statusKey: string): keyof typeof Ionicons.glyphMap {
   if (statusKey === 'evacuated') return 'walk-outline';
   if (statusKey === 'unsafe') return 'warning-outline';
   return 'medical-outline';
+}
+
+function parseSpecialNeeds(value?: string) {
+  return String(value || '')
+    .split(/[,;/]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 3);
 }
 
 function labelize(value?: string) {
@@ -577,6 +607,9 @@ const styles = StyleSheet.create({
     borderTopColor: palette.border,
     paddingTop: spacing.md,
   },
+  historyList: {
+    maxHeight: 180,
+  },
   historyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -596,9 +629,11 @@ const styles = StyleSheet.create({
   memberRow: {
     flexDirection: 'row',
     gap: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-    paddingTop: spacing.md,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: palette.card,
   },
   memberAvatar: {
     width: 42,
@@ -634,6 +669,30 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: '700',
   },
+  memberTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: spacing.sm,
+  },
+  mapLink: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    backgroundColor: palette.secondary,
+  },
+  mapLinkText: {
+    color: palette.navActive,
+    fontSize: 11,
+    fontWeight: '900',
+  },
   memberStatusBox: {
     gap: spacing.sm,
     marginTop: spacing.sm,
@@ -666,7 +725,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   memberStatusChoice: {
-    minWidth: '47%',
+    flexBasis: '48%',
     minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',

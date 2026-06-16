@@ -72,3 +72,14 @@ export async function saveToken(token: string) {
 export async function clearToken() {
   await deleteStoredItem(tokenKey);
 }
+
+export function storageUrl(path?: string | null) {
+  if (!path) {
+    return '';
+  }
+
+  const apiBase = String(api.defaults.baseURL || '').replace(/\/api\/v1\/?$/, '');
+  const cleanPath = path.replace(/^\/+/, '');
+
+  return `${apiBase}/storage/${cleanPath}`;
+}

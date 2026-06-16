@@ -162,7 +162,7 @@ function AuthRoutes() {
   }
 
   if (checkingSession) {
-    return <div className="screen-loader">Checking session...</div>
+    return <div className="screen-loader">Loading...</div>
   }
 
   return (

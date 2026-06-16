@@ -2,6 +2,7 @@ export const ARCHIVE_TABS = [
   { key: 'disaster-events', label: 'Disaster Event' },
   { key: 'household-status-logs', label: 'Household Status Logs' },
   { key: 'dispatch-logs', label: 'Rescue Dispatch Logs' },
+  { key: 'radio-communication-logs', label: 'Radio Logs' },
   { key: 'resource-requests', label: 'Resources & Requests' },
   { key: 'situation-reports', label: 'Situation Reporting' },
 ]
@@ -18,6 +19,10 @@ export const ARCHIVE_TABLE_COPY = {
   'dispatch-logs': {
     title: 'Rescue dispatch status logs',
     subtitle: 'Team routes, status changes, areas covered, and outcomes',
+  },
+  'radio-communication-logs': {
+    title: 'Radio communication logs',
+    subtitle: 'Team voice clips and field signals saved during the event',
   },
   'resource-requests': {
     title: 'Resources and requests archive',
@@ -54,6 +59,14 @@ export const ARCHIVE_COLUMNS = {
     { key: 'status', label: 'Status' },
     { key: 'outcome', label: 'Outcome entry' },
   ],
+  'radio-communication-logs': [
+    { key: 'datetime', label: 'Date / time' },
+    { key: 'event', label: 'Event' },
+    { key: 'transmission', label: 'Transmission' },
+    { key: 'team', label: 'Team' },
+    { key: 'channel', label: 'Channel' },
+    { key: 'status', label: 'Status' },
+  ],
   'resource-requests': [
     { key: 'datetime', label: 'Date / time' },
     { key: 'event', label: 'Event' },
@@ -72,14 +85,50 @@ export const ARCHIVE_COLUMNS = {
   ],
 }
 
-export function archiveParams({ search, purok, eventId, status }) {
+export function archiveParams({ search, purok, eventId, status, page = 1 }) {
   return {
     search: search.trim(),
     purok,
     event_id: eventId,
     status,
-    per_page: 25,
+    page,
+    per_page: 6,
   }
+}
+
+export function archiveDateLabel(record = {}) {
+  const rawDate = record.datetime || record.sitrep?.meta || record.period?.title || record.event?.meta || ''
+  const text = String(rawDate)
+    .replace(/^Generated\s+/i, '')
+    .split(' - ')[0]
+    .replace(/\s+\d{1,2}:\d{2}\s*(AM|PM)$/i, '')
+    .trim()
+
+  return text || 'No date recorded'
+}
+
+export function archiveRecordTitle(record = {}) {
+  if (record.event?.title) {
+    return record.event.title
+  }
+
+  if (record.request?.title) {
+    return record.request.title
+  }
+
+  if (record.transmission?.title) {
+    return record.transmission.title
+  }
+
+  if (record.team_route?.title) {
+    return record.team_route.title
+  }
+
+  if (record.sitrep?.title) {
+    return record.sitrep.title
+  }
+
+  return record.event_name || record.id || 'Archive record'
 }
 
 export function archiveErrorMessage(error, fallback = 'Archive records cannot be loaded right now.') {
@@ -92,32 +141,4 @@ export function archiveFileName(category, type = 'csv') {
   const date = new Date().toISOString().slice(0, 10)
 
   return `resqperation-${category}-archive-${date}.${type}`
-}
-
-export function downloadBlob(fileName, blob) {
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-
-  link.href = url
-  link.download = fileName
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  window.URL.revokeObjectURL(url)
-}
-
-export function downloadRecordCsv(record) {
-  const details = record?.details || []
-  const rows = [['Field', 'Value'], ...details.map((item) => [item.label, item.value])]
-  const csv = rows.map((row) => row.map(csvValue).join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const fileName = `resqperation-archive-record-${record?.id || 'details'}.csv`
-
-  downloadBlob(fileName, blob)
-}
-
-function csvValue(value) {
-  const text = String(value ?? '')
-
-  return `"${text.replace(/"/g, '""')}"`
 }

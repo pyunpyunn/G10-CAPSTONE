@@ -4,7 +4,6 @@ import {
   MapPin,
   RefreshCcw,
   Route,
-  ShieldCheck,
   Users,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -17,10 +16,14 @@ import HouseholdTable from '../components/households/HouseholdTable'
 import LoadingState from '../components/ui/LoadingState'
 import Modal from '../components/ui/Modal'
 import PageHeader from '../components/ui/PageHeader'
+import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
-  csvValue,
   emptySummary,
 } from '../utils/householdStatusHelpers'
+import {
+  downloadExcelWorkbook,
+  downloadPdfReport,
+} from '../utils/exportFileHelpers'
 
 export default function HouseholdStatusPage() {
   const navigate = useNavigate()
@@ -43,6 +46,9 @@ export default function HouseholdStatusPage() {
   const meta = payload?.households?.meta || {}
   const puroks = payload?.filters?.puroks || []
   const hasActiveEvent = Boolean(payload?.active_event)
+  const isInitialLoading = isLoading && !payload
+  const isRefreshing = isLoading && Boolean(payload)
+  const hasBlockingError = error && !payload
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -66,7 +72,7 @@ export default function HouseholdStatusPage() {
           purok,
           status,
           page,
-          per_page: 20,
+          per_page: 10,
         })
 
         if (!ignore) {
@@ -100,7 +106,7 @@ export default function HouseholdStatusPage() {
         purok,
         status,
         page,
-        per_page: 20,
+        per_page: 10,
       })
       setPayload(data)
     } catch {
@@ -148,38 +154,20 @@ export default function HouseholdStatusPage() {
     setPage(1)
   }
 
-  function exportCurrentPage() {
+  function exportCurrentPage(type) {
     if (households.length === 0) {
       return
     }
 
-    const headers = ['Household ID', 'Household', 'Purok', 'People', 'Status', 'Source', 'Report Time', 'Devices', 'Battery', 'Last Location', 'Priority']
-    const rows = households.map((household) => [
-      household.household_id,
-      household.household_name,
-      household.purok,
-      household.people,
-      household.status?.label,
-      household.source?.label,
-      household.source?.datetime,
-      `${household.device?.active || 0}/${household.device?.total || 0}`,
-      household.device?.lowest_battery !== null && household.device?.lowest_battery !== undefined ? `${household.device.lowest_battery}%` : '',
-      household.location?.label,
-      household.priority?.label,
-    ])
-    const csv = [headers, ...rows]
-      .map((row) => row.map(csvValue).join(','))
-      .join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
+    const rows = householdExportRows(households)
+    const title = `Household Status - Page ${page}`
 
-    link.href = url
-    link.download = `household-status-page-${page}.csv`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    if (type === 'pdf') {
+      downloadPdfReport(`household-status-page-${page}.pdf`, title, rows)
+      return
+    }
+
+    downloadExcelWorkbook(`household-status-page-${page}.xls`, title, rows)
   }
 
   return (
@@ -192,14 +180,19 @@ export default function HouseholdStatusPage() {
               <RefreshCcw size={14} />
               Refresh
             </button>
-            <button className="btn btn-secondary btn-sm" type="button" disabled={households.length === 0} onClick={exportCurrentPage}>
+            <button className="btn btn-secondary btn-sm" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('excel')}>
               <FileDown size={14} />
-              Export CSV
+              Export Excel
+            </button>
+            <button className="btn btn-secondary btn-sm" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('pdf')}>
+              <FileDown size={14} />
+              Export PDF
             </button>
           </>
         }
       />
 
+<<<<<<< HEAD
       <div className="hh-readonly-banner">
         <span>
           <ShieldCheck size={15} />
@@ -209,9 +202,12 @@ export default function HouseholdStatusPage() {
       </div>
 
       {isLoading && <LoadingState />}
+=======
+      {isInitialLoading && <LoadingState />}
+>>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       {error && <div className="form-error">{error}</div>}
 
-      {!isLoading && !error && (
+      {!isInitialLoading && !hasBlockingError && payload && (
         <>
           {!hasActiveEvent && (
             <div className="standby-strip hh-standby-strip">
@@ -232,7 +228,16 @@ export default function HouseholdStatusPage() {
             onStatusChange={changeStatusFilter}
           />
 
-          <HouseholdTable households={households} meta={meta} onOpen={openHousehold} onPageChange={setPage} />
+          <RefreshOverlay active={isRefreshing}>
+            <HouseholdTable
+              households={households}
+              meta={meta}
+              selectedPurok={purok}
+              onOpen={openHousehold}
+              onPageChange={setPage}
+              onDispatchPurok={() => navigate('/dispatch')}
+            />
+          </RefreshOverlay>
           <HouseholdOpsPanels activities={payload?.recent_activity || []} rows={payload?.purok_summary || []} />
         </>
       )}
@@ -263,7 +268,11 @@ export default function HouseholdStatusPage() {
           )
         }
       >
+<<<<<<< HEAD
         {isDetailLoading && <LoadingState />}
+=======
+        {isDetailLoading && <LoadingState inline />}
+>>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
         {detailError && <div className="form-error">{detailError}</div>}
         {!isDetailLoading && detail?.household && (
           <HouseholdDetailContent detail={detail} history={history} />
@@ -271,4 +280,22 @@ export default function HouseholdStatusPage() {
       </Modal>
     </section>
   )
+}
+
+function householdExportRows(households) {
+  const headers = ['Household ID', 'Household', 'Purok', 'People', 'Status', 'Source', 'Report Time', 'Devices', 'Battery', 'Last Location']
+  const rows = households.map((household) => [
+    household.household_id,
+    household.household_name,
+    household.purok,
+    household.people,
+    household.status?.label,
+    household.source?.label,
+    household.source?.datetime,
+    `${household.device?.active || 0}/${household.device?.total || 0}`,
+    household.device?.lowest_battery !== null && household.device?.lowest_battery !== undefined ? `${household.device.lowest_battery}%` : '',
+    household.location?.label,
+  ])
+
+  return [headers, ...rows]
 }

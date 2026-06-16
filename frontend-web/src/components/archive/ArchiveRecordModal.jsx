@@ -42,9 +42,9 @@ export default function ArchiveRecordModal({ record, categoryLabel, onClose, onD
             <Download size={14} />
             PDF
           </button>
-          <button className="btn btn-secondary btn-sm" type="button" onClick={() => onDownload('csv')}>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={() => onDownload('excel')}>
             <Download size={14} />
-            CSV
+            Excel
           </button>
           <button className="btn btn-primary btn-sm" type="button" onClick={onClose}>
             <CheckCircle2 size={14} />
@@ -61,6 +61,7 @@ function recordTitle(record) {
   return record?.event?.title
     || record?.household?.title
     || record?.team_route?.title
+    || record?.transmission?.title
     || record?.request?.title
     || record?.sitrep?.title
     || 'Archive record'

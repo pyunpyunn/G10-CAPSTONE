@@ -6,7 +6,10 @@ use App\Services\BarangayProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class ArchiveService
@@ -15,6 +18,7 @@ class ArchiveService
         'disaster-events' => 'Disaster Event',
         'household-status-logs' => 'Household Status Logs',
         'dispatch-logs' => 'Rescue Dispatch Logs',
+        'radio-communication-logs' => 'Radio Communication Logs',
         'resource-requests' => 'Resources & Requests',
         'situation-reports' => 'Situation Reporting',
     ];
@@ -45,6 +49,13 @@ class ArchiveService
         [$paginator, $records] = $this->dispatchRows($request);
 
         return $this->archiveResponse('dispatch-logs', $paginator, $records);
+    }
+
+    public function radioCommunicationLogs(Request $request): JsonResponse
+    {
+        [$paginator, $records] = $this->radioCommunicationRows($request);
+
+        return $this->archiveResponse('radio-communication-logs', $paginator, $records);
     }
 
     public function resourceRequests(Request $request): JsonResponse
@@ -117,11 +128,367 @@ class ArchiveService
         ]);
     }
 
+    public function deleteSelected(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'category' => ['required', 'string'],
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['required'],
+        ]);
+
+        $category = (string) $validated['category'];
+        $deleteMap = $this->deleteMap();
+
+        if (! array_key_exists($category, $deleteMap)) {
+            return response()->json([
+                'message' => 'Select a valid archive log category before deleting.',
+            ], 422);
+        }
+
+        $table = $deleteMap[$category]['table'];
+        $key = $deleteMap[$category]['key'];
+
+        if (! Schema::hasTable($table)) {
+            return response()->json([
+                'message' => "The {$table} table is not available right now.",
+            ], 503);
+        }
+
+        $ids = collect($validated['ids'])
+            ->map(fn (mixed $id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($ids)) {
+            return response()->json([
+                'message' => 'Select at least one archive log before deleting.',
+            ], 422);
+        }
+
+        try {
+            if ($category === 'disaster-events' && Schema::hasColumn($table, 'deleted_at')) {
+                $deletedCount = DB::table($table)
+                    ->whereIn($key, $ids)
+                    ->update([
+                        'deleted_at' => now(),
+                    ]);
+            } else {
+                $deletedCount = DB::table($table)
+                    ->whereIn($key, $ids)
+                    ->delete();
+            }
+        } catch (QueryException) {
+            return response()->json([
+                'message' => 'Selected logs cannot be deleted because another table is still linked to them. Remove the related child records first or keep them in a saved archive group.',
+            ], 409);
+        }
+
+        return response()->json([
+            'message' => 'Selected archive logs deleted forever.',
+            'data' => [
+                'category' => $category,
+                'deleted_count' => $deletedCount,
+            ],
+        ]);
+    }
+
+    public function savedGroups(Request $request): JsonResponse
+    {
+        $unavailableMessage = $this->archiveGroupStorageMessage();
+
+        if ($unavailableMessage !== '') {
+            return response()->json([
+                'success' => false,
+                'message' => $unavailableMessage,
+                'data' => [
+                    'groups' => [],
+                ],
+            ], 503);
+        }
+
+        $groups = DB::table('incident_archives')
+            ->where('archive_type', 'saved_log_group')
+            ->orderByDesc('archived_at')
+            ->orderByDesc('archive_id')
+            ->limit(50)
+            ->get()
+            ->map(fn (object $row): array => $this->savedGroupFromRow($row))
+            ->values()
+            ->all();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Saved archive groups loaded.',
+            'data' => [
+                'groups' => $groups,
+            ],
+        ]);
+    }
+
+    public function storeSavedGroup(Request $request): JsonResponse
+    {
+        $unavailableMessage = $this->archiveGroupStorageMessage();
+
+        if ($unavailableMessage !== '') {
+            return response()->json([
+                'success' => false,
+                'message' => $unavailableMessage,
+            ], 503);
+        }
+
+        $validated = $request->validate([
+            'category' => ['required', 'string', Rule::in(array_keys(self::CATEGORIES))],
+            'records' => ['required', 'array', 'min:1', 'max:100'],
+            'records.*.id' => ['required'],
+        ]);
+
+        $now = now();
+        $groupId = 'AG-'.$now->format('Ymd-His').'-'.strtoupper(substr(md5((string) microtime(true)), 0, 6));
+        $records = collect($validated['records'])
+            ->map(fn (mixed $record): array => is_array($record) ? $record : [])
+            ->filter(fn (array $record): bool => trim((string) ($record['id'] ?? '')) !== '')
+            ->values()
+            ->all();
+
+        if (empty($records)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Select at least one valid archive record before saving a group.',
+            ], 422);
+        }
+
+        $archiveNote = json_encode([
+            'category' => $validated['category'],
+            'records' => $records,
+        ]);
+
+        $group = DB::transaction(function () use ($request, $validated, $groupId, $archiveNote, $now): array {
+            $archiveId = ((int) DB::table('incident_archives')->lockForUpdate()->max('archive_id')) + 1;
+            $insertData = [
+                'archive_id' => $archiveId,
+                'archive_type' => 'saved_log_group',
+                'reference_table' => $validated['category'],
+                'reference_id' => $groupId,
+                'archive_note' => $archiveNote,
+                'archived_at' => $now,
+            ];
+
+            if (Schema::hasColumn('incident_archives', 'archived_by_admin_id')) {
+                $insertData['archived_by_admin_id'] = $request->user()?->user_id;
+            }
+
+            if (Schema::hasColumn('incident_archives', 'created_at')) {
+                $insertData['created_at'] = $now;
+            }
+
+            if (Schema::hasColumn('incident_archives', 'disaster_id')) {
+                $insertData['disaster_id'] = null;
+            }
+
+            DB::table('incident_archives')->insert($insertData);
+
+            $row = DB::table('incident_archives')
+                ->where('archive_id', $archiveId)
+                ->first();
+
+            return $this->savedGroupFromRow($row);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Selected archive logs saved to a database group.',
+            'data' => [
+                'group' => $group,
+            ],
+        ], 201);
+    }
+
+    public function deleteSavedGroup(string $groupId): JsonResponse
+    {
+        $unavailableMessage = $this->archiveGroupStorageMessage();
+
+        if ($unavailableMessage !== '') {
+            return response()->json([
+                'success' => false,
+                'message' => $unavailableMessage,
+            ], 503);
+        }
+
+        DB::table('incident_archives')
+            ->where('archive_type', 'saved_log_group')
+            ->where('reference_id', $groupId)
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Saved archive group deleted.',
+            'data' => [
+                'group_id' => $groupId,
+            ],
+        ]);
+    }
+
+    public function deleteSavedGroupRecord(string $groupId, string $recordId): JsonResponse
+    {
+        $unavailableMessage = $this->archiveGroupStorageMessage();
+
+        if ($unavailableMessage !== '') {
+            return response()->json([
+                'success' => false,
+                'message' => $unavailableMessage,
+            ], 503);
+        }
+
+        $row = DB::table('incident_archives')
+            ->where('archive_type', 'saved_log_group')
+            ->where('reference_id', $groupId)
+            ->first();
+
+        if (! $row) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Saved archive group was not found.',
+            ], 404);
+        }
+
+        $group = $this->savedGroupFromRow($row);
+        $remainingRecords = collect($group['records'])
+            ->filter(fn (array $record): bool => (string) ($record['id'] ?? '') !== (string) $recordId)
+            ->values()
+            ->all();
+
+        if (empty($remainingRecords)) {
+            DB::table('incident_archives')
+                ->where('archive_type', 'saved_log_group')
+                ->where('reference_id', $groupId)
+                ->delete();
+        } else {
+            DB::table('incident_archives')
+                ->where('archive_type', 'saved_log_group')
+                ->where('reference_id', $groupId)
+                ->update([
+                    'archive_note' => json_encode([
+                        'category' => $group['category'],
+                        'records' => $remainingRecords,
+                    ]),
+                ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Saved archive log removed from the group.',
+            'data' => [
+                'group_id' => $groupId,
+                'record_id' => $recordId,
+            ],
+        ]);
+    }
+
+    private function archiveGroupStorageMessage(): string
+    {
+        if (! Schema::hasTable('incident_archives')) {
+            return 'Saved archive groups cannot be used because the incident_archives table is not available.';
+        }
+
+        $requiredColumns = [
+            'archive_id',
+            'archive_type',
+            'reference_table',
+            'reference_id',
+            'archive_note',
+            'archived_at',
+        ];
+
+        foreach ($requiredColumns as $column) {
+            if (! Schema::hasColumn('incident_archives', $column)) {
+                return 'Saved archive groups need the approved incident_archives archive_type/reference columns before they can save to the shared database.';
+            }
+        }
+
+        return '';
+    }
+
+    private function savedGroupFromRow(?object $row): array
+    {
+        $payload = json_decode((string) ($row?->archive_note ?? ''), true);
+
+        if (! is_array($payload)) {
+            $payload = [];
+        }
+
+        $category = (string) ($row?->reference_table ?: ($payload['category'] ?? 'disaster-events'));
+        $records = collect($payload['records'] ?? [])
+            ->map(fn (mixed $record): array => is_array($record) ? $record : [])
+            ->filter(fn (array $record): bool => trim((string) ($record['id'] ?? '')) !== '')
+            ->values()
+            ->all();
+
+        return [
+            'id' => (string) ($row?->reference_id ?: $row?->archive_id),
+            'category' => array_key_exists($category, self::CATEGORIES) ? $category : 'disaster-events',
+            'savedAt' => $this->formatSavedGroupDate($row?->archived_at),
+            'records' => $records,
+        ];
+    }
+
+    private function formatSavedGroupDate(mixed $date): string
+    {
+        if (! $date) {
+            return now('Asia/Manila')->format('M d, Y, g:i A');
+        }
+
+        return Carbon::parse($date)
+            ->timezone('Asia/Manila')
+            ->format('M d, Y, g:i A');
+    }
+
+    private function excludeSavedGroupRecords(object $query, string $category, string $column): void
+    {
+        $ids = $this->savedGroupRecordIds($category);
+
+        if (empty($ids)) {
+            return;
+        }
+
+        $query->whereNotIn($column, $ids);
+    }
+
+    private function savedGroupRecordIds(string $category): array
+    {
+        if ($this->archiveGroupStorageMessage() !== '') {
+            return [];
+        }
+
+        return DB::table('incident_archives')
+            ->where('archive_type', 'saved_log_group')
+            ->where('reference_table', $category)
+            ->pluck('archive_note')
+            ->flatMap(function (?string $note): array {
+                $payload = json_decode((string) $note, true);
+
+                if (! is_array($payload) || ! is_array($payload['records'] ?? null)) {
+                    return [];
+                }
+
+                return collect($payload['records'])
+                    ->map(fn (mixed $record): string => is_array($record) ? trim((string) ($record['id'] ?? '')) : '')
+                    ->filter()
+                    ->values()
+                    ->all();
+            })
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     private function categoryRows(string $category, Request $request, int $perPage): array
     {
         return match ($category) {
             'household-status-logs' => $this->householdStatusRows($request, $perPage),
             'dispatch-logs' => $this->dispatchRows($request, $perPage),
+            'radio-communication-logs' => $this->radioCommunicationRows($request, $perPage),
             'resource-requests' => $this->resourceRequestRows($request, $perPage),
             'situation-reports' => $this->situationReportRows($request, $perPage),
             default => $this->disasterEventRows($request, $perPage),
@@ -141,6 +508,7 @@ class ArchiveService
                     'data' => $records,
                     'current_page' => $paginator->currentPage(),
                     'per_page' => $paginator->perPage(),
+                    'last_page' => $paginator->lastPage(),
                     'total' => $paginator->total(),
                     'from' => $paginator->firstItem(),
                     'to' => $paginator->lastItem(),
@@ -180,6 +548,7 @@ class ArchiveService
         $this->applyEventFilter($query, $request, 'de.event_id');
         $this->applyDisasterStatusFilter($query, $request);
         $this->applyDisasterPurokFilter($query, $request);
+        $this->excludeSavedGroupRecords($query, 'disaster-events', 'de.event_id');
 
         $paginator = $query
             ->orderByDesc('de.started_at')
@@ -227,6 +596,7 @@ class ArchiveService
         $this->applyEventFilter($query, $request, 'hsl.disaster_id');
         $this->applyPurokFilter($query, $request, 'a.purok_sitio');
         $this->applyHouseholdStatusFilter($query, $request);
+        $this->excludeSavedGroupRecords($query, 'household-status-logs', 'hsl.status_log_id');
 
         $paginator = $query
             ->orderByDesc('hsl.submitted_at')
@@ -271,6 +641,7 @@ class ArchiveService
         $this->applyEventFilter($query, $request, 'ra.disaster_id');
         $this->applyPurokFilter($query, $request, 'ra.assigned_area');
         $this->applyDispatchStatusFilter($query, $request);
+        $this->excludeSavedGroupRecords($query, 'dispatch-logs', 'ra.assignment_id');
 
         $paginator = $query
             ->orderByDesc('ra.assigned_at')
@@ -319,6 +690,7 @@ class ArchiveService
         $this->applyEventFilter($query, $request, 'rr.source_reference');
         $this->applyResourcePurokFilter($query, $request);
         $this->applyResourceStatusFilter($query, $request);
+        $this->excludeSavedGroupRecords($query, 'resource-requests', 'rr.request_id');
 
         $paginator = $query
             ->orderByDesc('rr.created_at')
@@ -326,6 +698,49 @@ class ArchiveService
 
         $records = collect($paginator->items())
             ->map(fn (object $row): array => $this->formatResourceRequest($row))
+            ->values()
+            ->all();
+
+        return [$paginator, $records];
+    }
+
+    private function radioCommunicationRows(Request $request, int $perPage = 25): array
+    {
+        $query = DB::table('responder_communication_logs as rcl')
+            ->leftJoin('disaster_events as de', 'de.event_id', '=', 'rcl.disaster_id')
+            ->leftJoin('responders as r', 'r.responder_id', '=', 'rcl.responder_id')
+            ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'rcl.team_id')
+            ->select([
+                'rcl.*',
+                'de.name as event_name',
+                'de.started_at as event_started_at',
+                'de.ended_at as event_ended_at',
+                'r.full_name as responder_name',
+                'r.responder_code',
+                'rt.team_code',
+                'rt.team_type',
+            ]);
+
+        $this->applySearch($query, $request, [
+            'rcl.communication_id',
+            'rcl.team_name',
+            'rcl.message',
+            'de.name',
+            'r.full_name',
+            'r.responder_code',
+            'rt.team_code',
+        ]);
+        $this->applyEventFilter($query, $request, 'rcl.disaster_id');
+        $this->applyRadioStatusFilter($query, $request);
+        $this->excludeSavedGroupRecords($query, 'radio-communication-logs', 'rcl.communication_id');
+
+        $paginator = $query
+            ->orderByDesc('rcl.timestamp')
+            ->orderByDesc('rcl.communication_id')
+            ->paginate($this->perPage($request, $perPage));
+
+        $records = collect($paginator->items())
+            ->map(fn (object $row): array => $this->formatRadioCommunication($row))
             ->values()
             ->all();
 
@@ -357,6 +772,7 @@ class ArchiveService
         $this->applyEventFilter($query, $request, 'sr.disaster_id');
         $this->applySituationPurokFilter($query, $request);
         $this->applySituationStatusFilter($query, $request);
+        $this->excludeSavedGroupRecords($query, 'situation-reports', 'sr.sit_rep_id');
 
         $paginator = $query
             ->orderByDesc('sr.generated_at')
@@ -613,6 +1029,68 @@ class ArchiveService
         ];
 
         return $record;
+    }
+
+    private function formatRadioCommunication(object $row): array
+    {
+        $message = $this->decodeJson($row->message);
+        $type = (string) ($message['type'] ?? 'message');
+        $channel = (string) ($message['channel'] ?? 'team');
+        $typeLabel = $this->radioTypeLabel($type, $message);
+        $responderName = $row->responder_name ?: ($message['responder_name'] ?? 'Responder');
+        $eventName = $row->event_name ?: ($message['event_name'] ?? 'No active event');
+        $teamName = $row->team_name ?: ($message['team_name'] ?? 'Assigned team');
+
+        return [
+            'id' => $row->communication_id,
+            'event_id' => $row->disaster_id,
+            'event_name' => $eventName,
+            'status_key' => $type,
+            'datetime' => $this->formatDateTime($row->timestamp),
+            'event' => [
+                'title' => $eventName,
+                'meta' => $row->disaster_id ? 'Event ID '.$row->disaster_id : 'General radio log',
+            ],
+            'team_route' => [
+                'title' => $teamName,
+                'meta' => trim(($row->team_code ?: 'Team').' - '.$responderName),
+            ],
+            'channel' => [
+                'title' => $this->radioChannelLabel($channel),
+                'meta' => $typeLabel,
+            ],
+            'transmission' => [
+                'title' => $this->radioDisplayMessage($type, $message, $responderName),
+                'meta' => $message['transmission_id'] ?? 'Signal / metadata log',
+            ],
+            'status' => [
+                'label' => $typeLabel,
+                'tone' => $this->statusTone($type),
+            ],
+            'details' => $this->details([
+                'Communication ID' => $row->communication_id,
+                'Date / time' => $this->formatDateTime($row->timestamp),
+                'Event' => $eventName,
+                'Responder' => $responderName,
+                'Responder code' => $row->responder_code ?: ($message['responder_code'] ?? 'Not recorded'),
+                'Team' => $teamName,
+                'Channel' => $this->radioChannelLabel($channel),
+                'Type' => $typeLabel,
+                'Transmission ID' => $message['transmission_id'] ?? 'Not recorded',
+                'Duration' => isset($message['duration_seconds']) ? ((int) $message['duration_seconds']).' seconds' : 'Not recorded',
+                'Signal' => $message['signal'] ?? 'Not recorded',
+                'Audio status' => $message['audio_status'] ?? 'Metadata only',
+            ]),
+            'export' => [
+                'datetime' => $this->formatDateTime($row->timestamp),
+                'event' => $eventName,
+                'reference' => 'COM-'.$row->communication_id,
+                'team_responder' => $teamName.' - '.$responderName,
+                'channel' => $this->radioChannelLabel($channel),
+                'transmission' => $this->radioDisplayMessage($type, $message, $responderName),
+                'status' => $typeLabel,
+            ],
+        ];
     }
 
     private function formatSituationReport(object $row): array
@@ -982,6 +1460,15 @@ class ArchiveService
                 'status' => 'Status',
                 'outcome' => 'Outcome',
             ],
+            'radio-communication-logs' => [
+                'datetime' => 'Date / time',
+                'event' => 'Event',
+                'reference' => 'Reference',
+                'team_responder' => 'Team / responder',
+                'channel' => 'Channel',
+                'transmission' => 'Transmission',
+                'status' => 'Status',
+            ],
             'resource-requests' => [
                 'datetime' => 'Date / time',
                 'event' => 'Event',
@@ -1051,7 +1538,37 @@ class ArchiveService
 
     private function perPage(Request $request, int $fallback): int
     {
-        return min(1000, max(10, (int) $request->query('per_page', $fallback)));
+        return min(1000, max(6, (int) $request->query('per_page', $fallback)));
+    }
+
+    private function deleteMap(): array
+    {
+        return [
+            'disaster-events' => [
+                'table' => 'disaster_events',
+                'key' => 'event_id',
+            ],
+            'household-status-logs' => [
+                'table' => 'household_status_logs',
+                'key' => 'status_log_id',
+            ],
+            'dispatch-logs' => [
+                'table' => 'responder_assignments',
+                'key' => 'assignment_id',
+            ],
+            'radio-communication-logs' => [
+                'table' => 'responder_communication_logs',
+                'key' => 'communication_id',
+            ],
+            'resource-requests' => [
+                'table' => 'resource_requests',
+                'key' => 'request_id',
+            ],
+            'situation-reports' => [
+                'table' => 'situation_reports',
+                'key' => 'sit_rep_id',
+            ],
+        ];
     }
 
     private function statusKey(?string $status): string
@@ -1076,9 +1593,53 @@ class ArchiveService
         return match ($key) {
             'safe', 'evacuated', 'verified', 'forwarded', 'fulfilled', 'completed', 'on_scene', 'returned_home', 'generated' => 'green',
             'active', 'dispatched', 'en_route', 'needs_validation', 'pending', 'assigned' => 'amber',
-            'unsafe', 'injured', 'missing', 'not_evacuated', 'displaced', 'returned', 'cancelled', 'failed', 'critical' => 'red',
+            'unsafe', 'injured', 'missing', 'not_evacuated', 'displaced', 'returned', 'cancelled', 'failed', 'critical', 'ptt_start', 'ptt_heartbeat' => 'red',
             'reviewed', 'archived' => 'purple',
             default => 'gray',
+        };
+    }
+
+    private function applyRadioStatusFilter(object $query, Request $request): void
+    {
+        $status = $this->statusKey($request->query('status', 'all'));
+
+        if ($status === 'all') {
+            return;
+        }
+
+        $query->where('rcl.message', 'like', '%"type":"'.$status.'"%');
+    }
+
+    private function radioDisplayMessage(string $type, array $message, string $responderName): string
+    {
+        return match ($type) {
+            'ptt_start' => $responderName.' started PTT',
+            'ptt_heartbeat' => $responderName.' was transmitting',
+            'ptt_audio' => $responderName.' sent a voice clip',
+            'ptt_end' => $responderName.' ended PTT after '.((int) ($message['duration_seconds'] ?? 0)).'s',
+            'quick_signal' => $responderName.' sent "'.((string) ($message['signal'] ?? 'Signal')).'"',
+            default => (string) ($message['text'] ?? $responderName.' sent a radio log'),
+        };
+    }
+
+    private function radioTypeLabel(string $type, array $message): string
+    {
+        return match ($type) {
+            'ptt_start' => 'PTT started',
+            'ptt_heartbeat' => 'PTT active',
+            'ptt_audio' => 'Voice clip',
+            'ptt_end' => 'PTT ended',
+            'quick_signal' => (string) ($message['signal'] ?? 'Signal'),
+            default => 'Radio log',
+        };
+    }
+
+    private function radioChannelLabel(string $channel): string
+    {
+        return match ($channel) {
+            'command' => 'HQ Command',
+            'event' => 'Event',
+            default => 'Team',
         };
     }
 

@@ -25,3 +25,22 @@ export async function deactivateRescuer(responderId) {
   return response.data.data
 }
 
+export async function getRescueTeamConfig() {
+  const response = await api.get('/rescuers/team-config')
+  return response.data.data
+}
+
+export async function createRescueTeam(payload) {
+  const response = await api.post('/rescuers/team-config', payload)
+  return response.data.data
+}
+
+export async function updateRescueTeam(teamId, payload) {
+  const response = await api.patch(`/rescuers/team-config/${teamId}`, payload)
+  return response.data.data
+}
+
+export async function deleteRescueTeam(teamId) {
+  const response = await api.delete(`/rescuers/team-config/${teamId}`)
+  return response.data.data
+}

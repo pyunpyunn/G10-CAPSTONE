@@ -168,6 +168,7 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
 
       <View style={styles.card}>
         <HouseholdSection title="Device user" />
+        <Text style={styles.helperText}>Choose the member using this phone so HQ can see the correct device, battery, and last location.</Text>
         <View style={styles.choiceGrid}>
           {members.map((member: any) => (
             <Pressable
@@ -317,4 +318,42 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
   },
+<<<<<<< HEAD
+=======
+  helperText: {
+    color: palette.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '800',
+  },
+  photoRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'center',
+  },
+  photoPreview: {
+    width: 82,
+    height: 82,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.lg,
+    backgroundColor: palette.secondary,
+    overflow: 'hidden',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+  },
+  photoActions: {
+    flex: 1,
+    gap: 6,
+  },
+  photoTitle: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+>>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 });

@@ -26,13 +26,14 @@ import type { RescuerOverview } from '@/api/rescuer';
 import { FieldReportScreen } from '@/components/rescuer/FieldReportScreen';
 import { RescuerDashboardScreen } from '@/components/rescuer/RescuerDashboardScreen';
 import { RescuerHeader } from '@/components/rescuer/RescuerHeader';
+import { RadioCommunicationScreen } from '@/components/rescuer/RadioCommunicationScreen';
 import { RescueMapScreen } from '@/components/rescuer/RescueMapScreen';
 import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScreen';
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
 import { LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 
-type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile';
+type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 
 const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; special?: boolean }[] = [
   { key: 'dashboard', label: 'Home', icon: 'home-outline' },
@@ -95,7 +96,17 @@ export default function RescuerHomeScreen() {
         return;
       }
 
+<<<<<<< HEAD
       await updateAssignmentStatus(assignmentId, status, payload);
+=======
+      if (status === 'en_route') {
+        await updateAssignmentStatus(assignmentId, 'en_route', payload);
+        await updateAssignmentStatus(assignmentId, 'on_scene', payload);
+      } else {
+        await updateAssignmentStatus(assignmentId, status, payload);
+      }
+
+>>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       await loadOverview(true);
 
       if (['accepted', 'en_route'].includes(status)) {
@@ -226,14 +237,17 @@ export default function RescuerHomeScreen() {
       );
     }
 
+    if (activeTab === 'radio') {
+      return <RadioCommunicationScreen overview={overview} />;
+    }
+
     return <ResponderProfileScreen profile={overview.profile} onSaveProfile={handleUpdateProfile} onLogout={handleLogout} />;
   }
 
   return (
     <SafeAreaView style={styles.safe}>
       <RescuerHeader
-        onRefresh={() => loadOverview(true)}
-        onLogout={handleLogout}
+        onOpenRadio={() => setActiveTab('radio')}
       />
 
       <ScrollView
