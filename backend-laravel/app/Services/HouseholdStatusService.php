@@ -21,7 +21,7 @@ class HouseholdStatusService
 
         $households = $query
             ->orderByRaw('CASE WHEN hd.needs_dispatch = 1 THEN 0 ELSE 1 END')
-            ->orderByRaw('CASE WHEN hs.status_key IN ("not_evacuated", "displaced", "unsafe", "missing", "injured") THEN 0 ELSE 1 END')
+            ->orderByRaw('CASE WHEN hs.status_key IN ("not_evacuated", "displaced", "unsafe", "needs_help", "need_help", "needs_assistance", "missing", "injured") THEN 0 ELSE 1 END')
             ->orderByDesc('hd.last_reported_at')
             ->orderBy('h.household_name')
             ->paginate($perPage);
@@ -364,7 +364,7 @@ class HouseholdStatusService
         }
 
         if ($status === 'unsafe') {
-            $query->whereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured']);
+            $query->whereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
         }
 
         if ($status === 'device' || $deviceRisk === 'watch') {
@@ -391,7 +391,7 @@ class HouseholdStatusService
             $query->where(function ($urgentQuery): void {
                 $urgentQuery
                     ->where('hd.needs_dispatch', true)
-                    ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'])
+                    ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'])
                     ->orWhere(function ($criticalDevice): void {
                         $criticalDevice
                             ->where('devices.device_total', '>', 0)
@@ -432,7 +432,7 @@ class HouseholdStatusService
 
         $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
-        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured']);
+        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
         $safeTotal = $safeOnly + $evacuated;
 
         $reported = DB::table('household_disasters')
@@ -460,7 +460,7 @@ class HouseholdStatusService
                 ->where(function ($query): void {
                     $query
                         ->where('hd.needs_dispatch', true)
-                        ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured']);
+                        ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
                 })
                 ->count(),
         ];
@@ -475,7 +475,7 @@ class HouseholdStatusService
             ->map(function ($items, string $purok): array {
                 $total = $items->count();
                 $reported = $items->whereNotNull('current_status_id')->count();
-                $unsafe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'], true))->count();
+                $unsafe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'], true))->count();
                 $deviceRisk = $items->filter(function (object $item): bool {
                     return (int) $item->device_total > 0 && ((int) $item->lowest_battery <= 25 || $this->isStale($item->latest_device_seen_at));
                 })->count();
@@ -842,7 +842,7 @@ class HouseholdStatusService
 
         if (in_array($statusKey, ['not_evacuated', 'displaced', 'unsafe'], true)) {
             $key = 'unsafe';
-            $label = 'Unsafe';
+            $label = str_contains(strtolower($label), 'help') || str_contains(strtolower($label), 'assist') ? 'Needs help' : 'Unsafe';
         }
 
         if (in_array($statusKey, ['needs_help', 'need_help', 'needs_assistance', 'injured', 'missing'], true)) {
@@ -910,7 +910,7 @@ class HouseholdStatusService
             return ['key' => 'standby', 'label' => 'Standby'];
         }
 
-        if ($needsDispatch || in_array($statusKey, ['unsafe', 'missing', 'injured'], true) || $deviceRisk === 'critical') {
+        if ($needsDispatch || in_array($statusKey, ['unsafe', 'needs-help', 'missing', 'injured'], true) || $deviceRisk === 'critical') {
             return ['key' => 'urgent', 'label' => 'Dispatch focus'];
         }
 

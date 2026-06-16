@@ -63,18 +63,30 @@ export default function DispatchModalForm({
 
 function RiskAreaSelector({ areas, selectedRiskId, onSelect }) {
   const [draftAreaId, setDraftAreaId] = useState(selectedRiskId || '')
+  const [householdPage, setHouseholdPage] = useState(1)
 
   if (areas.length === 0) {
     return <EmptyState title="No dispatch area yet" message="Areas appear after households send disaster status." />
   }
 
   const selectedArea = areas.find((area) => area.id === draftAreaId)
+  const households = selectedArea?.households || []
+  const householdsPerPage = 6
+  const totalHouseholdPages = Math.max(1, Math.ceil(households.length / householdsPerPage))
+  const currentHouseholdPage = Math.min(householdPage, totalHouseholdPages)
+  const visibleHouseholds = households.slice((currentHouseholdPage - 1) * householdsPerPage, currentHouseholdPage * householdsPerPage)
 
   return (
     <div className="dp-risk-selector">
       <label>
         <span className="form-label">Select purok</span>
-        <select value={draftAreaId} onChange={(event) => setDraftAreaId(event.target.value)}>
+        <select
+          value={draftAreaId}
+          onChange={(event) => {
+            setDraftAreaId(event.target.value)
+            setHouseholdPage(1)
+          }}
+        >
           <option value="">Choose affected purok</option>
           {areas.map((area) => (
             <option value={area.id} key={area.id}>
@@ -101,6 +113,14 @@ function RiskAreaSelector({ areas, selectedRiskId, onSelect }) {
             <RiskMetric label="Unchecked" value={selectedArea.unchecked_households} />
             <RiskMetric label="Safe HH" value={selectedArea.safe_households} />
           </div>
+          <HouseholdPreviewList
+            households={visibleHouseholds}
+            currentPage={currentHouseholdPage}
+            totalPages={totalHouseholdPages}
+            total={households.length}
+            onPrev={() => setHouseholdPage((value) => Math.max(1, value - 1))}
+            onNext={() => setHouseholdPage((value) => Math.min(totalHouseholdPages, value + 1))}
+          />
           <div className="dp-risk-actions">
             <button className="btn btn-secondary btn-sm" type="button" onClick={() => onSelect(selectedArea)}>
               Select purok
@@ -109,6 +129,49 @@ function RiskAreaSelector({ areas, selectedRiskId, onSelect }) {
         </article>
       ) : (
         <div className="dp-household-empty">Choose one purok to prepare a dispatch assignment.</div>
+      )}
+    </div>
+  )
+}
+
+function HouseholdPreviewList({ households, currentPage, totalPages, total, onPrev, onNext }) {
+  return (
+    <div className="dp-household-preview">
+      <div className="dp-household-target-head">
+        <span>Households in this purok</span>
+        <small>{total} household{total === 1 ? '' : 's'}</small>
+      </div>
+
+      {households.length === 0 ? (
+        <div className="dp-household-empty">No household records found for this purok.</div>
+      ) : (
+        <div className="dp-household-preview-list">
+          {households.map((household) => (
+            <div className="dp-household-preview-item" key={household.household_id}>
+              <div>
+                <strong>{household.household_name}</strong>
+                <span>{household.household_id}</span>
+                {household.address && <small>{household.address}</small>}
+              </div>
+              <div className="dp-household-badges">
+                <span className={`dp-mini-pill ${household.has_geotag ? 'ok' : 'muted'}`}>{household.has_geotag ? 'GPS' : 'No GPS'}</span>
+                <span className={`dp-mini-pill ${household.is_available_for_dispatch ? '' : 'busy'}`}>
+                  {household.is_available_for_dispatch ? household.status_label : 'Assigned'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="dp-mini-pagination compact">
+          <span>Page {currentPage} of {totalPages}</span>
+          <div>
+            <button type="button" disabled={currentPage === 1} onClick={onPrev}>Prev</button>
+            <button type="button" disabled={currentPage === totalPages} onClick={onNext}>Next</button>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -134,7 +197,7 @@ function PlanStats({ form }) {
 }
 
 function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOption, teams, responders, editingDispatch }) {
-  const outcomeDisabled = form.status !== 'on_scene'
+  const outcomeDisabled = !['on_scene', 'completed'].includes(form.status)
   const isEditing = Boolean(editingDispatch)
   const selectedTeamId = getSelectedTeamId(assignmentOption)
   const availableTeams = teams.filter((team) => team.team_id && team.is_available)

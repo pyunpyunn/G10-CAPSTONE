@@ -24,8 +24,6 @@ export default function RescuerRosterTable({ rescuers, pagination, onView, onEdi
                 <th>Responder</th>
                 <th>Team / role</th>
                 <th>Contact / ICE</th>
-                <th>Credentials</th>
-                <th>Equipment</th>
                 <th>Duty status</th>
                 <th />
               </tr>
@@ -44,14 +42,6 @@ export default function RescuerRosterTable({ rescuers, pagination, onView, onEdi
                   <td>
                     <span className="ra-mono">{rescuer.contact_number || '-'}</span>
                     <div className="ra-meta">ICE: {rescuer.emergency_contact_name || 'Not recorded'}</div>
-                  </td>
-                  <td>
-                    {rescuer.skills || 'No skills listed'}
-                    <div className={`ra-meta ${rescuer.training_due ? 'ra-due-text' : ''}`}>{rescuer.certification_reference || rescuer.training_notes || 'No certification note'}</div>
-                  </td>
-                  <td>
-                    {rescuer.equipment_notes || 'No equipment recorded'}
-                    <div className="ra-meta">Blood type: {rescuer.blood_type}</div>
                   </td>
                   <td><Badge tone={rescuer.duty_status.tone}>{rescuer.duty_status.label}</Badge></td>
                   <td>

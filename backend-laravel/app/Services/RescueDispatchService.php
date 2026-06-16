@@ -6,10 +6,22 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class RescueDispatchService
 {
+    private const TEAM_CATALOG = [
+        ['team_name' => 'Search & Rescue', 'team_type' => 'SAR', 'team_code' => 'SAR'],
+        ['team_name' => 'Evacuation', 'team_type' => 'Evacuation', 'team_code' => 'EVC'],
+        ['team_name' => 'Medical / First Aid', 'team_type' => 'Medical', 'team_code' => 'MED'],
+        ['team_name' => 'Relief & Transport', 'team_type' => 'Relief / Transport', 'team_code' => 'LOG'],
+        ['team_name' => 'Communication', 'team_type' => 'Communication', 'team_code' => 'COM'],
+        ['team_name' => 'Fire Brigade', 'team_type' => 'Fire Brigade', 'team_code' => 'FIR'],
+        ['team_name' => 'DANA', 'team_type' => 'Damage Assessment', 'team_code' => 'DANA'],
+        ['team_name' => 'Security', 'team_type' => 'Security', 'team_code' => 'SEC'],
+    ];
+
     public function teams(): JsonResponse
     {
         $activeEvent = $this->getActiveEvent();
@@ -49,7 +61,8 @@ class RescueDispatchService
                             'to' => null,
                         ],
                     ],
-                    'activity_log' => collect(),
+                    'activity_log' => $this->getDispatchActivity(null),
+                    'dispatch_history' => $this->getDispatchActivity(null, 50),
                 ],
             ]);
         }
@@ -112,6 +125,7 @@ class RescueDispatchService
                     ],
                 ],
                 'activity_log' => $this->getDispatchActivity($eventId),
+                'dispatch_history' => $this->getDispatchActivity(null, 50),
             ],
         ]);
     }
@@ -282,16 +296,19 @@ class RescueDispatchService
         ]);
 
         DB::transaction(function () use ($request, $assignmentId, $dispatch, $validated): void {
+            $now = now();
+
             DB::table('responder_assignments')
                 ->where('assignment_id', $assignmentId)
                 ->update([
                     'status' => 'completed',
-                    'completed_at' => now(),
+                    'completed_at' => $now,
                     'outcome_notes' => $this->outcomesJson($validated, $dispatch->outcome_notes),
-                    'updated_at' => now(),
+                    'updated_at' => $now,
                 ]);
 
             $this->updateSelectedResponderDuty($this->responderIdsForDispatch($dispatch), $dispatch->team_id, 'completed');
+            $this->saveHouseholdOutcomeFromDispatch($request, $dispatch, $validated, $now);
             $this->writeAuditLog($request, 'complete_dispatch', 'responder_assignments', (string) $assignmentId, $this->formatDispatch($dispatch), $validated);
         });
 
@@ -487,7 +504,21 @@ class RescueDispatchService
                 'leader.full_name as leader_name',
             ]);
 
-        $cards = $teams->map(fn (object $team): array => $this->formatTeamCard($team, $eventId))->values();
+        $catalogTeams = collect(self::TEAM_CATALOG)
+            ->reject(fn (array $item): bool => $teams->contains('team_name', $item['team_name']))
+            ->map(fn (array $item): object => (object) [
+                'team_id' => null,
+                'team_code' => $item['team_code'],
+                'team_name' => $item['team_name'],
+                'team_type' => $item['team_type'],
+                'duty_status' => 'standby',
+                'leader_name' => null,
+            ]);
+
+        $cards = $teams
+            ->merge($catalogTeams)
+            ->map(fn (object $team): array => $this->formatTeamCard($team, $eventId))
+            ->values();
 
         if ($cards->isEmpty()) {
             $unassignedResponders = DB::table('responders')
@@ -531,6 +562,30 @@ class RescueDispatchService
 
     private function formatTeamCard(object $team, ?string $eventId): array
     {
+        if (! $team->team_id) {
+            $status = $this->formatStatus('standby');
+
+            return [
+                'team_id' => null,
+                'team_code' => $team->team_code,
+                'team_name' => $team->team_name,
+                'team_type' => $team->team_type,
+                'status_key' => $status['key'],
+                'status_label' => $status['label'],
+                'leader_name' => 'No team leader assigned',
+                'member_count' => 0,
+                'assigned_households' => 0,
+                'assigned_area' => 'No active dispatch',
+                'active_assignment_id' => null,
+                'active_responder_id' => null,
+                'available_responder_id' => null,
+                'is_available' => false,
+                'outcomes' => $this->formatOutcomes([]),
+                'coverage_percent' => 0,
+                'assigned_time' => null,
+            ];
+        }
+
         $activeAssignment = null;
 
         if ($eventId) {
@@ -629,7 +684,8 @@ class RescueDispatchService
 
     private function getDispatchSummary(?string $eventId): array
     {
-        $totalTeams = DB::table('rescue_teams')->count();
+        $teamCards = $this->getTeamCards($eventId);
+        $totalTeams = count($teamCards);
         $statusCounts = collect();
 
         if ($eventId) {
@@ -643,9 +699,9 @@ class RescueDispatchService
         $dispatched = $this->sumKeys($statusCounts, ['dispatched', 'en_route', 'accepted']);
         $onScene = $this->sumKeys($statusCounts, ['on_scene', 'onscene']);
         $completed = $this->sumKeys($statusCounts, ['completed']);
-        $standby = $eventId
-            ? DB::table('rescue_teams')->where('duty_status', 'standby')->count()
-            : $totalTeams;
+        $standby = collect($teamCards)
+            ->filter(fn (array $team): bool => ($team['status_key'] ?? 'standby') === 'standby')
+            ->count();
         $activeUnits = $dispatched + $onScene;
         $responseRate = $totalTeams > 0 ? round(($activeUnits / $totalTeams) * 100) : 0;
 
@@ -708,7 +764,7 @@ class RescueDispatchService
             ->groupBy('area_name')
             ->map(function ($items, string $area) use ($busyHouseholdIds): array {
                 $total = $items->count();
-                $unsafe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'], true) || (bool) $item->needs_dispatch)->count();
+                $unsafe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'], true) || (bool) $item->needs_dispatch)->count();
                 $unchecked = $items->whereNull('status_key')->count();
                 $safeOnly = $items->filter(fn (object $item): bool => in_array($item->status_key, ['active', 'returned', 'safe'], true))->count();
                 $evacuated = $items->filter(fn (object $item): bool => in_array($item->status_key, ['evacuated', 'relocated'], true))->count();
@@ -740,7 +796,7 @@ class RescueDispatchService
                     'to_cover' => $toCover,
                     'households' => $households,
                     'recommended_households' => $households
-                        ->filter(fn (array $item): bool => $item['needs_dispatch'] || $item['status_key'] === 'unchecked' || in_array($item['status_key'], ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'], true))
+                        ->filter(fn (array $item): bool => $item['needs_dispatch'] || $item['status_key'] === 'unchecked' || in_array($item['status_key'], ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'], true))
                         ->take(10)
                         ->values(),
                 ];
@@ -750,19 +806,19 @@ class RescueDispatchService
             ->values();
     }
 
-    private function getDispatchActivity(?string $eventId)
+    private function getDispatchActivity(?string $eventId, int $limit = 10)
     {
-        if (! $eventId) {
-            return collect();
-        }
-
-        return DB::table('responder_assignments as ra')
+        $query = DB::table('responder_assignments as ra')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')
             ->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')
-            ->where('ra.disaster_id', $eventId)
             ->orderByDesc('ra.updated_at')
-            ->orderByDesc('ra.assigned_at')
-            ->limit(10)
+            ->orderByDesc('ra.assigned_at');
+
+        if ($eventId) {
+            $query->where('ra.disaster_id', $eventId);
+        }
+
+        return $query->limit($limit)
             ->get([
                 'ra.assignment_id',
                 'ra.status',
@@ -780,6 +836,108 @@ class RescueDispatchService
                 'assigned_area' => $log->assigned_area,
             ])
             ->values();
+    }
+
+    private function saveHouseholdOutcomeFromDispatch(Request $request, object $dispatch, array $validated, Carbon $now): void
+    {
+        if (empty($dispatch->household_id) || ! Schema::hasTable('household_disasters') || ! Schema::hasTable('household_statuses')) {
+            return;
+        }
+
+        $statusKey = $this->completionStatusKey($validated);
+        $statusId = $this->householdStatusId($statusKey);
+
+        if (! $statusId) {
+            return;
+        }
+
+        $notes = 'Dispatch '.$dispatch->assignment_code.' completed by responder team.';
+
+        if (! empty($validated['outcome_notes'])) {
+            $notes .= "\n".$validated['outcome_notes'];
+        }
+
+        $data = $this->filterColumns('household_disasters', [
+            'current_status_id' => $statusId,
+            'last_status_source' => 'rescue_dispatch',
+            'last_status_notes' => $notes,
+            'last_reported_by_user_id' => $request->user()?->user_id,
+            'priority_level' => in_array($statusKey, ['safe', 'evacuated'], true) ? 'monitor' : 'urgent',
+            'needs_dispatch' => ! in_array($statusKey, ['safe', 'evacuated'], true),
+            'last_reported_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $existing = DB::table('household_disasters')
+            ->where('disaster_id', $dispatch->disaster_id)
+            ->where('household_id', $dispatch->household_id)
+            ->first();
+
+        if ($existing) {
+            DB::table('household_disasters')
+                ->where('household_disaster_id', $existing->household_disaster_id)
+                ->update($data);
+        } else {
+            DB::table('household_disasters')->insert($this->filterColumns('household_disasters', array_merge($data, [
+                'household_disaster_id' => $this->nextId('household_disasters', 'household_disaster_id'),
+                'household_id' => $dispatch->household_id,
+                'disaster_id' => $dispatch->disaster_id,
+                'initial_status_id' => $statusId,
+                'created_at' => $now,
+            ])));
+        }
+
+        if (Schema::hasTable('household_status_logs')) {
+            DB::table('household_status_logs')->insert($this->filterColumns('household_status_logs', [
+                'status_log_id' => $this->nextId('household_status_logs', 'status_log_id'),
+                'disaster_id' => $dispatch->disaster_id,
+                'household_id' => $dispatch->household_id,
+                'status_id' => $statusId,
+                'source' => 'rescue_dispatch',
+                'submitted_by_user_id' => $request->user()?->user_id,
+                'responder_id' => $dispatch->responder_id,
+                'notes' => $notes,
+                'submitted_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]));
+        }
+    }
+
+    private function completionStatusKey(array $validated): string
+    {
+        if ((int) ($validated['evacuated_count'] ?? 0) > 0) {
+            return 'evacuated';
+        }
+
+        if ((int) ($validated['safe_count'] ?? 0) > 0) {
+            return 'safe';
+        }
+
+        if ((int) ($validated['unsafe_count'] ?? 0) > 0 || (int) ($validated['injured_count'] ?? 0) > 0 || (int) ($validated['missing_count'] ?? 0) > 0) {
+            return 'unsafe';
+        }
+
+        return 'safe';
+    }
+
+    private function householdStatusId(string $statusKey): ?int
+    {
+        if (! Schema::hasTable('household_statuses')) {
+            return null;
+        }
+
+        $candidates = match ($statusKey) {
+            'safe' => ['safe', 'active', 'returned'],
+            'evacuated' => ['evacuated', 'relocated'],
+            'unsafe' => ['unsafe', 'not_evacuated', 'displaced', 'needs_help', 'need_help'],
+            default => [$statusKey],
+        };
+
+        return DB::table('household_statuses')
+            ->whereIn('status_key', $candidates)
+            ->orderByRaw('CASE '.collect($candidates)->map(fn (string $key, int $index): string => 'WHEN status_key = ? THEN '.$index)->implode(' ').' ELSE 999 END', $candidates)
+            ->value('status_id');
     }
 
     private function getRoute(int $assignmentId): ?array
@@ -1275,6 +1433,19 @@ class RescueDispatchService
     private function nextId(string $table, string $column): int
     {
         return ((int) DB::table($table)->lockForUpdate()->max($column)) + 1;
+    }
+
+    private function filterColumns(string $table, array $data): array
+    {
+        if (! Schema::hasTable($table)) {
+            return $data;
+        }
+
+        $columns = Schema::getColumnListing($table);
+
+        return collect($data)
+            ->filter(fn ($value, string $key): bool => in_array($key, $columns, true))
+            ->all();
     }
 
     private function decodeJson(?string $value): array

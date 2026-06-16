@@ -20,6 +20,8 @@ class DashboardService
 
     public function index(): JsonResponse
     {
+        $this->clearEndedEventReferences();
+
         $activeEvent = $this->getActiveEvent();
         $eventId = $activeEvent?->event_id;
         $householdSummary = $this->getHouseholdSummary($eventId);
@@ -63,14 +65,16 @@ class DashboardService
                     'updated_at' => $endedAt,
                 ]);
 
+            $releasedEvacuationCenters = $this->clearCurrentEventReferences($event->event_id, $endedAt);
             $this->archiveSituationReports($event->event_id, $endedAt);
             $this->writeIncidentArchive($event, $user?->user_id, $closureNote, $endedAt);
-            $this->writeAuditLog($event, $user, $endedAt, $closureNote, $request);
+            $this->writeAuditLog($event, $user, $endedAt, $closureNote, $request, $releasedEvacuationCenters);
 
             return [
                 'event_id' => $event->event_id,
                 'name' => $event->name,
                 'ended_at' => $this->formatDateTime($endedAt->toDateTimeString()),
+                'released_evacuation_centers' => $releasedEvacuationCenters,
             ];
         });
 
@@ -79,6 +83,8 @@ class DashboardService
                 'message' => 'There is no active disaster event to close.',
             ], 404);
         }
+
+        $this->clearEndedEventReferences();
 
         $activeEvent = $this->getActiveEvent();
         $eventId = $activeEvent?->event_id;
@@ -506,7 +512,73 @@ class DashboardService
             ]);
     }
 
-    private function writeAuditLog(object $event, mixed $user, Carbon $endedAt, string $closureNote, Request $request): void
+    private function clearCurrentEventReferences(string $eventId, Carbon $endedAt): int
+    {
+        if (! $this->canUpdateEvacuationCenterEventLinks()) {
+            return 0;
+        }
+
+        $updates = [
+            'current_event_id' => null,
+        ];
+
+        if (Schema::hasColumn('evacuation_centers', 'updated_at')) {
+            $updates['updated_at'] = $endedAt;
+        }
+
+        return DB::table('evacuation_centers')
+            ->where('current_event_id', $eventId)
+            ->update($updates);
+    }
+
+    private function clearEndedEventReferences(): int
+    {
+        if (! $this->canUpdateEvacuationCenterEventLinks() || ! Schema::hasTable('disaster_events')) {
+            return 0;
+        }
+
+        $endedEventIds = DB::table('evacuation_centers as ec')
+            ->join('disaster_events as de', 'de.event_id', '=', 'ec.current_event_id')
+            ->whereNotNull('ec.current_event_id')
+            ->where(function ($query): void {
+                $query->whereNotNull('de.ended_at')
+                    ->orWhereNotNull('de.deleted_at');
+            })
+            ->pluck('ec.current_event_id')
+            ->unique()
+            ->values();
+
+        if ($endedEventIds->isEmpty()) {
+            return 0;
+        }
+
+        $updates = [
+            'current_event_id' => null,
+        ];
+
+        if (Schema::hasColumn('evacuation_centers', 'updated_at')) {
+            $updates['updated_at'] = now();
+        }
+
+        return DB::table('evacuation_centers')
+            ->whereIn('current_event_id', $endedEventIds)
+            ->update($updates);
+    }
+
+    private function canUpdateEvacuationCenterEventLinks(): bool
+    {
+        return Schema::hasTable('evacuation_centers')
+            && Schema::hasColumn('evacuation_centers', 'current_event_id');
+    }
+
+    private function writeAuditLog(
+        object $event,
+        mixed $user,
+        Carbon $endedAt,
+        string $closureNote,
+        Request $request,
+        int $releasedEvacuationCenters
+    ): void
     {
         DB::table('audit_logs')->insert([
             'user_id' => $user?->user_id,
@@ -521,6 +593,7 @@ class DashboardService
             'new_values' => json_encode([
                 'ended_at' => $endedAt->toDateTimeString(),
                 'archive_note' => $closureNote,
+                'released_evacuation_centers' => $releasedEvacuationCenters,
             ]),
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),

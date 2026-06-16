@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import L from 'leaflet'
-import { EyeOff, Layers, MapPin } from 'lucide-react'
+import { ArrowLeft, EyeOff, Layers, MapPin, Maximize2 } from 'lucide-react'
 import {
   CircleMarker,
   MapContainer,
@@ -32,9 +32,11 @@ export default function MappingMap({
   mapCenter,
   mapBounds,
   onChangeLayer,
+  isFullscreen = false,
+  onToggleFullscreen,
 }) {
   return (
-    <section className="mapping-map-shell">
+    <section className={`mapping-map-shell ${isFullscreen ? 'fullscreen' : ''}`}>
       <MapContainer
         center={mapCenter}
         zoom={workspace.barangay.zoom}
@@ -48,6 +50,7 @@ export default function MappingMap({
         className="mapping-leaflet"
       >
         <FitBarangay center={mapCenter} bounds={mapBounds} zoom={workspace.barangay.zoom} />
+        <ResizeMapWhenFullscreen isFullscreen={isFullscreen} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url={workspace.barangay.tile_url}
@@ -98,6 +101,11 @@ export default function MappingMap({
         ))}
       </MapContainer>
 
+      <button className="map-fullscreen-button" type="button" onClick={onToggleFullscreen}>
+        {isFullscreen ? <ArrowLeft size={15} /> : <Maximize2 size={15} />}
+        {isFullscreen ? 'Back' : 'Full screen'}
+      </button>
+
       {!hasActiveEvent && (
         <div className="map-standby-note">
           <EyeOff size={15} />
@@ -132,6 +140,20 @@ export default function MappingMap({
       </div>
     </section>
   )
+}
+
+function ResizeMapWhenFullscreen({ isFullscreen }) {
+  const map = useMap()
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      map.invalidateSize()
+    }, 120)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isFullscreen, map])
+
+  return null
 }
 
 function RouteLine({ route, isSelected }) {

@@ -316,18 +316,26 @@ class RescuerMobileService
 
         $validated = $request->validate([
             'household_id' => ['required', 'string', 'max:255'],
-            'household_head' => ['nullable', 'string', 'max:150'],
-            'address' => ['nullable', 'string', 'max:255'],
+            'household_head' => ['required', 'string', 'min:2', 'max:150'],
+            'address' => ['required', 'string', 'min:3', 'max:255'],
             'status_key' => ['required', 'string', 'max:50'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'battery_level' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:1000'],
+            'notes' => ['required', 'string', 'min:5', 'max:1000'],
             'members' => ['nullable', 'array'],
+            'members.*.name' => ['nullable', 'string', 'max:150'],
+            'members.*.condition' => ['nullable', 'string', 'max:255'],
         ], [
             'household_id.required' => 'Household ID is required.',
+            'household_head.required' => 'Household head name is required.',
+            'address.required' => 'Location, purok, or landmark is required.',
             'status_key.required' => 'Select the household status.',
+            'notes.required' => 'Field notes are required.',
+            'notes.min' => 'Field notes must describe the situation clearly.',
         ]);
+
+        $this->validateFieldReportMembers($validated['members'] ?? []);
 
         $statusId = $this->resolveHouseholdStatusId($validated['status_key']);
 
@@ -348,6 +356,8 @@ class RescuerMobileService
         $now = now();
         $statusLogId = $this->nextId('household_status_logs', 'status_log_id');
 
+        $notes = $this->fieldReportNotes($validated);
+
         DB::table('household_status_logs')->insert($this->filterColumns('household_status_logs', [
             'status_log_id' => $statusLogId,
             'disaster_id' => $activeEvent['event_id'],
@@ -359,12 +369,13 @@ class RescuerMobileService
             'latitude' => $validated['latitude'] ?? null,
             'longitude' => $validated['longitude'] ?? null,
             'battery_level' => $validated['battery_level'] ?? null,
-            'notes' => $this->fieldReportNotes($validated),
+            'notes' => $notes,
             'submitted_at' => $now,
             'created_at' => $now,
             'updated_at' => $now,
         ]));
 
+        $this->saveLatestFieldReportStatus($activeEvent['event_id'], $validated['household_id'], $statusId, $validated, $notes, $user?->user_id, $responder?->responder_id, $now);
         $this->writeAuditLog($request, 'mobile_field_report', 'household_status_logs', (string) $statusLogId, $validated);
 
         return response()->json([
@@ -396,20 +407,22 @@ class RescuerMobileService
         }
 
         $validated = $request->validate([
-            'location' => ['required', 'string', 'max:255'],
+            'location' => ['required', 'string', 'min:3', 'max:255'],
             'cluster' => ['nullable', 'string', 'max:100'],
             'request_category' => ['required', Rule::in(['resource', 'personnel', 'vehicle'])],
-            'resource_type' => ['required', 'string', 'max:100'],
+            'resource_type' => ['required', 'string', 'min:2', 'max:100'],
             'item_name' => ['nullable', 'string', 'max:150'],
             'quantity' => ['required', 'integer', 'min:1', 'max:100000'],
-            'unit' => ['nullable', 'string', 'max:50'],
-            'description' => ['nullable', 'string', 'max:1000'],
-            'urgency_key' => ['nullable', 'string', 'max:50'],
+            'unit' => ['required', 'string', 'min:2', 'max:50'],
+            'description' => ['required', 'string', 'min:5', 'max:1000'],
+            'urgency_key' => ['required', Rule::in(['low', 'medium', 'high', 'urgent', 'critical'])],
         ], [
             'location.required' => 'Location is required.',
             'request_category.required' => 'Request type is required.',
             'resource_type.required' => 'Need/category is required.',
             'quantity.required' => 'Quantity is required.',
+            'unit.required' => 'Unit is required.',
+            'description.required' => 'Reason or field note is required.',
         ]);
 
         $user = $request->user();
@@ -1571,6 +1584,71 @@ class RescuerMobileService
         }
 
         return implode("\n", $parts);
+    }
+
+    private function validateFieldReportMembers(array $members): void
+    {
+        foreach ($members as $index => $member) {
+            $name = trim((string) ($member['name'] ?? ''));
+            $condition = trim((string) ($member['condition'] ?? ''));
+
+            if ($name === '' && $condition === '') {
+                continue;
+            }
+
+            if ($name === '' || $condition === '') {
+                throw ValidationException::withMessages([
+                    'members.'.($index + 1) => ['Enter both member name and condition, or leave both blank.'],
+                ]);
+            }
+        }
+    }
+
+    private function saveLatestFieldReportStatus(string $eventId, string $householdId, int $statusId, array $validated, string $notes, ?string $userId, ?int $responderId, $now): void
+    {
+        if (! Schema::hasTable('household_disasters')) {
+            return;
+        }
+
+        $needsDispatch = in_array($validated['status_key'], ['unsafe', 'needs_help', 'need_help', 'injured', 'missing'], true);
+        $data = $this->filterColumns('household_disasters', [
+            'current_status_id' => $statusId,
+            'last_status_source' => 'responder_field_report',
+            'last_status_notes' => $notes,
+            'last_reported_by_user_id' => $userId,
+            'last_latitude' => $validated['latitude'] ?? null,
+            'last_longitude' => $validated['longitude'] ?? null,
+            'last_battery_level' => $validated['battery_level'] ?? null,
+            'last_reported_at' => $now,
+            'priority_level' => $needsDispatch ? 'urgent' : 'monitor',
+            'needs_dispatch' => $needsDispatch,
+            'updated_at' => $now,
+        ]);
+
+        if (Schema::hasColumn('household_disasters', 'last_responder_id')) {
+            $data['last_responder_id'] = $responderId;
+        }
+
+        $existing = DB::table('household_disasters')
+            ->where('disaster_id', $eventId)
+            ->where('household_id', $householdId)
+            ->first();
+
+        if ($existing) {
+            DB::table('household_disasters')
+                ->where('household_disaster_id', $existing->household_disaster_id)
+                ->update($data);
+
+            return;
+        }
+
+        DB::table('household_disasters')->insert($this->filterColumns('household_disasters', array_merge($data, [
+            'household_disaster_id' => $this->nextId('household_disasters', 'household_disaster_id'),
+            'household_id' => $householdId,
+            'disaster_id' => $eventId,
+            'initial_status_id' => $statusId,
+            'created_at' => $now,
+        ])));
     }
 
     private function resourceDescription(array $validated): ?string

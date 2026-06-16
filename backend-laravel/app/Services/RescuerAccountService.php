@@ -44,13 +44,17 @@ class RescuerAccountService
                     ->orWhere('r.username', 'like', "%{$search}%")
                     ->orWhere('r.title', 'like', "%{$search}%")
                     ->orWhere('r.skills', 'like', "%{$search}%")
-                    ->orWhere('rt.team_name', 'like', "%{$search}%");
+                    ->orWhere('rt.team_name', 'like', "%{$search}%")
+                    ->orWhere('rt.team_code', 'like', "%{$search}%")
+                    ->orWhere('rt.team_type', 'like', "%{$search}%");
             });
         }
 
         if ($team !== '' && $team !== 'all') {
             $query->where(function ($inner) use ($team): void {
                 $inner->where('rt.team_name', $team)
+                    ->orWhere('rt.team_code', $team)
+                    ->orWhere('rt.team_type', $team)
                     ->orWhere('r.team_id', $team);
             });
         }
@@ -336,6 +340,469 @@ class RescuerAccountService
                 'rescuer' => $this->formatResponder($this->findResponder($responderId), true),
             ],
         ]);
+    }
+
+    public function teamConfig(): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->teamConfigWorkspace(),
+        ]);
+    }
+
+    public function storeTeam(Request $request): JsonResponse
+    {
+        $validated = $this->validateTeamPayload($request);
+
+        $teamId = DB::transaction(function () use ($request, $validated): int {
+            $now = now();
+            $teamId = $this->nextId('rescue_teams', 'team_id');
+            $memberIds = $this->normalizedResponderIds($validated['member_ids'] ?? []);
+            $leaderId = $validated['leader_responder_id'] ?? null;
+
+            if ($leaderId && ! in_array((int) $leaderId, $memberIds, true)) {
+                $memberIds[] = (int) $leaderId;
+            }
+
+            $this->ensureUniqueTeam($validated['team_name'], $validated['team_code'], null);
+            $this->ensureRespondersCanMove($memberIds, $teamId);
+
+            DB::table('rescue_teams')->insert([
+                'team_id' => $teamId,
+                'team_code' => $this->normalizeTeamCode($validated['team_code']),
+                'team_name' => trim($validated['team_name']),
+                'team_type' => trim($validated['team_type']),
+                'assigned_purok_id' => $validated['assigned_purok_id'] ?? null,
+                'leader_responder_id' => $leaderId,
+                'duty_status' => $validated['duty_status'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            $this->syncTeamMembers($teamId, $memberIds, $leaderId, $now);
+            $this->writeTeamAuditLog($request, 'create_team', $teamId, null, $validated);
+
+            return $teamId;
+        });
+
+        return response()->json([
+            'message' => 'Rescue team configured.',
+            'data' => $this->teamConfigWorkspace($teamId),
+        ], 201);
+    }
+
+    public function updateTeam(Request $request, int $teamId): JsonResponse
+    {
+        $existing = DB::table('rescue_teams')->where('team_id', $teamId)->first();
+
+        if (! $existing) {
+            return response()->json([
+                'message' => 'Rescue team was not found.',
+            ], 404);
+        }
+
+        $validated = $this->validateTeamPayload($request, $teamId);
+
+        DB::transaction(function () use ($request, $teamId, $existing, $validated): void {
+            $now = now();
+            $memberIds = $this->normalizedResponderIds($validated['member_ids'] ?? []);
+            $leaderId = $validated['leader_responder_id'] ?? null;
+
+            if ($leaderId && ! in_array((int) $leaderId, $memberIds, true)) {
+                $memberIds[] = (int) $leaderId;
+            }
+
+            $this->ensureUniqueTeam($validated['team_name'], $validated['team_code'], $teamId);
+            $this->ensureRespondersCanMove($memberIds, $teamId);
+            $this->ensureCurrentTeamMembersCanBeRemoved($teamId, $memberIds);
+
+            DB::table('rescue_teams')
+                ->where('team_id', $teamId)
+                ->update([
+                    'team_code' => $this->normalizeTeamCode($validated['team_code']),
+                    'team_name' => trim($validated['team_name']),
+                    'team_type' => trim($validated['team_type']),
+                    'assigned_purok_id' => $validated['assigned_purok_id'] ?? null,
+                    'leader_responder_id' => $leaderId,
+                    'duty_status' => $validated['duty_status'],
+                    'updated_at' => $now,
+                ]);
+
+            $this->syncTeamMembers($teamId, $memberIds, $leaderId, $now);
+            $this->writeTeamAuditLog($request, 'update_team', $teamId, $existing, $validated);
+        });
+
+        return response()->json([
+            'message' => 'Rescue team updated.',
+            'data' => $this->teamConfigWorkspace($teamId),
+        ]);
+    }
+
+    public function deleteTeam(Request $request, int $teamId): JsonResponse
+    {
+        $existing = DB::table('rescue_teams')->where('team_id', $teamId)->first();
+
+        if (! $existing) {
+            return response()->json([
+                'message' => 'Rescue team was not found.',
+            ], 404);
+        }
+
+        $activeDispatchCount = DB::table('responder_assignments')
+            ->where('team_id', $teamId)
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->count();
+
+        if ($activeDispatchCount > 0) {
+            return response()->json([
+                'message' => 'This team has an active dispatch. Complete or cancel the dispatch before deleting the team.',
+            ], 409);
+        }
+
+        $this->ensureCurrentTeamMembersCanBeRemoved($teamId, []);
+
+        DB::transaction(function () use ($request, $teamId, $existing): void {
+            $now = now();
+
+            DB::table('responders')
+                ->where('team_id', $teamId)
+                ->update([
+                    'team_id' => null,
+                    'updated_at' => $now,
+                ]);
+
+            DB::table('rescue_teams')
+                ->where('team_id', $teamId)
+                ->delete();
+
+            $this->writeTeamAuditLog($request, 'delete_team', $teamId, $existing, [
+                'team_id' => null,
+                'members_moved_to' => 'Unassigned',
+            ]);
+        });
+
+        return response()->json([
+            'message' => 'Rescue team deleted. Members were moved to Unassigned.',
+            'data' => $this->teamConfigWorkspace(),
+        ]);
+    }
+
+    private function teamConfigWorkspace(?int $selectedTeamId = null): array
+    {
+        return [
+            'selected_team_id' => $selectedTeamId,
+            'teams' => $this->teamConfigCards(),
+            'responders' => $this->teamConfigResponders(),
+            'puroks' => $this->purokAddressOptions(),
+            'team_types' => $this->teamTypeOptions(),
+            'duty_statuses' => [
+                ['key' => 'standby', 'label' => 'Stand-by'],
+                ['key' => 'on_duty', 'label' => 'On duty'],
+                ['key' => 'off_duty', 'label' => 'Off duty'],
+                ['key' => 'unavailable', 'label' => 'Unavailable'],
+            ],
+            'catalog' => self::TEAM_CATALOG,
+            'note' => 'Team configuration uses the existing rescue_teams table. Deleting a team never deletes rescuer accounts.',
+        ];
+    }
+
+    private function teamConfigCards(): array
+    {
+        $databaseTeams = DB::table('rescue_teams as rt')
+            ->leftJoin('responders as leader', 'leader.responder_id', '=', 'rt.leader_responder_id')
+            ->leftJoin('addresses as a', 'a.address_id', '=', 'rt.assigned_purok_id')
+            ->orderBy('rt.team_name')
+            ->get([
+                'rt.team_id',
+                'rt.team_code',
+                'rt.team_name',
+                'rt.team_type',
+                'rt.assigned_purok_id',
+                'rt.leader_responder_id',
+                'rt.duty_status',
+                'leader.full_name as leader_name',
+                'a.purok_sitio',
+                'a.barangay_name',
+            ])
+            ->map(fn (object $team): array => $this->formatTeamConfigCard($team, 'database'));
+
+        $catalogTeams = collect(self::TEAM_CATALOG)
+            ->reject(fn (array $item): bool => $databaseTeams->contains('team_name', $item['team_name']))
+            ->map(fn (array $item): array => $this->formatTeamConfigCard((object) [
+                'team_id' => null,
+                'team_code' => $item['team_code'],
+                'team_name' => $item['team_name'],
+                'team_type' => $item['team_type'],
+                'assigned_purok_id' => null,
+                'leader_responder_id' => null,
+                'duty_status' => 'not_created',
+                'leader_name' => null,
+                'purok_sitio' => null,
+                'barangay_name' => null,
+            ], 'catalog'));
+
+        return $databaseTeams->merge($catalogTeams)->values()->all();
+    }
+
+    private function formatTeamConfigCard(object $team, string $source): array
+    {
+        $members = $team->team_id
+            ? DB::table('responders')
+                ->where('team_id', $team->team_id)
+                ->whereNull('deleted_at')
+                ->orderBy('full_name')
+                ->get(['responder_id', 'full_name', 'title', 'duty_status', 'is_deployed'])
+            : collect();
+
+        $activeDispatchCount = $team->team_id
+            ? DB::table('responder_assignments')
+                ->where('team_id', $team->team_id)
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->count()
+            : 0;
+
+        return [
+            'team_id' => $team->team_id,
+            'team_code' => $team->team_code,
+            'team_name' => $team->team_name,
+            'team_type' => $team->team_type,
+            'assigned_purok_id' => $team->assigned_purok_id,
+            'assigned_purok' => $team->purok_sitio,
+            'barangay_name' => $team->barangay_name,
+            'leader_responder_id' => $team->leader_responder_id,
+            'leader_name' => $team->leader_name,
+            'duty_status' => $team->duty_status,
+            'source' => $source,
+            'is_configured' => $source === 'database',
+            'can_delete' => $source === 'database' && $activeDispatchCount === 0,
+            'active_dispatch_count' => $activeDispatchCount,
+            'member_count' => $members->count(),
+            'deployed_count' => $members->where('is_deployed', 1)->count(),
+            'member_ids' => $members->pluck('responder_id')->map(fn ($id): int => (int) $id)->values()->all(),
+            'members' => $members->map(fn (object $member): array => [
+                'responder_id' => (int) $member->responder_id,
+                'full_name' => $member->full_name,
+                'title' => $member->title,
+                'duty_status' => $member->duty_status,
+                'is_deployed' => (bool) $member->is_deployed,
+            ])->values()->all(),
+        ];
+    }
+
+    private function teamConfigResponders(): array
+    {
+        return DB::table('responders as r')
+            ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'r.team_id')
+            ->whereNull('r.deleted_at')
+            ->orderBy('r.full_name')
+            ->get([
+                'r.responder_id',
+                'r.full_name',
+                'r.title',
+                'r.team_id',
+                'r.duty_status',
+                'r.is_deployed',
+                'rt.team_name',
+                'rt.team_code',
+            ])
+            ->map(fn (object $responder): array => [
+                'responder_id' => (int) $responder->responder_id,
+                'full_name' => $responder->full_name ?: 'Unnamed rescuer',
+                'title' => $responder->title ?: 'Responder',
+                'team_id' => $responder->team_id ? (int) $responder->team_id : null,
+                'team_name' => $responder->team_name ?: 'Unassigned',
+                'team_code' => $responder->team_code,
+                'duty_status' => $responder->duty_status,
+                'is_deployed' => (bool) $responder->is_deployed,
+                'is_busy' => (bool) $responder->is_deployed || in_array($responder->duty_status, ['dispatched', 'on_scene'], true),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function purokAddressOptions(): array
+    {
+        return DB::table('addresses')
+            ->whereNull('deleted_at')
+            ->whereNotNull('purok_sitio')
+            ->where('purok_sitio', '<>', '')
+            ->groupBy('purok_sitio')
+            ->orderBy('purok_sitio')
+            ->get([
+                DB::raw('MIN(address_id) as address_id'),
+                'purok_sitio',
+                DB::raw('MAX(barangay_name) as barangay_name'),
+            ])
+            ->map(fn (object $row): array => [
+                'address_id' => (int) $row->address_id,
+                'label' => $row->barangay_name ? "{$row->purok_sitio} - {$row->barangay_name}" : $row->purok_sitio,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function teamTypeOptions(): array
+    {
+        $catalogTypes = collect(self::TEAM_CATALOG)->pluck('team_type');
+        $databaseTypes = DB::table('rescue_teams')
+            ->whereNotNull('team_type')
+            ->where('team_type', '<>', '')
+            ->pluck('team_type');
+
+        return $catalogTypes
+            ->merge($databaseTypes)
+            ->merge([
+                'Incident Command Support',
+                'Logistics',
+                'Security',
+                'Medical',
+                'Search and Rescue',
+            ])
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    private function validateTeamPayload(Request $request, ?int $teamId = null): array
+    {
+        $validated = $request->validate([
+            'team_code' => ['required', 'string', 'max:8', 'regex:/^[A-Z0-9]+$/i'],
+            'team_name' => ['required', 'string', 'max:100'],
+            'team_type' => ['required', 'string', 'max:80'],
+            'duty_status' => ['required', Rule::in(['standby', 'on_duty', 'off_duty', 'unavailable'])],
+            'assigned_purok_id' => ['nullable', 'integer', 'exists:addresses,address_id'],
+            'leader_responder_id' => ['nullable', 'integer', 'exists:responders,responder_id'],
+            'member_ids' => ['nullable', 'array'],
+            'member_ids.*' => ['integer', 'exists:responders,responder_id'],
+        ], [
+            'team_code.required' => 'Team code is required.',
+            'team_code.regex' => 'Team code must use letters and numbers only.',
+            'team_name.required' => 'Team name is required.',
+            'team_type.required' => 'Team type is required.',
+            'duty_status.required' => 'Team duty status is required.',
+            'duty_status.in' => 'Select a valid team duty status.',
+            'leader_responder_id.exists' => 'Selected team leader does not exist.',
+            'member_ids.*.exists' => 'One selected member does not exist.',
+        ]);
+
+        $validated['team_code'] = $this->normalizeTeamCode($validated['team_code']);
+        $validated['team_name'] = trim($validated['team_name']);
+        $validated['team_type'] = trim($validated['team_type']);
+
+        if ($validated['team_name'] === '') {
+            throw ValidationException::withMessages([
+                'team_name' => ['Team name is required.'],
+            ]);
+        }
+
+        $this->ensureUniqueTeam($validated['team_name'], $validated['team_code'], $teamId);
+
+        return $validated;
+    }
+
+    private function ensureUniqueTeam(string $teamName, string $teamCode, ?int $teamId): void
+    {
+        $query = DB::table('rescue_teams')
+            ->where(function ($inner) use ($teamName, $teamCode): void {
+                $inner->whereRaw('LOWER(team_name) = ?', [strtolower(trim($teamName))])
+                    ->orWhereRaw('LOWER(team_code) = ?', [strtolower($this->normalizeTeamCode($teamCode))]);
+            });
+
+        if ($teamId) {
+            $query->where('team_id', '<>', $teamId);
+        }
+
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                'team_name' => ['Team name or team code is already used.'],
+            ]);
+        }
+    }
+
+    private function normalizedResponderIds(array $ids): array
+    {
+        return collect($ids)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function ensureRespondersCanMove(array $memberIds, int $targetTeamId): void
+    {
+        if (empty($memberIds)) {
+            return;
+        }
+
+        $busy = DB::table('responders')
+            ->whereIn('responder_id', $memberIds)
+            ->where(function ($query) use ($targetTeamId): void {
+                $query->whereNull('team_id')
+                    ->orWhere('team_id', '<>', $targetTeamId);
+            })
+            ->where(function ($query): void {
+                $query->where('is_deployed', 1)
+                    ->orWhereIn('duty_status', ['dispatched', 'on_scene']);
+            })
+            ->pluck('full_name')
+            ->values()
+            ->all();
+
+        if (! empty($busy)) {
+            throw ValidationException::withMessages([
+                'member_ids' => ['Busy responders cannot be moved to another team: '.implode(', ', $busy).'.'],
+            ]);
+        }
+    }
+
+    private function ensureCurrentTeamMembersCanBeRemoved(int $teamId, array $remainingMemberIds): void
+    {
+        $busyRemoved = DB::table('responders')
+            ->where('team_id', $teamId)
+            ->when(! empty($remainingMemberIds), fn ($query) => $query->whereNotIn('responder_id', $remainingMemberIds))
+            ->where(function ($query): void {
+                $query->where('is_deployed', 1)
+                    ->orWhereIn('duty_status', ['dispatched', 'on_scene']);
+            })
+            ->pluck('full_name')
+            ->values()
+            ->all();
+
+        if (! empty($busyRemoved)) {
+            throw ValidationException::withMessages([
+                'member_ids' => ['Busy responders cannot be removed from this team: '.implode(', ', $busyRemoved).'.'],
+            ]);
+        }
+    }
+
+    private function syncTeamMembers(int $teamId, array $memberIds, ?int $leaderId, Carbon $now): void
+    {
+        DB::table('responders')
+            ->where('team_id', $teamId)
+            ->when(! empty($memberIds), fn ($query) => $query->whereNotIn('responder_id', $memberIds))
+            ->update([
+                'team_id' => null,
+                'updated_at' => $now,
+            ]);
+
+        if (! empty($memberIds)) {
+            DB::table('responders')
+                ->whereIn('responder_id', $memberIds)
+                ->update([
+                    'team_id' => $teamId,
+                    'updated_at' => $now,
+                ]);
+        }
+
+        if ($leaderId) {
+            DB::table('rescue_teams')
+                ->where('team_id', $teamId)
+                ->update([
+                    'leader_responder_id' => $leaderId,
+                    'updated_at' => $now,
+                ]);
+        }
     }
 
     private function responderQuery()
@@ -939,6 +1406,27 @@ class RescuerAccountService
             'action' => $action,
             'reference_table' => 'responders',
             'reference_id' => (string) $responderId,
+            'old_values' => $oldValues ? json_encode($oldValues, JSON_UNESCAPED_SLASHES) : null,
+            'new_values' => $newValues ? json_encode($newValues, JSON_UNESCAPED_SLASHES) : null,
+            'ip_address' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            'created_at' => now(),
+        ]);
+    }
+
+    private function writeTeamAuditLog(Request $request, string $action, int $teamId, mixed $oldValues, mixed $newValues): void
+    {
+        if (! DB::getSchemaBuilder()->hasTable('audit_logs')) {
+            return;
+        }
+
+        DB::table('audit_logs')->insert([
+            'user_id' => $request->user()?->user_id,
+            'role_key' => $request->user()?->role?->role_key,
+            'module' => 'rescuer_accounts',
+            'action' => $action,
+            'reference_table' => 'rescue_teams',
+            'reference_id' => (string) $teamId,
             'old_values' => $oldValues ? json_encode($oldValues, JSON_UNESCAPED_SLASHES) : null,
             'new_values' => $newValues ? json_encode($newValues, JSON_UNESCAPED_SLASHES) : null,
             'ip_address' => $request->ip(),

@@ -53,6 +53,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/households/{householdId}/status-logs', [HouseholdStatusController::class, 'statusLogs']);
             Route::get('/rescue-teams', [RescueDispatchController::class, 'teams']);
             Route::get('/rescuers', [RescuerAccountController::class, 'index']);
+            Route::get('/rescuers/team-config', [RescuerAccountController::class, 'teamConfig']);
+            Route::post('/rescuers/team-config', [RescuerAccountController::class, 'storeTeam']);
+            Route::patch('/rescuers/team-config/{teamId}', [RescuerAccountController::class, 'updateTeam']);
+            Route::delete('/rescuers/team-config/{teamId}', [RescuerAccountController::class, 'deleteTeam']);
             Route::post('/rescuers', [RescuerAccountController::class, 'store']);
             Route::get('/rescuers/{responderId}', [RescuerAccountController::class, 'show']);
             Route::patch('/rescuers/{responderId}', [RescuerAccountController::class, 'update']);
@@ -75,6 +79,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/archive/resource-requests', [ArchiveController::class, 'resourceRequests']);
             Route::get('/archive/situation-reports', [ArchiveController::class, 'situationReports']);
             Route::get('/archive/export', [ArchiveController::class, 'export']);
+            Route::get('/archive/saved-groups', [ArchiveController::class, 'savedGroups']);
+            Route::post('/archive/saved-groups', [ArchiveController::class, 'storeSavedGroup']);
+            Route::delete('/archive/saved-groups/{groupId}/records/{recordId}', [ArchiveController::class, 'deleteSavedGroupRecord']);
+            Route::delete('/archive/saved-groups/{groupId}', [ArchiveController::class, 'deleteSavedGroup']);
+            Route::post('/archive/delete-selected', [ArchiveController::class, 'deleteSelected']);
             Route::get('/dispatches', [RescueDispatchController::class, 'index']);
             Route::post('/dispatches', [RescueDispatchController::class, 'store']);
             Route::get('/dispatches/{assignmentId}', [RescueDispatchController::class, 'show']);

@@ -272,6 +272,7 @@ export default function RescueDispatchPage() {
               teams={teams}
               responders={responders}
               logs={payload?.activity_log || []}
+              historyLogs={payload?.dispatch_history || []}
               dispatches={dispatches}
               filter={dispatchFilter}
               setFilter={setDispatchFilter}

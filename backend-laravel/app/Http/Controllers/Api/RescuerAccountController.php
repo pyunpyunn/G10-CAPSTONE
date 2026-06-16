@@ -21,6 +21,26 @@ class RescuerAccountController extends Controller
         return $this->service->index($request);
     }
 
+    public function teamConfig(): JsonResponse
+    {
+        return $this->service->teamConfig();
+    }
+
+    public function storeTeam(Request $request): JsonResponse
+    {
+        return $this->service->storeTeam($request);
+    }
+
+    public function updateTeam(Request $request, int $teamId): JsonResponse
+    {
+        return $this->service->updateTeam($request, $teamId);
+    }
+
+    public function deleteTeam(Request $request, int $teamId): JsonResponse
+    {
+        return $this->service->deleteTeam($request, $teamId);
+    }
+
     public function show(int $responderId): JsonResponse
     {
         return $this->service->show($responderId);

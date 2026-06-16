@@ -21,15 +21,53 @@ export default function ResourceValidationModal({
 
   const isView = mode === 'view'
   const isCreate = mode === 'create'
+  const isValidate = mode === 'validate'
+  const isReturn = mode === 'return'
+  const isForward = mode === 'forward'
+  const isReadOnly = isView || isForward
   const requestFieldsDisabled = !isCreate
-  const decisionDisabled = isView || isCreate
-  const modalTitle = isCreate ? 'New request record' : 'Validation record'
-  const modalSub = isCreate
-    ? 'Manual HQ intake before validation'
-    : `${selectedRequestId || 'Request'} - HQ sign-off before TrackingAid handoff`
+  const decisionDisabled = !isValidate
+  const modalTitle = modalTitleFor(mode)
+  const modalSub = modalSubFor(mode, selectedRequestId)
+  const sourceOptions = options.sources?.length
+    ? options.sources
+    : [
+      { key: 'hq_desk', label: 'HQ desk' },
+      { key: 'shared_db', label: 'Shared DB request' },
+      { key: 'rescuer_mobile', label: 'Rescuer mobile' },
+    ]
+  const categoryOptions = options.categories?.length
+    ? options.categories
+    : [
+      { key: 'resource', label: 'Resource' },
+      { key: 'personnel', label: 'Personnel' },
+    ]
+  const statusOptions = options.statuses?.length
+    ? options.statuses
+    : [
+      { key: 'needs_validation', label: 'Needs validation' },
+      { key: 'verified', label: 'Verified' },
+      { key: 'returned', label: 'Returned' },
+      { key: 'forwarded', label: 'Forwarded' },
+      { key: 'cancelled', label: 'Cancelled' },
+    ]
+  const validationOptions = statusOptions.filter((status) => ['needs_validation', 'verified', 'cancelled'].includes(status.key))
+  const displayedStatusOptions = statusOptionsForMode(mode, form.validation_status, statusOptions, validationOptions)
 
   function setField(key, value) {
     setForm((current) => ({ ...current, [key]: value }))
+  }
+
+  function centerOptionLabel(center) {
+    if (center.current_event_status === 'active' && center.current_event_name) {
+      return `${center.name} - active event`
+    }
+
+    if (center.current_event_status === 'closed') {
+      return `${center.name} - previous event closed`
+    }
+
+    return center.name
   }
 
   return createPortal(
@@ -58,7 +96,7 @@ export default function ResourceValidationModal({
               <div>
                 <label className="rr-mini-label">Source</label>
                 <select value={form.request_source} disabled={requestFieldsDisabled} onChange={(event) => setField('request_source', event.target.value)}>
-                  {(options.sources || []).map((source) => (
+                  {sourceOptions.map((source) => (
                     <option value={source.key} key={source.key}>{source.label}</option>
                   ))}
                 </select>
@@ -66,7 +104,7 @@ export default function ResourceValidationModal({
               <div>
                 <label className="rr-mini-label">Request type</label>
                 <select value={form.request_category} disabled={requestFieldsDisabled} onChange={(event) => setField('request_category', event.target.value)}>
-                  {(options.categories || []).map((category) => (
+                  {categoryOptions.map((category) => (
                     <option value={category.key} key={category.key}>{category.label}</option>
                   ))}
                 </select>
@@ -135,7 +173,7 @@ export default function ResourceValidationModal({
                   <option value="">No linked evacuation center</option>
                   {(options.evacuation_centers || []).map((center) => (
                     <option value={center.evacuation_center_id} key={center.evacuation_center_id}>
-                      {center.name}
+                      {centerOptionLabel(center)}
                     </option>
                   ))}
                 </select>
@@ -152,7 +190,7 @@ export default function ResourceValidationModal({
               <div>
                 <label className="rr-mini-label">Validation decision</label>
                 <select value={form.validation_status} disabled={decisionDisabled} onChange={(event) => setField('validation_status', event.target.value)}>
-                  {(options.statuses || []).map((status) => (
+                  {displayedStatusOptions.map((status) => (
                     <option value={status.key} key={status.key}>{status.label}</option>
                   ))}
                 </select>
@@ -162,7 +200,7 @@ export default function ResourceValidationModal({
                 <input
                   type="text"
                   value={form.tracking_reference}
-                  readOnly={isView || isCreate}
+                  readOnly={!isForward}
                   placeholder="Auto-generated if blank"
                   onChange={(event) => setField('tracking_reference', event.target.value)}
                 />
@@ -171,8 +209,8 @@ export default function ResourceValidationModal({
                 <label className="rr-mini-label">Validation notes</label>
                 <textarea
                   value={form.validation_notes}
-                  readOnly={isView}
-                  placeholder="Validation result, beneficiary check, duplicate check, missing details..."
+                  readOnly={isReadOnly && !isForward}
+                  placeholder={isReturn ? 'Reason for returning this request...' : 'Validation result, beneficiary check, duplicate check, missing details...'}
                   onChange={(event) => setField('validation_notes', event.target.value)}
                 />
               </div>
@@ -181,7 +219,7 @@ export default function ResourceValidationModal({
                 <input
                   type="text"
                   value={form.missing_information}
-                  readOnly={isView || isCreate}
+                  readOnly={!isReturn}
                   placeholder="Use when returning the request"
                   onChange={(event) => setField('missing_information', event.target.value)}
                 />
@@ -200,26 +238,32 @@ export default function ResourceValidationModal({
           </div>
 
           <div className="rr-validation-modal-actions">
-            {!isCreate && !isView && (
-              <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={onReturn}>
-                <Undo2 size={14} />
-                Return
-              </button>
-            )}
             <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={onClose}>
               <X size={14} />
               {isView ? 'Close' : 'Cancel'}
             </button>
-            {!isView && (
+            {isCreate && (
               <button className="btn btn-primary btn-sm" type="submit" disabled={isSaving}>
                 <FileCheck2 size={14} />
-                {isSaving ? 'Saving...' : isCreate ? 'Save request' : 'Save validation'}
+                {isSaving ? 'Saving...' : 'Save request'}
               </button>
             )}
-            {!isCreate && !isView && (
+            {isValidate && (
+              <button className="btn btn-primary btn-sm" type="submit" disabled={isSaving}>
+                <FileCheck2 size={14} />
+                {isSaving ? 'Saving...' : 'Save validation'}
+              </button>
+            )}
+            {isReturn && (
+              <button className="btn btn-warning btn-sm" type="button" disabled={isSaving} onClick={onReturn}>
+                <Undo2 size={14} />
+                {isSaving ? 'Returning...' : 'Return request'}
+              </button>
+            )}
+            {isForward && (
               <button className="btn btn-primary btn-sm" type="button" disabled={isSaving} onClick={onForward}>
                 <Send size={14} />
-                Forward verified
+                {isSaving ? 'Forwarding...' : 'Forward to TrackingAid'}
               </button>
             )}
           </div>
@@ -228,4 +272,58 @@ export default function ResourceValidationModal({
     </div>,
     document.body,
   )
+}
+
+function modalTitleFor(mode) {
+  return {
+    create: 'New request record',
+    validate: 'Validate request',
+    return: 'Return request',
+    forward: 'Forward request',
+    view: 'Request record',
+  }[mode] || 'Request record'
+}
+
+function modalSubFor(mode, requestId) {
+  if (mode === 'create') {
+    return 'Manual HQ intake before validation'
+  }
+
+  if (mode === 'validate') {
+    return `${requestId || 'Request'} - save validation decision`
+  }
+
+  if (mode === 'return') {
+    return `${requestId || 'Request'} - return with reason`
+  }
+
+  if (mode === 'forward') {
+    return `${requestId || 'Request'} - verified handoff to TrackingAid`
+  }
+
+  return `${requestId || 'Request'} - read-only record`
+}
+
+function statusOptionsForMode(mode, currentStatus, statusOptions, validationOptions) {
+  if (mode === 'return') {
+    return [{ key: 'returned', label: 'Returned' }]
+  }
+
+  if (mode === 'validate' || mode === 'create') {
+    return validationOptions
+  }
+
+  const hasCurrentStatus = statusOptions.some((status) => status.key === currentStatus)
+
+  if (hasCurrentStatus) {
+    return statusOptions
+  }
+
+  return [
+    ...statusOptions,
+    {
+      key: currentStatus || 'unknown',
+      label: currentStatus || 'Unknown',
+    },
+  ]
 }

@@ -8,7 +8,6 @@ import {
   returnResourceRequest,
   validateResourceRequest,
 } from '../api/resourceRequestApi'
-import ResourceRequestFilters from '../components/resources/ResourceRequestFilters'
 import ResourceRequestNotice from '../components/resources/ResourceRequestNotice'
 import ResourceRequestQueueTable from '../components/resources/ResourceRequestQueueTable'
 import ResourceRequestStats from '../components/resources/ResourceRequestStats'
@@ -33,9 +32,7 @@ export default function ResourcesRequestsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [search, setSearch] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [activeChip, setActiveChip] = useState('all')
+  const [queuePage, setQueuePage] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState('create')
   const [selectedRequestId, setSelectedRequestId] = useState('')
@@ -51,7 +48,7 @@ export default function ResourcesRequestsPage() {
       setError('')
 
       try {
-        const data = await getResourceRequests(filterParams(search, purok, activeChip))
+        const data = await getResourceRequests(filterParams('', 'all', 'all', queuePage))
 
         if (!ignore) {
           setPayload(data)
@@ -72,7 +69,7 @@ export default function ResourcesRequestsPage() {
     return () => {
       ignore = true
     }
-  }, [search, purok, activeChip])
+  }, [queuePage])
 
   async function loadRequests(showMessage = '') {
     setIsLoading(true)
@@ -80,7 +77,7 @@ export default function ResourcesRequestsPage() {
     setMessage('')
 
     try {
-      const data = await getResourceRequests(filterParams(search, purok, activeChip))
+      const data = await getResourceRequests(filterParams('', 'all', 'all', queuePage))
       setPayload(data)
 
       if (showMessage) {
@@ -108,7 +105,7 @@ export default function ResourcesRequestsPage() {
     setIsModalOpen(true)
   }
 
-  async function openExistingModal(request, mode, overrideStatus = '', initialError = '') {
+  async function openExistingModal(request, mode, initialError = '') {
     setError('')
     setFormError(initialError)
 
@@ -116,8 +113,8 @@ export default function ResourcesRequestsPage() {
       const data = await getResourceRequest(request.request_id)
       const nextForm = formFromResourceRequest(data.request)
 
-      if (overrideStatus) {
-        nextForm.validation_status = overrideStatus
+      if (mode === 'return') {
+        nextForm.validation_status = 'returned'
       }
 
       setModalMode(mode)
@@ -149,7 +146,7 @@ export default function ResourcesRequestsPage() {
         await createResourceRequest(buildCreatePayload(form))
         setIsModalOpen(false)
         await loadRequests('Request saved for validation.')
-      } else {
+      } else if (modalMode === 'validate') {
         await validateResourceRequest(selectedRequestId, buildValidationPayload(form))
         setIsModalOpen(false)
         await loadRequests('Validation record saved.')
@@ -176,7 +173,6 @@ export default function ResourcesRequestsPage() {
     setIsSaving(true)
 
     try {
-      await validateResourceRequest(selectedRequestId, buildValidationPayload(form))
       await forwardResourceRequest(selectedRequestId, buildForwardPayload(form))
       setIsModalOpen(false)
       await loadRequests('Verified request forwarded to TrackingAid handoff.')
@@ -213,30 +209,12 @@ export default function ResourcesRequestsPage() {
   }
 
   async function handleRowForward(request) {
-    if (!['verified', 'forwarded'].includes(request.validation.key)) {
-      await openExistingModal(
-        request,
-        'edit',
-        'verified',
-        'Review the record and save a Verified decision before forwarding to TrackingAid.',
-      )
+    if (request.validation.key !== 'verified') {
+      await openExistingModal(request, 'view', 'Only verified requests can be forwarded to TrackingAid.')
       return
     }
 
-    const confirmed = window.confirm(`Forward ${request.request_id} to TrackingAid handoff?`)
-
-    if (!confirmed) {
-      return
-    }
-
-    setError('')
-
-    try {
-      await forwardResourceRequest(request.request_id, { validation_notes: request.validation_notes })
-      await loadRequests('Verified request forwarded to TrackingAid handoff.')
-    } catch (forwardError) {
-      setError(resourceRequestErrorMessage(forwardError, 'Unable to forward the request right now.'))
-    }
+    await openExistingModal(request, 'forward')
   }
 
   async function handleSyncEvaTrack() {
@@ -253,7 +231,7 @@ export default function ResourcesRequestsPage() {
             <RefreshCcw size={14} />
             Sync EvaTrack
           </button>
-          <button className="btn btn-primary btn-sm" type="button" onClick={openCreateModal} disabled={!payload}>
+          <button className="btn btn-primary btn-sm" type="button" onClick={openCreateModal}>
             <PackageCheck size={14} />
             Validate request
           </button>
@@ -269,16 +247,6 @@ export default function ResourcesRequestsPage() {
           <ResourceRequestNotice note={payload?.scope_note} />
           <ResourceRequestStats summary={payload?.summary} />
 
-          <ResourceRequestFilters
-            search={search}
-            onSearchChange={setSearch}
-            purok={purok}
-            onPurokChange={setPurok}
-            puroks={options.puroks || []}
-            activeChip={activeChip}
-            onChipChange={setActiveChip}
-          />
-
           {message && <div className="rr-message">{message}</div>}
 
           <div className="rr-layout">
@@ -287,9 +255,10 @@ export default function ResourcesRequestsPage() {
                 requests={requests}
                 pagination={pagination}
                 onView={(request) => openExistingModal(request, 'view')}
-                onValidate={(request) => openExistingModal(request, 'edit')}
+                onValidate={(request) => openExistingModal(request, 'validate')}
                 onForward={handleRowForward}
-                onReturn={(request) => openExistingModal(request, 'edit', 'returned', 'Add the return reason before saving.')}
+                onReturn={(request) => openExistingModal(request, 'return', 'Add the return reason before saving.')}
+                onPageChange={setQueuePage}
               />
             </RefreshOverlay>
             <TrackingAidMirror items={payload?.tracking_mirror || []} />

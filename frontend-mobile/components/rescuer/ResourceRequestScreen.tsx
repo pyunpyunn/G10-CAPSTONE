@@ -37,8 +37,31 @@ export function ResourceRequestScreen({
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
-    if (!location.trim() || !resourceType.trim() || !quantity.trim()) {
+    const cleanLocation = location.trim();
+    const cleanCluster = cluster.trim();
+    const cleanResourceType = resourceType.trim();
+    const cleanItemName = itemName.trim();
+    const cleanUnit = unit.trim();
+    const cleanDescription = description.trim();
+    const quantityValue = Number(quantity.trim());
+
+    if (!cleanLocation || !cleanResourceType || !quantity.trim()) {
       Alert.alert('Missing request details', 'Enter location, need type, and quantity.');
+      return;
+    }
+
+    if (!Number.isInteger(quantityValue) || quantityValue < 1) {
+      Alert.alert('Invalid quantity', 'Quantity must be a whole number greater than zero.');
+      return;
+    }
+
+    if (!cleanUnit) {
+      Alert.alert('Missing unit', 'Enter the unit, such as packs, kits, liters, or persons.');
+      return;
+    }
+
+    if (!cleanDescription || cleanDescription.length < 5) {
+      Alert.alert('Missing reason', 'Enter a short reason so HQ can validate the request.');
       return;
     }
 
@@ -46,15 +69,15 @@ export function ResourceRequestScreen({
 
     try {
       await onSubmitRequest({
-        location: location.trim(),
-        cluster: cluster.trim(),
+        location: cleanLocation,
+        cluster: cleanCluster,
         request_category: requestCategory,
-        resource_type: resourceType.trim(),
-        item_name: itemName.trim(),
-        quantity: Number(quantity || 1),
-        unit: unit.trim(),
+        resource_type: cleanResourceType,
+        item_name: cleanItemName,
+        quantity: quantityValue,
+        unit: cleanUnit,
         urgency_key: urgencyKey,
-        description: description.trim(),
+        description: cleanDescription,
       });
 
       setLocation('');

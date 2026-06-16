@@ -45,7 +45,7 @@ class ResourceRequestService
         $category = $this->categoryKey((string) $request->query('category', 'all'));
         $purok = trim((string) $request->query('purok', 'all'));
         $eventId = trim((string) $request->query('event_id', ''));
-        $perPage = min(50, max(10, (int) $request->query('per_page', 25)));
+        $perPage = min(50, max(6, (int) $request->query('per_page', 25)));
 
         $query = $this->requestQuery();
 
@@ -109,6 +109,7 @@ class ResourceRequestService
                     'data' => $items,
                     'current_page' => $paginator->currentPage(),
                     'per_page' => $paginator->perPage(),
+                    'last_page' => $paginator->lastPage(),
                     'total' => $paginator->total(),
                     'from' => $paginator->firstItem(),
                     'to' => $paginator->lastItem(),
@@ -380,6 +381,7 @@ class ResourceRequestService
             ->leftJoin('resource_request_status as rrs', 'rrs.status_id', '=', 'rr.status_id')
             ->leftJoin('urgency_levels as ul', 'ul.urgency_id', '=', 'rr.urgency_id')
             ->leftJoin('evacuation_centers as ec', 'ec.evacuation_center_id', '=', 'rr.evacuation_center_id')
+            ->leftJoin('disaster_events as ec_event', 'ec_event.event_id', '=', 'ec.current_event_id')
             ->select([
                 'rr.*',
                 'rrs.status_key as request_status_key',
@@ -389,6 +391,9 @@ class ResourceRequestService
                 'ec.name as evacuation_center_name',
                 'ec.osm_address as evacuation_center_address',
                 'ec.current_event_id as evacuation_event_id',
+                'ec_event.name as evacuation_event_name',
+                'ec_event.ended_at as evacuation_event_ended_at',
+                'ec_event.deleted_at as evacuation_event_deleted_at',
             ]);
     }
 
@@ -475,6 +480,15 @@ class ResourceRequestService
                 'label' => $area,
                 'meta' => $row->evacuation_center_address ?: $row->description ?: 'No beneficiary note recorded',
                 'evacuation_center_id' => $row->evacuation_center_id,
+                'event' => [
+                    'event_id' => $row->evacuation_event_id,
+                    'name' => $row->evacuation_event_name,
+                    'status' => $this->evacuationEventStatus(
+                        $row->evacuation_event_id,
+                        $row->evacuation_event_ended_at,
+                        $row->evacuation_event_deleted_at
+                    ),
+                ],
             ],
             'requested_by' => $row->requested_by ?: 'Requester not recorded',
             'handled_by' => $row->handled_by,
@@ -656,17 +670,45 @@ class ResourceRequestService
     private function evacuationCenters(): array
     {
         return DB::table('evacuation_centers')
-            ->whereNull('deleted_at')
-            ->orderBy('name')
-            ->get(['evacuation_center_id', 'name', 'osm_address', 'current_event_id'])
-            ->map(fn (object $row): array => [
-                'evacuation_center_id' => $row->evacuation_center_id,
-                'name' => $row->name ?: $row->evacuation_center_id,
-                'address' => $row->osm_address,
-                'current_event_id' => $row->current_event_id,
+            ->leftJoin('disaster_events as de', 'de.event_id', '=', 'evacuation_centers.current_event_id')
+            ->whereNull('evacuation_centers.deleted_at')
+            ->orderBy('evacuation_centers.name')
+            ->get([
+                'evacuation_centers.evacuation_center_id',
+                'evacuation_centers.name',
+                'evacuation_centers.osm_address',
+                'evacuation_centers.current_event_id',
+                'de.name as current_event_name',
+                'de.ended_at as current_event_ended_at',
+                'de.deleted_at as current_event_deleted_at',
             ])
+            ->map(function (object $row): array {
+                $eventStatus = $this->evacuationEventStatus(
+                    $row->current_event_id,
+                    $row->current_event_ended_at,
+                    $row->current_event_deleted_at
+                );
+
+                return [
+                    'evacuation_center_id' => $row->evacuation_center_id,
+                    'name' => $row->name ?: $row->evacuation_center_id,
+                    'address' => $row->osm_address,
+                    'current_event_id' => $eventStatus === 'active' ? $row->current_event_id : null,
+                    'current_event_name' => $eventStatus === 'active' ? $row->current_event_name : null,
+                    'current_event_status' => $eventStatus,
+                ];
+            })
             ->values()
             ->all();
+    }
+
+    private function evacuationEventStatus(?string $eventId, ?string $endedAt, ?string $deletedAt): string
+    {
+        if (! $eventId) {
+            return 'none';
+        }
+
+        return $endedAt || $deletedAt ? 'closed' : 'active';
     }
 
     private function purokOptions(): array

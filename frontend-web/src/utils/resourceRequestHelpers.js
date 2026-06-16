@@ -91,13 +91,14 @@ export function buildReturnPayload(form) {
   }
 }
 
-export function filterParams(search, purok, activeChip) {
+export function filterParams(search, purok, activeChip, page = 1) {
   const chip = requestChips.find((item) => item.key === activeChip)
 
   return {
     search: search.trim(),
     purok,
-    per_page: 25,
+    page,
+    per_page: 6,
     ...(chip?.params || {}),
   }
 }

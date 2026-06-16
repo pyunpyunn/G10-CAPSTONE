@@ -30,6 +30,7 @@ export default function MappingPage() {
   const [selectedRoute, setSelectedRoute] = useState(null)
   const [routeLoadingId, setRouteLoadingId] = useState('')
   const [routeError, setRouteError] = useState('')
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false)
 
   const hasActiveEvent = Boolean(workspace.active_event)
   const mapCenter = useMemo(() => [
@@ -96,6 +97,18 @@ export default function MappingPage() {
       ignore = true
     }
   }, [purok, status])
+
+  useEffect(() => {
+    function closeFullscreen(event) {
+      if (event.key === 'Escape') {
+        setIsMapFullscreen(false)
+      }
+    }
+
+    window.addEventListener('keydown', closeFullscreen)
+
+    return () => window.removeEventListener('keydown', closeFullscreen)
+  }, [])
 
   async function reloadMap() {
     setIsLoading(true)
@@ -214,6 +227,8 @@ export default function MappingPage() {
                   mapCenter={mapCenter}
                   mapBounds={mapBounds}
                   onChangeLayer={changeLayer}
+                  isFullscreen={isMapFullscreen}
+                  onToggleFullscreen={() => setIsMapFullscreen((current) => !current)}
                 />
               </RefreshOverlay>
             </main>

@@ -251,16 +251,6 @@ export default function RescuerHomeScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
-        <View style={styles.pageTopBar}>
-          <Pressable
-            style={[styles.refreshButton, (refreshing || loading) && styles.refreshButtonDisabled]}
-            onPress={() => loadOverview(true)}
-            disabled={refreshing || loading}
-          >
-            <Ionicons name="refresh-outline" size={18} color={palette.navActive} />
-            <Text style={styles.refreshText}>Refresh</Text>
-          </Pressable>
-        </View>
         {renderContent()}
       </ScrollView>
 
@@ -316,31 +306,6 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     paddingBottom: 100,
-  },
-  pageTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: spacing.sm,
-  },
-  refreshButton: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: palette.card,
-  },
-  refreshButtonDisabled: {
-    opacity: 0.55,
-  },
-  refreshText: {
-    color: palette.nav,
-    fontSize: 13,
-    fontWeight: '900',
   },
   tabBar: {
     position: 'absolute',

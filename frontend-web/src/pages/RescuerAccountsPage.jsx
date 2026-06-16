@@ -1,16 +1,21 @@
-import { FileCheck2, UserPlus } from 'lucide-react'
+import { FileCheck2, Settings2, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
+  createRescueTeam,
   createRescuer,
+  deleteRescueTeam,
   deactivateRescuer,
+  getRescueTeamConfig,
   getRescuer,
   getRescuers,
+  updateRescueTeam,
   updateRescuer,
 } from '../api/rescuerApi'
 import RescuerAccountModal from '../components/rescuers/RescuerAccountModal'
 import RescuerFilters from '../components/rescuers/RescuerFilters'
 import RescuerRosterTable from '../components/rescuers/RescuerRosterTable'
 import RescuerTeamGrid from '../components/rescuers/RescuerTeamGrid'
+import RescueTeamConfigModal from '../components/rescuers/RescueTeamConfigModal'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
@@ -41,6 +46,12 @@ export default function RescuerAccountsPage() {
   const [selectedRescuerId, setSelectedRescuerId] = useState(null)
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [teamConfigOpen, setTeamConfigOpen] = useState(false)
+  const [teamConfig, setTeamConfig] = useState(null)
+  const [teamConfigVersion, setTeamConfigVersion] = useState(0)
+  const [teamConfigLoading, setTeamConfigLoading] = useState(false)
+  const [teamConfigSaving, setTeamConfigSaving] = useState(false)
+  const [teamConfigError, setTeamConfigError] = useState('')
 
   useEffect(() => {
     let ignore = false
@@ -105,6 +116,26 @@ export default function RescuerAccountsPage() {
     setForm(emptyRescuerForm(accountIdForTeam(accountIdOptions, defaultTeam?.team_name, payload?.next_account_id || ''), defaultTeam))
     setFormError('')
     setIsModalOpen(true)
+  }
+
+  async function openTeamConfig() {
+    await loadTeamConfig()
+    setTeamConfigOpen(true)
+  }
+
+  async function loadTeamConfig() {
+    setTeamConfigLoading(true)
+    setTeamConfigError('')
+
+    try {
+      const data = await getRescueTeamConfig()
+      setTeamConfig(data)
+      setTeamConfigVersion((current) => current + 1)
+    } catch {
+      setTeamConfigError('Team configuration cannot be loaded right now.')
+    } finally {
+      setTeamConfigLoading(false)
+    }
   }
 
   async function openViewModal(rescuer) {
@@ -191,6 +222,47 @@ export default function RescuerAccountsPage() {
     }
   }
 
+  async function saveTeamConfig(body) {
+    setTeamConfigSaving(true)
+    setTeamConfigError('')
+
+    try {
+      const data = body.team_id
+        ? await updateRescueTeam(body.team_id, body)
+        : await createRescueTeam(body)
+
+      setTeamConfig(data)
+      setTeamConfigVersion((current) => current + 1)
+      await loadRescuers()
+    } catch (saveError) {
+      setTeamConfigError(rescuerErrorMessage(saveError, 'Unable to save rescue team.'))
+    } finally {
+      setTeamConfigSaving(false)
+    }
+  }
+
+  async function removeTeamConfig(teamId, teamName) {
+    const confirmed = window.confirm(`Delete ${teamName}? Members will move to Unassigned. Rescuer accounts will not be deleted.`)
+
+    if (!confirmed) {
+      return
+    }
+
+    setTeamConfigSaving(true)
+    setTeamConfigError('')
+
+    try {
+      const data = await deleteRescueTeam(teamId)
+      setTeamConfig(data)
+      setTeamConfigVersion((current) => current + 1)
+      await loadRescuers()
+    } catch (deleteError) {
+      setTeamConfigError(rescuerErrorMessage(deleteError, 'Unable to delete rescue team.'))
+    } finally {
+      setTeamConfigSaving(false)
+    }
+  }
+
   function exportRoster(type) {
     const rows = exportRosterRows(rescuers)
 
@@ -216,6 +288,10 @@ export default function RescuerAccountsPage() {
             <FileCheck2 size={14} />
             Export PDF
           </button>
+          <button className="btn btn-primary btn-sm" type="button" onClick={openTeamConfig}>
+            <Settings2 size={14} />
+            Configure rescue teams
+          </button>
           <button className="btn btn-primary btn-sm" type="button" onClick={openCreateModal}>
             <UserPlus size={14} />
             Create verified account
@@ -235,20 +311,30 @@ export default function RescuerAccountsPage() {
             purok={purok}
             onPurokChange={setPurok}
             puroks={filters.puroks || []}
+            teamOptions={teamOptions}
             activeChip={activeChip}
             onChipChange={setActiveChip}
           />
 
-          <RefreshOverlay active={isRefreshing}>
-            <RescuerRosterTable
-              rescuers={rescuers}
-              pagination={pagination}
-              onView={openViewModal}
-              onEdit={openEditModal}
-              onDeactivate={handleDeactivate}
-            />
-          </RefreshOverlay>
-          <RescuerTeamGrid teams={teams} />
+          <div className="ra-workspace">
+            <div className="ra-main-panel">
+              <RefreshOverlay active={isRefreshing}>
+                <RescuerRosterTable
+                  rescuers={rescuers}
+                  pagination={pagination}
+                  onView={openViewModal}
+                  onEdit={openEditModal}
+                  onDeactivate={handleDeactivate}
+                />
+              </RefreshOverlay>
+            </div>
+            <aside className="ra-side-panel">
+              <div className="ra-side-head">
+                <span className="ra-title">Team cards</span>
+              </div>
+              <RescuerTeamGrid teams={teams} />
+            </aside>
+          </div>
         </>
       )}
 
@@ -268,6 +354,18 @@ export default function RescuerAccountsPage() {
         onReset={resetForm}
         onSubmit={submitForm}
       />
+
+      <RescueTeamConfigModal
+        key={teamConfigVersion}
+        isOpen={teamConfigOpen}
+        workspace={teamConfig}
+        isLoading={teamConfigLoading}
+        isSaving={teamConfigSaving}
+        error={teamConfigError}
+        onClose={() => !teamConfigSaving && setTeamConfigOpen(false)}
+        onSave={saveTeamConfig}
+        onDelete={removeTeamConfig}
+      />
     </section>
   )
 }
@@ -279,8 +377,8 @@ function filterParams(search, purok, activeChip) {
     per_page: 25,
   }
 
-  if (['SAR', 'Evacuation', 'Medical / First Aid', 'Relief & Transport'].includes(activeChip)) {
-    params.team = activeChip
+  if (activeChip.startsWith('team:')) {
+    params.team = activeChip.replace('team:', '')
   } else {
     params.duty_status = activeChip
   }

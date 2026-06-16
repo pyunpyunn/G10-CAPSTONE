@@ -30,8 +30,41 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
-    if (!householdId.trim()) {
+    const cleanHouseholdId = householdId.trim();
+    const cleanHouseholdHead = householdHead.trim();
+    const cleanAddress = address.trim();
+    const cleanMemberName = memberName.trim();
+    const cleanMemberCondition = memberCondition.trim();
+    const cleanNotes = notes.trim();
+    const batteryValue = batteryLevel.trim() ? Number(batteryLevel.trim()) : undefined;
+
+    if (!cleanHouseholdId) {
       Alert.alert('Missing household ID', 'Enter the household ID before submitting.');
+      return;
+    }
+
+    if (!cleanHouseholdHead) {
+      Alert.alert('Missing household head', 'Enter the household head name before submitting.');
+      return;
+    }
+
+    if (!cleanAddress) {
+      Alert.alert('Missing location', 'Enter the purok, address, or landmark before submitting.');
+      return;
+    }
+
+    if (!cleanNotes || cleanNotes.length < 5) {
+      Alert.alert('Missing field notes', 'Enter a short note that explains the household situation.');
+      return;
+    }
+
+    if ((cleanMemberName && !cleanMemberCondition) || (!cleanMemberName && cleanMemberCondition)) {
+      Alert.alert('Incomplete member condition', 'Enter both member name and condition, or leave both blank.');
+      return;
+    }
+
+    if (batteryValue !== undefined && (Number.isNaN(batteryValue) || batteryValue < 0 || batteryValue > 100)) {
+      Alert.alert('Invalid battery level', 'Battery level must be from 0 to 100.');
       return;
     }
 
@@ -39,15 +72,15 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
 
     try {
       await onSubmitReport({
-        household_id: householdId.trim(),
-        household_head: householdHead.trim(),
-        address: address.trim(),
+        household_id: cleanHouseholdId,
+        household_head: cleanHouseholdHead,
+        address: cleanAddress,
         status_key: statusKey,
-        battery_level: batteryLevel ? Number(batteryLevel) : undefined,
-        notes: notes.trim(),
+        battery_level: batteryValue,
+        notes: cleanNotes,
         members:
-          memberName.trim() || memberCondition.trim()
-            ? [{ name: memberName.trim(), condition: memberCondition.trim() }]
+          cleanMemberName || cleanMemberCondition
+            ? [{ name: cleanMemberName, condition: cleanMemberCondition }]
             : [],
       });
 

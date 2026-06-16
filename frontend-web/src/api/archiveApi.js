@@ -48,3 +48,39 @@ export async function exportArchive(category, type, params = {}) {
 
   return response.data
 }
+
+export async function deleteArchiveRecords(category, ids = []) {
+  const response = await api.post('/archive/delete-selected', {
+    category,
+    ids,
+  })
+
+  return response.data.data
+}
+
+export async function getSavedArchiveGroups() {
+  const response = await api.get('/archive/saved-groups')
+
+  return response.data.data
+}
+
+export async function createSavedArchiveGroup(category, records = []) {
+  const response = await api.post('/archive/saved-groups', {
+    category,
+    records,
+  })
+
+  return response.data.data
+}
+
+export async function deleteSavedArchiveGroup(groupId) {
+  const response = await api.delete(`/archive/saved-groups/${groupId}`)
+
+  return response.data.data
+}
+
+export async function deleteSavedArchiveGroupRecord(groupId, recordId) {
+  const response = await api.delete(`/archive/saved-groups/${groupId}/records/${recordId}`)
+
+  return response.data.data
+}

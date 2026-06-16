@@ -85,14 +85,50 @@ export const ARCHIVE_COLUMNS = {
   ],
 }
 
-export function archiveParams({ search, purok, eventId, status }) {
+export function archiveParams({ search, purok, eventId, status, page = 1 }) {
   return {
     search: search.trim(),
     purok,
     event_id: eventId,
     status,
-    per_page: 25,
+    page,
+    per_page: 6,
   }
+}
+
+export function archiveDateLabel(record = {}) {
+  const rawDate = record.datetime || record.sitrep?.meta || record.period?.title || record.event?.meta || ''
+  const text = String(rawDate)
+    .replace(/^Generated\s+/i, '')
+    .split(' - ')[0]
+    .replace(/\s+\d{1,2}:\d{2}\s*(AM|PM)$/i, '')
+    .trim()
+
+  return text || 'No date recorded'
+}
+
+export function archiveRecordTitle(record = {}) {
+  if (record.event?.title) {
+    return record.event.title
+  }
+
+  if (record.request?.title) {
+    return record.request.title
+  }
+
+  if (record.transmission?.title) {
+    return record.transmission.title
+  }
+
+  if (record.team_route?.title) {
+    return record.team_route.title
+  }
+
+  if (record.sitrep?.title) {
+    return record.sitrep.title
+  }
+
+  return record.event_name || record.id || 'Archive record'
 }
 
 export function archiveErrorMessage(error, fallback = 'Archive records cannot be loaded right now.') {
