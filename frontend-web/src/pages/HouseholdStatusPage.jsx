@@ -192,19 +192,7 @@ export default function HouseholdStatusPage() {
         }
       />
 
-<<<<<<< HEAD
-      <div className="hh-readonly-banner">
-        <span>
-          <ShieldCheck size={15} />
-          HQ reviews reports only. Status is updated by household mobile reports or authenticated responder field reports.
-        </span>
-        <span>Latest row per household - History on open</span>
-      </div>
-
-      {isLoading && <LoadingState />}
-=======
       {isInitialLoading && <LoadingState />}
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       {error && <div className="form-error">{error}</div>}
 
       {!isInitialLoading && !hasBlockingError && payload && (
@@ -268,11 +256,7 @@ export default function HouseholdStatusPage() {
           )
         }
       >
-<<<<<<< HEAD
-        {isDetailLoading && <LoadingState />}
-=======
         {isDetailLoading && <LoadingState inline />}
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
         {detailError && <div className="form-error">{detailError}</div>}
         {!isDetailLoading && detail?.household && (
           <HouseholdDetailContent detail={detail} history={history} />

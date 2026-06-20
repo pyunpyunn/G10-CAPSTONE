@@ -126,11 +126,7 @@ function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
 
       <div className="dashboard-map-preview">
         {isLoading ? (
-<<<<<<< HEAD
-          <LoadingState />
-=======
           <LoadingState inline />
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
         ) : (
           <MapContainer
             center={mapCenter}

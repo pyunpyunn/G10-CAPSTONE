@@ -142,8 +142,6 @@ export default function MappingMap({
   )
 }
 
-<<<<<<< HEAD
-=======
 function ResizeMapWhenFullscreen({ isFullscreen }) {
   const map = useMap()
 
@@ -158,7 +156,6 @@ function ResizeMapWhenFullscreen({ isFullscreen }) {
   return null
 }
 
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 function RouteLine({ route, isSelected }) {
   const coordinates = Array.isArray(route.coordinates) ? route.coordinates : []
 

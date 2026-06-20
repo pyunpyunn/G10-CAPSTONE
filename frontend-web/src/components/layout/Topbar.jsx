@@ -70,10 +70,19 @@ export default function Topbar({ user }) {
       }
     }
 
-    document.addEventListener('mousedown', closeOnOutsideClick)
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+        bellButtonRef.current?.focus()
+      }
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
 
     return () => {
-      document.removeEventListener('mousedown', closeOnOutsideClick)
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
     }
   }, [isOpen])
 

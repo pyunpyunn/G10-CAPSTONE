@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
@@ -9,8 +10,6 @@ type RouteProps = {
   evacuationCenters: any[];
 };
 
-<<<<<<< HEAD
-=======
 const defaultRegion = {
   latitude: 10.2898,
   longitude: 123.879,
@@ -18,7 +17,6 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) {
   const centers = useMemo(() => evacuationCenters || [], [evacuationCenters]);
   const [selectedId, setSelectedId] = useState<string>('');
@@ -52,13 +50,10 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
         }
       : null
   ), [selectedCenter]);
-<<<<<<< HEAD
-=======
 
   const mapRegion = householdPoint
     ? { ...householdPoint, latitudeDelta: 0.025, longitudeDelta: 0.025 }
     : defaultRegion;
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 
   useEffect(() => {
     let ignore = false;
@@ -110,22 +105,6 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
           action={<HouseholdBadge label={selectedCenter ? 'Route ready' : 'No center'} tone={selectedCenter ? 'info' : 'neutral'} />}
         />
 
-<<<<<<< HEAD
-        <View style={styles.webMapFallback}>
-          <Ionicons name="map-outline" size={30} color={palette.navActive} />
-          <Text style={styles.fallbackTitle}>Native route map available on mobile</Text>
-          <Text style={styles.fallbackText}>
-            Open this screen in Expo Go on Android or iPhone to view household pins, evacuation centers, and route lines.
-          </Text>
-          {householdPoint ? (
-            <HouseholdBadge label="Household geotag ready" tone="info" />
-          ) : (
-            <HouseholdBadge label="No household geotag" tone="neutral" />
-          )}
-        </View>
-
-        {!householdPoint ? <HouseholdEmpty icon="location-outline" title="No household geotag yet" /> : null}
-=======
         <View style={styles.mapWrap}>
           <MapView style={styles.map} initialRegion={mapRegion}>
             {householdPoint ? (
@@ -165,7 +144,6 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
             title="No household geotag yet"
           />
         ) : null}
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       </View>
 
       <View style={styles.card}>
@@ -295,18 +273,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: palette.card,
   },
-<<<<<<< HEAD
-  webMapFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 240,
-    borderWidth: 1,
-    borderColor: palette.border,
-=======
   mapWrap: {
     overflow: 'hidden',
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
     borderRadius: radius.md,
     padding: spacing.lg,
     backgroundColor: palette.secondary,

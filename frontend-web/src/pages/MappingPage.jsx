@@ -4,6 +4,7 @@ import { getMappingOverview, getRouteToSite } from '../api/mappingApi'
 import GeotagToolbar from '../components/mapping/GeotagToolbar'
 import MappingEventStrip from '../components/mapping/MappingEventStrip'
 import MappingMap from '../components/mapping/MappingMap'
+import MappingMapPanels from '../components/mapping/MappingMapPanels'
 import MappingSidebar from '../components/mapping/MappingSidebar'
 import MappingSummary from '../components/mapping/MappingSummary'
 import LoadingState from '../components/ui/LoadingState'
@@ -203,11 +204,7 @@ export default function MappingPage() {
         }
       />
 
-<<<<<<< HEAD
-      {isLoading && <LoadingState />}
-=======
       {isInitialLoading && <LoadingState />}
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       {error && <div className="form-error">{error}</div>}
 
       {hasLoaded && (
@@ -235,20 +232,23 @@ export default function MappingPage() {
                   onToggleFullscreen={() => setIsMapFullscreen((current) => !current)}
                 />
               </RefreshOverlay>
+              <MappingMapPanels
+                hasActiveEvent={hasActiveEvent}
+                dispatchRoutes={dispatchRoutes}
+                selectedRoute={selectedRoute}
+                mapRules={workspace.map_rules}
+                onStoredRoute={showStoredRoute}
+                onClearSelectedRoute={() => setSelectedRoute(null)}
+              />
             </main>
 
             <MappingSidebar
               hasActiveEvent={hasActiveEvent}
               households={households}
               evacuationSites={evacuationSites}
-              dispatchRoutes={dispatchRoutes}
-              selectedRoute={selectedRoute}
               routeError={routeError}
               routeLoadingId={routeLoadingId}
-              mapRules={workspace.map_rules}
               onRouteToSite={showRouteToSite}
-              onStoredRoute={showStoredRoute}
-              onClearSelectedRoute={() => setSelectedRoute(null)}
             />
           </div>
         </>

@@ -108,37 +108,14 @@ export default function RescueDispatchPage() {
   }
 
   function openNewDispatch() {
-<<<<<<< HEAD
-    const firstRisk = riskAreas[0]
-    const firstOption = firstAssignmentOption(teams, responders)
-    const firstHousehold = firstDispatchableHousehold(firstRisk)
-=======
-    openDispatchForArea(null)
-  }
-
-  function openDispatchForArea(area) {
     const firstOption = firstAssignmentOption(teams)
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 
     setEditingDispatch(null)
-    setSelectedRiskId(area?.id || '')
+    setSelectedRiskId('')
     setAssignmentOption(firstOption)
     setForm({
       ...defaultForm(),
-<<<<<<< HEAD
-      assigned_area: firstRisk?.area_name || '',
-      household_id: firstHousehold?.household_id || '',
-      households_to_cover: firstRisk?.to_cover || 0,
-      priority_level: firstRisk?.priority || 'high',
-=======
-      assigned_area: area?.area_name || '',
       household_id: '',
-      households_to_cover: area?.to_cover || 0,
-      safe_count: area?.safe_households || 0,
-      unsafe_count: area?.unsafe_households || 0,
-      pending_count: area?.unchecked_households || 0,
-      priority_level: area?.priority || 'high',
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
     })
     setFormError('')
     setIsModalOpen(true)
@@ -191,11 +168,7 @@ export default function RescueDispatchPage() {
     setForm((current) => ({
       ...current,
       assigned_area: area.area_name,
-<<<<<<< HEAD
       household_id: firstHousehold?.household_id || '',
-=======
-      household_id: '',
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       households_to_cover: area.to_cover,
       safe_count: area.safe_households || 0,
       unsafe_count: area.unsafe_households || 0,
@@ -244,13 +217,13 @@ export default function RescueDispatchPage() {
       return
     }
 
-<<<<<<< HEAD
     if (!editingDispatch && !form.household_id) {
       setFormError('Select a household with GPS from the affected area list. This is required for routed dispatch.')
-=======
+      return
+    }
+
     if (!editingDispatch && (!form.selected_responder_ids || form.selected_responder_ids.length === 0)) {
       setFormError('Select at least one available responder from the selected team.')
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       return
     }
 
@@ -294,11 +267,7 @@ export default function RescueDispatchPage() {
         }
       />
 
-<<<<<<< HEAD
-      {isLoading && <LoadingState />}
-=======
       {isInitialLoading && <LoadingState />}
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       {error && <div className="form-error">{error}</div>}
 
       {!isInitialLoading && !hasBlockingError && payload && (

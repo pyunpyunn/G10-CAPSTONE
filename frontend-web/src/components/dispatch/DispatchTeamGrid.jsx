@@ -21,10 +21,7 @@ function TeamCard({ team, onOpenUpdate, onOpenNew }) {
   const coverage = team.coverage_percent || 0
   const hasActiveAssignment = Boolean(team.active_assignment_id)
   const canDispatch = hasActiveAssignment || team.is_available
-<<<<<<< HEAD
-=======
   const memberLabel = team.member_count === 1 ? '1 member' : `${team.member_count || 0} members`
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 
   return (
     <article className={`dp-team-card status-${team.status_key}`}>

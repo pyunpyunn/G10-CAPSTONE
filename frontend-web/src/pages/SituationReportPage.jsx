@@ -203,11 +203,7 @@ export default function SituationReportPage() {
           />
 
           {message && <div className="rr-message sr-message">{message}</div>}
-<<<<<<< HEAD
-          {isSummaryLoading && <LoadingState />}
-=======
           {isSummaryLoading && <LoadingState inline />}
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 
           {!summary && !isSummaryLoading && (
             <div className="sitrep-empty-state">Choose a disaster event log to load the SitRep summary.</div>

@@ -300,11 +300,7 @@ export default function RescuerAccountsPage() {
         }
       />
 
-<<<<<<< HEAD
-      {isLoading && <LoadingState />}
-=======
       {isInitialLoading && <LoadingState />}
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       {error && <div className="form-error">{error}</div>}
 
       {!isInitialLoading && !hasBlockingError && payload && (

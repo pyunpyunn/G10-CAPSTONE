@@ -91,24 +91,14 @@ export function defaultForm() {
   }
 }
 
-<<<<<<< HEAD
-export function firstAssignmentOption(teams, responders) {
-=======
 export function firstAssignmentOption(teams) {
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
   const team = teams.find((item) => item.team_id && item.is_available)
 
   if (team) {
     return `team:${team.team_id}`
   }
 
-<<<<<<< HEAD
-  const responder = responders.find((item) => item.is_available)
-
-  return responder ? `responder:${responder.responder_id}` : ''
-=======
   return ''
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 }
 
 export function emptySummary() {
