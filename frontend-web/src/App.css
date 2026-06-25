@@ -82,6 +82,13 @@
   font-weight: 900;
 }
 
+.brand-logo-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .eyebrow {
   margin: 0 0 7px;
   color: var(--color-nav-active);
@@ -211,12 +218,11 @@
   place-items: center;
   border-radius: 50%;
   color: #ffffff;
-  background:
-    radial-gradient(circle at 34% 32%, rgba(255, 255, 255, 0.78) 0 12%, transparent 13%),
-    linear-gradient(135deg, var(--chart-evacuated), var(--chart-safe));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+  background: transparent;
+  box-shadow: none;
   font-size: 14px;
   font-weight: 900;
+  overflow: hidden;
 }
 
 .landing-brand {
@@ -1143,6 +1149,7 @@
   background: transparent;
   object-fit: contain;
   flex: 0 0 auto;
+  overflow: hidden;
 }
 
 .header-brand strong {

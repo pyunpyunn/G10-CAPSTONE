@@ -11,7 +11,9 @@ class EnsureUserHasRole
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $user = $request->user();
-        $roleKey = $user?->role?->role_key;
+        $roleKey = $user && method_exists($user, 'roleKey')
+            ? $user->roleKey()
+            : $user?->role?->role_key;
 
         if (! $user || ! in_array($roleKey, $roles, true)) {
             return response()->json([

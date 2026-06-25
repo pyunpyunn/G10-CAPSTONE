@@ -1,18 +1,19 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ArchiveController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DisasterBroadcastController;
-use App\Http\Controllers\Api\HouseholdStatusController;
 use App\Http\Controllers\Api\HouseholdMobileController;
+use App\Http\Controllers\Api\HouseholdStatusController;
 use App\Http\Controllers\Api\MappingController;
+use App\Http\Controllers\Api\MobileDeviceController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
-use App\Http\Controllers\Api\ResourceRequestController;
+use App\Http\Controllers\Api\RescueDispatchController;
 use App\Http\Controllers\Api\RescuerAccountController;
 use App\Http\Controllers\Api\RescuerMobileController;
-use App\Http\Controllers\Api\RescueDispatchController;
+use App\Http\Controllers\Api\ResourceRequestController;
 use App\Http\Controllers\Api\SituationReportController;
 use App\Http\Controllers\Api\WeatherController;
 use Illuminate\Support\Facades\Route;
@@ -21,7 +22,7 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])
         ->middleware('throttle:5,1');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'throttle:300,1'])->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 
@@ -91,6 +92,7 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::middleware('role:household_resident,rescuer')->group(function () {
+            Route::post('/mobile/device-token', [MobileDeviceController::class, 'storePushToken']);
             Route::post('/households/{householdId}/status-logs', [HouseholdStatusController::class, 'storeStatusLog']);
         });
 

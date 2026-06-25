@@ -31,19 +31,30 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
   const [pin, setPin] = useState<any>(null);
   const [locationLabel, setLocationLabel] = useState<string>(household.address || '');
   const [houseNumber, setHouseNumber] = useState<string>('');
+  const [buildingName, setBuildingName] = useState<string>('');
+  const [floorNumber, setFloorNumber] = useState<string>('');
   const [unitNumber, setUnitNumber] = useState<string>('');
+  const [roomNumber, setRoomNumber] = useState<string>('');
   const [street, setStreet] = useState<string>('');
   const [barangay, setBarangay] = useState<string>(household.barangay === 'Not recorded' ? '' : household.barangay || '');
   const [city, setCity] = useState<string>(household.city === 'Not recorded' ? '' : household.city || '');
   const [province, setProvince] = useState<string>(household.province === 'Not recorded' ? '' : household.province || '');
   const [memberId, setMemberId] = useState(members[0]?.member_id || '');
   const [relationship, setRelationship] = useState('Head of household');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [findingAddress, setFindingAddress] = useState(false);
 
   const selectedAddress = useMemo(() => {
-    return [unitNumber, houseNumber, street, barangay, city, province].filter(Boolean).join(', ');
-  }, [unitNumber, houseNumber, street, barangay, city, province]);
+    return [buildingName, floorNumber, unitNumber, roomNumber, houseNumber, street, barangay, city, province]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(', ');
+  }, [buildingName, floorNumber, unitNumber, roomNumber, houseNumber, street, barangay, city, province]);
+
+  const rescueAddress = useMemo(() => {
+    return buildRescueAddress(selectedAddress, locationLabel);
+  }, [selectedAddress, locationLabel]);
 
   async function applyPinnedCoordinate(coordinate: any) {
     setPin(coordinate);
@@ -87,13 +98,18 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
       return;
     }
 
-    if (!locationLabel.trim() && !selectedAddress.trim()) {
+    if (!rescueAddress.trim()) {
       Alert.alert('Address required', 'Confirm the household address before saving setup.');
       return;
     }
 
     if (!memberId) {
       Alert.alert('Member required', 'Select which family member is using this device.');
+      return;
+    }
+
+    if (!privacyAccepted) {
+      Alert.alert('Agreement required', 'Confirm that this geotag and address may be used by HQ and assigned rescuers during disaster response.');
       return;
     }
 
@@ -104,9 +120,9 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
         latitude: pin.latitude,
         longitude: pin.longitude,
         accuracy_m: pin.accuracy_m,
-        address_label: locationLabel.trim() || selectedAddress,
+        address_label: rescueAddress,
         house_number: houseNumber.trim(),
-        unit_number: unitNumber.trim(),
+        unit_number: [buildingName, floorNumber, unitNumber, roomNumber].map((part) => part.trim()).filter(Boolean).join(' / '),
         street: street.trim(),
         barangay: barangay.trim(),
         city: city.trim(),
@@ -154,8 +170,19 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
           placeholder="Selected address / landmark"
           placeholderTextColor="#7d8da0"
         />
+        <TextInput
+          style={styles.input}
+          value={buildingName}
+          onChangeText={setBuildingName}
+          placeholder="Building / apartment / boarding house"
+          placeholderTextColor="#7d8da0"
+        />
         <View style={styles.twoColumn}>
+          <TextInput style={[styles.input, styles.flexInput]} value={floorNumber} onChangeText={setFloorNumber} placeholder="Floor" placeholderTextColor="#7d8da0" />
           <TextInput style={[styles.input, styles.flexInput]} value={unitNumber} onChangeText={setUnitNumber} placeholder="Unit" placeholderTextColor="#7d8da0" />
+        </View>
+        <View style={styles.twoColumn}>
+          <TextInput style={[styles.input, styles.flexInput]} value={roomNumber} onChangeText={setRoomNumber} placeholder="Room" placeholderTextColor="#7d8da0" />
           <TextInput style={[styles.input, styles.flexInput]} value={houseNumber} onChangeText={setHouseNumber} placeholder="House no." placeholderTextColor="#7d8da0" />
         </View>
         <TextInput style={styles.input} value={street} onChangeText={setStreet} placeholder="Street / purok" placeholderTextColor="#7d8da0" />
@@ -164,6 +191,10 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
           <TextInput style={[styles.input, styles.flexInput]} value={city} onChangeText={setCity} placeholder="City" placeholderTextColor="#7d8da0" />
         </View>
         <TextInput style={styles.input} value={province} onChangeText={setProvince} placeholder="Province" placeholderTextColor="#7d8da0" />
+        <View style={styles.previewBox}>
+          <Text style={styles.label}>Saved rescue address</Text>
+          <Text style={styles.previewText}>{rescueAddress || 'Complete the address fields above.'}</Text>
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -196,6 +227,15 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
         </View>
       </View>
 
+      <Pressable style={styles.privacyRow} onPress={() => setPrivacyAccepted((value) => !value)}>
+        <View style={[styles.checkBox, privacyAccepted && styles.checkBoxActive]}>
+          {privacyAccepted ? <Ionicons name="checkmark" size={15} color="#fff" /> : null}
+        </View>
+        <Text style={styles.privacyText}>
+          I agree that RESQPERATION may securely store this household geotag and exact address for disaster response, HQ monitoring, and assigned rescuer access only.
+        </Text>
+      </Pressable>
+
       <HouseholdButton
         label={saving ? 'Saving setup...' : 'Complete setup'}
         icon="checkmark-circle-outline"
@@ -204,6 +244,17 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
       />
     </View>
   );
+}
+
+function buildRescueAddress(selectedAddress: string, locationLabel: string) {
+  const cleanSelected = selectedAddress.trim();
+  const cleanLabel = locationLabel.trim();
+
+  if (cleanSelected && cleanLabel && !cleanLabel.toLowerCase().includes(cleanSelected.toLowerCase())) {
+    return `${cleanSelected} - ${cleanLabel}`.slice(0, 255);
+  }
+
+  return (cleanSelected || cleanLabel).slice(0, 255);
 }
 
 const styles = StyleSheet.create({
@@ -273,6 +324,20 @@ const styles = StyleSheet.create({
   flexInput: {
     flex: 1,
   },
+  previewBox: {
+    gap: 4,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: palette.page,
+  },
+  previewText: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
   choiceGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -318,42 +383,41 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-<<<<<<< HEAD
-=======
   helperText: {
     color: palette.textSoft,
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '800',
   },
-  photoRow: {
+  privacyRow: {
     flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'center',
-  },
-  photoPreview: {
-    width: 82,
-    height: 82,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: radius.lg,
-    backgroundColor: palette.secondary,
-    overflow: 'hidden',
+    padding: spacing.md,
+    backgroundColor: palette.card,
   },
-  photo: {
-    width: '100%',
-    height: '100%',
+  checkBox: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: 6,
+    backgroundColor: palette.card,
   },
-  photoActions: {
+  checkBoxActive: {
+    borderColor: palette.navActive,
+    backgroundColor: palette.navActive,
+  },
+  privacyText: {
     flex: 1,
-    gap: 6,
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
   },
-  photoTitle: {
-    color: palette.text,
-    fontSize: 14,
-    fontWeight: '900',
-  },
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 });

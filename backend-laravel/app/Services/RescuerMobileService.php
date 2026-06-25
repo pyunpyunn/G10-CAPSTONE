@@ -889,9 +889,11 @@ class RescuerMobileService
         if (Schema::hasTable('geotagged_locations')) {
             $columns[] = 'gl.latitude as household_latitude';
             $columns[] = 'gl.longitude as household_longitude';
+            $columns[] = 'gl.location_label as household_location_label';
         } else {
             $columns[] = DB::raw('NULL as household_latitude');
             $columns[] = DB::raw('NULL as household_longitude');
+            $columns[] = DB::raw('NULL as household_location_label');
         }
 
         return $query->select($columns);
@@ -1163,6 +1165,7 @@ class RescuerMobileService
             'event_name' => $row->event_name ?? 'Active event',
             'household_id' => $row->household_id,
             'assigned_area' => $row->assigned_area,
+            'destination_label' => $row->household_location_label ?? null,
             'priority_level' => $row->priority_level ?: 'medium',
             'status_key' => $status,
             'status_label' => $this->statusLabel($status),

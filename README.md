@@ -141,6 +141,13 @@ Important development rule:
 - `docs/sql_proposals/2026_06_01_g10_existing_db_gap_review.sql` - superseded historical proposal
 - `docs/sql_proposals/initial/2026_06_03_g10_barangay_profile_review.sql` - review-only Barangay Profile proposal
 
+- `docs/DOCUMENTATION_INDEX.md` - start here for all project documentation.
+- `docs/RESQPERATION_FINAL_DEFENSE_STUDY_GUIDE_AND_DIAGRAMS.md` - final-defense study guide and system diagrams.
+- `docs/RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, and TrackingAid/MappingAid integration draft.
+- `docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md` - current build checklist.
+- `docs/RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - shared MySQL connection guide using only `backend-laravel/.env`.
+- `docs/sql_proposals/` - review-only SQL proposals.
+
 Private local references:
 
 - `FOR DEV/RESQPERATION_UPDATED_STEP_GUIDE.md`

@@ -1384,10 +1384,11 @@ class HouseholdMobileService
             'device_name' => $validated['device_name'] ?? 'Household mobile',
             'platform' => $validated['platform'] ?? 'mobile',
             'app_role' => 'household',
+            'push_provider' => 'expo',
             'location_permission_status' => $validated['location_permission_status'] ?? 'granted',
             'last_seen_at' => $now,
+            'logged_at' => $now,
             'is_active' => 1,
-            'created_at' => $now,
             'updated_at' => $now,
         ];
 
@@ -1396,7 +1397,7 @@ class HouseholdMobileService
         }
 
         foreach (['battery_level', 'signal_strength'] as $column) {
-            if (array_key_exists($column, $validated)) {
+            if (array_key_exists($column, $validated) && $validated[$column] !== null) {
                 $data[$column] = $validated[$column];
             }
         }
@@ -1428,7 +1429,9 @@ class HouseholdMobileService
             return (int) $existing->id;
         }
 
-        DB::table('device_tokens')->insert($data);
+        DB::table('device_tokens')->insert($this->filterColumns('device_tokens', array_merge($data, [
+            'created_at' => $now,
+        ])));
 
         return (int) $deviceId;
     }

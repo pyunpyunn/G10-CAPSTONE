@@ -82,27 +82,26 @@ class AuthService
 
     private function userFromResponderLogin(string $login): ?User
     {
-        if (! Schema::hasTable('responders')) {
+        $responderTable = $this->firstExistingTable(['responders', 'responder']);
+
+        if (! $responderTable) {
             return null;
         }
 
-        $responder = DB::table('responders')
-            ->where(function ($query) use ($login): void {
-                $query->where('responder_code', $login)
-                    ->orWhere('username', $login);
+        $responder = DB::table($responderTable)
+            ->where(function ($query) use ($login, $responderTable): void {
+                $this->orWhereExisting($query, $responderTable, ['responder_code', 'username', 'login_id', 'user_id'], $login);
             })
-            ->when(Schema::hasColumn('responders', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
-            ->first(['user_id', 'username']);
+            ->when(Schema::hasColumn($responderTable, 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->first();
 
         if (! $responder) {
             return null;
         }
 
-        $query = User::query()
-            ->with('role')
+        $query = $this->userQuery()
             ->where(function ($inner) use ($responder): void {
-                $inner->where('user_id', $responder->user_id)
-                    ->orWhere('username', $responder->username);
+                $this->orWhereExisting($inner, 'users', ['user_id', 'username', 'login_id', 'id'], $responder->user_id ?? $responder->username ?? $responder->login_id ?? null);
             });
 
         if (Schema::hasColumn('users', 'deleted_at')) {
@@ -114,17 +113,14 @@ class AuthService
 
     private function userFromSharedUserTable(string $login): ?User
     {
-        $query = User::query()
-            ->with('role');
+        $query = $this->userQuery();
 
         if (Schema::hasColumn('users', 'deleted_at')) {
             $query->whereNull('deleted_at');
         }
 
         $query->where(function ($inner) use ($login): void {
-            $inner->where('username', $login)
-                ->orWhere('email', $login)
-                ->orWhere('user_id', $login);
+            $this->orWhereExisting($inner, 'users', ['username', 'login_id', 'email', 'user_id', 'id'], $login);
 
             if (Schema::hasColumn('users', 'household_id')) {
                 $inner->orWhere('household_id', $login);
@@ -142,22 +138,20 @@ class AuthService
 
     private function userFromHouseholdIdentifier(string $login): ?User
     {
-        if (! Schema::hasTable('households') || ! Schema::hasColumn('users', 'household_id')) {
+        $householdTable = $this->firstExistingTable(['households', 'household']);
+
+        if (! $householdTable || ! Schema::hasColumn('users', 'household_id')) {
             return null;
         }
 
-        $householdQuery = DB::table('households');
+        $householdQuery = DB::table($householdTable);
 
-        if (Schema::hasColumn('households', 'deleted_at')) {
+        if (Schema::hasColumn($householdTable, 'deleted_at')) {
             $householdQuery->whereNull('deleted_at');
         }
 
-        $householdQuery->where(function ($inner) use ($login): void {
-            $inner->where('household_id', $login);
-
-            if (Schema::hasColumn('households', 'household_code')) {
-                $inner->orWhere('household_code', $login);
-            }
+        $householdQuery->where(function ($inner) use ($login, $householdTable): void {
+            $this->orWhereExisting($inner, $householdTable, ['household_id', 'household_code', 'login_id'], $login);
         });
 
         $householdId = $householdQuery->value('household_id');
@@ -166,8 +160,7 @@ class AuthService
             return null;
         }
 
-        $userQuery = User::query()
-            ->with('role')
+        $userQuery = $this->userQuery()
             ->where('household_id', $householdId);
 
         if (Schema::hasColumn('users', 'deleted_at')) {
@@ -179,18 +172,20 @@ class AuthService
 
     private function isHouseholdAccountReady(User $user): bool
     {
-        if ($user->role?->role_key !== 'household_resident') {
+        if ($user->roleKey() !== 'household_resident') {
             return true;
         }
 
-        if (! $user->household_id || ! Schema::hasTable('households')) {
+        $householdTable = $this->firstExistingTable(['households', 'household']);
+
+        if (! $user->household_id || ! $householdTable) {
             return false;
         }
 
-        $query = DB::table('households')
+        $query = DB::table($householdTable)
             ->where('household_id', $user->household_id);
 
-        if (Schema::hasColumn('households', 'deleted_at')) {
+        if (Schema::hasColumn($householdTable, 'deleted_at')) {
             $query->whereNull('deleted_at');
         }
 
@@ -229,5 +224,36 @@ class AuthService
         fclose($socket);
 
         return null;
+    }
+
+    private function userQuery()
+    {
+        $query = User::query();
+
+        if (Schema::hasTable('roles') && Schema::hasColumn('users', 'role_id')) {
+            $query->with('role');
+        }
+
+        return $query;
+    }
+
+    private function firstExistingTable(array $tables): ?string
+    {
+        foreach ($tables as $table) {
+            if (Schema::hasTable($table)) {
+                return $table;
+            }
+        }
+
+        return null;
+    }
+
+    private function orWhereExisting($query, string $table, array $columns, mixed $value): void
+    {
+        foreach ($columns as $column) {
+            if ($value !== null && Schema::hasColumn($table, $column)) {
+                $query->orWhere($column, $value);
+            }
+        }
     }
 }

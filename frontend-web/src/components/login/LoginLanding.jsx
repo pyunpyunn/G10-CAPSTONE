@@ -47,7 +47,9 @@ export default function LoginLanding({ onOpenLogin }) {
       <header className="landing-header">
         <div className="landing-wrap landing-header-inner">
           <a className="landing-brand" href="#top" aria-label="RESQPERATION landing page">
-            <span className="brand-mark">R</span>
+            <span className="brand-mark">
+              <img className="brand-logo-image" src="/favicon.svg" alt="" aria-hidden="true" />
+            </span>
             <span className="landing-brand-text">
               <strong>RESQPERATION</strong>
               <span>Barangay rescue operations</span>

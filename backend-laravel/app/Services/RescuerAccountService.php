@@ -500,7 +500,6 @@ class RescuerAccountService
                 ['key' => 'off_duty', 'label' => 'Off duty'],
                 ['key' => 'unavailable', 'label' => 'Unavailable'],
             ],
-            'catalog' => self::TEAM_CATALOG,
             'note' => 'Team configuration uses the existing rescue_teams table. Deleting a team never deletes rescuer accounts.',
         ];
     }
@@ -525,22 +524,7 @@ class RescuerAccountService
             ])
             ->map(fn (object $team): array => $this->formatTeamConfigCard($team, 'database'));
 
-        $catalogTeams = collect(self::TEAM_CATALOG)
-            ->reject(fn (array $item): bool => $databaseTeams->contains('team_name', $item['team_name']))
-            ->map(fn (array $item): array => $this->formatTeamConfigCard((object) [
-                'team_id' => null,
-                'team_code' => $item['team_code'],
-                'team_name' => $item['team_name'],
-                'team_type' => $item['team_type'],
-                'assigned_purok_id' => null,
-                'leader_responder_id' => null,
-                'duty_status' => 'not_created',
-                'leader_name' => null,
-                'purok_sitio' => null,
-                'barangay_name' => null,
-            ], 'catalog'));
-
-        return $databaseTeams->merge($catalogTeams)->values()->all();
+        return $databaseTeams->values()->all();
     }
 
     private function formatTeamConfigCard(object $team, string $source): array
@@ -642,21 +626,12 @@ class RescuerAccountService
 
     private function teamTypeOptions(): array
     {
-        $catalogTypes = collect(self::TEAM_CATALOG)->pluck('team_type');
         $databaseTypes = DB::table('rescue_teams')
             ->whereNotNull('team_type')
             ->where('team_type', '<>', '')
             ->pluck('team_type');
 
-        return $catalogTypes
-            ->merge($databaseTypes)
-            ->merge([
-                'Incident Command Support',
-                'Logistics',
-                'Security',
-                'Medical',
-                'Search and Rescue',
-            ])
+        return $databaseTypes
             ->unique()
             ->sort()
             ->values()
@@ -1018,20 +993,6 @@ class RescuerAccountService
             ];
         });
 
-        foreach (self::TEAM_CATALOG as $item) {
-            if (! $cards->contains('team_name', $item['team_name'])) {
-                $cards->push([
-                    'team_id' => null,
-                    'team_code' => $item['team_code'],
-                    'team_name' => $item['team_name'],
-                    'team_type' => $item['team_type'],
-                    'duty_status' => 'not_created',
-                    'member_count' => 0,
-                    'deployed_count' => 0,
-                ]);
-            }
-        }
-
         return $cards->values()->all();
     }
 
@@ -1048,17 +1009,7 @@ class RescuerAccountService
                 'source' => 'database',
             ]);
 
-        $catalogTeams = collect(self::TEAM_CATALOG)
-            ->reject(fn (array $item): bool => $databaseTeams->contains('team_name', $item['team_name']))
-            ->map(fn (array $item): array => [
-                'team_id' => null,
-                'team_code' => $item['team_code'],
-                'team_name' => $item['team_name'],
-                'team_type' => $item['team_type'],
-                'source' => 'catalog',
-            ]);
-
-        return $databaseTeams->merge($catalogTeams)->values()->all();
+        return $databaseTeams->values()->all();
     }
 
     private function accountIdOptions(array $teamOptions): array

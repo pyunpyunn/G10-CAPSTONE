@@ -1,15 +1,11 @@
-<<<<<<< HEAD
-import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-=======
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 import { palette, radius, spacing } from '@/constants/resqTheme';
-import { EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
+import { formatPhilippineTime } from '@/utils/time';
+import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
 
 type RescueMapProps = {
   assignments: any[];
@@ -17,9 +13,6 @@ type RescueMapProps = {
   onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
 };
 
-<<<<<<< HEAD
-export function RescueMapScreen({ assignments, activeAssignment }: RescueMapProps) {
-=======
 const defaultRegion = {
   latitude: 10.2898,
   longitude: 123.879,
@@ -135,14 +128,11 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
     startTracking();
   }
 
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
   const mappedAssignments = assignments.filter((item) => item.latitude && item.longitude);
   const urgentCount = assignments.filter((item) => item.priority_level === 'urgent').length;
   const activeCount = assignments.filter((item) =>
     ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(item.status_key)
   ).length;
-  const hasActiveTarget = Boolean(activeAssignment?.latitude && activeAssignment?.longitude);
-  const hasRoute = Array.isArray(activeAssignment?.route?.coordinates) && activeAssignment.route.coordinates.length >= 2;
 
   return (
     <View style={styles.stack}>
@@ -153,21 +143,6 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
       </View>
 
       <View style={styles.card}>
-<<<<<<< HEAD
-        <SectionHeader title="Barangay rescue map" />
-        <View style={styles.webMapFallback}>
-          <Ionicons name="map-outline" size={30} color={palette.navActive} />
-          <Text style={styles.fallbackTitle}>Native map available on mobile</Text>
-          <Text style={styles.fallbackText}>
-            Open this screen in Expo Go on Android or iPhone to view assignment pins and sync live GPS.
-          </Text>
-          {activeAssignment?.assignment_id ? (
-            <StatusBadge label="Active dispatch ready" tone="en_route" />
-          ) : (
-            <StatusBadge label="No active dispatch" tone="neutral" />
-          )}
-        </View>
-=======
         <SectionHeader
           title="Barangay rescue map"
           action={
@@ -213,7 +188,7 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
                 longitude: Number(assignment.longitude),
               }}
               title={assignment.assigned_area || assignment.household_id || 'Assignment'}
-              description={assignment.status_label}
+              description={assignment.destination_label || assignment.status_label}
               pinColor={assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated}
             />
           ))}
@@ -222,7 +197,7 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
             <Marker
               coordinate={activeTarget}
               title="Dispatch destination"
-              description={activeAssignment?.assigned_area || activeAssignment?.household_id}
+              description={activeAssignment?.destination_label || activeAssignment?.assigned_area || activeAssignment?.household_id}
               pinColor={palette.unsafe}
             />
           ) : null}
@@ -239,23 +214,9 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
             </>
           ) : null}
         </MapView>
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 
         {mappedAssignments.length === 0 ? (
           <EmptyState icon="location-outline" title="No mapped assignments" />
-        ) : null}
-
-        {activeAssignment ? (
-          <View style={styles.routeInfo}>
-            <Ionicons name="navigate-outline" size={18} color={palette.evacuated} />
-            <Text style={styles.routeInfoText}>
-              {hasRoute
-                ? `${activeAssignment.route?.distance_km || '-'} km · ${activeAssignment.route?.duration_min || '-'} min road route`
-                : hasActiveTarget
-                  ? 'Waiting for road route. Open this screen on mobile with GPS enabled.'
-                  : 'This assignment has no household geotag target yet.'}
-            </Text>
-          </View>
         ) : null}
 
         {activeAssignment ? (
@@ -285,7 +246,7 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle}>{assignment.assigned_area || assignment.household_id || 'Assigned location'}</Text>
                 <Text style={styles.rowMeta}>
-                  {assignment.latitude && assignment.longitude ? 'Geotag available' : 'No household geotag yet'}
+                  {assignment.destination_label || (assignment.latitude && assignment.longitude ? 'Geotag available' : 'No household geotag yet')}
                 </Text>
               </View>
               <StatusBadge label={assignment.status_label} tone={assignment.status_key} />
@@ -323,30 +284,32 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: palette.card,
   },
-  webMapFallback: {
+  errorStrip: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: spacing.sm,
-    minHeight: 240,
-    borderWidth: 1,
-    borderColor: palette.border,
     borderRadius: radius.md,
-    padding: spacing.lg,
+    padding: spacing.sm,
+    backgroundColor: '#96202012',
+  },
+  errorText: {
+    flex: 1,
+    color: palette.unsafe,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  syncStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    padding: spacing.sm,
     backgroundColor: palette.secondary,
   },
-  fallbackTitle: {
-    color: palette.text,
-    fontSize: 15,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  fallbackText: {
-    maxWidth: 320,
+  syncText: {
     color: palette.textSoft,
     fontSize: 12,
     fontWeight: '800',
-    lineHeight: 18,
-    textAlign: 'center',
   },
   routeInfo: {
     flexDirection: 'row',
@@ -362,28 +325,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-<<<<<<< HEAD
-=======
   map: {
     height: 340,
     overflow: 'hidden',
     borderRadius: radius.md,
   },
-  routeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    backgroundColor: palette.secondary,
-  },
-  routeInfoText: {
-    flex: 1,
-    color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '800',
-  },
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
   smallText: {
     color: palette.textSoft,
     fontSize: 13,

@@ -17,14 +17,30 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 
 - `RESQPERATION_G10_DB_READINESS_CHECK.md` - shared DB readiness and missing table notes.
 - `RESQPERATION_G10_SAFE_SAMPLE_SEED_PLAN.md` - safe sample data plan.
-- `RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - switch between shared MySQL and local SQLite.
+- `RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - connect to the shared MySQL database by editing only `backend-laravel/.env`.
+- `RESQPERATION_SHARED_DB_DATA_SOURCE_RULES.md` - rule that web pages must display only records from the active database connection.
+- `RESQPERATION_SHARED_DB_AUDIT_AND_PUSH_TOKENS.md` - shared DB connectivity, safe seeder review, Expo token storage, and duplicate-data checks.
 - `sql_proposals/` - review-only SQL scripts. Do not run on shared DB without DB member approval.
+- `sql_proposals/2026_06_25_shared_db_read_only_audit.sql` - read-only lookup, duplicate, and device-token audit.
 - `sql_proposals/initial/2026_06_12_g10_trackingaid_mappingaid_integration_draft.sql` - draft only for future TrackingAid/MappingAid shared DB integration.
 - `sql_proposals/initial/2026_06_13_mambaling_household_geotag_update.sql` - review-only Mambaling household geotag update.
 
 ## Final Defense Docs
 
 - `RESQPERATION_FINAL_DEFENSE_STUDY_GUIDE_AND_DIAGRAMS.md` - topics to study, system concept, and Mermaid diagrams.
+- `diagrams/` - detailed final defense diagram set covering system context, roles, auth, HQ workflows, mobile workflows, mapping, dispatch, resources, archive, database, and SSDLC/security.
+- `diagrams/10_household_status_reporting_simulation.md` - household status reporting simulation.
+- `diagrams/11_household_status_flow.md` - household status mobile flow.
+- `diagrams/12_household_analytics_formula.md` - household analytics formula diagram.
+- `diagrams/13_rescuer_dispatching_flow.md` - rescuer dispatching flow.
+- `diagrams/14_resqperation_scope_erd.md` - RESQPERATION-only ERD with external connections.
+- `diagrams/15_household_use_case.md` - household use case.
+- `diagrams/16_rescuer_use_case.md` - rescuer use case.
+- `diagrams/17_hq_admin_web_use_case.md` - HQ/Admin web use case.
+- `diagrams/18_system_architecture.md` - system architecture.
+- `diagrams/19_http_request_methods_process.md` - HTTP request method flow for household, rescuer, and HQ web.
+- `diagrams/20_data_flow_diagram.md` - data flow diagram.
+- `diagrams/21_radio_communication_flow.md` - radio communication flow.
 - `RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, and TrackingAid/MappingAid draft integration plan.
 - `RESQPERATION_RESCUER_RADIO_PTT_PLAN.md` - rescuer radio / push-to-talk plan and implementation resources.
 - `RESQPERATION_RESCUER_RADIO_COMMUNICATION.md` - implemented rescuer radio voice-clip workflow and test guide.

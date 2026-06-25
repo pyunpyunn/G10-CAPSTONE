@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,13 +14,9 @@ import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import * as Network from 'expo-network';
 import { type Href, useRouter } from 'expo-router';
-<<<<<<< HEAD
-import { SafeAreaView } from 'react-native-safe-area-context';
-=======
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as SecureStore from 'expo-secure-store';
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 import { logoutMobile } from '@/api/auth';
+import { savePushRegistration } from '@/api/device';
 import {
   completeHouseholdSetup,
   createTrustedHousehold,
@@ -44,6 +41,7 @@ import { HouseholdSetupScreen } from '@/components/household/HouseholdSetupScree
 import { HouseholdLoading } from '@/components/household/HouseholdUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
+import { getPushRegistration } from '@/utils/pushNotifications';
 
 const deviceUuidKey = 'resq_household_device_uuid';
 const trustedPinKey = 'resq_household_trusted_pin';
@@ -194,6 +192,31 @@ export default function HouseholdHomeScreen() {
       syncDeviceLocation();
     }
   }, [overview?.setup?.is_setup_complete, deviceUuid, syncDeviceLocation]);
+
+  useEffect(() => {
+    if (!deviceUuid) {
+      return;
+    }
+
+    async function registerNotifications() {
+      const registration = await getPushRegistration();
+
+      try {
+        await savePushRegistration({
+          device_uuid: deviceUuid,
+          device_name: 'Household mobile',
+          platform: Platform.OS as 'android' | 'ios',
+          expo_push_token: registration.token,
+          battery_level: realBatteryLevel,
+          notification_permission_status: registration.permissionStatus,
+        });
+      } catch {
+        // Registration retries the next time the authenticated mobile screen opens.
+      }
+    }
+
+    registerNotifications();
+  }, [deviceUuid, realBatteryLevel]);
 
   const currentDevice = useMemo(() => {
     if (!overview?.devices?.length || !deviceUuid) {
