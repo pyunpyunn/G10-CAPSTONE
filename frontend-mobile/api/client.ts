@@ -1,10 +1,16 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
+<<<<<<< Updated upstream
 import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
+=======
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+>>>>>>> Stashed changes
 
 const tokenKey = 'resqperation_mobile_token';
 
 function getApiBaseUrl() {
+<<<<<<< Updated upstream
   const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 
   if (configuredUrl && !isLocalhostUrl(configuredUrl)) {
@@ -32,6 +38,27 @@ function getExpoHost() {
     constants.manifest?.debuggerHost;
 
   return typeof hostUri === 'string' ? hostUri.split(':')[0] : '';
+=======
+  const envUrl =
+    Constants.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL ||
+    Constants.manifest?.extra?.EXPO_PUBLIC_API_BASE_URL ||
+    process.env.EXPO_PUBLIC_API_BASE_URL;
+
+  if (typeof envUrl === 'string' && envUrl.trim().length > 0) {
+    return envUrl;
+  }
+
+  const hostFromDebugger = Constants.manifest?.debuggerHost?.split(':')[0];
+  if (hostFromDebugger) {
+    return `http://${hostFromDebugger}:8000/api/v1`;
+  }
+
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:8000/api/v1';
+  }
+
+  return 'http://127.0.0.1:8000/api/v1';
+>>>>>>> Stashed changes
 }
 
 export const api = axios.create({

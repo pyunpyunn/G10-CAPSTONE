@@ -10,33 +10,33 @@ import {
 
 const featureCards = [
   {
-    title: 'Disaster broadcasting',
-    text: 'Critical alerts, purok targeting, evacuation instructions, and mobile push notification support.',
+    title: 'Disaster Broadcasting',
+    text: 'Broadcast critical alerts, target specific puroks, issue evacuation instructions, and send mobile push notifications.',
     Icon: Radio,
   },
   {
-    title: 'Weather and alert updates',
-    text: 'Designed for PAGASA and government advisory context with full-view tracking for warnings.',
+    title: 'Weather and Alert Updates',
+    text: 'Monitor PAGASA weather updates and government advisories with centralized warning tracking.',
     Icon: CloudSun,
   },
   {
     title: 'Mapping',
-    text: 'Evacuation sites, rescue routes, and compact household status dots for dense barangay maps.',
+    text: 'Visualize evacuation sites, rescue routes, and household status indicators on barangay maps.',
     Icon: Map,
   },
   {
-    title: 'Household status',
-    text: 'Reports and analytics for safe, evacuated, unsafe, injured, missing, and unchecked households.',
+    title: 'Household Status',
+    text: 'Monitor household safety status, including safe, evacuated, injured, missing, and unverified cases.',
     Icon: House,
   },
   {
-    title: 'Rescue dispatch',
-    text: 'Team assignments, dispatch status, outcomes, and field requests connected to household reports.',
+    title: 'Rescue Dispatch',
+    text: 'Manage team assignments, dispatch status, field requests, and response outcomes linked to household reports',
     Icon: Route,
   },
   {
-    title: 'Archive and reports',
-    text: 'Disaster duration, casualties, missing and injured counts, property damage, and situation reports.',
+    title: 'Archive and Reports',
+    text: 'Generate situation reports and maintain historical records of casualties, injuries, missing persons, property damage, and response activities.',
     Icon: Database,
   },
 ]
@@ -52,13 +52,13 @@ export default function LoginLanding({ onOpenLogin }) {
             </span>
             <span className="landing-brand-text">
               <strong>RESQPERATION</strong>
-              <span>Barangay rescue operations</span>
+              <span>COMMAND CENTER</span>
             </span>
           </a>
 
           <nav className="landing-nav" aria-label="Landing navigation">
             <a href="#workflow">Workflow</a>
-            <a href="#basis">Basis</a>
+            <a href="#basis">Framework</a>
             <a href="#features">Features</a>
             <a href="#contact">Contact</a>
           </nav>
@@ -87,27 +87,27 @@ function HeroSection({ onOpenLogin }) {
   return (
     <section className="landing-wrap landing-hero">
       <div>
-        <p className="eyebrow">Barangay DRRM command support</p>
+        <p className="eyebrow">Barangay DRRM Command Center</p>
         <h1>RESQPERATION</h1>
-        <p className="hero-tagline">Barangay rescue operations, organized from alert to archive.</p>
+        <p className="hero-tagline">Command Center operations organized from alert to archive.</p>
         <p className="hero-copy">
-          RESQPERATION is a role-based system for barangay response headquarters: broadcast
-          official alerts, monitor household safety status, dispatch rescue teams, track resources,
-          and archive disaster records after operations.
+          RESQPERATION is a role-based barangay command center platform: broadcast official
+          alerts, monitor household and responder safety, assign field teams, manage requests,
+          and archive incident records for accountability and recovery.
         </p>
 
         <div className="hero-cta">
           <button className="primary-button" type="button" onClick={onOpenLogin}>
-            Access command dashboard
+            Open command center
           </button>
           <a className="secondary-button" href="#workflow">See how it works</a>
         </div>
 
         <div className="basis-row" aria-label="System basis">
-          <span className="basis-chip">RA 10121 aligned</span>
-          <span className="basis-chip">NDRRMP pillars</span>
-          <span className="basis-chip">PAGASA alert context</span>
-          <span className="basis-chip">SDG 11 support</span>
+          <a className="basis-chip" href="https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/2/21121" target="_blank" rel="noreferrer">RA 10121 aligned</a>
+          <a className="basis-chip" href="https://www.preventionweb.net/publication/policies-and-plans/philippines-national-disaster-risk-reduction-and-management-plan" target="_blank" rel="noreferrer">NDRRMP pillars</a>
+          <a className="basis-chip" href="https://pagasa.dost.gov.ph/products-and-services" target="_blank" rel="noreferrer">PAGASA alert context</a>
+          <a className="basis-chip" href="https://sdgs.un.org/goals/goal11" target="_blank" rel="noreferrer">SDG 11 support</a>
         </div>
       </div>
 
@@ -148,15 +148,14 @@ function WorkflowSection() {
     <section className="section" id="workflow">
       <div className="landing-wrap">
         <div className="section-heading">
-          <h2>How the system supports a barangay rescue operation</h2>
-          <p>Each step turns field updates into information the command desk can act on quickly.</p>
+          <h2>How the command center streamlines disaster response</h2>
         </div>
 
         <div className="workflow-grid">
-          <StepCard number="01" title="Declare event" text="Open an active disaster record and reset household status to unchecked for a clean operation cycle." />
-          <StepCard number="02" title="Broadcast alert" text="Send barangay-wide or purok-specific instructions to households and rescue mobile users." />
-          <StepCard number="03" title="Collect reports" text="Track safe, evacuated, unsafe, injured, missing, and unchecked households from verified accounts." />
-          <StepCard number="04" title="Dispatch and archive" text="Assign teams, monitor requests and resources, then close the event with a situation report." />
+          <StepCard number="01" title="Activate incident" text="Create an incident record, assign operational roles, and initiate the command center response cycle." />
+          <StepCard number="02" title="Issue alerts" text="Broadcast official alerts and advisories to households, responders, and designated purok zones." />
+          <StepCard number="03" title="Monitor status" text="Monitor household and responder status, including safe, evacuated, injured, missing, and unverified cases." />
+          <StepCard number="04" title="Coordinate response" text="Assign teams, track field requests, update resources, and close the incident with a situation report." />
         </div>
       </div>
     </section>
@@ -168,15 +167,14 @@ function BasisSection() {
     <section className="section" id="basis">
       <div className="landing-wrap">
         <div className="section-heading">
-          <h2>Built around Philippine DRRM practice</h2>
-          <p>The landing copy is based on official DRRM roles, local risk information, early warning, response coordination, and recovery reporting.</p>
+          <h2>Aligned with Philippine DRRM Frameworks and Practices</h2>
         </div>
 
         <div className="pillar-grid">
-          <StepCard number="PM" title="Prevention and Mitigation" text="Risk maps, household status patterns, and archived records help identify repeated vulnerabilities." />
-          <StepCard number="PR" title="Preparedness" text="Broadcasts, evacuation routes, resource visibility, and assigned accounts support readiness." />
+          <StepCard number="PM" title="Prevention and Mitigation" text="Risk mapping, household data analysis, and archived incident records help identify recurring vulnerabilities." />
+          <StepCard number="PR" title="Preparedness" text="Alert broadcasts, evacuation planning, resource visibility, and role-based user access support preparedness." />
           <StepCard number="RS" title="Response" text="Dispatch tracking connects household reports with rescue teams, medical aid, evacuation, and resources." />
-          <StepCard number="RR" title="Rehabilitation and Recovery" text="Situation reporting and archives preserve casualties, damage, resource actions, and timelines." />
+          <StepCard number="RR" title="Rehabilitation and Recovery" text="Situation reports and archived records document casualties, damages, resource deployments, and recovery timelines." />
         </div>
       </div>
     </section>
@@ -191,20 +189,20 @@ function SdgSection() {
           <div>
             <div className="sdg-mark">11</div>
             <h2 id="sdg-title">Supports SDG 11: resilient communities</h2>
-            <p>SDG 11 includes local disaster risk reduction strategies. RESQPERATION supports that goal by helping barangays organize response data, warnings, evacuation status, and post-disaster records.</p>
+            <p>SDG 11 promotes safer, more resilient communities through disaster risk reduction and preparedness. RESQPERATION supports this goal by helping command centers manage alerts, response operations, evacuation monitoring, and post-disaster records.</p>
           </div>
           <div className="sdg-list">
             <div>
               <strong>Local strategy support</strong>
-              Links household reporting, mapping, dispatching, and records in one barangay-level workflow.
+              Integrates household reporting, mapping, dispatch operations, and incident records into a unified barangay-level workflow.
             </div>
             <div>
               <strong>Inclusive response view</strong>
-              Helps the command desk see unchecked households and urgent status reports during operations.
+              Helps command center personnel identify unsafe households and prioritize urgent status reports during operations.
             </div>
             <div>
               <strong>Evidence for planning</strong>
-              Archived events can support future drills, resource requests, and evacuation improvements.
+              Archived incident records support future drills, resource planning, and evacuation improvements.
             </div>
           </div>
         </div>
@@ -219,7 +217,6 @@ function FeatureSection() {
       <div className="landing-wrap">
         <div className="section-heading">
           <h2>Feature overview</h2>
-          <p>Simple modules for the work a barangay response headquarters needs during and after a disaster.</p>
         </div>
 
         <div className="feature-grid">
@@ -243,8 +240,7 @@ function VisualPanelsSection() {
     <section className="section" aria-labelledby="visuals-title">
       <div className="landing-wrap">
         <div className="section-heading">
-          <h2 id="visuals-title">Operational picture panels</h2>
-          <p>Original prototype visuals are used here instead of copyrighted photographs or agency logos.</p>
+          <h2 id="visuals-title">Operational Dashboard Views</h2>
         </div>
 
         <div className="photo-grid">
@@ -253,8 +249,8 @@ function VisualPanelsSection() {
               <div className="screen-block" />
             </div>
             <div className="visual-card-content">
-              <h3>Command desk view</h3>
-              <p>Dashboard status, requests, resources, and dispatch activity in one headquarters view.</p>
+              <h3>Command Desk View</h3>
+              <p>Monitor incident status, resource availability, requests, and dispatch activities from a centralized command dashboard.</p>
             </div>
           </article>
           <article className="soft-card visual-card">
@@ -266,8 +262,8 @@ function VisualPanelsSection() {
               </div>
             </div>
             <div className="visual-card-content">
-              <h3>Evacuation and routing</h3>
-              <p>Compact pins and route lines keep maps usable even with many households.</p>
+              <h3>Evacuation and Routing</h3>
+              <p>Visualize evacuation sites, response routes, and household locations on a clear and scalable barangay map.</p>
             </div>
           </article>
           <article className="soft-card visual-card">
@@ -280,8 +276,8 @@ function VisualPanelsSection() {
               </div>
             </div>
             <div className="visual-card-content">
-              <h3>Mobile status reports</h3>
-              <p>Households and rescuers submit field information that updates the command dashboard.</p>
+              <h3>Mobile Status Reports</h3>
+              <p>Households and responders submit field reports that automatically update the command center dashboard.</p>
             </div>
           </article>
         </div>
@@ -312,22 +308,22 @@ function ContactSection() {
       <div className="landing-wrap">
         <div className="contact-panel">
           <div className="soft-card">
-            <p className="eyebrow">Reach out</p>
-            <h2>Contact the developers</h2>
-            <p>For demo access, capstone review, or barangay workflow notes, contact the RESQPERATION development team.</p>
+            <p className="eyebrow">Get In Touch</p>
+            <h2>Contact Us</h2>
+            <p>Have questions about RESQPERATION? Reach out to discuss system capabilities, research objectives, implementation opportunities, or request a live demonstration.</p>
             <div className="contact-list">
               <div className="contact-item">
                 <div className="contact-icon"><ShieldUser size={18} /></div>
                 <div>
-                  <strong>Capstone Development Team</strong>
-                  <span>resqperation.devteam@example.com</span>
+                  <strong>Project Information</strong>
+                  <span>Questions regarding system features, documentation, architecture, and research objectives.</span>
                 </div>
               </div>
               <div className="contact-item">
                 <div className="contact-icon"><Radio size={18} /></div>
                 <div>
                   <strong>System demo and coordination</strong>
-                  <span>Available for BDRRMO and barangay response walkthroughs</span>
+                  <span>Available for BDRRMO and command center walkthroughs. Learn how RESQPERATION supports barangay disaster risk reduction and management operations.</span>
                 </div>
               </div>
             </div>
@@ -335,11 +331,17 @@ function ContactSection() {
 
           <form className="soft-card contact-form" onSubmit={submitInquiry}>
             <div className="form-row">
-              <input type="text" name="name" placeholder="Name" aria-label="Name" />
-              <input type="text" name="organization" placeholder="Organization" aria-label="Organization" />
+            <strong>Full Name</strong>
+            <strong>Organization</strong>
             </div>
-            <input type="email" name="email" placeholder="Email" aria-label="Email" />
-            <textarea name="message" placeholder="Message" aria-label="Message" />
+            <div className="form-row">
+              <input type="text" name="name" placeholder="Enter your FullName" aria-label="Name" />
+              <input type="text" name="organization" placeholder="Enter your Organization" aria-label="Organization" />
+            </div>
+            <strong>Email Address </strong>
+            <input type="email" name="email" placeholder="Enter your Email" aria-label="Email" />
+            <strong>Tell us about your Inquiry</strong>
+            <textarea name="message" placeholder="Enter your Message" aria-label="Message" />
             <button className="primary-button" type="submit">Send inquiry</button>
           </form>
         </div>
@@ -352,13 +354,7 @@ function LandingFooter() {
   return (
     <footer className="landing-footer">
       <div className="landing-wrap footer-inner">
-        <span>RESQPERATION capstone prototype. Original UI visuals, no public registration, credential-based access only.</span>
-        <div className="footer-links" aria-label="Reference links">
-          <a href="https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/2/21121" target="_blank" rel="noreferrer">RA 10121</a>
-          <a href="https://www.preventionweb.net/publication/policies-and-plans/philippines-national-disaster-risk-reduction-and-management-plan" target="_blank" rel="noreferrer">NDRRMP 2020-2030</a>
-          <a href="https://pagasa.dost.gov.ph/products-and-services" target="_blank" rel="noreferrer">PAGASA</a>
-          <a href="https://sdgs.un.org/goals/goal11" target="_blank" rel="noreferrer">SDG 11</a>
-        </div>
+        <span>Copyright © 2026 RESQPERATION All Right Reserved</span>
       </div>
     </footer>
   )

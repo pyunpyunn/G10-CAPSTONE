@@ -959,7 +959,7 @@
 }
 
 .footer-inner {
-  justify-content: space-between;
+  justify-content: center;
   gap: 18px;
 }
 
