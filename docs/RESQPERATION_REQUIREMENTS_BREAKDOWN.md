@@ -263,7 +263,7 @@ GET  /api/v1/disaster-events/{id}/broadcasts
 Beginner code:
 
 - Start by saving broadcast logs in DB.
-- Add push notifications later.
+- Send mobile push notifications through OneSignal after saving the broadcast record.
 
 ### Frontend
 
@@ -802,4 +802,3 @@ Before coding, each team member should understand:
 - how Leaflet displays markers
 - how Expo stores auth tokens
 - how CSV/PDF exports work
-

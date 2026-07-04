@@ -17,7 +17,7 @@ stateDiagram-v2
   Returned: Shows return reason and missing/duplicate reference
   Returned --> NeedsValidation: Resubmitted later with corrected information
 
-  Validated --> Forwarded: Forward to TrackingAid/MappingAid handoff queue
+  Validated --> Forwarded: Forward to TrackingAid handoff table
   Forwarded: TrackingAid owns release, delivery, fulfillment after handoff
 
   Rejected --> ArchivedReview
@@ -34,7 +34,7 @@ sequenceDiagram
   participant Service as ResourceRequestService
   participant DB as Active DB
   participant Admin as HQ/Admin Web
-  participant Tracking as TrackingAid/MappingAid
+  participant Tracking as TrackingAid DB
 
   Source->>API: POST /api/v1/resource-requests
   API->>Service: Validate required fields
@@ -55,8 +55,9 @@ sequenceDiagram
   alt Forwardable request
     Admin->>API: POST /resource-requests/{id}/forward
     API->>Service: Create handoff reference
-    Service->>DB: Mark TrackingAid handoff pending/forwarded
-    Service-->>Tracking: Future DB/API handoff when available
+    Service->>Tracking: Upsert into resqperation_forwarded_requests
+    Tracking-->>Service: Handoff row saved
+    Service->>DB: Mark request forwarded with tracking reference
   else Returned request
     Admin->>API: POST /resource-requests/{id}/return
     API->>Service: Require return reason

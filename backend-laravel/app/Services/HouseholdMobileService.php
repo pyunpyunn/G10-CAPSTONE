@@ -266,7 +266,7 @@ class HouseholdMobileService
             return response()->json(['message' => 'This account is not linked to a household record.'], 403);
         }
 
-        foreach (['household_status_logs', 'household_statuses', 'household_members'] as $table) {
+        foreach (['household_status_logs', 'household_statuses', 'household_members', 'household_disasters'] as $table) {
             if (! Schema::hasTable($table)) {
                 return $this->missingTableResponse($table);
             }
@@ -342,6 +342,15 @@ class HouseholdMobileService
                 'created_at' => $now,
                 'updated_at' => $now,
             ]), 'status_log_id');
+
+            $this->saveLatestHouseholdStatusFromMemberStatuses(
+                $activeEvent['event_id'],
+                $householdId,
+                $validated,
+                $user?->user_id,
+                $deviceId,
+                $now
+            );
 
             $this->writeAuditLog($request, 'mobile_member_status', 'household_status_logs', (string) $statusLogId, array_merge($validated, [
                 'member_id' => $memberId,
@@ -1384,7 +1393,7 @@ class HouseholdMobileService
             'device_name' => $validated['device_name'] ?? 'Household mobile',
             'platform' => $validated['platform'] ?? 'mobile',
             'app_role' => 'household',
-            'push_provider' => 'expo',
+            'push_provider' => 'onesignal',
             'location_permission_status' => $validated['location_permission_status'] ?? 'granted',
             'last_seen_at' => $now,
             'logged_at' => $now,
@@ -1469,10 +1478,11 @@ class HouseholdMobileService
             ->where('disaster_id', $eventId)
             ->where('household_id', $householdId)
             ->first();
+        $needsDispatch = in_array($validated['status_key'], ['unsafe', 'needs_help'], true);
 
         $data = $this->filterColumns('household_disasters', [
             'current_status_id' => $statusId,
-            'last_status_source' => 'household_mobile',
+            'last_status_source' => $validated['status_source'] ?? 'household_mobile',
             'last_status_notes' => $validated['notes'] ?? null,
             'last_reported_by_user_id' => $userId,
             'last_device_token_id' => $deviceId,
@@ -1480,8 +1490,8 @@ class HouseholdMobileService
             'last_longitude' => $validated['longitude'] ?? null,
             'last_battery_level' => $validated['battery_level'] ?? null,
             'last_reported_at' => $now,
-            'priority_level' => $validated['status_key'] === 'needs_help' ? 'urgent' : 'monitor',
-            'needs_dispatch' => $validated['status_key'] === 'needs_help',
+            'priority_level' => $needsDispatch ? 'urgent' : 'monitor',
+            'needs_dispatch' => $needsDispatch,
             'updated_at' => $now,
         ]);
 
@@ -1500,6 +1510,69 @@ class HouseholdMobileService
             'initial_status_id' => $statusId,
             'created_at' => $now,
         ])));
+    }
+
+    private function saveLatestHouseholdStatusFromMemberStatuses(string $eventId, string $householdId, array $validated, ?string $userId, ?int $deviceId, $now): void
+    {
+        $statusKey = $this->householdRollupStatusKey($householdId, $eventId);
+        $status = $this->resolveStatus($statusKey);
+
+        if (! $status) {
+            return;
+        }
+
+        $notes = json_encode([
+            'report_type' => 'household_member_rollup',
+            'mobile_status_key' => $statusKey,
+            'mobile_status_label' => $this->mobileStatusLabel($statusKey, null),
+            'user_notes' => $this->householdRollupNote($statusKey),
+            'latest_member_status_key' => $validated['status_key'],
+        ], JSON_UNESCAPED_SLASHES);
+
+        $this->saveLatestDisasterStatus($eventId, $householdId, $status['status_id'], array_merge($validated, [
+            'status_key' => $statusKey,
+            'status_source' => 'household_member_mobile',
+            'notes' => $notes,
+        ]), $userId, $deviceId, $now);
+    }
+
+    private function householdRollupStatusKey(string $householdId, string $eventId): string
+    {
+        $memberStatuses = collect($this->memberStatusRows($householdId, $eventId))
+            ->pluck('status_key')
+            ->filter()
+            ->values();
+
+        if ($memberStatuses->contains('needs_help')) {
+            return 'needs_help';
+        }
+
+        if ($memberStatuses->contains('unsafe')) {
+            return 'unsafe';
+        }
+
+        if ($memberStatuses->contains('evacuated')) {
+            return 'evacuated';
+        }
+
+        if ($memberStatuses->contains('safe')) {
+            return 'safe';
+        }
+
+        return 'safe';
+    }
+
+    private function householdRollupNote(string $statusKey): string
+    {
+        if (in_array($statusKey, ['unsafe', 'needs_help'], true)) {
+            return 'At least one family member needs checking or rescue.';
+        }
+
+        if ($statusKey === 'evacuated') {
+            return 'Latest family member reports include evacuation.';
+        }
+
+        return 'Latest family member reports are safe.';
     }
 
     private function saveLatestDeviceForStatus(string $householdId, ?int $deviceId, array $validated, $now): void

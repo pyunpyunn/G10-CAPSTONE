@@ -199,14 +199,17 @@ export default function HouseholdHomeScreen() {
     }
 
     async function registerNotifications() {
-      const registration = await getPushRegistration();
+      const registration = await getPushRegistration(deviceUuid);
 
       try {
         await savePushRegistration({
           device_uuid: deviceUuid,
           device_name: 'Household mobile',
           platform: Platform.OS as 'android' | 'ios',
-          expo_push_token: registration.token,
+          player_id: registration.playerId,
+          push_token: registration.pushToken,
+          push_provider: registration.pushProvider,
+          one_signal_user_id: registration.oneSignalUserId,
           battery_level: realBatteryLevel,
           notification_permission_status: registration.permissionStatus,
         });

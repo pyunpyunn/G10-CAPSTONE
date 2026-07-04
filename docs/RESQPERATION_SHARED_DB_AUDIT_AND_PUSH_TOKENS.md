@@ -1,4 +1,4 @@
-# RESQPERATION Shared DB Audit and Expo Push Tokens
+# RESQPERATION Shared DB Audit and OneSignal Push Tokens
 
 ## Current Connection Status
 
@@ -22,13 +22,12 @@ php artisan db:show
 
 Do not run `migrate:fresh`, `db:wipe`, or the sample seeders on the shared DB.
 
-The current device registration audit found:
+The device registration target is now OneSignal:
 
-- 7 registered device rows
-- 7 rows identified with `push_provider = expo`
-- 5 rows with a real battery sample
-- 0 Expo push tokens until an EAS development/production build is installed
-  and notification permission is granted
+- `push_provider` should be `onesignal`
+- `device_tokens.player_id` stores the OneSignal Player ID / push subscription ID
+- `notification_permission_status`, `last_seen_at`, and `is_active` must be updated by the mobile login flow
+- `expo_push_token` is no longer used by RESQPERATION mobile notifications
 
 ## Seeder Review
 
@@ -42,19 +41,20 @@ The current device registration audit found:
 The application schema is owned by the shared DB. Laravel's default migrations
 only cover framework tables and must not be used to rebuild the shared schema.
 
-## Expo Push Token Flow
+## OneSignal Push Token Flow
 
-The mobile app now performs this flow after an authenticated household or
-rescuer screen opens:
+The mobile app now performs this flow immediately after a successful household
+or rescuer login. The authenticated role screens also retry registration when
+opened:
 
 1. Ask the device for notification permission.
 2. Create/read the persistent mobile device UUID.
-3. Request an Expo push token.
-4. Send the token to `POST /api/v1/mobile/device-token`.
+3. Initialize OneSignal using `EXPO_PUBLIC_ONESIGNAL_APP_ID`.
+4. Read the OneSignal Player ID / push subscription ID.
+5. Send the token to `POST /api/v1/mobile/device-token`.
 5. Laravel updates an existing device row or inserts a new row.
-6. Laravel prefers `device_tokens.expo_push_token`.
-7. Laravel uses legacy `device_tokens.player_id` only when the Expo-specific
-   column is absent.
+6. Laravel stores the token in `device_tokens.player_id`.
+7. Laravel stores `push_provider = onesignal`.
 8. The permission state, platform, app role, device name, and last-seen time
    are also stored when those columns exist.
 9. The current shared schema has no `user_id` or `responder_id` in
@@ -72,12 +72,12 @@ Relevant files:
 - `backend-laravel/app/Http/Controllers/Api/MobileDeviceController.php`
 - `backend-laravel/app/Services/MobileDeviceService.php`
 
-An EAS project ID is required for production Expo push tokens. Run `eas init`
-for the Expo project before a production build. The app safely retries token
-registration on the next authenticated app open when registration fails.
+OneSignal requires a development or production build. Expo Go is not enough for
+the OneSignal native SDK. The app safely retries token registration on the next
+authenticated app open when registration fails.
 
-Expo Go does not support remote push notifications for this SDK. Use the
-development client configuration in `frontend-mobile/eas.json`:
+Use the development client configuration in `frontend-mobile/eas.json` for
+real push testing:
 
 For ordinary Expo Go testing:
 
@@ -86,14 +86,11 @@ cd frontend-mobile
 npm start
 ```
 
-This explicitly generates an Expo Go QR code. Do not use the development
-client QR unless the development build has already been installed on the
-phone.
+This is only for ordinary UI testing. Use the development build for OneSignal.
 
 ```bash
 cd frontend-mobile
 npx eas-cli login
-npx eas-cli init
 npx eas-cli build --profile development --platform android
 ```
 
@@ -105,8 +102,8 @@ npx eas-cli build --profile development --platform ios
 ```
 
 After installing the development build, sign in as a household or rescuer.
-The app asks for operating-system notification permission, obtains the Expo
-push token, and sends it to Laravel for database storage.
+The app asks for operating-system notification permission, obtains the OneSignal
+Player ID, and sends it to Laravel for database storage.
 
 Start Metro for the installed development build with:
 
@@ -114,26 +111,33 @@ Start Metro for the installed development build with:
 npm run start:dev
 ```
 
-Set the EAS project UUID in `frontend-mobile/.env` after `eas init`:
+Set the OneSignal App ID in `frontend-mobile/.env`:
 
 ```env
-EXPO_PUBLIC_EAS_PROJECT_ID=your-eas-project-uuid
+EXPO_PUBLIC_ONESIGNAL_APP_ID=your-onesignal-app-id
 ```
 
-## Why Some Device Columns Can Be NULL
+## Device Token Storage Rules
 
 | Column | Expected value |
 |---|---|
-| `push_provider` | `expo` for RESQPERATION mobile registrations. Existing app rows can be safely backfilled to `expo`. |
-| `expo_push_token` | Present only after the installed EAS build receives notification permission and Expo returns a real token. Expo Go cannot create this remote-push token. |
-| `player_id` | Remains `NULL`. It is a legacy OneSignal field and RESQPERATION does not use OneSignal. |
-| `battery_level` | Updated from the physical device. Old rows with no battery sample remain `NULL`; a value must not be invented. |
-| `signal_strength` | Remains nullable because Expo does not expose a reliable cross-platform numeric cellular/Wi-Fi signal percentage. Network connection type is shown in the app instead. |
+| `push_provider` | `onesignal` for RESQPERATION mobile registrations. |
+| `player_id` | OneSignal Player ID / push subscription ID. If permission is denied or unsupported, Laravel stores an explicit `unavailable:{status}:{device_uuid}` marker instead of leaving the field blank. |
+| `expo_push_token` | Not used. RESQPERATION no longer writes Expo push tokens. If this old column exists in the shared DB, ignore it for current notification checks. |
+| `push_token` | Native OneSignal push token when available. If not available yet, Laravel stores the OneSignal Player ID marker instead of leaving the field blank. |
+| `one_signal_user_id` | OneSignal user ID when available. If not available yet, Laravel stores the OneSignal Player ID marker instead of leaving the field blank. |
+| `battery_level` | Updated from the physical device when available. New registration rows default to `0` until a real reading is received. |
+| `signal_strength` | New registration rows default to `0` until a real network signal value is available. |
 | `notification_permission_status` | Updated to `granted`, `denied`, or another real result when the installed development/production build requests permission. |
 
-Do not replace unknown telemetry or tokens with `0`, placeholder strings, or a
-token copied from another device. That would make dispatch and notification
-data inaccurate.
+Do not copy a token from another device. Placeholder tokens are created only by
+the app/backend to mark unsupported or denied-permission devices. Notification
+sending must target real OneSignal player IDs only.
+
+Laravel sends mobile pushes through `OneSignalNotificationService` for disaster
+broadcasts and new rescue dispatch assignments. The sender reads active,
+permission-granted rows from `device_tokens` and ignores `unavailable:*`
+placeholder Player IDs.
 
 ## Query: Check Push Token Columns
 
@@ -153,19 +157,41 @@ household_id
 platform
 app_role
 push_provider
-expo_push_token
+player_id
+push_token
+one_signal_user_id
 notification_permission_status
 last_seen_at
 is_active
 ```
 
-If `expo_push_token` exists:
+Count OneSignal registration readiness:
 
 ```sql
 SELECT
     COUNT(*) AS registered_devices,
-    SUM(expo_push_token IS NOT NULL AND expo_push_token <> '') AS devices_with_expo_token,
+    SUM(player_id IS NOT NULL AND player_id <> '') AS devices_with_player_id,
+    SUM(player_id IS NOT NULL
+        AND player_id <> ''
+        AND player_id NOT LIKE 'unavailable:%') AS devices_with_sendable_onesignal_id,
     SUM(notification_permission_status = 'granted') AS permission_granted
+FROM device_tokens;
+```
+
+Check the required fields that should not be blank after a mobile login:
+
+```sql
+SELECT
+    SUM(device_uuid IS NULL OR device_uuid = '') AS missing_device_uuid,
+    SUM(platform IS NULL OR platform = '') AS missing_platform,
+    SUM(app_role IS NULL OR app_role = '') AS missing_app_role,
+    SUM(push_provider IS NULL OR push_provider = '') AS missing_push_provider,
+    SUM(player_id IS NULL OR player_id = '') AS missing_player_id,
+    SUM(push_token IS NULL OR push_token = '') AS missing_push_token,
+    SUM(one_signal_user_id IS NULL OR one_signal_user_id = '') AS missing_one_signal_user_id,
+    SUM(notification_permission_status IS NULL OR notification_permission_status = '') AS missing_permission_status,
+    SUM(last_seen_at IS NULL) AS missing_last_seen_at,
+    SUM(is_active IS NULL) AS missing_is_active
 FROM device_tokens;
 ```
 
@@ -180,24 +206,12 @@ SELECT
     app_role,
     platform,
     notification_permission_status,
-    CONCAT(LEFT(expo_push_token, 18), '...') AS masked_expo_token,
+    push_provider,
+    CONCAT(LEFT(player_id, 18), '...') AS masked_player_id,
     last_seen_at,
     is_active
 FROM device_tokens
 ORDER BY last_seen_at DESC;
-```
-
-If only the old `player_id` column exists:
-
-```sql
-SELECT
-    id,
-    household_id,
-    CONCAT(LEFT(player_id, 18), '...') AS masked_legacy_token,
-    updated_at
-FROM device_tokens
-WHERE player_id IS NOT NULL AND player_id <> ''
-ORDER BY updated_at DESC;
 ```
 
 ## Duplicate Review

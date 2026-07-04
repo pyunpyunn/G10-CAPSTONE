@@ -58,7 +58,7 @@ flowchart LR
   subgraph External["External Actors"]
     S1["SafeTrack provides household accounts"]
     E1["EvaTrack sends requests"]
-    T1["TrackingAid/MappingAid receives validated handoff later"]
+    T1["TrackingAid receives validated handoff rows"]
     W1["Weather source provides snapshot/advisory"]
   end
 

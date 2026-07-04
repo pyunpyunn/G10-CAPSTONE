@@ -31,6 +31,11 @@ class ResourceRequestController extends Controller
         return $this->service->store($request);
     }
 
+    public function externalStore(Request $request): JsonResponse
+    {
+        return $this->service->storeExternal($request);
+    }
+
     public function validateResource(Request $request, string $requestId): JsonResponse
     {
         return $this->service->validateResource($request, $requestId);

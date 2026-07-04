@@ -1,6 +1,6 @@
 # RESQPERATION: Barangay Rescue Operations and Disaster Response Management System
 
-RESQPERATION is a capstone project for barangay disaster response operations. The system helps HQ/Admin users monitor disaster events, broadcast alerts, review household safety reports, monitor rescue dispatch, validate resource requests, and keep situation reports and archives. Mobile access is planned for household and rescuer users, but the current development focus is the HQ/Admin web system.
+RESQPERATION is a capstone project for barangay disaster response operations. The system helps HQ/Admin users monitor disaster events, broadcast alerts, review household safety reports, monitor rescue dispatch, validate resource requests, and keep situation reports and archives. It also includes Expo mobile access for household residents and rescuers through the same Laravel API.
 
 ## Team Members
 
@@ -18,20 +18,23 @@ RESQPERATION is a capstone project for barangay disaster response operations. Th
 - Mobile Frontend: Expo React Native
 - HTTP Client: Axios
 - UI Icons: Lucide React
-- Mapping: Leaflet / React Leaflet planned for web mapping modules
+- Mapping: Leaflet / React Leaflet for web maps, React Native Maps / external map links for mobile maps
+- Push Notifications: OneSignal
 - Testing: PHPUnit for Laravel, ESLint and Vite build checks for React
 
 ## Main Roles or Users
 
 - HQ/Admin: Uses the web dashboard to manage operations, review reports, create rescuer/HQ accounts, validate requests, and generate reports.
-- Rescuer: Uses the mobile app login. Full rescuer mobile operations are planned after HQ/Admin backend modules.
-- Household Resident: Uses the mobile app login. Household accounts are expected to come from the external SafeTrack system.
+- Super Admin: Uses the web dashboard to access system-wide administration and inquiries where enabled.
+- Rescuer: Uses the mobile app to receive assignments, update route/status, submit field reports, request resources, and use radio/PTT voice clips.
+- Household Resident: Uses the mobile app to complete first-time geotag setup, update household status, manage family/trusted household views, and access evacuation QR.
 - Shared Database Modules:
   - Household account records may come from the shared SafeTrack tables.
   - Resource/personnel requests may be read from shared request tables.
-  - Validated requests are marked ready for tracking in the same database.
+  - EvaTrack can send resource/personnel requests into RESQPERATION through the external request intake endpoint.
+  - Validated requests are forwarded to TrackingAid through the configured second database handoff table.
   - Weather providers such as PAGASA/OpenMeteo are treated as data sources, not separate capstone systems.
-  - ExpoPush is treated as a notification provider, not a separate capstone system.
+  - OneSignal is the active mobile push notification provider.
 
 ## Default Login Credentials
 
@@ -97,9 +100,9 @@ ID note:
 - [x] Resources & Requests module backend and frontend
 - [x] Situation Reporting module backend and frontend
 - [x] Archive module backend and frontend
-- [ ] Push notification sending and receiving
+- [x] Push notification sending and receiving foundation through OneSignal
 
-Checklist note: checked module items mean the backend routes, frontend pages, and current build/lint/test checks are present. Push notification delivery is still pending.
+Checklist note: checked module items mean the backend routes, frontend pages, and current build/lint/test checks are present. OneSignal is implemented for device registration and Laravel push sending; final push QA still requires a real Android/iOS development or production build with real OneSignal credentials.
 
 ## Current Structure Notes
 
@@ -144,6 +147,9 @@ Important development rule:
 - `docs/DOCUMENTATION_INDEX.md` - start here for all project documentation.
 - `docs/RESQPERATION_FINAL_DEFENSE_STUDY_GUIDE_AND_DIAGRAMS.md` - final-defense study guide and system diagrams.
 - `docs/RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, and TrackingAid/MappingAid integration draft.
+- `docs/RESQPERATION_TRACKINGAID_REQUEST_INTEGRATION_GUIDE.md` - complete EvaTrack intake and TrackingAid request handoff guide.
+- `docs/RESQPERATION_ONESIGNAL_MOBILE_SETUP.md` - OneSignal mobile setup and token registration flow.
+- `docs/RESQPERATION_SYSTEM_CLEANUP_AND_CURRENT_STATE.md` - latest cleanup notes and current system status.
 - `docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md` - current build checklist.
 - `docs/RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - shared MySQL connection guide using only `backend-laravel/.env`.
 - `docs/sql_proposals/` - review-only SQL proposals.
@@ -193,10 +199,17 @@ Mobile frontend:
 ```bash
 cd frontend-mobile
 npm install
-npx expo start
+npm run start:go
+npm run start:dev
 npx tsc --noEmit
 npm run lint
 ```
+
+Mobile command notes:
+
+- `npm run start:go` runs ordinary Expo Go UI testing.
+- `npm run start:dev` runs Metro for an installed development build.
+- OneSignal and native maps require a development or production build, not plain Expo Go.
 
 Mobile API connection:
 
@@ -205,6 +218,8 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.112.109:8000/api/v1
 ```
 
 For Expo Go on Android/iPhone, the Laravel backend must run with `--host=0.0.0.0` so the phone can reach the API through the laptop Wi-Fi IP.
+
+Use the QR code shown by `npm start` and scan it with Expo Go on the actual phone. Emulator commands are optional and are not required for normal mobile testing.
 
 Local development URLs:
 

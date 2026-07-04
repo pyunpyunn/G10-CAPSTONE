@@ -2,92 +2,157 @@ import Constants from 'expo-constants';
 import { Alert, Platform } from 'react-native';
 
 export type PushRegistration = {
-  token: string | null;
+  playerId: string | null;
+  oneSignalUserId: string | null;
+  pushToken: string | null;
+  pushProvider: 'onesignal';
   permissionStatus: 'granted' | 'denied' | 'undetermined' | 'unavailable' | 'error';
 };
 
+let oneSignalReady = false;
+let unsupportedNoticeShown = false;
+let settingsNoticeShown = false;
+
 export async function configureNotificationHandler() {
+  await initializeOneSignal();
+}
+
+export async function getPushRegistration(externalUserId?: string): Promise<PushRegistration> {
+  const oneSignalAppId = oneSignalAppIdFromConfig();
+
   if (!supportsRemotePushNotifications()) {
+    await explainNotificationBuildRequirement();
+
+    return emptyOneSignalRegistration('unavailable');
+  }
+
+  if (!oneSignalAppId) {
+    return emptyOneSignalRegistration('error');
+  }
+
+  return getOneSignalRegistration(oneSignalAppId, externalUserId);
+}
+
+async function initializeOneSignal() {
+  const appId = oneSignalAppIdFromConfig();
+
+  if (!appId || oneSignalReady || !supportsRemotePushNotifications()) {
     return;
   }
 
-  const Notifications = await import('expo-notifications');
-
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
+  try {
+    const { OneSignal } = await import('react-native-onesignal');
+    OneSignal.initialize(appId);
+    oneSignalReady = true;
+  } catch {
+    oneSignalReady = false;
+  }
 }
 
-export async function getPushRegistration(): Promise<PushRegistration> {
-  if (!supportsRemotePushNotifications()) {
-    return { token: null, permissionStatus: 'unavailable' };
-  }
-
+async function getOneSignalRegistration(
+  appId: string,
+  externalUserId?: string
+): Promise<PushRegistration> {
   try {
-    const Notifications = await import('expo-notifications');
+    const { OneSignal } = await import('react-native-onesignal');
 
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('disaster-alerts', {
-        name: 'Disaster alerts',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        sound: 'default',
+    if (!oneSignalReady) {
+      OneSignal.initialize(appId);
+      oneSignalReady = true;
+    }
+
+    if (externalUserId) {
+      OneSignal.login(externalUserId);
+      OneSignal.User.addTags({
+        resqperation_device_uuid: externalUserId,
+        app_role: 'mobile',
       });
     }
 
-    let permission = await Notifications.getPermissionsAsync();
+    const hasPermission = await OneSignal.Notifications.getPermissionAsync();
+    let accepted = hasPermission;
 
-    if (permission.status !== 'granted') {
-      const accepted = await confirmNotificationConsent();
+    if (!hasPermission) {
+      const canAsk = await OneSignal.Notifications.canRequestPermission();
 
-      if (!accepted) {
+      if (!canAsk) {
+        await explainNotificationSettingsRequired();
+
         return {
-          token: null,
-          permissionStatus: permission.status === 'denied' ? 'denied' : 'undetermined',
+          pushToken: null,
+          playerId: await OneSignal.User.pushSubscription.getIdAsync(),
+          oneSignalUserId: await OneSignal.User.getOnesignalId(),
+          pushProvider: 'onesignal',
+          permissionStatus: 'denied',
         };
       }
 
-      permission = await Notifications.requestPermissionsAsync();
+      const consent = await confirmNotificationConsent();
+
+      if (!consent) {
+        return {
+          pushToken: null,
+          playerId: await OneSignal.User.pushSubscription.getIdAsync(),
+          oneSignalUserId: await OneSignal.User.getOnesignalId(),
+          pushProvider: 'onesignal',
+          permissionStatus: 'undetermined',
+        };
+      }
+
+      accepted = await OneSignal.Notifications.requestPermission(true);
     }
 
-    if (permission.status !== 'granted') {
+    if (!accepted) {
       return {
-        token: null,
-        permissionStatus: permission.status === 'denied' ? 'denied' : 'undetermined',
+        pushToken: null,
+        playerId: await OneSignal.User.pushSubscription.getIdAsync(),
+        oneSignalUserId: await OneSignal.User.getOnesignalId(),
+        pushProvider: 'onesignal',
+        permissionStatus: 'denied',
       };
     }
 
-    const projectId =
-      process.env.EXPO_PUBLIC_EAS_PROJECT_ID ||
-      Constants.easConfig?.projectId ||
-      (Constants.expoConfig?.extra?.eas?.projectId as string | undefined);
+    OneSignal.User.pushSubscription.optIn();
 
-    if (!projectId) {
-      return {
-        token: null,
-        permissionStatus: 'error',
-      };
-    }
-
-    const response = await Notifications.getExpoPushTokenAsync(
-      { projectId }
-    );
+    const subscription = await readOneSignalSubscription();
 
     return {
-      token: response.data,
+      pushToken: subscription.token,
+      playerId: subscription.playerId,
+      oneSignalUserId: await OneSignal.User.getOnesignalId(),
+      pushProvider: 'onesignal',
       permissionStatus: 'granted',
     };
   } catch {
-    return {
-      token: null,
-      permissionStatus: 'error',
-    };
+    return emptyOneSignalRegistration('error');
   }
+}
+
+async function readOneSignalSubscription() {
+  const { OneSignal } = await import('react-native-onesignal');
+  let playerId: string | null = null;
+  let token: string | null = null;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    playerId = await OneSignal.User.pushSubscription.getIdAsync();
+    token = await OneSignal.User.pushSubscription.getTokenAsync();
+
+    if (playerId || token) {
+      break;
+    }
+
+    await wait(1000);
+  }
+
+  return { playerId, token };
+}
+
+function oneSignalAppIdFromConfig() {
+  return (
+    process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID ||
+    (Constants.expoConfig?.extra?.oneSignalAppId as string | undefined) ||
+    ''
+  ).trim();
 }
 
 function supportsRemotePushNotifications() {
@@ -97,6 +162,22 @@ function supportsRemotePushNotifications() {
     Constants.appOwnership === 'expo';
 
   return isMobile && !isExpoGo;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function emptyOneSignalRegistration(
+  permissionStatus: PushRegistration['permissionStatus']
+): PushRegistration {
+  return {
+    playerId: null,
+    oneSignalUserId: null,
+    pushToken: null,
+    pushProvider: 'onesignal',
+    permissionStatus,
+  };
 }
 
 function confirmNotificationConsent(): Promise<boolean> {
@@ -113,6 +194,54 @@ function confirmNotificationConsent(): Promise<boolean> {
         {
           text: 'Continue',
           onPress: () => resolve(true),
+        },
+      ],
+      {
+        cancelable: false,
+      }
+    );
+  });
+}
+
+function explainNotificationBuildRequirement(): Promise<void> {
+  if (unsupportedNoticeShown) {
+    return Promise.resolve();
+  }
+
+  unsupportedNoticeShown = true;
+
+  return new Promise((resolve) => {
+    Alert.alert(
+      'Notifications need the installed app',
+      'Expo Go can open RESQPERATION for screen testing, but OneSignal notifications require the RESQPERATION development or production app. Install that build, then log in and allow notifications to create a OneSignal subscription record.',
+      [
+        {
+          text: 'OK',
+          onPress: () => resolve(),
+        },
+      ],
+      {
+        cancelable: false,
+      }
+    );
+  });
+}
+
+function explainNotificationSettingsRequired(): Promise<void> {
+  if (settingsNoticeShown) {
+    return Promise.resolve();
+  }
+
+  settingsNoticeShown = true;
+
+  return new Promise((resolve) => {
+    Alert.alert(
+      'Notifications are blocked',
+      'Notification permission cannot be requested again from inside the app. Enable notifications for RESQPERATION in your device settings, then open the app again.',
+      [
+        {
+          text: 'OK',
+          onPress: () => resolve(),
         },
       ],
       {

@@ -22,8 +22,12 @@ class MobileDeviceService
             'device_uuid' => ['required', 'string', 'max:150'],
             'device_name' => ['nullable', 'string', 'max:100'],
             'platform' => ['required', Rule::in(['android', 'ios'])],
-            'expo_push_token' => ['nullable', 'string', 'max:255'],
+            'push_provider' => ['nullable', Rule::in(['onesignal'])],
+            'player_id' => ['nullable', 'string', 'max:255'],
+            'push_token' => ['nullable', 'string', 'max:255'],
+            'one_signal_user_id' => ['nullable', 'string', 'max:255'],
             'battery_level' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'signal_strength' => ['nullable'],
             'notification_permission_status' => [
                 'required',
                 Rule::in(['granted', 'denied', 'undetermined', 'unavailable', 'error']),
@@ -39,11 +43,11 @@ class MobileDeviceService
             ], 403);
         }
 
-        $tokenColumn = $this->pushTokenColumn();
+        $tokenColumn = $this->oneSignalTokenColumn();
 
         if (! $tokenColumn) {
             return response()->json([
-                'message' => 'The selected database has no Expo push-token column. Add device_tokens.expo_push_token before registering mobile notifications.',
+                'message' => 'The selected database has no OneSignal player_id column. Add device_tokens.player_id before registering mobile notifications.',
             ], 503);
         }
 
@@ -53,6 +57,7 @@ class MobileDeviceService
         $canLinkMember = Schema::hasColumn('device_tokens', 'member_id');
         $householdId = $roleKey === 'household_resident' ? $user->household_id : null;
         $appRole = $roleKey === 'household_resident' ? 'household' : $roleKey;
+        $savedPlayerId = $this->oneSignalPlayerIdForStorage($validated);
 
         if ($roleKey === 'rescuer' && ! $canLinkUser && ! $canLinkResponder && ! $canLinkMember) {
             return $this->storeRescuerTokenOnUsersTable($user->user_id, $validated);
@@ -78,21 +83,18 @@ class MobileDeviceService
             'device_name' => $validated['device_name'] ?? 'RESQPERATION mobile',
             'platform' => $validated['platform'],
             'app_role' => $appRole,
-            'push_provider' => 'expo',
+            'push_provider' => 'onesignal',
+            $tokenColumn => $savedPlayerId,
+            'push_token' => $this->stringOrFallback($validated['push_token'] ?? null, $savedPlayerId),
+            'one_signal_user_id' => $this->stringOrFallback($validated['one_signal_user_id'] ?? null, $savedPlayerId),
             'notification_permission_status' => $validated['notification_permission_status'],
+            'battery_level' => $validated['battery_level'] ?? 0,
+            'signal_strength' => $validated['signal_strength'] ?? 0,
             'last_seen_at' => $now,
             'logged_at' => $now,
             'is_active' => 1,
             'updated_at' => $now,
         ];
-
-        if (! empty($validated['expo_push_token'])) {
-            $data[$tokenColumn] = $validated['expo_push_token'];
-        }
-
-        if (array_key_exists('battery_level', $validated) && $validated['battery_level'] !== null) {
-            $data['battery_level'] = $validated['battery_level'];
-        }
 
         if (! $canLinkUser && ! $canLinkResponder && $canLinkMember) {
             $data['member_id'] = $user->user_id;
@@ -117,7 +119,7 @@ class MobileDeviceService
             'message' => 'Mobile notification registration saved.',
             'data' => [
                 'permission_status' => $validated['notification_permission_status'],
-                'push_token_saved' => ! empty($validated['expo_push_token']),
+                'push_token_saved' => $this->isUsableOneSignalPlayerId($savedPlayerId),
                 'storage_column' => $tokenColumn,
             ],
         ]);
@@ -158,7 +160,7 @@ class MobileDeviceService
 
     private function storeRescuerTokenOnUsersTable(string $userId, array $validated): JsonResponse
     {
-        $tokenColumn = collect(['expo_push_token', 'push_token'])
+        $tokenColumn = collect(['player_id', 'push_token'])
             ->first(fn (string $column): bool => Schema::hasColumn('users', $column));
 
         if (! $tokenColumn) {
@@ -167,10 +169,12 @@ class MobileDeviceService
             ], 503);
         }
 
+        $savedToken = $this->oneSignalPlayerIdForStorage($validated);
+
         DB::table('users')
             ->where('user_id', $userId)
             ->update([
-                $tokenColumn => $validated['expo_push_token'] ?? null,
+                $tokenColumn => $savedToken,
                 'updated_at' => now(),
             ]);
 
@@ -178,21 +182,45 @@ class MobileDeviceService
             'message' => 'Rescuer notification registration saved.',
             'data' => [
                 'permission_status' => $validated['notification_permission_status'],
-                'push_token_saved' => ! empty($validated['expo_push_token']),
+                'push_token_saved' => $this->isUsableOneSignalPlayerId($savedToken),
                 'storage_column' => 'users.'.$tokenColumn,
             ],
         ]);
     }
 
-    private function pushTokenColumn(): ?string
+    private function oneSignalPlayerIdForStorage(array $validated): string
     {
-        foreach (['expo_push_token', 'player_id'] as $column) {
-            if (Schema::hasColumn('device_tokens', $column)) {
-                return $column;
-            }
+        $token = trim((string) ($validated['player_id'] ?? ''));
+
+        if ($token !== '') {
+            return $token;
+        }
+
+        $status = $validated['notification_permission_status'] ?? 'unavailable';
+        $deviceUuid = $validated['device_uuid'] ?? 'unknown-device';
+
+        return substr('unavailable:'.$status.':'.$deviceUuid, 0, 255);
+    }
+
+    private function isUsableOneSignalPlayerId(string $token): bool
+    {
+        return $token !== '' && ! str_starts_with($token, 'unavailable:');
+    }
+
+    private function oneSignalTokenColumn(): ?string
+    {
+        if (Schema::hasColumn('device_tokens', 'player_id')) {
+            return 'player_id';
         }
 
         return null;
+    }
+
+    private function stringOrFallback(mixed $value, string $fallback): string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? $fallback : $value;
     }
 
     private function responderId(string $userId): ?int

@@ -7,7 +7,7 @@ export default function ResourceRequestNotice({ note }) {
         <ShieldCheck size={16} />
         {note || 'Validate before TrackingAid handoff.'}
       </span>
-      <strong>Shared DB</strong>
+      <strong>EvaTrack / ResQperation</strong>
     </div>
   )
 }

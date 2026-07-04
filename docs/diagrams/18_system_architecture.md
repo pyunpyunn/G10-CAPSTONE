@@ -26,7 +26,7 @@ flowchart TD
   subgraph External["External systems and sources"]
     SafeTrack["SafeTrack\nhousehold accounts"]
     EvaTrack["EvaTrack\nrequests"]
-    TrackingAid["TrackingAid/MappingAid\nfuture validated handoff"]
+    TrackingAid["TrackingAid\nvalidated request handoff DB"]
     Weather["Open-Meteo + PAGASA links\nweather source"]
     MapTiles["Map tiles/routing source"]
   end

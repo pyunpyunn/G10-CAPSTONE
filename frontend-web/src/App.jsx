@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import {
   BrowserRouter,
   Navigate,
@@ -8,27 +8,38 @@ import {
   useNavigate,
 } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
-import ArchivePage from './pages/ArchivePage'
-import BroadcastPage from './pages/BroadcastPage'
-import DashboardPage from './pages/DashboardPage'
-import HouseholdStatusPage from './pages/HouseholdStatusPage'
 import LoginPage from './pages/LoginPage'
-import MappingPage from './pages/MappingPage'
-import NotificationsPage from './pages/NotificationsPage'
 import PlaceholderPage from './pages/PlaceholderPage'
-import ProfilePage from './pages/ProfilePage'
-import ResourcesRequestsPage from './pages/ResourcesRequestsPage'
-import RescuerAccountsPage from './pages/RescuerAccountsPage'
-import RescueDispatchPage from './pages/RescueDispatchPage'
-import SituationReportPage from './pages/SituationReportPage'
-import WeatherPage from './pages/WeatherPage'
 import { getCurrentUser, loginUser, logoutUser } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
 import './App.css'
 
 const webRoles = ['super_admin', 'admin']
 
+const pageComponents = {
+  '/super-admin': lazy(() => import('./pages/SuperAdminPage')),
+  '/dashboard': lazy(() => import('./pages/DashboardPage')),
+  '/broadcast': lazy(() => import('./pages/BroadcastPage')),
+  '/weather': lazy(() => import('./pages/WeatherPage')),
+  '/mapping': lazy(() => import('./pages/MappingPage')),
+  '/households': lazy(() => import('./pages/HouseholdStatusPage')),
+  '/dispatch': lazy(() => import('./pages/RescueDispatchPage')),
+  '/rescuers': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/resources-requests': lazy(() => import('./pages/ResourcesRequestsPage')),
+  '/situation': lazy(() => import('./pages/SituationReportPage')),
+  '/archive': lazy(() => import('./pages/ArchivePage')),
+  '/notifications': lazy(() => import('./pages/NotificationsPage')),
+  '/profile': lazy(() => import('./pages/ProfilePage')),
+}
+
 const modulePages = [
+  {
+    path: '/super-admin',
+    title: 'Inquiries',
+    kicker: 'Super Admin',
+    summary: 'Review landing page inquiries and manage command-level account access.',
+    superOnly: true,
+  },
   {
     path: '/dashboard',
     title: 'Dashboard',
@@ -182,48 +193,38 @@ function AuthRoutes() {
         path="/"
         element={
           <ProtectedRoute user={user}>
-            <AppShell user={user} pages={modulePages} onLogout={handleLogout} onUserChange={setUser} />
+            <AppShell user={user} pages={pagesForUser(user)} onLogout={handleLogout} onUserChange={setUser} />
           </ProtectedRoute>
         }
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
-        {modulePages.map((page) => (
+        {pagesForUser(user).map((page) => (
           <Route
             key={page.path}
             path={page.path.replace('/', '')}
-            element={
-              page.path === '/dashboard' ? (
-                <DashboardPage />
-              ) : page.path === '/broadcast' ? (
-                <BroadcastPage />
-              ) : page.path === '/weather' ? (
-                <WeatherPage />
-              ) : page.path === '/mapping' ? (
-                <MappingPage />
-              ) : page.path === '/households' ? (
-                <HouseholdStatusPage />
-              ) : page.path === '/dispatch' ? (
-                <RescueDispatchPage />
-              ) : page.path === '/rescuers' ? (
-                <RescuerAccountsPage />
-              ) : page.path === '/resources-requests' ? (
-                <ResourcesRequestsPage />
-              ) : page.path === '/situation' ? (
-                <SituationReportPage />
-              ) : page.path === '/archive' ? (
-                <ArchivePage />
-              ) : (
-                <PlaceholderPage page={page} />
-              )
-            }
+            element={<LazyPage page={page} />}
           />
         ))}
-        <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="profile" element={<ProfilePage />} />
+        <Route path="notifications" element={<LazyPage page={{ path: '/notifications' }} />} />
+        <Route path="profile" element={<LazyPage page={{ path: '/profile' }} />} />
       </Route>
 
       <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
     </Routes>
+  )
+}
+
+function LazyPage({ page }) {
+  const PageComponent = pageComponents[page.path]
+
+  if (!PageComponent) {
+    return <PlaceholderPage page={page} />
+  }
+
+  return (
+    <Suspense fallback={<div className="screen-loader">Loading...</div>}>
+      <PageComponent />
+    </Suspense>
   )
 }
 
@@ -239,6 +240,12 @@ function ProtectedRoute({ user, children }) {
 
 function isWebUser(user) {
   return webRoles.includes(user?.role?.role_key)
+}
+
+function pagesForUser(user) {
+  const roleKey = user?.role?.role_key
+
+  return modulePages.filter((page) => !page.superOnly || roleKey === 'super_admin')
 }
 
 function getLoginMessage(error) {

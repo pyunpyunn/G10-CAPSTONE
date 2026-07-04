@@ -21,9 +21,10 @@
         },
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.kathlnbarro.frontendmobile"
+      "bundleIdentifier": "com.kathlnbarro.resqperationmobile"
     },
     "android": {
+      "package": "com.kathlnbarro.resqperationmobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -33,6 +34,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
@@ -42,6 +44,12 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "development"
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
@@ -57,7 +65,6 @@
       ],
       "expo-secure-store",
       "expo-audio",
-      "expo-notifications",
       "expo-asset",
       [
         "expo-build-properties",
@@ -74,6 +81,7 @@
     },
     "extra": {
       "router": {},
+      "oneSignalAppId": "bc6266ac-90a4-4bfe-b4d5-59c57939e7a5",
       "eas": {
         "projectId": "46103553-dfad-4364-a44d-7de048079f00"
       }

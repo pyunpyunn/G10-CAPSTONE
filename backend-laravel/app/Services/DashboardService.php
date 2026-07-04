@@ -179,13 +179,13 @@ class DashboardService
         $counts = DB::table('household_disasters as hd')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
             ->where('hd.disaster_id', $eventId)
-            ->select('hs.status_key', DB::raw('COUNT(*) as total'))
+            ->select('hs.status_key', DB::raw('COUNT(DISTINCT hd.household_id) as total'))
             ->groupBy('hs.status_key')
             ->pluck('total', 'status_key');
 
         $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
-        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'missing']);
+        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
         $safeTotal = $safeOnly + $evacuated;
 
         $reported = DB::table('household_disasters')

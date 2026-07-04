@@ -58,5 +58,5 @@ erDiagram
 
 ## Scope rule
 
-The ERD excludes internal SafeTrack, EvaTrack, and TrackingAid/MappingAid tables. RESQPERATION only documents the records it reads, writes, validates, or forwards.
+The ERD excludes internal SafeTrack, EvaTrack, and TrackingAid-owned tables. RESQPERATION only documents the records it reads, writes, validates, or forwards.
 

@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { clearToken } from '@/api/client';
 import { loginMobile } from '@/api/auth';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
+import { askStandardMobilePermissions } from '@/utils/mobilePermissions';
 
 export default function MobileLoginScreen() {
   const router = useRouter();
@@ -39,11 +40,13 @@ export default function MobileLoginScreen() {
       const role = user.role?.role_key;
 
       if (role === 'household_resident') {
+        await askStandardMobilePermissions('household_resident');
         router.replace('/household' as Href);
         return;
       }
 
       if (role === 'rescuer') {
+        await askStandardMobilePermissions('rescuer');
         router.replace('/rescuer' as Href);
         return;
       }

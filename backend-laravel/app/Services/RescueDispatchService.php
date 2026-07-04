@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class RescueDispatchService
 {
+    public function __construct(private OneSignalNotificationService $oneSignal) {}
+
     public function teams(): JsonResponse
     {
         $activeEvent = $this->getActiveEvent();
@@ -183,9 +185,24 @@ class RescueDispatchService
             return $assignmentId;
         });
 
+        $dispatch = $this->getDispatchById($assignmentId);
+        $pushResult = $this->oneSignal->sendToResponderIds(
+            $selectedResponderIds,
+            'New rescue dispatch',
+            'Assignment '.$dispatch['assignment_code'].' for '.$dispatch['assigned_area'].'.',
+            [
+                'type' => 'rescue_dispatch',
+                'assignment_id' => (string) $assignmentId,
+                'assignment_code' => $dispatch['assignment_code'],
+                'event_id' => $activeEvent->event_id,
+            ]
+        );
+
         return response()->json([
             'message' => 'Dispatch assignment created.',
-            'data' => $this->getDispatchById($assignmentId),
+            'data' => array_merge($dispatch, [
+                'push_delivery' => $pushResult,
+            ]),
         ], 201);
     }
 
@@ -891,16 +908,16 @@ class RescueDispatchService
 
     private function completionStatusKey(array $validated): string
     {
+        if ((int) ($validated['unsafe_count'] ?? 0) > 0 || (int) ($validated['injured_count'] ?? 0) > 0 || (int) ($validated['missing_count'] ?? 0) > 0) {
+            return 'unsafe';
+        }
+
         if ((int) ($validated['evacuated_count'] ?? 0) > 0) {
             return 'evacuated';
         }
 
         if ((int) ($validated['safe_count'] ?? 0) > 0) {
             return 'safe';
-        }
-
-        if ((int) ($validated['unsafe_count'] ?? 0) > 0 || (int) ($validated['injured_count'] ?? 0) > 0 || (int) ($validated['missing_count'] ?? 0) > 0) {
-            return 'unsafe';
         }
 
         return 'safe';

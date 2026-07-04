@@ -529,12 +529,12 @@ class RescuerMobileService
         $channel = $validated['channel'] ?? 'team';
         $page = max(1, (int) ($validated['page'] ?? 1));
         $perPage = min(20, max(1, (int) ($validated['per_page'] ?? 5)));
-        $logs = collect($this->radioRowsForScope($responder))
+        $logs = collect($this->radioRowsForScope($responder, 150))
             ->filter(fn (array $log): bool => ($log['channel'] ?? 'team') === $channel)
             ->values();
         $total = $logs->count();
         $items = $logs->forPage($page, $perPage)->values()->all();
-        $activeTransmission = $this->activeRadioTransmission($responder);
+        $activeTransmission = $this->activeRadioTransmission($responder, $logs);
 
         return response()->json([
             'data' => [
@@ -1729,7 +1729,7 @@ class RescuerMobileService
         ], $values);
     }
 
-    private function radioRowsForScope(object $responder): array
+    private function radioRowsForScope(object $responder, int $limit = 120): array
     {
         $activeEvent = $this->activeEvent();
         $query = DB::table('responder_communication_logs');
@@ -1749,7 +1749,7 @@ class RescuerMobileService
         return $query
             ->orderByDesc('timestamp')
             ->orderByDesc('communication_id')
-            ->limit(120)
+            ->limit(max(20, min($limit, 200)))
             ->get()
             ->map(fn (object $row): array => $this->formatRadioLog($row))
             ->values()
@@ -1824,9 +1824,9 @@ class RescuerMobileService
         return $parts ?: 'R';
     }
 
-    private function activeRadioTransmission(object $responder): ?array
+    private function activeRadioTransmission(object $responder, $logs = null): ?array
     {
-        $recentLogs = collect($this->radioRowsForScope($responder))
+        $recentLogs = collect($logs ?? $this->radioRowsForScope($responder, 60))
             ->filter(fn (array $log): bool => in_array($log['type'], ['ptt_start', 'ptt_heartbeat', 'ptt_end'], true))
             ->values();
 

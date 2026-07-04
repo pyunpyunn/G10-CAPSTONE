@@ -9,7 +9,7 @@ flowchart TD
   R["1. Requirements\nDefine functional + security requirements"]
   R1["Identify sensitive data:\nGPS, household identity, phone numbers,\nfamily members, responder location"]
   R2["Define role access:\nHQ/Admin, household, rescuer"]
-  R3["Define external trust boundaries:\nSafeTrack, EvaTrack, TrackingAid/MappingAid,\nOpen-Meteo, PAGASA"]
+  R3["Define external trust boundaries:\nSafeTrack, EvaTrack, TrackingAid,\nOpen-Meteo, PAGASA"]
 
   D["2. Design\nThreat modeling and secure architecture"]
   D1["Use Laravel API as gatekeeper\nno direct frontend DB access"]
@@ -81,7 +81,7 @@ flowchart LR
   subgraph External["External Systems/APIs"]
     SafeTrack["SafeTrack shared household data"]
     EvaTrack["EvaTrack requests"]
-    TrackingAid["TrackingAid/MappingAid future handoff"]
+    TrackingAid["TrackingAid handoff DB"]
     Weather["Open-Meteo / PAGASA links"]
   end
 

@@ -4,7 +4,10 @@ export type PushRegistrationPayload = {
   device_uuid: string;
   device_name: string;
   platform: 'android' | 'ios';
-  expo_push_token: string | null;
+  player_id: string | null;
+  push_token?: string | null;
+  push_provider: 'onesignal';
+  one_signal_user_id?: string | null;
   battery_level?: number | null;
   notification_permission_status:
     | 'granted'

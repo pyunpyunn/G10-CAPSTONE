@@ -10,6 +10,7 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 - `RESQPERATION_UPDATED_STEP_GUIDE.md` - step-by-step development guide.
 - `RESQPERATION_REQUIREMENTS_BREAKDOWN.md` - module requirements.
 - `RESQPERATION_ACTUAL_DEVELOPMENT_PLAN.md` - development plan.
+- `RESQPERATION_SYSTEM_CLEANUP_AND_CURRENT_STATE.md` - latest cleanup notes and current implemented system status.
 - `RESQPERATION_G10_BEGINNER_MODULE_PROMPTS.md` - beginner-friendly module prompts.
 - `RESQPERATION_G10_DEVELOPMENT_READINESS_AUDIT.md` - readiness audit.
 
@@ -19,10 +20,11 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 - `RESQPERATION_G10_SAFE_SAMPLE_SEED_PLAN.md` - safe sample data plan.
 - `RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - connect to the shared MySQL database by editing only `backend-laravel/.env`.
 - `RESQPERATION_SHARED_DB_DATA_SOURCE_RULES.md` - rule that web pages must display only records from the active database connection.
-- `RESQPERATION_SHARED_DB_AUDIT_AND_PUSH_TOKENS.md` - shared DB connectivity, safe seeder review, Expo token storage, and duplicate-data checks.
+- `RESQPERATION_SHARED_DB_AUDIT_AND_PUSH_TOKENS.md` - shared DB connectivity, safe seeder review, OneSignal Player ID storage, and duplicate-data checks.
+- `RESQPERATION_ONESIGNAL_MOBILE_SETUP.md` - OneSignal mobile setup, Player ID flow, and authentication rules.
 - `sql_proposals/` - review-only SQL scripts. Do not run on shared DB without DB member approval.
 - `sql_proposals/2026_06_25_shared_db_read_only_audit.sql` - read-only lookup, duplicate, and device-token audit.
-- `sql_proposals/initial/2026_06_12_g10_trackingaid_mappingaid_integration_draft.sql` - draft only for future TrackingAid/MappingAid shared DB integration.
+- `sql_proposals/initial/2026_06_12_g10_trackingaid_mappingaid_integration_draft.sql` - historical draft only; current TrackingAid handoff is documented in `RESQPERATION_TRACKINGAID_REQUEST_INTEGRATION_GUIDE.md`.
 - `sql_proposals/initial/2026_06_13_mambaling_household_geotag_update.sql` - review-only Mambaling household geotag update.
 
 ## Final Defense Docs
@@ -41,7 +43,8 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 - `diagrams/19_http_request_methods_process.md` - HTTP request method flow for household, rescuer, and HQ web.
 - `diagrams/20_data_flow_diagram.md` - data flow diagram.
 - `diagrams/21_radio_communication_flow.md` - radio communication flow.
-- `RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, and TrackingAid/MappingAid draft integration plan.
+- `RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, TrackingAid, weather, and notification integration plan.
+- `RESQPERATION_TRACKINGAID_REQUEST_INTEGRATION_GUIDE.md` - complete request intake, validation, forwarding, TrackingAid handoff table, resource inventory, and SQL verification guide.
 - `RESQPERATION_RESCUER_RADIO_PTT_PLAN.md` - rescuer radio / push-to-talk plan and implementation resources.
 - `RESQPERATION_RESCUER_RADIO_COMMUNICATION.md` - implemented rescuer radio voice-clip workflow and test guide.
 - `RESQPERATION_SYSTEM_STACK_RESOURCES_AND_REFERENCES.md` - stack, resources, references, and legal basis.
@@ -61,4 +64,4 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 - `module-readmes/BACKEND_LARAVEL_README.md`
 - `module-readmes/FRONTEND_WEB_README.md`
 
-Mobile documentation was intentionally left inside `frontend-mobile/` during this cleanup because the current instruction was to ignore mobile changes.
+Module-local mobile references remain in `frontend-mobile/` because they are used while developing the Expo app. Maintained project-level documentation lives in `docs/`.

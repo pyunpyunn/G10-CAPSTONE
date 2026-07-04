@@ -2,7 +2,7 @@
 
 ## 1.1 Overall System Context
 
-This diagram shows RESQPERATION as the barangay response operations hub. The system receives and displays data from the active database connection, reads household identity from SafeTrack-related records, receives or validates requests from EvaTrack/rescuer sources, and prepares handoff records for TrackingAid/MappingAid when their integration is ready.
+This diagram shows RESQPERATION as the barangay response operations hub. The system receives and displays data from the active database connection, reads household identity from SafeTrack-related records, receives or validates requests from EvaTrack/rescuer sources, and writes validated request handoff records to the configured TrackingAid database.
 
 ```mermaid
 flowchart LR
@@ -34,7 +34,7 @@ flowchart LR
   subgraph External["External Sources and Systems"]
     SafeTrack["SafeTrack\nhousehold accounts and barangay identity"]
     EvaTrack["EvaTrack\nevacuation/personnel/resource requests"]
-    TrackingAid["TrackingAid / MappingAid\nfuture validated request handoff"]
+    TrackingAid["TrackingAid\nvalidated request handoff DB"]
     OpenMeteo["Open-Meteo\nweather snapshots"]
     PAGASA["PAGASA\nofficial advisory confirmation links/API later"]
     MapTiles["OpenStreetMap / Leaflet tiles\nmap display and routing base"]
@@ -83,8 +83,8 @@ flowchart TD
   Returned["Returned for missing details or duplicate"]
   Rejected["Rejected / invalid"]
 
-  TrackingPending["TrackingAid / MappingAid integration pending"]
-  HandoffDraft["Validated request is prepared for future handoff\nthrough DB/API details to be provided later"]
+  TrackingReady["TrackingAid DB connection configured"]
+  HandoffDraft["Validated request is written into\nresqperation_forwarded_requests"]
 
   WeatherSource["Open-Meteo weather snapshot fetched"]
   WeatherSaved["Snapshot saved in weather_logs"]
@@ -93,7 +93,7 @@ flowchart TD
 
   Start --> SafeTrackSource --> SafeTrackUse --> SafeTrackNoTouch
   Start --> EvaTrackSource --> RequestIntake --> HQReview --> Decision
-  Decision --> Approved --> HandoffDraft --> TrackingPending
+  Decision --> Approved --> HandoffDraft --> TrackingReady
   Decision --> Returned
   Decision --> Rejected
   Start --> WeatherSource --> WeatherSaved --> WeatherShown --> PagasaConfirm
@@ -130,8 +130,8 @@ flowchart TD
 | Integration | Current Purpose | Ownership | Current Status |
 | --- | --- | --- | --- |
 | SafeTrack | Household and barangay identity source | External/shared DB | RESQPERATION reads available data |
-| EvaTrack | Source of evacuation/resource requests | External system | Draft/partial request intake supported |
-| TrackingAid / MappingAid | Future destination for validated requests | External system | Pending final DB/API details |
+| EvaTrack | Source of evacuation/resource requests | External system | External request intake endpoint supported |
+| TrackingAid | Destination for validated resource requests | External system / second DB | DB connection and handoff table implemented |
 | Open-Meteo | Automated weather snapshots | Public API | Implemented as non-official weather source |
 | PAGASA | Official warning confirmation | Government source | Links available; API token pending |
 | Map tiles/routing | Visual map, route context | Public map resources / DB routes | Used by web/mobile mapping features |

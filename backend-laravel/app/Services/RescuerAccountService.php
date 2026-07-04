@@ -17,6 +17,7 @@ class RescuerAccountService
     private const ACCOUNT_SEQUENCE_LENGTH = 3;
 
     private const TEAM_CATALOG = [
+        ['team_name' => 'HQ Command Center', 'team_type' => 'Command Center', 'team_code' => 'HQCC'],
         ['team_name' => 'Search & Rescue', 'team_type' => 'SAR', 'team_code' => 'SAR'],
         ['team_name' => 'Evacuation', 'team_type' => 'Evacuation', 'team_code' => 'EVC'],
         ['team_name' => 'Medical / First Aid', 'team_type' => 'Medical', 'team_code' => 'MED'],
@@ -145,14 +146,15 @@ class RescuerAccountService
         $rescuer = DB::transaction(function () use ($request, $validated): array {
             $now = now();
             $teamId = $this->teamIdFromPayload($validated, $now);
-            $roleId = $this->rescuerRoleId();
+            $teamCode = $this->teamCodeFromPayload($validated);
+            $roleId = $this->roleIdForAccount($teamCode);
             $responderId = $this->nextResponderId();
             $fullName = $this->fullNameFromPayload($validated);
             $firstName = trim($validated['first_name']);
             $lastName = trim($validated['last_name']);
             $password = $validated['password'] ?? 'password';
             $passwordHash = Hash::make($password);
-            $userId = 'USR-RESCUER-'.$validated['account_id'];
+            $userId = ($teamCode === 'HQCC' ? 'USR-HQCC-' : 'USR-RESCUER-').$validated['account_id'];
             $displayUsername = $this->uniqueDisplayUsername($fullName);
 
             DB::table('users')->insert([
@@ -524,7 +526,29 @@ class RescuerAccountService
             ])
             ->map(fn (object $team): array => $this->formatTeamConfigCard($team, 'database'));
 
-        return $databaseTeams->values()->all();
+        $databaseTeamNames = $databaseTeams
+            ->pluck('team_name')
+            ->map(fn ($name) => strtolower((string) $name))
+            ->all();
+
+        $catalogTeams = collect(self::TEAM_CATALOG)
+            ->reject(fn (array $team): bool => in_array(strtolower($team['team_name']), $databaseTeamNames, true))
+            ->map(function (array $team): array {
+                return $this->formatTeamConfigCard((object) [
+                    'team_id' => null,
+                    'team_code' => $team['team_code'],
+                    'team_name' => $team['team_name'],
+                    'team_type' => $team['team_type'],
+                    'assigned_purok_id' => null,
+                    'leader_responder_id' => null,
+                    'duty_status' => 'standby',
+                    'leader_name' => null,
+                    'purok_sitio' => null,
+                    'barangay_name' => null,
+                ], 'catalog');
+            });
+
+        return $databaseTeams->merge($catalogTeams)->sortBy('team_name')->values()->all();
     }
 
     private function formatTeamConfigCard(object $team, string $source): array
@@ -900,6 +924,15 @@ class RescuerAccountService
         }
     }
 
+    private function roleIdForAccount(string $teamCode): int
+    {
+        if ($teamCode === 'HQCC') {
+            return $this->adminRoleId();
+        }
+
+        return $this->rescuerRoleId();
+    }
+
     private function rescuerRoleId(): int
     {
         $roleId = DB::table('roles')
@@ -909,6 +942,21 @@ class RescuerAccountService
         if (! $roleId) {
             throw ValidationException::withMessages([
                 'role' => ['The rescuer role is missing in the roles table. Ask the DB member to check roles.'],
+            ]);
+        }
+
+        return (int) $roleId;
+    }
+
+    private function adminRoleId(): int
+    {
+        $roleId = DB::table('roles')
+            ->whereIn('role_key', ['admin', 'hq_admin'])
+            ->value('role_id');
+
+        if (! $roleId) {
+            throw ValidationException::withMessages([
+                'role' => ['The admin role is missing in the roles table. Ask the DB member to check roles.'],
             ]);
         }
 
@@ -1009,7 +1057,22 @@ class RescuerAccountService
                 'source' => 'database',
             ]);
 
-        return $databaseTeams->values()->all();
+        $databaseTeamNames = $databaseTeams
+            ->pluck('team_name')
+            ->map(fn ($name) => strtolower((string) $name))
+            ->all();
+
+        $catalogTeams = collect(self::TEAM_CATALOG)
+            ->reject(fn (array $team): bool => in_array(strtolower($team['team_name']), $databaseTeamNames, true))
+            ->map(fn (array $team): array => [
+                'team_id' => '',
+                'team_code' => $team['team_code'],
+                'team_name' => $team['team_name'],
+                'team_type' => $team['team_type'],
+                'source' => 'catalog',
+            ]);
+
+        return $databaseTeams->merge($catalogTeams)->sortBy('team_name')->values()->all();
     }
 
     private function accountIdOptions(array $teamOptions): array
@@ -1118,6 +1181,7 @@ class RescuerAccountService
     {
         return [
             'Responder',
+            'HQ Command Center',
             'Team leader',
             'Driver',
             'Medic / first aider',

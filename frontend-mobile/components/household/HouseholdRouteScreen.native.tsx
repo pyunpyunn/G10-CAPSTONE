@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
+import { canUseNativeMap, MobileMapFallback } from '@/components/MobileMapFallback';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
 
@@ -62,31 +63,42 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
           action={<HouseholdBadge label={selectedCenter ? 'Route ready' : 'No center'} tone={selectedCenter ? 'info' : 'neutral'} />}
         />
 
-        <MapView style={styles.map} initialRegion={mapRegion}>
-          {householdPoint ? (
-            <>
-              <Marker coordinate={householdPoint} title="Your household" description={geotag.location_label} pinColor={palette.navActive} />
-              <Circle center={householdPoint} radius={geotag.accuracy_m || 35} strokeColor="#1f3e5a55" fillColor="#1f3e5a18" />
-            </>
-          ) : null}
+        {canUseNativeMap ? (
+          <MapView style={styles.map} initialRegion={mapRegion}>
+            {householdPoint ? (
+              <>
+                <Marker coordinate={householdPoint} title="Your household" description={geotag.location_label} pinColor={palette.navActive} />
+                <Circle center={householdPoint} radius={geotag.accuracy_m || 35} strokeColor="#1f3e5a55" fillColor="#1f3e5a18" />
+              </>
+            ) : null}
 
-          {centers.map((center) => (
-            <Marker
-              key={center.evacuation_center_id}
-              coordinate={{
-                latitude: Number(center.latitude),
-                longitude: Number(center.longitude),
-              }}
-              title={center.name}
-              description={center.address || center.center_type}
-              pinColor={String(center.evacuation_center_id) === selectedId ? palette.safe : palette.evacuated}
-            />
-          ))}
+            {centers.map((center) => (
+              <Marker
+                key={center.evacuation_center_id}
+                coordinate={{
+                  latitude: Number(center.latitude),
+                  longitude: Number(center.longitude),
+                }}
+                title={center.name}
+                description={center.address || center.center_type}
+                pinColor={String(center.evacuation_center_id) === selectedId ? palette.safe : palette.evacuated}
+              />
+            ))}
 
-          {householdPoint && selectedPoint ? (
-            <Polyline coordinates={[householdPoint, selectedPoint]} strokeColor={palette.safe} strokeWidth={4} />
-          ) : null}
-        </MapView>
+            {householdPoint && selectedPoint ? (
+              <Polyline coordinates={[householdPoint, selectedPoint]} strokeColor={palette.safe} strokeWidth={4} />
+            ) : null}
+          </MapView>
+        ) : (
+          <MobileMapFallback
+            title="Evacuation route map"
+            message="OpenStreetMap preview for your household and selected evacuation center."
+            points={[
+              ...(householdPoint ? [{ ...householdPoint, label: 'Your household', color: palette.navActive }] : []),
+              ...(selectedPoint ? [{ ...selectedPoint, label: selectedCenter?.name || 'Evacuation center', color: palette.safe }] : []),
+            ]}
+          />
+        )}
 
         {!householdPoint ? (
           <HouseholdEmpty

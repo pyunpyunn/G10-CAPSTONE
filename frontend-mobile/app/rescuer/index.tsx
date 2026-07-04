@@ -87,7 +87,7 @@ export default function RescuerHomeScreen() {
         await setStoredItem(deviceUuidKey, savedDeviceUuid);
       }
 
-      const registration = await getPushRegistration();
+      const registration = await getPushRegistration(savedDeviceUuid);
       const batteryLevel = await currentBatteryLevel();
 
       try {
@@ -95,7 +95,10 @@ export default function RescuerHomeScreen() {
           device_uuid: savedDeviceUuid,
           device_name: 'Rescuer mobile',
           platform: Platform.OS as 'android' | 'ios',
-          expo_push_token: registration.token,
+          player_id: registration.playerId,
+          push_token: registration.pushToken,
+          push_provider: registration.pushProvider,
+          one_signal_user_id: registration.oneSignalUserId,
           battery_level: batteryLevel,
           notification_permission_status: registration.permissionStatus,
         });

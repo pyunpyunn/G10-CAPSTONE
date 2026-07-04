@@ -5,6 +5,7 @@ import {
   Database,
   FileCheck2,
   House,
+  Inbox,
   LayoutDashboard,
   LogOut,
   Map,
@@ -17,6 +18,7 @@ import {
 
 const icons = {
   '/dashboard': LayoutDashboard,
+  '/super-admin': Inbox,
   '/broadcast': Radio,
   '/weather': CloudSun,
   '/mapping': Map,

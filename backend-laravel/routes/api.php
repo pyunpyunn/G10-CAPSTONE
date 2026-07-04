@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DisasterBroadcastController;
 use App\Http\Controllers\Api\HouseholdMobileController;
 use App\Http\Controllers\Api\HouseholdStatusController;
+use App\Http\Controllers\Api\InquiryController;
 use App\Http\Controllers\Api\MappingController;
 use App\Http\Controllers\Api\MobileDeviceController;
 use App\Http\Controllers\Api\NotificationController;
@@ -19,12 +20,23 @@ use App\Http\Controllers\Api\WeatherController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::post('/inquiries', [InquiryController::class, 'store'])
+        ->middleware('throttle:10,1');
+
+    Route::post('/external/resource-requests', [ResourceRequestController::class, 'externalStore'])
+        ->middleware('throttle:60,1');
+
     Route::post('/auth/login', [AuthController::class, 'login'])
         ->middleware('throttle:5,1');
 
     Route::middleware(['auth:sanctum', 'throttle:300,1'])->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+        Route::middleware('role:super_admin')->group(function () {
+            Route::get('/inquiries', [InquiryController::class, 'index']);
+            Route::patch('/inquiries/{inquiryId}', [InquiryController::class, 'updateStatus']);
+        });
 
         Route::middleware('role:super_admin,admin')->group(function () {
             Route::get('/dashboard', [DashboardController::class, 'index']);

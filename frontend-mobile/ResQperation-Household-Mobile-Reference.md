@@ -1918,9 +1918,10 @@ Needs improvement:
 - stronger disclaimer
 - recovery/reset process
 
-## Current Prototype Gaps
+## Original Prototype Gaps
 
-The current project is a strong UI prototype, but not a final integrated app.
+This section describes the original downloaded prototype reference, not the
+current integrated RESQPERATION mobile app.
 
 Major gaps:
 
@@ -1932,7 +1933,9 @@ Major gaps:
 6. No persisted onboarding completion.
 7. No real map/geocoding.
 8. No real device battery/location tracking.
-9. No push notifications.
+9. No push notifications in the original prototype. The current app uses
+   OneSignal Player IDs and stores them through the Laravel mobile device-token
+   endpoint.
 10. No real disaster broadcast.
 11. No backend status history.
 12. No trusted household approval workflow.
@@ -2307,7 +2310,11 @@ Fields:
 - `id`
 - `user_id`
 - `household_member_id`
-- `expo_push_token`
+- `player_id`
+- `push_provider`
+- `notification_permission_status`
+- `last_seen_at`
+- `is_active`
 - `platform`
 - `created_at`
 
@@ -2366,4 +2373,3 @@ The main work for the actual capstone is not designing the screens from scratch.
 - implementing real location and map behavior
 - implementing real trusted household approval and PIN protection
 - implementing disaster broadcast/status history with backend storage
-

@@ -33,7 +33,7 @@ export default function ResourceValidationModal({
     ? options.sources
     : [
       { key: 'hq_desk', label: 'HQ desk' },
-      { key: 'shared_db', label: 'Shared DB request' },
+      { key: 'shared_db', label: 'EvaTrack request' },
       { key: 'rescuer_mobile', label: 'Rescuer mobile' },
     ]
   const categoryOptions = options.categories?.length

@@ -108,7 +108,7 @@ DB_HOST=10.150.111.114
 DB_PORT=3306
 DB_DATABASE=klint
 DB_USERNAME=groupmate
-DB_PASSWORD=password123
+DB_PASSWORD=<shared-db-password>
 ```
 
 Important:
@@ -886,7 +886,7 @@ The system has heavy features, but each can still be simple:
 - Weather: backend fetches and saves weather snapshots; frontend only displays saved logs.
 - CSV export: use Laravel streamed response first; add packages only if needed.
 - PDF export: use a simple PDF package only for situation reports and archive summaries.
-- Push notifications: make database broadcast logs first, add actual mobile push after the mobile app works.
+- Push notifications: save database broadcast logs and send mobile alerts through OneSignal for registered `device_tokens.player_id` records.
 
 ## 11. Setup Steps
 

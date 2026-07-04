@@ -7,7 +7,7 @@ flowchart TD
   A["HQ/Admin web user"]
   SafeTrack["SafeTrack"]
   EvaTrack["EvaTrack"]
-  TrackingAid["TrackingAid/MappingAid"]
+  TrackingAid["TrackingAid"]
   Weather["PAGASA links / Open-Meteo"]
 
   subgraph Processes["RESQPERATION processes"]
@@ -75,7 +75,7 @@ flowchart TD
 ## Data flow constraints
 
 - Household records originate from the active database connection and SafeTrack-shared account data.
-- EvaTrack and TrackingAid/MappingAid are integration partners, not owned internal modules.
+- EvaTrack and TrackingAid are integration partners, not owned internal modules.
 - Weather snapshots are operational references; official warnings still require PAGASA confirmation.
 - Archive/export operations must respect role access.
 
