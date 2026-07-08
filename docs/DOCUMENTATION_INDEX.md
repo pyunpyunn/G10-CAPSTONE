@@ -45,4 +45,10 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 - `module-readmes/BACKEND_LARAVEL_README.md`
 - `module-readmes/FRONTEND_WEB_README.md`
 
+## Pending Improvement Tracking
+
+- `RESQPERATION_PENDING_WEB_MOBILE_IMPROVEMENTS.md` - documented follow-up items for web/mobile issues and UX enhancements.
+- `RESQPERATION_DATA_FLOW_DIAGRAM.md` - system-level data flow diagram for the ResQperation platform.
+- `RESQPERATION_WEB_USE_CASES.md` - detailed web use cases for the HQ/Admin module.
+
 Mobile documentation was intentionally left inside `frontend-mobile/` during this cleanup because the current instruction was to ignore mobile changes.
