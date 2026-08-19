@@ -2,12 +2,12 @@ import { KeyRound, X } from 'lucide-react'
 import Modal from '../ui/Modal'
 
 const questionOptions = [
-  ['mother_maiden_name', "What is your mother's maiden name?"],
-  ['childhood_food', 'What food did you enjoy most as a child?'],
-  ['first_school', 'What was the name of your first school?'],
+  ['first_pet', "What was your first pet's name?"],
+  ['birth_city', "What's the name of the city where you were born?"],
   ['childhood_nickname', 'What was your childhood nickname?'],
-  ['first_pet', 'What was the name of your first pet?'],
-  ['birth_city', 'In what city were you born?'],
+  ['parents_met_city', "What's the name of the city where your parents met?"],
+  ['eldest_cousin_first_name', "What's the first name of your eldest cousin?"],
+  ['first_school', "What's the name of the first school you attended?"],
 ]
 
 export default function RecoveryQuestionsModal({ isOpen, form, setForm, formError, isSaving, onClose, onSubmit }) {

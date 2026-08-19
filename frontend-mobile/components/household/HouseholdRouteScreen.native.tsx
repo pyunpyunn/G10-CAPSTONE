@@ -247,6 +247,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
+  navigateButton: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: palette.navActive,
+  },
+  navigateButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   centerRow: {
     flexDirection: 'row',
     alignItems: 'center',

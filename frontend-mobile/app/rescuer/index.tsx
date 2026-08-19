@@ -243,8 +243,6 @@ export default function RescuerHomeScreen() {
     }
   }
 
-  }, []);
-
   function renderLoadedContent() {
     if (!overview) {
       return null;

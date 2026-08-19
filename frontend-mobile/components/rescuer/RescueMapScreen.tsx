@@ -10,6 +10,7 @@ import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerU
 type RescueMapProps = {
   assignments: any[];
   activeAssignment: any;
+  evacuationCenters?: any[];
   onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
 };
 

@@ -716,8 +716,7 @@ export default function HouseholdHomeScreen() {
         {renderContent()}
       </ScrollView>
 
-      {overview?.setup?.is_setup_complete ? (
-        <View style={[styles.tabBar, { bottom: Math.max(insets.bottom + 8, spacing.md) }]}>
+      <View style={[styles.tabBar, { bottom: Math.max(insets.bottom + 8, spacing.md) }]}>
           {tabs.map((tab) => {
             const isQrAction = tab.key === 'qr';
             const isActive = !isQrAction && activeTab === tab.key;
@@ -749,7 +748,6 @@ export default function HouseholdHomeScreen() {
             );
           })}
         </View>
-      ) : null}
 
       <HouseholdQrModal visible={showQr} qr={overview?.qr} onClose={() => setShowQr(false)} />
       <TrustedPinModal
