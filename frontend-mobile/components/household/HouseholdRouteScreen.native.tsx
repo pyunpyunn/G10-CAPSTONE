@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
 import { canUseNativeMap, MobileMapFallback } from '@/components/MobileMapFallback';
@@ -19,7 +19,10 @@ const defaultRegion = {
 };
 
 export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) {
-  const centers = useMemo(() => evacuationCenters || [], [evacuationCenters]);
+  const centers = useMemo(() => {
+    const list = [...(evacuationCenters || [])];
+    return list.sort((a, b) => (a.distance_km ?? Number.MAX_VALUE) - (b.distance_km ?? Number.MAX_VALUE));
+  }, [evacuationCenters]);
   const [selectedId, setSelectedId] = useState<string>('');
 
   useEffect(() => {
@@ -52,8 +55,17 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
 
   const distanceLabel =
     householdPoint && selectedPoint
-      ? `${distanceKm(householdPoint, selectedPoint).toFixed(2)} km direct distance`
+      ? `${(selectedCenter?.distance_km ?? distanceKm(householdPoint, selectedPoint)).toFixed(2)} km direct distance`
       : 'Route distance unavailable';
+
+  function openExternalNavigation() {
+    if (!selectedPoint) {
+      return;
+    }
+
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedPoint.latitude},${selectedPoint.longitude}`;
+    Linking.openURL(url).catch(() => undefined);
+  }
 
   return (
     <View style={styles.stack}>
@@ -119,6 +131,9 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
               <Text style={styles.centerTitle}>{selectedCenter.name}</Text>
               <Text style={styles.centerMeta}>{selectedCenter.address || selectedCenter.center_type}</Text>
               <Text style={styles.distanceText}>{distanceLabel}</Text>
+              <Pressable style={styles.navigateButton} onPress={openExternalNavigation}>
+                <Text style={styles.navigateButtonText}>Open in Maps</Text>
+              </Pressable>
             </View>
           </View>
         ) : (

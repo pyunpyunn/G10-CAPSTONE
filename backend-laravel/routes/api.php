@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DisasterBroadcastController;
+use App\Http\Controllers\Api\EvacuationCheckInController;
 use App\Http\Controllers\Api\HouseholdMobileController;
 use App\Http\Controllers\Api\HouseholdStatusController;
 use App\Http\Controllers\Api\InquiryController;
@@ -20,6 +21,13 @@ use App\Http\Controllers\Api\WeatherController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::get('/', function () {
+        return response()->json([
+            'message' => 'ResQperation API v1 is running.',
+            'documentation' => 'Use /dashboard, /auth/login, /auth/me, or other documented endpoints under /api/v1.',
+        ]);
+    });
+
     Route::post('/inquiries', [InquiryController::class, 'store'])
         ->middleware('throttle:10,1');
 
@@ -28,12 +36,18 @@ Route::prefix('v1')->group(function () {
 
     Route::post('/auth/login', [AuthController::class, 'login'])
         ->middleware('throttle:5,1');
+    Route::get('/auth/password-recovery/questions', [AuthController::class, 'recoveryQuestions'])
+        ->middleware('throttle:10,1');
+    Route::post('/auth/password-recovery/reset', [AuthController::class, 'resetPassword'])
+        ->middleware('throttle:5,1');
 
     Route::middleware(['auth:sanctum', 'throttle:300,1'])->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+        Route::get('/auth/security-questions', [AuthController::class, 'recoveryQuestions']);
+        Route::put('/auth/security-questions', [AuthController::class, 'saveRecoveryQuestions']);
 
-        Route::middleware('role:super_admin')->group(function () {
+        Route::middleware('role:super_admin,admin')->group(function () {
             Route::get('/inquiries', [InquiryController::class, 'index']);
             Route::patch('/inquiries/{inquiryId}', [InquiryController::class, 'updateStatus']);
         });
@@ -64,6 +78,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/households', [HouseholdStatusController::class, 'index']);
             Route::get('/households/{householdId}', [HouseholdStatusController::class, 'show']);
             Route::get('/households/{householdId}/status-logs', [HouseholdStatusController::class, 'statusLogs']);
+            Route::post('/households/{householdId}/confirm', [HouseholdStatusController::class, 'confirmStatus']);
+            Route::post('/evacuation/check-in', [EvacuationCheckInController::class, 'store']);
+            Route::post('/evacuation/verify-qr', [EvacuationCheckInController::class, 'verifyQr']);
+            Route::get('/field-reports', [RescuerMobileController::class, 'fieldReportsAdmin']);
             Route::get('/rescue-teams', [RescueDispatchController::class, 'teams']);
             Route::get('/rescuers', [RescuerAccountController::class, 'index']);
             Route::get('/rescuers/team-config', [RescuerAccountController::class, 'teamConfig']);
@@ -80,6 +98,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/resource-requests/{requestId}/validate', [ResourceRequestController::class, 'validateResource']);
             Route::post('/resource-requests/{requestId}/forward', [ResourceRequestController::class, 'forward']);
             Route::post('/resource-requests/{requestId}/return', [ResourceRequestController::class, 'returnRequest']);
+            Route::post('/resource-requests/{requestId}/complete', [ResourceRequestController::class, 'complete']);
             Route::get('/situation-reports', [SituationReportController::class, 'index']);
             Route::post('/situation-reports', [SituationReportController::class, 'store']);
             Route::get('/situation-reports/{sitRepId}', [SituationReportController::class, 'show']);
@@ -124,6 +143,8 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('role:super_admin,admin,rescuer')->group(function () {
             Route::patch('/dispatches/{assignmentId}', [RescueDispatchController::class, 'update']);
+            Route::post('/evacuation/check-in', [EvacuationCheckInController::class, 'store']);
+            Route::post('/evacuation/verify-qr', [EvacuationCheckInController::class, 'verifyQr']);
         });
 
         Route::middleware('role:rescuer')->group(function () {
@@ -138,6 +159,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/rescuer/assignments/{assignmentId}/location', [RescuerMobileController::class, 'storeLocation']);
             Route::get('/rescuer/field-reports', [RescuerMobileController::class, 'fieldReports']);
             Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport']);
+            Route::get('/rescuer/check-ins', [RescuerMobileController::class, 'checkIns']);
+            Route::post('/rescuer/check-ins', [RescuerMobileController::class, 'storeCheckIn']);
             Route::get('/rescuer/resource-requests', [RescuerMobileController::class, 'resourceRequests']);
             Route::post('/rescuer/resource-requests', [RescuerMobileController::class, 'storeResourceRequest']);
             Route::patch('/rescuer/resource-requests/{requestId}/cancel', [RescuerMobileController::class, 'cancelResourceRequest']);

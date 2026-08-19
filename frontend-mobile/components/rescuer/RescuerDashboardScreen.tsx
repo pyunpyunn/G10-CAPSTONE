@@ -8,6 +8,7 @@ type DashboardProps = {
   overview: any;
   onOpenMap: () => void;
   onOpenReport: () => void;
+  onOpenOps: () => void;
   onStatusChange: (assignmentId: number, status: string) => void;
 };
 
@@ -15,6 +16,7 @@ export function RescuerDashboardScreen({
   overview,
   onOpenMap,
   onOpenReport,
+  onOpenOps,
   onStatusChange,
 }: DashboardProps) {
   const profile = overview?.profile || {};
@@ -57,8 +59,8 @@ export function RescuerDashboardScreen({
           <View style={styles.eventStrip}>
             <Ionicons name="shield-checkmark-outline" size={18} color={palette.safe} />
             <View style={styles.eventCopy}>
-              <Text style={styles.eventTitle}>No active disaster event</Text>
-              <Text style={styles.eventMeta}>Stand by for HQ dispatch or monitoring instructions.</Text>
+              <Text style={styles.eventTitle}>No active event</Text>
+              <Text style={styles.eventMeta}>Stand by for dispatch.</Text>
             </View>
           </View>
         )}
@@ -146,6 +148,10 @@ export function RescuerDashboardScreen({
           <Ionicons name="create-outline" size={18} color={palette.navActive} />
           <Text style={styles.quickText}>Send field report</Text>
         </Pressable>
+        <Pressable style={styles.quickLink} onPress={onOpenOps}>
+          <Ionicons name="qr-code-outline" size={18} color={palette.navActive} />
+          <Text style={styles.quickText}>Check-in / QR</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -161,7 +167,7 @@ const styles = StyleSheet.create({
   },
   identityCard: {
     borderRadius: radius.lg,
-    padding: spacing.lg,
+    padding: spacing.md,
     backgroundColor: palette.nav,
     ...shadow,
   },
@@ -182,29 +188,29 @@ const styles = StyleSheet.create({
   },
   kicker: {
     color: palette.navMuted,
-    fontSize: 11,
-    fontWeight: '900',
+    fontSize: 10,
+    fontWeight: '600',
     textTransform: 'uppercase',
   },
   name: {
-    marginTop: 4,
+    marginTop: 2,
     color: '#fff',
-    fontSize: 22,
-    fontWeight: '900',
+    fontSize: 18,
+    fontWeight: '800',
   },
   meta: {
-    marginTop: 3,
+    marginTop: 2,
     color: palette.navMuted,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '500',
   },
   eventStrip: {
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     borderRadius: radius.md,
-    padding: spacing.md,
+    padding: spacing.sm,
     backgroundColor: '#ffffff12',
   },
   eventCopy: {
@@ -212,37 +218,37 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 13,
+    fontWeight: '700',
   },
   eventMeta: {
     marginTop: 2,
     color: palette.navMuted,
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  card: {
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    backgroundColor: palette.card,
+  },
+  assignmentTitle: {
+    color: palette.text,
+    fontSize: 16,
     fontWeight: '700',
+  },
+  assignmentMeta: {
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '500',
   },
   statsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-  },
-  card: {
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    backgroundColor: palette.card,
-  },
-  assignmentTitle: {
-    color: palette.text,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  assignmentMeta: {
-    color: palette.textSoft,
-    fontSize: 13,
-    fontWeight: '800',
   },
   destinationText: {
     color: palette.text,

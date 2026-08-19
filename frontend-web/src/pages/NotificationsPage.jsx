@@ -9,6 +9,7 @@ import NotificationList from '../components/notifications/NotificationList'
 import NotificationToolbar from '../components/notifications/NotificationToolbar'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
+import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   deleteItems,
   markItemsRead,
@@ -22,7 +23,6 @@ export default function NotificationsPage() {
   const [items, setItems] = useState([])
   const [, setSummary] = useState({})
   const [pagination, setPagination] = useState({})
-  const [scopeNote, setScopeNote] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -43,7 +43,6 @@ export default function NotificationsPage() {
           setItems(data.notifications?.data || [])
           setSummary(data.summary || {})
           setPagination(data.notifications || {})
-          setScopeNote(data.scope_note || '')
           setSelectedIds([])
         }
       } catch (loadError) {
@@ -93,7 +92,7 @@ export default function NotificationsPage() {
         unread: 0,
         selected: selectedIds.length,
       }))
-      setMessage('Notifications marked as read in the current HQ view.')
+      setMessage('Marked as read.')
       notifyHeader()
     } catch (saveError) {
       setMessage(notificationErrorMessage(saveError, 'Unable to mark notifications as read.'))
@@ -127,7 +126,7 @@ export default function NotificationsPage() {
         selected: 0,
       }))
       setSelectedIds([])
-      setMessage('Selected notification(s) hidden from this HQ view.')
+      setMessage('Selected notifications removed from this view.')
       notifyHeader()
     } catch (saveError) {
       setMessage(notificationErrorMessage(saveError, 'Unable to delete selected notifications.'))
@@ -155,7 +154,7 @@ export default function NotificationsPage() {
         total: 0,
       })
       setSelectedIds([])
-      setMessage('Notifications cleared from this HQ view.')
+      setMessage('Notifications cleared from this view.')
       notifyHeader()
     } catch (saveError) {
       setMessage(notificationErrorMessage(saveError, 'Unable to clear notifications.'))
@@ -163,6 +162,9 @@ export default function NotificationsPage() {
       setIsSaving(false)
     }
   }
+
+  const isInitialLoading = isLoading && items.length === 0
+  const isRefreshing = isLoading && items.length > 0
 
   return (
     <section className="page active notifications-page">
@@ -177,13 +179,12 @@ export default function NotificationsPage() {
         disabled={isSaving}
       />
 
-      {message && <div className="notification-page-message">{message}</div>}
-      {isLoading && <LoadingState />}
-      {error && <div className="form-error">{error}</div>}
+      {message ? <div className="notification-page-message">{message}</div> : null}
+      {error ? <div className="page-data-notice is-error">{error}</div> : null}
 
-      {!isLoading && !error && (
-        <>
-          {scopeNote && <div className="notification-scope-note">{scopeNote}</div>}
+      <RefreshOverlay active={isRefreshing}>
+        <div className="notification-page-scroll">
+          {isInitialLoading ? <LoadingState /> : null}
           <NotificationList
             notifications={items}
             selectedIds={selectedIds}
@@ -192,8 +193,8 @@ export default function NotificationsPage() {
             onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
             onNext={() => setPage((currentPage) => currentPage + 1)}
           />
-        </>
-      )}
+        </div>
+      </RefreshOverlay>
     </section>
   )
 }

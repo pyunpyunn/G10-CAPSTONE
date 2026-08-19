@@ -26,6 +26,9 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
   const [batteryLevel, setBatteryLevel] = useState('');
   const [memberName, setMemberName] = useState('');
   const [memberCondition, setMemberCondition] = useState('');
+  const [injuredCount, setInjuredCount] = useState('');
+  const [deathCount, setDeathCount] = useState('');
+  const [propertyDamage, setPropertyDamage] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -77,6 +80,9 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
         address: cleanAddress,
         status_key: statusKey,
         battery_level: batteryValue,
+        injured_count: injuredCount.trim() ? Number(injuredCount.trim()) : undefined,
+        death_count: deathCount.trim() ? Number(deathCount.trim()) : undefined,
+        property_damage: propertyDamage.trim() || undefined,
         notes: cleanNotes,
         members:
           cleanMemberName || cleanMemberCondition
@@ -90,6 +96,9 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
       setBatteryLevel('');
       setMemberName('');
       setMemberCondition('');
+      setInjuredCount('');
+      setDeathCount('');
+      setPropertyDamage('');
       setNotes('');
     } finally {
       setSubmitting(false);
@@ -163,6 +172,33 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
           value={memberCondition}
           onChangeText={setMemberCondition}
           placeholder="Member condition"
+          placeholderTextColor="#7d8da0"
+        />
+
+        <View style={styles.twoColumn}>
+          <TextInput
+            style={[styles.input, styles.flexInput]}
+            value={injuredCount}
+            onChangeText={setInjuredCount}
+            placeholder="Injuries"
+            placeholderTextColor="#7d8da0"
+            keyboardType="number-pad"
+          />
+          <TextInput
+            style={[styles.input, styles.flexInput]}
+            value={deathCount}
+            onChangeText={setDeathCount}
+            placeholder="Deaths"
+            placeholderTextColor="#7d8da0"
+            keyboardType="number-pad"
+          />
+        </View>
+
+        <TextInput
+          style={styles.input}
+          value={propertyDamage}
+          onChangeText={setPropertyDamage}
+          placeholder="Property damage summary"
           placeholderTextColor="#7d8da0"
         />
 

@@ -255,6 +255,47 @@ class HouseholdStatusService
         ], 201);
     }
 
+    public function confirmStatus(Request $request, string $householdId): JsonResponse
+    {
+        if (! Schema::hasTable('household_status_logs')) {
+            return response()->json([
+                'message' => 'Household status logs are not available in the active database.',
+            ], 503);
+        }
+
+        $log = DB::table('household_status_logs')
+            ->where('household_id', $householdId)
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (! $log) {
+            return response()->json([
+                'message' => 'No household status report is available to confirm yet.',
+            ], 404);
+        }
+
+        $now = now();
+        $userId = $request->user()?->user_id;
+
+        DB::table('household_status_logs')
+            ->where('status_log_id', $log->status_log_id)
+            ->update(array_filter([
+                'reviewed_by_user_id' => Schema::hasColumn('household_status_logs', 'reviewed_by_user_id') ? $userId : null,
+                'reviewed_at' => Schema::hasColumn('household_status_logs', 'reviewed_at') ? $now : null,
+                'updated_at' => Schema::hasColumn('household_status_logs', 'updated_at') ? $now : null,
+            ], fn ($value) => $value !== null));
+
+        return response()->json([
+            'message' => 'Latest household status report confirmed by HQ.',
+            'data' => [
+                'household_id' => $householdId,
+                'status_log_id' => $log->status_log_id,
+                'reviewed_at' => $now->format('M d, Y h:i A'),
+            ],
+        ]);
+    }
+
     private function householdListQuery(?string $eventId)
     {
         $memberCounts = DB::table('household_members')

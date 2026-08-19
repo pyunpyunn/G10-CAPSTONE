@@ -59,7 +59,8 @@ class HouseholdMobileService
                 'members' => $members,
                 'devices' => $devices,
                 'geotag' => $geotag,
-                'evacuation_centers' => $this->evacuationCenters($activeEvent['event_id'] ?? null),
+                'evacuation_centers' => $this->evacuationCenters($activeEvent['event_id'] ?? null, $geotag['latitude'] ?? null, $geotag['longitude'] ?? null),
+                'recent_alerts' => $this->recentAlerts($activeEvent['event_id'] ?? null),
                 'trusted' => [
                     'is_available' => Schema::hasTable('trusted_households'),
                     'households' => $this->trustedRows($householdId),
@@ -917,7 +918,7 @@ class HouseholdMobileService
         ];
     }
 
-    private function evacuationCenters(?string $eventId): array
+    private function evacuationCenters(?string $eventId, ?float $originLat = null, ?float $originLng = null): array
     {
         if (
             ! Schema::hasTable('evacuation_centers')
@@ -956,19 +957,24 @@ class HouseholdMobileService
             $this->optionalColumnSelect('evacuation_centers', 'contact_number', 'contact_number'),
         ];
 
-        return $query
-            ->orderBy('name')
+        $centers = $query
             ->limit(20)
             ->get($columns)
-            ->map(function (object $center): array {
+            ->map(function (object $center) use ($originLat, $originLng): array {
                 $capacity = $center->capacity !== null ? (int) $center->capacity : null;
                 $occupancy = $center->current_occupancy !== null ? (int) $center->current_occupancy : null;
+                $latitude = (float) $center->latitude;
+                $longitude = (float) $center->longitude;
+                $distanceKm = ($originLat !== null && $originLng !== null)
+                    ? $this->distanceKm($originLat, $originLng, $latitude, $longitude)
+                    : null;
 
                 return [
                     'evacuation_center_id' => $center->evacuation_center_id,
                     'name' => $center->name ?: 'Evacuation center',
-                    'latitude' => (float) $center->latitude,
-                    'longitude' => (float) $center->longitude,
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                    'distance_km' => $distanceKm,
                     'capacity' => $capacity,
                     'current_occupancy' => $occupancy,
                     'vacancy' => $capacity !== null && $occupancy !== null ? max($capacity - $occupancy, 0) : null,
@@ -980,6 +986,54 @@ class HouseholdMobileService
             })
             ->values()
             ->all();
+
+        if ($originLat !== null && $originLng !== null) {
+            usort($centers, fn (array $a, array $b): int => ($a['distance_km'] ?? PHP_FLOAT_MAX) <=> ($b['distance_km'] ?? PHP_FLOAT_MAX));
+        } else {
+            usort($centers, fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+        }
+
+        return $centers;
+    }
+
+    private function recentAlerts(?string $eventId): array
+    {
+        if (! $eventId || ! Schema::hasTable('disaster_broadcasts')) {
+            return [];
+        }
+
+        return DB::table('disaster_broadcasts')
+            ->where('disaster_id', $eventId)
+            ->orderByDesc('sent_at')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get([
+                'broadcast_id',
+                'broadcast_title',
+                'message',
+                'scope_type',
+                'sent_at',
+                'created_at',
+            ])
+            ->map(fn (object $row): array => [
+                'broadcast_id' => $row->broadcast_id,
+                'title' => $row->broadcast_title ?: 'Disaster alert',
+                'message' => $row->message,
+                'scope_type' => $row->scope_type,
+                'sent_at' => $row->sent_at ? date('M d, Y g:i A', strtotime($row->sent_at)) : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function distanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadius = 6371;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return round($earthRadius * (2 * atan2(sqrt($a), sqrt(1 - $a))), 2);
     }
 
     private function members(string $householdId, $devices, $fallbackUser, ?string $eventId = null)
@@ -1637,17 +1691,9 @@ class HouseholdMobileService
 
     private function qrPayload(object $household, ?array $activeEvent): array
     {
-        $payload = [
-            'household_id' => $household->household_id,
-            'household_name' => $household->household_name ?? $household->household_code,
-            'event_id' => $activeEvent['event_id'] ?? null,
-            'purpose' => 'evacuation_check_in',
-            'issued_at' => now()->toIso8601String(),
-        ];
-
         return [
             'label' => 'Evacuation QR',
-            'value' => json_encode($payload, JSON_UNESCAPED_SLASHES),
+            'value' => (string) $household->household_id,
             'household_id' => $household->household_id,
             'household_name' => $household->household_name ?? $household->household_code,
         ];

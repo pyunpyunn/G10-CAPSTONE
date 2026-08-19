@@ -14,6 +14,8 @@ export type RescuerOverview = {
   };
   assignments: any[];
   field_reports: any[];
+  check_ins?: any[];
+  evacuation_centers?: any[];
   resource_requests: any[];
   status_options: any[];
   category_options: any[];
@@ -54,6 +56,16 @@ export async function sendAssignmentLocation(assignmentId: number, payload: any)
 
 export async function createFieldReport(payload: any) {
   const response = await api.post('/rescuer/field-reports', payload);
+  return response.data;
+}
+
+export async function createRescuerCheckIn(payload: any) {
+  const response = await api.post('/rescuer/check-ins', payload);
+  return response.data;
+}
+
+export async function verifyEvacuationQr(payload: any) {
+  const response = await api.post('/evacuation/verify-qr', payload);
   return response.data;
 }
 

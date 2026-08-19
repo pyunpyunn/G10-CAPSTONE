@@ -1,68 +1,90 @@
 import {
+  Building2,
   CloudSun,
   Database,
   House,
+  Mail,
   Map,
+  MessageSquare,
   Radio,
   Route,
+  Send,
   ShieldUser,
+  UserRound,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { submitLandingInquiry } from '../../api/inquiryApi'
 
+const navItems = [
+  { id: 'workflow', label: 'Workflow' },
+  { id: 'basis', label: 'Framework' },
+  { id: 'features', label: 'Features' },
+  { id: 'contact', label: 'Contact' },
+]
+
+function scrollToLandingSection(sectionId) {
+  if (sectionId === 'top') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    return
+  }
+
+  const target = document.getElementById(sectionId)
+
+  if (!target) {
+    return
+  }
+
+  const header = document.querySelector('.landing-header')
+  const offset = (header?.offsetHeight || 70) + 16
+  const top = window.scrollY + target.getBoundingClientRect().top - offset
+
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+}
+
 const featureCards = [
-  {
-    title: 'Disaster broadcasting',
-    text: 'Critical alerts, purok targeting, evacuation instructions, and mobile push notification support.',
-    Icon: Radio,
-  },
-  {
-    title: 'Weather and alert updates',
-    text: 'Designed for PAGASA and government advisory context with full-view tracking for warnings.',
-    Icon: CloudSun,
-  },
-  {
-    title: 'Mapping',
-    text: 'Evacuation sites, rescue routes, and compact household status dots for dense barangay maps.',
-    Icon: Map,
-  },
-  {
-    title: 'Household status',
-    text: 'Reports and analytics for safe, evacuated, unsafe, injured, missing, and unchecked households.',
-    Icon: House,
-  },
-  {
-    title: 'Rescue dispatch',
-    text: 'Team assignments, dispatch status, outcomes, and field requests connected to household reports.',
-    Icon: Route,
-  },
-  {
-    title: 'Archive and reports',
-    text: 'Disaster duration, casualties, missing and injured counts, property damage, and situation reports.',
-    Icon: Database,
-  },
+  { title: 'Alerts', text: 'Broadcast and target barangay zones.', Icon: Radio },
+  { title: 'Weather', text: 'Track advisories in one place.', Icon: CloudSun },
+  { title: 'Maps', text: 'Households, routes, and evacuation sites.', Icon: Map },
+  { title: 'Households', text: 'Live safety status from residents.', Icon: House },
+  { title: 'Dispatch', text: 'Assign teams and track progress.', Icon: Route },
+  { title: 'Archive', text: 'SitReps and incident history.', Icon: Database },
 ]
 
 export default function LoginLanding({ onOpenLogin }) {
+  const handleNavClick = useCallback((event, sectionId) => {
+    event.preventDefault()
+    scrollToLandingSection(sectionId)
+  }, [])
+
   return (
     <main className="landing-page" id="top">
       <header className="landing-header">
         <div className="landing-wrap landing-header-inner">
-          <a className="landing-brand" href="#top" aria-label="RESQPERATION landing page">
+          <a
+            className="landing-brand"
+            href="#top"
+            aria-label="RESQPERATION landing page"
+            onClick={(event) => handleNavClick(event, 'top')}
+          >
             <span className="brand-mark">
               <img className="brand-logo-image" src="/favicon.svg" alt="" aria-hidden="true" />
             </span>
             <span className="landing-brand-text">
               <strong>RESQPERATION</strong>
-              <span>Barangay rescue operations</span>
+              <span>COMMAND CENTER</span>
             </span>
           </a>
 
           <nav className="landing-nav" aria-label="Landing navigation">
-            <a href="#workflow">Workflow</a>
-            <a href="#basis">Basis</a>
-            <a href="#features">Features</a>
-            <a href="#contact">Contact</a>
+            {navItems.map((item) => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                onClick={(event) => handleNavClick(event, item.id)}
+              >
+                {item.label}
+              </a>
+            ))}
           </nav>
 
           <div className="landing-actions">
@@ -73,7 +95,7 @@ export default function LoginLanding({ onOpenLogin }) {
         </div>
       </header>
 
-      <HeroSection onOpenLogin={onOpenLogin} />
+      <HeroSection onOpenLogin={onOpenLogin} onNavigate={handleNavClick} />
       <WorkflowSection />
       <BasisSection />
       <SdgSection />
@@ -85,31 +107,32 @@ export default function LoginLanding({ onOpenLogin }) {
   )
 }
 
-function HeroSection({ onOpenLogin }) {
+function HeroSection({ onOpenLogin, onNavigate }) {
   return (
     <section className="landing-wrap landing-hero">
       <div>
-        <p className="eyebrow">Barangay DRRM command support</p>
+        <p className="eyebrow">Barangay command center</p>
         <h1>RESQPERATION</h1>
-        <p className="hero-tagline">Barangay rescue operations, organized from alert to archive.</p>
-        <p className="hero-copy">
-          RESQPERATION is a role-based system for barangay response headquarters: broadcast
-          official alerts, monitor household safety status, dispatch rescue teams, track resources,
-          and archive disaster records after operations.
-        </p>
+        <p className="hero-tagline">Alerts, households, dispatch, and records in one place.</p>
 
         <div className="hero-cta">
           <button className="primary-button" type="button" onClick={onOpenLogin}>
-            Access command dashboard
+            Sign in
           </button>
-          <a className="secondary-button" href="#workflow">See how it works</a>
+          <a
+            className="secondary-button"
+            href="#workflow"
+            onClick={(event) => onNavigate(event, 'workflow')}
+          >
+            How it works
+          </a>
         </div>
 
         <div className="basis-row" aria-label="System basis">
-          <span className="basis-chip">RA 10121 aligned</span>
-          <span className="basis-chip">NDRRMP pillars</span>
-          <span className="basis-chip">PAGASA alert context</span>
-          <span className="basis-chip">SDG 11 support</span>
+          <a className="basis-chip" href="https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/2/21121" target="_blank" rel="noreferrer">RA 10121 aligned</a>
+          <a className="basis-chip" href="https://www.preventionweb.net/publication/policies-and-plans/philippines-national-disaster-risk-reduction-and-management-plan" target="_blank" rel="noreferrer">NDRRMP pillars</a>
+          <a className="basis-chip" href="https://pagasa.dost.gov.ph/products-and-services" target="_blank" rel="noreferrer">PAGASA alert context</a>
+          <a className="basis-chip" href="https://sdgs.un.org/goals/goal11" target="_blank" rel="noreferrer">SDG 11 support</a>
         </div>
       </div>
 
@@ -150,15 +173,14 @@ function WorkflowSection() {
     <section className="section" id="workflow">
       <div className="landing-wrap">
         <div className="section-heading">
-          <h2>How the system supports a barangay rescue operation</h2>
-          <p>Each step turns field updates into information the command desk can act on quickly.</p>
+          <h2>Response workflow</h2>
         </div>
 
         <div className="workflow-grid">
-          <StepCard number="01" title="Declare event" text="Open an active disaster record and reset household status to unchecked for a clean operation cycle." />
-          <StepCard number="02" title="Broadcast alert" text="Send barangay-wide or purok-specific instructions to households and rescue mobile users." />
-          <StepCard number="03" title="Collect reports" text="Track safe, evacuated, unsafe, injured, missing, and unchecked households from verified accounts." />
-          <StepCard number="04" title="Dispatch and archive" text="Assign teams, monitor requests and resources, then close the event with a situation report." />
+          <StepCard number="01" title="Activate" text="Open an incident and assign roles." />
+          <StepCard number="02" title="Alert" text="Send instructions to households and teams." />
+          <StepCard number="03" title="Monitor" text="Track household and field status." />
+          <StepCard number="04" title="Close" text="Dispatch teams and file the SitRep." />
         </div>
       </div>
     </section>
@@ -170,15 +192,14 @@ function BasisSection() {
     <section className="section" id="basis">
       <div className="landing-wrap">
         <div className="section-heading">
-          <h2>Built around Philippine DRRM practice</h2>
-          <p>The landing copy is based on official DRRM roles, local risk information, early warning, response coordination, and recovery reporting.</p>
+          <h2>DRRM alignment</h2>
         </div>
 
         <div className="pillar-grid">
-          <StepCard number="PM" title="Prevention and Mitigation" text="Risk maps, household status patterns, and archived records help identify repeated vulnerabilities." />
-          <StepCard number="PR" title="Preparedness" text="Broadcasts, evacuation routes, resource visibility, and assigned accounts support readiness." />
-          <StepCard number="RS" title="Response" text="Dispatch tracking connects household reports with rescue teams, medical aid, evacuation, and resources." />
-          <StepCard number="RR" title="Rehabilitation and Recovery" text="Situation reporting and archives preserve casualties, damage, resource actions, and timelines." />
+          <StepCard number="PM" title="Prevention" text="Risk data and archived incidents." />
+          <StepCard number="PR" title="Preparedness" text="Alerts, plans, and role access." />
+          <StepCard number="RS" title="Response" text="Dispatch linked to household reports." />
+          <StepCard number="RR" title="Recovery" text="SitReps and post-event records." />
         </div>
       </div>
     </section>
@@ -192,21 +213,21 @@ function SdgSection() {
         <div className="sdg-band">
           <div>
             <div className="sdg-mark">11</div>
-            <h2 id="sdg-title">Supports SDG 11: resilient communities</h2>
-            <p>SDG 11 includes local disaster risk reduction strategies. RESQPERATION supports that goal by helping barangays organize response data, warnings, evacuation status, and post-disaster records.</p>
+            <h2 id="sdg-title">Supports SDG 11</h2>
+            <p>Helps barangays run safer, better-prepared disaster operations.</p>
           </div>
           <div className="sdg-list">
             <div>
-              <strong>Local strategy support</strong>
-              Links household reporting, mapping, dispatching, and records in one barangay-level workflow.
+              <strong>Unified workflow</strong>
+              Households, maps, dispatch, and records together.
             </div>
             <div>
-              <strong>Inclusive response view</strong>
-              Helps the command desk see unchecked households and urgent status reports during operations.
+              <strong>Priority view</strong>
+              See unsafe households first during operations.
             </div>
             <div>
-              <strong>Evidence for planning</strong>
-              Archived events can support future drills, resource requests, and evacuation improvements.
+              <strong>Planning data</strong>
+              Archived events support future drills and plans.
             </div>
           </div>
         </div>
@@ -221,7 +242,6 @@ function FeatureSection() {
       <div className="landing-wrap">
         <div className="section-heading">
           <h2>Feature overview</h2>
-          <p>Simple modules for the work a barangay response headquarters needs during and after a disaster.</p>
         </div>
 
         <div className="feature-grid">
@@ -245,8 +265,7 @@ function VisualPanelsSection() {
     <section className="section" aria-labelledby="visuals-title">
       <div className="landing-wrap">
         <div className="section-heading">
-          <h2 id="visuals-title">Operational picture panels</h2>
-          <p>Original prototype visuals are used here instead of copyrighted photographs or agency logos.</p>
+          <h2 id="visuals-title">Dashboard views</h2>
         </div>
 
         <div className="photo-grid">
@@ -255,8 +274,8 @@ function VisualPanelsSection() {
               <div className="screen-block" />
             </div>
             <div className="visual-card-content">
-              <h3>Command desk view</h3>
-              <p>Dashboard status, requests, resources, and dispatch activity in one headquarters view.</p>
+              <h3>Command desk</h3>
+              <p>Incident status, requests, and dispatch at a glance.</p>
             </div>
           </article>
           <article className="soft-card visual-card">
@@ -268,8 +287,8 @@ function VisualPanelsSection() {
               </div>
             </div>
             <div className="visual-card-content">
-              <h3>Evacuation and routing</h3>
-              <p>Compact pins and route lines keep maps usable even with many households.</p>
+              <h3>Evacuation map</h3>
+              <p>Centers, routes, and household locations.</p>
             </div>
           </article>
           <article className="soft-card visual-card">
@@ -282,8 +301,8 @@ function VisualPanelsSection() {
               </div>
             </div>
             <div className="visual-card-content">
-              <h3>Mobile status reports</h3>
-              <p>Households and rescuers submit field information that updates the command dashboard.</p>
+              <h3>Mobile reports</h3>
+              <p>Household and field updates sync to HQ.</p>
             </div>
           </article>
         </div>
@@ -294,6 +313,7 @@ function VisualPanelsSection() {
 
 function ContactSection() {
   const [status, setStatus] = useState('')
+  const [statusTone, setStatusTone] = useState('info')
   const [isSending, setIsSending] = useState(false)
 
   async function submitInquiry(event) {
@@ -303,59 +323,107 @@ function ContactSection() {
 
     const data = new FormData(event.currentTarget)
     const payload = {
-      name: data.get('name') || '',
-      organization: data.get('organization') || '',
-      email: data.get('email') || '',
-      message: data.get('message') || '',
+      name: String(data.get('name') || '').trim(),
+      organization: String(data.get('organization') || '').trim(),
+      email: String(data.get('email') || '').trim(),
+      message: String(data.get('message') || '').trim(),
+    }
+
+    if (!payload.name || !payload.message) {
+      setStatusTone('error')
+      setStatus('Full name and inquiry message are required.')
+      setIsSending(false)
+      return
     }
 
     try {
       await submitLandingInquiry(payload)
       event.currentTarget.reset()
-      setStatus('Inquiry sent. The Super Admin can review it in the Inquiries page.')
+      setStatusTone('success')
+      setStatus('Your inquiry was sent. HQ admin can review it in the Inquiries page.')
     } catch (error) {
-      const message = error?.response?.data?.message || 'Inquiry cannot be saved right now. Please contact the development team directly.'
-      setStatus(message)
+      setStatusTone('error')
+      setStatus(error?.response?.data?.message || 'Inquiry cannot be saved right now. Please try again later.')
     } finally {
       setIsSending(false)
     }
   }
 
   return (
-    <section className="section" id="contact">
+    <section className="section landing-contact-section" id="contact">
       <div className="landing-wrap">
-        <div className="contact-panel">
-          <div className="soft-card">
-            <p className="eyebrow">Reach out</p>
-            <h2>Contact the developers</h2>
-            <p>For demo access, capstone review, or barangay workflow notes, contact the RESQPERATION development team.</p>
-            <div className="contact-list">
-              <div className="contact-item">
-                <div className="contact-icon"><ShieldUser size={18} /></div>
+        <div className="landing-contact-grid">
+          <div className="landing-contact-intro soft-card">
+            <p className="eyebrow">Contact</p>
+            <h2>Send a message</h2>
+
+            <div className="landing-contact-points">
+              <div className="landing-contact-point">
+                <div className="landing-contact-point-icon"><ShieldUser size={18} /></div>
                 <div>
-                  <strong>Capstone Development Team</strong>
-                  <span>resqperation.devteam@example.com</span>
+                  <strong>Project questions</strong>
+                  <span>Modules, research, and documentation.</span>
                 </div>
               </div>
-              <div className="contact-item">
-                <div className="contact-icon"><Radio size={18} /></div>
+              <div className="landing-contact-point">
+                <div className="landing-contact-point-icon"><Radio size={18} /></div>
                 <div>
-                  <strong>System demo and coordination</strong>
-                  <span>Available for BDRRMO and barangay response walkthroughs</span>
+                  <strong>Demo requests</strong>
+                  <span>Walkthroughs for BDRRMO teams.</span>
                 </div>
               </div>
+            </div>
+
+            <div className="landing-contact-note">
+              Visible to HQ admin only.
             </div>
           </div>
 
-          <form className="soft-card contact-form" onSubmit={submitInquiry}>
-            <div className="form-row">
-              <input type="text" name="name" placeholder="Name" aria-label="Name" />
-              <input type="text" name="organization" placeholder="Organization" aria-label="Organization" />
+          <form className="soft-card landing-inquiry-form" onSubmit={submitInquiry}>
+            <div className="landing-inquiry-form-head">
+              <MessageSquare size={18} />
+              <div>
+                <strong>Inquiry</strong>
+                <span>* required fields</span>
+              </div>
             </div>
-            <input type="email" name="email" placeholder="Email" aria-label="Email" />
-            <textarea name="message" placeholder="Message" aria-label="Message" />
-            {status && <div className="landing-form-note">{status}</div>}
-            <button className="primary-button" type="submit" disabled={isSending}>{isSending ? 'Sending...' : 'Send inquiry'}</button>
+
+            <div className="form-row">
+              <label className="landing-field">
+                <span><UserRound size={14} /> Full name *</span>
+                <input type="text" name="name" placeholder="Enter your full name" aria-label="Full name" required />
+              </label>
+              <label className="landing-field">
+                <span><Building2 size={14} /> Organization</span>
+                <input type="text" name="organization" placeholder="Barangay, school, or agency" aria-label="Organization" />
+              </label>
+            </div>
+
+            <label className="landing-field">
+              <span><Mail size={14} /> Email address</span>
+              <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" />
+            </label>
+
+            <label className="landing-field">
+              <span><MessageSquare size={14} /> Inquiry message *</span>
+              <textarea
+                name="message"
+                placeholder="Tell us what you want to know about RESQPERATION..."
+                aria-label="Inquiry message"
+                required
+              />
+            </label>
+
+            {status && (
+              <div className={`landing-form-note ${statusTone === 'success' ? 'is-success' : 'is-error'}`}>
+                {status}
+              </div>
+            )}
+
+            <button className="primary-button landing-inquiry-submit" type="submit" disabled={isSending}>
+              <Send size={16} />
+              {isSending ? 'Sending inquiry...' : 'Send inquiry'}
+            </button>
           </form>
         </div>
       </div>
@@ -367,13 +435,7 @@ function LandingFooter() {
   return (
     <footer className="landing-footer">
       <div className="landing-wrap footer-inner">
-        <span>RESQPERATION capstone prototype. Original UI visuals, no public registration, credential-based access only.</span>
-        <div className="footer-links" aria-label="Reference links">
-          <a href="https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/2/21121" target="_blank" rel="noreferrer">RA 10121</a>
-          <a href="https://www.preventionweb.net/publication/policies-and-plans/philippines-national-disaster-risk-reduction-and-management-plan" target="_blank" rel="noreferrer">NDRRMP 2020-2030</a>
-          <a href="https://pagasa.dost.gov.ph/products-and-services" target="_blank" rel="noreferrer">PAGASA</a>
-          <a href="https://sdgs.un.org/goals/goal11" target="_blank" rel="noreferrer">SDG 11</a>
-        </div>
+        <span>Copyright © 2026 RESQPERATION All Right Reserved</span>
       </div>
     </footer>
   )

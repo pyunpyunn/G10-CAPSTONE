@@ -90,7 +90,11 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
     };
   }, [householdPoint, selectedPoint]);
 
-  const routeLine = roadRoute?.coordinates?.length >= 2 ? roadRoute.coordinates : [];
+  const routeLine = roadRoute?.coordinates?.length >= 2
+    ? roadRoute.coordinates
+    : householdPoint && selectedPoint
+      ? [householdPoint, selectedPoint]
+      : [];
   const distanceLabel = roadRoute
     ? `${roadRoute.distance_km} km · ${roadRoute.duration_min} min by road`
     : householdPoint && selectedPoint

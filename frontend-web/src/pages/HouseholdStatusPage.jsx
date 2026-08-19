@@ -6,8 +6,8 @@ import {
   Route,
   Users,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { getHousehold, getHouseholdStatusLogs, getHouseholds } from '../api/householdApi'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { getHousehold, getHouseholdStatusLogs, getHouseholds, confirmHouseholdStatus } from '../api/householdApi'
 import HouseholdDetailContent from '../components/households/HouseholdDetailContent'
 import HouseholdFilters from '../components/households/HouseholdFilters'
 import HouseholdOpsPanels from '../components/households/HouseholdOpsPanels'
@@ -20,6 +20,8 @@ import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   emptySummary,
 } from '../utils/householdStatusHelpers'
+import { pageDataError } from '../utils/pageShell'
+import { readQueryNumber, readQueryParam, setQueryParams } from '../utils/pageQuery'
 import {
   downloadExcelWorkbook,
   downloadPdfReport,
@@ -27,14 +29,15 @@ import {
 
 export default function HouseholdStatusPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [payload, setPayload] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchText, setSearchText] = useState('')
   const [search, setSearch] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [status, setStatus] = useState('all')
-  const [page, setPage] = useState(1)
+  const [purok, setPurok] = useState(readQueryParam(searchParams, 'purok', 'all'))
+  const [status, setStatus] = useState(readQueryParam(searchParams, 'status', 'all'))
+  const [page, setPage] = useState(readQueryNumber(searchParams, 'page', 1))
   const [selectedId, setSelectedId] = useState('')
   const [detail, setDetail] = useState(null)
   const [history, setHistory] = useState([])
@@ -48,7 +51,7 @@ export default function HouseholdStatusPage() {
   const hasActiveEvent = Boolean(payload?.active_event)
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
-  const hasBlockingError = error && !payload
+  const dataError = pageDataError(error, Boolean(payload))
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -96,6 +99,16 @@ export default function HouseholdStatusPage() {
     }
   }, [search, purok, status, page])
 
+  useEffect(() => {
+    const activeEventId = payload?.active_event?.event_id
+
+    if (!activeEventId || readQueryParam(searchParams, 'event_id') === activeEventId) {
+      return
+    }
+
+    setQueryParams(setSearchParams, searchParams, { event_id: activeEventId }, { replace: true })
+  }, [payload?.active_event?.event_id, searchParams, setSearchParams])
+
   async function loadHouseholds() {
     setIsLoading(true)
     setError('')
@@ -118,6 +131,10 @@ export default function HouseholdStatusPage() {
 
   async function openHousehold(householdId) {
     setSelectedId(householdId)
+    setQueryParams(setSearchParams, searchParams, {
+      household_id: householdId,
+      event_id: payload?.active_event?.event_id || null,
+    }, { replace: true })
     setDetail(null)
     setHistory([])
     setDetailError('')
@@ -142,16 +159,49 @@ export default function HouseholdStatusPage() {
     setDetail(null)
     setHistory([])
     setDetailError('')
+    setQueryParams(setSearchParams, searchParams, { household_id: null }, { replace: true })
+  }
+
+  async function handleConfirmHousehold() {
+    if (!selectedId) {
+      return
+    }
+
+    try {
+      await confirmHouseholdStatus(selectedId)
+      await openHousehold(selectedId)
+      await loadHouseholds()
+    } catch {
+      setDetailError('Household status could not be confirmed right now.')
+    }
   }
 
   function changeStatusFilter(nextStatus) {
     setStatus(nextStatus)
     setPage(1)
+    setQueryParams(setSearchParams, searchParams, {
+      status: nextStatus,
+      page: 1,
+      event_id: payload?.active_event?.event_id || null,
+    })
   }
 
   function changePurok(nextPurok) {
     setPurok(nextPurok)
     setPage(1)
+    setQueryParams(setSearchParams, searchParams, {
+      purok: nextPurok,
+      page: 1,
+      event_id: payload?.active_event?.event_id || null,
+    })
+  }
+
+  function changePage(nextPage) {
+    setPage(nextPage)
+    setQueryParams(setSearchParams, searchParams, {
+      page: nextPage,
+      event_id: payload?.active_event?.event_id || null,
+    })
   }
 
   function exportCurrentPage(type) {
@@ -192,43 +242,39 @@ export default function HouseholdStatusPage() {
         }
       />
 
-      {isInitialLoading && <LoadingState />}
-      {error && <div className="form-error">{error}</div>}
+      {dataError ? <div className="page-data-notice is-error">{dataError}</div> : null}
+      {isInitialLoading ? <LoadingState label="Loading household status..." /> : null}
 
-      {!isInitialLoading && !hasBlockingError && payload && (
-        <>
-          {!hasActiveEvent && (
-            <div className="standby-strip hh-standby-strip">
-              <strong>No active disaster event</strong>
-              <span>Household reporting starts after HQ/Admin broadcasts an active event.</span>
-            </div>
-          )}
-
-          <HouseholdSummary summary={summary} />
-          <HouseholdFilters
-            searchText={searchText}
-            purok={purok}
-            status={status}
-            summary={summary}
-            puroks={puroks}
-            onSearchTextChange={setSearchText}
-            onPurokChange={changePurok}
-            onStatusChange={changeStatusFilter}
-          />
-
-          <RefreshOverlay active={isRefreshing}>
-            <HouseholdTable
-              households={households}
-              meta={meta}
-              selectedPurok={purok}
-              onOpen={openHousehold}
-              onPageChange={setPage}
-              onDispatchPurok={() => navigate('/dispatch')}
-            />
-          </RefreshOverlay>
-          <HouseholdOpsPanels activities={payload?.recent_activity || []} rows={payload?.purok_summary || []} />
-        </>
+      {!hasActiveEvent && (
+        <div className="standby-strip hh-standby-strip">
+          <strong>No active disaster event</strong>
+          <span>Household reporting starts after HQ/Admin broadcasts an active event.</span>
+        </div>
       )}
+
+      <HouseholdSummary summary={summary} />
+      <HouseholdFilters
+        searchText={searchText}
+        purok={purok}
+        status={status}
+        summary={summary}
+        puroks={puroks}
+        onSearchTextChange={setSearchText}
+        onPurokChange={changePurok}
+        onStatusChange={changeStatusFilter}
+      />
+
+      <RefreshOverlay active={isRefreshing}>
+        <HouseholdTable
+          households={households}
+          meta={meta}
+          selectedPurok={purok}
+          onOpen={openHousehold}
+          onPageChange={changePage}
+          onDispatchPurok={() => navigate('/dispatch')}
+        />
+      </RefreshOverlay>
+      <HouseholdOpsPanels activities={payload?.recent_activity || []} rows={payload?.purok_summary || []} />
 
       <Modal
         title={detail?.household?.household_name || 'Household details'}
@@ -246,6 +292,9 @@ export default function HouseholdStatusPage() {
                 <Users size={14} />
                 Request check
               </button>
+              <button className="btn btn-primary btn-sm" type="button" onClick={handleConfirmHousehold}>
+                Confirm latest report
+              </button>
               {detail.household.priority?.key === 'urgent' && (
                 <button className="btn btn-danger btn-sm" type="button" onClick={() => navigate('/dispatch')}>
                   <Route size={14} />
@@ -256,7 +305,7 @@ export default function HouseholdStatusPage() {
           )
         }
       >
-        {isDetailLoading && <LoadingState inline />}
+        {isDetailLoading && <LoadingState />}
         {detailError && <div className="form-error">{detailError}</div>}
         {!isDetailLoading && detail?.household && (
           <HouseholdDetailContent detail={detail} history={history} />

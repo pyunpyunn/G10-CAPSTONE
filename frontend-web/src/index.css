@@ -18,12 +18,17 @@ body,
   min-height: 100%;
 }
 
+html {
+  font-size: clamp(11px, 0.22vw + 10px, 12px);
+}
+
 body {
   margin: 0;
   overflow-x: hidden;
   color: var(--color-text-1);
   background: var(--color-bg-page);
-  font-size: 13px;
+  font-size: var(--font-base, 12px);
+  line-height: 1.45;
 }
 
 a {

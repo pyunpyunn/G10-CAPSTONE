@@ -11,6 +11,7 @@ export const palette = {
   borderStrong: '#b0bfce',
   text: '#0a1520',
   textSoft: '#3a4d61',
+  textMuted: '#6b7d91',
   safe: '#3a7d57',
   evacuated: '#2a5a90',
   unsafe: '#962020',
@@ -19,24 +20,39 @@ export const palette = {
 };
 
 export const spacing = {
-  xs: 6,
-  sm: 10,
-  md: 14,
-  lg: 18,
-  xl: 24,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 14,
+  xl: 18,
 };
 
 export const radius = {
-  sm: 8,
-  md: 10,
-  lg: 14,
+  sm: 6,
+  md: 8,
+  lg: 10,
   pill: 999,
+};
+
+export const typography = {
+  display: { fontSize: 22, lineHeight: 26, fontWeight: '800' as const },
+  title: { fontSize: 17, lineHeight: 21, fontWeight: '700' as const },
+  body: { fontSize: 13, lineHeight: 18, fontWeight: '500' as const },
+  label: { fontSize: 11, lineHeight: 14, fontWeight: '600' as const },
+  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' as const },
+  stat: { fontSize: 20, lineHeight: 24, fontWeight: '800' as const },
+};
+
+export const layout = {
+  inputHeight: 42,
+  buttonHeight: 42,
+  tabBarHeight: 58,
 };
 
 export const shadow = {
   shadowColor: '#0a1520',
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.08,
-  shadowRadius: 16,
-  elevation: 4,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.06,
+  shadowRadius: 10,
+  elevation: 3,
 };

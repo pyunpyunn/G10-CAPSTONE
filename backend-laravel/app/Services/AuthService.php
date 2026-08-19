@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\QueryException;
 use PDOException;
@@ -45,6 +46,12 @@ class AuthService
         if ($user->is_active !== null && ! (bool) $user->is_active) {
             return response()->json([
                 'message' => 'This account is inactive. Please contact HQ/Admin.',
+            ], 403);
+        }
+
+        if ($this->isUnvalidatedResponder($user)) {
+            return response()->json([
+                'message' => 'This rescuer account is pending HQ validation. Please wait for approval before logging in.',
             ], 403);
         }
 
@@ -192,6 +199,38 @@ class AuthService
         return $query->exists();
     }
 
+    private function isUnvalidatedResponder(User $user): bool
+    {
+        if (! in_array($user->roleKey(), ['rescuer', 'responder'], true)) {
+            return false;
+        }
+
+        $responderTable = $this->firstExistingTable(['responders', 'responder']);
+
+        if (! $responderTable || ! Schema::hasColumn($responderTable, 'is_validated')) {
+            return false;
+        }
+
+        $query = DB::table($responderTable);
+
+        if (Schema::hasColumn($responderTable, 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        $query->where(function ($inner) use ($responderTable, $user): void {
+            $this->orWhereExisting(
+                $inner,
+                $responderTable,
+                ['user_id', 'username', 'login_id'],
+                $user->user_id ?? $user->username ?? $user->id
+            );
+        });
+
+        $isValidated = $query->value('is_validated');
+
+        return $isValidated !== null && (int) $isValidated !== 1;
+    }
+
     private function databaseUnavailableResponse(): ?JsonResponse
     {
         $connectionName = config('database.default');
@@ -209,13 +248,22 @@ class AuthService
             return null;
         }
 
-        $timeout = max(1.0, (float) env('DB_CONNECT_TIMEOUT', 2));
+        $timeout = max(1.0, (float) env('DB_CONNECTION_TIMEOUT', 5));
         $target = str_contains($host, ':')
             ? "tcp://[$host]:$port"
             : "tcp://$host:$port";
         $socket = @stream_socket_client($target, $errno, $error, $timeout);
 
         if ($socket === false) {
+            Log::warning('Database connectivity check failed.', [
+                'connection' => $connectionName,
+                'driver' => $driver,
+                'host' => $host,
+                'port' => $port,
+                'errno' => $errno,
+                'error' => $error,
+            ]);
+
             return response()->json([
                 'message' => "The database is not reachable at $host:$port. Make sure the shared MySQL laptop is online, or update DB_HOST to a working database.",
             ], 503);

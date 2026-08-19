@@ -50,4 +50,9 @@ class ResourceRequestController extends Controller
     {
         return $this->service->returnRequest($request, $requestId);
     }
+
+    public function complete(Request $request, string $requestId): JsonResponse
+    {
+        return $this->service->complete($request, $requestId);
+    }
 }

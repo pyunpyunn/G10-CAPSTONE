@@ -29,3 +29,8 @@ export async function returnResourceRequest(requestId, payload) {
   const response = await api.post(`/resource-requests/${requestId}/return`, payload)
   return response.data.data
 }
+
+export async function completeResourceRequest(requestId, payload = {}) {
+  const response = await api.post(`/resource-requests/${requestId}/complete`, payload)
+  return response.data.data
+}
