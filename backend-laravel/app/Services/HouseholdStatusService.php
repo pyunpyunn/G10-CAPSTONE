@@ -299,8 +299,7 @@ class HouseholdStatusService
                 'h.member_count',
                 'a.full_address',
                 'a.purok_sitio',
-                'a.barangay_name',
-                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(a.barangay_name, ''), 'Unassigned') as purok"),
+                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned') as purok"),
                 'hd.current_status_id',
                 'hd.last_status_source',
                 'hd.last_status_notes',
@@ -469,7 +468,7 @@ class HouseholdStatusService
 
     private function getPurokSummary(?string $eventId)
     {
-        $areaExpression = "COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(a.barangay_name, ''), 'Unassigned')";
+        $areaExpression = "COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned')";
         $unsafeKeys = [
             'not_evacuated',
             'displaced',

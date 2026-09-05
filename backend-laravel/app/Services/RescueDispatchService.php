@@ -732,7 +732,7 @@ class RescueDispatchService
                 'a.full_address',
                 'a.street_address',
                 'a.house_number',
-                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(a.barangay_name, ''), 'Unassigned') as area_name"),
+                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned') as area_name"),
                 DB::raw("(
                     SELECT gl.location_label
                     FROM geotagged_locations gl
