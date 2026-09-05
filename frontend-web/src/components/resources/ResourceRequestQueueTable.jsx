@@ -12,6 +12,7 @@ export default function ResourceRequestQueueTable({
   onValidate,
   onForward,
   onReturn,
+  onComplete,
   onPageChange,
 }) {
   const total = pagination?.total || 0
@@ -46,7 +47,7 @@ export default function ResourceRequestQueueTable({
             </thead>
             <tbody>
               {requests.map((request) => {
-                const actions = requestActions(request, onView, onValidate, onForward, onReturn)
+                const actions = requestActions(request, onView, onValidate, onForward, onReturn, onComplete)
 
                 return (
                   <tr key={request.request_id}>
@@ -98,7 +99,7 @@ export default function ResourceRequestQueueTable({
   )
 }
 
-function requestActions(request, onView, onValidate, onForward, onReturn) {
+function requestActions(request, onView, onValidate, onForward, onReturn, onComplete) {
   const status = request.validation?.key || 'needs_validation'
   const actions = [{ label: 'View', onClick: () => onView(request) }]
 
@@ -109,6 +110,10 @@ function requestActions(request, onView, onValidate, onForward, onReturn) {
 
   if (status === 'verified') {
     actions.push({ label: 'Forward to TrackingAid', onClick: () => onForward(request) })
+  }
+
+  if (status === 'forwarded') {
+    actions.push({ label: 'Mark completed', onClick: () => onComplete(request) })
   }
 
   return actions

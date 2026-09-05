@@ -11,6 +11,7 @@ import DispatchTeamGrid from '../components/dispatch/DispatchTeamGrid'
 import LoadingState from '../components/ui/LoadingState'
 import Modal from '../components/ui/Modal'
 import PageHeader from '../components/ui/PageHeader'
+import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   buildRequestBody,
   defaultForm,
@@ -19,6 +20,7 @@ import {
   getSaveMessage,
   teamFilters,
 } from '../utils/dispatchHelpers'
+import { pageDataError } from '../utils/pageShell'
 
 export default function RescueDispatchPage() {
   const [payload, setPayload] = useState(null)
@@ -99,7 +101,7 @@ export default function RescueDispatchPage() {
     : teams.filter((team) => team.status_key === teamFilter)
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
-  const hasBlockingError = error && !payload
+  const dataError = pageDataError(error, Boolean(payload))
 
   function firstDispatchableHousehold(area) {
     return area?.recommended_households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
@@ -267,50 +269,48 @@ export default function RescueDispatchPage() {
         }
       />
 
-      {isInitialLoading && <LoadingState />}
-      {error && <div className="form-error">{error}</div>}
+      {dataError ? <div className="page-data-notice is-error">{dataError}</div> : null}
+      {isInitialLoading ? <LoadingState /> : null}
 
-      {!isInitialLoading && !hasBlockingError && payload && (
-        <>
-          {!hasActiveEvent && (
-            <div className="standby-strip">
-              <strong>No active disaster event</strong>
-              <span>New dispatch assignments are enabled after HQ/Admin declares an active event.</span>
-            </div>
-          )}
-
-          <DispatchSummary summary={summary} />
-
-          <div className="dp-dispatch-layout">
-            <DispatchSidePanel
-              teams={teams}
-              responders={responders}
-              logs={payload?.activity_log || []}
-              historyLogs={payload?.dispatch_history || []}
-              dispatches={dispatches}
-              filter={dispatchFilter}
-              setFilter={setDispatchFilter}
-              searchText={searchText}
-              setSearchText={setSearchText}
-              onSearch={loadDispatch}
-              isUpdating={isRefreshing}
-            />
-
-            <main className="dp-main-column dp-team-side-panel">
-              <div className="dp-team-toolbar">
-                <span>Team status cards</span>
-                <select className="dp-filter-select" value={teamFilter} onChange={(event) => setTeamFilter(event.target.value)} aria-label="Filter team status cards">
-                  {teamFilters.map((filter) => (
-                    <option value={filter.key} key={filter.key}>{filter.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <DispatchTeamGrid teams={filteredTeams} onOpenUpdate={openUpdateDispatch} onOpenNew={openNewDispatch} />
-            </main>
-          </div>
-        </>
+      {!hasActiveEvent && (
+        <div className="standby-strip">
+          <strong>No active disaster event</strong>
+          <span>New dispatch assignments are enabled after HQ/Admin declares an active event.</span>
+        </div>
       )}
+
+      <DispatchSummary summary={summary} />
+
+      <div className="dp-dispatch-layout">
+        <DispatchSidePanel
+          teams={teams}
+          responders={responders}
+          logs={payload?.activity_log || []}
+          historyLogs={payload?.dispatch_history || []}
+          dispatches={dispatches}
+          filter={dispatchFilter}
+          setFilter={setDispatchFilter}
+          searchText={searchText}
+          setSearchText={setSearchText}
+          onSearch={loadDispatch}
+          isUpdating={isRefreshing}
+        />
+
+        <main className="dp-main-column dp-team-side-panel">
+          <div className="dp-team-toolbar">
+            <span>Team status cards</span>
+            <select className="dp-filter-select" value={teamFilter} onChange={(event) => setTeamFilter(event.target.value)} aria-label="Filter team status cards">
+              {teamFilters.map((filter) => (
+                <option value={filter.key} key={filter.key}>{filter.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <RefreshOverlay active={isRefreshing}>
+            <DispatchTeamGrid teams={filteredTeams} onOpenUpdate={openUpdateDispatch} onOpenNew={openNewDispatch} />
+          </RefreshOverlay>
+        </main>
+      </div>
 
       <Modal
         title={editingDispatch ? 'Update Dispatch' : 'New Dispatch'}

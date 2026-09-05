@@ -14,3 +14,8 @@ export async function getHouseholdStatusLogs(householdId) {
   const response = await api.get(`/households/${householdId}/status-logs`)
   return response.data.data
 }
+
+export async function confirmHouseholdStatus(householdId) {
+  const response = await api.post(`/households/${householdId}/confirm`)
+  return response.data.data
+}

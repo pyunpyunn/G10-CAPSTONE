@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import MapView, { Circle, Marker } from 'react-native-maps';
+import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
 import { canUseNativeMap, MobileMapFallback } from '@/components/MobileMapFallback';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineTime } from '@/utils/time';
@@ -11,6 +11,7 @@ import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerU
 type RescueMapProps = {
   assignments: any[];
   activeAssignment: any;
+  evacuationCenters?: any[];
   onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
 };
 
@@ -21,7 +22,7 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
-export function RescueMapScreen({ assignments, activeAssignment, onSendLocation }: RescueMapProps) {
+export function RescueMapScreen({ assignments, activeAssignment, evacuationCenters = [], onSendLocation }: RescueMapProps) {
   const watcher = useRef<Location.LocationSubscription | null>(null);
   const [tracking, setTracking] = useState(false);
   const [position, setPosition] = useState<any>(null);
@@ -85,6 +86,27 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
     setLastUpdated('');
   }
 
+  function openExternalNavigation() {
+    const mapped = assignments.filter((item) => item.latitude && item.longitude);
+    const target = activeAssignment?.latitude && activeAssignment?.longitude
+      ? {
+          latitude: Number(activeAssignment.latitude),
+          longitude: Number(activeAssignment.longitude),
+          label: activeAssignment.assigned_area || activeAssignment.household_id || 'Assignment',
+        }
+      : mapped.find((item) => item.latitude && item.longitude);
+
+    if (!target) {
+      Alert.alert('No mapped destination', 'This assignment does not have coordinates yet.');
+      return;
+    }
+
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${target.latitude},${target.longitude}&travelmode=driving`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Unable to open maps', 'Install Google Maps or open the coordinates manually.');
+    });
+  }
+
   function handleTrackPress() {
     if (tracking) {
       stopTracking();
@@ -116,12 +138,20 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
         <SectionHeader
           title="Barangay rescue map"
           action={
-            <ActionButton
-              label={tracking ? 'Stop' : 'Track Me'}
-              icon={tracking ? 'stop-outline' : 'navigate-outline'}
-              tone={tracking ? 'danger' : 'primary'}
-              onPress={handleTrackPress}
-            />
+            <View style={styles.headerActions}>
+              <ActionButton
+                label="Navigate"
+                icon="map-outline"
+                tone="light"
+                onPress={openExternalNavigation}
+              />
+              <ActionButton
+                label={tracking ? 'Stop' : 'Track Me'}
+                icon={tracking ? 'stop-outline' : 'navigate-outline'}
+                tone={tracking ? 'danger' : 'primary'}
+                onPress={handleTrackPress}
+              />
+            </View>
           }
         />
 
@@ -156,6 +186,21 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
               />
             ))}
 
+            {evacuationCenters.map((center) => (
+              center.latitude && center.longitude ? (
+                <Marker
+                  key={center.center_id || center.id || center.name}
+                  coordinate={{
+                    latitude: Number(center.latitude),
+                    longitude: Number(center.longitude),
+                  }}
+                  title={center.name || 'Evacuation center'}
+                  description={center.address || 'Evacuation site'}
+                  pinColor={palette.safe}
+                />
+              ) : null
+            ))}
+
             {position ? (
               <>
                 <Marker coordinate={position} title="My location" pinColor={palette.navActive} />
@@ -166,6 +211,17 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
                   fillColor="#2a5a9018"
                 />
               </>
+            ) : null}
+
+            {activeAssignment?.route?.coordinates?.length ? (
+              <Polyline
+                coordinates={activeAssignment.route.coordinates.map((point: any) => ({
+                  latitude: Number(point.latitude),
+                  longitude: Number(point.longitude),
+                }))}
+                strokeColor={palette.navActive}
+                strokeWidth={4}
+              />
             ) : null}
           </MapView>
         ) : (
@@ -233,6 +289,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
     backgroundColor: palette.card,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    justifyContent: 'flex-end',
   },
   errorStrip: {
     flexDirection: 'row',

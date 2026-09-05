@@ -17,6 +17,35 @@ export async function configureNotificationHandler() {
   await initializeOneSignal();
 }
 
+export function subscribeToForegroundNotifications(onNotification: () => void) {
+  let removeListener: (() => void) | undefined;
+
+  void initializeOneSignal().then(async () => {
+    if (!supportsRemotePushNotifications()) {
+      return;
+    }
+
+    try {
+      const { OneSignal } = await import('react-native-onesignal');
+
+      const listener = () => {
+        onNotification();
+      };
+
+      OneSignal.Notifications.addEventListener('foregroundWillDisplay', listener);
+      removeListener = () => {
+        OneSignal.Notifications.removeEventListener('foregroundWillDisplay', listener);
+      };
+    } catch {
+      // Notification listeners require a dev build with OneSignal configured.
+    }
+  });
+
+  return () => {
+    removeListener?.();
+  };
+}
+
 export async function getPushRegistration(externalUserId?: string): Promise<PushRegistration> {
   const oneSignalAppId = oneSignalAppIdFromConfig();
 

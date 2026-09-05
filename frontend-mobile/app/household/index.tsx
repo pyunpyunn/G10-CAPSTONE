@@ -29,6 +29,7 @@ import {
 } from '@/api/household';
 import type { HouseholdOverview } from '@/api/household';
 import { HouseholdDashboardScreen, HouseholdTrustedScreen } from '@/components/household/HouseholdDashboardScreen';
+import { getStoredJson, setStoredJson } from '@/utils/secureStorage';
 import { HouseholdHeader } from '@/components/household/HouseholdHeader';
 import {
   AddTrustedHouseholdModal,
@@ -38,13 +39,25 @@ import {
 import { HouseholdProfileScreen } from '@/components/household/HouseholdProfileScreen';
 import { HouseholdRouteScreen } from '@/components/household/HouseholdRouteScreen';
 import { HouseholdSetupScreen } from '@/components/household/HouseholdSetupScreen';
-import { HouseholdLoading } from '@/components/household/HouseholdUI';
+import { MobileDataState } from '@/components/MobileDataState';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
-import { getPushRegistration } from '@/utils/pushNotifications';
+import { getPushRegistration, subscribeToForegroundNotifications } from '@/utils/pushNotifications';
 
 const deviceUuidKey = 'resq_household_device_uuid';
 const trustedPinKey = 'resq_household_trusted_pin';
+const householdOverviewCacheKey = 'resq_household_overview_cache';
+const householdStatusQueueKey = 'resq_household_status_queue';
+
+type QueueAction = 'household_status' | 'member_status';
+
+type QueueItem = {
+  action: QueueAction;
+  payload: any;
+  memberId?: string;
+  queued_at: string;
+};
+
 type TabKey = 'home' | 'route' | 'trusted' | 'profile';
 type TabButtonKey = TabKey | 'qr';
 
@@ -66,6 +79,9 @@ export default function HouseholdHomeScreen() {
   const [deviceUuid, setDeviceUuid] = useState('');
   const [realBatteryLevel, setRealBatteryLevel] = useState<number | null>(null);
   const [connectionLabel, setConnectionLabel] = useState('Offline');
+  const [isOffline, setIsOffline] = useState(false);
+  const [pendingQueueCount, setPendingQueueCount] = useState(0);
+  const [queueMessage, setQueueMessage] = useState('');
   const [pendingStatus, setPendingStatus] = useState('safe');
   const [editingStatus, setEditingStatus] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
@@ -79,6 +95,7 @@ export default function HouseholdHomeScreen() {
   const [showAddTrusted, setShowAddTrusted] = useState(false);
   const [trustedLookup, setTrustedLookup] = useState<any>(null);
   const [trustedLoading, setTrustedLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const loadLocalKeys = useCallback(async () => {
     const existingDeviceUuid = await getStoredItem(deviceUuidKey);
@@ -95,6 +112,74 @@ export default function HouseholdHomeScreen() {
     setTrustedPin(existingPin || '');
   }, []);
 
+  async function loadCachedOverview() {
+    const cached = await getStoredJson<HouseholdOverview>(householdOverviewCacheKey);
+
+    if (cached) {
+      setOverview(cached);
+      setQueueMessage('Offline mode: showing cached household data.');
+      setIsOffline(true);
+      return cached;
+    }
+
+    return null;
+  }
+
+  async function loadQueuedStatusUpdates(): Promise<QueueItem[]> {
+    const queue = await getStoredJson<QueueItem[]>(householdStatusQueueKey);
+    const pending = queue || [];
+    setPendingQueueCount(pending.length);
+    return pending;
+  }
+
+  async function saveQueuedStatusUpdates(queue: QueueItem[]) {
+    await setStoredJson(householdStatusQueueKey, queue);
+    setPendingQueueCount(queue.length);
+    setQueueMessage(queue.length > 0 ? `${queue.length} status update(s) queued for later sending.` : '');
+  }
+
+  async function flushQueuedStatusUpdates() {
+    const queue = await loadQueuedStatusUpdates();
+
+    if (queue.length === 0) {
+      return;
+    }
+
+    const network = await Network.getNetworkStateAsync();
+
+    if (!network.isConnected) {
+      return;
+    }
+
+    const remaining: QueueItem[] = [];
+
+    for (const item of queue) {
+      try {
+        if (item.action === 'member_status' && item.memberId) {
+          await saveHouseholdMemberStatus(item.memberId, item.payload);
+        } else {
+          await saveHouseholdStatus(item.payload);
+        }
+      } catch {
+        remaining.push(item);
+      }
+    }
+
+    await saveQueuedStatusUpdates(remaining);
+
+    if (remaining.length === 0) {
+      setQueueMessage('All pending status updates have been sent.');
+    } else {
+      setQueueMessage(`${remaining.length} status update(s) remain queued.`);
+    }
+  }
+
+  async function queueStatusUpdate(item: Omit<QueueItem, 'queued_at'>) {
+    const queue = await loadQueuedStatusUpdates();
+    const nextQueue = [...queue, { ...item, queued_at: new Date().toISOString() }];
+    await saveQueuedStatusUpdates(nextQueue);
+  }
+
   const loadOverview = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
@@ -105,11 +190,21 @@ export default function HouseholdHomeScreen() {
     try {
       const data = await getHouseholdOverview();
       setOverview(data);
+      await setStoredJson(householdOverviewCacheKey, data);
+      setIsOffline(false);
+      setQueueMessage('');
+      setLoadError('');
       const savedStatus = data.current_status?.status_key || data.status_options?.[0]?.key || 'safe';
       setPendingStatus(savedStatus);
       setEditingStatus(!data.current_status);
     } catch (error: any) {
-      Alert.alert('Unable to load household data', errorMessage(error));
+      const cached = await loadCachedOverview();
+
+      if (!cached) {
+        setLoadError(errorMessage(error));
+      } else {
+        setLoadError('');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -132,11 +227,15 @@ export default function HouseholdHomeScreen() {
 
       if (!network.isConnected) {
         setConnectionLabel('Offline');
+        setIsOffline(true);
       } else {
         setConnectionLabel(labelizeNetwork(network.type));
+        setIsOffline(false);
+        flushQueuedStatusUpdates();
       }
     } catch {
       setConnectionLabel('Online');
+      setIsOffline(false);
     }
   }, []);
 
@@ -166,9 +265,18 @@ export default function HouseholdHomeScreen() {
 
   useEffect(() => {
     loadLocalKeys();
+    loadQueuedStatusUpdates();
     loadOverview();
     refreshDeviceSensors();
   }, [loadLocalKeys, loadOverview, refreshDeviceSensors]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToForegroundNotifications(() => {
+      loadOverview(true);
+    });
+
+    return unsubscribe;
+  }, [loadOverview]);
 
   useEffect(() => {
     refreshDeviceSensors();
@@ -191,6 +299,18 @@ export default function HouseholdHomeScreen() {
     if (overview?.setup?.is_setup_complete && deviceUuid) {
       syncDeviceLocation();
     }
+  }, [overview?.setup?.is_setup_complete, deviceUuid, syncDeviceLocation]);
+
+  useEffect(() => {
+    if (!overview?.setup?.is_setup_complete || !deviceUuid) {
+      return;
+    }
+
+    const locationIntervalId = setInterval(() => {
+      syncDeviceLocation();
+    }, 180000);
+
+    return () => clearInterval(locationIntervalId);
   }, [overview?.setup?.is_setup_complete, deviceUuid, syncDeviceLocation]);
 
   useEffect(() => {
@@ -316,18 +436,35 @@ export default function HouseholdHomeScreen() {
       locationPayload.location_accuracy_m = overview.geotag.accuracy_m;
     }
 
+    const payload: any = {
+      status_key: pendingStatus,
+      device_uuid: deviceUuid,
+      battery_level: realBatteryLevel ?? undefined,
+      ...locationPayload,
+      notes: pendingStatus === 'needs_help' ? 'Household requested assistance from mobile.' : null,
+    };
+
     try {
-      await saveHouseholdStatus({
-        status_key: pendingStatus,
-        device_uuid: deviceUuid,
-        battery_level: realBatteryLevel ?? undefined,
-        ...locationPayload,
-        notes: pendingStatus === 'needs_help' ? 'Household requested assistance from mobile.' : null,
-      });
+      if (isOffline) {
+        await queueStatusUpdate({ action: 'household_status', payload });
+        Alert.alert('Offline', 'Status update was queued and will be sent when connection returns.');
+        setEditingStatus(false);
+        return;
+      }
+
+      await saveHouseholdStatus(payload);
       Alert.alert('Status saved', 'Your household status update was sent to HQ.');
       setEditingStatus(false);
       await loadOverview(true);
     } catch (error: any) {
+      const network = await Network.getNetworkStateAsync();
+
+      if (!network.isConnected || !error.response) {
+        await queueStatusUpdate({ action: 'household_status', payload });
+        Alert.alert('Offline', 'Status update was queued because the connection failed. It will be sent when the app regains connectivity.');
+        return;
+      }
+
       Alert.alert('Unable to save status', errorMessage(error));
     }
   }
@@ -351,15 +488,31 @@ export default function HouseholdHomeScreen() {
       locationPayload.location_accuracy_m = overview.geotag.accuracy_m;
     }
 
+    const payload: any = {
+      status_key: statusKey,
+      device_uuid: deviceUuid,
+      battery_level: realBatteryLevel ?? undefined,
+      ...locationPayload,
+    };
+
     try {
-      await saveHouseholdMemberStatus(memberId, {
-        status_key: statusKey,
-        device_uuid: deviceUuid,
-        battery_level: realBatteryLevel ?? undefined,
-        ...locationPayload,
-      });
+      if (isOffline) {
+        await queueStatusUpdate({ action: 'member_status', memberId, payload });
+        Alert.alert('Offline', 'Member status update was queued and will be sent when connection returns.');
+        return;
+      }
+
+      await saveHouseholdMemberStatus(memberId, payload);
       await loadOverview(true);
     } catch (error: any) {
+      const network = await Network.getNetworkStateAsync();
+
+      if (!network.isConnected || !error.response) {
+        await queueStatusUpdate({ action: 'member_status', memberId, payload });
+        Alert.alert('Offline', 'Member status update was queued because the connection failed. It will be sent when the app regains connectivity.');
+        return;
+      }
+
       Alert.alert('Unable to save member status', errorMessage(error));
       throw error;
     }
@@ -469,6 +622,21 @@ export default function HouseholdHomeScreen() {
   }
 
   function renderContent() {
+    const isInitialLoading = loading && !overview;
+
+    return (
+      <MobileDataState
+        isInitialLoading={isInitialLoading}
+        error={!overview ? loadError : ''}
+        loadingLabel="Loading household data..."
+        onRetry={() => loadOverview()}
+      >
+        {renderLoadedContent()}
+      </MobileDataState>
+    );
+  }
+
+  function renderLoadedContent() {
     if (!overview) {
       return null;
     }
@@ -528,38 +696,27 @@ export default function HouseholdHomeScreen() {
         onOpenQr={() => setShowQr(true)}
         onOpenMap={() => setActiveTab('route')}
         onSaveMemberStatus={handleSaveMemberStatus}
+        offlineMessage={queueMessage || (isOffline ? 'Offline mode: showing cached household data.' : '')}
       />
-    );
-  }
-
-  if (loading || !overview || !deviceUuid) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <HouseholdLoading label="Loading household mobile..." />
-      </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <HouseholdHeader
-        connectionLabel={connectionLabel}
-        onRefresh={() => loadOverview(true)}
-      />
+      <HouseholdHeader connectionLabel={connectionLabel} />
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          overview.setup?.is_setup_complete && { paddingBottom: 104 + insets.bottom },
+          overview?.setup?.is_setup_complete && { paddingBottom: 104 + insets.bottom },
         ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
         {renderContent()}
       </ScrollView>
 
-      {overview.setup?.is_setup_complete ? (
-        <View style={[styles.tabBar, { bottom: Math.max(insets.bottom + 8, spacing.md) }]}>
+      <View style={[styles.tabBar, { bottom: Math.max(insets.bottom + 8, spacing.md) }]}>
           {tabs.map((tab) => {
             const isQrAction = tab.key === 'qr';
             const isActive = !isQrAction && activeTab === tab.key;
@@ -591,9 +748,8 @@ export default function HouseholdHomeScreen() {
             );
           })}
         </View>
-      ) : null}
 
-      <HouseholdQrModal visible={showQr} qr={overview.qr} onClose={() => setShowQr(false)} />
+      <HouseholdQrModal visible={showQr} qr={overview?.qr} onClose={() => setShowQr(false)} />
       <TrustedPinModal
         visible={showPin}
         hasPin={Boolean(trustedPin)}

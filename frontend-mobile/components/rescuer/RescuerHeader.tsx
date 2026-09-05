@@ -14,13 +14,13 @@ export function RescuerHeader({ onOpenRadio }: HeaderProps) {
           <Text style={styles.logoText}>R</Text>
         </View>
         <Text style={styles.brand}>RESQPERATION</Text>
-        <View style={styles.actions}>
-          {onOpenRadio ? (
-            <Pressable style={styles.iconButton} onPress={onOpenRadio}>
+        {onOpenRadio ? (
+          <View style={styles.actions}>
+            <Pressable style={styles.iconButton} onPress={onOpenRadio} accessibilityLabel="Open radio">
               <Ionicons name="call-outline" size={20} color={palette.navText} />
             </Pressable>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -28,10 +28,10 @@ export function RescuerHeader({ onOpenRadio }: HeaderProps) {
 
 const styles = StyleSheet.create({
   header: {
-    minHeight: 72,
-    paddingTop: spacing.md,
+    minHeight: 56,
+    paddingTop: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.sm,
     backgroundColor: palette.nav,
   },
   brandRow: {
@@ -55,6 +55,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   brand: {
+    flex: 1,
     color: '#fff',
     fontSize: 19,
     fontWeight: '900',

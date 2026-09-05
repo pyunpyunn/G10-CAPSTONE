@@ -17,6 +17,7 @@ type DashboardProps = {
   onOpenQr: () => void;
   onOpenMap: () => void;
   onSaveMemberStatus?: (memberId: string, status: string) => Promise<void>;
+  offlineMessage?: string;
 };
 
 type TrustedScreenProps = {
@@ -40,6 +41,7 @@ export function HouseholdDashboardScreen({
   onOpenQr,
   onOpenMap,
   onSaveMemberStatus,
+  offlineMessage,
 }: DashboardProps) {
   const activeEvent = overview.active_event;
   const currentStatus = overview.current_status;
@@ -54,6 +56,11 @@ export function HouseholdDashboardScreen({
             <HouseholdBadge label="Disaster active" tone="danger" />
           <Text style={styles.eventDate}>{formatDate(activeEvent.started_at)}</Text>
           </View>
+          {offlineMessage ? (
+            <View style={styles.offlineBanner}>
+              <Text style={styles.offlineText}>{offlineMessage}</Text>
+            </View>
+          ) : null}
           <Text style={styles.eventTitle}>{activeEvent.name}</Text>
           <Text style={styles.eventMeta}>{activeEvent.type} · {activeEvent.severity}</Text>
           {activeEvent.message ? <Text style={styles.eventBody}>{activeEvent.message}</Text> : null}
@@ -63,6 +70,19 @@ export function HouseholdDashboardScreen({
           <HouseholdBadge label="No current disaster" tone="safe" />
         </View>
       )}
+
+      {(overview.recent_alerts || []).length > 0 ? (
+        <View style={styles.card}>
+          <HouseholdSection title="Disaster alerts" />
+          {(overview.recent_alerts || []).slice(0, 3).map((alert: any) => (
+            <View style={styles.alertRow} key={String(alert.broadcast_id)}>
+              <Text style={styles.alertTitle}>{alert.title}</Text>
+              <Text style={styles.alertMeta}>{alert.sent_at || 'Recent alert'}</Text>
+              <Text style={styles.alertBody}>{alert.message}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {activeEvent ? (
         <View style={styles.card}>
@@ -510,6 +530,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  offlineBanner: {
+    marginTop: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#f5a623',
+    backgroundColor: '#fff4e5',
+    padding: spacing.sm,
+  },
+  offlineText: {
+    color: '#7a4f03',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   eventTitle: {
     color: palette.text,
     fontSize: 20,
@@ -525,6 +558,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     fontWeight: '800',
+  },
+  alertRow: {
+    gap: 4,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    paddingTop: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  alertTitle: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  alertMeta: {
+    color: palette.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  alertBody: {
+    color: palette.text,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
   },
   card: {
     gap: spacing.md,

@@ -2,7 +2,7 @@ import axios from 'axios'
 import { getToken } from './token'
 
 function getApiBaseUrl() {
-  const configuredUrl = import.meta.env.VITE_API_BASE_URL
+  const configuredUrl = String(import.meta.env.VITE_API_BASE_URL || '').trim()
 
   if (configuredUrl) {
     return configuredUrl
@@ -20,7 +20,7 @@ function getApiBaseUrl() {
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
-  timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || 10000),
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || 30000),
   headers: {
     Accept: 'application/json',
   },
@@ -39,8 +39,20 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.code === 'ECONNABORTED' || String(error.message || '').toLowerCase().includes('timeout')) {
-      error.friendlyMessage = 'The server took too long to respond. Please check if Laravel and the shared database are running, then try again.'
+    const status = error.response?.status
+
+    if (status === 401) {
+      error.friendlyMessage = 'Authentication failed. Please log in again.'
+    } else if (status === 403) {
+      error.friendlyMessage = 'Access denied. You need admin access to view the dashboard.'
+    } else if (status === 404) {
+      error.friendlyMessage = 'The requested API endpoint was not found on the backend.'
+    } else if (status === 503) {
+      error.friendlyMessage = error.response?.data?.message || 'The database is not available right now. Make sure Tailscale is connected and the shared MySQL host is online.'
+    } else if (error.code === 'ECONNABORTED' || String(error.message || '').toLowerCase().includes('timeout')) {
+      error.friendlyMessage = 'The server took too long to respond. Make sure Laravel is running, Tailscale is connected, and the shared database is online, then try again.'
+    } else if (!error.response) {
+      error.friendlyMessage = 'Cannot reach the backend API. Start Laravel with `php artisan serve --host=0.0.0.0 --port=8000` and confirm the frontend is pointing to the correct API URL.'
     }
 
     return Promise.reject(error)

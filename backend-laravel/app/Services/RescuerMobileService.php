@@ -122,6 +122,7 @@ class RescuerMobileService
         $user = $request->user()?->load('role');
         $responder = $this->responderForUser($user);
         $assignments = $this->assignmentList($responder?->responder_id, 10);
+        $activeEvent = $this->activeEvent();
 
         return response()->json([
             'data' => [
@@ -129,10 +130,12 @@ class RescuerMobileService
                     'user' => $this->formatUser($user),
                     'responder' => $this->formatResponder($responder),
                 ],
-                'active_event' => $this->activeEvent(),
+                'active_event' => $activeEvent,
                 'summary' => $this->summary($assignments),
                 'assignments' => $assignments,
                 'field_reports' => $this->fieldReportList($responder?->responder_id, $user?->user_id),
+                'check_ins' => $this->checkInList($responder?->responder_id, 10),
+                'evacuation_centers' => $this->evacuationCenters($activeEvent['event_id'] ?? null),
                 'resource_requests' => $this->resourceRequestList($user?->user_id, 8),
                 'status_options' => $this->householdStatusOptions(),
                 'category_options' => $this->resourceCategoryOptions(),
@@ -323,6 +326,9 @@ class RescuerMobileService
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'battery_level' => ['nullable', 'integer', 'min:0', 'max:100'],
             'notes' => ['required', 'string', 'min:5', 'max:1000'],
+            'injured_count' => ['nullable', 'integer', 'min:0', 'max:999'],
+            'death_count' => ['nullable', 'integer', 'min:0', 'max:999'],
+            'property_damage' => ['nullable', 'string', 'max:255'],
             'members' => ['nullable', 'array'],
             'members.*.name' => ['nullable', 'string', 'max:150'],
             'members.*.condition' => ['nullable', 'string', 'max:255'],
@@ -376,12 +382,103 @@ class RescuerMobileService
         ]));
 
         $this->saveLatestFieldReportStatus($activeEvent['event_id'], $validated['household_id'], $statusId, $validated, $notes, $user?->user_id, $responder?->responder_id, $now);
+        $this->saveResponderFieldReportRow($responder?->responder_id, $activeEvent['event_id'], $validated, $notes, $now);
         $this->writeAuditLog($request, 'mobile_field_report', 'household_status_logs', (string) $statusLogId, $validated);
 
         return response()->json([
             'message' => 'Field report submitted to HQ.',
             'data' => [
                 'status_log_id' => $statusLogId,
+            ],
+        ], 201);
+    }
+
+    public function fieldReportsAdmin(Request $request): JsonResponse
+    {
+        $status = strtolower(trim((string) $request->query('status', 'all')));
+        $statusId = trim((string) $request->query('status_id', ''));
+        $eventId = trim((string) $request->query('event_id', ''));
+        $activeEvent = $this->activeEvent();
+
+        if ($eventId === '' && $activeEvent) {
+            $eventId = (string) ($activeEvent['event_id'] ?? '');
+        }
+
+        return response()->json([
+            'data' => [
+                'active_event' => $activeEvent,
+                'status_options' => $this->householdStatusOptions(),
+                'summary' => $this->fieldReportSummary($eventId),
+                'reports' => $this->fieldReportList(null, null, [
+                    'status' => $status,
+                    'status_id' => $statusId,
+                    'event_id' => $eventId,
+                ]),
+            ],
+        ]);
+    }
+
+    public function checkIns(Request $request): JsonResponse
+    {
+        $responder = $this->responderForUser($request->user());
+
+        return response()->json([
+            'data' => [
+                'check_ins' => $this->checkInList($responder?->responder_id, 30),
+            ],
+        ]);
+    }
+
+    public function storeCheckIn(Request $request): JsonResponse
+    {
+        if (! Schema::hasTable('responder_check_ins')) {
+            return $this->missingTableResponse('responder_check_ins');
+        }
+
+        $activeEvent = $this->activeEvent();
+
+        if (! $activeEvent) {
+            return response()->json([
+                'message' => 'Check-ins can only be recorded during an active disaster event.',
+            ], 409);
+        }
+
+        $validated = $request->validate([
+            'household_id' => ['required', 'string', 'max:255'],
+            'member_id' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'status_key' => ['nullable', 'string', 'max:50'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'check_in_method' => ['nullable', 'string', 'max:80'],
+        ]);
+
+        $user = $request->user();
+        $responder = $this->responderForUser($user);
+        $now = now();
+        $checkInId = $this->nextId('responder_check_ins', 'check_in_id');
+        $statusId = $this->resolveHouseholdStatusId($validated['status_key'] ?? 'safe');
+
+        DB::table('responder_check_ins')->insert($this->filterColumns('responder_check_ins', [
+            'check_in_id' => $checkInId,
+            'responder_id' => $responder?->responder_id,
+            'disaster_id' => $activeEvent['event_id'],
+            'team_id' => $responder?->team_id ?? null,
+            'household_id' => $validated['household_id'],
+            'member_id' => $validated['member_id'] ?? null,
+            'latitude' => $validated['latitude'] ?? null,
+            'longitude' => $validated['longitude'] ?? null,
+            'check_in_method' => $validated['check_in_method'] ?? 'field_visit',
+            'status_id' => $statusId,
+            'notes' => $validated['notes'] ?? null,
+            'checked_in_at' => $now,
+            'verified_by' => $user?->user_id,
+        ]));
+
+        return response()->json([
+            'message' => 'Household check-in recorded.',
+            'data' => [
+                'check_in_id' => $checkInId,
             ],
         ], 201);
     }
@@ -941,16 +1038,22 @@ class RescuerMobileService
         ];
     }
 
-    private function fieldReportList(?int $responderId, ?string $userId): array
+    private function fieldReportList(?int $responderId, ?string $userId, array $filters = []): array
     {
         if (! Schema::hasTable('household_status_logs')) {
             return [];
         }
 
+        $status = strtolower(trim((string) ($filters['status'] ?? 'all')));
+        $statusId = trim((string) ($filters['status_id'] ?? ''));
+        $eventId = trim((string) ($filters['event_id'] ?? ''));
+
         $query = DB::table('household_status_logs as hsl');
         $columns = [
             $this->optionalColumnSelect('household_status_logs', 'status_log_id', 'status_log_id', 'hsl'),
             $this->optionalColumnSelect('household_status_logs', 'household_id', 'household_id', 'hsl'),
+            $this->optionalColumnSelect('household_status_logs', 'status_id', 'status_id', 'hsl'),
+            $this->optionalColumnSelect('household_status_logs', 'disaster_id', 'disaster_id', 'hsl'),
             $this->optionalColumnSelect('household_status_logs', 'latitude', 'latitude', 'hsl'),
             $this->optionalColumnSelect('household_status_logs', 'longitude', 'longitude', 'hsl'),
             $this->optionalColumnSelect('household_status_logs', 'battery_level', 'battery_level', 'hsl'),
@@ -986,21 +1089,33 @@ class RescuerMobileService
             $query->where('hsl.submitted_by_user_id', $userId);
         }
 
+        if ($eventId !== '' && Schema::hasColumn('household_status_logs', 'disaster_id')) {
+            $query->where('hsl.disaster_id', $eventId);
+        }
+
+        if ($statusId !== '' && Schema::hasColumn('household_status_logs', 'status_id')) {
+            $query->where('hsl.status_id', $statusId);
+        } elseif ($status !== '' && $status !== 'all' && Schema::hasTable('household_statuses')) {
+            $query->where('hs.status_key', $status);
+        }
+
         $orderColumn = Schema::hasColumn('household_status_logs', 'submitted_at')
             ? 'hsl.submitted_at'
             : 'hsl.status_log_id';
 
         return $query
             ->orderByDesc($orderColumn)
-            ->limit(20)
+            ->limit(50)
             ->get($columns)
             ->map(fn (object $row): array => [
                 'status_log_id' => $row->status_log_id,
                 'household_id' => $row->household_id,
                 'household_code' => $row->household_code ?? null,
-                'household_head' => $row->household_head_name ?? 'Household',
+                'household_head_name' => $row->household_head_name ?? 'Household',
+                'status_id' => $row->status_id ?? null,
                 'status_key' => $row->status_key ?? 'reported',
                 'status_label' => $row->status_label ?? 'Reported',
+                'event_id' => $row->disaster_id ?? null,
                 'latitude' => $row->latitude,
                 'longitude' => $row->longitude,
                 'battery_level' => $row->battery_level,
@@ -1009,6 +1124,41 @@ class RescuerMobileService
             ])
             ->values()
             ->all();
+    }
+
+    private function fieldReportSummary(?string $eventId = null): array
+    {
+        if (! Schema::hasTable('household_status_logs')) {
+            return ['rows' => []];
+        }
+
+        $rows = collect($this->householdStatusOptions())
+            ->map(function (array $option) use ($eventId): array {
+                $query = DB::table('household_status_logs as hsl');
+
+                if (Schema::hasColumn('household_status_logs', 'source')) {
+                    $query->where('hsl.source', 'responder_field_report');
+                }
+
+                if ($eventId !== '' && Schema::hasColumn('household_status_logs', 'disaster_id')) {
+                    $query->where('hsl.disaster_id', $eventId);
+                }
+
+                if (! empty($option['status_id']) && Schema::hasColumn('household_status_logs', 'status_id')) {
+                    $query->where('hsl.status_id', $option['status_id']);
+                }
+
+                return [
+                    'key' => $option['key'],
+                    'label' => $option['label'],
+                    'status_id' => $option['status_id'] ?? null,
+                    'count' => (int) $query->count(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return ['rows' => $rows];
     }
 
     private function resourceRequestList(?string $userId, int $limit): array
@@ -1474,6 +1624,85 @@ class RescuerMobileService
         return ((int) DB::table($table)->max($column)) + 1;
     }
 
+    private function checkInList(?int $responderId, int $limit = 20): array
+    {
+        if (! Schema::hasTable('responder_check_ins')) {
+            return [];
+        }
+
+        $query = DB::table('responder_check_ins');
+
+        if ($responderId) {
+            $query->where('responder_id', $responderId);
+        }
+
+        return $query
+            ->orderByDesc('checked_in_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn (object $row): array => [
+                'check_in_id' => $row->check_in_id,
+                'household_id' => $row->household_id,
+                'member_id' => $row->member_id ?? null,
+                'latitude' => $row->latitude ?? null,
+                'longitude' => $row->longitude ?? null,
+                'check_in_method' => $row->check_in_method ?? 'field_visit',
+                'notes' => $row->notes ?? null,
+                'checked_in_at' => $row->checked_in_at,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function saveResponderFieldReportRow(?int $responderId, string $eventId, array $validated, string $notes, $now): void
+    {
+        if (! Schema::hasTable('responder_field_reports') || ! $responderId) {
+            return;
+        }
+
+        DB::table('responder_field_reports')->insert($this->filterColumns('responder_field_reports', [
+            'report_id' => (string) $this->nextId('responder_field_reports', 'report_id'),
+            'responder_id' => $responderId,
+            'disaster_id' => $eventId,
+            'household_id' => $validated['household_id'],
+            'latitude' => $validated['latitude'] ?? null,
+            'longitude' => $validated['longitude'] ?? null,
+            'notes' => $notes,
+            'created_at' => $now,
+        ]));
+    }
+
+    private function evacuationCenters(?string $eventId): array
+    {
+        if (! Schema::hasTable('evacuation_centers') || ! Schema::hasColumn('evacuation_centers', 'latitude')) {
+            return [];
+        }
+
+        $query = DB::table('evacuation_centers')
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude');
+
+        if (Schema::hasColumn('evacuation_centers', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        return $query
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['evacuation_center_id', 'name', 'latitude', 'longitude', 'capacity', 'current_occupancy', 'status'])
+            ->map(fn (object $center): array => [
+                'evacuation_center_id' => $center->evacuation_center_id,
+                'name' => $center->name ?: 'Evacuation center',
+                'latitude' => (float) $center->latitude,
+                'longitude' => (float) $center->longitude,
+                'capacity' => $center->capacity !== null ? (int) $center->capacity : null,
+                'current_occupancy' => $center->current_occupancy !== null ? (int) $center->current_occupancy : null,
+                'status' => $center->status ?: 'active',
+            ])
+            ->values()
+            ->all();
+    }
+
     private function nextResourceRequestId(): string
     {
         do {
@@ -1580,6 +1809,18 @@ class RescuerMobileService
 
         if (! empty($validated['notes'])) {
             $parts[] = 'Notes: ' . $validated['notes'];
+        }
+
+        if (array_key_exists('injured_count', $validated) && $validated['injured_count'] !== null) {
+            $parts[] = 'Injuries: ' . (int) $validated['injured_count'];
+        }
+
+        if (array_key_exists('death_count', $validated) && $validated['death_count'] !== null) {
+            $parts[] = 'Deaths: ' . (int) $validated['death_count'];
+        }
+
+        if (! empty($validated['property_damage'])) {
+            $parts[] = 'Property damage: ' . $validated['property_damage'];
         }
 
         if (! empty($validated['members'])) {
