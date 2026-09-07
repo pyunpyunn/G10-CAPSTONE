@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\ResourceRequest;
+use App\Models\ResourceRequestStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -528,7 +530,7 @@ class RescuerMobileService
         $now = now();
         $requestId = $this->nextResourceRequestId();
 
-        DB::table('resource_requests')->insert($this->filterColumns('resource_requests', [
+        ResourceRequest::create($this->filterColumns('resource_requests', [
             'request_id' => $requestId,
             'request_source' => 'rescuer_mobile',
             'source_reference' => $activeEvent['event_id'] ?? null,
@@ -564,7 +566,7 @@ class RescuerMobileService
             return $this->missingTableResponse('resource_requests');
         }
 
-        $query = DB::table('resource_requests')
+        $query = ResourceRequest::query()
             ->where('request_id', $requestId);
 
         if (Schema::hasColumn('resource_requests', 'handled_by')) {
@@ -585,7 +587,7 @@ class RescuerMobileService
             ], 409);
         }
 
-        DB::table('resource_requests')
+        ResourceRequest::query()
             ->where('request_id', $requestId)
             ->update($this->filterColumns('resource_requests', [
                 'validation_status' => 'cancelled',
@@ -1167,7 +1169,7 @@ class RescuerMobileService
             return [];
         }
 
-        $query = DB::table('resource_requests');
+        $query = ResourceRequest::query();
 
         if (Schema::hasColumn('resource_requests', 'request_source')) {
             $query->where('request_source', 'rescuer_mobile');
@@ -1420,7 +1422,7 @@ class RescuerMobileService
             return null;
         }
 
-        return DB::table('resource_request_status')
+        return ResourceRequestStatus::query()
             ->where('status_key', $statusKey)
             ->value('status_id');
     }
@@ -1707,7 +1709,7 @@ class RescuerMobileService
     {
         do {
             $requestId = 'RR-' . now()->format('Y') . '-' . strtoupper(Str::random(6));
-        } while (Schema::hasTable('resource_requests') && DB::table('resource_requests')->where('request_id', $requestId)->exists());
+        } while (Schema::hasTable('resource_requests') && ResourceRequest::query()->where('request_id', $requestId)->exists());
 
         return $requestId;
     }

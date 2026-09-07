@@ -54,6 +54,11 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('role:super_admin,admin')->group(function () {
             Route::get('/dashboard', [DashboardController::class, 'index']);
+            Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
+            Route::get('/dashboard/dispatch', [DashboardController::class, 'dispatch']);
+            Route::get('/dashboard/weather', [DashboardController::class, 'weather']);
+            Route::get('/dashboard/requests', [DashboardController::class, 'requests']);
+            Route::get('/dashboard/activity', [DashboardController::class, 'activity']);
             Route::get('/notifications', [NotificationController::class, 'index']);
             Route::post('/notifications/mark-read', [NotificationController::class, 'markRead']);
             Route::post('/notifications/delete-selected', [NotificationController::class, 'deleteSelected']);
@@ -72,6 +77,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/disaster-events/{eventId}/weather-logs', [WeatherController::class, 'index']);
             Route::post('/disaster-events/{eventId}/weather-logs/refresh', [WeatherController::class, 'refreshEvent']);
             Route::get('/map/overview', [MappingController::class, 'overview']);
+            Route::get('/map/workspace', [MappingController::class, 'workspace']);
             Route::get('/map/household-geotags', [MappingController::class, 'householdGeotags']);
             Route::get('/map/evacuation-sites', [MappingController::class, 'evacuationSites']);
             Route::get('/map/dispatch-routes', [MappingController::class, 'dispatchRoutes']);

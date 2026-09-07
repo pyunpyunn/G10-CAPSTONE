@@ -1515,17 +1515,30 @@
   --nav-icon-box: calc(var(--left-collapsed) - 16px);
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 4px;
-  height: auto;
+  min-height: 0;
   padding: 4px 8px 16px;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.left-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .left-sidebar-logout {
   --nav-icon-size: 17px;
   --nav-icon-box: calc(var(--left-collapsed) - 16px);
-  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  flex: 0 0 auto;
   padding: 8px 8px 16px;
+  background: var(--nav);
+  box-shadow: 0 -8px 16px rgba(9, 15, 24, 0.12);
 }
 
 .app-shell.left-peeking .left-nav,
@@ -1539,9 +1552,17 @@
 }
 
 .nav-section-title {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% - 20px);
   margin: 16px 10px 7px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   color: var(--color-nav-text-muted);
+  background: transparent;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -1549,6 +1570,46 @@
   text-transform: uppercase;
   white-space: nowrap;
   visibility: hidden;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.nav-section-title svg {
+  flex: 0 0 auto;
+  transition: transform 220ms ease;
+}
+
+.nav-group.is-open .nav-section-title svg {
+  transform: rotate(180deg);
+}
+
+.nav-section-title:hover,
+.nav-section-title:focus-visible {
+  color: var(--color-nav-text);
+  border-color: var(--color-nav-hover);
+  background: var(--nav-strong);
+  outline: none;
+}
+
+.nav-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: max-height 220ms ease, opacity 160ms ease, transform 220ms ease;
+}
+
+.nav-group + .nav-group {
+  margin-top: 5px;
+}
+
+.nav-group.is-open .nav-group-items {
+  max-height: 220px;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .left-nav .nav-section-title:first-child {
@@ -1646,6 +1707,8 @@
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  box-sizing: border-box;
+  padding-bottom: 32px;
   background: var(--bg);
   transition: left 220ms cubic-bezier(0.19, 1, 0.22, 1);
   scrollbar-gutter: stable;
@@ -1658,7 +1721,7 @@
   flex: 1 0 auto;
   flex-direction: column;
   min-height: calc(100vh - var(--header-height));
-  padding: 32px 28px 72px;
+  padding: 32px 28px 104px;
 }
 
 .pg-head {
@@ -9949,7 +10012,7 @@ th {
   }
 
   .main {
-    padding-bottom: 24px;
+    padding-bottom: 32px;
   }
 }
 

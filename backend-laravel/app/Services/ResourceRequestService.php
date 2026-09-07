@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\RequestValidation;
+use App\Models\ResourceRequest;
+use App\Models\ResourceRequestStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -173,7 +176,7 @@ class ResourceRequestService
             $now = now();
             $requestId = $this->nextRequestId();
 
-            DB::table('resource_requests')->insert([
+            ResourceRequest::create([
                 'request_id' => $requestId,
                 'request_source' => $validated['request_source'],
                 'source_reference' => $validated['source_reference'] ?? $activeEvent?->event_id,
@@ -184,7 +187,7 @@ class ResourceRequestService
                 'resource_type' => $validated['resource_type'],
                 'item_name' => $validated['item_name'] ?? null,
                 'quantity' => (int) $validated['quantity'],
-                'unit' => $validated['unit'] ?? null,
+                'unit' => $validated['unit'] ?? 'units',
                 'description' => $validated['description'] ?? null,
                 'urgency_id' => (int) ($validated['urgency_id'] ?? $this->urgencyId('medium')),
                 'status_id' => $this->resourceStatusId('needs_validation'),
@@ -248,7 +251,7 @@ class ResourceRequestService
             $category,
             $description
         ): array {
-            $existing = DB::table('resource_requests')
+            $existing = ResourceRequest::query()
                 ->where('request_source', $source)
                 ->where('source_reference', $sourceReference)
                 ->first();
@@ -267,7 +270,7 @@ class ResourceRequestService
                 'resource_type' => $resourceType,
                 'item_name' => $itemName,
                 'quantity' => (int) $validated['quantity'],
-                'unit' => $validated['unit'] ?? null,
+                'unit' => $validated['unit'] ?? 'units',
                 'description' => $description,
                 'urgency_id' => $this->externalUrgencyId($validated['priority'] ?? $validated['urgency'] ?? null),
                 'status_id' => $this->resourceStatusId($status),
@@ -276,11 +279,15 @@ class ResourceRequestService
             ];
 
             if ($existing) {
-                DB::table('resource_requests')
+                ResourceRequest::query()
                     ->where('request_id', $requestId)
                     ->update($row);
+
+                if ($existing->tracking_reference) {
+                    $this->trackingAid->syncRequestStatus($requestId, $status, $now);
+                }
             } else {
-                DB::table('resource_requests')->insert(array_merge($row, [
+                ResourceRequest::create(array_merge($row, [
                     'request_id' => $requestId,
                     'handled_by' => null,
                     'validation_notes' => null,
@@ -328,7 +335,7 @@ class ResourceRequestService
             $status = $this->statusKey($validated['validation_status']);
             $oldValues = $this->formatRequest($resourceRequest, true);
 
-            DB::table('resource_requests')
+            ResourceRequest::query()
                 ->where('request_id', $requestId)
                 ->update([
                     'validation_status' => $status,
@@ -339,6 +346,8 @@ class ResourceRequestService
                     'status_id' => $this->resourceStatusId($status),
                     'updated_at' => $now,
                 ]);
+
+            $this->trackingAid->syncRequestStatus($requestId, $status, $now);
 
             $this->insertValidationRecord(
                 $requestId,
@@ -409,7 +418,7 @@ class ResourceRequestService
                     $notes
                 );
 
-                DB::table('resource_requests')
+                ResourceRequest::query()
                     ->where('request_id', $requestId)
                     ->update([
                         'validation_status' => 'forwarded',
@@ -476,7 +485,7 @@ class ResourceRequestService
             $now = now();
             $oldValues = $this->formatRequest($resourceRequest, true);
 
-            DB::table('resource_requests')
+            ResourceRequest::query()
                 ->where('request_id', $requestId)
                 ->update([
                     'validation_status' => 'returned',
@@ -487,6 +496,8 @@ class ResourceRequestService
                     'status_id' => $this->resourceStatusId('returned'),
                     'updated_at' => $now,
                 ]);
+
+            $this->trackingAid->syncRequestStatus($requestId, 'returned', $now);
 
             $this->insertValidationRecord(
                 $requestId,
@@ -530,7 +541,7 @@ class ResourceRequestService
             $now = now();
             $oldValues = $this->formatRequest($resourceRequest, true);
 
-            DB::table('resource_requests')
+            ResourceRequest::query()
                 ->where('request_id', $requestId)
                 ->update([
                     'validation_status' => 'fulfilled',
@@ -541,6 +552,8 @@ class ResourceRequestService
                     'status_id' => $this->resourceStatusId('fulfilled'),
                     'updated_at' => $now,
                 ]);
+
+            $this->trackingAid->syncRequestStatus($requestId, 'fulfilled', $now);
 
             $this->insertValidationRecord(
                 $requestId,
@@ -568,7 +581,8 @@ class ResourceRequestService
 
     private function requestQuery()
     {
-        return DB::table('resource_requests as rr')
+        return ResourceRequest::query()
+            ->from('resource_requests as rr')
             ->leftJoin('resource_request_status as rrs', 'rrs.status_id', '=', 'rr.status_id')
             ->leftJoin('urgency_levels as ul', 'ul.urgency_id', '=', 'rr.urgency_id')
             ->leftJoin('evacuation_centers as ec', 'ec.evacuation_center_id', '=', 'rr.evacuation_center_id')
@@ -869,7 +883,7 @@ class ResourceRequestService
 
     private function summary(): array
     {
-        $counts = DB::table('resource_requests')
+        $counts = ResourceRequest::query()
             ->select('validation_status', DB::raw('COUNT(*) as total'))
             ->groupBy('validation_status')
             ->pluck('total', 'validation_status');
@@ -877,7 +891,7 @@ class ResourceRequestService
         return [
             'needs_validation' => (int) ($counts['needs_validation'] ?? 0),
             'verified' => (int) (($counts['verified'] ?? 0) + ($counts['validated'] ?? 0)),
-            'forwarded_today' => DB::table('resource_requests')
+            'forwarded_today' => ResourceRequest::query()
                 ->whereDate('released_for_tracking_at', Carbon::today())
                 ->count(),
             'returned' => (int) ($counts['returned'] ?? 0),
@@ -906,7 +920,7 @@ class ResourceRequestService
                     'key' => 'forwarded',
                     'label' => 'Forwarded today',
                     'status_id' => $this->resourceStatusId('forwarded'),
-                    'count' => DB::table('resource_requests')
+                    'count' => ResourceRequest::query()
                         ->whereDate('released_for_tracking_at', Carbon::today())
                         ->count(),
                 ],
@@ -953,7 +967,7 @@ class ResourceRequestService
             ['label' => 'Transport volunteers', 'keywords' => ['volunteer', 'driver', 'transport']],
         ];
 
-        $openRequests = DB::table('resource_requests')
+        $openRequests = ResourceRequest::query()
             ->whereNotIn('validation_status', ['returned', 'cancelled', 'fulfilled'])
             ->get(['resource_type', 'item_name', 'description', 'quantity', 'unit']);
 
@@ -1037,7 +1051,7 @@ class ResourceRequestService
             return [];
         }
 
-        return DB::table('request_validations')
+        return RequestValidation::query()
             ->where('request_id', $requestId)
             ->orderByDesc('created_at')
             ->limit(8)
@@ -1068,7 +1082,7 @@ class ResourceRequestService
             return;
         }
 
-        DB::table('request_validations')->insert([
+        RequestValidation::create([
             'request_id' => $requestId,
             'validation_status' => $status,
             'validator_user_id' => $validatorId,
@@ -1321,7 +1335,7 @@ class ResourceRequestService
             default => 'pending',
         };
 
-        return DB::table('resource_request_status')
+        return ResourceRequestStatus::query()
             ->where('status_key', $statusKey)
             ->value('status_id');
     }
@@ -1337,7 +1351,7 @@ class ResourceRequestService
     {
         do {
             $requestId = 'RR-' . now()->format('Y') . '-' . strtoupper(Str::random(6));
-        } while (DB::table('resource_requests')->where('request_id', $requestId)->exists());
+        } while (ResourceRequest::query()->where('request_id', $requestId)->exists());
 
         return $requestId;
     }
@@ -1345,7 +1359,7 @@ class ResourceRequestService
     private function nextTrackingReference(): string
     {
         $today = now()->format('Ymd');
-        $count = DB::table('resource_requests')
+        $count = ResourceRequest::query()
             ->whereDate('released_for_tracking_at', Carbon::today())
             ->count() + 1;
 

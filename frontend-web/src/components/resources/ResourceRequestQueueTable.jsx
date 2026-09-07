@@ -44,6 +44,7 @@ export default function ResourceRequestQueueTable({
                 <th>Quantity</th>
                 <th>Area / beneficiaries</th>
                 <th>Validation</th>
+                <th>Resource status</th>
                 <th>TrackingAid handoff</th>
                 <th />
               </tr>
@@ -79,6 +80,10 @@ export default function ResourceRequestQueueTable({
                       <div className="rr-meta">{request.validation_notes || 'HQ check pending'}</div>
                     </td>
                     <td>
+                      <Badge tone={statusTone(request.status?.key)}>{request.status?.label || 'Pending'}</Badge>
+                      <div className="rr-meta">{request.status?.key || 'pending'}</div>
+                    </td>
+                    <td>
                       <span className={`rr-system-pill ${request.handoff.tone === 'green' ? 'out' : ''}`}>{request.handoff.label}</span>
                       {request.handoff.meta && <div className="rr-meta">{request.handoff.meta}</div>}
                     </td>
@@ -106,7 +111,7 @@ function requestActions(request, onView, onValidate, onForward, onReturn) {
   const status = request.validation?.key || 'needs_validation'
   const actions = [{ label: 'View', onClick: () => onView(request) }]
 
-  if (status === 'needs_validation') {
+  if (status === 'needs_validation' || status === 'returned') {
     actions.push({ label: 'Validate', onClick: () => onValidate(request) })
     actions.push({ label: 'Return', onClick: () => onReturn(request) })
   }
@@ -116,4 +121,14 @@ function requestActions(request, onView, onValidate, onForward, onReturn) {
   }
 
   return actions
+}
+
+function statusTone(status) {
+  return {
+    pending: 'amber',
+    acknowledged: 'blue',
+    approved: 'green',
+    rejected: 'red',
+    delivered: 'green',
+  }[status] || 'gray'
 }
