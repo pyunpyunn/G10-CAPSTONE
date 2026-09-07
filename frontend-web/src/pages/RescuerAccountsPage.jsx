@@ -28,7 +28,6 @@ import {
   formFromRescuer,
   rescuerErrorMessage,
 } from '../utils/rescuerHelpers'
-import { pageDataError } from '../utils/pageShell'
 
 export default function RescuerAccountsPage() {
   const [payload, setPayload] = useState(null)
@@ -89,7 +88,7 @@ export default function RescuerAccountsPage() {
   const filters = payload?.filters || {}
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
-  const dataError = pageDataError(error, Boolean(payload))
+  const hasBlockingError = error && !payload
 
   async function loadRescuers() {
     setIsLoading(true)
@@ -290,39 +289,43 @@ export default function RescuerAccountsPage() {
         }
       />
 
-      {dataError ? <div className="page-data-notice is-error">{dataError}</div> : null}
-      {isInitialLoading ? <LoadingState /> : null}
+      {isInitialLoading && <LoadingState />}
+      {error && <div className="form-error">{error}</div>}
 
-      <RescuerFilters
-        search={search}
-        onSearchChange={setSearch}
-        purok={purok}
-        onPurokChange={setPurok}
-        puroks={filters.puroks || []}
-        teamOptions={teamOptions}
-        activeChip={activeChip}
-        onChipChange={setActiveChip}
-      />
+      {!isInitialLoading && !hasBlockingError && payload && (
+        <>
+          <RescuerFilters
+            search={search}
+            onSearchChange={setSearch}
+            purok={purok}
+            onPurokChange={setPurok}
+            puroks={filters.puroks || []}
+            teamOptions={teamOptions}
+            activeChip={activeChip}
+            onChipChange={setActiveChip}
+          />
 
-      <div className="ra-workspace">
-        <div className="ra-main-panel">
-          <RefreshOverlay active={isRefreshing}>
-            <RescuerRosterTable
-              rescuers={rescuers}
-              pagination={pagination}
-              onView={openViewModal}
-              onEdit={openEditModal}
-              onDeactivate={handleDeactivate}
-            />
-          </RefreshOverlay>
-        </div>
-        <aside className="ra-side-panel">
-          <div className="ra-side-head">
-            <span className="ra-title">Team cards</span>
+          <div className="ra-workspace">
+            <div className="ra-main-panel">
+              <RefreshOverlay active={isRefreshing}>
+                <RescuerRosterTable
+                  rescuers={rescuers}
+                  pagination={pagination}
+                  onView={openViewModal}
+                  onEdit={openEditModal}
+                  onDeactivate={handleDeactivate}
+                />
+              </RefreshOverlay>
+            </div>
+            <aside className="ra-side-panel">
+              <div className="ra-side-head">
+                <span className="ra-title">Team cards</span>
+              </div>
+              <RescuerTeamGrid teams={teams} />
+            </aside>
           </div>
-          <RescuerTeamGrid teams={teams} />
-        </aside>
-      </div>
+        </>
+      )}
 
       <RescuerAccountModal
         mode={modalMode}

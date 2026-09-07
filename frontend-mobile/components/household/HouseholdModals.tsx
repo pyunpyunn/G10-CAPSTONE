@@ -18,11 +18,7 @@ export function HouseholdQrModal({ visible, qr, onClose }: QrModalProps) {
         <View style={styles.modalCard}>
           <ModalHeader title="Evacuation QR" onClose={onClose} />
           <View style={styles.qrBox}>
-            {qr?.value ? (
-              <QRCode value={qr.value} size={180} />
-            ) : (
-              <Text style={styles.qrUnavailable}>Household QR will appear when household data is available.</Text>
-            )}
+            <QRCode value={qr?.value || 'RESQPERATION-HOUSEHOLD'} size={180} />
           </View>
           <Text style={styles.qrTitle}>{qr?.household_name || 'Household'}</Text>
           <Text style={styles.qrMeta}>{qr?.household_id || 'Household ID'}</Text>
@@ -314,14 +310,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: '#fff',
-  },
-  qrUnavailable: {
-    maxWidth: 190,
-    color: palette.textSoft,
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: '700',
-    textAlign: 'center',
   },
   qrTitle: {
     color: palette.text,

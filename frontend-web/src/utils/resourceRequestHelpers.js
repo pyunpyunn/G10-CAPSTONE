@@ -1,9 +1,8 @@
 export const requestChips = [
   { key: 'all', label: 'All', params: {} },
-  { key: 'needs_validation', label: 'Pending', params: { status: 'needs_validation' } },
-  { key: 'verified', label: 'Approved', params: { status: 'verified' } },
-  { key: 'forwarded', label: 'In Progress', params: { status: 'forwarded' } },
-  { key: 'fulfilled', label: 'Completed', params: { status: 'fulfilled' } },
+  { key: 'needs_validation', label: 'Needs validation', params: { status: 'needs_validation' } },
+  { key: 'verified', label: 'Verified', params: { status: 'verified' } },
+  { key: 'forwarded', label: 'Forwarded', params: { status: 'forwarded' } },
   { key: 'personnel', label: 'Personnel', params: { category: 'personnel' } },
   { key: 'resource', label: 'Resource', params: { category: 'resource' } },
 ]
@@ -92,7 +91,7 @@ export function buildReturnPayload(form) {
   }
 }
 
-export function filterParams(search, purok, activeChip, page = 1, extra = {}) {
+export function filterParams(search, purok, activeChip, page = 1) {
   const chip = requestChips.find((item) => item.key === activeChip)
 
   return {
@@ -100,38 +99,9 @@ export function filterParams(search, purok, activeChip, page = 1, extra = {}) {
     purok,
     page,
     per_page: 6,
+    core: 1,
     ...(chip?.params || {}),
-    ...extra,
   }
-}
-
-export function defaultResourceSummaryRows(summary = {}) {
-  return [
-    {
-      key: 'needs_validation',
-      label: 'Needs validation',
-      status_id: summary.status_ids?.needs_validation ?? null,
-      count: summary.needs_validation || 0,
-    },
-    {
-      key: 'verified',
-      label: 'Verified',
-      status_id: summary.status_ids?.verified ?? null,
-      count: summary.verified || 0,
-    },
-    {
-      key: 'forwarded',
-      label: 'Forwarded today',
-      status_id: summary.status_ids?.forwarded ?? null,
-      count: summary.forwarded_today || 0,
-    },
-    {
-      key: 'returned',
-      label: 'Returned',
-      status_id: summary.status_ids?.returned ?? null,
-      count: summary.returned || 0,
-    },
-  ]
 }
 
 export function resourceRequestErrorMessage(error, fallback = 'Unable to save the request. Please check the form and try again.') {

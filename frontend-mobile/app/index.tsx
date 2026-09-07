@@ -16,18 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { type Href, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { clearToken } from '@/api/client';
-import { getRecoveryQuestions, loginMobile, resetMobilePassword } from '@/api/auth';
+import { loginMobile } from '@/api/auth';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { askStandardMobilePermissions } from '@/utils/mobilePermissions';
-
-const recoveryQuestionOptions = [
-  { key: 'first_pet', label: "What was your first pet's name?" },
-  { key: 'birth_city', label: "What's the name of the city where you were born?" },
-  { key: 'childhood_nickname', label: 'What was your childhood nickname?' },
-  { key: 'parents_met_city', label: "What's the name of the city where your parents met?" },
-  { key: 'eldest_cousin_first_name', label: "What's the first name of your eldest cousin?" },
-  { key: 'first_school', label: "What's the name of the first school you attended?" },
-];
 
 export default function MobileLoginScreen() {
   const router = useRouter();
@@ -35,21 +26,6 @@ export default function MobileLoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [remember, setRemember] = useState(false);
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
-  const [recoveryStep, setRecoveryStep] = useState<'account' | 'method' | 'verification' | 'password'>('account');
-  const [firstTimeChoice, setFirstTimeChoice] = useState<'new_password' | 'security_questions'>('new_password');
-  const [recoveryMethod, setRecoveryMethod] = useState<'previous_password' | 'security_questions'>('previous_password');
-  const [recoveryQuestions, setRecoveryQuestions] = useState<any>(null);
-  const [recoveryConfigured, setRecoveryConfigured] = useState(false);
-  const [recoveryLookupLoading, setRecoveryLookupLoading] = useState(false);
-  const [selectedQuestion1, setSelectedQuestion1] = useState('');
-  const [selectedQuestion2, setSelectedQuestion2] = useState('');
-  const [previousPassword, setPreviousPassword] = useState('');
-  const [answer1, setAnswer1] = useState('');
-  const [answer2, setAnswer2] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
 
   async function handleLogin() {
     if (!login.trim() || !password.trim()) {
@@ -60,7 +36,7 @@ export default function MobileLoginScreen() {
     setLoading(true);
 
     try {
-      const user = await loginMobile(login.trim(), password, remember);
+      const user = await loginMobile(login.trim(), password);
       const role = user.role?.role_key;
 
       if (role === 'household_resident') {
@@ -90,90 +66,6 @@ export default function MobileLoginScreen() {
     }
   }
 
-  async function openRecovery() {
-    setRecoveryOpen(true);
-    setRecoveryStep('account');
-    setRecoveryQuestions(null);
-  }
-
-  async function lookupRecoveryAccount() {
-    if (!login.trim()) {
-      Alert.alert('Account ID required', 'Enter your account ID first so we can find your recovery setup.');
-      return;
-    }
-
-    setRecoveryLookupLoading(true);
-    try {
-      const data = await getRecoveryQuestions(login.trim());
-      setRecoveryQuestions(data.questions);
-      setRecoveryConfigured(Boolean(data.configured));
-      setRecoveryMethod(data.configured ? 'security_questions' : 'previous_password');
-      setRecoveryStep('method');
-    } catch (error: any) {
-      Alert.alert('Recovery unavailable', error?.response?.data?.message || 'Enter a valid account ID and try again.');
-    } finally {
-      setRecoveryLookupLoading(false);
-    }
-  }
-
-  async function handleRecovery() {
-    if (!login.trim()) {
-      Alert.alert('Account ID required', 'Enter your account ID first.');
-      return;
-    }
-
-    if (recoveryStep === 'method') {
-      return;
-    }
-
-    if (!recoveryConfigured && firstTimeChoice === 'security_questions' && (!selectedQuestion1 || !selectedQuestion2 || selectedQuestion1 === selectedQuestion2 || !previousPassword || !answer1 || !answer2)) {
-      Alert.alert('Complete recovery setup', 'Verify your previous password, choose two different questions, and answer both questions.');
-      return;
-    }
-
-    if (recoveryStep === 'verification') {
-      if (!recoveryConfigured && firstTimeChoice === 'security_questions' && (!selectedQuestion1 || !selectedQuestion2 || selectedQuestion1 === selectedQuestion2 || !previousPassword || !answer1 || !answer2)) {
-        Alert.alert('Complete recovery setup', 'Verify your previous password, choose two different questions, and answer both questions.');
-        return;
-      }
-
-      if (recoveryConfigured && recoveryMethod === 'previous_password' && !previousPassword) {
-        Alert.alert('Password required', 'Enter your last used password.');
-        return;
-      }
-
-      if (recoveryConfigured && recoveryMethod === 'security_questions' && (!answer1 || !answer2)) {
-        Alert.alert('Answers required', 'Answer both security questions.');
-        return;
-      }
-
-      setRecoveryStep('password');
-      return;
-    }
-
-    if (!newPassword || newPassword !== newPasswordConfirmation) {
-      Alert.alert('Password required', 'Enter and confirm the new password.');
-      return;
-    }
-
-    try {
-      const result = await resetMobilePassword({
-        login: login.trim(),
-        method: recoveryConfigured ? recoveryMethod : 'previous_password',
-        previous_password: previousPassword,
-        question_1: selectedQuestion1,
-        question_2: selectedQuestion2,
-        answer_1: answer1,
-        answer_2: answer2,
-        password: newPassword,
-        password_confirmation: newPasswordConfirmation,
-      });
-      Alert.alert('Password reset', result.message || 'Password reset successfully.', [{ text: 'Sign in', onPress: () => setRecoveryOpen(false) }]);
-    } catch (error: any) {
-      Alert.alert('Recovery failed', error?.response?.data?.message || 'The verification details are incorrect.');
-    }
-  }
-
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -195,10 +87,10 @@ export default function MobileLoginScreen() {
 
           <View style={styles.card}>
             <View style={styles.headerBlock}>
-              <Text style={styles.title}>{recoveryOpen ? 'Reset password' : 'Sign in'}</Text>
+              <Text style={styles.title}>Sign in</Text>
             </View>
 
-            {!recoveryOpen ? <><View style={styles.fieldGroup}>
+            <View style={styles.fieldGroup}>
               <Text style={styles.label}>Account ID</Text>
               <View style={styles.inputShell}>
                 <Ionicons name="person-outline" size={19} color={palette.textSoft} />
@@ -240,11 +132,6 @@ export default function MobileLoginScreen() {
               </View>
             </View>
 
-            <Pressable style={styles.rememberRow} onPress={() => setRemember((current) => !current)}>
-              <Ionicons name={remember ? 'checkbox' : 'square-outline'} size={20} color={palette.navActive} />
-              <Text style={styles.forgotText}>Keep me signed in on this device</Text>
-            </Pressable>
-
             <Pressable style={[styles.button, loading && styles.buttonDisabled]} onPress={handleLogin} disabled={loading}>
               {loading ? (
                 <ActivityIndicator color="#fff" />
@@ -258,43 +145,10 @@ export default function MobileLoginScreen() {
 
             <Pressable
               style={styles.forgotButton}
-              onPress={openRecovery}
+              onPress={() => Alert.alert('Password help', 'Please contact HQ/Admin to reset your mobile account password.')}
             >
               <Text style={styles.forgotText}>Forgot password?</Text>
-            </Pressable></> : <>
-              {recoveryLookupLoading ? <ActivityIndicator color={palette.navActive} /> : recoveryStep === 'account' ? <View style={styles.recoveryStack}>
-                <Text style={styles.label}>Account ID</Text>
-                <TextInput style={styles.recoveryInput} value={login} onChangeText={setLogin} placeholder="Account ID" />
-                <Pressable style={styles.button} onPress={lookupRecoveryAccount}><Text style={styles.buttonText}>Continue</Text></Pressable>
-              </View> : recoveryStep === 'method' ? <View style={styles.recoveryStack}>
-                <Text style={styles.recoveryNote}>Account found. Choose one option.</Text>
-                {recoveryConfigured ? <>
-                  <Pressable style={styles.recoveryOption} onPress={() => { setRecoveryMethod('previous_password'); setRecoveryStep('verification'); }}><Text style={styles.recoveryOptionText}>Enter last used password</Text></Pressable>
-                  <Pressable style={styles.recoveryOption} onPress={() => { setRecoveryMethod('security_questions'); setRecoveryStep('verification'); }}><Text style={styles.recoveryOptionText}>Answer security questions</Text></Pressable>
-                </> : <>
-                  <Pressable style={styles.recoveryOption} onPress={() => { setFirstTimeChoice('new_password'); setRecoveryMethod('previous_password'); setRecoveryStep('verification'); }}><Text style={styles.recoveryOptionText}>Set a new password</Text></Pressable>
-                  <Pressable style={styles.recoveryOption} onPress={() => { setFirstTimeChoice('security_questions'); setRecoveryMethod('security_questions'); setRecoveryStep('verification'); }}><Text style={styles.recoveryOptionText}>Set up security questions</Text></Pressable>
-                </>}
-              </View> : recoveryStep === 'verification' ? <View style={styles.recoveryStack}>
-                {recoveryConfigured && recoveryMethod === 'previous_password' ? <TextInput style={styles.recoveryInput} value={previousPassword} onChangeText={setPreviousPassword} placeholder="Last used password" secureTextEntry /> : null}
-                {!recoveryConfigured && firstTimeChoice === 'security_questions' ? <>
-                  <TextInput style={styles.recoveryInput} value={previousPassword} onChangeText={setPreviousPassword} placeholder="Last used password" secureTextEntry />
-                  <Text style={styles.question}>Choose question 1</Text>
-                  {recoveryQuestionOptions.map((question) => <Pressable key={`one-${question.key}`} style={[styles.recoveryOption, selectedQuestion1 === question.key && styles.recoveryOptionSelected, question.key === selectedQuestion2 && styles.recoveryOptionDisabled]} disabled={question.key === selectedQuestion2} onPress={() => setSelectedQuestion1(question.key)}><Text style={styles.recoveryOptionText}>{selectedQuestion1 === question.key ? '● ' : '○ '}{question.label}</Text></Pressable>)}
-                  <TextInput style={styles.recoveryInput} value={answer1} onChangeText={setAnswer1} placeholder="Answer 1" />
-                  <Text style={styles.question}>Choose question 2</Text>
-                  {recoveryQuestionOptions.map((question) => <Pressable key={`two-${question.key}`} style={[styles.recoveryOption, selectedQuestion2 === question.key && styles.recoveryOptionSelected, question.key === selectedQuestion1 && styles.recoveryOptionDisabled]} disabled={question.key === selectedQuestion1} onPress={() => setSelectedQuestion2(question.key)}><Text style={styles.recoveryOptionText}>{selectedQuestion2 === question.key ? '● ' : '○ '}{question.label}</Text></Pressable>)}
-                  <TextInput style={styles.recoveryInput} value={answer2} onChangeText={setAnswer2} placeholder="Answer 2" />
-                </> : null}
-                {recoveryConfigured && recoveryMethod === 'security_questions' ? <><Text style={styles.question}>{recoveryQuestions?.first}</Text><TextInput style={styles.recoveryInput} value={answer1} onChangeText={setAnswer1} placeholder="Answer 1" /><Text style={styles.question}>{recoveryQuestions?.second}</Text><TextInput style={styles.recoveryInput} value={answer2} onChangeText={setAnswer2} placeholder="Answer 2" /></> : null}
-                <Pressable style={styles.button} onPress={handleRecovery}><Text style={styles.buttonText}>Continue</Text></Pressable>
-              </View> : <View style={styles.recoveryStack}>
-                <TextInput style={styles.recoveryInput} value={newPassword} onChangeText={setNewPassword} placeholder="New password" secureTextEntry />
-                <TextInput style={styles.recoveryInput} value={newPasswordConfirmation} onChangeText={setNewPasswordConfirmation} placeholder="Confirm new password" secureTextEntry />
-                <Pressable style={styles.button} onPress={handleRecovery}><Text style={styles.buttonText}>Reset password</Text></Pressable>
-              </View>}
-              <Pressable style={styles.forgotButton} onPress={() => setRecoveryOpen(false)}><Text style={styles.forgotText}>Back to sign in</Text></Pressable>
-            </>}
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -313,8 +167,8 @@ const styles = StyleSheet.create({
   screen: {
     flexGrow: 1,
     justifyContent: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
+    gap: spacing.lg,
+    padding: spacing.lg,
   },
   brandRow: {
     flexDirection: 'row',
@@ -322,27 +176,27 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   brandLogo: {
-    width: 56,
-    height: 32,
+    width: 72,
+    height: 42,
   },
   brandName: {
     color: palette.nav,
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 21,
+    fontWeight: '900',
   },
   brandRole: {
     marginTop: 2,
     color: palette.textSoft,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '900',
     textTransform: 'uppercase',
   },
   card: {
-    gap: spacing.sm,
+    gap: spacing.md,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: radius.lg,
-    padding: spacing.md,
+    padding: spacing.lg,
     backgroundColor: palette.card,
     ...shadow,
   },
@@ -351,45 +205,45 @@ const styles = StyleSheet.create({
   },
   title: {
     color: palette.text,
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 31,
+    fontWeight: '900',
   },
   fieldGroup: {
-    gap: 6,
+    gap: 7,
   },
   label: {
     color: palette.text,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '900',
     textTransform: 'uppercase',
   },
   inputShell: {
-    minHeight: 42,
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     borderWidth: 1,
     borderColor: palette.borderStrong,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.md,
     backgroundColor: '#ffffff',
   },
   input: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 50,
     color: palette.text,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '800',
   },
   eyeButton: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,
   },
   button: {
-    minHeight: 42,
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -402,72 +256,17 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '900',
   },
   forgotButton: {
     alignSelf: 'center',
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 8,
-  },
-  rememberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: 2,
-  },
-  recoveryChoice: {
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  recoveryStack: {
-    gap: spacing.sm,
-  },
-  recoveryInput: {
-    minHeight: 42,
-    borderWidth: 1,
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm,
-    color: palette.text,
-    backgroundColor: '#ffffff',
-    fontSize: 14,
-  },
-  question: {
-    color: palette.text,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  recoveryNote: {
-    color: palette.textSoft,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '600',
-  },
-  recoveryOption: {
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    backgroundColor: '#ffffff',
-  },
-  recoveryOptionSelected: {
-    borderColor: palette.navActive,
-    backgroundColor: palette.secondary,
-  },
-  recoveryOptionDisabled: {
-    opacity: 0.45,
-  },
-  recoveryOptionText: {
-    color: palette.text,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '700',
   },
   forgotText: {
     color: palette.navActive,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '900',
   },
 });

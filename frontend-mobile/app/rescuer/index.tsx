@@ -19,29 +19,26 @@ import { savePushRegistration } from '@/api/device';
 import {
   cancelResourceRequest,
   createFieldReport,
-  createRescuerCheckIn,
   createResourceRequest,
   getRescuerOverview,
   sendAssignmentLocation,
   updateAssignmentStatus,
   updateRescuerProfile,
-  verifyEvacuationQr,
 } from '@/api/rescuer';
 import type { RescuerOverview } from '@/api/rescuer';
 import { FieldReportScreen } from '@/components/rescuer/FieldReportScreen';
-import { RescuerOperationsScreen } from '@/components/rescuer/RescuerOperationsScreen';
 import { RescuerDashboardScreen } from '@/components/rescuer/RescuerDashboardScreen';
 import { RescuerHeader } from '@/components/rescuer/RescuerHeader';
 import { RadioCommunicationScreen } from '@/components/rescuer/RadioCommunicationScreen';
 import { RescueMapScreen } from '@/components/rescuer/RescueMapScreen';
 import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScreen';
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
-import { RescuerDataState } from '@/components/MobileDataState';
+import { LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
 
-type TabKey = 'dashboard' | 'map' | 'report' | 'ops' | 'resource' | 'profile' | 'radio';
+type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 const deviceUuidKey = 'resq_rescuer_device_uuid';
 
 const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; special?: boolean }[] = [
@@ -58,7 +55,6 @@ export default function RescuerHomeScreen() {
   const [overview, setOverview] = useState<RescuerOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState('');
 
   const loadOverview = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -70,13 +66,8 @@ export default function RescuerHomeScreen() {
     try {
       const data = await getRescuerOverview();
       setOverview(data);
-      setLoadError('');
     } catch (error: any) {
-      if (isRefresh) {
-        Alert.alert('Unable to load rescuer data', errorMessage(error));
-      } else {
-        setLoadError(errorMessage(error));
-      }
+      Alert.alert('Unable to load rescuer data', errorMessage(error));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -198,16 +189,6 @@ export default function RescuerHomeScreen() {
     }
   }
 
-  async function handleSubmitCheckIn(payload: any) {
-    await createRescuerCheckIn(payload);
-    await loadOverview(true);
-  }
-
-  async function handleVerifyQr(payload: any) {
-    await verifyEvacuationQr(payload);
-    await loadOverview(true);
-  }
-
   async function handleSubmitResourceRequest(payload: any) {
     if (!payload.location || !payload.resource_type || !payload.quantity) {
       Alert.alert('Missing request details', 'Enter location, need type, and quantity.');
@@ -243,9 +224,9 @@ export default function RescuerHomeScreen() {
     }
   }
 
-  function renderLoadedContent() {
-    if (!overview) {
-      return null;
+  function renderContent() {
+    if (loading || !overview) {
+      return <LoadingState label="Loading rescuer console..." />;
     }
 
     if (activeTab === 'dashboard') {
@@ -254,7 +235,6 @@ export default function RescuerHomeScreen() {
           overview={overview}
           onOpenMap={() => setActiveTab('map')}
           onOpenReport={() => setActiveTab('report')}
-          onOpenOps={() => setActiveTab('ops')}
           onStatusChange={handleStatusChange}
         />
       );
@@ -265,7 +245,6 @@ export default function RescuerHomeScreen() {
         <RescueMapScreen
           assignments={assignments}
           activeAssignment={activeAssignment}
-          evacuationCenters={overview.evacuation_centers || []}
           onSendLocation={handleSendLocation}
         />
       );
@@ -277,17 +256,6 @@ export default function RescuerHomeScreen() {
           reports={overview.field_reports || []}
           statusOptions={overview.status_options || []}
           onSubmitReport={handleSubmitFieldReport}
-        />
-      );
-    }
-
-    if (activeTab === 'ops') {
-      return (
-        <RescuerOperationsScreen
-          checkIns={overview.check_ins || []}
-          statusOptions={overview.status_options || []}
-          onSubmitCheckIn={handleSubmitCheckIn}
-          onVerifyQr={handleVerifyQr}
         />
       );
     }
@@ -310,22 +278,11 @@ export default function RescuerHomeScreen() {
     return <ResponderProfileScreen profile={overview.profile} onSaveProfile={handleUpdateProfile} onLogout={handleLogout} />;
   }
 
-  function renderContent() {
-    return (
-      <RescuerDataState
-        isInitialLoading={loading && !overview}
-        error={!overview ? loadError : ''}
-        loadingLabel="Loading rescuer data..."
-        onRetry={() => loadOverview()}
-      >
-        {renderLoadedContent()}
-      </RescuerDataState>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.safe}>
-      <RescuerHeader onOpenRadio={() => setActiveTab('radio')} />
+      <RescuerHeader
+        onOpenRadio={() => setActiveTab('radio')}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -395,15 +352,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: spacing.sm,
-    paddingBottom: 84,
+    padding: spacing.md,
+    paddingBottom: 100,
   },
   tabBar: {
     position: 'absolute',
-    right: spacing.sm,
-    bottom: spacing.sm,
-    left: spacing.sm,
-    minHeight: 58,
+    right: spacing.md,
+    bottom: spacing.md,
+    left: spacing.md,
+    minHeight: 70,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',

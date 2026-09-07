@@ -14,7 +14,6 @@ import {
   apiErrorMessage,
   defaultWorkspace,
 } from '../utils/mappingHelpers'
-import { pageDataError } from '../utils/pageShell'
 
 export default function MappingPage() {
   const [workspace, setWorkspace] = useState(defaultWorkspace)
@@ -180,7 +179,6 @@ export default function MappingPage() {
 
   const isInitialLoading = isLoading && !hasLoaded
   const isRefreshing = isLoading && hasLoaded
-  const dataError = pageDataError(error, hasLoaded)
 
   return (
     <section className="page mapping-page active">
@@ -207,14 +205,16 @@ export default function MappingPage() {
         }
       />
 
-      {dataError ? <div className="page-data-notice is-error">{dataError}</div> : null}
-      {isInitialLoading ? <LoadingState /> : null}
+      {isInitialLoading && <LoadingState />}
+      {error && <div className="form-error">{error}</div>}
 
-      <MappingEventStrip activeEvent={workspace.active_event} />
-      <MappingSummary summary={workspace.summary} hasActiveEvent={hasActiveEvent} />
-      <GeotagToolbar />
+      {hasLoaded && (
+        <>
+          <MappingEventStrip activeEvent={workspace.active_event} />
+          <MappingSummary summary={workspace.summary} hasActiveEvent={hasActiveEvent} />
+          <GeotagToolbar />
 
-      <div className="mapping-layout">
+          <div className="mapping-layout">
             <main className="mapping-main">
               <RefreshOverlay active={isRefreshing}>
                 <MappingMap
@@ -252,6 +252,8 @@ export default function MappingPage() {
               onRouteToSite={showRouteToSite}
             />
           </div>
+        </>
+      )}
     </section>
   )
 }

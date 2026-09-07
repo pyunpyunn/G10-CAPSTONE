@@ -83,11 +83,11 @@ function toneColor(tone: string) {
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 40,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
   },
@@ -107,8 +107,8 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '900',
   },
   lightText: {
     color: palette.nav,
@@ -121,8 +121,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '900',
   },
   statTile: {
     flex: 1,
@@ -140,20 +140,20 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   statValue: {
-    marginTop: 4,
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  sectionTitle: {
-    color: palette.text,
-    fontSize: 14,
-    fontWeight: '700',
+    marginTop: 6,
+    fontSize: 24,
+    fontWeight: '900',
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
+  },
+  sectionTitle: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: '900',
   },
   centerState: {
     alignItems: 'center',
@@ -171,20 +171,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: radius.md,
-    padding: spacing.md,
+    padding: spacing.xl,
     backgroundColor: palette.card,
   },
   emptyTitle: {
-    marginTop: 8,
+    marginTop: 10,
     color: palette.text,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '900',
   },
   emptyBody: {
-    marginTop: 4,
+    marginTop: 6,
     color: palette.textSoft,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
     textAlign: 'center',
   },
 });

@@ -1,8 +1,6 @@
 import { PackageCheck, RefreshCcw } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import {
-  completeResourceRequest,
   createResourceRequest,
   forwardResourceRequest,
   getResourceRequest,
@@ -10,8 +8,9 @@ import {
   returnResourceRequest,
   validateResourceRequest,
 } from '../api/resourceRequestApi'
+import ResourceRequestNotice from '../components/resources/ResourceRequestNotice'
 import ResourceRequestQueueTable from '../components/resources/ResourceRequestQueueTable'
-import ResourceRequestSummaryTable from '../components/resources/ResourceRequestSummaryTable'
+import ResourceRequestStats from '../components/resources/ResourceRequestStats'
 import ResourceValidationModal from '../components/resources/ResourceValidationModal'
 import TrackingAidMirror from '../components/resources/TrackingAidMirror'
 import LoadingState from '../components/ui/LoadingState'
@@ -27,15 +26,13 @@ import {
   formFromResourceRequest,
   resourceRequestErrorMessage,
 } from '../utils/resourceRequestHelpers'
-import { mergeQueryParams, readQueryNumber, readQueryParam, setQueryParams } from '../utils/pageQuery'
-import { pageDataError } from '../utils/pageShell'
 
 export default function ResourcesRequestsPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
   const [payload, setPayload] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [queuePage, setQueuePage] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState('create')
   const [selectedRequestId, setSelectedRequestId] = useState('')
@@ -43,53 +40,62 @@ export default function ResourcesRequestsPage() {
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
-  const statusFilter = readQueryParam(searchParams, 'status', 'all')
-  const statusId = readQueryParam(searchParams, 'status_id')
-  const eventId = readQueryParam(searchParams, 'event_id')
-  const queuePage = readQueryNumber(searchParams, 'page', 1)
+  useEffect(() => {
+    let ignore = false
 
-  const loadRequests = useCallback(async (showMessage = '') => {
+    async function loadInitialRequests() {
+      setIsLoading(true)
+      setError('')
+
+      try {
+        const data = await getResourceRequests(filterParams('', 'all', 'all', queuePage))
+
+        if (!ignore) {
+          setPayload(data)
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(resourceRequestErrorMessage(loadError, 'Resource requests could not be loaded. Please sign in again or check the Laravel API.'))
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadInitialRequests()
+
+    return () => {
+      ignore = true
+    }
+  }, [queuePage])
+
+  async function loadRequests(showMessage = '') {
     setIsLoading(true)
     setError('')
     setMessage('')
 
     try {
-      const data = await getResourceRequests(filterParams('', 'all', statusFilter, queuePage, {
-        status_id: statusId,
-        event_id: eventId,
-      }))
+      const data = await getResourceRequests(filterParams('', 'all', 'all', queuePage))
       setPayload(data)
 
       if (showMessage) {
         setMessage(showMessage)
       }
-    } catch {
-      setError('Resource requests cannot be loaded right now. Please check the backend or database connection.')
+    } catch (loadError) {
+      setError(resourceRequestErrorMessage(loadError, 'Resource requests could not be loaded. Please sign in again or check the Laravel API.'))
     } finally {
       setIsLoading(false)
     }
-  }, [statusFilter, statusId, eventId, queuePage])
-
-  useEffect(() => {
-    loadRequests()
-  }, [loadRequests])
-
-  useEffect(() => {
-    const activeEventId = payload?.active_event?.event_id
-
-    if (!activeEventId || eventId === activeEventId) {
-      return
-    }
-
-    setQueryParams(setSearchParams, searchParams, { event_id: activeEventId }, { replace: true })
-  }, [payload?.active_event?.event_id, eventId, searchParams, setSearchParams])
+  }
 
   const requests = payload?.requests?.data || []
   const pagination = payload?.requests || {}
   const options = payload?.options || {}
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
-  const dataError = pageDataError(error, Boolean(payload))
+  const hasBlockingError = error && !payload
 
   function openCreateModal() {
     setModalMode('create')
@@ -115,11 +121,6 @@ export default function ResourcesRequestsPage() {
       setSelectedRequestId(data.request.request_id)
       setForm(nextForm)
       setIsModalOpen(true)
-
-      setQueryParams(setSearchParams, searchParams, {
-        request_id: data.request.request_id,
-        event_id: eventId || payload?.active_event?.event_id || null,
-      }, { replace: true })
     } catch {
       setError('Selected resource request cannot be loaded right now.')
     }
@@ -133,22 +134,6 @@ export default function ResourcesRequestsPage() {
     setIsModalOpen(false)
     setSelectedRequestId('')
     setFormError('')
-    setQueryParams(setSearchParams, searchParams, { request_id: null }, { replace: true })
-  }
-
-  function selectStatusRow(row) {
-    const nextStatus = statusFilter === row.key ? 'all' : row.key
-
-    setQueryParams(setSearchParams, searchParams, {
-      status: nextStatus,
-      status_id: nextStatus === 'all' ? null : row.status_id,
-      page: 1,
-      event_id: eventId || payload?.active_event?.event_id || null,
-    })
-  }
-
-  function changeQueuePage(page) {
-    setQueryParams(setSearchParams, searchParams, { page })
   }
 
   async function submitForm(event) {
@@ -232,27 +217,8 @@ export default function ResourcesRequestsPage() {
     await openExistingModal(request, 'forward')
   }
 
-  async function handleRowComplete(request) {
-    if (request.validation.key !== 'forwarded') {
-      await openExistingModal(request, 'view', 'Only in-progress requests can be marked completed.')
-      return
-    }
-
-    setError('')
-    setIsSaving(true)
-
-    try {
-      await completeResourceRequest(request.request_id)
-      await loadRequests('Request marked as completed.')
-    } catch (completeError) {
-      setError(resourceRequestErrorMessage(completeError, 'Unable to mark the request as completed.'))
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   async function handleSyncEvaTrack() {
-    await loadRequests('Latest shared DB requests loaded.')
+    await loadRequests('Latest shared DB requests loaded. EvaTrack requests will appear here after they are saved in the shared database.')
   }
 
   return (
@@ -261,44 +227,45 @@ export default function ResourcesRequestsPage() {
         title="Resources & Requests"
         actions={
           <>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={handleSyncEvaTrack}>
-              <RefreshCcw size={14} />
-              Sync EvaTrack
-            </button>
-            <button className="btn btn-primary btn-sm" type="button" onClick={openCreateModal}>
-              <PackageCheck size={14} />
-              Validate request
-            </button>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={handleSyncEvaTrack}>
+            <RefreshCcw size={14} />
+            Sync EvaTrack
+          </button>
+          <button className="btn btn-primary btn-sm" type="button" onClick={openCreateModal}>
+            <PackageCheck size={14} />
+            Validate request
+          </button>
           </>
         }
       />
 
-      {isInitialLoading ? <LoadingState label="Loading resource requests..." /> : null}
-      {dataError ? <div className="page-data-notice is-error">{dataError}</div> : null}
+      {isInitialLoading && <LoadingState />}
+      {error && <div className="form-error">{error}</div>}
 
-      <ResourceRequestSummaryTable
-        summary={payload?.summary}
-        activeStatus={statusFilter}
-        onSelectStatus={selectStatusRow}
-      />
+      {!hasBlockingError && (payload || isLoading) && (
+        <>
+          <ResourceRequestNotice note={payload?.scope_note} />
+          <ResourceRequestStats summary={payload?.summary} />
 
-      {message && <div className="rr-message">{message}</div>}
+          {message && <div className="rr-message">{message}</div>}
 
-      <div className="rr-layout">
-        <RefreshOverlay active={isRefreshing}>
-          <ResourceRequestQueueTable
-            requests={requests}
-            pagination={pagination}
-            onView={(request) => openExistingModal(request, 'view')}
-            onValidate={(request) => openExistingModal(request, 'validate')}
-            onForward={handleRowForward}
-            onReturn={(request) => openExistingModal(request, 'return', 'Add the return reason before saving.')}
-            onComplete={handleRowComplete}
-            onPageChange={changeQueuePage}
-          />
-        </RefreshOverlay>
-        <TrackingAidMirror items={payload?.tracking_mirror || []} />
-      </div>
+          <div className="rr-layout">
+            <RefreshOverlay active={isRefreshing}>
+              <ResourceRequestQueueTable
+                requests={requests}
+                pagination={pagination}
+                loading={isLoading}
+                onView={(request) => openExistingModal(request, 'view')}
+                onValidate={(request) => openExistingModal(request, 'validate')}
+                onForward={handleRowForward}
+                onReturn={(request) => openExistingModal(request, 'return', 'Add the return reason before saving.')}
+                onPageChange={setQueuePage}
+              />
+            </RefreshOverlay>
+            <TrackingAidMirror items={payload?.tracking_mirror || []} />
+          </div>
+        </>
+      )}
 
       <ResourceValidationModal
         mode={modalMode}

@@ -17,7 +17,6 @@ import './App.css'
 const webRoles = ['super_admin', 'admin']
 
 const pageComponents = {
-  '/inquiries': lazy(() => import('./pages/InquiriesPage')),
   '/super-admin': lazy(() => import('./pages/SuperAdminPage')),
   '/dashboard': lazy(() => import('./pages/DashboardPage')),
   '/broadcast': lazy(() => import('./pages/BroadcastPage')),
@@ -27,7 +26,6 @@ const pageComponents = {
   '/dispatch': lazy(() => import('./pages/RescueDispatchPage')),
   '/rescuers': lazy(() => import('./pages/RescuerAccountsPage')),
   '/resources-requests': lazy(() => import('./pages/ResourcesRequestsPage')),
-  '/field-reports': lazy(() => import('./pages/FieldReportsPage')),
   '/situation': lazy(() => import('./pages/SituationReportPage')),
   '/archive': lazy(() => import('./pages/ArchivePage')),
   '/notifications': lazy(() => import('./pages/NotificationsPage')),
@@ -36,15 +34,8 @@ const pageComponents = {
 
 const modulePages = [
   {
-    path: '/inquiries',
-    title: 'Inquiries',
-    kicker: 'Landing messages',
-    summary: 'Review contact form messages sent from the public landing page.',
-    adminOnly: true,
-  },
-  {
     path: '/super-admin',
-    title: 'Super Admin',
+    title: 'Inquiries',
     kicker: 'Super Admin',
     summary: 'Review landing page inquiries and manage command-level account access.',
     superOnly: true,
@@ -96,12 +87,6 @@ const modulePages = [
     title: 'Resources & Requests',
     kicker: 'Validation queue',
     summary: 'Validate EvaTrack/manual requests before forwarding verified records to TrackingAid/HQ.',
-  },
-  {
-    path: '/field-reports',
-    title: 'Field Operations',
-    kicker: 'Responder updates',
-    summary: 'Review field rescue reports and verify household evacuation through QR or manual check-in.',
   },
   {
     path: '/situation',
@@ -169,7 +154,7 @@ function AuthRoutes() {
         return
       }
 
-      saveToken(data.token, form.remember)
+      saveToken(data.token)
       setUser(nextUser)
       navigate('/dashboard', { replace: true })
     } catch (error) {
@@ -260,17 +245,7 @@ function isWebUser(user) {
 function pagesForUser(user) {
   const roleKey = user?.role?.role_key
 
-  return modulePages.filter((page) => {
-    if (page.superOnly) {
-      return roleKey === 'super_admin'
-    }
-
-    if (page.adminOnly) {
-      return roleKey === 'super_admin' || roleKey === 'admin'
-    }
-
-    return true
-  })
+  return modulePages.filter((page) => !page.superOnly || roleKey === 'super_admin')
 }
 
 function getLoginMessage(error) {

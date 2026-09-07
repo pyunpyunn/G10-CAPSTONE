@@ -3,16 +3,17 @@ import { displayText } from '../../utils/resourceRequestHelpers'
 import ActionMenu from '../ui/ActionMenu'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
+import LoadingState from '../ui/LoadingState'
 import PaginationBar from '../ui/PaginationBar'
 
 export default function ResourceRequestQueueTable({
   requests = [],
   pagination = {},
+  loading = false,
   onView,
   onValidate,
   onForward,
   onReturn,
-  onComplete,
   onPageChange,
 }) {
   const total = pagination?.total || 0
@@ -26,7 +27,9 @@ export default function ResourceRequestQueueTable({
         <span className="rr-subtle">{total ? `Showing ${from}-${to} of ${total}` : 'No records yet'}</span>
       </div>
       <div className="rr-table-wrap">
-        {requests.length === 0 ? (
+        {loading ? (
+          <LoadingState />
+        ) : requests.length === 0 ? (
           <EmptyState
             title="No resource requests found"
             message="Requests from EvaTrack, field teams, evacuation sites, and HQ desk will appear here after they are saved in the shared DB."
@@ -47,7 +50,7 @@ export default function ResourceRequestQueueTable({
             </thead>
             <tbody>
               {requests.map((request) => {
-                const actions = requestActions(request, onView, onValidate, onForward, onReturn, onComplete)
+                const actions = requestActions(request, onView, onValidate, onForward, onReturn)
 
                 return (
                   <tr key={request.request_id}>
@@ -99,7 +102,7 @@ export default function ResourceRequestQueueTable({
   )
 }
 
-function requestActions(request, onView, onValidate, onForward, onReturn, onComplete) {
+function requestActions(request, onView, onValidate, onForward, onReturn) {
   const status = request.validation?.key || 'needs_validation'
   const actions = [{ label: 'View', onClick: () => onView(request) }]
 
@@ -110,10 +113,6 @@ function requestActions(request, onView, onValidate, onForward, onReturn, onComp
 
   if (status === 'verified') {
     actions.push({ label: 'Forward to TrackingAid', onClick: () => onForward(request) })
-  }
-
-  if (status === 'forwarded') {
-    actions.push({ label: 'Mark completed', onClick: () => onComplete(request) })
   }
 
   return actions

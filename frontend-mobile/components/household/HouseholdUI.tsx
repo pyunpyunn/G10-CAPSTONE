@@ -72,11 +72,11 @@ export function statusColor(tone: string) {
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 40,
+    minHeight: 46,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
   },
@@ -99,8 +99,8 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '900',
   },
   darkButtonText: {
     color: palette.nav,
@@ -113,8 +113,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '900',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -124,8 +124,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: palette.text,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '900',
   },
   center: {
     alignItems: 'center',
@@ -140,22 +140,22 @@ const styles = StyleSheet.create({
   empty: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: radius.md,
-    padding: spacing.md,
+    padding: spacing.lg,
     backgroundColor: palette.card,
   },
   emptyTitle: {
     color: palette.text,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '900',
   },
   emptyBody: {
     color: palette.textSoft,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: 'center',
   },
 });

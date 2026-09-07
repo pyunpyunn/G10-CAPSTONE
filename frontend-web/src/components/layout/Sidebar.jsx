@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
   Archive,
-  ClipboardList,
   CloudSun,
   Database,
   FileCheck2,
@@ -19,8 +18,7 @@ import {
 
 const icons = {
   '/dashboard': LayoutDashboard,
-  '/inquiries': Inbox,
-  '/super-admin': ShieldUser,
+  '/super-admin': Inbox,
   '/broadcast': Radio,
   '/weather': CloudSun,
   '/mapping': Map,
@@ -28,7 +26,6 @@ const icons = {
   '/dispatch': Route,
   '/rescuers': ShieldUser,
   '/resources-requests': PackageCheck,
-  '/field-reports': ClipboardList,
   '/situation': FileCheck2,
   '/archive': Database,
 }
@@ -56,13 +53,11 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
         </button>
       </div>
 
-      <div className="leftbar-scroll">
-        <nav className="left-nav">
-          <NavGroup title="Main Views" pages={pages.slice(0, 3)} />
-          <NavGroup title="Response Operations" pages={pages.slice(3, 6)} />
-          <NavGroup title="Management & Reports" pages={pages.slice(6)} />
-        </nav>
-      </div>
+      <nav className="left-nav">
+        <NavGroup title="Main Views" pages={pages.slice(0, 3)} />
+        <NavGroup title="Response Operations" pages={pages.slice(3, 6)} />
+        <NavGroup title="Management & Reports" pages={pages.slice(6)} />
+      </nav>
 
       <div className="left-sidebar-logout">
         <button className="nav-item" type="button" onClick={onLogout}>

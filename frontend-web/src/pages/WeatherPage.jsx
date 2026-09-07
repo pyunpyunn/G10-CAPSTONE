@@ -10,7 +10,6 @@ import {
   makeMonitorRows,
   riskToneFor,
 } from '../utils/weatherHelpers'
-import { pageDataError } from '../utils/pageShell'
 
 export default function WeatherPage() {
   const [workspace, setWorkspace] = useState(null)
@@ -87,10 +86,8 @@ export default function WeatherPage() {
   const activeConditionKey = latest?.condition_key || 'monitoring'
   const riskTone = riskToneFor(latest?.risk_level)
   const liveTitle = hasSnapshot
-    ? `${latest.condition_name} conditions over ${workspace?.location?.name || 'Barangay Sta. Cruz'}`
+    ? `${latest.condition_name} conditions over ${workspace.location.name}`
     : `Weather monitoring for ${workspace?.location?.name || 'Barangay Sta. Cruz'}`
-  const isInitialLoading = isLoading && !workspace
-  const dataError = pageDataError(error, Boolean(workspace))
   const monitorRows = useMemo(() => makeMonitorRows(latest), [latest])
 
   return (
@@ -111,25 +108,27 @@ export default function WeatherPage() {
         }
       />
 
-      {dataError ? <div className="page-data-notice is-error">{dataError}</div> : null}
-      {isInitialLoading ? <LoadingState /> : null}
+      {isLoading && <LoadingState />}
+      {error && <div className="form-error">{error}</div>}
       {refreshMessage && <div className="wx-save-message">{refreshMessage}</div>}
 
-      <div className="weather-dashboard">
-        <WeatherMainColumn
-          latest={latest}
-          sourceLinks={sourceLinks}
-          hasSnapshot={hasSnapshot}
-          activeConditionKey={activeConditionKey}
-          riskTone={riskTone}
-          liveTitle={liveTitle}
-        />
-        <WeatherSidebar
-          workspace={workspace || { active_event: null, auto_refresh: false, location: { name: 'Barangay Sta. Cruz' } }}
-          logs={logs}
-          monitorRows={monitorRows}
-        />
-      </div>
+      {!isLoading && !error && workspace && (
+        <div className="weather-dashboard">
+          <WeatherMainColumn
+            latest={latest}
+            sourceLinks={sourceLinks}
+            hasSnapshot={hasSnapshot}
+            activeConditionKey={activeConditionKey}
+            riskTone={riskTone}
+            liveTitle={liveTitle}
+          />
+          <WeatherSidebar
+            workspace={workspace}
+            logs={logs}
+            monitorRows={monitorRows}
+          />
+        </div>
+      )}
     </section>
   )
 }

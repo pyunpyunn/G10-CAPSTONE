@@ -1,12 +1,16 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 
 type HeaderProps = {
   connectionLabel?: string;
+  onRefresh: () => void;
 };
 
-export function HouseholdHeader({ connectionLabel }: HeaderProps) {
+export function HouseholdHeader({
+  connectionLabel,
+  onRefresh,
+}: HeaderProps) {
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
@@ -19,6 +23,9 @@ export function HouseholdHeader({ connectionLabel }: HeaderProps) {
             <Ionicons name="cellular-outline" size={14} color={palette.navText} />
             <Text style={styles.signalText}>{connectionLabel || 'Offline'}</Text>
           </View>
+          <Pressable style={styles.iconButton} onPress={onRefresh}>
+            <Ionicons name="refresh-outline" size={20} color={palette.navText} />
+          </Pressable>
         </View>
       </View>
     </View>
@@ -78,5 +85,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  iconButton: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#2a4f72',
+    borderRadius: radius.md,
+    backgroundColor: palette.navActive,
   },
 });

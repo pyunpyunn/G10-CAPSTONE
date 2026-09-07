@@ -56,6 +56,7 @@ class ResourceRequestService
         $category = $this->categoryKey((string) $request->query('category', 'all'));
         $purok = trim((string) $request->query('purok', 'all'));
         $eventId = trim((string) $request->query('event_id', ''));
+        $coreOnly = $request->boolean('core');
         $perPage = min(50, max(6, (int) $request->query('per_page', 25)));
 
         $query = $this->requestQuery();
@@ -118,8 +119,10 @@ class ResourceRequestService
 
         return response()->json([
             'data' => [
-                'active_event' => $this->formatActiveEvent($this->getActiveEvent()),
-                'summary' => $this->summary(),
+                'active_event' => $coreOnly ? null : $this->formatActiveEvent($this->getActiveEvent()),
+                'summary' => $coreOnly
+                    ? $this->coreSummary($items, $paginator->total())
+                    : $this->summary(),
                 'requests' => [
                     'data' => $items,
                     'current_page' => $paginator->currentPage(),
@@ -129,8 +132,9 @@ class ResourceRequestService
                     'from' => $paginator->firstItem(),
                     'to' => $paginator->lastItem(),
                 ],
-                'tracking_mirror' => $this->trackingMirror(),
-                'options' => [
+                // Keep the primary queue independent from the optional TrackingAid database.
+                'tracking_mirror' => [],
+                'options' => $coreOnly ? [] : [
                     'sources' => $this->sourceOptions(),
                     'categories' => $this->categoryOptions(),
                     'statuses' => $this->statusOptions(),
@@ -913,6 +917,20 @@ class ResourceRequestService
                     'count' => (int) ($counts['returned'] ?? 0),
                 ],
             ],
+        ];
+    }
+
+    private function coreSummary(array $items, int $total): array
+    {
+        $counts = collect($items)->countBy(fn (array $item): string => $item['validation']['key'] ?? 'needs_validation');
+
+        return [
+            'needs_validation' => (int) $counts->get('needs_validation', 0),
+            'verified' => (int) $counts->get('verified', 0),
+            'forwarded_today' => (int) $counts->get('forwarded', 0),
+            'returned' => (int) $counts->get('returned', 0),
+            'total' => $total,
+            'rows' => [],
         ];
     }
 

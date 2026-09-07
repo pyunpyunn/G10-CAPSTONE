@@ -81,32 +81,3 @@ export function getCloseEventMessage(error) {
 
   return error.response.data?.message || 'Unable to close the active event. Please try again.'
 }
-
-export function emptyDashboard() {
-  return {
-    active_event: null,
-    households: {
-      total: 0,
-      unchecked: 0,
-      safe_total: 0,
-      safe_only: 0,
-      evacuated: 0,
-      unsafe: 0,
-      reported: 0,
-      reporting_percent: 0,
-      bars: [],
-    },
-    dispatch: {
-      counts: [],
-      teams: [],
-    },
-    weather: null,
-    requests: {
-      needs_validation: 0,
-      validated: 0,
-      released: 0,
-      latest: [],
-    },
-    recent_activity: [],
-  }
-}

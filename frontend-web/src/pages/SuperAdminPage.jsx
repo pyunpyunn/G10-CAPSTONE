@@ -7,7 +7,6 @@ import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import PaginationBar from '../components/ui/PaginationBar'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
-import { pageDataError } from '../utils/pageShell'
 
 const statuses = [
   { key: 'all', label: 'All' },
@@ -87,7 +86,6 @@ export default function SuperAdminPage() {
   const accounts = payload?.accounts || {}
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
-  const dataError = pageDataError(error, Boolean(payload))
 
   return (
     <section className="page active super-admin-page">
@@ -101,11 +99,13 @@ export default function SuperAdminPage() {
         }
       />
 
-      {dataError ? <div className="page-data-notice is-error">{dataError}</div> : null}
-      {isInitialLoading ? <LoadingState /> : null}
+      {isInitialLoading && <LoadingState />}
+      {error && <div className="form-error">{error}</div>}
       {message && <div className="rr-message">{message}</div>}
 
-      <div className="super-stat-row">
+      {!isInitialLoading && payload && (
+        <>
+          <div className="super-stat-row">
             <SummaryCard label="New" value={summary.new || 0} />
             <SummaryCard label="In review" value={summary.in_review || 0} />
             <SummaryCard label="Responded" value={summary.responded || 0} />
@@ -140,9 +140,9 @@ export default function SuperAdminPage() {
             </select>
           </div>
 
-          {!payload?.table_ready && payload ? (
+          {!payload.table_ready && (
             <div className="form-error">{payload.message || 'landing_inquiries table is not available yet.'}</div>
-          ) : null}
+          )}
 
           <RefreshOverlay active={isRefreshing}>
             <div className="super-panel">
@@ -175,6 +175,8 @@ export default function SuperAdminPage() {
           </RefreshOverlay>
 
           <PaginationBar meta={pagination} onPageChange={setPage} label="inquiries" />
+        </>
+      )}
     </section>
   )
 }

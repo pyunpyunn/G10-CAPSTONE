@@ -29,7 +29,6 @@ import {
   downloadPdfReport,
   parseCsvText,
 } from '../utils/exportFileHelpers'
-import { pageDataError } from '../utils/pageShell'
 
 export default function ArchivePage() {
   const [activeCategory, setActiveCategory] = useState('disaster-events')
@@ -349,7 +348,7 @@ export default function ArchivePage() {
   const pagination = payload?.records || {}
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
-  const dataError = pageDataError(error, Boolean(payload))
+  const hasBlockingError = error && !payload
 
   return (
     <section className="page active archive-page">
@@ -362,36 +361,40 @@ export default function ArchivePage() {
 
       <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} />
 
-      {dataError ? <div className="page-data-notice is-error">{dataError}</div> : null}
-      {isInitialLoading ? <LoadingState /> : null}
+      {isInitialLoading && <LoadingState />}
+      {error && <div className="form-error">{error}</div>}
 
-      {message && <div className="rr-message archive-message">{message}</div>}
+      {!isInitialLoading && !hasBlockingError && payload && (
+        <>
+          {message && <div className="rr-message archive-message">{message}</div>}
 
-      <ArchiveSelectionTools
-        selectedCount={selectedIds().length}
-        savedGroups={savedGroups}
-        onSaveGroup={saveSelectedGroup}
-        onDeleteSelected={deleteSelectedForever}
-        onClearSelected={clearSelected}
-        onOpenGroups={() => {
-          setOpenGroupId('')
-          setIsSavedGroupsOpen(true)
-        }}
-      />
+          <ArchiveSelectionTools
+            selectedCount={selectedIds().length}
+            savedGroups={savedGroups}
+            onSaveGroup={saveSelectedGroup}
+            onDeleteSelected={deleteSelectedForever}
+            onClearSelected={clearSelected}
+            onOpenGroups={() => {
+              setOpenGroupId('')
+              setIsSavedGroupsOpen(true)
+            }}
+          />
 
-      <RefreshOverlay active={isRefreshing}>
-        <ArchiveTable
-          category={activeCategory}
-          records={records}
-          pagination={pagination}
-          selectedIds={selectedIds()}
-          onToggleRecord={toggleSelectedRecord}
-          onToggleDate={toggleSelectedMany}
-          onTogglePage={toggleSelectedMany}
-          onView={viewTableRecord}
-          onPageChange={setPage}
-        />
-      </RefreshOverlay>
+          <RefreshOverlay active={isRefreshing}>
+            <ArchiveTable
+              category={activeCategory}
+              records={records}
+              pagination={pagination}
+              selectedIds={selectedIds()}
+              onToggleRecord={toggleSelectedRecord}
+              onToggleDate={toggleSelectedMany}
+              onTogglePage={toggleSelectedMany}
+              onView={viewTableRecord}
+              onPageChange={setPage}
+            />
+          </RefreshOverlay>
+        </>
+      )}
 
       <ArchiveSavedLogsModal
         isOpen={isSavedGroupsOpen}

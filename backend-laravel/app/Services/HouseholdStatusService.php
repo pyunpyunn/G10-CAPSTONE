@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Repositories\HouseholdRepository;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class HouseholdStatusService
 {
+    public function __construct(private readonly HouseholdRepository $households) {}
+
     public function index(Request $request): JsonResponse
     {
         $activeEvent = $this->getActiveEvent();
@@ -107,40 +110,16 @@ class HouseholdStatusService
     {
         $activeEvent = $this->getActiveEvent();
 
-        $logs = DB::table('household_status_logs as hsl')
-            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
-            ->leftJoin('users as u', 'u.user_id', '=', 'hsl.submitted_by_user_id')
-            ->where('hsl.household_id', $householdId)
-            ->when($activeEvent, fn ($query) => $query->where('hsl.disaster_id', $activeEvent->event_id))
-            ->orderByDesc('hsl.submitted_at')
-            ->orderByDesc('hsl.created_at')
-            ->limit(50)
-            ->get([
-                'hsl.status_log_id',
-                'hsl.status_id',
-                'hs.status_key',
-                'hs.status_label',
-                'hsl.source',
-                'hsl.submitted_by_user_id',
-                'u.name as user_name',
-                'u.first_name',
-                'u.last_name',
-                'hsl.location_label',
-                'hsl.location_accuracy_m',
-                'hsl.battery_level',
-                'hsl.signal_strength',
-                'hsl.notes',
-                'hsl.submitted_at',
-                'hsl.created_at',
-            ])
-            ->map(function (object $log): array {
+        $logs = $this->households
+            ->latestStatusLogs($householdId, $activeEvent?->event_id)
+            ->map(function ($log): array {
                 $notes = $this->decodeJson($log->notes);
 
                 return [
                     'status_log_id' => $log->status_log_id,
-                    'status' => $this->formatStatus($log->status_key, $log->status_label, $notes),
+                    'status' => $this->formatStatus($log->status?->status_key, $log->status?->status_label, $notes),
                     'source' => $this->sourceLabel($log->source),
-                    'submitted_by' => $this->personName($log->user_name, $log->first_name, $log->last_name, $log->submitted_by_user_id),
+                    'submitted_by' => $this->personName($log->submittedBy?->name, $log->submittedBy?->first_name, $log->submittedBy?->last_name, $log->submitted_by_user_id),
                     'location_label' => $log->location_label,
                     'location_accuracy_m' => $log->location_accuracy_m,
                     'battery_level' => $log->battery_level,

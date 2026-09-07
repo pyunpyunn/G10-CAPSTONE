@@ -3,7 +3,6 @@ import Constants from 'expo-constants';
 import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
 
 const tokenKey = 'resqperation_mobile_token';
-let sessionToken: string | null = null;
 
 function getApiBaseUrl() {
   const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -44,7 +43,7 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  const token = sessionToken || (await getStoredItem(tokenKey));
+  const token = await getStoredItem(tokenKey);
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -66,18 +65,11 @@ api.interceptors.response.use(
   }
 );
 
-export async function saveToken(token: string, remember = false) {
-  sessionToken = token;
-
-  if (remember) {
-    await setStoredItem(tokenKey, token);
-  } else {
-    await deleteStoredItem(tokenKey);
-  }
+export async function saveToken(token: string) {
+  await setStoredItem(tokenKey, token);
 }
 
 export async function clearToken() {
-  sessionToken = null;
   await deleteStoredItem(tokenKey);
 }
 

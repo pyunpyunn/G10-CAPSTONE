@@ -17,26 +17,16 @@ type LoginResponse = {
   user: AuthUser;
 };
 
-export async function loginMobile(login: string, password: string, remember = false) {
+export async function loginMobile(login: string, password: string) {
   const response = await api.post<LoginResponse>('/auth/login', {
     login,
     password,
     device_name: 'resqperation-mobile',
   });
 
-  await saveToken(response.data.token, remember);
+  await saveToken(response.data.token);
 
   return response.data.user;
-}
-
-export async function getRecoveryQuestions(login: string) {
-  const response = await api.get('/auth/password-recovery/questions', { params: { login } });
-  return response.data.data;
-}
-
-export async function resetMobilePassword(payload: Record<string, string>) {
-  const response = await api.post('/auth/password-recovery/reset', payload);
-  return response.data;
 }
 
 export async function logoutMobile() {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   createSituationReport,
   getSituationReport,
@@ -20,12 +20,8 @@ import {
   emptyGenerateForm,
   situationErrorMessage,
 } from '../utils/situationReportHelpers'
-import { pageDataError } from '../utils/pageShell'
-import { readQueryParam, setQueryParams } from '../utils/pageQuery'
-import RefreshOverlay from '../components/ui/RefreshOverlay'
 
 export default function SituationReportPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
   const [workspace, setWorkspace] = useState(null)
   const [selectedEventId, setSelectedEventId] = useState('')
   const [summary, setSummary] = useState(null)
@@ -70,16 +66,6 @@ export default function SituationReportPage() {
     }
   }, [])
 
-  useEffect(() => {
-    const urlEventId = readQueryParam(searchParams, 'event_id')
-
-    if (!urlEventId || urlEventId === selectedEventId || !workspace) {
-      return
-    }
-
-    handleSelectEvent(urlEventId)
-  }, [workspace, searchParams])
-
   async function reloadWorkspace(showMessage = '') {
     try {
       const data = await getSituationWorkspace()
@@ -98,7 +84,6 @@ export default function SituationReportPage() {
     setSummary(null)
     setMessage('')
     setError('')
-    setQueryParams(setSearchParams, searchParams, { event_id: eventId || null })
 
     if (!eventId) {
       return
@@ -192,8 +177,6 @@ export default function SituationReportPage() {
 
   const events = workspace?.events || []
   const reports = workspace?.reports || []
-  const isInitialLoading = isLoading && !workspace
-  const dataError = pageDataError(error, Boolean(workspace))
   const selectedEvent = summary?.event
     ? {
         type: summary.event.type,
@@ -207,42 +190,45 @@ export default function SituationReportPage() {
     <section className="page active situation-page">
       <PageHeader title="Situation Reporting" />
 
-      {dataError ? <div className="page-data-notice is-error">{dataError}</div> : null}
-      {isInitialLoading ? <LoadingState label="Loading situation reporting..." /> : null}
+      {isLoading && <LoadingState />}
+      {error && <div className="form-error">{error}</div>}
 
-      <SituationEventPanel
-        events={events}
-        selectedEventId={selectedEventId}
-        selectedEvent={selectedEvent}
-        onSelect={handleSelectEvent}
-      />
+      {!isLoading && !error && workspace && (
+        <>
+          <SituationEventPanel
+            events={events}
+            selectedEventId={selectedEventId}
+            selectedEvent={selectedEvent}
+            onSelect={handleSelectEvent}
+          />
 
-      {message && <div className="rr-message sr-message">{message}</div>}
+          {message && <div className="rr-message sr-message">{message}</div>}
+          {isSummaryLoading && <LoadingState inline />}
 
-      <RefreshOverlay active={isSummaryLoading}>
-        {!summary && !isSummaryLoading && (
-          <div className="sitrep-empty-state">Choose a disaster event log to load the SitRep summary.</div>
-        )}
+          {!summary && !isSummaryLoading && (
+            <div className="sitrep-empty-state">Choose a disaster event log to load the SitRep summary.</div>
+          )}
 
-        {summary && !isSummaryLoading && (
-          <div id="sitrepSummaryContent">
-            <div className="sr-live-toolbar">
-              <div className="sr-live-title">Live SitRep Preview</div>
-              <SituationActionMenu
-                hasSummary={Boolean(summary)}
-                onGenerate={openGenerateModal}
-                onArchive={handleArchiveCurrent}
-                onViewArchive={() => navigate('/archive')}
-                onExportExcel={handleExcelExport}
-                onExportPdf={handlePdfPreview}
-              />
+          {summary && !isSummaryLoading && (
+            <div id="sitrepSummaryContent">
+              <div className="sr-live-toolbar">
+                <div className="sr-live-title">Live SitRep Preview</div>
+                <SituationActionMenu
+                  hasSummary={Boolean(summary)}
+                  onGenerate={openGenerateModal}
+                  onArchive={handleArchiveCurrent}
+                  onViewArchive={() => navigate('/archive')}
+                  onExportExcel={handleExcelExport}
+                  onExportPdf={handlePdfPreview}
+                />
+              </div>
+              <SitrepPreview summary={summary} />
             </div>
-            <SitrepPreview summary={summary} />
-          </div>
-        )}
-      </RefreshOverlay>
+          )}
 
-      <SavedSitrepPanel reports={reports} onOpen={openSavedReport} />
+          <SavedSitrepPanel reports={reports} onOpen={openSavedReport} />
+        </>
+      )}
 
       <SitrepGenerateModal
         isOpen={isGenerateOpen}

@@ -4,12 +4,6 @@ Expo React Native app for the household and rescuer mobile roles.
 
 The mobile app does not connect directly to MySQL. It connects to Laravel through the API, and Laravel connects to the shared MySQL database.
 
-For the complete groupmate setup guide, including APK installation, development build setup, OneSignal dashboard verification, and troubleshooting, see:
-
-```text
-../docs/RESQPERATION_MOBILE_INSTALL_DEV_BUILD_ONESIGNAL_GUIDE.md
-```
-
 ## Current API Connection
 
 `frontend-mobile/.env`

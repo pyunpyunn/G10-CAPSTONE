@@ -10,9 +10,7 @@ import PageHeader from '../components/ui/PageHeader'
 import {
   getCloseEventMessage,
   getStats,
-  emptyDashboard,
 } from '../utils/dashboardHelpers'
-import RefreshOverlay from '../components/ui/RefreshOverlay'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -33,9 +31,9 @@ export default function DashboardPage() {
         if (!ignore) {
           setDashboard(data)
         }
-      } catch (dashboardError) {
+      } catch {
         if (!ignore) {
-          setError(getDashboardErrorMessage(dashboardError))
+          setError('Dashboard data cannot be loaded right now. Please check the backend or database connection.')
         }
       } finally {
         if (!ignore) {
@@ -46,33 +44,13 @@ export default function DashboardPage() {
 
     loadInitialDashboard()
 
-    const intervalId = window.setInterval(async () => {
-      if (ignore) {
-        return
-      }
-
-      try {
-        const data = await getDashboard()
-
-        if (!ignore) {
-          setDashboard(data)
-        }
-      } catch {
-        // Keep the last loaded dashboard visible during background refresh failures.
-      }
-    }, 30000)
-
     return () => {
       ignore = true
-      window.clearInterval(intervalId)
     }
   }, [])
 
-  const displayDashboard = dashboard || emptyDashboard()
-  const stats = useMemo(() => getStats(displayDashboard), [displayDashboard])
-  const hasActiveEvent = Boolean(displayDashboard?.active_event)
-  const isInitialLoading = isLoading && !dashboard
-  const isRefreshing = isLoading && Boolean(dashboard)
+  const stats = useMemo(() => getStats(dashboard), [dashboard])
+  const hasActiveEvent = Boolean(dashboard?.active_event)
   async function loadDashboard() {
     setIsLoading(true)
     setError('')
@@ -80,8 +58,8 @@ export default function DashboardPage() {
     try {
       const data = await getDashboard()
       setDashboard(data)
-    } catch (dashboardError) {
-      setError(getDashboardErrorMessage(dashboardError))
+    } catch {
+      setError('Dashboard data cannot be loaded right now. Please check the backend or database connection.')
     } finally {
       setIsLoading(false)
     }
@@ -89,22 +67,6 @@ export default function DashboardPage() {
 
   function openModule(path) {
     navigate(path)
-  }
-
-  function getDashboardErrorMessage(error) {
-    if (error?.response?.status === 401) {
-      return 'Your session has expired or you are not authenticated. Please log in again.'
-    }
-
-    if (error?.response?.status === 403) {
-      return 'You do not have permission to view the dashboard. Please use an admin account.'
-    }
-
-    if (error?.response?.status === 404) {
-      return 'The dashboard API endpoint was not found on the backend.'
-    }
-
-    return error?.friendlyMessage || error?.response?.data?.message || 'Dashboard data cannot be loaded right now. Please check the backend or database connection.'
   }
 
   function closeModal() {
@@ -157,7 +119,7 @@ export default function DashboardPage() {
       />
 
       <DashboardCloseEventModal
-        activeEvent={displayDashboard?.active_event}
+        activeEvent={dashboard?.active_event}
         isOpen={isCloseModalOpen}
         isClosingEvent={isClosingEvent}
         closeError={closeError}
@@ -165,24 +127,24 @@ export default function DashboardPage() {
         onConfirm={handleCloseActiveEvent}
       />
 
-      {error && !dashboard ? <div className="page-data-notice is-error">{error}</div> : null}
-      {isInitialLoading ? <LoadingState /> : null}
+      {isLoading && <LoadingState />}
+      {error && <div className="form-error">{error}</div>}
 
-      <RefreshOverlay active={isRefreshing}>
+      {!isLoading && !error && dashboard && (
         <div className="dashboard-layout">
           <DashboardMainContent
-            dashboard={displayDashboard}
+            dashboard={dashboard}
             stats={stats}
             hasActiveEvent={hasActiveEvent}
             onOpenModule={openModule}
           />
           <DashboardOverview
-            dashboard={displayDashboard}
+            dashboard={dashboard}
             hasActiveEvent={hasActiveEvent}
             onOpenModule={openModule}
           />
         </div>
-      </RefreshOverlay>
+      )}
     </section>
   )
 }

@@ -1,12 +1,10 @@
 import { KeyRound, Pencil, Settings, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { saveRecoveryQuestions } from '../api/authApi'
 import { changePassword, getProfile, updateProfile } from '../api/profileApi'
 import ActionMenu from '../components/ui/ActionMenu'
 import DeleteAccountModal from '../components/profile/DeleteAccountModal'
 import PasswordModal from '../components/profile/PasswordModal'
-import RecoveryQuestionsModal from '../components/profile/RecoveryQuestionsModal'
 import ProfileEditModal from '../components/profile/ProfileEditModal'
 import ProfileIdentity from '../components/profile/ProfileIdentity'
 import LoadingState from '../components/ui/LoadingState'
@@ -16,7 +14,6 @@ import {
   profileErrorMessage,
   profileFormFromIdentity,
 } from '../utils/profileHelpers'
-import { pageDataError } from '../utils/pageShell'
 
 export default function ProfilePage() {
   const outlet = useOutletContext() || {}
@@ -27,13 +24,10 @@ export default function ProfilePage() {
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isPasswordOpen, setIsPasswordOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false)
   const [profileForm, setProfileForm] = useState(profileFormFromIdentity())
   const [passwordValues, setPasswordValues] = useState(passwordForm())
-  const [recoveryValues, setRecoveryValues] = useState({ current_password: '', question_1: '', answer_1: '', question_2: '', answer_2: '' })
   const [profileFormError, setProfileFormError] = useState('')
   const [passwordError, setPasswordError] = useState('')
-  const [recoveryError, setRecoveryError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
@@ -76,28 +70,6 @@ export default function ProfilePage() {
   function openDeleteModal() {
     setMessage('')
     setIsDeleteOpen(true)
-  }
-
-  function openRecoveryModal() {
-    setRecoveryValues({ current_password: '', question_1: '', answer_1: '', question_2: '', answer_2: '' })
-    setRecoveryError('')
-    setIsRecoveryOpen(true)
-  }
-
-  async function submitRecoveryQuestions(event) {
-    event.preventDefault()
-    setIsSaving(true)
-    setRecoveryError('')
-
-    try {
-      const data = await saveRecoveryQuestions(recoveryValues)
-      setIsRecoveryOpen(false)
-      setMessage(data.message || 'Recovery questions saved successfully.')
-    } catch (saveError) {
-      setRecoveryError(profileErrorMessage(saveError, 'Unable to save recovery questions.'))
-    } finally {
-      setIsSaving(false)
-    }
   }
 
   async function submitProfile(event) {
@@ -149,34 +121,33 @@ export default function ProfilePage() {
   const profileActions = [
     { label: 'Edit profile', icon: Pencil, onClick: openEditModal, disabled: !payload },
     { label: 'Change password', icon: KeyRound, onClick: openPasswordModal, disabled: !payload },
-    { label: 'Set recovery questions', icon: KeyRound, onClick: openRecoveryModal, disabled: !payload },
     { label: 'Delete account forever', icon: Trash2, onClick: openDeleteModal, danger: true, disabled: !payload },
   ]
-  const isInitialLoading = isLoading && !payload
-  const dataError = pageDataError(error, Boolean(payload))
 
   return (
     <section className="page active profile-page">
       <PageHeader title="Profile" />
 
       {message && <div className="profile-page-message">{message}</div>}
-      {dataError ? <div className="page-data-notice is-error">{dataError}</div> : null}
-      {isInitialLoading ? <LoadingState /> : null}
+      {isLoading && <LoadingState />}
+      {error && <div className="form-error">{error}</div>}
 
-      <div className="profile-layout profile-layout-focused profile-layout-single">
-        <ProfileIdentity
-          identity={payload?.identity || {}}
-          barangayProfile={payload?.barangay_profile || {}}
-          settingsMenu={(
-            <ActionMenu
-              label="Profile settings"
-              buttonClassName="profile-settings-button"
-              icon={<Settings size={17} />}
-              actions={profileActions}
-            />
-          )}
-        />
-      </div>
+      {!isLoading && !error && payload && (
+        <div className="profile-layout profile-layout-focused profile-layout-single">
+          <ProfileIdentity
+            identity={payload.identity || {}}
+            barangayProfile={payload.barangay_profile || {}}
+            settingsMenu={(
+              <ActionMenu
+                label="Profile settings"
+                buttonClassName="profile-settings-button"
+                icon={<Settings size={17} />}
+                actions={profileActions}
+              />
+            )}
+          />
+        </div>
+      )}
 
       <ProfileEditModal
         isOpen={isEditOpen}
@@ -196,16 +167,6 @@ export default function ProfilePage() {
         isSaving={isSaving}
         onClose={() => setIsPasswordOpen(false)}
         onSubmit={submitPassword}
-      />
-
-      <RecoveryQuestionsModal
-        isOpen={isRecoveryOpen}
-        form={recoveryValues}
-        setForm={setRecoveryValues}
-        formError={recoveryError}
-        isSaving={isSaving}
-        onClose={() => setIsRecoveryOpen(false)}
-        onSubmit={submitRecoveryQuestions}
       />
 
       <DeleteAccountModal
