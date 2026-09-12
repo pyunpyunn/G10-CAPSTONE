@@ -1152,7 +1152,7 @@ class RescueDispatchService
             ->values()
             ->all();
     }
-    }
+
     private function activeAssignmentStatuses(): array
     {
         return ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'];
