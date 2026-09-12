@@ -685,7 +685,7 @@ class HouseholdStatusService
                 'dt.last_location_at',
                 'dt.last_seen_at',
                 'dt.is_active',
-                'hm.name as member_name',
+                DB::raw("NULLIF(TRIM(CONCAT(COALESCE(hm.first_name, ''), ' ', COALESCE(hm.last_name, ''))), '') as member_name"),
                 'hm.first_name',
                 'hm.last_name',
             ]);
@@ -735,21 +735,28 @@ class HouseholdStatusService
             ->groupBy('member_id')
             ->map(fn ($memberDevices) => $memberDevices->first());
 
-        return DB::table('household_members')
-            ->where('household_id', $householdId)
-            ->whereNull('deleted_at')
-            ->orderByRaw("CASE WHEN relation IN ('Head', 'head', 'Household Head') THEN 0 ELSE 1 END")
-            ->orderBy('name')
-            ->get()
+        return DB::table('household_members as hm')
+            ->leftJoin('relationships as r', 'r.relationship_id', '=', 'hm.relationship_id')
+            ->leftJoin('genders as g', 'g.gender_id', '=', 'hm.gender_id')
+            ->where('hm.household_id', $householdId)
+            ->whereNull('hm.deleted_at')
+            ->orderByRaw("CASE WHEN r.relationship_key IN ('head', 'household_head') OR r.relationship_label LIKE '%Head%' THEN 0 ELSE 1 END")
+            ->orderBy('hm.first_name')
+            ->get([
+                'hm.*',
+                'r.relationship_label as relation',
+                'g.gender_label as gender',
+            ])
             ->map(function (object $member) use ($devicesByMember): array {
                 $device = $devicesByMember->get($member->member_id);
+                $fullName = trim(($member->first_name ?? '').' '.($member->last_name ?? ''));
 
                 return [
                     'member_id' => $member->member_id,
-                    'name' => $member->name ?: trim(($member->first_name ?? '').' '.($member->last_name ?? '')),
-                    'relation' => $member->relation ?: 'Member',
-                    'age' => $member->age ?: $this->ageFromBirthDate($member->birth_date),
-                    'gender' => $member->gender ?: $member->sex,
+                    'name' => $fullName !== '' ? $fullName : 'Household member',
+                    'relation' => $member->relation ?? 'Member',
+                    'age' => $this->ageFromBirthDate($member->birth_date),
+                    'gender' => $member->gender ?? 'Unspecified',
                     'risk_flags' => $this->memberRiskFlags($member),
                     'device_name' => $device['device_name'] ?? 'No assigned mobile',
                     'device_platform' => $device['platform'] ?? null,
@@ -1050,7 +1057,7 @@ class HouseholdStatusService
             $flags[] = 'Pregnant';
         }
 
-        if ($member->special_needs) {
+        if (! empty($member->special_needs)) {
             $flags[] = $member->special_needs;
         }
 
