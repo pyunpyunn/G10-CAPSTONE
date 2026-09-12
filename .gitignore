@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+docs/RESQPERATION_SHARED_DB_ENV_BACKUP.md
 
 # Dependencies
 node_modules/
@@ -65,4 +66,3 @@ yarn-error.log*
 pnpm-debug.log*
 Thumbs.db
 .DS_Store
-

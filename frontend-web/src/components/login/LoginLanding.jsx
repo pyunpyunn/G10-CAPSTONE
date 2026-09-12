@@ -7,6 +7,8 @@ import {
   Route,
   ShieldUser,
 } from 'lucide-react'
+import { useState } from 'react'
+import { submitLandingInquiry } from '../../api/inquiryApi'
 
 const featureCards = [
   {
@@ -47,7 +49,9 @@ export default function LoginLanding({ onOpenLogin }) {
       <header className="landing-header">
         <div className="landing-wrap landing-header-inner">
           <a className="landing-brand" href="#top" aria-label="RESQPERATION landing page">
-            <span className="brand-mark">R</span>
+            <span className="brand-mark">
+              <img className="brand-logo-image" src="/favicon.svg" alt="" aria-hidden="true" />
+            </span>
             <span className="landing-brand-text">
               <strong>RESQPERATION</strong>
               <span>Barangay rescue operations</span>
@@ -289,20 +293,32 @@ function VisualPanelsSection() {
 }
 
 function ContactSection() {
-  function submitInquiry(event) {
+  const [status, setStatus] = useState('')
+  const [isSending, setIsSending] = useState(false)
+
+  async function submitInquiry(event) {
     event.preventDefault()
+    setStatus('')
+    setIsSending(true)
 
     const data = new FormData(event.currentTarget)
-    const name = data.get('name') || ''
-    const organization = data.get('organization') || ''
-    const email = data.get('email') || ''
-    const message = data.get('message') || ''
-    const subject = encodeURIComponent('RESQPERATION inquiry')
-    const body = encodeURIComponent(
-      `Name: ${name}\nOrganization: ${organization}\nEmail: ${email}\n\nMessage:\n${message}`,
-    )
+    const payload = {
+      name: data.get('name') || '',
+      organization: data.get('organization') || '',
+      email: data.get('email') || '',
+      message: data.get('message') || '',
+    }
 
-    window.location.href = `mailto:resqperation.devteam@example.com?subject=${subject}&body=${body}`
+    try {
+      await submitLandingInquiry(payload)
+      event.currentTarget.reset()
+      setStatus('Inquiry sent. The Super Admin can review it in the Inquiries page.')
+    } catch (error) {
+      const message = error?.response?.data?.message || 'Inquiry cannot be saved right now. Please contact the development team directly.'
+      setStatus(message)
+    } finally {
+      setIsSending(false)
+    }
   }
 
   return (
@@ -338,7 +354,8 @@ function ContactSection() {
             </div>
             <input type="email" name="email" placeholder="Email" aria-label="Email" />
             <textarea name="message" placeholder="Message" aria-label="Message" />
-            <button className="primary-button" type="submit">Send inquiry</button>
+            {status && <div className="landing-form-note">{status}</div>}
+            <button className="primary-button" type="submit" disabled={isSending}>{isSending ? 'Sending...' : 'Send inquiry'}</button>
           </form>
         </div>
       </div>

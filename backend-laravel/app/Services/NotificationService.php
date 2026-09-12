@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ResourceRequest;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -227,7 +228,7 @@ class NotificationService
 
     private function resourceRequestRows(): array
     {
-        return DB::table('resource_requests')
+        return ResourceRequest::query()
             ->orderByDesc('created_at')
             ->limit(20)
             ->get()

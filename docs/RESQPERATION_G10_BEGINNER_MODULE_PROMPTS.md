@@ -205,18 +205,18 @@ No advanced route optimizer in version 1.
 ## 10. Broadcast and Notification Prompt
 
 ```text
-Build disaster broadcast logs first, then prepare for push notifications.
+Build disaster broadcast logs first, then send mobile push notifications through OneSignal.
 
 Backend version 1:
 - disaster_events table/API
 - broadcast_logs table/API
 - Save all broadcasts.
 - Filter recipient scope by all, rescuers_only, or purok_specific.
-- Do not require Expo push yet.
+- Do not use Expo push tokens.
 
 Backend version 2:
-- Register mobile device push tokens.
-- Send Expo push notifications in batches.
+- Register mobile OneSignal Player IDs in `device_tokens.player_id`.
+- Send OneSignal push notifications in batches.
 - Keep database broadcast logs as the official record.
 
 Frontend:
@@ -437,4 +437,3 @@ Check:
 
 List bugs first with file and line references, then suggest small beginner-friendly fixes.
 ```
-

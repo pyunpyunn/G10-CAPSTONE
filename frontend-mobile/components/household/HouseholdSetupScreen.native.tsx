@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
+import { canUseNativeMap, MobileMapFallback } from '@/components/MobileMapFallback';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { reverseGeocodeAddress } from '@/utils/geocoding';
 import { HouseholdBadge, HouseholdButton, HouseholdSection } from './HouseholdUI';
@@ -157,13 +158,21 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
           title="Location"
           action={<HouseholdButton label="Use GPS" icon="locate-outline" tone="light" onPress={useCurrentLocation} />}
         />
-        <MapView
-          style={styles.map}
-          initialRegion={pin ? { ...pin, latitudeDelta: 0.018, longitudeDelta: 0.018 } : defaultRegion}
-          onPress={(event) => applyPinnedCoordinate({ ...event.nativeEvent.coordinate, accuracy_m: null })}
-        >
-          {pin ? <Marker coordinate={pin} title="Household pin" /> : null}
-        </MapView>
+        {canUseNativeMap ? (
+          <MapView
+            style={styles.map}
+            initialRegion={pin ? { ...pin, latitudeDelta: 0.018, longitudeDelta: 0.018 } : defaultRegion}
+            onPress={(event) => applyPinnedCoordinate({ ...event.nativeEvent.coordinate, accuracy_m: null })}
+          >
+            {pin ? <Marker coordinate={pin} title="Household pin" /> : null}
+          </MapView>
+        ) : (
+          <MobileMapFallback
+            title="Household location map"
+            message="OpenStreetMap preview. Use GPS to capture the household location on this build."
+            point={pin}
+          />
+        )}
         <Text style={styles.mapHint}>{findingAddress ? 'Finding address...' : pin ? 'Pin selected' : 'Use GPS or tap map'}</Text>
       </View>
 

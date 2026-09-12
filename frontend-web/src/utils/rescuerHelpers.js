@@ -127,6 +127,39 @@ export function firstTeam(teamOptions = []) {
   return teamOptions[0] || null
 }
 
+export function commandCenterTeam(teamOptions = []) {
+  return teamOptions.find((team) => team.team_code === 'HQCC' || team.team_name === 'HQ Command Center') || {
+    team_id: '',
+    team_code: 'HQCC',
+    team_name: 'HQ Command Center',
+    team_type: 'Command Center',
+  }
+}
+
+export function commandCenterAccountForm(accountIdOptions = [], fallback = 'BDRRM-HQCC-001', teamOptions = []) {
+  const team = commandCenterTeam(teamOptions)
+  const accountId = accountIdForTeam(accountIdOptions, team.team_name, fallback) || fallback
+
+  return {
+    ...emptyRescuerForm(accountId, team),
+    account_id: accountId,
+    first_name: 'Command',
+    middle_initial: '',
+    last_name: 'Center',
+    email: 'command.center@resqperation.local',
+    password: 'password',
+    contact_number: '09170000000',
+    emergency_contact_name: 'BDRRMC Head',
+    emergency_contact_number: '09170000001',
+    address: 'Barangay Command Center',
+    title: 'HQ Command Center',
+    skills: 'Incident command, dispatch monitoring, radio coordination, situation reporting',
+    training_notes: 'ICS, BDRRMC coordination, emergency operations center procedures',
+    certification_reference: 'HQCC account for command center access',
+    equipment_notes: 'Command desk, radio console, dashboard access',
+  }
+}
+
 export function fullNameFromForm(form) {
   return [form.first_name, formatMiddleInitial(form.middle_initial), form.last_name]
     .filter(Boolean)

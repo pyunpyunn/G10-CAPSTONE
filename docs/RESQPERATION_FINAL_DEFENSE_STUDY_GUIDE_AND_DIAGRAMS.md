@@ -11,7 +11,7 @@ The system is not the creator of all data. It acts as a response operations hub 
 - SafeTrack provides registered household identity/account data.
 - EvaTrack can send evacuation/personnel/resource requests.
 - RESQPERATION validates and monitors requests.
-- TrackingAid / MappingAid will receive validated resource requests after their system is ready.
+- TrackingAid receives validated resource requests through the configured second database handoff table. MappingAid can be added later if it provides a separate API or database contract.
 - PAGASA is the official warning confirmation source.
 - Open-Meteo is used for automated weather snapshots while waiting for official PAGASA API access.
 
@@ -95,7 +95,7 @@ actor "Rescuer" as Rescuer
 actor "Evacuation Personnel" as EvacPersonnel
 actor "SafeTrack" as SafeTrack
 actor "EvaTrack" as EvaTrack
-actor "TrackingAid / MappingAid" as TrackingAid
+actor "TrackingAid" as TrackingAid
 actor "PAGASA / Open-Meteo" as WeatherSource
 
 Admin --> (Log in to web dashboard)
@@ -137,7 +137,7 @@ flowchart LR
   Rescuer[Rescuer Mobile User]
   SafeTrack[SafeTrack Shared Household Data]
   EvaTrack[EvaTrack Requests]
-  TrackingAid[TrackingAid / MappingAid Pending System]
+  TrackingAid[TrackingAid Handoff DB]
   Weather[PAGASA / Open-Meteo]
 
   subgraph RESQ[RESQPERATION System]
@@ -171,7 +171,7 @@ flowchart TD
   W[PAGASA / Open-Meteo] -->|weather advisory/snapshot data| P1
   P1 --> D[(Database)]
   D --> P1
-  P1 -->|validated request handoff| T[TrackingAid / MappingAid]
+  P1 -->|validated request handoff| T[TrackingAid]
   P1 -->|dashboards, reports, exports| A
 ```
 
@@ -310,8 +310,8 @@ flowchart LR
   API[RESQPERATION API]
   Admin[HQ/Admin Validation]
   DB[(RESQPERATION Shared DB)]
-  Outbox[(Pending TrackingAid / MappingAid Shared DB)]
-  Tracking[TrackingAid / MappingAid]
+  Outbox[(TrackingAid handoff table)]
+  Tracking[TrackingAid]
 
   Rescuer -->|resource request| API
   Evac -->|resource/personnel request| API
@@ -374,13 +374,13 @@ flowchart TD
 - How are weather snapshots saved and why is PAGASA still the official confirmation source?
 - What data is exported to PDF/Excel and who is allowed to export it?
 - Which modules are already working and which integrations are still pending?
-- How will RESQPERATION connect to TrackingAid / MappingAid when their system is ready?
+- How does RESQPERATION forward validated requests to TrackingAid and keep an audit trail?
 
 ## 16. Current Pending Work
 
-- Push notification sending and receiving.
+- Full real-device OneSignal QA for Android and iOS push delivery.
 - Real rescuer radio/PTT audio streaming through LiveKit/WebRTC.
-- Final external integration with TrackingAid / MappingAid once they provide database/API details.
+- TrackingAid post-handoff status callback if their team exposes delivery/release status later.
 - Final official PAGASA API integration if token/access is approved.
 - Final deployment configuration.
 - Final security review and adviser-approved legal citations.

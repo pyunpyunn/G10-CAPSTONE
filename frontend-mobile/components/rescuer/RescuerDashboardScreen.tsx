@@ -74,6 +74,9 @@ export function RescuerDashboardScreen({
         <View style={styles.card}>
           <SectionHeader title="Current assignment" action={<StatusBadge label={activeAssignment.status_label} tone={activeAssignment.status_key} />} />
           <Text style={styles.assignmentTitle}>{activeAssignment.assigned_area || activeAssignment.household_id || 'Assigned area'}</Text>
+          {activeAssignment.destination_label ? (
+            <Text style={styles.destinationText}>{activeAssignment.destination_label}</Text>
+          ) : null}
           <Text style={styles.assignmentMeta}>
             {activeAssignment.event_name} · {activeAssignment.priority_level || 'medium'} priority
           </Text>
@@ -81,33 +84,6 @@ export function RescuerDashboardScreen({
             <Text style={styles.note}>{activeAssignment.dispatch_notes}</Text>
           ) : null}
           <View style={styles.buttonGrid}>
-<<<<<<< HEAD
-            <ActionButton
-              label="Accept"
-              icon="checkmark-outline"
-              tone="light"
-              disabled={activeAssignment.status_key !== 'dispatched'}
-              onPress={() => onStatusChange(activeAssignment.assignment_id, 'accepted')}
-            />
-            <ActionButton
-              label="En route"
-              icon="navigate-outline"
-              tone="light"
-              disabled={!['accepted', 'dispatched'].includes(activeAssignment.status_key)}
-              onPress={() => onStatusChange(activeAssignment.assignment_id, 'en_route')}
-            />
-            <ActionButton
-              label="On-scene"
-              icon="location-outline"
-              tone="light"
-              disabled={!['accepted', 'en_route'].includes(activeAssignment.status_key)}
-              onPress={() => onStatusChange(activeAssignment.assignment_id, 'on_scene')}
-            />
-            <ActionButton
-              label="Complete"
-              icon="flag-outline"
-              disabled={activeAssignment.status_key !== 'on_scene'}
-=======
             {activeAssignment.status_key === 'dispatched' ? (
               <ActionButton
                 label="Accept"
@@ -128,7 +104,6 @@ export function RescuerDashboardScreen({
               label="Complete"
               icon="flag-outline"
               disabled={!['en_route', 'on_scene'].includes(activeAssignment.status_key)}
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
               onPress={() => onStatusChange(activeAssignment.assignment_id, 'completed')}
             />
           </View>
@@ -153,7 +128,7 @@ export function RescuerDashboardScreen({
               <View style={styles.queueText}>
                 <Text style={styles.queueTitle}>{assignment.assigned_area || assignment.household_id || 'Assigned location'}</Text>
                 <Text style={styles.queueMeta}>
-                  {assignment.assignment_code || `Assignment ${assignment.assignment_id}`} · {formatDate(assignment.assigned_at)}
+                  {assignment.destination_label || assignment.assignment_code || `Assignment ${assignment.assignment_id}`} · {formatDate(assignment.assigned_at)}
                 </Text>
               </View>
               <StatusBadge label={assignment.status_label} tone={assignment.status_key} />
@@ -268,6 +243,12 @@ const styles = StyleSheet.create({
     color: palette.textSoft,
     fontSize: 13,
     fontWeight: '800',
+  },
+  destinationText: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   note: {
     borderRadius: radius.md,

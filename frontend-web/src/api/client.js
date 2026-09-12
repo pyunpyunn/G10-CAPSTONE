@@ -3,15 +3,19 @@ import { getToken } from './token'
 
 function getApiBaseUrl() {
   const configuredUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.EXPO_PUBLIC_API_BASE_URL
+
+  if (configuredUrl) {
+    return configuredUrl
+  }
+
   const browserHost = window.location.hostname
   const openedFromNetwork = browserHost !== 'localhost' && browserHost !== '127.0.0.1' && browserHost !== '0.0.0.0'
-  const configuredIsLocal = configuredUrl?.includes('127.0.0.1') || configuredUrl?.includes('localhost')
 
-  if (openedFromNetwork && (!configuredUrl || configuredIsLocal)) {
+  if (openedFromNetwork) {
     return `${window.location.protocol}//${browserHost}:8000/api/v1`
   }
 
-  return configuredUrl || 'http://127.0.0.1:8000/api/v1'
+  return 'http://127.0.0.1:8000/api/v1'
 }
 
 const api = axios.create({

@@ -102,7 +102,7 @@ Use this final architecture for development:
 React web app       -> Laravel API -> MySQL
 Expo mobile app     -> Laravel API -> MySQL
 Laravel scheduler   -> Weather APIs -> weather_logs
-Laravel broadcast   -> Expo push service -> mobile devices
+Laravel broadcast   -> OneSignal REST API -> mobile devices
 Leaflet web map     -> Laravel map endpoints + OSM/OpenFreeMap tiles
 ```
 
@@ -248,11 +248,11 @@ Version 1:
 
 Version 2:
 
-- register Expo push tokens
-- send push notifications through Expo Push Service
+- register OneSignal Player IDs
+- send push notifications through OneSignal REST delivery
 - still save every broadcast in the database
 
-This makes the core system work before adding mobile push complexity.
+This keeps the database broadcast record as the official source while OneSignal handles mobile delivery.
 
 ### 9. Resources and Requests Scope
 
@@ -334,7 +334,7 @@ The prototype repeated UI blocks manually. The actual system uses reusable React
 17. Build household mobile screens.
 18. Build rescuer mobile screens.
 19. Add CSV/PDF exports.
-20. Add Expo push notifications after core flows work.
+20. Use OneSignal mobile push notifications after core flows work.
 
 ## Immediate Next Development Task
 
@@ -350,4 +350,3 @@ Do not start all modules at once. The clean first milestone is:
 - seed accounts
 
 After that, build the approved tables.
-

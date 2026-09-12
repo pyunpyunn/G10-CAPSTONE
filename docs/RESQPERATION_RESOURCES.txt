@@ -109,13 +109,14 @@ https://docs.expo.dev/versions/latest/sdk/securestore/
 Expo Location:
 https://docs.expo.dev/versions/latest/sdk/location/
 
-Expo Notifications:
-https://docs.expo.dev/versions/latest/sdk/notifications/
+OneSignal Push Notifications:
+https://documentation.onesignal.com/docs/en/react-native-expo-sdk-setup
 
 Install mobile basics:
 npm install axios
 npm install @react-navigation/native @react-navigation/native-stack
-npx expo install expo-secure-store expo-location expo-notifications react-native-screens react-native-safe-area-context
+npx expo install expo-secure-store expo-location react-native-screens react-native-safe-area-context
+npm install react-native-onesignal onesignal-expo-plugin
 
 ============================================================
 2. DATABASE
@@ -126,7 +127,7 @@ DB_HOST=10.150.111.114
 DB_PORT=3306
 DB_DATABASE=klint
 DB_USERNAME=groupmate
-DB_PASSWORD=password123
+DB_PASSWORD=<shared-db-password>
 
 Backend .env:
 DB_CONNECTION=mysql
@@ -134,7 +135,7 @@ DB_HOST=10.150.111.114
 DB_PORT=3306
 DB_DATABASE=klint
 DB_USERNAME=groupmate
-DB_PASSWORD=password123
+DB_PASSWORD=<shared-db-password>
 
 Important:
 - Do not commit .env.
@@ -266,7 +267,7 @@ Version 1:
 - Display alerts in household/rescuer mobile app after refresh/login.
 
 Version 2:
-- Add Expo push notifications.
+- Add OneSignal push notifications.
 
 Expo Notifications:
 https://docs.expo.dev/versions/latest/sdk/notifications/
@@ -410,7 +411,8 @@ npx create-expo-app@latest frontend-mobile
 cd frontend-mobile
 npm install axios
 npm install @react-navigation/native @react-navigation/native-stack
-npx expo install expo-secure-store expo-location expo-notifications react-native-screens react-native-safe-area-context
+npx expo install expo-secure-store expo-location react-native-screens react-native-safe-area-context
+npm install react-native-onesignal onesignal-expo-plugin
 npx expo start
 
 ============================================================

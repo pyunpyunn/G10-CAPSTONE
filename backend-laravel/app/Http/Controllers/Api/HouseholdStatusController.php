@@ -35,4 +35,9 @@ class HouseholdStatusController extends Controller
     {
         return $this->service->storeStatusLog($request, $householdId);
     }
+
+    public function confirmStatus(Request $request, string $householdId): JsonResponse
+    {
+        return $this->service->confirmStatus($request, $householdId);
+    }
 }

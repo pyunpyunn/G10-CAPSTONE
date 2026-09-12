@@ -59,7 +59,8 @@ class HouseholdMobileService
                 'members' => $members,
                 'devices' => $devices,
                 'geotag' => $geotag,
-                'evacuation_centers' => $this->evacuationCenters($activeEvent['event_id'] ?? null),
+                'evacuation_centers' => $this->evacuationCenters($activeEvent['event_id'] ?? null, $geotag['latitude'] ?? null, $geotag['longitude'] ?? null),
+                'recent_alerts' => $this->recentAlerts($activeEvent['event_id'] ?? null),
                 'trusted' => [
                     'is_available' => Schema::hasTable('trusted_households'),
                     'households' => $this->trustedRows($householdId),
@@ -266,7 +267,7 @@ class HouseholdMobileService
             return response()->json(['message' => 'This account is not linked to a household record.'], 403);
         }
 
-        foreach (['household_status_logs', 'household_statuses', 'household_members'] as $table) {
+        foreach (['household_status_logs', 'household_statuses', 'household_members', 'household_disasters'] as $table) {
             if (! Schema::hasTable($table)) {
                 return $this->missingTableResponse($table);
             }
@@ -342,6 +343,15 @@ class HouseholdMobileService
                 'created_at' => $now,
                 'updated_at' => $now,
             ]), 'status_log_id');
+
+            $this->saveLatestHouseholdStatusFromMemberStatuses(
+                $activeEvent['event_id'],
+                $householdId,
+                $validated,
+                $user?->user_id,
+                $deviceId,
+                $now
+            );
 
             $this->writeAuditLog($request, 'mobile_member_status', 'household_status_logs', (string) $statusLogId, array_merge($validated, [
                 'member_id' => $memberId,
@@ -908,7 +918,7 @@ class HouseholdMobileService
         ];
     }
 
-    private function evacuationCenters(?string $eventId): array
+    private function evacuationCenters(?string $eventId, ?float $originLat = null, ?float $originLng = null): array
     {
         if (
             ! Schema::hasTable('evacuation_centers')
@@ -947,19 +957,24 @@ class HouseholdMobileService
             $this->optionalColumnSelect('evacuation_centers', 'contact_number', 'contact_number'),
         ];
 
-        return $query
-            ->orderBy('name')
+        $centers = $query
             ->limit(20)
             ->get($columns)
-            ->map(function (object $center): array {
+            ->map(function (object $center) use ($originLat, $originLng): array {
                 $capacity = $center->capacity !== null ? (int) $center->capacity : null;
                 $occupancy = $center->current_occupancy !== null ? (int) $center->current_occupancy : null;
+                $latitude = (float) $center->latitude;
+                $longitude = (float) $center->longitude;
+                $distanceKm = ($originLat !== null && $originLng !== null)
+                    ? $this->distanceKm($originLat, $originLng, $latitude, $longitude)
+                    : null;
 
                 return [
                     'evacuation_center_id' => $center->evacuation_center_id,
                     'name' => $center->name ?: 'Evacuation center',
-                    'latitude' => (float) $center->latitude,
-                    'longitude' => (float) $center->longitude,
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                    'distance_km' => $distanceKm,
                     'capacity' => $capacity,
                     'current_occupancy' => $occupancy,
                     'vacancy' => $capacity !== null && $occupancy !== null ? max($capacity - $occupancy, 0) : null,
@@ -971,6 +986,54 @@ class HouseholdMobileService
             })
             ->values()
             ->all();
+
+        if ($originLat !== null && $originLng !== null) {
+            usort($centers, fn (array $a, array $b): int => ($a['distance_km'] ?? PHP_FLOAT_MAX) <=> ($b['distance_km'] ?? PHP_FLOAT_MAX));
+        } else {
+            usort($centers, fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+        }
+
+        return $centers;
+    }
+
+    private function recentAlerts(?string $eventId): array
+    {
+        if (! $eventId || ! Schema::hasTable('disaster_broadcasts')) {
+            return [];
+        }
+
+        return DB::table('disaster_broadcasts')
+            ->where('disaster_id', $eventId)
+            ->orderByDesc('sent_at')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get([
+                'broadcast_id',
+                'broadcast_title',
+                'message',
+                'scope_type',
+                'sent_at',
+                'created_at',
+            ])
+            ->map(fn (object $row): array => [
+                'broadcast_id' => $row->broadcast_id,
+                'title' => $row->broadcast_title ?: 'Disaster alert',
+                'message' => $row->message,
+                'scope_type' => $row->scope_type,
+                'sent_at' => $row->sent_at ? date('M d, Y g:i A', strtotime($row->sent_at)) : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function distanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadius = 6371;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return round($earthRadius * (2 * atan2(sqrt($a), sqrt(1 - $a))), 2);
     }
 
     private function members(string $householdId, $devices, $fallbackUser, ?string $eventId = null)
@@ -1384,10 +1447,11 @@ class HouseholdMobileService
             'device_name' => $validated['device_name'] ?? 'Household mobile',
             'platform' => $validated['platform'] ?? 'mobile',
             'app_role' => 'household',
+            'push_provider' => 'onesignal',
             'location_permission_status' => $validated['location_permission_status'] ?? 'granted',
             'last_seen_at' => $now,
+            'logged_at' => $now,
             'is_active' => 1,
-            'created_at' => $now,
             'updated_at' => $now,
         ];
 
@@ -1396,7 +1460,7 @@ class HouseholdMobileService
         }
 
         foreach (['battery_level', 'signal_strength'] as $column) {
-            if (array_key_exists($column, $validated)) {
+            if (array_key_exists($column, $validated) && $validated[$column] !== null) {
                 $data[$column] = $validated[$column];
             }
         }
@@ -1428,7 +1492,9 @@ class HouseholdMobileService
             return (int) $existing->id;
         }
 
-        DB::table('device_tokens')->insert($data);
+        DB::table('device_tokens')->insert($this->filterColumns('device_tokens', array_merge($data, [
+            'created_at' => $now,
+        ])));
 
         return (int) $deviceId;
     }
@@ -1466,10 +1532,11 @@ class HouseholdMobileService
             ->where('disaster_id', $eventId)
             ->where('household_id', $householdId)
             ->first();
+        $needsDispatch = in_array($validated['status_key'], ['unsafe', 'needs_help'], true);
 
         $data = $this->filterColumns('household_disasters', [
             'current_status_id' => $statusId,
-            'last_status_source' => 'household_mobile',
+            'last_status_source' => $validated['status_source'] ?? 'household_mobile',
             'last_status_notes' => $validated['notes'] ?? null,
             'last_reported_by_user_id' => $userId,
             'last_device_token_id' => $deviceId,
@@ -1477,8 +1544,8 @@ class HouseholdMobileService
             'last_longitude' => $validated['longitude'] ?? null,
             'last_battery_level' => $validated['battery_level'] ?? null,
             'last_reported_at' => $now,
-            'priority_level' => $validated['status_key'] === 'needs_help' ? 'urgent' : 'monitor',
-            'needs_dispatch' => $validated['status_key'] === 'needs_help',
+            'priority_level' => $needsDispatch ? 'urgent' : 'monitor',
+            'needs_dispatch' => $needsDispatch,
             'updated_at' => $now,
         ]);
 
@@ -1497,6 +1564,69 @@ class HouseholdMobileService
             'initial_status_id' => $statusId,
             'created_at' => $now,
         ])));
+    }
+
+    private function saveLatestHouseholdStatusFromMemberStatuses(string $eventId, string $householdId, array $validated, ?string $userId, ?int $deviceId, $now): void
+    {
+        $statusKey = $this->householdRollupStatusKey($householdId, $eventId);
+        $status = $this->resolveStatus($statusKey);
+
+        if (! $status) {
+            return;
+        }
+
+        $notes = json_encode([
+            'report_type' => 'household_member_rollup',
+            'mobile_status_key' => $statusKey,
+            'mobile_status_label' => $this->mobileStatusLabel($statusKey, null),
+            'user_notes' => $this->householdRollupNote($statusKey),
+            'latest_member_status_key' => $validated['status_key'],
+        ], JSON_UNESCAPED_SLASHES);
+
+        $this->saveLatestDisasterStatus($eventId, $householdId, $status['status_id'], array_merge($validated, [
+            'status_key' => $statusKey,
+            'status_source' => 'household_member_mobile',
+            'notes' => $notes,
+        ]), $userId, $deviceId, $now);
+    }
+
+    private function householdRollupStatusKey(string $householdId, string $eventId): string
+    {
+        $memberStatuses = collect($this->memberStatusRows($householdId, $eventId))
+            ->pluck('status_key')
+            ->filter()
+            ->values();
+
+        if ($memberStatuses->contains('needs_help')) {
+            return 'needs_help';
+        }
+
+        if ($memberStatuses->contains('unsafe')) {
+            return 'unsafe';
+        }
+
+        if ($memberStatuses->contains('evacuated')) {
+            return 'evacuated';
+        }
+
+        if ($memberStatuses->contains('safe')) {
+            return 'safe';
+        }
+
+        return 'safe';
+    }
+
+    private function householdRollupNote(string $statusKey): string
+    {
+        if (in_array($statusKey, ['unsafe', 'needs_help'], true)) {
+            return 'At least one family member needs checking or rescue.';
+        }
+
+        if ($statusKey === 'evacuated') {
+            return 'Latest family member reports include evacuation.';
+        }
+
+        return 'Latest family member reports are safe.';
     }
 
     private function saveLatestDeviceForStatus(string $householdId, ?int $deviceId, array $validated, $now): void
@@ -1561,17 +1691,9 @@ class HouseholdMobileService
 
     private function qrPayload(object $household, ?array $activeEvent): array
     {
-        $payload = [
-            'household_id' => $household->household_id,
-            'household_name' => $household->household_name ?? $household->household_code,
-            'event_id' => $activeEvent['event_id'] ?? null,
-            'purpose' => 'evacuation_check_in',
-            'issued_at' => now()->toIso8601String(),
-        ];
-
         return [
             'label' => 'Evacuation QR',
-            'value' => json_encode($payload, JSON_UNESCAPED_SLASHES),
+            'value' => (string) $household->household_id,
             'household_id' => $household->household_id,
             'household_name' => $household->household_name ?? $household->household_code,
         ];

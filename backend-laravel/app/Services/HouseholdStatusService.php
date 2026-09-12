@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Repositories\HouseholdRepository;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class HouseholdStatusService
 {
+    public function __construct(private readonly HouseholdRepository $households) {}
+
     public function index(Request $request): JsonResponse
     {
         $activeEvent = $this->getActiveEvent();
@@ -107,40 +110,16 @@ class HouseholdStatusService
     {
         $activeEvent = $this->getActiveEvent();
 
-        $logs = DB::table('household_status_logs as hsl')
-            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
-            ->leftJoin('users as u', 'u.user_id', '=', 'hsl.submitted_by_user_id')
-            ->where('hsl.household_id', $householdId)
-            ->when($activeEvent, fn ($query) => $query->where('hsl.disaster_id', $activeEvent->event_id))
-            ->orderByDesc('hsl.submitted_at')
-            ->orderByDesc('hsl.created_at')
-            ->limit(50)
-            ->get([
-                'hsl.status_log_id',
-                'hsl.status_id',
-                'hs.status_key',
-                'hs.status_label',
-                'hsl.source',
-                'hsl.submitted_by_user_id',
-                'u.name as user_name',
-                'u.first_name',
-                'u.last_name',
-                'hsl.location_label',
-                'hsl.location_accuracy_m',
-                'hsl.battery_level',
-                'hsl.signal_strength',
-                'hsl.notes',
-                'hsl.submitted_at',
-                'hsl.created_at',
-            ])
-            ->map(function (object $log): array {
+        $logs = $this->households
+            ->latestStatusLogs($householdId, $activeEvent?->event_id)
+            ->map(function ($log): array {
                 $notes = $this->decodeJson($log->notes);
 
                 return [
                     'status_log_id' => $log->status_log_id,
-                    'status' => $this->formatStatus($log->status_key, $log->status_label, $notes),
+                    'status' => $this->formatStatus($log->status?->status_key, $log->status?->status_label, $notes),
                     'source' => $this->sourceLabel($log->source),
-                    'submitted_by' => $this->personName($log->user_name, $log->first_name, $log->last_name, $log->submitted_by_user_id),
+                    'submitted_by' => $this->personName($log->submittedBy?->name, $log->submittedBy?->first_name, $log->submittedBy?->last_name, $log->submitted_by_user_id),
                     'location_label' => $log->location_label,
                     'location_accuracy_m' => $log->location_accuracy_m,
                     'battery_level' => $log->battery_level,
@@ -253,6 +232,47 @@ class HouseholdStatusService
                 'status_log_id' => $statusLogId,
             ],
         ], 201);
+    }
+
+    public function confirmStatus(Request $request, string $householdId): JsonResponse
+    {
+        if (! Schema::hasTable('household_status_logs')) {
+            return response()->json([
+                'message' => 'Household status logs are not available in the active database.',
+            ], 503);
+        }
+
+        $log = DB::table('household_status_logs')
+            ->where('household_id', $householdId)
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (! $log) {
+            return response()->json([
+                'message' => 'No household status report is available to confirm yet.',
+            ], 404);
+        }
+
+        $now = now();
+        $userId = $request->user()?->user_id;
+
+        DB::table('household_status_logs')
+            ->where('status_log_id', $log->status_log_id)
+            ->update(array_filter([
+                'reviewed_by_user_id' => Schema::hasColumn('household_status_logs', 'reviewed_by_user_id') ? $userId : null,
+                'reviewed_at' => Schema::hasColumn('household_status_logs', 'reviewed_at') ? $now : null,
+                'updated_at' => Schema::hasColumn('household_status_logs', 'updated_at') ? $now : null,
+            ], fn ($value) => $value !== null));
+
+        return response()->json([
+            'message' => 'Latest household status report confirmed by HQ.',
+            'data' => [
+                'household_id' => $householdId,
+                'status_log_id' => $log->status_log_id,
+                'reviewed_at' => $now->format('M d, Y h:i A'),
+            ],
+        ]);
     }
 
     private function householdListQuery(?string $eventId)
@@ -427,7 +447,7 @@ class HouseholdStatusService
         $counts = DB::table('household_disasters as hd')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
             ->where('hd.disaster_id', $eventId)
-            ->select('hs.status_key', DB::raw('COUNT(*) as total'))
+            ->select('hs.status_key', DB::raw('COUNT(DISTINCT hd.household_id) as total'))
             ->groupBy('hs.status_key')
             ->pluck('total', 'status_key');
 
@@ -463,26 +483,71 @@ class HouseholdStatusService
                         ->where('hd.needs_dispatch', true)
                         ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
                 })
-                ->count(),
+                ->distinct()
+                ->count('hd.household_id'),
         ];
     }
 
     private function getPurokSummary(?string $eventId)
     {
-        $rows = $this->householdListQuery($eventId)->get();
+        $areaExpression = "COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned')";
+        $unsafeKeys = [
+            'not_evacuated',
+            'displaced',
+            'unsafe',
+            'needs_help',
+            'need_help',
+            'needs_assistance',
+            'missing',
+            'injured',
+        ];
+        $deviceStaleBefore = now()->subHours(6)->toDateTimeString();
+        $deviceSummary = DB::table('device_tokens')
+            ->select(
+                'household_id',
+                DB::raw('COUNT(*) as device_total'),
+                DB::raw('MIN(battery_level) as lowest_battery'),
+                DB::raw('MAX(COALESCE(last_seen_at, logged_at, updated_at, created_at)) as latest_device_seen_at')
+            )
+            ->groupBy('household_id');
 
-        return $rows
-            ->groupBy(fn (object $row): string => $row->purok ?: 'Unassigned')
-            ->map(function ($items, string $purok): array {
-                $total = $items->count();
-                $reported = $items->whereNotNull('current_status_id')->count();
-                $unsafe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'], true))->count();
-                $deviceRisk = $items->filter(function (object $item): bool {
-                    return (int) $item->device_total > 0 && ((int) $item->lowest_battery <= 25 || $this->isStale($item->latest_device_seen_at));
-                })->count();
+        return DB::table('households as h')
+            ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->leftJoin('household_disasters as hd', function ($join) use ($eventId): void {
+                $join->on('hd.household_id', '=', 'h.household_id');
+
+                if ($eventId) {
+                    $join->where('hd.disaster_id', '=', $eventId);
+                } else {
+                    $join->whereRaw('1 = 0');
+                }
+            })
+            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
+            ->leftJoinSub($deviceSummary, 'devices', 'devices.household_id', '=', 'h.household_id')
+            ->whereNull('h.deleted_at')
+            ->whereNotNull('h.household_id')
+            ->selectRaw($areaExpression.' as purok')
+            ->selectRaw('COUNT(DISTINCT h.household_id) as total')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN hd.current_status_id IS NOT NULL THEN h.household_id END) as reported')
+            ->selectRaw(
+                'COUNT(DISTINCT CASE WHEN hd.needs_dispatch = 1 OR hs.status_key IN ('.implode(',', array_fill(0, count($unsafeKeys), '?')).') THEN h.household_id END) as unsafe',
+                $unsafeKeys
+            )
+            ->selectRaw(
+                'COUNT(DISTINCT CASE WHEN devices.device_total > 0 AND (devices.lowest_battery <= 25 OR devices.latest_device_seen_at IS NULL OR devices.latest_device_seen_at < ?) THEN h.household_id END) as device_risk',
+                [$deviceStaleBefore]
+            )
+            ->groupByRaw($areaExpression)
+            ->orderByDesc('unsafe')
+            ->get()
+            ->map(function (object $row): array {
+                $total = (int) $row->total;
+                $reported = (int) $row->reported;
+                $unsafe = (int) $row->unsafe;
+                $deviceRisk = (int) $row->device_risk;
 
                 return [
-                    'purok' => $purok,
+                    'purok' => $row->purok ?: 'Unassigned',
                     'total' => $total,
                     'reported' => $reported,
                     'unchecked' => max($total - $reported, 0),
@@ -492,7 +557,6 @@ class HouseholdStatusService
                     'priority' => $unsafe > 0 ? 'urgent' : ($deviceRisk > 0 ? 'watch' : 'stable'),
                 ];
             })
-            ->sortByDesc('unsafe')
             ->values();
     }
 

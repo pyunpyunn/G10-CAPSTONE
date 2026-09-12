@@ -53,9 +53,9 @@ export default function ResourcesRequestsPage() {
         if (!ignore) {
           setPayload(data)
         }
-      } catch {
+      } catch (loadError) {
         if (!ignore) {
-          setError('Resource requests cannot be loaded right now. Please check the backend or database connection.')
+          setError(resourceRequestErrorMessage(loadError, 'Resource requests could not be loaded. Please sign in again or check the Laravel API.'))
         }
       } finally {
         if (!ignore) {
@@ -83,8 +83,8 @@ export default function ResourcesRequestsPage() {
       if (showMessage) {
         setMessage(showMessage)
       }
-    } catch {
-      setError('Resource requests cannot be loaded right now. Please check the backend or database connection.')
+    } catch (loadError) {
+      setError(resourceRequestErrorMessage(loadError, 'Resource requests could not be loaded. Please sign in again or check the Laravel API.'))
     } finally {
       setIsLoading(false)
     }
@@ -242,7 +242,7 @@ export default function ResourcesRequestsPage() {
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
-      {!isInitialLoading && !hasBlockingError && payload && (
+      {!hasBlockingError && (payload || isLoading) && (
         <>
           <ResourceRequestNotice note={payload?.scope_note} />
           <ResourceRequestStats summary={payload?.summary} />
@@ -254,6 +254,7 @@ export default function ResourcesRequestsPage() {
               <ResourceRequestQueueTable
                 requests={requests}
                 pagination={pagination}
+                loading={isLoading}
                 onView={(request) => openExistingModal(request, 'view')}
                 onValidate={(request) => openExistingModal(request, 'validate')}
                 onForward={handleRowForward}

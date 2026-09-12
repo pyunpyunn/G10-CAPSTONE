@@ -31,6 +31,11 @@ class ResourceRequestController extends Controller
         return $this->service->store($request);
     }
 
+    public function externalStore(Request $request): JsonResponse
+    {
+        return $this->service->storeExternal($request);
+    }
+
     public function validateResource(Request $request, string $requestId): JsonResponse
     {
         return $this->service->validateResource($request, $requestId);
@@ -44,5 +49,10 @@ class ResourceRequestController extends Controller
     public function returnRequest(Request $request, string $requestId): JsonResponse
     {
         return $this->service->returnRequest($request, $requestId);
+    }
+
+    public function complete(Request $request, string $requestId): JsonResponse
+    {
+        return $this->service->complete($request, $requestId);
     }
 }

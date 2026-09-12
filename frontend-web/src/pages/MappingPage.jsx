@@ -56,13 +56,9 @@ export default function MappingPage() {
   const closestStartPoint = useMemo(() => {
     const team = rescueTeams[0]
     const urgentHousehold = households.find((household) => household.marker_group === 'red')
-    const fallback = {
-      latitude: workspace.barangay.center.latitude,
-      longitude: workspace.barangay.center.longitude,
-    }
 
-    return team || urgentHousehold || fallback
-  }, [households, rescueTeams, workspace.barangay.center.latitude, workspace.barangay.center.longitude])
+    return team || urgentHousehold || null
+  }, [households, rescueTeams])
 
   useEffect(() => {
     let ignore = false
@@ -83,7 +79,7 @@ export default function MappingPage() {
         if (!ignore) {
           setWorkspace(defaultWorkspace)
           setError(apiErrorMessage(loadError))
-          setHasLoaded(true)
+          setHasLoaded(false)
         }
       } finally {
         if (!ignore) {
@@ -124,7 +120,7 @@ export default function MappingPage() {
     } catch (loadError) {
       setWorkspace(defaultWorkspace)
       setError(apiErrorMessage(loadError))
-      setHasLoaded(true)
+      setHasLoaded(false)
     } finally {
       setIsLoading(false)
     }
@@ -139,6 +135,11 @@ export default function MappingPage() {
 
   async function showRouteToSite(site) {
     if (!hasActiveEvent) {
+      return
+    }
+
+    if (!closestStartPoint) {
+      setRouteError('No DB-saved team or household GPS point is available for route generation.')
       return
     }
 

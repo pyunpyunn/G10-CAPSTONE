@@ -6,7 +6,6 @@ import {
   markNotificationsRead,
 } from '../api/notificationApi'
 import NotificationList from '../components/notifications/NotificationList'
-import NotificationSummary from '../components/notifications/NotificationSummary'
 import NotificationToolbar from '../components/notifications/NotificationToolbar'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
@@ -21,7 +20,7 @@ export default function NotificationsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [items, setItems] = useState([])
-  const [summary, setSummary] = useState({})
+  const [, setSummary] = useState({})
   const [pagination, setPagination] = useState({})
   const [scopeNote, setScopeNote] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
@@ -165,11 +164,6 @@ export default function NotificationsPage() {
     }
   }
 
-  const visibleSummary = {
-    ...summary,
-    selected: selectedIds.length,
-  }
-
   return (
     <section className="page active notifications-page">
       <PageHeader title="Notifications" />
@@ -189,7 +183,6 @@ export default function NotificationsPage() {
 
       {!isLoading && !error && (
         <>
-          <NotificationSummary summary={visibleSummary} />
           {scopeNote && <div className="notification-scope-note">{scopeNote}</div>}
           <NotificationList
             notifications={items}

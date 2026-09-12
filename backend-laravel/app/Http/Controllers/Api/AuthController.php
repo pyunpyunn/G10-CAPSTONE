@@ -32,4 +32,19 @@ class AuthController extends Controller
     {
         return $this->service->logout($request);
     }
+
+    public function recoveryQuestions(Request $request): JsonResponse
+    {
+        return $this->service->recoveryQuestions($request);
+    }
+
+    public function saveRecoveryQuestions(Request $request): JsonResponse
+    {
+        return $this->service->saveRecoveryQuestions($request);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        return $this->service->resetPassword($request);
+    }
 }

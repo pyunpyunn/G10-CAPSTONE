@@ -181,7 +181,7 @@ This newer script replaces the earlier gap proposal as the recommended review fi
 | `resource_items` | Do not create for version 1. Extend `resource_requests`. | RESQPERATION validates/forwards requests but does not manage delivery inventory. |
 | `request_validations` | Create new `request_validations`. | Needed for validation history before marking requests ready for tracking. |
 | `audit_logs` | Create new `audit_logs`. | `import_logs` and `analytics_job_logs` are not general user action logs. |
-| `integration_logs` | Do not create for version 1. | All capstone modules now share one DB. PAGASA/OpenMeteo belong in `weather_logs`; ExpoPush belongs in notification delivery logs. |
+| `integration_logs` | Do not create for version 1. | All capstone modules now share one DB. PAGASA/OpenMeteo belong in `weather_logs`; OneSignal push delivery belongs in notification delivery logs. |
 
 Status:
 
@@ -255,7 +255,7 @@ Added in the current DB update:
 - device label
 - linked household member
 - platform
-- Expo push token or clarified push token field
+- OneSignal Player ID / push subscription field
 - location permission status
 - last known location
 - last seen timestamp

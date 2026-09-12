@@ -225,7 +225,7 @@ Status: done for the first live HQ/Admin Household Status module. The web page u
 - [x] Dispatch web page
 - [x] Create/update modals
 
-Status: done for the first live HQ/Admin Rescue Dispatch module. The backend uses the approved shared DB mapping: `rescue_teams`, `responders`, `responder_assignments`, `responder_routes`, `route_coordinates`, and `responder_location_logs`. No migrations were run and no schema was changed. Current shared DB note: `rescue_teams` has no formal team rows yet, so the page displays the existing temporary responder as an unassigned responder pool until HQ/Admin registers actual teams.
+Status: done for the live HQ/Admin Rescue Dispatch module. The backend uses the approved shared DB mapping: `rescue_teams`, `responders`, `responder_assignments`, `responder_routes`, `route_coordinates`, and `responder_location_logs`. No destructive shared DB migrations are required. The page supports team availability, assignment status, responder selection, purok triage, route display, and dispatch completion workflows based on the active database records.
 
 ### 10. Disaster Broadcasting
 
@@ -234,9 +234,9 @@ Status: done for the first live HQ/Admin Rescue Dispatch module. The backend use
 - [x] Broadcast page
 - [x] Save broadcast logs first
 - [x] Apply approved broadcast metadata columns to shared DB
-- [ ] Add Expo push later after mobile works
+- [x] Add OneSignal mobile push after mobile device registration works
 
-Status: v1 done for the live HQ/Admin Disaster Broadcasting module. The web page now uses the Laravel API instead of the placeholder prototype, supports active-event lifecycle display, declaration/update compose flow, recipient scope notes, direct-impact purok selection, the 4-status mobile button rule, and active-event broadcast logs. On 2026-06-03, the approved nullable metadata columns from `docs/sql_proposals/initial/2026_06_03_g10_disaster_broadcast_metadata_review.sql` were applied to the shared DB with guarded column checks. No Laravel migrations were run. Expo push is still deferred until the mobile notification workflow is ready.
+Status: v1 done for the live HQ/Admin Disaster Broadcasting module. The web page now uses the Laravel API instead of the placeholder prototype, supports active-event lifecycle display, declaration/update compose flow, recipient scope notes, direct-impact purok selection, the 4-status mobile button rule, active-event broadcast logs, and OneSignal mobile push delivery through registered `device_tokens.player_id` records. On 2026-06-03, the approved nullable metadata columns from `docs/sql_proposals/initial/2026_06_03_g10_disaster_broadcast_metadata_review.sql` were applied to the shared DB with guarded column checks. No Laravel migrations were run.
 
 ### 11. Weather Updates
 
@@ -262,7 +262,7 @@ Status: v1 done for the live HQ/Admin Weather Updates module. React displays sav
 - [x] Rescue team markers
 - [x] Route display on demand
 
-Status: v1 done for the live HQ/Admin Mapping module. The backend uses existing shared DB tables only: `geotagged_locations`, `households`, `household_disasters`, `household_statuses`, `evacuation_centers`, `responder_location_logs`, `responders`, `rescue_teams`, `responder_assignments`, `responder_routes`, and `route_coordinates`. No migrations were run and no schema was changed. React now uses Leaflet/OpenStreetMap tiles, automatically focuses on Barangay Guadalupe, hides operational status layers when there is no active disaster event, and shows household GPS markers, evacuation pins, rescue team markers, stored route lines, and on-demand route display during an active event. Live DB payload testing is still pending because the shared DB server was offline during this step.
+Status: v1 done for the live HQ/Admin Mapping module. The backend uses existing shared DB tables only: `geotagged_locations`, `households`, `household_disasters`, `household_statuses`, `evacuation_centers`, `responder_location_logs`, `responders`, `rescue_teams`, `responder_assignments`, `responder_routes`, and `route_coordinates`. No destructive shared DB migrations are required. React uses Leaflet/OpenStreetMap tiles, focuses on the configured barangay scope from `.env` (currently Mambaling), hides operational status layers when there is no active disaster event, and shows household GPS markers, evacuation pins, rescue team markers, stored route lines, and on-demand route display during an active event.
 
 ### 13. Rescuer Accounts
 
@@ -286,7 +286,7 @@ Status: v1 done for the live HQ/Admin Rescuer Accounts module. The backend reuse
 - [x] Validation modal
 - [x] Mark ready for tracking / return actions
 
-Status: v1 done for the live HQ/Admin Resources & Requests module. The backend reuses the existing shared DB tables only: `resource_requests`, `request_validations`, `resource_request_status`, `urgency_levels`, and `evacuation_centers`. No migrations were run and no schema was changed. RESQPERATION can load the live validation queue, create a manual HQ request, save validation decisions, return incomplete or duplicate requests, and forward verified requests with a TrackingAid handoff reference. The frontend uses feature-based component splitting for the notice, stats, filters, queue table, validation modal, and TrackingAid mirror. Rollback-only API testing passed for list, create, validate, and forward, so no temporary resource request was left in the shared DB.
+Status: v1 done for the live HQ/Admin Resources & Requests module. The backend reuses the existing shared DB tables for the RESQPERATION queue: `resource_requests`, `request_validations`, `resource_request_status`, `urgency_levels`, and `evacuation_centers`. RESQPERATION can load the live validation queue, receive EvaTrack/external requests through `POST /api/v1/external/resource-requests`, create a manual HQ request, save validation decisions, return incomplete or duplicate requests, and forward verified requests to TrackingAid with a handoff reference. TrackingAid uses a separate configured DB connection and the `resqperation_forwarded_requests` handoff table. The frontend uses feature-based component splitting for the notice, stats, queue table, validation modal, and TrackingAid inventory mirror.
 
 ### 15. Situation Reporting
 

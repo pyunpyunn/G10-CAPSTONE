@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import EmptyState from '../ui/EmptyState'
 import {
   dispatchStatuses,
@@ -64,39 +65,97 @@ export default function DispatchModalForm({
 }
 
 function RiskAreaList({ areas, selectedRiskId, selectedHouseholdId, onSelect, onSelectHousehold }) {
+  const pageSize = 5
+  const [page, setPage] = useState(1)
+
+  const selectedArea = useMemo(() => (
+    areas.find((area) => area.id === selectedRiskId) || null
+  ), [areas, selectedRiskId])
+
+  const pageCount = Math.max(1, Math.ceil(areas.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const visibleAreas = areas.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
   if (areas.length === 0) {
     return <EmptyState title="No dispatch area yet" message="Areas appear after households send disaster status." />
   }
 
   return (
-    <div className="dp-risk-list">
-      {areas.map((area) => (
-        <article className={`dp-risk-card ${selectedRiskId === area.id ? 'active' : ''}`} key={area.id}>
+    <div className="dp-risk-selector">
+      <label>
+        <span className="form-label">Select purok</span>
+        <select
+          value={selectedRiskId}
+          onChange={(event) => {
+            const area = areas.find((item) => item.id === event.target.value)
+            if (area) {
+              onSelect(area)
+            }
+          }}
+        >
+          <option value="">Choose affected purok</option>
+          {areas.map((area) => (
+            <option value={area.id} key={area.id}>
+              {area.area_name} - {area.unsafe_households || 0}/{area.total_households || 0} unsafe
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="dp-triage-list">
+        <div className="dp-household-target-head">
+          <span>Purok triage</span>
+          <small>5 areas per page</small>
+        </div>
+        {visibleAreas.map((area) => (
+          <button
+            className={`dp-triage-row ${selectedRiskId === area.id ? 'active' : ''}`}
+            type="button"
+            onClick={() => onSelect(area)}
+            key={area.id}
+          >
+            <span>{area.area_name}</span>
+            <strong>{area.unsafe_households || 0}/{area.total_households || 0} unsafe</strong>
+          </button>
+        ))}
+        <div className="dp-mini-pagination compact">
+          <span>Page {currentPage} of {pageCount}</span>
+          <div>
+            <button type="button" disabled={currentPage <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Prev</button>
+            <button type="button" disabled={currentPage >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>Next</button>
+          </div>
+        </div>
+      </div>
+
+      {selectedArea ? (
+        <article className="dp-risk-card active">
           <div className="dp-risk-top">
             <div>
-              <div className="dp-risk-name">{area.area_name}</div>
-              <div className="dp-risk-zone">{area.zone} - {area.geotagged_households || 0} with GPS</div>
+              <div className="dp-risk-name">{selectedArea.area_name}</div>
+              <div className="dp-risk-zone">{selectedArea.zone} - {selectedArea.geotagged_households || 0} with GPS</div>
             </div>
-            <span className={`dp-priority-pill dp-priority-${area.priority}`}>{area.priority_label}</span>
+            <span className={`dp-priority-pill dp-priority-${selectedArea.priority}`}>{selectedArea.priority_label}</span>
           </div>
           <div className="dp-risk-metrics">
-            <RiskMetric label="Total" value={area.total_households} />
-            <RiskMetric label="GPS" value={area.geotagged_households} />
-            <RiskMetric label="Unsafe" value={area.unsafe_households} />
-            <RiskMetric label="To cover" value={area.to_cover} />
+            <RiskMetric label="Total" value={selectedArea.total_households} />
+            <RiskMetric label="GPS" value={selectedArea.geotagged_households} />
+            <RiskMetric label="Unsafe" value={selectedArea.unsafe_households} />
+            <RiskMetric label="To cover" value={selectedArea.to_cover} />
           </div>
           <div className="dp-risk-actions">
-            <button className="btn btn-secondary btn-sm" type="button" onClick={() => onSelect(area)}>
+            <button className="btn btn-secondary btn-sm dp-use-purok-btn" type="button" onClick={() => onSelect(selectedArea)}>
               Use this purok
             </button>
           </div>
           <HouseholdTargetList
-            area={area}
+            area={selectedArea}
             selectedHouseholdId={selectedHouseholdId}
             onSelectHousehold={onSelectHousehold}
           />
         </article>
-      ))}
+      ) : (
+        <div className="dp-household-empty">Select a purok to review households and route target.</div>
+      )}
     </div>
   )
 }

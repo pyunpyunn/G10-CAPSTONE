@@ -3,6 +3,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import MapView, { Circle, Marker } from 'react-native-maps';
+import { canUseNativeMap, MobileMapFallback } from '@/components/MobileMapFallback';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineTime } from '@/utils/time';
 import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
@@ -140,32 +141,48 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
           </View>
         ) : null}
 
-        <MapView style={styles.map} initialRegion={defaultRegion}>
-          {mappedAssignments.map((assignment) => (
-            <Marker
-              key={assignment.assignment_id}
-              coordinate={{
-                latitude: Number(assignment.latitude),
-                longitude: Number(assignment.longitude),
-              }}
-              title={assignment.assigned_area || assignment.household_id || 'Assignment'}
-              description={assignment.status_label}
-              pinColor={assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated}
-            />
-          ))}
-
-          {position ? (
-            <>
-              <Marker coordinate={position} title="My location" pinColor={palette.navActive} />
-              <Circle
-                center={position}
-                radius={position.accuracy_m || 30}
-                strokeColor="#2a5a9055"
-                fillColor="#2a5a9018"
+        {canUseNativeMap ? (
+          <MapView style={styles.map} initialRegion={defaultRegion}>
+            {mappedAssignments.map((assignment) => (
+              <Marker
+                key={assignment.assignment_id}
+                coordinate={{
+                  latitude: Number(assignment.latitude),
+                  longitude: Number(assignment.longitude),
+                }}
+                title={assignment.assigned_area || assignment.household_id || 'Assignment'}
+                description={assignment.status_label}
+                pinColor={assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated}
               />
-            </>
-          ) : null}
-        </MapView>
+            ))}
+
+            {position ? (
+              <>
+                <Marker coordinate={position} title="My location" pinColor={palette.navActive} />
+                <Circle
+                  center={position}
+                  radius={position.accuracy_m || 30}
+                  strokeColor="#2a5a9055"
+                  fillColor="#2a5a9018"
+                />
+              </>
+            ) : null}
+          </MapView>
+        ) : (
+          <MobileMapFallback
+            title="Barangay rescue map"
+            message="OpenStreetMap preview. GPS sync still works when you tap Track Me."
+            points={[
+              ...(position ? [{ ...position, label: 'My location', color: palette.navActive }] : []),
+              ...mappedAssignments.map((assignment) => ({
+                latitude: assignment.latitude,
+                longitude: assignment.longitude,
+                label: assignment.assigned_area || assignment.household_id || 'Assignment',
+                color: assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated,
+              })),
+            ]}
+          />
+        )}
 
         {mappedAssignments.length === 0 ? (
           <EmptyState

@@ -13,6 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 class DisasterBroadcastService
 {
+    public function __construct(private OneSignalNotificationService $oneSignal) {}
+
     public function index(): JsonResponse
     {
         $activeEvent = $this->getActiveEvent();
@@ -159,13 +161,72 @@ class DisasterBroadcastService
             return $broadcastId;
         });
 
+        $pushResult = $this->sendBroadcastPush($broadcastId, $validated, $metadata, $event);
+        $this->updateBroadcastPushStatus($broadcastId, $pushResult);
+
         return response()->json([
-            'message' => 'Broadcast saved. Push sending will be connected in the mobile notification step.',
+            'message' => $this->broadcastSaveMessage($pushResult),
             'data' => [
                 'broadcast' => $this->findBroadcast($broadcastId),
                 'broadcasts' => $this->getBroadcastsForEvent($event->event_id),
+                'push_delivery' => $pushResult,
             ],
         ], 201);
+    }
+
+    private function sendBroadcastPush(int $broadcastId, array $validated, array $metadata, object $event): array
+    {
+        $scope = $validated['scope_type'];
+        $purokNames = in_array($scope, ['selected_puroks', 'local_direct_impact'], true)
+            ? collect($metadata['puroks'])->pluck('name')->filter()->values()->all()
+            : [];
+
+        $roles = match ($scope) {
+            'rescuers_only' => ['rescuer'],
+            'selected_puroks', 'local_direct_impact' => ['household'],
+            default => ['household', 'rescuer'],
+        };
+
+        return $this->oneSignal->sendToMobileDevices(
+            $validated['broadcast_title'],
+            $validated['message'],
+            [
+                'roles' => $roles,
+                'household_puroks' => $purokNames,
+                'data' => [
+                    'type' => 'disaster_broadcast',
+                    'event_id' => $event->event_id,
+                    'broadcast_id' => (string) $broadcastId,
+                    'scope_type' => $scope,
+                ],
+            ]
+        );
+    }
+
+    private function updateBroadcastPushStatus(int $broadcastId, array $pushResult): void
+    {
+        if (! Schema::hasTable('disaster_broadcasts') || ! Schema::hasColumn('disaster_broadcasts', 'push_status')) {
+            return;
+        }
+
+        DB::table('disaster_broadcasts')
+            ->where('broadcast_id', $broadcastId)
+            ->update($this->filterColumns('disaster_broadcasts', [
+                'push_status' => 'onesignal_'.$pushResult['status'],
+                'channel' => 'onesignal',
+                'updated_at' => now(),
+            ]));
+    }
+
+    private function broadcastSaveMessage(array $pushResult): string
+    {
+        return match ($pushResult['status']) {
+            'sent' => 'Broadcast saved and sent through OneSignal to '.$pushResult['sent_count'].' device(s).',
+            'partial' => 'Broadcast saved. OneSignal sent to '.$pushResult['sent_count'].' of '.$pushResult['recipient_count'].' device(s).',
+            'no_recipients' => 'Broadcast saved, but no OneSignal-ready mobile devices were found.',
+            'not_configured' => 'Broadcast saved, but OneSignal credentials are not configured.',
+            default => 'Broadcast saved, but OneSignal delivery failed. Check backend logs and OneSignal credentials.',
+        };
     }
 
     private function validateBroadcast(Request $request): array
@@ -358,7 +419,93 @@ class DisasterBroadcastService
             'started_time' => $this->formatTime($event->started_at),
             'ended_at' => $this->formatDateTime($event->ended_at),
             'ended_time' => $this->formatTime($event->ended_at),
+            'duration_label' => $this->durationLabel($event->started_at, $event->ended_at),
+            'status_sent_count' => $this->latestStatusCount($event->event_id),
+            'latest_weather' => $this->latestWeather($event->event_id),
             'status' => $isActive ? 'active' : 'closed',
+        ];
+    }
+
+    private function durationLabel(?string $startedAt, ?string $endedAt): string
+    {
+        if (! $startedAt) {
+            return 'Not recorded';
+        }
+
+        $start = Carbon::parse($startedAt);
+        $end = $endedAt ? Carbon::parse($endedAt) : now();
+
+        return $start->diffForHumans($end, true).' '.($endedAt ? 'total' : 'active');
+    }
+
+    private function latestStatusCount(string $eventId): int
+    {
+        if (! Schema::hasTable('disaster_broadcasts')) {
+            return 0;
+        }
+
+        $broadcast = DB::table('disaster_broadcasts')
+            ->where('disaster_id', $eventId)
+            ->orderByDesc('sent_at')
+            ->first(['allowed_statuses']);
+
+        if (! $broadcast) {
+            return 0;
+        }
+
+        $metadata = $this->decodeMetadata($broadcast->allowed_statuses);
+        $statuses = $metadata['statuses'] ?? $this->legacyStatuses($broadcast->allowed_statuses);
+
+        return count($statuses);
+    }
+
+    private function latestWeather(string $eventId): array
+    {
+        if (! Schema::hasTable('weather_logs')) {
+            return [
+                'condition' => 'No weather snapshot',
+                'temperature' => null,
+                'wind_speed' => null,
+                'rainfall' => null,
+            ];
+        }
+
+        $columns = Schema::getColumnListing('weather_logs');
+        $eventColumn = collect(['disaster_id', 'event_id'])
+            ->first(fn (string $column): bool => in_array($column, $columns, true));
+
+        if (! $eventColumn) {
+            return [
+                'condition' => 'Weather not linked',
+                'temperature' => null,
+                'wind_speed' => null,
+                'rainfall' => null,
+            ];
+        }
+
+        $orderColumn = collect(['logged_at', 'created_at', 'weather_log_id', 'id'])
+            ->first(fn (string $column): bool => in_array($column, $columns, true));
+
+        $query = DB::table('weather_logs')
+            ->where($eventColumn, $eventId)
+            ->when($orderColumn, fn ($weatherQuery) => $weatherQuery->orderByDesc($orderColumn));
+
+        $row = $query->first();
+
+        if (! $row) {
+            return [
+                'condition' => 'No weather snapshot',
+                'temperature' => null,
+                'wind_speed' => null,
+                'rainfall' => null,
+            ];
+        }
+
+        return [
+            'condition' => $row->condition ?? $row->weather_condition ?? $row->summary ?? 'Weather saved',
+            'temperature' => $row->temperature_c ?? $row->temperature ?? null,
+            'wind_speed' => $row->wind_speed_kmh ?? $row->wind_speed ?? null,
+            'rainfall' => $row->rainfall_mm ?? $row->rainfall ?? null,
         ];
     }
 
@@ -625,6 +772,15 @@ class DisasterBroadcastService
             ->max($column);
 
         return ((int) $currentMax) + 1;
+    }
+
+    private function filterColumns(string $table, array $data): array
+    {
+        $columns = Schema::getColumnListing($table);
+
+        return collect($data)
+            ->filter(fn ($value, string $key): bool => in_array($key, $columns, true))
+            ->all();
     }
 
     private function formatDateTime(?string $value): ?string

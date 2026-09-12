@@ -21,6 +21,12 @@ class MappingController extends Controller
         return $this->service->overview($request);
     }
 
+    /** Fast map shell: event, filters, boundaries, and summary only. */
+    public function workspace(Request $request): JsonResponse
+    {
+        return $this->service->workspace($request);
+    }
+
     public function householdGeotags(Request $request): JsonResponse
     {
         return $this->service->householdGeotags($request);

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Services\BarangayProfileService;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -40,6 +39,32 @@ class MappingService
                     'evacuation_sites' => $hasActiveEvent ? $this->getEvacuationSites($eventId) : [],
                     'rescue_teams' => $hasActiveEvent ? $this->getRescueTeamMarkers($eventId) : [],
                     'dispatch_routes' => $hasActiveEvent ? $this->getDispatchRoutes($eventId) : [],
+                    'map_rules' => $this->mapRules(),
+                ],
+            ]);
+        });
+    }
+
+    /**
+     * Deliberately excludes marker collections. The web view loads each map
+     * layer separately so a slow GPS/route query cannot block first paint.
+     */
+    public function workspace(Request $request): JsonResponse
+    {
+        return $this->safeResponse(function () use ($request): JsonResponse {
+            $activeEvent = $this->getActiveEvent();
+            $eventId = $request->query('event_id') ?: $activeEvent?->event_id;
+            $hasActiveEvent = (bool) $activeEvent && (string) $eventId === (string) $activeEvent->event_id;
+
+            return response()->json([
+                'data' => [
+                    'active_event' => $activeEvent ? $this->formatEvent($activeEvent) : null,
+                    'barangay' => $this->barangayFocus(),
+                    'summary' => $this->getSummary($eventId, $hasActiveEvent),
+                    'filters' => [
+                        'puroks' => $this->getPuroks(),
+                        'statuses' => $this->mapStatusFilters(),
+                    ],
                     'map_rules' => $this->mapRules(),
                 ],
             ]);

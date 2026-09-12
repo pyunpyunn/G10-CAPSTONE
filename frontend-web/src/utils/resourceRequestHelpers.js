@@ -99,6 +99,7 @@ export function filterParams(search, purok, activeChip, page = 1) {
     purok,
     page,
     per_page: 6,
+    core: 1,
     ...(chip?.params || {}),
   }
 }

@@ -88,27 +88,29 @@ Suggested tools:
 - Web: Playwright or Vitest with React Testing Library.
 - Mobile: TypeScript checks plus focused screen logic tests where practical.
 
-### 4. Finish push notification sending and receiving
+### 4. Verify OneSignal push notification sending and receiving
 
 Current behavior:
 
-- `expo-notifications` is installed in the mobile app.
-- The README still marks push notification sending and receiving as pending.
-- No mobile push token registration/listener code was found during this pass.
+- OneSignal is installed in the mobile app.
+- Mobile push token registration stores OneSignal Player IDs through the mobile device-token endpoint.
+- Laravel sends OneSignal push messages for disaster broadcasts and new rescue dispatch assignments.
 
-Recommended behavior:
+Remaining verification:
 
-- Mobile app asks permission and registers the Expo push token after login.
+- Mobile app asks permission and registers the OneSignal Player ID after login.
 - Backend stores the active device token per user/device.
-- Backend sends push messages when HQ/Admin broadcasts an alert.
+- Backend sends push messages through OneSignal when HQ/Admin broadcasts an alert or creates a rescue dispatch.
 - Mobile app displays received alerts and stores/reloads alert history from the API.
-- Failed push sends are logged for admin review.
+- Failed push sends should be reviewed in backend logs and OneSignal delivery reports.
 
 Files/modules to build around:
 
 - `frontend-mobile`
+- `backend-laravel/app/Services/OneSignalNotificationService.php`
 - `backend-laravel/app/Services/NotificationService.php`
 - `backend-laravel/app/Services/DisasterBroadcastService.php`
+- `backend-laravel/app/Services/RescueDispatchService.php`
 
 ### 5. Improve API session expiration handling on the web frontend
 

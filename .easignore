@@ -1,0 +1,17 @@
+# EAS Build is only for frontend-mobile.
+# Keep backend/web/docs out of the upload so Laravel symlinks and local files do not break the mobile build archive.
+backend-laravel/
+frontend-web/
+docs/
+FOR DEV/
+prototype/
+.dist/
+.sixth/
+
+# Local/generated files
+.git/
+.expo/
+node_modules/
+*.log
+*.docx
+*.zip
