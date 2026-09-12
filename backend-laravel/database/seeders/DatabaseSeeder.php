@@ -14,6 +14,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (config('database.default') === 'sqlite') {
+            $this->call([
+                TemporaryLoginSeeder::class,
+            ]);
+
+            return;
+        }
+
         $this->call([
             TemporaryLoginSeeder::class,
             SampleDisasterStatusSeeder::class,

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class TemporaryLoginSeeder extends Seeder
 {
@@ -13,7 +14,9 @@ class TemporaryLoginSeeder extends Seeder
         $adminRoleId = DB::table('roles')->where('role_key', 'admin')->value('role_id');
         $householdRoleId = DB::table('roles')->where('role_key', 'household_resident')->value('role_id');
         $rescuerRoleId = DB::table('roles')->where('role_key', 'rescuer')->value('role_id');
-        $sarTeamId = DB::table('rescue_teams')->where('team_code', 'SAR')->value('team_id');
+        $sarTeamId = Schema::hasTable('rescue_teams')
+            ? DB::table('rescue_teams')->where('team_code', 'SAR')->value('team_id')
+            : null;
 
         if (! $adminRoleId || ! $householdRoleId || ! $rescuerRoleId) {
             $this->command?->warn('Temporary users were not seeded because required roles are missing.');
@@ -86,13 +89,13 @@ class TemporaryLoginSeeder extends Seeder
             ]);
         }
 
-        if (! DB::table('responders')->where('username', 'BDRRM-SAR-001')->exists()) {
+        if (Schema::hasTable('responders') && ! DB::table('responders')->where('username', 'BDRRM-SAR-001')->exists()) {
             DB::table('responders')->insert([
                 'responder_id' => 2024035502,
                 'user_id' => 'USR-RESCUER-BDRRM-SAR-001',
                 'responder_code' => 'BDRRM-SAR-001',
                 'created_by_admin_id' => 'USR-HQ-2024035500',
-                'team_id' => $sarTeamId,
+                'team_id' => $sarTeamId ?? 'SAR',
                 'username' => 'BDRRM-SAR-001',
                 'password_hash' => $password,
                 'full_name' => 'Temporary Rescuer User',

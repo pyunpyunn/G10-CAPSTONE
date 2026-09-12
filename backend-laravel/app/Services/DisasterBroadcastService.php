@@ -485,7 +485,7 @@ class DisasterBroadcastService
             $query->whereNull('deleted_at');
         }
 
-        return $query->orderByRaw("FIELD(severity_key, 'low', 'medium', 'high', 'critical')")
+        return $query->orderByRaw("CASE severity_key WHEN 'low' THEN 1 WHEN 'medium' THEN 2 WHEN 'high' THEN 3 WHEN 'critical' THEN 4 ELSE 99 END")
             ->get(['severity_id', 'severity_key', 'severity_label'])
             ->map(fn (object $severity): array => [
                 'severity_id' => $severity->severity_id,

@@ -40,6 +40,61 @@ class DashboardService
         ]);
     }
 
+    public function summary(): JsonResponse
+    {
+        $this->clearEndedEventReferences();
+
+        $activeEvent = $this->getActiveEvent();
+        $eventId = $activeEvent?->event_id;
+        $householdSummary = $this->getHouseholdSummary($eventId);
+
+        return response()->json([
+            'data' => [
+                'barangay_profile' => $this->barangayProfile->current(),
+                'active_event' => $activeEvent ? $this->formatActiveEvent($activeEvent) : null,
+                'households' => $householdSummary,
+                'map' => $this->getMapSummary($eventId, $householdSummary),
+            ],
+        ]);
+    }
+
+    public function dispatch(): JsonResponse
+    {
+        $activeEvent = $this->getActiveEvent();
+        $eventId = $activeEvent?->event_id;
+
+        return response()->json([
+            'data' => $this->getDispatchSummary($eventId),
+        ]);
+    }
+
+    public function weather(): JsonResponse
+    {
+        $activeEvent = $this->getActiveEvent();
+        $eventId = $activeEvent?->event_id;
+
+        return response()->json([
+            'data' => $this->getWeatherSnapshot($eventId),
+        ]);
+    }
+
+    public function requests(): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->getRequestSummary(),
+        ]);
+    }
+
+    public function activity(): JsonResponse
+    {
+        $activeEvent = $this->getActiveEvent();
+        $eventId = $activeEvent?->event_id;
+
+        return response()->json([
+            'data' => $this->getRecentActivity($eventId),
+        ]);
+    }
+
     public function closeActiveEvent(Request $request): JsonResponse
     {
         $closedEvent = DB::transaction(function () use ($request): ?array {

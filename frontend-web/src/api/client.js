@@ -2,9 +2,9 @@ import axios from 'axios'
 import { getToken } from './token'
 
 function getApiBaseUrl() {
-  const configuredUrl = import.meta.env.VITE_API_BASE_URL
+  const configuredUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.EXPO_PUBLIC_API_BASE_URL
   const browserHost = window.location.hostname
-  const openedFromNetwork = browserHost !== 'localhost' && browserHost !== '127.0.0.1'
+  const openedFromNetwork = browserHost !== 'localhost' && browserHost !== '127.0.0.1' && browserHost !== '0.0.0.0'
   const configuredIsLocal = configuredUrl?.includes('127.0.0.1') || configuredUrl?.includes('localhost')
 
   if (openedFromNetwork && (!configuredUrl || configuredIsLocal)) {

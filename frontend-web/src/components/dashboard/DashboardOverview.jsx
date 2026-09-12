@@ -27,20 +27,23 @@ import EmptyState from '../ui/EmptyState'
 import LoadingState from '../ui/LoadingState'
 
 export default function DashboardOverview({
-  dashboard,
+  weatherState,
+  requestsState,
   hasActiveEvent,
   onOpenModule,
 }) {
   return (
     <aside className="dashboard-overview" aria-label="Dashboard side information">
-      <WeatherCard weather={dashboard.weather} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
+      <WeatherCard weatherState={weatherState} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
       <DashboardMapCard hasActiveEvent={hasActiveEvent} onOpenMap={() => onOpenModule('/mapping')} />
-      <RequestCard requests={dashboard.requests} onOpenRequests={() => onOpenModule('/resources-requests')} />
+      <RequestCard requestsState={requestsState} onOpenRequests={() => onOpenModule('/resources-requests')} />
     </aside>
   )
 }
 
-function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
+function WeatherCard({ weatherState, hasActiveEvent, onOpenWeather }) {
+  const weather = weatherState?.data
+  const isLoading = weatherState?.isLoading
   const hasWeather = Boolean(weather)
 
   return (
@@ -50,7 +53,9 @@ function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
         <button className="panel-link" type="button" onClick={onOpenWeather}>Full view -&gt;</button>
       </div>
 
-      {hasWeather ? (
+      {isLoading ? (
+        <LoadingState inline />
+      ) : hasWeather ? (
         <div className="dashboard-weather-compact">
           <div className="dashboard-weather-icon">
             <CloudSun size={30} />
@@ -190,35 +195,50 @@ function FitBarangay({ center, bounds, zoom }) {
   return null
 }
 
-function RequestCard({ requests, onOpenRequests }) {
+function RequestCard({ requestsState, onOpenRequests }) {
+  const requests = requestsState?.data || {
+    needs_validation: 0,
+    validated: 0,
+    released: 0,
+    latest: [],
+  }
+  const isLoading = requestsState?.isLoading
+
   return (
     <section className="overview-card">
       <div className="panel-head">
         <span className="panel-title"><PackageCheck size={15} />Requests</span>
         <button className="panel-link" type="button" onClick={onOpenRequests}>Full view -&gt;</button>
       </div>
-      <div className="dashboard-side-metrics">
-        <div><strong>{requests.needs_validation}</strong><span>Needs validation</span></div>
-        <div><strong>{requests.validated}</strong><span>Validated</span></div>
-        <div><strong>{requests.released}</strong><span>Released</span></div>
-      </div>
-      {requests.latest.length > 0 ? (
-        <div className="overview-request-table">
-          <table>
-            <thead><tr><th>Request from</th><th>Request</th><th>Status</th></tr></thead>
-            <tbody>
-              {requests.latest.map((request) => (
-                <tr key={request.request_id}>
-                  <td>{request.requested_by}</td>
-                  <td>{request.item_name}</td>
-                  <td><Badge tone={statusTone(request.status_key)}>{request.validation_status}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+      {isLoading ? (
+        <LoadingState inline />
       ) : (
-        <EmptyState title="No requests yet" message="Requests will appear after records are received for validation." />
+        <>
+          <div className="dashboard-side-metrics">
+            <div><strong>{requests.needs_validation}</strong><span>Needs validation</span></div>
+            <div><strong>{requests.validated}</strong><span>Validated</span></div>
+            <div><strong>{requests.released}</strong><span>Released</span></div>
+          </div>
+          {requests.latest.length > 0 ? (
+            <div className="overview-request-table">
+              <table>
+                <thead><tr><th>Request from</th><th>Request</th><th>Status</th></tr></thead>
+                <tbody>
+                  {requests.latest.map((request) => (
+                    <tr key={request.request_id}>
+                      <td>{request.requested_by}</td>
+                      <td>{request.item_name}</td>
+                      <td><Badge tone={statusTone(request.status_key)}>{request.validation_status}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="No requests yet" message="Requests will appear after records are received for validation." />
+          )}
+        </>
       )}
     </section>
   )
