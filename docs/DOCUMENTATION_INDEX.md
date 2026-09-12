@@ -10,6 +10,7 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 - `RESQPERATION_UPDATED_STEP_GUIDE.md` - step-by-step development guide.
 - `RESQPERATION_REQUIREMENTS_BREAKDOWN.md` - module requirements.
 - `RESQPERATION_ACTUAL_DEVELOPMENT_PLAN.md` - development plan.
+- `RESQPERATION_SYSTEM_CLEANUP_AND_CURRENT_STATE.md` - latest cleanup notes and current implemented system status.
 - `RESQPERATION_G10_BEGINNER_MODULE_PROMPTS.md` - beginner-friendly module prompts.
 - `RESQPERATION_G10_DEVELOPMENT_READINESS_AUDIT.md` - readiness audit.
 
@@ -17,15 +18,34 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 
 - `RESQPERATION_G10_DB_READINESS_CHECK.md` - shared DB readiness and missing table notes.
 - `RESQPERATION_G10_SAFE_SAMPLE_SEED_PLAN.md` - safe sample data plan.
-- `RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - switch between shared MySQL and local SQLite.
+- `RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - connect to the shared MySQL database by editing only `backend-laravel/.env`.
+- `RESQPERATION_SHARED_DB_DATA_SOURCE_RULES.md` - rule that web pages must display only records from the active database connection.
+- `RESQPERATION_SHARED_DB_AUDIT_AND_PUSH_TOKENS.md` - shared DB connectivity, safe seeder review, OneSignal Player ID storage, and duplicate-data checks.
+- `RESQPERATION_ONESIGNAL_MOBILE_SETUP.md` - OneSignal mobile setup, Player ID flow, and authentication rules.
+- `RESQPERATION_MOBILE_INSTALL_DEV_BUILD_ONESIGNAL_GUIDE.md` - complete groupmate guide for installing the mobile APK, running Expo Go/dev build, and verifying OneSignal subscriptions.
 - `sql_proposals/` - review-only SQL scripts. Do not run on shared DB without DB member approval.
-- `sql_proposals/initial/2026_06_12_g10_trackingaid_mappingaid_integration_draft.sql` - draft only for future TrackingAid/MappingAid shared DB integration.
+- `sql_proposals/2026_06_25_shared_db_read_only_audit.sql` - read-only lookup, duplicate, and device-token audit.
+- `sql_proposals/initial/2026_06_12_g10_trackingaid_mappingaid_integration_draft.sql` - historical draft only; current TrackingAid handoff is documented in `RESQPERATION_TRACKINGAID_REQUEST_INTEGRATION_GUIDE.md`.
 - `sql_proposals/initial/2026_06_13_mambaling_household_geotag_update.sql` - review-only Mambaling household geotag update.
 
 ## Final Defense Docs
 
 - `RESQPERATION_FINAL_DEFENSE_STUDY_GUIDE_AND_DIAGRAMS.md` - topics to study, system concept, and Mermaid diagrams.
-- `RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, and TrackingAid/MappingAid draft integration plan.
+- `diagrams/` - detailed final defense diagram set covering system context, roles, auth, HQ workflows, mobile workflows, mapping, dispatch, resources, archive, database, and SSDLC/security.
+- `diagrams/10_household_status_reporting_simulation.md` - household status reporting simulation.
+- `diagrams/11_household_status_flow.md` - household status mobile flow.
+- `diagrams/12_household_analytics_formula.md` - household analytics formula diagram.
+- `diagrams/13_rescuer_dispatching_flow.md` - rescuer dispatching flow.
+- `diagrams/14_resqperation_scope_erd.md` - RESQPERATION-only ERD with external connections.
+- `diagrams/15_household_use_case.md` - household use case.
+- `diagrams/16_rescuer_use_case.md` - rescuer use case.
+- `diagrams/17_hq_admin_web_use_case.md` - HQ/Admin web use case.
+- `diagrams/18_system_architecture.md` - system architecture.
+- `diagrams/19_http_request_methods_process.md` - HTTP request method flow for household, rescuer, and HQ web.
+- `diagrams/20_data_flow_diagram.md` - data flow diagram.
+- `diagrams/21_radio_communication_flow.md` - radio communication flow.
+- `RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, TrackingAid, weather, and notification integration plan.
+- `RESQPERATION_TRACKINGAID_REQUEST_INTEGRATION_GUIDE.md` - complete request intake, validation, forwarding, TrackingAid handoff table, resource inventory, and SQL verification guide.
 - `RESQPERATION_RESCUER_RADIO_PTT_PLAN.md` - rescuer radio / push-to-talk plan and implementation resources.
 - `RESQPERATION_RESCUER_RADIO_COMMUNICATION.md` - implemented rescuer radio voice-clip workflow and test guide.
 - `RESQPERATION_SYSTEM_STACK_RESOURCES_AND_REFERENCES.md` - stack, resources, references, and legal basis.
@@ -51,4 +71,4 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 - `RESQPERATION_DATA_FLOW_DIAGRAM.md` - system-level data flow diagram for the ResQperation platform.
 - `RESQPERATION_WEB_USE_CASES.md` - detailed web use cases for the HQ/Admin module.
 
-Mobile documentation was intentionally left inside `frontend-mobile/` during this cleanup because the current instruction was to ignore mobile changes.
+Module-local mobile references remain in `frontend-mobile/` because they are used while developing the Expo app. Maintained project-level documentation lives in `docs/`.

@@ -61,6 +61,21 @@ class RescuerMobileController extends Controller
         return $this->service->storeFieldReport($request);
     }
 
+    public function fieldReportsAdmin(Request $request): JsonResponse
+    {
+        return $this->service->fieldReportsAdmin($request);
+    }
+
+    public function checkIns(Request $request): JsonResponse
+    {
+        return $this->service->checkIns($request);
+    }
+
+    public function storeCheckIn(Request $request): JsonResponse
+    {
+        return $this->service->storeCheckIn($request);
+    }
+
     public function resourceRequests(Request $request): JsonResponse
     {
         return $this->service->resourceRequests($request);

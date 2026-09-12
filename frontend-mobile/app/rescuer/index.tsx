@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,10 +10,12 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { logoutMobile } from '@/api/auth';
+import { savePushRegistration } from '@/api/device';
 import {
   cancelResourceRequest,
   createFieldReport,
@@ -32,8 +35,11 @@ import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScr
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
 import { LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
+import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
+import { getPushRegistration } from '@/utils/pushNotifications';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
+const deviceUuidKey = 'resq_rescuer_device_uuid';
 
 const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; special?: boolean }[] = [
   { key: 'dashboard', label: 'Home', icon: 'home-outline' },
@@ -72,6 +78,38 @@ export default function RescuerHomeScreen() {
     loadOverview();
   }, [loadOverview]);
 
+  useEffect(() => {
+    async function registerNotifications() {
+      let savedDeviceUuid = await getStoredItem(deviceUuidKey);
+
+      if (!savedDeviceUuid) {
+        savedDeviceUuid = `rescuer-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        await setStoredItem(deviceUuidKey, savedDeviceUuid);
+      }
+
+      const registration = await getPushRegistration(savedDeviceUuid);
+      const batteryLevel = await currentBatteryLevel();
+
+      try {
+        await savePushRegistration({
+          device_uuid: savedDeviceUuid,
+          device_name: 'Rescuer mobile',
+          platform: Platform.OS as 'android' | 'ios',
+          player_id: registration.playerId,
+          push_token: registration.pushToken,
+          push_provider: registration.pushProvider,
+          one_signal_user_id: registration.oneSignalUserId,
+          battery_level: batteryLevel,
+          notification_permission_status: registration.permissionStatus,
+        });
+      } catch {
+        // Registration retries the next time the authenticated mobile screen opens.
+      }
+    }
+
+    registerNotifications();
+  }, []);
+
   const assignments = useMemo(() => overview?.assignments || [], [overview?.assignments]);
   const activeAssignment = useMemo(
     () =>
@@ -96,9 +134,6 @@ export default function RescuerHomeScreen() {
         return;
       }
 
-<<<<<<< HEAD
-      await updateAssignmentStatus(assignmentId, status, payload);
-=======
       if (status === 'en_route') {
         await updateAssignmentStatus(assignmentId, 'en_route', payload);
         await updateAssignmentStatus(assignmentId, 'on_scene', payload);
@@ -106,7 +141,6 @@ export default function RescuerHomeScreen() {
         await updateAssignmentStatus(assignmentId, status, payload);
       }
 
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
       await loadOverview(true);
 
       if (['accepted', 'en_route'].includes(status)) {
@@ -282,6 +316,16 @@ export default function RescuerHomeScreen() {
       </View>
     </SafeAreaView>
   );
+}
+
+async function currentBatteryLevel() {
+  try {
+    const level = await Battery.getBatteryLevelAsync();
+
+    return level >= 0 ? Math.round(level * 100) : null;
+  } catch {
+    return null;
+  }
 }
 
 function errorMessage(error: any) {

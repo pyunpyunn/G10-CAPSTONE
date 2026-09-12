@@ -1,4 +1,4 @@
-import { FileCheck2, Settings2, UserPlus } from 'lucide-react'
+import { Settings2, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
   createRescueTeam,
@@ -21,17 +21,13 @@ import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   buildRescuerPayload,
+  commandCenterAccountForm,
   emptyRescuerForm,
-  exportRosterRows,
   accountIdForTeam,
   firstTeam,
   formFromRescuer,
   rescuerErrorMessage,
 } from '../utils/rescuerHelpers'
-import {
-  downloadExcelWorkbook,
-  downloadPdfReport,
-} from '../utils/exportFileHelpers'
 
 export default function RescuerAccountsPage() {
   const [payload, setPayload] = useState(null)
@@ -114,6 +110,14 @@ export default function RescuerAccountsPage() {
     setModalMode('create')
     setSelectedRescuerId(null)
     setForm(emptyRescuerForm(accountIdForTeam(accountIdOptions, defaultTeam?.team_name, payload?.next_account_id || ''), defaultTeam))
+    setFormError('')
+    setIsModalOpen(true)
+  }
+
+  function openCommandCenterModal() {
+    setModalMode('create')
+    setSelectedRescuerId(null)
+    setForm(commandCenterAccountForm(accountIdOptions, 'BDRRM-HQCC-001', teamOptions))
     setFormError('')
     setIsModalOpen(true)
   }
@@ -263,34 +267,19 @@ export default function RescuerAccountsPage() {
     }
   }
 
-  function exportRoster(type) {
-    const rows = exportRosterRows(rescuers)
-
-    if (type === 'pdf') {
-      downloadPdfReport('resqperation-rescuer-roster.pdf', 'ResQperation Rescuer Roster', rows)
-      return
-    }
-
-    downloadExcelWorkbook('resqperation-rescuer-roster.xls', 'ResQperation Rescuer Roster', rows)
-  }
-
   return (
     <section className="page active rescuer-page">
       <PageHeader
         title="Rescuer Accounts"
         actions={
           <>
-          <button className="btn btn-secondary btn-sm" type="button" onClick={() => exportRoster('excel')}>
-            <FileCheck2 size={14} />
-            Export Excel
-          </button>
-          <button className="btn btn-secondary btn-sm" type="button" onClick={() => exportRoster('pdf')}>
-            <FileCheck2 size={14} />
-            Export PDF
-          </button>
           <button className="btn btn-primary btn-sm" type="button" onClick={openTeamConfig}>
             <Settings2 size={14} />
             Configure rescue teams
+          </button>
+          <button className="btn btn-primary btn-sm" type="button" onClick={openCommandCenterModal}>
+            <UserPlus size={14} />
+            Add HQ command center
           </button>
           <button className="btn btn-primary btn-sm" type="button" onClick={openCreateModal}>
             <UserPlus size={14} />

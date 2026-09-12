@@ -29,7 +29,9 @@ export default function LoginModal({ error, onClose, onLogin }) {
     <div className="login-modal open" aria-hidden="false">
       <section className="login-card" aria-labelledby="loginTitle" role="dialog" aria-modal="true">
         <div className="login-top">
-          <span className="brand-mark">R</span>
+          <span className="brand-mark">
+            <img className="brand-logo-image" src="/favicon.svg" alt="" aria-hidden="true" />
+          </span>
           <button
             className="modal-close"
             type="button"

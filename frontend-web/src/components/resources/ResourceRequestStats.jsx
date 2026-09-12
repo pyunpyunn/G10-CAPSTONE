@@ -1,38 +1,38 @@
 export default function ResourceRequestStats({ summary = {} }) {
-  const cards = [
+  const totalRequests = Array.isArray(summary.rows)
+    ? summary.rows.reduce((total, row) => total + Number(row.count || 0), 0)
+    : Number(summary.total || 0)
+
+  const stats = [
     {
       label: 'Needs validation',
-      value: summary.needs_validation || 0,
-      note: 'from shared DB + teams',
-      color: '#4a2e08',
+      value: summary.needs_validation ?? 0,
+      note: 'awaiting HQ review',
     },
     {
       label: 'Verified',
-      value: summary.verified || 0,
-      note: 'ready for handoff',
-      color: '#0f3520',
+      value: summary.verified ?? 0,
+      note: 'approved requests',
     },
     {
       label: 'Forwarded today',
-      value: summary.forwarded_today || 0,
-      note: 'TrackingAid handoff',
-      color: '#0e2548',
+      value: summary.forwarded_today ?? 0,
+      note: 'sent to TrackingAid',
     },
     {
-      label: 'Returned',
-      value: summary.returned || 0,
-      note: 'missing info or duplicate',
-      color: '#5a1010',
+      label: 'Total requests',
+      value: totalRequests,
+      note: 'shared request records',
     },
   ]
 
   return (
     <div className="rr-stat-row">
-      {cards.map((card) => (
-        <div className="rr-stat" key={card.label}>
-          <div className="k">{card.label}</div>
-          <div className="v" style={{ color: card.color }}>{card.value}</div>
-          <div className="n">{card.note}</div>
+      {stats.map((stat) => (
+        <div className="rr-stat" key={stat.label}>
+          <div className="k">{stat.label}</div>
+          <div className="v">{stat.value}</div>
+          <div className="n">{stat.note}</div>
         </div>
       ))}
     </div>

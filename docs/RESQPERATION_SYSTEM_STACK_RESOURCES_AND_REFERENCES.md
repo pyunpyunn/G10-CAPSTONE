@@ -712,35 +712,37 @@ Official docs:
 
 - https://openrouteservice.org/dev/#/api-docs
 
-### Expo Push Notifications
+### OneSignal Push Notifications
 
 Status:
 
 ```text
-Planned / packages installed, full push workflow deferred.
+Configured for mobile token registration and Laravel OneSignal REST delivery.
 ```
 
 Purpose:
 
-- Future disaster broadcast push notifications to household and rescuer devices.
+- Disaster broadcast push notifications to household and rescuer devices.
+- Rescue dispatch push notifications to assigned rescuer devices.
 
 Current state:
 
-- `expo-notifications` is installed in `frontend-mobile`.
+- `react-native-onesignal` and `onesignal-expo-plugin` are installed in `frontend-mobile`.
+- Mobile registration stores OneSignal Player IDs in `device_tokens.player_id`.
 - Database already has notification-related tables.
-- Current version stores notification/broadcast records and displays web notification feed.
-- Push sending/receiving is not final yet.
+- Current version stores notification/broadcast records, displays the web notification feed, and submits mobile pushes through `OneSignalNotificationService`.
+- Laravel reads `ONESIGNAL_APP_ID` and `ONESIGNAL_API_KEY` from `backend-laravel/.env`.
 
 Official docs:
 
-- https://docs.expo.dev/versions/latest/sdk/notifications/
+- https://documentation.onesignal.com/docs/en/react-native-expo-sdk-setup
 
 ### SafeTrack
 
 Status:
 
 ```text
-Conceptual/shared-DB integration.
+Implemented intake path.
 ```
 
 Purpose:
@@ -759,7 +761,7 @@ Current implementation:
 Status:
 
 ```text
-Conceptual/shared-DB integration.
+Implemented request intake.
 ```
 
 Purpose:
@@ -769,15 +771,15 @@ Purpose:
 Current implementation:
 
 - Resource request source options include `evatrack`.
-- Web page has "Sync EvaTrack", which reloads latest shared DB requests.
-- No separate external API connector exists yet because systems are using one shared DB.
+- External systems can post to `POST /api/v1/external/resource-requests` using the shared integration key.
+- Incoming external requests are saved to the RESQPERATION validation queue and are not forwarded automatically.
 
 ### TrackingAid
 
 Status:
 
 ```text
-Conceptual/shared-DB handoff and mirror.
+Implemented second-DB handoff and inventory mirror.
 ```
 
 Purpose:
@@ -787,9 +789,9 @@ Purpose:
 Current implementation:
 
 - RESQPERATION validates requests only.
-- Forward action marks a request ready for TrackingAid handoff.
-- Tracking reference is stored.
-- TrackingAid mirror panel displays request availability/queue summary.
+- Forward action writes a row to TrackingAid `resqperation_forwarded_requests`.
+- Tracking reference and forwarded-by metadata are stored.
+- TrackingAid mirror reads their `inventory` table when available. If TrackingAid inventory is empty, RESQPERATION shows a real empty state instead of fake resources.
 
 Important scope rule:
 
@@ -1143,7 +1145,7 @@ Recommended future controls before real deployment:
 | Notifications and profile | Implemented v1 |
 | Household mobile | Login and placeholder only |
 | Rescuer mobile | Login and placeholder only |
-| Push notifications | Planned |
+| Push notifications | Implemented through OneSignal device registration and Laravel REST delivery |
 | PDF exports | Planned |
 | Final QA | Pending |
 
@@ -1215,7 +1217,7 @@ The strongest technical justifications are:
 - PDF export implementation or clear "planned" explanation.
 - Mobile household status submission.
 - Mobile rescuer dispatch update workflow.
-- Push notification workflow.
+- Real-device OneSignal QA for Android and iOS push delivery.
 - Barangay Profile settings UI.
 - Production deployment plan.
 - Privacy notice and consent text for location/device data.

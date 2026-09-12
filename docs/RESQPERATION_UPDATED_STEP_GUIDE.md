@@ -112,7 +112,7 @@ DB_HOST=10.150.111.114
 DB_PORT=3306
 DB_DATABASE=klint
 DB_USERNAME=groupmate
-DB_PASSWORD=password123
+DB_PASSWORD=<shared-db-password>
 ```
 
 ### Web
@@ -138,7 +138,8 @@ npx create-expo-app@latest frontend-mobile
 cd frontend-mobile
 npm install axios
 npm install @react-navigation/native @react-navigation/native-stack
-npx expo install expo-secure-store expo-location expo-notifications react-native-screens react-native-safe-area-context
+npx expo install expo-secure-store expo-location react-native-screens react-native-safe-area-context
+npm install react-native-onesignal onesignal-expo-plugin
 npx expo start
 ```
 
@@ -449,7 +450,7 @@ Version 1:
 
 Version 2:
 
-- Add mobile push notifications.
+- Send mobile push notifications through OneSignal.
 
 Checklist:
 
@@ -729,4 +730,3 @@ If asked why the real system has fewer lines than the prototype:
 ```text
 The prototype repeated UI blocks manually. The actual system uses reusable React components and arrays to render repeated cards, filters, tabs, table rows, and actions. This keeps the code shorter while preserving the same requirements and UI/UX.
 ```
-

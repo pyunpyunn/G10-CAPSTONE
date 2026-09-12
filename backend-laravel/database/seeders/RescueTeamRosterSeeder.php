@@ -207,7 +207,6 @@ class RescueTeamRosterSeeder extends Seeder
         $accountId = sprintf('BDRRM-%s-%03d', $teamCode, $sequence);
         $fullName = trim($firstName.' '.$middleInitial.' '.$lastName);
         $displayUsername = $this->uniqueDisplayUsername($firstName, $lastName, $accountId);
-        $passwordHash = Hash::make(self::DEFAULT_PASSWORD);
 
         $existing = DB::table('responders')
             ->where('username', $accountId)
@@ -215,26 +214,31 @@ class RescueTeamRosterSeeder extends Seeder
             ->first();
 
         $userId = $existing?->user_id ?: 'USR-RESCUER-'.$accountId;
+        $existingUser = DB::table('users')->where('user_id', $userId)->first();
+        $userData = [
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'name' => $fullName,
+            'username' => $displayUsername,
+            'email' => strtolower(str_replace(' ', '.', $firstName.'.'.$lastName)).'@resqperation.local',
+            'role_id' => $rescuerRoleId,
+            'contact_number' => $mobile,
+            'is_active' => 1,
+            'deleted_at' => null,
+            'updated_at' => now(),
+        ];
 
-        DB::table('users')->updateOrInsert(
-            ['user_id' => $userId],
-            [
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'name' => $fullName,
-                'username' => $displayUsername,
-                'email' => strtolower(str_replace(' ', '.', $firstName.'.'.$lastName)).'@resqperation.local',
-                'password' => $passwordHash,
-                'role_id' => $rescuerRoleId,
-                'contact_number' => $mobile,
-                'is_active' => 1,
+        if ($existingUser) {
+            DB::table('users')->where('user_id', $userId)->update($userData);
+        } else {
+            DB::table('users')->insert(array_merge($userData, [
+                'user_id' => $userId,
+                'password' => Hash::make(self::DEFAULT_PASSWORD),
                 'must_change_password' => 1,
                 'temp_password' => self::DEFAULT_PASSWORD,
-                'deleted_at' => null,
-                'updated_at' => now(),
-                'created_at' => $existing ? ($this->userCreatedAt($userId) ?? now()) : now(),
-            ]
-        );
+                'created_at' => now(),
+            ]));
+        }
 
         $responderData = [
             'user_id' => $userId,
@@ -242,7 +246,6 @@ class RescueTeamRosterSeeder extends Seeder
             'created_by_admin_id' => 'USR-HQ-2024035500',
             'team_id' => $teamId,
             'username' => $accountId,
-            'password_hash' => $passwordHash,
             'full_name' => $fullName,
             'title' => 'Responder',
             'contact_number' => $mobile,
@@ -275,6 +278,7 @@ class RescueTeamRosterSeeder extends Seeder
 
         DB::table('responders')->insert(array_merge($responderData, [
             'responder_id' => $responderId,
+            'password_hash' => Hash::make(self::DEFAULT_PASSWORD),
             'created_at' => now(),
         ]));
 
@@ -310,11 +314,6 @@ class RescueTeamRosterSeeder extends Seeder
         $currentMax = (int) DB::table($table)->max($column);
 
         return max($currentMax + 1, 1);
-    }
-
-    private function userCreatedAt(string $userId): mixed
-    {
-        return DB::table('users')->where('user_id', $userId)->value('created_at');
     }
 
     private function birthDateFor(int $sequence): string

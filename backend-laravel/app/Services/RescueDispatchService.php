@@ -11,16 +11,7 @@ use Illuminate\Validation\ValidationException;
 
 class RescueDispatchService
 {
-    private const TEAM_CATALOG = [
-        ['team_name' => 'Search & Rescue', 'team_type' => 'SAR', 'team_code' => 'SAR'],
-        ['team_name' => 'Evacuation', 'team_type' => 'Evacuation', 'team_code' => 'EVC'],
-        ['team_name' => 'Medical / First Aid', 'team_type' => 'Medical', 'team_code' => 'MED'],
-        ['team_name' => 'Relief & Transport', 'team_type' => 'Relief / Transport', 'team_code' => 'LOG'],
-        ['team_name' => 'Communication', 'team_type' => 'Communication', 'team_code' => 'COM'],
-        ['team_name' => 'Fire Brigade', 'team_type' => 'Fire Brigade', 'team_code' => 'FIR'],
-        ['team_name' => 'DANA', 'team_type' => 'Damage Assessment', 'team_code' => 'DANA'],
-        ['team_name' => 'Security', 'team_type' => 'Security', 'team_code' => 'SEC'],
-    ];
+    public function __construct(private OneSignalNotificationService $oneSignal) {}
 
     public function teams(): JsonResponse
     {
@@ -154,7 +145,6 @@ class RescueDispatchService
                 ]);
             }
         }
-
         $responderId = $this->resolveResponderId($validated, $activeEvent->event_id);
 
         if (! $responderId) {
@@ -207,9 +197,24 @@ class RescueDispatchService
             return $assignmentId;
         });
 
+        $dispatch = $this->getDispatchById($assignmentId);
+        $pushResult = $this->oneSignal->sendToResponderIds(
+            $selectedResponderIds,
+            'New rescue dispatch',
+            'Assignment '.$dispatch['assignment_code'].' for '.$dispatch['assigned_area'].'.',
+            [
+                'type' => 'rescue_dispatch',
+                'assignment_id' => (string) $assignmentId,
+                'assignment_code' => $dispatch['assignment_code'],
+                'event_id' => $activeEvent->event_id,
+            ]
+        );
+
         return response()->json([
             'message' => 'Dispatch assignment created.',
-            'data' => $this->getDispatchById($assignmentId),
+            'data' => array_merge($dispatch, [
+                'push_delivery' => $pushResult,
+            ]),
         ], 201);
     }
 
@@ -517,19 +522,7 @@ class RescueDispatchService
                 'leader.full_name as leader_name',
             ]);
 
-        $catalogTeams = collect(self::TEAM_CATALOG)
-            ->reject(fn (array $item): bool => $teams->contains('team_name', $item['team_name']))
-            ->map(fn (array $item): object => (object) [
-                'team_id' => null,
-                'team_code' => $item['team_code'],
-                'team_name' => $item['team_name'],
-                'team_type' => $item['team_type'],
-                'duty_status' => 'standby',
-                'leader_name' => null,
-            ]);
-
         $cards = $teams
-            ->merge($catalogTeams)
             ->map(fn (object $team): array => $this->formatTeamCard($team, $eventId))
             ->values();
 
@@ -616,6 +609,7 @@ class RescueDispatchService
             ->count();
 
         $outcomes = $this->decodeJson($activeAssignment?->outcome_notes);
+        $route = $this->decodeJson($activeAssignment?->route_notes);
         $status = $this->formatStatus($eventId ? ($activeAssignment?->status ?: $team->duty_status) : 'standby');
         $availableResponderId = $this->availableResponderQuery($eventId)
             ->where('r.team_id', $team->team_id)
@@ -752,6 +746,14 @@ class RescueDispatchService
                 'a.street_address',
                 'a.house_number',
                 DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(b.barangay_name, ''), 'Unassigned') as area_name"),
+                DB::raw("(
+                    SELECT gl.location_label
+                    FROM geotagged_locations gl
+                    WHERE gl.household_id = h.household_id
+                    AND gl.location_label IS NOT NULL
+                    ORDER BY COALESCE(gl.updated_at, gl.created_at) DESC
+                    LIMIT 1
+                ) as geotag_label"),
                 'hs.status_key',
                 'hs.status_label',
                 'hd.needs_dispatch',
@@ -919,16 +921,16 @@ class RescueDispatchService
 
     private function completionStatusKey(array $validated): string
     {
+        if ((int) ($validated['unsafe_count'] ?? 0) > 0 || (int) ($validated['injured_count'] ?? 0) > 0 || (int) ($validated['missing_count'] ?? 0) > 0) {
+            return 'unsafe';
+        }
+
         if ((int) ($validated['evacuated_count'] ?? 0) > 0) {
             return 'evacuated';
         }
 
         if ((int) ($validated['safe_count'] ?? 0) > 0) {
             return 'safe';
-        }
-
-        if ((int) ($validated['unsafe_count'] ?? 0) > 0 || (int) ($validated['injured_count'] ?? 0) > 0 || (int) ($validated['missing_count'] ?? 0) > 0) {
-            return 'unsafe';
         }
 
         return 'safe';
@@ -1150,6 +1152,7 @@ class RescueDispatchService
             ->values()
             ->all();
     }
+    }
     private function activeAssignmentStatuses(): array
     {
         return ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'];
@@ -1286,7 +1289,7 @@ class RescueDispatchService
             'household_id' => $item->household_id,
             'household_code' => $item->household_code,
             'household_name' => $item->household_name ?: $item->household_code ?: $item->household_id,
-            'address' => $item->full_address ?: trim(($item->house_number ? $item->house_number.' ' : '').($item->street_address ?: '')),
+            'address' => $item->geotag_label ?: ($item->full_address ?: trim(($item->house_number ? $item->house_number.' ' : '').($item->street_address ?: ''))),
             'status_key' => $statusKey,
             'status_label' => $item->status_label ?: 'Unchecked',
             'priority_level' => $item->priority_level ?: 'watch',

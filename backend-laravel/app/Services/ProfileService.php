@@ -105,6 +105,7 @@ class ProfileService
             ->where('user_id', $user->user_id)
             ->update([
                 'password' => Hash::make($validated['password']),
+                'password_changed_at' => now(),
                 'must_change_password' => 0,
                 'updated_at' => now(),
             ]);

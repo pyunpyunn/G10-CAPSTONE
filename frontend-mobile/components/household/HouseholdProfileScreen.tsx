@@ -175,7 +175,6 @@ export function HouseholdProfileScreen({
           action={<HouseholdBadge label={connectionValue} tone={connectionValue === 'Offline' ? 'warning' : 'active'} />}
         />
 
-<<<<<<< HEAD
         <View style={styles.devicePanel}>
           <View style={styles.deviceIcon}>
             <Ionicons name="phone-portrait-outline" size={24} color={palette.navActive} />
@@ -194,10 +193,6 @@ export function HouseholdProfileScreen({
         </View>
 
         <Text style={styles.selectorLabel}>Assign this device</Text>
-=======
-        <Text style={styles.selectorLabel}>Assign this device to one member</Text>
-        <Text style={styles.helperText}>Only one member should use this device profile so battery and location logs stay accurate.</Text>
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
         {members.length === 0 ? (
           <HouseholdEmpty icon="people-outline" title="No family members found" />
         ) : (
@@ -238,42 +233,12 @@ export function HouseholdProfileScreen({
         />
         {selectedMember ? (
           <>
-<<<<<<< HEAD
             <View style={styles.memberProfileHeader}>
               <MemberInitialAvatar name={selectedMember.name} selected size="large" />
               <View style={styles.panelText}>
                 <Text style={styles.panelLabel}>Editing</Text>
                 <Text style={styles.panelTitle}>{selectedMember.name || 'Household member'}</Text>
                 <Text style={styles.panelMeta}>{selectedMember.relationship || 'Member'}</Text>
-=======
-            <View style={styles.statusPanel}>
-              <InfoRow label="Device check" value={deviceCheckLabel(selectedMember)} />
-              <InfoRow label="Last location" value={selectedMember.device?.last_location_label || 'No device location'} />
-              <InfoRow label="Last seen" value={selectedMember.device?.last_seen_label || 'Not recorded'} />
-              {selectedMember.special_needs ? <InfoRow label="Priority info" value={selectedMember.special_needs} /> : null}
-            </View>
-
-            <View style={styles.twoColumn}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.formLabel}>First name</Text>
-                <TextInput
-                  style={styles.input}
-                  value={memberForm.first_name}
-                  onChangeText={(value) => setMemberForm((current) => ({ ...current, first_name: value }))}
-                  placeholder="First name"
-                  placeholderTextColor="#7d8da0"
-                />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.formLabel}>MI.</Text>
-                <TextInput
-                  style={styles.input}
-                  value={memberForm.middle_name}
-                  onChangeText={(value) => setMemberForm((current) => ({ ...current, middle_name: value }))}
-                  placeholder="MI."
-                  placeholderTextColor="#7d8da0"
-                />
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
               </View>
             </View>
 

@@ -3,11 +3,13 @@ import { displayText } from '../../utils/resourceRequestHelpers'
 import ActionMenu from '../ui/ActionMenu'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
+import LoadingState from '../ui/LoadingState'
 import PaginationBar from '../ui/PaginationBar'
 
 export default function ResourceRequestQueueTable({
   requests = [],
   pagination = {},
+  loading = false,
   onView,
   onValidate,
   onForward,
@@ -25,7 +27,9 @@ export default function ResourceRequestQueueTable({
         <span className="rr-subtle">{total ? `Showing ${from}-${to} of ${total}` : 'No records yet'}</span>
       </div>
       <div className="rr-table-wrap">
-        {requests.length === 0 ? (
+        {loading ? (
+          <LoadingState />
+        ) : requests.length === 0 ? (
           <EmptyState
             title="No resource requests found"
             message="Requests from EvaTrack, field teams, evacuation sites, and HQ desk will appear here after they are saved in the shared DB."
@@ -37,8 +41,10 @@ export default function ResourceRequestQueueTable({
                 <th>Request</th>
                 <th>Source</th>
                 <th>Need</th>
+                <th>Quantity</th>
                 <th>Area / beneficiaries</th>
                 <th>Validation</th>
+                <th>Resource status</th>
                 <th>TrackingAid handoff</th>
                 <th />
               </tr>
@@ -54,12 +60,16 @@ export default function ResourceRequestQueueTable({
                       <div className="rr-meta">{displayText(request.source_reference, 'No event/reference')} - {displayText(request.created_time)}</div>
                     </td>
                     <td>
-                      <span className="rr-system-pill in">{request.request_source.label}</span>
+                      <span className="rr-system-pill in">{request.source_system?.label || request.request_source.label}</span>
                       <div className="rr-meta">{request.request_category.label}</div>
                     </td>
                     <td>
                       <strong>{request.need.type}</strong>
-                      <div className="rr-meta">{request.need.quantity_text} - {request.urgency.label}</div>
+                      <div className="rr-meta">{request.request_source.label}</div>
+                    </td>
+                    <td>
+                      <strong>{request.need.quantity_text}</strong>
+                      <div className="rr-meta">{request.urgency.label}</div>
                     </td>
                     <td>
                       {request.area.label}
@@ -68,6 +78,10 @@ export default function ResourceRequestQueueTable({
                     <td>
                       <Badge tone={request.validation.tone}>{request.validation.label}</Badge>
                       <div className="rr-meta">{request.validation_notes || 'HQ check pending'}</div>
+                    </td>
+                    <td>
+                      <Badge tone={statusTone(request.status?.key)}>{request.status?.label || 'Pending'}</Badge>
+                      <div className="rr-meta">{request.status?.key || 'pending'}</div>
                     </td>
                     <td>
                       <span className={`rr-system-pill ${request.handoff.tone === 'green' ? 'out' : ''}`}>{request.handoff.label}</span>
@@ -97,7 +111,7 @@ function requestActions(request, onView, onValidate, onForward, onReturn) {
   const status = request.validation?.key || 'needs_validation'
   const actions = [{ label: 'View', onClick: () => onView(request) }]
 
-  if (status === 'needs_validation') {
+  if (status === 'needs_validation' || status === 'returned') {
     actions.push({ label: 'Validate', onClick: () => onValidate(request) })
     actions.push({ label: 'Return', onClick: () => onReturn(request) })
   }
@@ -107,4 +121,14 @@ function requestActions(request, onView, onValidate, onForward, onReturn) {
   }
 
   return actions
+}
+
+function statusTone(status) {
+  return {
+    pending: 'amber',
+    acknowledged: 'blue',
+    approved: 'green',
+    rejected: 'red',
+    delivered: 'green',
+  }[status] || 'gray'
 }

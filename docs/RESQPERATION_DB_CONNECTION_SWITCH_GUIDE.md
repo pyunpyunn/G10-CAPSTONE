@@ -1,34 +1,23 @@
-# RESQPERATION DB Connection Switch Guide
+# RESQPERATION Shared DB Connection Guide
 
-Use this guide when the shared MySQL database laptop is offline, then switch back when it is available again.
+Use this guide when connecting RESQPERATION to the shared MySQL database.
 
-## Current Mode: Shared MySQL
+## Main Rule
 
-The backend is currently connected to the shared MySQL database because the DB member's laptop/server is reachable again.
+Only `backend-laravel/.env` should change when connecting to the shared database.
 
-Current backend settings in `backend-laravel/.env`:
+Do not edit PHP files, React files, controllers, services, or frontend API files just to change databases.
 
-```env
-DB_CONNECTION=mysql
-DB_HOST=192.168.112.68
-DB_PORT=3306
-DB_DATABASE=klint
-SESSION_DRIVER=file
-QUEUE_CONNECTION=sync
-CACHE_STORE=file
+The web app must show only records from the database currently selected in `.env`.
+Do not use old local records, prototype rows, or generated seed data as visible fallback data.
+
+Related rule document:
+
+```text
+docs/RESQPERATION_SHARED_DB_DATA_SOURCE_RULES.md
 ```
 
-The shared MySQL password stays only in `backend-laravel/.env`. Do not commit or paste the full `.env` file.
-
-Why `SESSION_DRIVER=file`, `QUEUE_CONNECTION=sync`, and `CACHE_STORE=file` stay like this:
-
-- The app can use shared MySQL for system data.
-- Laravel sessions/cache/queue do not depend on database support tables during development.
-- If the shared DB becomes unreachable again, the app is less likely to timeout on session/cache operations.
-
-## Run The System In Current Shared DB Mode
-
-Backend:
+After editing `.env`, always clear Laravel config and restart the backend:
 
 ```bash
 cd backend-laravel
@@ -37,52 +26,36 @@ php artisan cache:clear
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-Frontend:
+## Required Shared DB Settings
 
-```bash
-cd frontend-web
-npm run dev -- --host 0.0.0.0 --port 5175
-```
-
-Open:
-
-```text
-http://127.0.0.1:5175/login
-```
-
-Temporary login:
-
-```text
-Account ID: 2024035500
-Password: password
-```
-
-## If The Backend Still Shows A DB Timeout
-
-Do this after editing `.env`:
-
-```bash
-cd backend-laravel
-php artisan config:clear
-php artisan cache:clear
-```
-
-Then stop and restart `php artisan serve`.
-
-If the error still shows `mysql:host=192...`, Laravel is still using an old cached config or a server process that was started before the `.env` change.
-
-## How To Temporarily Disconnect From The Shared DB
-
-Only use this when the shared MySQL laptop/server is offline.
-
-1. Open `backend-laravel/.env`.
-2. Change:
+Keep these development-safe settings:
 
 ```env
-DB_CONNECTION=sqlite
+SESSION_DRIVER=file
+QUEUE_CONNECTION=sync
+CACHE_STORE=file
 ```
 
-3. Keep these local-safe settings:
+This prevents Laravel sessions, queue jobs, and cache from depending on database support tables during development.
+
+## Connecting To The Shared DB
+
+When the DB member's laptop/server is online:
+
+1. Open `backend-laravel/.env`.
+2. Replace only the DB section:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=shared-db-ip-address
+DB_PORT=3306
+DB_DATABASE=shared-db-name
+DB_USERNAME=shared-db-username
+DB_PASSWORD=shared-db-password
+DB_CONNECTION_TIMEOUT=5
+```
+
+3. Keep:
 
 ```env
 SESSION_DRIVER=file
@@ -99,68 +72,119 @@ php artisan cache:clear
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-Offline SQLite is only for temporary UI/API testing. Some modules can fail if the SQLite file does not have the same tables as the shared MySQL database.
+5. Open:
 
-## How To Reconnect To The Shared DB
-
-Only do this when the DB member's laptop/server is online and reachable on the same network.
-
-1. Open `backend-laravel/.env`.
-2. Change the DB section back to MySQL:
-
-```env
-DB_CONNECTION=mysql
-DB_HOST=192.168.112.68
-DB_PORT=3306
-DB_DATABASE=klint
-DB_USERNAME=groupmate
-DB_PASSWORD=check backend-laravel/.env
+```text
+http://127.0.0.1:5175/login
 ```
 
-3. If the shared database has Laravel support tables, switch these back:
+6. Log in again after changing the database connection.
 
-```env
-SESSION_DRIVER=database
-QUEUE_CONNECTION=database
-CACHE_STORE=database
+Laravel Sanctum tokens are stored in the selected database. If `.env` changes, the old browser/mobile token may no longer match the active database.
+
+If the browser keeps using an old token, open DevTools Console and run:
+
+```js
+localStorage.removeItem('resqperation_web_token')
 ```
 
-For safer local testing, you may keep:
+Then refresh the page and log in again.
 
-```env
-SESSION_DRIVER=file
-QUEUE_CONNECTION=sync
-CACHE_STORE=file
-```
+## Important Schema Requirement
 
-4. Clear config:
+Changing `.env` only changes which database Laravel connects to.
 
-```bash
-cd backend-laravel
-php artisan config:clear
-```
+For all pages to load, the target database must also contain the RESQPERATION app-compatible tables used by the backend, such as:
 
-5. Restart the Laravel backend server.
+- `users`
+- `roles`
+- `disaster_events`
+- `disaster_broadcasts`
+- `weather_logs`
+- `households`
+- `household_members`
+- `household_status_logs`
+- `rescue_teams`
+- `responders`
+- `responder_assignments`
+- `resource_requests`
+- `situation_reports`
+- `incident_archives`
+- `notifications`
 
-## Check If The Shared DB Is Reachable
+If the target DB only has imported raw tables like `disasterevent`, `household`, `responder`, or `rescueteam`, document the missing table or column first and coordinate with the DB member before applying any additive SQL.
 
-Run this in PowerShell:
+## Check If The DB Server Is Reachable
+
+PowerShell:
 
 ```powershell
-Test-NetConnection 192.168.112.68 -Port 3306
+Test-NetConnection shared-db-ip-address -Port 3306
 ```
 
-Expected result before reconnecting:
+Expected:
 
 ```text
 TcpTestSucceeded : True
 ```
 
-If it is `False`, do not reconnect yet. Laravel will timeout again.
+If it is `False`, the issue is network/server access, not Laravel code.
 
-## Important Notes
+Also check that both laptops are on the same reachable network.
+
+```powershell
+ipconfig
+ping shared-db-ip-address
+```
+
+Example diagnosis:
+
+- Your laptop Wi-Fi IPv4: `192.168.1.44`
+- Entered DB host: `192.168.112.68`
+- Result: unreachable unless there is a router/VPN route between `192.168.1.x` and `192.168.112.x`
+
+In that case, ask the DB member to run `ipconfig` again and give the current Wi-Fi IPv4 address. If your laptop is `192.168.1.x`, the DB host will usually also be `192.168.1.x`.
+
+The shared DB computer must also allow MySQL remote connections:
+
+- MySQL service is running.
+- MySQL is listening on port `3306`.
+- Windows Firewall allows inbound TCP `3306`.
+- The MySQL user is allowed to connect from another laptop, not only `localhost`.
+
+## Check If Laravel Can Connect
+
+After updating `.env`:
+
+```bash
+cd backend-laravel
+php artisan tinker --execute="DB::connection()->getPdo(); echo DB::connection()->getDatabaseName();"
+```
+
+Expected output should be the database name you placed in `.env`.
+
+## Check If Main Pages Can Load
+
+Use the web app after starting both servers:
+
+```bash
+cd frontend-web
+npm run dev -- --host 0.0.0.0 --port 5175
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5175/login
+```
+
+If login works but pages show "cannot be loaded", the DB connection is working but the target DB is missing app-compatible tables or columns.
+
+## Do Not Do These
 
 - Do not commit `.env`.
-- Do not run `migrate:fresh` on the shared MySQL database.
-- The offline SQLite database is only for local UI testing.
-- Real shared data will only appear after reconnecting to the shared MySQL database.
+- Do not run `php artisan migrate:fresh` on the shared DB.
+- Do not delete DB member tables.
+- Do not change backend/frontend code just to switch DB connection.
+- Do not paste the shared DB password in public documentation.
+- Do not run broad seeders on the shared DB. Use explicit seeder classes only after checking the active database name.

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ResourceRequest;
 use App\Services\BarangayProfileService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -245,13 +246,13 @@ class SituationReportService
         $counts = DB::table('household_disasters as hd')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
             ->where('hd.disaster_id', $eventId)
-            ->select('hs.status_key', DB::raw('COUNT(*) as total'))
+            ->select('hs.status_key', DB::raw('COUNT(DISTINCT hd.household_id) as total'))
             ->groupBy('hs.status_key')
             ->pluck('total', 'status_key');
 
         $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
-        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured']);
+        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
         $reported = DB::table('household_disasters')
             ->where('disaster_id', $eventId)
             ->whereNotNull('current_status_id')
@@ -302,7 +303,7 @@ class SituationReportService
             $total = $items->count();
             $safe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['active', 'returned', 'safe'], true))->count();
             $evacuated = $items->filter(fn (object $item): bool => in_array($item->status_key, ['evacuated', 'relocated'], true))->count();
-            $unsafe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'], true))->count();
+            $unsafe = $items->filter(fn (object $item): bool => in_array($item->status_key, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'], true))->count();
             $reported = $items->whereNotNull('status_key')->count();
 
             return [
@@ -484,7 +485,7 @@ class SituationReportService
 
     private function resourceSummary(string $eventId): array
     {
-        $requests = DB::table('resource_requests')
+        $requests = ResourceRequest::query()
             ->where(function ($query) use ($eventId): void {
                 $query->where('source_reference', $eventId)
                     ->orWhereNull('source_reference');
