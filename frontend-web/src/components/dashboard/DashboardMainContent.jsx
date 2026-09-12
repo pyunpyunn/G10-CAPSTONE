@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
+import LoadingState from '../ui/LoadingState'
 import Panel from '../ui/Panel'
 import StatCard from '../ui/StatCard'
 import {
@@ -15,22 +16,51 @@ import {
 } from '../../utils/dashboardHelpers'
 
 export default function DashboardMainContent({
-  dashboard,
+  summaryState,
+  dispatchState,
+  activityState,
   stats,
   hasActiveEvent,
   onOpenModule,
 }) {
+  const households = summaryState?.data?.households || {
+    total: 0,
+    reported: 0,
+    reporting_percent: 0,
+    unchecked: 0,
+    safe_total: 0,
+    safe_only: 0,
+    evacuated: 0,
+    unsafe: 0,
+    bars: [],
+  }
+
+  const dispatchData = dispatchState?.data || {
+    counts: [],
+    teams: [],
+  }
+
+  const activities = activityState?.data || []
+
   return (
     <div className="dashboard-main">
-      {hasActiveEvent && (
-        <ActiveEventBanner activeEvent={dashboard.active_event} onOpenBroadcast={() => onOpenModule('/broadcast')} />
-      )}
-
-      {!hasActiveEvent && (
+      {summaryState?.isLoading ? (
         <div className="standby-strip">
-          <strong>Standby mode</strong>
-          <span>Household reporting, dispatch charts, weather snapshots, and activity logs will appear after an active disaster event is declared.</span>
+          <LoadingState inline />
         </div>
+      ) : (
+        <>
+          {hasActiveEvent && (
+            <ActiveEventBanner activeEvent={summaryState?.data?.active_event} onOpenBroadcast={() => onOpenModule('/broadcast')} />
+          )}
+
+          {!hasActiveEvent && (
+            <div className="standby-strip">
+              <strong>Standby mode</strong>
+              <span>Household reporting, dispatch charts, weather snapshots, and activity logs will appear after an active disaster event is declared.</span>
+            </div>
+          )}
+        </>
       )}
 
       <div className="stat-row">
@@ -39,20 +69,22 @@ export default function DashboardMainContent({
         ))}
       </div>
 
-      <ReportingProgress households={dashboard.households} hasActiveEvent={hasActiveEvent} />
+      <ReportingProgress households={households} hasActiveEvent={hasActiveEvent} isLoading={summaryState?.isLoading} />
 
       <Panel title="Operational charts">
         <div className="dashboard-dispatch-graphs">
           <ChartCard
             title="Household status"
-            bars={dashboard.households.bars}
+            bars={households.bars}
+            isLoading={summaryState?.isLoading}
             emptyTitle="No household reports yet"
             emptyMessage="Reports will come from household mobile users or authenticated responder field reports."
             onManage={() => onOpenModule('/households')}
           />
           <ChartCard
             title="Dispatch status - team count"
-            bars={dashboard.dispatch.counts}
+            bars={dispatchData.counts}
+            isLoading={dispatchState?.isLoading}
             emptyTitle="No dispatch yet"
             emptyMessage="Teams will appear after HQ assigns responders to an active event."
             onManage={() => onOpenModule('/dispatch')}
@@ -64,13 +96,13 @@ export default function DashboardMainContent({
         title="Team dispatch overview"
         action={<button className="panel-link" type="button" onClick={() => onOpenModule('/dispatch')}>Full dispatch -&gt;</button>}
       >
-        <TeamDispatchTable teams={dashboard.dispatch.teams} />
+        <TeamDispatchTable teams={dispatchData.teams} isLoading={dispatchState?.isLoading} />
       </Panel>
 
       <div className="sep">
         Recent activity log <span>showing latest event reports only</span>
       </div>
-      <ActivityLog activities={dashboard.recent_activity} onViewAll={() => onOpenModule('/archive')} />
+      <ActivityLog activities={activities} isLoading={activityState?.isLoading} onViewAll={() => onOpenModule('/archive')} />
     </div>
   )
 }
@@ -140,7 +172,7 @@ function ReportingProgress({ households, hasActiveEvent }) {
   )
 }
 
-function ChartCard({ title, bars = [], emptyTitle, emptyMessage, onManage }) {
+function ChartCard({ title, bars = [], isLoading, emptyTitle, emptyMessage, onManage }) {
   const hasValues = bars.some((bar) => Number(bar.value) > 0)
   const axis = makeAxis(bars)
 
@@ -152,7 +184,9 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, onManage }) {
           <Settings size={15} />
         </button>
       </div>
-      {hasValues ? (
+      {isLoading ? (
+        <LoadingState inline />
+      ) : hasValues ? (
         <div className="team-count-chart" role="img" aria-label={title}>
           <div className="chart-y-axis" aria-hidden="true">
             {axis.map((item) => <span key={item}>{item}</span>)}
@@ -174,7 +208,11 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, onManage }) {
   )
 }
 
-function TeamDispatchTable({ teams = [] }) {
+function TeamDispatchTable({ teams = [], isLoading }) {
+  if (isLoading) {
+    return <LoadingState inline />
+  }
+
   if (teams.length === 0) {
     return <EmptyState title="No team assignments yet" message="Dispatch rows will appear after HQ assigns a team to an active event." />
   }
@@ -207,7 +245,15 @@ function TeamDispatchTable({ teams = [] }) {
   )
 }
 
-function ActivityLog({ activities = [], onViewAll }) {
+function ActivityLog({ activities = [], isLoading, onViewAll }) {
+  if (isLoading) {
+    return (
+      <div className="tbl-wrap">
+        <LoadingState inline />
+      </div>
+    )
+  }
+
   if (activities.length === 0) {
     return (
       <div className="tbl-wrap">

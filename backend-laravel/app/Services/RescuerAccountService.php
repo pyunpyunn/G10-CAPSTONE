@@ -510,6 +510,7 @@ class RescuerAccountService
         $databaseTeams = DB::table('rescue_teams as rt')
             ->leftJoin('responders as leader', 'leader.responder_id', '=', 'rt.leader_responder_id')
             ->leftJoin('addresses as a', 'a.address_id', '=', 'rt.assigned_purok_id')
+            ->leftJoin('barangays as b', 'b.barangay_id', '=', 'a.barangay_id')
             ->orderBy('rt.team_name')
             ->get([
                 'rt.team_id',
@@ -521,7 +522,7 @@ class RescuerAccountService
                 'rt.duty_status',
                 'leader.full_name as leader_name',
                 'a.purok_sitio',
-                'a.barangay_name',
+                'b.barangay_name',
             ])
             ->map(fn (object $team): array => $this->formatTeamConfigCard($team, 'database'));
 
@@ -621,16 +622,17 @@ class RescuerAccountService
 
     private function purokAddressOptions(): array
     {
-        return DB::table('addresses')
-            ->whereNull('deleted_at')
-            ->whereNotNull('purok_sitio')
-            ->where('purok_sitio', '<>', '')
-            ->groupBy('purok_sitio')
-            ->orderBy('purok_sitio')
+        return DB::table('addresses as a')
+            ->leftJoin('barangays as b', 'b.barangay_id', '=', 'a.barangay_id')
+            ->whereNull('a.deleted_at')
+            ->whereNotNull('a.purok_sitio')
+            ->where('a.purok_sitio', '<>', '')
+            ->groupBy('a.purok_sitio')
+            ->orderBy('a.purok_sitio')
             ->get([
-                DB::raw('MIN(address_id) as address_id'),
-                'purok_sitio',
-                DB::raw('MAX(barangay_name) as barangay_name'),
+                DB::raw('MIN(a.address_id) as address_id'),
+                'a.purok_sitio',
+                DB::raw('MAX(b.barangay_name) as barangay_name'),
             ])
             ->map(fn (object $row): array => [
                 'address_id' => (int) $row->address_id,

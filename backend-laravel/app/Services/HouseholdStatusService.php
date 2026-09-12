@@ -21,7 +21,7 @@ class HouseholdStatusService
 
         $households = $query
             ->orderByRaw('CASE WHEN hd.needs_dispatch = 1 THEN 0 ELSE 1 END')
-            ->orderByRaw('CASE WHEN hs.status_key IN ("not_evacuated", "displaced", "unsafe", "needs_help", "need_help", "needs_assistance", "missing", "injured") THEN 0 ELSE 1 END')
+            ->orderByRaw("CASE WHEN hs.status_key IN ('not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured') THEN 0 ELSE 1 END")
             ->orderByDesc('hd.last_reported_at')
             ->orderBy('h.household_name')
             ->paginate($perPage);
@@ -274,6 +274,7 @@ class HouseholdStatusService
 
         return DB::table('households as h')
             ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->leftJoin('barangays as b', 'b.barangay_id', '=', 'a.barangay_id')
             ->leftJoin('household_disasters as hd', function ($join) use ($eventId): void {
                 $join->on('hd.household_id', '=', 'h.household_id');
 
@@ -299,8 +300,8 @@ class HouseholdStatusService
                 'h.member_count',
                 'a.full_address',
                 'a.purok_sitio',
-                'a.barangay_name',
-                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(a.barangay_name, ''), 'Unassigned') as purok"),
+                'b.barangay_name',
+                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(b.barangay_name, ''), 'Unassigned') as purok"),
                 'hd.current_status_id',
                 'hd.last_status_source',
                 'hd.last_status_notes',
@@ -673,7 +674,7 @@ class HouseholdStatusService
         return DB::table('household_members')
             ->where('household_id', $householdId)
             ->whereNull('deleted_at')
-            ->orderByRaw('CASE WHEN relation IN ("Head", "head", "Household Head") THEN 0 ELSE 1 END')
+            ->orderByRaw("CASE WHEN relation IN ('Head', 'head', 'Household Head') THEN 0 ELSE 1 END")
             ->orderBy('name')
             ->get()
             ->map(function (object $member) use ($devicesByMember): array {

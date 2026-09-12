@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Archive, RefreshCcw, TriangleAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { closeActiveEvent, getDashboard } from '../api/dashboardApi'
+import {
+  closeActiveEvent,
+  getDashboardActivity,
+  getDashboardDispatch,
+  getDashboardRequests,
+  getDashboardSummary,
+  getDashboardWeather,
+} from '../api/dashboardApi'
 import DashboardCloseEventModal from '../components/dashboard/DashboardCloseEventModal'
 import DashboardMainContent from '../components/dashboard/DashboardMainContent'
 import DashboardOverview from '../components/dashboard/DashboardOverview'
-import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import {
   getCloseEventMessage,
@@ -14,56 +20,81 @@ import {
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const [dashboard, setDashboard] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
+
+  const [summaryState, setSummaryState] = useState({ data: null, isLoading: true, error: '' })
+  const [dispatchState, setDispatchState] = useState({ data: null, isLoading: true, error: '' })
+  const [weatherState, setWeatherState] = useState({ data: null, isLoading: true, error: '' })
+  const [requestsState, setRequestsState] = useState({ data: null, isLoading: true, error: '' })
+  const [activityState, setActivityState] = useState({ data: null, isLoading: true, error: '' })
+
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
   const [isClosingEvent, setIsClosingEvent] = useState(false)
   const [closeError, setCloseError] = useState('')
 
-  useEffect(() => {
-    let ignore = false
-
-    async function loadInitialDashboard() {
-      try {
-        const data = await getDashboard()
-
-        if (!ignore) {
-          setDashboard(data)
-        }
-      } catch {
-        if (!ignore) {
-          setError('Dashboard data cannot be loaded right now. Please check the backend or database connection.')
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadInitialDashboard()
-
-    return () => {
-      ignore = true
+  const fetchSummary = useCallback(async () => {
+    setSummaryState((current) => ({ ...current, isLoading: true, error: '' }))
+    try {
+      const data = await getDashboardSummary()
+      setSummaryState({ data, isLoading: false, error: '' })
+    } catch {
+      setSummaryState({ data: null, isLoading: false, error: 'Summary data cannot be loaded right now.' })
     }
   }, [])
 
-  const stats = useMemo(() => getStats(dashboard), [dashboard])
-  const hasActiveEvent = Boolean(dashboard?.active_event)
-  async function loadDashboard() {
-    setIsLoading(true)
-    setError('')
-
+  const fetchDispatch = useCallback(async () => {
+    setDispatchState((current) => ({ ...current, isLoading: true, error: '' }))
     try {
-      const data = await getDashboard()
-      setDashboard(data)
+      const data = await getDashboardDispatch()
+      setDispatchState({ data, isLoading: false, error: '' })
     } catch {
-      setError('Dashboard data cannot be loaded right now. Please check the backend or database connection.')
-    } finally {
-      setIsLoading(false)
+      setDispatchState({ data: null, isLoading: false, error: 'Dispatch data cannot be loaded right now.' })
     }
-  }
+  }, [])
+
+  const fetchWeather = useCallback(async () => {
+    setWeatherState((current) => ({ ...current, isLoading: true, error: '' }))
+    try {
+      const data = await getDashboardWeather()
+      setWeatherState({ data, isLoading: false, error: '' })
+    } catch {
+      setWeatherState({ data: null, isLoading: false, error: 'Weather snapshot cannot be loaded right now.' })
+    }
+  }, [])
+
+  const fetchRequests = useCallback(async () => {
+    setRequestsState((current) => ({ ...current, isLoading: true, error: '' }))
+    try {
+      const data = await getDashboardRequests()
+      setRequestsState({ data, isLoading: false, error: '' })
+    } catch {
+      setRequestsState({ data: null, isLoading: false, error: 'Request summary cannot be loaded right now.' })
+    }
+  }, [])
+
+  const fetchActivity = useCallback(async () => {
+    setActivityState((current) => ({ ...current, isLoading: true, error: '' }))
+    try {
+      const data = await getDashboardActivity()
+      setActivityState({ data, isLoading: false, error: '' })
+    } catch {
+      setActivityState({ data: null, isLoading: false, error: 'Recent activity logs cannot be loaded right now.' })
+    }
+  }, [])
+
+  const loadAllWidgets = useCallback(() => {
+    fetchSummary()
+    fetchDispatch()
+    fetchWeather()
+    fetchRequests()
+    fetchActivity()
+  }, [fetchSummary, fetchDispatch, fetchWeather, fetchRequests, fetchActivity])
+
+  useEffect(() => {
+    loadAllWidgets()
+  }, [loadAllWidgets])
+
+  const stats = useMemo(() => getStats(summaryState.data), [summaryState.data])
+  const hasActiveEvent = Boolean(summaryState.data?.active_event)
 
   function openModule(path) {
     navigate(path)
@@ -84,7 +115,24 @@ export default function DashboardPage() {
 
     try {
       const result = await closeActiveEvent()
-      setDashboard(result.dashboard)
+      if (result?.dashboard) {
+        setSummaryState({
+          data: {
+            barangay_profile: result.dashboard.barangay_profile,
+            active_event: result.dashboard.active_event,
+            households: result.dashboard.households,
+            map: result.dashboard.map,
+          },
+          isLoading: false,
+          error: '',
+        })
+        setDispatchState({ data: result.dashboard.dispatch, isLoading: false, error: '' })
+        setWeatherState({ data: result.dashboard.weather, isLoading: false, error: '' })
+        setRequestsState({ data: result.dashboard.requests, isLoading: false, error: '' })
+        setActivityState({ data: result.dashboard.recent_activity, isLoading: false, error: '' })
+      } else {
+        loadAllWidgets()
+      }
       setIsCloseModalOpen(false)
     } catch (closeEventError) {
       setCloseError(getCloseEventMessage(closeEventError))
@@ -99,7 +147,7 @@ export default function DashboardPage() {
         title="Dashboard"
         actions={
           <>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={loadDashboard}>
+            <button className="btn btn-secondary btn-sm" type="button" onClick={loadAllWidgets}>
               <RefreshCcw size={14} />
               Refresh
             </button>
@@ -119,7 +167,7 @@ export default function DashboardPage() {
       />
 
       <DashboardCloseEventModal
-        activeEvent={dashboard?.active_event}
+        activeEvent={summaryState.data?.active_event}
         isOpen={isCloseModalOpen}
         isClosingEvent={isClosingEvent}
         closeError={closeError}
@@ -127,24 +175,22 @@ export default function DashboardPage() {
         onConfirm={handleCloseActiveEvent}
       />
 
-      {isLoading && <LoadingState />}
-      {error && <div className="form-error">{error}</div>}
-
-      {!isLoading && !error && dashboard && (
-        <div className="dashboard-layout">
-          <DashboardMainContent
-            dashboard={dashboard}
-            stats={stats}
-            hasActiveEvent={hasActiveEvent}
-            onOpenModule={openModule}
-          />
-          <DashboardOverview
-            dashboard={dashboard}
-            hasActiveEvent={hasActiveEvent}
-            onOpenModule={openModule}
-          />
-        </div>
-      )}
+      <div className="dashboard-layout">
+        <DashboardMainContent
+          summaryState={summaryState}
+          dispatchState={dispatchState}
+          activityState={activityState}
+          stats={stats}
+          hasActiveEvent={hasActiveEvent}
+          onOpenModule={openModule}
+        />
+        <DashboardOverview
+          weatherState={weatherState}
+          requestsState={requestsState}
+          hasActiveEvent={hasActiveEvent}
+          onOpenModule={openModule}
+        />
+      </div>
     </section>
   )
 }

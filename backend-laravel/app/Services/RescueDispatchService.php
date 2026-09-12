@@ -100,7 +100,7 @@ class RescueDispatchService
         $this->applyDispatchFilters($query, $request);
 
         $dispatches = $query
-            ->orderByRaw('CASE WHEN ra.status IN ("on_scene", "onscene", "dispatched", "en_route") THEN 0 ELSE 1 END')
+            ->orderByRaw("CASE WHEN ra.status IN ('on_scene', 'onscene', 'dispatched', 'en_route') THEN 0 ELSE 1 END")
             ->orderByDesc('ra.assigned_at')
             ->paginate($perPage);
 
@@ -142,17 +142,20 @@ class RescueDispatchService
 
         $validated = $this->validateDispatch($request);
 
-<<<<<<< HEAD
-        if (empty($validated['household_id'])) {
-            throw ValidationException::withMessages([
-                'household_id' => ['Select a GPS-tagged household target before creating a routed dispatch.'],
-            ]);
+        if (! empty($validated['household_id'])) {
+            $household = DB::table('households')
+                ->where('household_id', $validated['household_id'])
+                ->whereNull('deleted_at')
+                ->first();
+
+            if (! $household) {
+                throw ValidationException::withMessages([
+                    'household_id' => ['Selected household record was not found.'],
+                ]);
+            }
         }
 
-        $responderId = $this->resolveResponderId($validated);
-=======
         $responderId = $this->resolveResponderId($validated, $activeEvent->event_id);
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 
         if (! $responderId) {
             throw ValidationException::withMessages([
@@ -168,10 +171,6 @@ class RescueDispatchService
             $assignmentId = $this->nextId('responder_assignments', 'assignment_id');
             $status = $this->dbStatus($validated['status'] ?? 'dispatched');
 
-<<<<<<< HEAD
-            $this->ensureResponderCanReceiveDispatch($responderId);
-            $this->ensureHouseholdCanReceiveDispatch($validated['household_id'] ?? null);
-=======
             foreach ($selectedResponderIds as $selectedResponderId) {
                 $this->ensureResponderIsAvailableForDispatch($selectedResponderId, $activeEvent->event_id);
             }
@@ -179,7 +178,6 @@ class RescueDispatchService
             if (! empty($validated['household_id'])) {
                 $this->ensureHouseholdCanReceiveDispatch($validated['household_id'], $activeEvent->event_id);
             }
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 
             DB::table('responder_assignments')->insert([
                 'assignment_id' => $assignmentId,
@@ -544,11 +542,7 @@ class RescueDispatchService
                 ->count();
 
             if ($unassignedResponders > 0) {
-<<<<<<< HEAD
-                $availableResponderId = $this->availableResponderQuery()
-=======
                 $availableResponderId = $this->availableResponderQuery($eventId)
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
                     ->where(function ($query): void {
                         $query->whereNull('r.team_id')->orWhere('r.team_id', 0);
                     })
@@ -622,14 +616,8 @@ class RescueDispatchService
             ->count();
 
         $outcomes = $this->decodeJson($activeAssignment?->outcome_notes);
-        $route = $this->decodeJson($activeAssignment?->route_notes);
-<<<<<<< HEAD
-        $status = $this->formatStatus($activeAssignment?->status ?: $team->duty_status);
-        $availableResponderId = $this->availableResponderQuery()
-=======
         $status = $this->formatStatus($eventId ? ($activeAssignment?->status ?: $team->duty_status) : 'standby');
         $availableResponderId = $this->availableResponderQuery($eventId)
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
             ->where('r.team_id', $team->team_id)
             ->orderBy('r.responder_id')
             ->value('r.responder_id');
@@ -674,29 +662,17 @@ class RescueDispatchService
                 'rt.team_name',
                 'rt.team_code',
             ])
-<<<<<<< HEAD
-            ->map(function (object $responder): array {
-                $activeAssignment = $this->activeAssignmentForResponder((int) $responder->responder_id);
-                $status = $activeAssignment
-                    ? $this->formatStatus($activeAssignment->status)
-                    : $this->formatStatus($responder->duty_status);
-                $dutyKey = $this->statusKey($responder->duty_status);
-                $isAvailable = ! $activeAssignment
-                    && ! (bool) $responder->is_deployed
-                    && ! in_array($dutyKey, ['deployed', 'dispatched', 'accepted', 'en_route', 'on_scene', 'off_duty'], true);
-=======
             ->map(function (object $responder) use ($eventId): array {
                 $activeAssignment = $this->activeAssignmentForResponder((int) $responder->responder_id, $eventId);
-                $status = $activeAssignment
-                    ? $this->formatStatus($activeAssignment->status)
-                    : $this->formatStatus($eventId ? $responder->duty_status : 'available');
+                $status = $this->formatStatus($activeAssignment
+                    ? $activeAssignment->status
+                    : ($eventId ? $responder->duty_status : 'available'));
                 $dutyKey = $this->statusKey($responder->duty_status);
                 $isAvailable = ! $activeAssignment && (
                     $eventId
                         ? (! (bool) $responder->is_deployed && ! in_array($dutyKey, ['deployed', 'dispatched', 'accepted', 'en_route', 'on_scene', 'off_duty'], true))
                         : $dutyKey !== 'off_duty'
                 );
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 
                 return [
                     'responder_id' => $responder->responder_id,
@@ -760,6 +736,7 @@ class RescueDispatchService
 
         $rows = DB::table('households as h')
             ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->leftJoin('barangays as b', 'b.barangay_id', '=', 'a.barangay_id')
             ->leftJoin('household_disasters as hd', function ($join) use ($eventId): void {
                 $join->on('hd.household_id', '=', 'h.household_id')
                     ->where('hd.disaster_id', '=', $eventId);
@@ -774,7 +751,7 @@ class RescueDispatchService
                 'a.full_address',
                 'a.street_address',
                 'a.house_number',
-                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(a.barangay_name, ''), 'Unassigned') as area_name"),
+                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(b.barangay_name, ''), 'Unassigned') as area_name"),
                 'hs.status_key',
                 'hs.status_label',
                 'hd.needs_dispatch',
@@ -832,11 +809,7 @@ class RescueDispatchService
                     'to_cover' => $toCover,
                     'households' => $households,
                     'recommended_households' => $households
-<<<<<<< HEAD
-                        ->filter(fn (array $item): bool => $item['needs_dispatch'] || $item['status_key'] === 'unchecked' || in_array($item['status_key'], ['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'], true))
-=======
                         ->filter(fn (array $item): bool => $item['needs_dispatch'] || $item['status_key'] === 'unchecked' || in_array($item['status_key'], ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'], true))
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
                         ->take(10)
                         ->values(),
                 ];
@@ -1067,11 +1040,7 @@ class RescueDispatchService
             ->value('leader_responder_id');
 
         if ($leaderId) {
-<<<<<<< HEAD
-            $leaderIsAvailable = $this->availableResponderQuery()
-=======
             $leaderIsAvailable = $this->availableResponderQuery($eventId)
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
                 ->where('r.responder_id', $leaderId)
                 ->exists();
 
@@ -1080,12 +1049,6 @@ class RescueDispatchService
             }
         }
 
-<<<<<<< HEAD
-        return $this->availableResponderQuery()
-            ->where('r.team_id', $validated['team_id'])
-            ->orderBy('r.responder_id')
-            ->value('r.responder_id');
-=======
         return $this->availableResponderQuery($eventId)
             ->where('r.team_id', $validated['team_id'])
             ->orderBy('r.responder_id')
@@ -1123,7 +1086,6 @@ class RescueDispatchService
         throw ValidationException::withMessages([
             'selected_responder_ids' => ['Selected responders must belong to the selected team.'],
         ]);
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
     }
 
     private function authorizeRescuerForDispatch(Request $request, object $dispatch): void
@@ -1170,8 +1132,6 @@ class RescueDispatchService
         }
     }
 
-<<<<<<< HEAD
-=======
     private function updateSelectedResponderDuty(array $responderIds, ?int $teamId, string $status): void
     {
         foreach ($responderIds as $responderId) {
@@ -1190,19 +1150,11 @@ class RescueDispatchService
             ->values()
             ->all();
     }
-
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
     private function activeAssignmentStatuses(): array
     {
         return ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'];
     }
 
-<<<<<<< HEAD
-    private function activeAssignmentForResponder(int $responderId): ?object
-    {
-        return DB::table('responder_assignments')
-            ->where('responder_id', $responderId)
-=======
     private function activeAssignmentForResponder(int $responderId, ?string $eventId): ?object
     {
         if (! $eventId) {
@@ -1212,18 +1164,11 @@ class RescueDispatchService
         return DB::table('responder_assignments')
             ->where('responder_id', $responderId)
             ->where('disaster_id', $eventId)
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
             ->whereIn('status', $this->activeAssignmentStatuses())
             ->orderByDesc('assigned_at')
             ->first();
     }
 
-<<<<<<< HEAD
-    private function availableResponderQuery()
-    {
-        return DB::table('responders as r')
-            ->whereNull('r.deleted_at')
-=======
     private function availableResponderQuery(?string $eventId = null)
     {
         $query = DB::table('responders as r')
@@ -1237,7 +1182,6 @@ class RescueDispatchService
         }
 
         return $query
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
             ->where(function ($query): void {
                 $query->whereNull('r.is_deployed')->orWhere('r.is_deployed', false);
             })
@@ -1245,31 +1189,18 @@ class RescueDispatchService
                 $query->whereNull('r.duty_status')
                     ->orWhereNotIn('r.duty_status', ['deployed', 'dispatched', 'accepted', 'en_route', 'on_scene', 'off_duty']);
             })
-<<<<<<< HEAD
-            ->whereNotExists(function ($query): void {
-                $query->select(DB::raw(1))
-                    ->from('responder_assignments as active_ra')
-                    ->whereColumn('active_ra.responder_id', 'r.responder_id')
-=======
             ->whereNotExists(function ($query) use ($eventId): void {
                 $query->select(DB::raw(1))
                     ->from('responder_assignments as active_ra')
                     ->whereColumn('active_ra.responder_id', 'r.responder_id')
                     ->where('active_ra.disaster_id', $eventId)
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
                     ->whereIn('active_ra.status', $this->activeAssignmentStatuses());
             });
     }
 
-<<<<<<< HEAD
-    private function ensureResponderCanReceiveDispatch(int $responderId): void
-    {
-        $activeAssignment = $this->activeAssignmentForResponder($responderId);
-=======
     private function ensureResponderCanReceiveDispatch(int $responderId, string $eventId): void
     {
         $activeAssignment = $this->activeAssignmentForResponder($responderId, $eventId);
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
 
         if (! $activeAssignment) {
             return;
@@ -1282,9 +1213,6 @@ class RescueDispatchService
         ]);
     }
 
-<<<<<<< HEAD
-    private function ensureHouseholdCanReceiveDispatch(?string $householdId): void
-=======
     private function ensureResponderIsAvailableForDispatch(int $responderId, string $eventId): void
     {
         $isAvailable = $this->availableResponderQuery($eventId)
@@ -1303,7 +1231,6 @@ class RescueDispatchService
     }
 
     private function ensureHouseholdCanReceiveDispatch(?string $householdId, string $eventId): void
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
     {
         if (! $householdId) {
             return;
@@ -1334,10 +1261,7 @@ class RescueDispatchService
 
         $activeAssignment = DB::table('responder_assignments')
             ->where('household_id', $householdId)
-<<<<<<< HEAD
-=======
             ->where('disaster_id', $eventId)
->>>>>>> 4748515fd9da7c3d41af7e11c0951e50f424cd0c
             ->whereIn('status', $this->activeAssignmentStatuses())
             ->orderByDesc('assigned_at')
             ->first();
