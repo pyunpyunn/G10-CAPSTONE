@@ -1,6 +1,7 @@
 import {
   CloudSun,
   Database,
+  ExternalLink,
   House,
   Map,
   Radio,
@@ -369,10 +370,10 @@ function LandingFooter() {
       <div className="landing-wrap footer-inner">
         <span>RESQPERATION capstone prototype. Original UI visuals, no public registration, credential-based access only.</span>
         <div className="footer-links" aria-label="Reference links">
-          <a href="https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/2/21121" target="_blank" rel="noreferrer">RA 10121</a>
-          <a href="https://www.preventionweb.net/publication/policies-and-plans/philippines-national-disaster-risk-reduction-and-management-plan" target="_blank" rel="noreferrer">NDRRMP 2020-2030</a>
-          <a href="https://pagasa.dost.gov.ph/products-and-services" target="_blank" rel="noreferrer">PAGASA</a>
-          <a href="https://sdgs.un.org/goals/goal11" target="_blank" rel="noreferrer">SDG 11</a>
+          <a href="https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/2/21121" target="_blank" rel="noreferrer">RA 10121 <ExternalLink className="external-link-icon" size={12} aria-hidden="true" /></a>
+          <a href="https://www.preventionweb.net/publication/policies-and-plans/philippines-national-disaster-risk-reduction-and-management-plan" target="_blank" rel="noreferrer">NDRRMP 2020-2030 <ExternalLink className="external-link-icon" size={12} aria-hidden="true" /></a>
+          <a href="https://pagasa.dost.gov.ph/products-and-services" target="_blank" rel="noreferrer">PAGASA <ExternalLink className="external-link-icon" size={12} aria-hidden="true" /></a>
+          <a href="https://sdgs.un.org/goals/goal11" target="_blank" rel="noreferrer">SDG 11 <ExternalLink className="external-link-icon" size={12} aria-hidden="true" /></a>
         </div>
       </div>
     </footer>

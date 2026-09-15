@@ -22,14 +22,39 @@ function CurrentAlertCard({ activeEvent, latestBroadcast }) {
         </Badge>
       </div>
       {activeEvent ? (
-        <div className="bc-current">
-          <strong>{activeEvent.name}</strong>
-          <div className="bc-current-meta">
-            <span>{activeEvent.type_name}</span>
-            <span>{activeEvent.severity_label}</span>
-            <span>{activeEvent.started_time || '-'}</span>
+        <div className="bc-current-details">
+          <div className="bc-current-header">
+            <span className="bc-label-kicker">Event Name</span>
+            <strong className="bc-event-title">{activeEvent.name}</strong>
           </div>
-          <p>{latestBroadcast?.message || 'No saved broadcast update yet for this event.'}</p>
+
+          {/* Labeled Key-Value Details */}
+          <div className="bc-grid-info">
+            <div className="bc-info-item">
+              <span className="bc-info-label">Event ID</span>
+              <span className="bc-info-value">#{activeEvent.event_id || '-'}</span>
+            </div>
+            <div className="bc-info-item">
+              <span className="bc-info-label">Type</span>
+              <span className="bc-info-value">{activeEvent.type_name || '-'}</span>
+            </div>
+            <div className="bc-info-item">
+              <span className="bc-info-label">Severity</span>
+              <span className="bc-info-value">{activeEvent.severity_label || '-'}</span>
+            </div>
+            <div className="bc-info-item">
+              <span className="bc-info-label">Declared</span>
+              <span className="bc-info-value">{activeEvent.started_time || '-'}</span>
+            </div>
+            <div className="bc-info-item">
+              <span className="bc-info-label">Duration</span>
+              <span className="bc-info-value">{latestBroadcast?.estimated_duration || activeEvent.estimated_duration || 'Ongoing'}</span>
+            </div>
+            <div className="bc-info-item">
+              <span className="bc-info-label">Last Updated</span>
+              <span className="bc-info-value">{latestBroadcast?.sent_time || activeEvent.updated_at || '-'}</span>
+            </div>
+          </div>
         </div>
       ) : (
         <EmptyState title="No active alert" message="This panel opens after HQ/Admin declares the disaster broadcast." />
@@ -52,17 +77,23 @@ function BroadcastLog({ broadcasts }) {
           {broadcasts.map((broadcast) => (
             <article className="bc-log-item" key={broadcast.broadcast_id}>
               <div className="bc-log-icon"><Radio size={14} /></div>
-              <div>
+              <div className="bc-log-content">
                 <div className="bc-log-title">
                   <strong>{broadcast.broadcast_title}</strong>
                   <Badge tone={eventTone(broadcast.severity_key)}>{broadcast.severity_label}</Badge>
                 </div>
-                <p>{broadcast.message}</p>
+                
+                {/* Formal Message Display */}
+                <div className="bc-log-message-body">
+                  <span className="bc-info-label">Official Instruction</span>
+                  <p>{broadcast.message}</p>
+                </div>
+
                 <div className="bc-log-meta">
-                  <span>{broadcast.sent_time || '-'}</span>
-                  <span>{broadcast.scope_label}</span>
-                  <span>{broadcast.recipient_count} recipients</span>
-                  <span>{broadcast.status}</span>
+                  <span><strong>Sent:</strong> {broadcast.sent_time || '-'}</span>
+                  <span><strong>Target:</strong> {broadcast.scope_label || broadcast.target_area || 'All'}</span>
+                  <span><strong>Recipients:</strong> {broadcast.recipient_count || 0}</span>
+                  <span><strong>Status:</strong> {broadcast.status || 'Sent'}</span>
                 </div>
               </div>
             </article>

@@ -1,8 +1,9 @@
 import {
   Radio,
-  Settings,
   TriangleAlert,
 } from 'lucide-react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 import Panel from '../ui/Panel'
@@ -62,7 +63,11 @@ export default function DashboardMainContent({
 
       <Panel
         title="Team dispatch overview"
-        action={<button className="panel-link" type="button" onClick={() => onOpenModule('/dispatch')}>Full dispatch -&gt;</button>}
+        action={
+          <button className="panel-link" type="button" onClick={() => onOpenModule('/dispatch')}>
+            Full dispatch <FontAwesomeIcon icon={faArrowRight} />
+          </button>
+        }
       >
         <TeamDispatchTable teams={dashboard.dispatch.teams} />
       </Panel>
@@ -78,40 +83,67 @@ export default function DashboardMainContent({
 function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
   if (!activeEvent) {
     return (
-      <div className="event-banner standby">
-        <div className="event-banner-main">
-          <span className="event-icon">
-            <Radio size={18} />
-          </span>
-          <div className="event-copy">
-            <span className="event-kicker">No active disaster</span>
-            <strong className="event-name">Dashboard is on standby</strong>
-          </div>
+      <div 
+        className="event-banner standby" 
+        onClick={onOpenBroadcast}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast()}
+      >
+        <div className="event-main-col">
+          <span className="event-kicker">System Status</span>
+          <strong className="event-name">Dashboard Standby</strong>
         </div>
-        <button className="event-action" type="button" onClick={onOpenBroadcast}>Declare event -&gt;</button>
+        <div className="event-meta-col">
+          <span className="standby-hint">
+            Click to declare event <FontAwesomeIcon icon={faArrowRight} />
+          </span>
+        </div>
       </div>
     )
   }
 
+  const tone = eventTone(activeEvent.severity_key)
+
   return (
-    <div className={`event-banner event-${eventTone(activeEvent.severity_key)}`}>
-      <div className="event-banner-main">
-        <span className="event-icon">
-          <TriangleAlert size={18} />
-        </span>
-        <div className="event-copy">
-          <div className="event-topline">
-            <span className="event-kicker">Active event</span>
-            <Badge tone={eventTone(activeEvent.severity_key)}>{activeEvent.severity}</Badge>
+    <div 
+      className={`event-banner active-state tone-${tone}`}
+      onClick={onOpenBroadcast}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast()}
+    >
+      {/* Left Section: White/Light Event Info */}
+      <div className="event-main-col">
+        <span className="event-kicker">Active Disaster Event</span>
+        <h2 className="event-name">{activeEvent.name}</h2>
+      </div>
+
+      {/* Right Section: Darker Translucent Container */}
+      <div className="event-meta-col">
+        <div className="meta-card">
+          <div className="meta-group">
+            <span className="meta-label">Type</span>
+            <span className="meta-value">{activeEvent.type}</span>
           </div>
-          <strong className="event-name">{activeEvent.name}</strong>
-          <div className="event-meta" aria-label="Active event details">
-            <span>{activeEvent.type}</span>
-            <span>Declared {activeEvent.started_time || 'time not set'}</span>
+
+          <div className="meta-divider" aria-hidden="true" />
+
+          <div className="meta-group">
+            <span className="meta-label">Declared</span>
+            <span className="meta-value">{activeEvent.started_time || 'Time not set'}</span>
+          </div>
+
+          <div className="meta-divider" aria-hidden="true" />
+
+          <div className="meta-group">
+            <span className="meta-label">Severity</span>
+            <div className="meta-value">
+              <Badge tone={tone}>{activeEvent.severity}</Badge>
+            </div>
           </div>
         </div>
       </div>
-      <button className="event-action" type="button" onClick={onOpenBroadcast}>View details -&gt;</button>
     </div>
   )
 }
@@ -149,7 +181,7 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, onManage }) {
       <div className="dispatch-chart-head">
         <div className="dispatch-chart-title">{title}</div>
         <button className="chart-manage-button" type="button" aria-label={`Open ${title}`} onClick={onManage}>
-          <Settings size={15} />
+          <FontAwesomeIcon icon={faArrowRight} />
         </button>
       </div>
       {hasValues ? (

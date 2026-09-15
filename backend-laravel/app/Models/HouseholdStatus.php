@@ -11,7 +11,7 @@ class HouseholdStatus extends Model
 
     public const EVACUATED_KEYS = ['evacuated', 'relocated'];
 
-    public const UNSAFE_KEYS = ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'];
+    public const UNSAFE_KEYS = ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased'];
 
     protected $primaryKey = 'status_id';
 

@@ -13,6 +13,16 @@ import PlaceholderPage from './pages/PlaceholderPage'
 import { getCurrentUser, loginUser, logoutUser } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
 import './App.css'
+import './styles/foundation.css'
+import './styles/auth.css'
+import './styles/shell.css'
+import './styles/households.css'
+import './styles/weather.css'
+import './styles/broadcast.css'
+import './styles/mapping.css'
+import './styles/dispatch.css'
+import './styles/typography.css'
+import './styles/responsive.css'
 
 const webRoles = ['super_admin', 'admin']
 

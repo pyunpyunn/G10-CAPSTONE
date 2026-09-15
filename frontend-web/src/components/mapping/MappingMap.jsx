@@ -40,8 +40,8 @@ export default function MappingMap({
       <MapContainer
         center={mapCenter}
         zoom={workspace.barangay.zoom}
-        minZoom={15}
-        maxZoom={19}
+        minZoom={13}
+        maxZoom={18}
         maxBounds={mapBounds}
         maxBoundsViscosity={1}
         zoomSnap={0.25}
@@ -56,7 +56,7 @@ export default function MappingMap({
           url={workspace.barangay.tile_url}
           maxZoom={19}
         />
-        <Rectangle bounds={mapBounds} pathOptions={{ color: '#1f3e5a', weight: 2, fillOpacity: 0.03 }} />
+        <Rectangle bounds={mapBounds} pathOptions={{ color: '#173b5f', weight: 3, opacity: 0.95, fillColor: '#b9d8ed', fillOpacity: 0.04 }} />
 
         {hasActiveEvent && layers.households && households.map((household) => (
           <HouseholdMarker household={household} key={household.id} />
@@ -285,7 +285,7 @@ function FitBarangay({ center, bounds, zoom }) {
   useEffect(() => {
     if (bounds?.length === 2) {
       map.setMaxBounds(bounds)
-      map.fitBounds(bounds, { padding: [8, 8], maxZoom: zoom })
+      map.fitBounds(bounds, { padding: [24, 24], maxZoom: zoom })
       return
     }
 

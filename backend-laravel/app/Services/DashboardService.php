@@ -215,33 +215,39 @@ class DashboardService
                 'total' => $total,
                 'reported' => 0,
                 'reporting_percent' => 0,
-                'unchecked' => 0,
+                'unchecked' => $total,
                 'safe_total' => 0,
                 'safe_only' => 0,
                 'evacuated' => 0,
                 'unsafe' => 0,
-                'bars' => $this->householdBars(0, 0, 0, 0, 0),
+                'bars' => $this->householdBars(0, 0, 0, 0, $total),
             ];
         }
 
         $counts = DB::table('household_disasters as hd')
+            ->join('households as h', 'h.household_id', '=', 'hd.household_id')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
             ->where('hd.disaster_id', $eventId)
+            ->whereNull('h.deleted_at')
             ->select('hs.status_key', DB::raw('COUNT(DISTINCT hd.household_id) as total'))
             ->groupBy('hs.status_key')
             ->pluck('total', 'status_key');
 
-        $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
+        $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe', 'safe_at_home']);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
-        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
+        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased']);
         $safeTotal = $safeOnly + $evacuated;
 
-        $reported = DB::table('household_disasters')
+        $reportedRows = DB::table('household_disasters as hd')
+            ->join('households as h', 'h.household_id', '=', 'hd.household_id')
             ->where('disaster_id', $eventId)
             ->whereNotNull('current_status_id')
+            ->whereNull('h.deleted_at')
             ->distinct()
-            ->count('household_id');
+            ->count('hd.household_id');
 
+        $unknown = (int) ($counts['unknown'] ?? 0);
+        $reported = max($reportedRows - $unknown, 0);
         $unchecked = max($total - $reported, 0);
         $reportingPercent = $total > 0 ? round(($reported / $total) * 100) : 0;
 
