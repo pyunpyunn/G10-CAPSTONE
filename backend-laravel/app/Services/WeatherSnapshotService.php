@@ -20,7 +20,7 @@ class WeatherSnapshotService
     public function pageData(?string $eventId): array
     {
         $activeEvent = $this->getActiveEvent();
-        $logs = $this->getWeatherLogs($eventId);
+        $logs = $this->getWeatherLogs(null);
         $latest = $logs[0] ?? null;
 
         return [
@@ -49,14 +49,11 @@ class WeatherSnapshotService
 
         if ($eventId) {
             $query->where('disaster_id', $eventId);
-        } else {
-            $query->whereNull('disaster_id');
         }
 
         return $query
             ->orderByDesc('observed_at')
             ->orderByDesc('created_at')
-            ->limit(25)
             ->get()
             ->map(fn (object $log): array => $this->formatWeatherLog($log))
             ->values()
@@ -79,17 +76,8 @@ class WeatherSnapshotService
         $summary = $this->weatherSummary($weather);
         $observedAt = $this->observedAt($current['time'] ?? null);
 
-        if ($this->snapshotAlreadySaved($eventId, $observedAt)) {
-            return [
-                'status' => 200,
-                'saved' => false,
-                'message' => 'Latest Open-Meteo weather snapshot is already saved.',
-                'data' => $this->pageData($eventId),
-            ];
-        }
-
         DB::table('weather_logs')->insert([
-            'disaster_id' => $eventId,
+            'disaster_id' => null,
             'source_name' => 'Open-Meteo Forecast API',
             'source_url' => $this->openMeteoUrl(),
             'condition_name' => $summary['condition_name'],
@@ -109,10 +97,8 @@ class WeatherSnapshotService
         return [
             'status' => 201,
             'saved' => true,
-            'message' => $eventId
-                ? 'Weather snapshot saved for the active disaster event.'
-                : 'Weather monitoring snapshot saved. It is not linked to a disaster event yet.',
-            'data' => $this->pageData($eventId),
+            'message' => 'Weather monitoring snapshot saved independently of disaster events.',
+            'data' => $this->pageData(null),
         ];
     }
 
@@ -368,42 +354,16 @@ class WeatherSnapshotService
         ];
     }
 
-    private function snapshotAlreadySaved(?string $eventId, ?string $observedAt): bool
-    {
-        if (! $observedAt) {
-            return false;
-        }
-
-        $query = DB::table('weather_logs')
-            ->where('source_name', 'Open-Meteo Forecast API')
-            ->where('observed_at', $observedAt);
-
-        if ($eventId) {
-            $query->where('disaster_id', $eventId);
-        } else {
-            $query->whereNull('disaster_id');
-        }
-
-        return $query
-            ->limit(5)
-            ->get(['raw_payload'])
-            ->contains(function (object $row): bool {
-                $payload = json_decode($row->raw_payload ?? '', true);
-
-                if (! is_array($payload)) {
-                    return false;
-                }
-
-                $savedLatitude = (float) ($payload['latitude'] ?? 0);
-                $savedLongitude = (float) ($payload['longitude'] ?? 0);
-
-                return abs($savedLatitude - $this->latitude()) < 0.001
-                    && abs($savedLongitude - $this->longitude()) < 0.001;
-            });
-    }
-
     private function formatEvent(object $event): array
     {
+        $latestAdvisory = Schema::hasTable('disaster_broadcasts')
+            ? DB::table('disaster_broadcasts')
+                ->where('disaster_id', $event->event_id)
+                ->orderByDesc('sent_at')
+                ->orderByDesc('created_at')
+                ->first(['broadcast_title', 'message', 'sent_at'])
+            : null;
+
         return [
             'event_id' => $event->event_id,
             'name' => $event->name,
@@ -414,6 +374,11 @@ class WeatherSnapshotService
             'started_time' => $this->formatTime($event->started_at),
             'ended_at' => $this->formatDateTime($event->ended_at),
             'status' => $event->ended_at ? 'closed' : 'active',
+            'latest_advisory' => $latestAdvisory ? [
+                'title' => $latestAdvisory->broadcast_title,
+                'message' => $latestAdvisory->message,
+                'sent_at' => $this->formatDateTime($latestAdvisory->sent_at),
+            ] : null,
         ];
     }
 
