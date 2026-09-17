@@ -51,12 +51,56 @@ export const defaultWorkspace = {
   map_rules: [],
 }
 
+export function normalizeWorkspaceData(data = {}) {
+  return {
+    ...defaultWorkspace,
+    ...data,
+    barangay: {
+      ...defaultWorkspace.barangay,
+      ...(data?.barangay || {}),
+      center: {
+        ...defaultWorkspace.barangay.center,
+        ...(data?.barangay?.center || {}),
+      },
+    },
+    summary: {
+      ...defaultWorkspace.summary,
+      ...(data?.summary || {}),
+    },
+    filters: {
+      ...defaultWorkspace.filters,
+      ...(data?.filters || {}),
+      puroks: Array.isArray(data?.filters?.puroks) ? data.filters.puroks : defaultWorkspace.filters.puroks,
+      statuses: Array.isArray(data?.filters?.statuses) ? data.filters.statuses : defaultWorkspace.filters.statuses,
+    },
+    households: Array.isArray(data?.households) ? data.households : [],
+    evacuation_sites: Array.isArray(data?.evacuation_sites) ? data.evacuation_sites : [],
+    rescue_teams: Array.isArray(data?.rescue_teams) ? data.rescue_teams : [],
+    dispatch_routes: Array.isArray(data?.dispatch_routes) ? data.dispatch_routes : [],
+  }
+}
+
 export function apiErrorMessage(error) {
   if (!error?.response) {
     return 'Cannot connect to the backend right now. The map will stay in plain barangay view until the server is available.'
   }
 
   return error.response.data?.message || 'Mapping data cannot be loaded right now.'
+}
+
+export function isHouseholdRouteAllowed(household) {
+  if (!household) {
+    return false
+  }
+
+  const statusKey = String(household.status_key || household.marker_group || household.status?.key || '').toLowerCase()
+  const statusLabel = String(household.status_label || household.status?.label || '').toLowerCase()
+
+  if (['red', 'unsafe', 'missing', 'injured', 'needs_help', 'need_help', 'not_safe', 'not-safe'].includes(statusKey)) {
+    return true
+  }
+
+  return ['unsafe', 'missing', 'injured', 'needs help', 'need help', 'not safe'].some((term) => statusLabel.includes(term))
 }
 
 export function defaultRules() {
@@ -66,6 +110,17 @@ export function defaultRules() {
     { color: 'gray', title: 'Grey marker', text: 'Unchecked household with GPS coordinates.' },
     { color: 'hidden', title: 'No coordinates, no marker', text: 'Households without latitude and longitude stay hidden from the map.' },
   ]
+}
+
+export function isActiveRouteStatus(route = {}) {
+  const rawStatus = route?.status ?? route?.route_status ?? route?.assignment_status ?? ''
+  const status = String(rawStatus).trim().toLowerCase()
+
+  if (!status) {
+    return true
+  }
+
+  return !['completed', 'cancelled', 'returned', 'ended', 'closed', 'failed'].some((value) => status === value || status.includes(value))
 }
 
 export function vacancyPercent(site) {

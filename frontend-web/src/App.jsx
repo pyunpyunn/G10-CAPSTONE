@@ -23,6 +23,7 @@ import './styles/mapping.css'
 import './styles/dispatch.css'
 import './styles/typography.css'
 import './styles/responsive.css'
+import './styles/mapmate-reference.css'
 
 const webRoles = ['super_admin', 'admin']
 

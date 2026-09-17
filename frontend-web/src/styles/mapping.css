@@ -661,3 +661,329 @@
   align-items: center;
   background: var(--color-bg-secondary);
 }
+
+/* MapMate-inspired mapping workspace: real data and Leaflet behavior remain unchanged. */
+.mapping-page {
+  gap: 10px;
+}
+
+.mapping-event-strip,
+.geotag-toolbar {
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 2px rgba(30, 58, 95, 0.05);
+}
+
+.mapping-event-strip {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  padding: 9px 11px;
+}
+
+.mapping-event-strip.active,
+.mapping-event-strip.standby {
+  border-left: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.mapping-event-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+
+.geotag-toolbar {
+  padding: 7px 9px;
+}
+
+.geotag-chip {
+  border: 0;
+  border-radius: 4px;
+  padding: 5px 7px;
+  color: var(--color-text-2);
+  background: var(--color-bg-secondary);
+  font-size: 10px;
+}
+
+.mapping-layout {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 10px;
+  min-height: 680px;
+}
+
+.mapping-main {
+  gap: 10px;
+}
+
+.mapping-side {
+  gap: 10px;
+}
+
+.map-summary-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.map-summary-card {
+  display: block;
+  min-height: 84px;
+  border-radius: 7px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 2px rgba(30, 58, 95, 0.05);
+}
+
+.map-summary-label {
+  font-size: 9px;
+  letter-spacing: 0.03em;
+}
+
+.map-summary-card strong {
+  margin-top: 5px;
+  font-size: 17px;
+  line-height: 1.15;
+}
+
+.map-summary-card span:last-child {
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.mapping-map-shell {
+  min-height: 680px;
+  border: 1px solid rgba(23, 59, 95, 0.3);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(30, 58, 95, 0.09);
+}
+
+.mapping-leaflet {
+  height: 680px;
+  min-height: 680px;
+}
+
+.map-fullscreen-button {
+  top: 12px;
+  left: 12px;
+  width: 32px;
+  min-height: 32px;
+  justify-content: center;
+  border-radius: 6px;
+  padding: 0;
+}
+
+.map-fullscreen-button svg {
+  margin: 0;
+}
+
+.map-fullscreen-button {
+  font-size: 0;
+}
+
+.map-layers-box {
+  top: 12px;
+  right: 12px;
+}
+
+.map-legend-box {
+  right: auto;
+  bottom: 12px;
+  left: 12px;
+}
+
+.mapping-layer-card,
+.mapping-legend-card {
+  width: 178px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.87);
+  backdrop-filter: blur(12px);
+}
+
+.mapping-side .panel,
+.mapping-map-panels .panel {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 2px rgba(30, 58, 95, 0.05);
+}
+
+.mapping-side .panel-head,
+.mapping-map-panels .panel-head {
+  min-height: 37px;
+  margin: 0;
+  padding: 0 11px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mapping-side .geotag-registry-list {
+  max-height: 265px;
+  overflow: auto;
+  gap: 0;
+  padding: 3px 10px;
+}
+
+.mapping-side .geotag-registry-card,
+.mapping-side .map-site-card {
+  border: 0;
+  border-bottom: 1px solid rgba(209, 221, 233, 0.72);
+  border-radius: 0;
+  padding: 9px 0;
+  background: transparent;
+}
+
+.mapping-side .geotag-registry-card:last-child,
+.mapping-side .map-site-card:last-child {
+  border-bottom: 0;
+}
+
+.mapping-side .map-site-list {
+  gap: 0;
+  padding: 3px 10px;
+}
+
+.mapmate-registry-row {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 49px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 8px 9px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mapmate-registry-row:hover,
+.mapmate-registry-row:focus-visible {
+  border-color: #d1dde9;
+  background: #f2f7fb;
+  outline: none;
+}
+
+.mapmate-registry-row.selected {
+  border-color: #9bb9d4;
+  background: #edf5ff;
+  box-shadow: inset 0 0 0 1px rgba(118, 160, 203, 0.2);
+}
+
+.mapmate-registry-row + .mapmate-registry-row {
+  margin-top: 4px;
+}
+
+.mapmate-registry-row > div {
+  min-width: 0;
+}
+
+.mapmate-registry-row strong,
+.mapmate-registry-row b {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-1);
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mapmate-registry-row span {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--color-text-3);
+  font-size: 10px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mapmate-registry-row b {
+  color: var(--color-text-3);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.mapmate-registry-row .status-swatch {
+  display: inline-flex;
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--chart-unchecked);
+}
+
+.mapmate-registry-row .status-swatch.green {
+  background: var(--chart-safe);
+}
+
+.mapmate-registry-row .status-swatch.red {
+  background: var(--chart-unsafe);
+}
+
+.mapmate-registry-row .status-swatch.gray {
+  background: var(--chart-unchecked);
+}
+
+.mapmate-registry-row .status-swatch.blue {
+  background: var(--chart-evacuated);
+}
+
+.mapping-side .map-site-footer .btn {
+  display: grid;
+  width: 28px;
+  min-height: 28px;
+  place-items: center;
+  padding: 0;
+  font-size: 0;
+}
+
+.mapping-side .map-site-footer .btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mapping-map-panels {
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 1100px) {
+  .mapping-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .mapping-side {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .mapping-side .map-summary-grid {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .mapping-side,
+  .mapping-map-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .mapping-side .map-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mapping-map-shell,
+  .mapping-leaflet {
+    min-height: 520px;
+    height: 520px;
+  }
+}
