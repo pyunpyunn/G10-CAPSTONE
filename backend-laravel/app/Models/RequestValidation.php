@@ -34,4 +34,9 @@ class RequestValidation extends Model
     {
         return $this->belongsTo(ResourceRequest::class, 'request_id', 'request_id');
     }
+
+    public function validator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'validator_user_id', 'user_id');
+    }
 }

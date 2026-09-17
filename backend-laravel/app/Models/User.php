@@ -34,11 +34,23 @@ class User extends Authenticatable
         'contact_number',
         'assigned_center_id',
         'household_id',
+        'member_id',
         'is_active',
+        'must_change_password',
+        'temp_password',
+        'profile_photo',
+        'security_question_1',
+        'security_answer_1',
+        'security_question_2',
+        'security_answer_2',
+        'password_changed_at',
     ];
 
     protected $hidden = [
         'password',
+        'temp_password',
+        'security_answer_1',
+        'security_answer_2',
     ];
 
     /**
@@ -51,15 +63,27 @@ class User extends Authenticatable
         return [
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
+            'password_changed_at' => 'datetime',
         ];
     }
 
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'role_id', 'role_id');
+    }
+
+    public function household(): BelongsTo
+    {
+        return $this->belongsTo(Household::class, 'household_id', 'household_id');
+    }
+
+    public function member(): BelongsTo
+    {
+        return $this->belongsTo(HouseholdMember::class, 'member_id', 'member_id');
     }
 
     public function getKeyName(): string

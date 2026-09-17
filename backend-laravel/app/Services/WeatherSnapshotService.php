@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Carbon\Carbon;
+use App\Models\WeatherLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -45,7 +46,7 @@ class WeatherSnapshotService
             return [];
         }
 
-        $query = DB::table('weather_logs');
+        $query = WeatherLog::query();
 
         if ($eventId) {
             $query->where('disaster_id', $eventId);
@@ -76,7 +77,7 @@ class WeatherSnapshotService
         $summary = $this->weatherSummary($weather);
         $observedAt = $this->observedAt($current['time'] ?? null);
 
-        DB::table('weather_logs')->insert([
+        WeatherLog::query()->create([
             'disaster_id' => null,
             'source_name' => 'Open-Meteo Forecast API',
             'source_url' => $this->openMeteoUrl(),
@@ -239,7 +240,9 @@ class WeatherSnapshotService
 
     private function formatWeatherLog(object $log): array
     {
-        $payload = json_decode($log->raw_payload ?? '', true);
+        $payload = is_array($log->raw_payload)
+            ? $log->raw_payload
+            : json_decode((string) ($log->raw_payload ?? ''), true);
         $current = $payload['current'] ?? [];
         $daily = $this->dailyForecast($payload['daily'] ?? []);
         $risk = $this->riskLevel($log, $current, $daily);
