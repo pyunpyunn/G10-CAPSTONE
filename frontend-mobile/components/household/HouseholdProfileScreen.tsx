@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
@@ -12,7 +12,6 @@ type ProfileProps = {
   currentDevice: any;
   realBatteryLevel?: number | null;
   connectionLabel?: string;
-  onSaveDeviceUser: (memberId: string) => Promise<void>;
   onUpdateMember: (memberId: string, payload: any) => Promise<void>;
   onUpdateGeotag: (payload: any) => Promise<void>;
   onLogout: () => void;
@@ -24,7 +23,6 @@ export function HouseholdProfileScreen({
   currentDevice,
   realBatteryLevel,
   connectionLabel,
-  onSaveDeviceUser,
   onUpdateMember,
   onUpdateGeotag,
   onLogout,
@@ -33,16 +31,10 @@ export function HouseholdProfileScreen({
   const user = overview.profile?.user || {};
   const members = useMemo(() => overview.members || [], [overview.members]);
   const geotag = overview.geotag || null;
-  const [selectedMemberId, setSelectedMemberId] = useState('');
+  const selectedMemberId = String(currentDevice?.member_id || members[0]?.member_id || '');
   const [memberForm, setMemberForm] = useState(memberFormFrom(null));
-  const [savingMember, setSavingMember] = useState(false);
   const [savingMemberInfo, setSavingMemberInfo] = useState(false);
   const [savingGeotag, setSavingGeotag] = useState(false);
-
-  useEffect(() => {
-    const nextMemberId = currentDevice?.member_id || members[0]?.member_id || '';
-    setSelectedMemberId(String(nextMemberId));
-  }, [currentDevice?.member_id, members]);
 
   const selectedMember = useMemo(() => {
     return members.find((member: any) => String(member.member_id) === String(selectedMemberId)) || null;
@@ -60,24 +52,6 @@ export function HouseholdProfileScreen({
   const connectionValue = connectionLabel || 'Offline';
   const lastLocationValue = currentDevice?.last_location_label || geotag?.location_label || 'Not recorded';
   const hasGeotag = Boolean(geotag?.latitude && geotag?.longitude);
-
-  async function handleSaveDeviceUser() {
-    if (!selectedMemberId) {
-      Alert.alert('Select member', 'Choose which household member is using this device.');
-      return;
-    }
-
-    setSavingMember(true);
-
-    try {
-      await onSaveDeviceUser(selectedMemberId);
-      Alert.alert('Device user saved', 'This mobile device is now assigned to the selected household member.');
-    } catch {
-      // Parent screen already shows the API error message.
-    } finally {
-      setSavingMember(false);
-    }
-  }
 
   async function handleSaveMemberInfo() {
     if (!selectedMemberId) {
@@ -191,39 +165,6 @@ export function HouseholdProfileScreen({
           <MetricTile icon="wifi-outline" label="Connection" value={connectionValue} />
           <MetricTile icon="navigate-outline" label="Last location" value={lastLocationValue} />
         </View>
-
-        <Text style={styles.selectorLabel}>Assign this device</Text>
-        {members.length === 0 ? (
-          <HouseholdEmpty icon="people-outline" title="No family members found" />
-        ) : (
-          <View style={styles.memberGrid}>
-            {members.map((member: any) => {
-              const isSelected = String(member.member_id) === String(selectedMemberId);
-
-              return (
-                <Pressable
-                  key={member.member_id}
-                  style={[styles.memberChoice, isSelected && styles.memberChoiceActive]}
-                  onPress={() => setSelectedMemberId(String(member.member_id))}
-                >
-                  <View style={styles.memberChoiceTop}>
-                    <MemberInitialAvatar name={member.name} selected={isSelected} />
-                    {isSelected ? <Ionicons name="checkmark-circle" size={20} color="#fff" /> : null}
-                  </View>
-                  <Text style={[styles.memberName, isSelected && styles.memberTextActive]} numberOfLines={1}>{member.name}</Text>
-                  <Text style={[styles.memberRelation, isSelected && styles.memberTextActive]} numberOfLines={1}>{member.relationship || 'Member'}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-
-        <HouseholdButton
-          label={savingMember ? 'Saving device user...' : 'Save device user'}
-          icon="phone-portrait-outline"
-          disabled={savingMember || !selectedMemberId}
-          onPress={handleSaveDeviceUser}
-        />
       </View>
 
       <View style={styles.card}>
@@ -738,43 +679,11 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     textAlignVertical: 'top',
   },
-  selectorLabel: {
-    marginTop: spacing.xs,
-    color: palette.textSoft,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
   helperText: {
     color: palette.textSoft,
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '800',
-  },
-  memberGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  memberChoice: {
-    flexBasis: '47%',
-    flexGrow: 1,
-    minHeight: 104,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: palette.card,
-  },
-  memberChoiceActive: {
-    borderColor: palette.navActive,
-    backgroundColor: palette.navActive,
-  },
-  memberChoiceTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
   },
   choiceAvatar: {
     width: 34,
@@ -804,20 +713,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   choiceAvatarTextSelected: {
-    color: '#fff',
-  },
-  memberName: {
-    color: palette.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  memberRelation: {
-    marginTop: 3,
-    color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  memberTextActive: {
     color: '#fff',
   },
   locationPanel: {

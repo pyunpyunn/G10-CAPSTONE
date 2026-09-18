@@ -260,33 +260,6 @@ export default function HouseholdHomeScreen() {
     }
   }
 
-  async function handleSaveDeviceUser(memberId: string) {
-    const payload: any = {
-      device_uuid: deviceUuid,
-      member_id: memberId,
-      location_permission_status: 'granted',
-      battery_level: realBatteryLevel ?? undefined,
-    };
-
-    if (currentDevice?.latitude && currentDevice?.longitude) {
-      payload.latitude = currentDevice.latitude;
-      payload.longitude = currentDevice.longitude;
-      payload.location_label = currentDevice.last_location_label;
-    } else if (overview?.geotag?.latitude && overview?.geotag?.longitude) {
-      payload.latitude = overview.geotag.latitude;
-      payload.longitude = overview.geotag.longitude;
-      payload.location_label = overview.geotag.location_label;
-    }
-
-    try {
-      await updateHouseholdDeviceLocation(payload);
-      await loadOverview(true);
-    } catch (error: any) {
-      Alert.alert('Unable to save device user', errorMessage(error));
-      throw error;
-    }
-  }
-
   async function handleUpdateMember(memberId: string, payload: any) {
     try {
       await updateHouseholdMember(memberId, payload);
@@ -507,7 +480,6 @@ export default function HouseholdHomeScreen() {
           currentDevice={currentDevice}
           realBatteryLevel={realBatteryLevel}
           connectionLabel={connectionLabel}
-          onSaveDeviceUser={handleSaveDeviceUser}
           onUpdateMember={handleUpdateMember}
           onUpdateGeotag={handleUpdateGeotag}
           onLogout={handleLogout}
