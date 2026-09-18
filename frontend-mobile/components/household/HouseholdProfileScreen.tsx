@@ -136,11 +136,6 @@ export function HouseholdProfileScreen({
           <HouseholdBadge label={overview.active_event ? 'Disaster mode' : 'Standby'} tone={overview.active_event ? 'danger' : 'safe'} />
         </View>
 
-        <View style={styles.heroStats}>
-          <HeroStat icon="people-outline" label="Members" value={String(memberCount)} />
-          <HeroStat icon="phone-portrait-outline" label="Device user" value={deviceUser} />
-          <HeroStat icon="location-outline" label="Geotag" value={hasGeotag ? 'Saved' : 'Missing'} />
-        </View>
       </View>
 
       <View style={styles.card}>
@@ -345,16 +340,6 @@ export function HouseholdProfileScreen({
   );
 }
 
-function HeroStat({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
-  return (
-    <View style={styles.heroStat}>
-      <Ionicons name={icon} size={16} color="#fff" />
-      <Text style={styles.heroStatLabel}>{label}</Text>
-      <Text style={styles.heroStatValue} numberOfLines={1}>{value}</Text>
-    </View>
-  );
-}
-
 function MetricTile({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   return (
     <View style={styles.metricTile}>
@@ -506,32 +491,6 @@ const styles = StyleSheet.create({
     color: palette.navText,
     fontSize: 12,
     fontWeight: '800',
-  },
-  heroStats: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  heroStat: {
-    flex: 1,
-    minHeight: 72,
-    justifyContent: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#ffffff33',
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    backgroundColor: '#ffffff14',
-  },
-  heroStatLabel: {
-    color: palette.navMuted,
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  heroStatValue: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '900',
   },
   card: {
     gap: spacing.md,
