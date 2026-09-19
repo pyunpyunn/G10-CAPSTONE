@@ -21,12 +21,23 @@ class DisasterEvent extends Model
 
     protected function casts(): array
     {
-        return ['started_at' => 'datetime', 'ended_at' => 'datetime'];
+        return [
+            'started_at' => 'datetime',
+            'ended_at' => 'datetime',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+            'deleted_at' => 'datetime',
+        ];
     }
 
     public function type(): BelongsTo
     {
         return $this->belongsTo(DisasterType::class, 'type_id', 'type_id');
+    }
+
+    public function severity(): BelongsTo
+    {
+        return $this->belongsTo(SeverityLevel::class, 'severity_level_id', 'severity_id');
     }
 
     public function householdDisasters(): HasMany
@@ -37,6 +48,11 @@ class DisasterEvent extends Model
     public function statusLogs(): HasMany
     {
         return $this->hasMany(HouseholdStatusLog::class, 'disaster_id', 'event_id');
+    }
+
+    public function weatherLogs(): HasMany
+    {
+        return $this->hasMany(WeatherLog::class, 'disaster_id', 'event_id');
     }
 
     public function scopeActive($query)

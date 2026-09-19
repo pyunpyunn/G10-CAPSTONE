@@ -3,6 +3,7 @@ import {
   RefreshCcw,
   Route,
 } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { completeDispatch, createDispatch, getDispatchDashboard, updateDispatch } from '../api/dispatchApi'
 import DispatchModalForm from '../components/dispatch/DispatchModalForm'
 import DispatchSidePanel from '../components/dispatch/DispatchSidePanel'
@@ -21,6 +22,8 @@ import {
 } from '../utils/dispatchHelpers'
 
 export default function RescueDispatchPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [payload, setPayload] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -100,6 +103,38 @@ export default function RescueDispatchPage() {
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
   const hasBlockingError = error && !payload
+
+  useEffect(() => {
+    const selectedHousehold = location.state?.selectedHousehold
+
+    if (!selectedHousehold || !payload || !Array.isArray(riskAreas) || riskAreas.length === 0) {
+      return
+    }
+
+    const matchingArea = riskAreas.find((area) => {
+      const areaName = String(area.area_name || '').toLowerCase()
+      const householdPurok = String(selectedHousehold.purok || '').toLowerCase()
+      return areaName === householdPurok || householdPurok.includes(areaName) || areaName.includes(householdPurok)
+    })
+
+    const nextForm = {
+      ...defaultForm(),
+      assigned_area: matchingArea?.area_name || selectedHousehold.purok || '',
+      household_id: selectedHousehold.household_id || selectedHousehold.id || '',
+      households_to_cover: 1,
+      priority_level: selectedHousehold.priority_level || 'high',
+      unsafe_count: 1,
+      pending_count: 0,
+    }
+
+    setEditingDispatch(null)
+    setSelectedRiskId(matchingArea?.id || '')
+    setAssignmentOption(firstAssignmentOption(teams))
+    setForm(nextForm)
+    setFormError('')
+    setIsModalOpen(true)
+    navigate('/dispatch', { replace: true, state: {} })
+  }, [location.state, payload, riskAreas, teams, navigate])
 
   function firstDispatchableHousehold(area) {
     return area?.recommended_households?.find((household) => household.is_available_for_dispatch && household.has_geotag)

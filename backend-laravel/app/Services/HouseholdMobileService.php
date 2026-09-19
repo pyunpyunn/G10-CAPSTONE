@@ -344,6 +344,16 @@ class HouseholdMobileService
                 'updated_at' => $now,
             ]), 'status_log_id');
 
+            $this->saveMemberDisasterStatus(
+                $activeEvent['event_id'],
+                $householdId,
+                $memberId,
+                $validated,
+                $user?->user_id,
+                $deviceId,
+                $now
+            );
+
             $this->saveLatestHouseholdStatusFromMemberStatuses(
                 $activeEvent['event_id'],
                 $householdId,
@@ -1590,30 +1600,94 @@ class HouseholdMobileService
         ]), $userId, $deviceId, $now);
     }
 
-    private function householdRollupStatusKey(string $householdId, string $eventId): string
+    private function saveMemberDisasterStatus(string $eventId, string $householdId, string $memberId, array $validated, ?string $userId, ?int $deviceId, $now): void
     {
-        $memberStatuses = collect($this->memberStatusRows($householdId, $eventId))
-            ->pluck('status_key')
-            ->filter()
-            ->values();
-
-        if ($memberStatuses->contains('needs_help')) {
-            return 'needs_help';
+        if (! Schema::hasTable('member_disaster_statuses') || ! Schema::hasTable('member_statuses')) {
+            return;
         }
 
-        if ($memberStatuses->contains('unsafe')) {
+        $statusId = DB::table('member_statuses')
+            ->where('status_key', $validated['status_key'])
+            ->where('is_active', true)
+            ->value('status_id');
+
+        if (! $statusId) {
+            $statusId = DB::table('member_statuses')
+                ->whereIn('status_key', $validated['status_key'] === 'needs_help'
+                    ? ['needs_assistance', 'unsafe', 'trapped']
+                    : [$validated['status_key']])
+                ->where('is_active', true)
+                ->orderBy('status_id')
+                ->value('status_id');
+        }
+
+        if (! $statusId) {
+            return;
+        }
+
+        $payload = [
+            'disaster_id' => $eventId,
+            'household_id' => $householdId,
+            'member_id' => $memberId,
+            'status_id' => $statusId,
+            'report_source' => 'self',
+            'reported_by_user_id' => $userId,
+            'device_token_id' => $deviceId,
+            'latitude' => $validated['latitude'] ?? null,
+            'longitude' => $validated['longitude'] ?? null,
+            'location_label' => $validated['location_label'] ?? null,
+            'location_accuracy_m' => $validated['location_accuracy_m'] ?? null,
+            'battery_level' => $validated['battery_level'] ?? null,
+            'signal_strength' => $validated['signal_strength'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'reported_at' => $now,
+            'updated_at' => $now,
+        ];
+
+        DB::table('member_disaster_statuses')->updateOrInsert(
+            ['disaster_id' => $eventId, 'member_id' => $memberId],
+            $payload
+        );
+    }
+
+    private function householdRollupStatusKey(string $householdId, string $eventId): string
+    {
+        if (! Schema::hasTable('member_disaster_statuses') || ! Schema::hasTable('member_statuses')) {
+            return 'unknown';
+        }
+
+        $memberStatuses = DB::table('member_disaster_statuses as mds')
+            ->join('household_members as hm', 'hm.member_id', '=', 'mds.member_id')
+            ->join('member_statuses as ms', 'ms.status_id', '=', 'mds.status_id')
+            ->where('mds.disaster_id', $eventId)
+            ->where('mds.household_id', $householdId)
+            ->whereNull('hm.deleted_at')
+            ->pluck('ms.status_key');
+
+        $unsafeKeys = [
+            'unsafe',
+            'needs_help',
+            'needs_assistance',
+            'injured',
+            'trapped',
+            'missing',
+            'unreachable',
+            'deceased',
+        ];
+
+        if ($memberStatuses->intersect($unsafeKeys)->isNotEmpty()) {
             return 'unsafe';
         }
 
-        if ($memberStatuses->contains('evacuated')) {
+        if ($memberStatuses->contains(fn (string $status): bool => in_array($status, ['evacuated', 'relocated'], true))) {
             return 'evacuated';
         }
 
-        if ($memberStatuses->contains('safe')) {
+        if ($memberStatuses->isNotEmpty() && $memberStatuses->every(fn (string $status): bool => in_array($status, ['safe', 'safe_at_home', 'active', 'returned'], true))) {
             return 'safe';
         }
 
-        return 'safe';
+        return 'unknown';
     }
 
     private function householdRollupNote(string $statusKey): string

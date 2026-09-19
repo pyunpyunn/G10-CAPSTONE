@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { RefreshCcw } from 'lucide-react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faXmark } from '@fortawesome/free-solid-svg-icons'
 import { getWeatherWorkspace, refreshWeather } from '../api/weatherApi'
 import WeatherMainColumn from '../components/weather/WeatherMainColumn'
 import WeatherSidebar from '../components/weather/WeatherSidebar'
 import LoadingState from '../components/ui/LoadingState'
-import PageHeader from '../components/ui/PageHeader'
 import {
   apiErrorMessage,
-  makeMonitorRows,
   riskToneFor,
 } from '../utils/weatherHelpers'
 
@@ -46,21 +46,6 @@ export default function WeatherPage() {
     }
   }, [])
 
-  async function loadWeather() {
-    setIsLoading(true)
-    setError('')
-    setRefreshMessage('')
-
-    try {
-      const data = await getWeatherWorkspace()
-      setWorkspace(data)
-    } catch {
-      setError('Weather updates cannot be loaded right now. Please check the backend or database connection.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   async function handleRefresh() {
     setIsRefreshing(true)
     setError('')
@@ -85,32 +70,44 @@ export default function WeatherPage() {
   const hasSnapshot = Boolean(latest)
   const activeConditionKey = latest?.condition_key || 'monitoring'
   const riskTone = riskToneFor(latest?.risk_level)
-  const liveTitle = hasSnapshot
-    ? `${latest.condition_name} conditions over ${workspace.location.name}`
-    : `Weather monitoring for ${workspace?.location?.name || 'Barangay Sta. Cruz'}`
-  const monitorRows = useMemo(() => makeMonitorRows(latest), [latest])
+  const locationName = 'Barangay Mambaling, Cebu City'
+  const updatedAt = latest?.observed_at || latest?.created_at || 'Not yet available'
 
   return (
     <section className="page weather-page active">
-      <PageHeader
-        title="Weather Updates"
-        actions={
-          <>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={loadWeather}>
-              <RefreshCcw size={14} />
-              Reload
-            </button>
-            <button className="btn btn-primary btn-sm wx-refresh-button" type="button" disabled={isRefreshing} onClick={handleRefresh}>
-              <RefreshCcw size={14} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh now'}
-            </button>
-          </>
-        }
-      />
+      <header className="weather-page-header">
+        <div>
+          <h1>Weather Updates</h1>
+          <p>{locationName}</p>
+        </div>
+        <div className="weather-page-actions">
+          <div className="weather-live-status">
+            <strong>{isLoading ? 'Connecting' : 'Live'}</strong>
+            <span>Updated {updatedAt}</span>
+          </div>
+          <button className="btn btn-primary btn-sm wx-refresh-button" type="button" disabled={isRefreshing} onClick={handleRefresh}>
+            <RefreshCcw size={14} />
+            {isRefreshing ? 'Refreshing' : 'Refresh'}
+          </button>
+        </div>
+      </header>
 
       {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
-      {refreshMessage && <div className="wx-save-message">{refreshMessage}</div>}
+      
+      {refreshMessage && (
+        <div className="wx-save-message">
+          <span>{refreshMessage}</span>
+          <button
+            type="button"
+            className="wx-banner-close"
+            onClick={() => setRefreshMessage('')}
+            aria-label="Close message"
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
+        </div>
+      )}
 
       {!isLoading && !error && workspace && (
         <div className="weather-dashboard">
@@ -120,12 +117,12 @@ export default function WeatherPage() {
             hasSnapshot={hasSnapshot}
             activeConditionKey={activeConditionKey}
             riskTone={riskTone}
-            liveTitle={liveTitle}
+            activeEvent={workspace.active_event}
+            locationName={locationName}
           />
           <WeatherSidebar
             workspace={workspace}
             logs={logs}
-            monitorRows={monitorRows}
           />
         </div>
       )}

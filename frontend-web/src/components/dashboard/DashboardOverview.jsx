@@ -15,6 +15,8 @@ import {
   Thermometer,
   Wind,
 } from 'lucide-react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import { getMappingOverview } from '../../api/mappingApi'
 import {
   defaultWorkspace,
@@ -50,7 +52,9 @@ function WeatherCard({ weatherState, hasActiveEvent, onOpenWeather }) {
     <section className="overview-card dashboard-weather-card">
       <div className="panel-head">
         <span className="panel-title"><CloudSun size={15} />Weather update</span>
-        <button className="panel-link" type="button" onClick={onOpenWeather}>Full view -&gt;</button>
+        <button className="panel-link" type="button" onClick={onOpenWeather}>
+          Full view <FontAwesomeIcon icon={faArrowRight} />
+        </button>
       </div>
 
       {isLoading ? (
@@ -126,7 +130,9 @@ function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
     <section className="overview-card">
       <div className="panel-head">
         <span className="panel-title"><Map size={15} />Household map</span>
-        <button className="panel-link" type="button" onClick={onOpenMap}>Full view -&gt;</button>
+        <button className="panel-link" type="button" onClick={onOpenMap}>
+          Full view <FontAwesomeIcon icon={faArrowRight} />
+        </button>
       </div>
 
       <div className="dashboard-map-preview">
@@ -208,7 +214,9 @@ function RequestCard({ requestsState, onOpenRequests }) {
     <section className="overview-card">
       <div className="panel-head">
         <span className="panel-title"><PackageCheck size={15} />Requests</span>
-        <button className="panel-link" type="button" onClick={onOpenRequests}>Full view -&gt;</button>
+        <button className="panel-link" type="button" onClick={onOpenRequests}>
+          Full view <FontAwesomeIcon icon={faArrowRight} />
+        </button>
       </div>
 
       {isLoading ? (

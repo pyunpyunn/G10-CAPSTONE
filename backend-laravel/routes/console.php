@@ -13,18 +13,11 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('weather:refresh {--active-event : Skip refresh when there is no active disaster event}', function () {
+Artisan::command('weather:refresh', function () {
     $weather = app(WeatherSnapshotService::class);
-    $activeEvent = $weather->getActiveEvent();
-
-    if ($this->option('active-event') && ! $activeEvent) {
-        $this->info('No active disaster event. Weather refresh was skipped.');
-
-        return 0;
-    }
 
     try {
-        $result = $weather->saveLatestSnapshot($activeEvent?->event_id);
+        $result = $weather->saveLatestSnapshot(null);
     } catch (\Throwable $exception) {
         $this->error($exception->getMessage());
 

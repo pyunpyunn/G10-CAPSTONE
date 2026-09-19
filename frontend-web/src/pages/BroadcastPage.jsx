@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Archive, RefreshCcw, Siren } from 'lucide-react'
+import { Archive, RefreshCcw, RotateCcw } from 'lucide-react'
 import { createBroadcast, createDisasterEvent, getBroadcastWorkspace } from '../api/broadcastApi'
 import { closeActiveEvent } from '../api/dashboardApi'
 import BroadcastComposeForm from '../components/broadcast/BroadcastComposeForm'
-import BroadcastLifecycleCard from '../components/broadcast/BroadcastLifecycleCard'
 import BroadcastSidePanel from '../components/broadcast/BroadcastSidePanel'
-import BroadcastStartPanel from '../components/broadcast/BroadcastStartPanel'
 import CloseActiveEventModal from '../components/broadcast/CloseActiveEventModal'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
@@ -21,7 +19,6 @@ export default function BroadcastPage() {
   const [workspace, setWorkspace] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [isFormOpen, setIsFormOpen] = useState(false)
   const [form, setForm] = useState(defaultForm())
   const [selectedStatuses, setSelectedStatuses] = useState(defaultStatusKeys)
   const [selectedPurok, setSelectedPurok] = useState('')
@@ -42,8 +39,7 @@ export default function BroadcastPage() {
 
         if (!ignore) {
           setWorkspace(data)
-          setForm(defaultForm(data))
-          setSelectedPurok(data.puroks?.[0]?.name || '')
+          initForm(data)
         }
       } catch {
         if (!ignore) {
@@ -69,13 +65,31 @@ export default function BroadcastPage() {
   const severityLevels = workspace?.severity_levels || []
   const puroks = workspace?.puroks || []
   const statusOptions = workspace?.status_options || []
-  const lifecycleState = activeEvent ? 'active' : 'monitoring'
   const selectedType = disasterTypes.find((type) => String(type.type_id) === String(form.type_id))
   const currentTypeName = activeEvent?.type_name || selectedType?.type_name || 'Disaster event'
   const recipientNote = useMemo(
     () => getRecipientNote(currentTypeName, form.scope_type, directPuroks),
     [currentTypeName, form.scope_type, directPuroks],
   )
+
+  function initForm(wsData) {
+    const currentWorkspace = wsData || workspace
+    const nextForm = defaultForm(currentWorkspace)
+    const active = currentWorkspace?.active_event
+
+    if (active) {
+      nextForm.broadcast_title = `${active.type_name} update`
+      nextForm.type_id = active.type_id || nextForm.type_id
+      nextForm.severity_id = active.severity_level_id || nextForm.severity_id
+      nextForm.event_name = active.name
+    }
+
+    setForm(nextForm)
+    setSelectedStatuses(defaultStatusKeys)
+    setSelectedPurok(currentWorkspace?.puroks?.[0]?.name || '')
+    setDirectPuroks([])
+    setFormError('')
+  }
 
   async function loadWorkspace() {
     setIsLoading(true)
@@ -84,29 +98,12 @@ export default function BroadcastPage() {
     try {
       const data = await getBroadcastWorkspace()
       setWorkspace(data)
-      setSelectedPurok(data.puroks?.[0]?.name || '')
+      initForm(data)
     } catch {
       setError('Disaster broadcasting cannot be loaded right now. Please check the backend or database connection.')
     } finally {
       setIsLoading(false)
     }
-  }
-
-  function openCompose() {
-    const nextForm = defaultForm(workspace)
-
-    if (activeEvent) {
-      nextForm.broadcast_title = `${activeEvent.type_name} update`
-      nextForm.type_id = activeEvent.type_id || nextForm.type_id
-      nextForm.severity_id = activeEvent.severity_level_id || nextForm.severity_id
-      nextForm.event_name = activeEvent.name
-    }
-
-    setForm(nextForm)
-    setSelectedStatuses(defaultStatusKeys)
-    setDirectPuroks([])
-    setFormError('')
-    setIsFormOpen(true)
   }
 
   function updateForm(field, value) {
@@ -204,13 +201,15 @@ export default function BroadcastPage() {
         direct_puroks: directPuroks,
       })
 
-      setWorkspace((current) => ({
-        ...current,
+      const updatedWorkspace = {
+        ...workspace,
         active_event: nextActiveEvent,
         events: nextEvents,
         broadcasts: broadcastResult.broadcasts,
-      }))
-      setIsFormOpen(false)
+      }
+
+      setWorkspace(updatedWorkspace)
+      initForm(updatedWorkspace)
     } catch (saveError) {
       setFormError(apiErrorMessage(saveError, 'Unable to save this broadcast. Please check the entries and try again.'))
     } finally {
@@ -225,7 +224,6 @@ export default function BroadcastPage() {
     try {
       await closeActiveEvent()
       setIsCloseModalOpen(false)
-      setIsFormOpen(false)
       await loadWorkspace()
     } catch (closeEventError) {
       setCloseError(apiErrorMessage(closeEventError, 'Unable to close the active event. Please try again.'))
@@ -240,19 +238,18 @@ export default function BroadcastPage() {
         title="Disaster Broadcasting"
         actions={
           <>
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => initForm()}>
+              <RotateCcw size={14} />
+              Reset Form
+            </button>
             <button className="btn btn-secondary btn-sm" type="button" onClick={loadWorkspace}>
               <RefreshCcw size={14} />
               Refresh
             </button>
-            {activeEvent ? (
+            {activeEvent && (
               <button className="btn btn-warning btn-sm" type="button" onClick={() => setIsCloseModalOpen(true)}>
                 <Archive size={14} />
                 Close Active Event
-              </button>
-            ) : (
-              <button className="btn btn-danger btn-sm" type="button" onClick={openCompose}>
-                <Siren size={14} />
-                Declare Disaster Broadcast
               </button>
             )}
           </>
@@ -274,40 +271,29 @@ export default function BroadcastPage() {
       {!isLoading && !error && workspace && (
         <div className="broadcast-shell">
           <main className="panel broadcast-form-panel">
-            <BroadcastLifecycleCard
-              state={lifecycleState}
+            <BroadcastComposeForm
               activeEvent={activeEvent}
-              broadcastCount={broadcasts.length}
-              onCloseEvent={() => setIsCloseModalOpen(true)}
+              form={form}
+              disasterTypes={disasterTypes}
+              severityLevels={severityLevels}
+              puroks={puroks}
+              statusOptions={statusOptions}
+              selectedPurok={selectedPurok}
+              selectedPriority={selectedPriority}
+              selectedStatuses={selectedStatuses}
+              directPuroks={directPuroks}
+              recipientNote={recipientNote}
+              formError={formError}
+              isSaving={isSaving}
+              onChange={updateForm}
+              onSelectPurok={setSelectedPurok}
+              onSelectPriority={setSelectedPriority}
+              onAddPurok={addDirectPurok}
+              onRemovePurok={removeDirectPurok}
+              onToggleStatus={toggleStatus}
+              onSubmit={handleSubmit}
+              onCancel={() => initForm()}
             />
-
-            <BroadcastStartPanel activeEvent={activeEvent} onCompose={openCompose} />
-
-            {isFormOpen && (
-              <BroadcastComposeForm
-                activeEvent={activeEvent}
-                form={form}
-                disasterTypes={disasterTypes}
-                severityLevels={severityLevels}
-                puroks={puroks}
-                statusOptions={statusOptions}
-                selectedPurok={selectedPurok}
-                selectedPriority={selectedPriority}
-                selectedStatuses={selectedStatuses}
-                directPuroks={directPuroks}
-                recipientNote={recipientNote}
-                formError={formError}
-                isSaving={isSaving}
-                onChange={updateForm}
-                onSelectPurok={setSelectedPurok}
-                onSelectPriority={setSelectedPriority}
-                onAddPurok={addDirectPurok}
-                onRemovePurok={removeDirectPurok}
-                onToggleStatus={toggleStatus}
-                onSubmit={handleSubmit}
-                onCancel={() => setIsFormOpen(false)}
-              />
-            )}
           </main>
 
           <BroadcastSidePanel activeEvent={activeEvent} broadcasts={broadcasts} />

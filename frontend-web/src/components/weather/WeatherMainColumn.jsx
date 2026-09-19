@@ -1,21 +1,6 @@
-import {
-  CloudLightning,
-  CloudRain,
-  CloudRainWind,
-  Cloudy,
-  ExternalLink,
-  Sun,
-} from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
 import WeatherLivePanel from './WeatherLivePanel'
-
-const conditionOptions = [
-  { key: 'sunny', label: 'Sunny', sub: 'Clear', icon: Sun },
-  { key: 'rainy', label: 'Rainy', sub: 'Rainfall', icon: CloudRain },
-  { key: 'stormy', label: 'Stormy', sub: 'Thunderstorm', icon: CloudLightning },
-  { key: 'cloudy', label: 'Cloudy', sub: 'Overcast', icon: Cloudy },
-  { key: 'storm', label: 'Storm', sub: 'Severe', icon: CloudRainWind },
-]
 
 export default function WeatherMainColumn({
   latest,
@@ -23,60 +8,41 @@ export default function WeatherMainColumn({
   hasSnapshot,
   activeConditionKey,
   riskTone,
-  liveTitle,
+  activeEvent,
+  locationName,
 }) {
   return (
-    <div className="weather-main-column">
+    <>
       <WeatherLivePanel
         latest={latest}
-        hasSnapshot={hasSnapshot}
         activeConditionKey={activeConditionKey}
         riskTone={riskTone}
-        liveTitle={liveTitle}
       />
 
-      <WeatherConditionStates activeConditionKey={activeConditionKey} />
-      <ForecastOutlook latest={latest} />
-      <AdvisoryUpdates latest={latest} sourceLinks={sourceLinks} hasSnapshot={hasSnapshot} riskTone={riskTone} />
-    </div>
-  )
-}
-
-function WeatherConditionStates({ activeConditionKey }) {
-  return (
-    <section className="panel">
-      <div className="panel-head"><span className="panel-title">Weather condition display</span></div>
-      <div className="wx-condition-options" aria-label="Weather condition states">
-        {conditionOptions.map((option) => {
-          const Icon = option.icon
-          const isActive = activeConditionKey === option.key || (activeConditionKey === 'stormy' && option.key === 'storm')
-
-          return (
-            <div className={`wx-condition-option ${isActive ? 'active' : ''}`} key={option.key}>
-              <Icon size={20} />
-              <span><strong>{option.label}</strong><span>{isActive ? 'Active now' : option.sub}</span></span>
-            </div>
-          )
-        })}
+      <div className="weather-main-column">
+        <ForecastOutlook latest={latest} locationName={locationName} />
+        <AdvisoryUpdates latest={latest} hasSnapshot={hasSnapshot} riskTone={riskTone} activeEvent={activeEvent} />
+        <SourceLinks sourceLinks={sourceLinks} />
       </div>
-    </section>
+    </>
   )
 }
 
-function ForecastOutlook({ latest }) {
+function ForecastOutlook({ latest, locationName }) {
   return (
-    <section className="panel">
-      <div className="panel-head"><span className="panel-title">Forecast outlook</span></div>
+    <section className="wx-panel">
+      <div className="wx-panel-head">
+        <span className="wx-panel-title">Three-day forecast</span>
+        {locationName && <span className="wx-panel-location">{locationName}</span>}
+      </div>
       {latest?.daily_forecast?.length ? (
         <div className="wx-forecast-grid">
           {latest.daily_forecast.map((day) => (
             <article className="wx-forecast-card" key={day.date}>
               <div className="wx-forecast-date">{day.date}</div>
-              <strong>{day.condition_name}</strong>
-              <span>{day.temp_min}°C - {day.temp_max}°C</span>
-              <span>{day.rain_probability}% rain chance</span>
-              <span>{day.rainfall_sum} mm expected rain</span>
-              <span>Gusts up to {day.gust_max} km/h</span>
+              <div className="wx-forecast-temp">{day.temp_max}° / {day.temp_min}°</div>
+              <div className="wx-forecast-meta">{day.condition_name} · {day.rain_probability}% rain</div>
+              <div className="wx-forecast-extra">{day.rainfall_sum} mm · gusts {day.gust_max} km/h</div>
             </article>
           ))}
         </div>
@@ -87,33 +53,93 @@ function ForecastOutlook({ latest }) {
   )
 }
 
-function AdvisoryUpdates({ latest, sourceLinks, hasSnapshot, riskTone }) {
+function AdvisoryUpdates({ latest, hasSnapshot, riskTone, activeEvent }) {
   return (
-    <section className="panel">
-      <div className="panel-head"><span className="panel-title">Latest advisory updates</span></div>
+    <section className="wx-panel">
+      <div className="wx-panel-head"><span className="wx-panel-title">Latest advisory updates</span></div>
       <div className="wx-advisory-list">
-        {hasSnapshot ? (
-          <article className={`wx-advisory-card ${riskTone}`}>
+        {!activeEvent ? (
+          <div className="wx-advisory-title">NO ACTIVE DISASTER</div>
+        ) : activeEvent.latest_advisory ? (
+          <article>
             <div className="wx-advisory-head">
-              <span className="wx-advisory-source">{latest.source_name} - Saved Forecast Snapshot</span>
-              <span className="wx-advisory-time">{latest.observed_at || '-'}</span>
+              <span className="wx-advisory-source">Disaster advisory</span>
+              <span className="wx-status-pill">Broadcast</span>
             </div>
-            <div className="wx-msg">{latest.advisory_text}</div>
+            <div className="wx-advisory-title">{activeEvent.latest_advisory.title || activeEvent.name}</div>
+            <div className="wx-advisory-text">{activeEvent.latest_advisory.message}</div>
+            <div className="wx-advisory-context">
+              <span className="wx-advisory-dot" aria-hidden="true" />
+              {activeEvent.latest_advisory.sent_at || activeEvent.name}
+            </div>
+          </article>
+        ) : hasSnapshot ? (
+          <article>
+            <div className="wx-advisory-title">{activeEvent.name}</div>
+            <div className="wx-advisory-text">No disaster advisory has been broadcast for this active event.</div>
           </article>
         ) : (
           <EmptyState title="No saved advisory snapshot" message="The latest forecast snapshot will appear after the scheduled backend refresh runs." />
         )}
+      </div>
+    </section>
+  )
+}
 
+function SourceLinks({ sourceLinks }) {
+  if (!sourceLinks?.length) {
+    return null
+  }
+
+  // Helper function to map full backend notes into short, concise titles/phrases
+  const getShortPhrase = (source) => {
+    const text = source.note || ''
+    
+    if (text.includes('Official public weather forecast')) {
+      return 'Public Forecast & Warning Context'
+    }
+    if (text.includes('confirm named cyclones')) {
+      return 'Named Cyclones, PAR Entry & Wind Signals'
+    }
+    if (text.includes('Reference for rainfall warning')) {
+      return 'Rainfall, Thunderstorm & Flood Alerts'
+    }
+    if (text.includes('Structured numeric forecast')) {
+      return 'Automated Open-Meteo Numeric Model'
+    }
+
+    return source.name || 'Official Weather Reference'
+  }
+
+  return (
+    <section className="wx-panel">
+      <div className="wx-panel-head">
+        <span className="wx-panel-title">Official sources</span>
+      </div>
+
+      <div className="wx-source-links grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {sourceLinks.map((source) => (
-          <article className="wx-advisory-card info" key={source.url}>
-            <div className="wx-advisory-head">
-              <span className="wx-advisory-source">{source.name}</span>
-              <a href={source.url} target="_blank" rel="noreferrer">
-                Open <ExternalLink size={12} />
-              </a>
+          <a
+            key={source.url}
+            href={source.url}
+            target="_blank"
+            rel="noreferrer"
+            className="wx-source-card group flex flex-col justify-between p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left no-underline h-full"
+          >
+            <div className="flex flex-col mb-3">
+              <span className="wx-source-name font-semibold text-gray-900 group-hover:text-blue-600 text-sm leading-tight">
+                {source.name}
+              </span>
+              <span className="wx-source-phrase text-xs text-gray-500 mt-1">
+                {getShortPhrase(source)}
+              </span>
             </div>
-            <div className="wx-msg">{source.note}</div>
-          </article>
+
+            <div className="wx-source-action">
+              <span>Open</span>
+              <ExternalLink size={12} />
+            </div>
+          </a>
         ))}
       </div>
     </section>

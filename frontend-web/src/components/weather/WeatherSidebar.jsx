@@ -1,4 +1,3 @@
-import { AlertTriangle } from 'lucide-react'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 import {
@@ -6,56 +5,28 @@ import {
   valueWithUnit,
 } from '../../utils/weatherHelpers'
 
-export default function WeatherSidebar({ workspace, logs, monitorRows }) {
+export default function WeatherSidebar({ workspace, logs }) {
   return (
     <aside className="weather-side-column">
-      <MonitoringStatus activeEvent={workspace.active_event} monitorRows={monitorRows} />
       <SourceRule autoRefresh={workspace.auto_refresh} />
       <AlertHistory logs={logs} />
-      <ActiveEventLink activeEvent={workspace.active_event} />
     </aside>
-  )
-}
-
-function MonitoringStatus({ activeEvent, monitorRows }) {
-  return (
-    <section className="panel">
-      <div className="panel-head">
-        <span className="panel-title">Monitoring status</span>
-        <Badge tone={activeEvent ? 'red' : 'gray'}>{activeEvent ? 'Event-linked' : 'Monitoring'}</Badge>
-      </div>
-      <div className="wx-monitor-list">
-        {monitorRows.map((row) => {
-          const Icon = row.icon
-
-          return (
-            <div className={`wx-monitor-row ${row.tone}`} key={row.title}>
-              <span className="wx-monitor-icon"><Icon size={16} /></span>
-              <div>
-                <span className="wx-monitor-title">{row.title}</span>
-                <span className="wx-monitor-sub">{row.sub}</span>
-              </div>
-              <span className="wx-monitor-value">{row.value}</span>
-            </div>
-          )
-        })}
-      </div>
-    </section>
   )
 }
 
 function SourceRule({ autoRefresh }) {
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <span className="panel-title">Source rule</span>
-        <Badge tone="blue">Auto</Badge>
+    <section className="wx-panel">
+      <div className="wx-panel-head">
+        <span className="wx-panel-title">Source freshness</span>
+        <Badge tone="blue">Live</Badge>
       </div>
-      <div className="wx-source-note">
-        {autoRefresh?.source || 'Open-Meteo Forecast API'} refreshes every 3 hours.
+      <div className="wx-freshness-row">
+        <span className="wx-freshness-dot" aria-hidden="true" />
+        <strong>{autoRefresh?.source || 'Open-Meteo Forecast API'}</strong>
       </div>
-      <div className="wx-source-note">
-        Confirm PAGASA warnings before broadcasting.
+      <div className="wx-freshness-meta">
+        Latest snapshot refreshes every 3 hours.
       </div>
     </section>
   )
@@ -63,46 +34,34 @@ function SourceRule({ autoRefresh }) {
 
 function AlertHistory({ logs }) {
   return (
-    <section className="panel">
-      <div className="panel-head"><span className="panel-title">Alert history</span></div>
+    <section className="wx-panel">
+      <div className="wx-panel-head"><span className="wx-panel-title">Alert history</span></div>
       {logs.length === 0 ? (
         <EmptyState title="No weather logs yet" message="Saved snapshots will appear here after refresh." />
       ) : (
-        <div className="log-list wx-history-list">
+        <div className="wx-history-list">
           {logs.map((log) => (
-            <div className="log-item" key={log.weather_log_id}>
-              <span className="log-time">{log.observed_time || '-'}</span>
-              <span className={`log-dot log-${historyTone(log.risk_level)}`} />
-              <div className="log-msg">
-                {log.condition_name} - {log.source_name}
-                <span className="log-extra">Rain {valueWithUnit(log.rainfall_mm, 'mm')}</span>
+            <div className="wx-history-item" key={log.weather_log_id}>
+              <span className={`wx-history-dot ${historyTone(log.risk_level)}`} aria-hidden="true" />
+              <div className="wx-history-body">
+                <span className="wx-history-title">{log.condition_name} · {log.source_name}</span>
+                <span className="wx-history-meta">{log.observed_at || log.observed_time || '-'} · {log.advisory_title || 'Weather snapshot'}</span>
+                <span className="wx-history-meta">
+                  Temp {valueWithUnit(log.temperature, 'C')} · Feels {valueWithUnit(log.apparent_temperature, 'C')} · Humidity {valueWithUnit(log.humidity, '%')}
+                </span>
+                <span className="wx-history-meta">
+                  Rain {valueWithUnit(log.rainfall_mm, 'mm')} · Wind {valueWithUnit(log.wind_speed, 'km/h')} {log.wind_direction || ''} · Gusts {valueWithUnit(log.wind_gusts, 'km/h')}
+                </span>
+                {log.advisory_text && <span className="wx-history-text">{log.advisory_text}</span>}
+                {log.risk_tags?.length > 0 && <span className="wx-history-meta">{log.risk_tags.join(' · ')}</span>}
               </div>
             </div>
           ))}
         </div>
       )}
-      <div className="wx-source-note">
+      <div className="wx-footnote">
         PAGASA Ten-Day API can be added after token approval.
       </div>
-    </section>
-  )
-}
-
-function ActiveEventLink({ activeEvent }) {
-  return (
-    <section className="panel">
-      <div className="panel-head"><span className="panel-title">Active event link</span></div>
-      {activeEvent ? (
-        <div className="wx-event-link">
-          <AlertTriangle size={16} />
-          <div>
-            <strong>{activeEvent.name}</strong>
-            <span>{activeEvent.type_name} - {activeEvent.severity_label}</span>
-          </div>
-        </div>
-      ) : (
-        <EmptyState title="No active disaster event" message="Weather can still be monitored, but archive/SitRep linkage starts after an event is declared." />
-      )}
     </section>
   )
 }
