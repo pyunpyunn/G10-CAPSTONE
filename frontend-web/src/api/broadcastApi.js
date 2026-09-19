@@ -19,3 +19,8 @@ export async function getBroadcasts(eventId) {
   const response = await api.get(`/disaster-events/${eventId}/broadcasts`)
   return response.data.data
 }
+
+export async function updateDisasterEvent(eventId, payload) {
+  const response = await api.put(`/disaster-events/${eventId}`, payload)
+  return response.data.data
+}
