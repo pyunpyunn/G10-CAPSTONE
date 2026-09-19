@@ -1,9 +1,9 @@
 import {
+  ArrowUpRight,
   Radio,
+  Settings,
   TriangleAlert,
 } from 'lucide-react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 import LoadingState from '../ui/LoadingState'

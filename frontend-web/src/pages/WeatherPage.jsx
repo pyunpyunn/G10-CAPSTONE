@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RefreshCcw } from 'lucide-react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faXmark } from '@fortawesome/free-solid-svg-icons'
+import { RefreshCcw, X } from 'lucide-react'
 import { getWeatherWorkspace, refreshWeather } from '../api/weatherApi'
 import WeatherMainColumn from '../components/weather/WeatherMainColumn'
 import WeatherSidebar from '../components/weather/WeatherSidebar'
@@ -104,7 +102,7 @@ export default function WeatherPage() {
             onClick={() => setRefreshMessage('')}
             aria-label="Close message"
           >
-            <FontAwesomeIcon icon={faXmark} />
+            <X size={14} />
           </button>
         </div>
       )}
