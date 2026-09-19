@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 
@@ -10,9 +10,11 @@ export function RescuerHeader({ onOpenRadio }: HeaderProps) {
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
-        <View style={styles.logo}>
-          <Text style={styles.logoText}>R</Text>
-        </View>
+        <Image
+          source={require('@/assets/images/resqperation-logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <Text style={styles.brand}>RESQPERATION</Text>
         <View style={styles.actions}>
           {onOpenRadio ? (
@@ -40,19 +42,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   logo: {
-    width: 42,
+    width: 48,
     height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#8bd5dc',
-    borderRadius: 21,
-    backgroundColor: '#4bbbc4',
-  },
-  logoText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '900',
   },
   brand: {
     color: '#fff',

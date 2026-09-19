@@ -1,0 +1,104 @@
+/* Shared viewport gutters and a consistent safe area below every page. */
+:root {
+  --page-gutter: clamp(14px, 2vw, 22px);
+  --page-top-space: clamp(16px, 2.5vw, 26px);
+  --page-bottom-space: clamp(36px, 5vw, 56px);
+  --main-bottom-space: max(30px, env(safe-area-inset-bottom));
+}
+
+.main {
+  display: block;
+  border-bottom: 1px solid var(--color-border);
+  padding:
+    var(--page-top-space)
+    var(--page-gutter)
+    var(--main-bottom-space);
+}
+
+.main-view {
+  display: block;
+  width: 100%;
+  min-height: 0;
+}
+
+.main-view > .page,
+.main-view > .page.active,
+.main-view > section.page {
+  min-width: 0;
+  min-height: 0 !important;
+  padding: 0 !important;
+}
+
+.landing-page {
+  padding-bottom: var(--main-bottom-space);
+}
+
+.landing-wrap {
+  width: min(1120px, calc(100% - (var(--page-gutter) * 2)));
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --page-gutter: 14px;
+    --page-top-space: 14px;
+    --page-bottom-space: 40px;
+  }
+
+  .topbar {
+    gap: 8px;
+    padding-inline: var(--page-gutter);
+  }
+
+  .header-brand {
+    width: auto;
+  }
+
+  .pg-head,
+  .pg-actions,
+  .page-ops-row,
+  .footer-inner {
+    align-items: stretch;
+  }
+
+  .pg-actions,
+  .page-ops-row,
+  .page-ops-row .left,
+  .page-ops-row .right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .pg-actions .btn,
+  .page-ops-row .btn {
+    flex: 1 1 140px;
+  }
+
+  .footer-inner,
+  .footer-links {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --page-gutter: 12px;
+    --page-bottom-space: 36px;
+  }
+
+  .header-brand-text,
+  .topbar .header-meta {
+    display: none;
+  }
+
+  .pg-actions .btn,
+  .page-ops-row .btn {
+    flex-basis: 100%;
+  }
+}

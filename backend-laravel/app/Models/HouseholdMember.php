@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HouseholdMember extends Model
@@ -16,11 +17,11 @@ class HouseholdMember extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['household_id', 'first_name', 'middle_name', 'last_name', 'birth_date', 'gender_id', 'relationship_id', 'civil_status_id', 'occupation', 'education_level_id', 'is_graduate', 'is_pwd', 'is_senior', 'is_pregnant'];
+    protected $fillable = ['household_id', 'first_name', 'middle_name', 'last_name', 'birth_date', 'gender_id', 'relationship_id', 'is_household_head', 'can_report_for_household', 'contact_number', 'civil_status_id', 'occupation', 'education_level_id', 'is_graduate', 'is_pwd', 'is_senior', 'is_pregnant'];
 
     protected function casts(): array
     {
-        return ['birth_date' => 'date', 'is_graduate' => 'boolean', 'is_pwd' => 'boolean', 'is_senior' => 'boolean', 'is_pregnant' => 'boolean'];
+        return ['birth_date' => 'date', 'is_household_head' => 'boolean', 'can_report_for_household' => 'boolean', 'is_graduate' => 'boolean', 'is_pwd' => 'boolean', 'is_senior' => 'boolean', 'is_pregnant' => 'boolean', 'created_at' => 'datetime', 'updated_at' => 'datetime', 'deleted_at' => 'datetime'];
     }
 
     public function household(): BelongsTo
@@ -36,5 +37,10 @@ class HouseholdMember extends Model
     public function relationship(): BelongsTo
     {
         return $this->belongsTo(Relationship::class, 'relationship_id', 'relationship_id');
+    }
+
+    public function vulnerableGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(VulnerableGroup::class, 'member_vulnerable_groups', 'member_id', 'vulnerable_group_id');
     }
 }

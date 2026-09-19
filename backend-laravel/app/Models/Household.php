@@ -22,7 +22,12 @@ class Household extends Model
 
     protected function casts(): array
     {
-        return ['member_count' => 'integer'];
+        return [
+            'member_count' => 'integer',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+            'deleted_at' => 'datetime',
+        ];
     }
 
     public function address(): BelongsTo

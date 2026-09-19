@@ -160,7 +160,21 @@ class MappingService
             ->orderBy('h.household_name')
             ->limit(1500)
             ->get()
-            ->map(fn (object $row): array => $this->formatHouseholdPoint($row))
+            ->map(function (object $row) use ($eventId): array {
+                $point = $this->formatHouseholdPoint($row);
+
+                if (! $row->status_key || $row->status_key === 'unknown' || $row->status_key === 'unchecked') {
+                    $fallback = $this->fallbackHouseholdStatusFromMembers((string) $row->household_id, $eventId);
+
+                    if ($fallback) {
+                        $point['status_key'] = $fallback['status_key'];
+                        $point['status_label'] = $fallback['status_label'];
+                        $point['marker_group'] = $this->statusGroup($fallback['status_key']);
+                    }
+                }
+
+                return $point;
+            })
             ->values();
 
         $status = $request->query('status', 'all');
@@ -261,15 +275,36 @@ class MappingService
             $query->where('ra.disaster_id', $eventId);
         }
 
-        return $query
+        $routes = $query
             ->select($this->routeSelectColumns())
             ->orderByDesc('rr.created_at')
             ->limit(50)
             ->get()
             ->map(fn (object $route): array => $this->formatRoute($route))
-            ->filter(fn (array $route): bool => count($route['coordinates']) >= 2)
+            ->filter(fn (array $route): bool => $this->isActiveDispatchRoute($route['status']) && count($route['coordinates']) >= 2)
             ->values()
             ->all();
+
+        return $routes;
+    }
+
+    private function isActiveDispatchRoute(?string $status): bool
+    {
+        $value = strtolower((string) ($status ?? ''));
+
+        if ($value === '') {
+            return true;
+        }
+
+        $inactive = ['completed', 'cancelled', 'returned', 'ended', 'closed', 'failed'];
+
+        foreach ($inactive as $flag) {
+            if ($value === $flag || str_contains($value, $flag)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function getSummary(?string $eventId, bool $hasActiveEvent): array
@@ -414,7 +449,8 @@ class MappingService
 
     private function formatHouseholdPoint(object $row): array
     {
-        $statusKey = $row->status_key ?? null;
+        $statusKey = $this->normalizeHouseholdStatusKey($row->status_key ?? null);
+        $statusLabel = $row->status_label ?: 'Unchecked';
         $group = $this->statusGroup($statusKey);
 
         return [
@@ -424,7 +460,7 @@ class MappingService
             'household_code' => $row->household_code,
             'purok' => $row->purok_name ?: 'Unassigned',
             'status_key' => $statusKey ?: 'unchecked',
-            'status_label' => $row->status_label ?: 'Unchecked',
+            'status_label' => $statusLabel ?: 'Unchecked',
             'marker_group' => $group,
             'marker_color' => $this->statusColor($group),
             'latitude' => (float) $row->latitude,
@@ -611,15 +647,70 @@ class MappingService
     {
         $key = str_replace('-', '_', strtolower((string) $statusKey));
 
-        if (in_array($key, ['safe', 'evacuated', 'checked', 'active', 'returned', 'relocated'], true)) {
+        if (in_array($key, ['safe', 'safe_at_home', 'evacuated', 'checked', 'active', 'returned', 'relocated', 'all_members_safe'], true)) {
             return 'green';
         }
 
-        if (in_array($key, ['unsafe', 'missing', 'injured', 'need_help', 'needs_help', 'not_evacuated', 'displaced'], true)) {
+        if (in_array($key, ['unsafe', 'missing', 'injured', 'need_help', 'needs_help', 'needs_assistance', 'not_evacuated', 'displaced', 'trapped', 'unreachable', 'deceased', 'not_safe'], true)) {
             return 'red';
         }
 
         return 'gray';
+    }
+
+    private function normalizeHouseholdStatusKey(?string $statusKey): ?string
+    {
+        if (! $statusKey) {
+            return null;
+        }
+
+        $key = str_replace('-', '_', strtolower(trim((string) $statusKey)));
+
+        return match ($key) {
+            'safe_at_home', 'all_members_safe' => 'safe',
+            'needs_assistance' => 'unsafe',
+            'need_help', 'needs_help' => 'unsafe',
+            'not_safe' => 'unsafe',
+            'not_evacuated' => 'unsafe',
+            default => $key,
+        };
+    }
+
+    private function fallbackHouseholdStatusFromMembers(string $householdId, ?string $eventId): ?array
+    {
+        if (! $eventId || ! Schema::hasTable('member_disaster_statuses') || ! Schema::hasTable('member_statuses')) {
+            return null;
+        }
+
+        $statuses = DB::table('member_disaster_statuses as mds')
+            ->join('household_members as hm', 'hm.member_id', '=', 'mds.member_id')
+            ->join('member_statuses as ms', 'ms.status_id', '=', 'mds.status_id')
+            ->where('mds.disaster_id', $eventId)
+            ->where('mds.household_id', $householdId)
+            ->whereNull('hm.deleted_at')
+            ->pluck('ms.status_key');
+
+        if ($statuses->isEmpty()) {
+            return null;
+        }
+
+        $list = $statuses->map(fn ($value) => str_replace('-', '_', strtolower((string) $value)))->all();
+        $unsafeKeys = ['unsafe', 'needs_help', 'needs_assistance', 'injured', 'trapped', 'missing', 'unreachable', 'deceased', 'not_safe'];
+        $safeKeys = ['safe', 'safe_at_home', 'active', 'returned', 'evacuated', 'relocated'];
+
+        if (collect($list)->contains(fn ($value) => in_array($value, $unsafeKeys, true))) {
+            return ['status_key' => 'unsafe', 'status_label' => 'Unsafe'];
+        }
+
+        if (collect($list)->every(fn ($value) => in_array($value, $safeKeys, true))) {
+            return ['status_key' => 'safe', 'status_label' => 'Safe'];
+        }
+
+        if (collect($list)->contains(fn ($value) => in_array($value, ['evacuated', 'relocated'], true))) {
+            return ['status_key' => 'evacuated', 'status_label' => 'Evacuated'];
+        }
+
+        return ['status_key' => 'unchecked', 'status_label' => 'Unchecked'];
     }
 
     private function statusColor(string $group): string

@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class HouseholdStatusService
@@ -100,7 +101,7 @@ class HouseholdStatusService
                     $devices,
                     (bool) $activeEvent
                 ),
-                'members' => $this->getMembers($householdId, $devices),
+                'members' => $this->getMembers($householdId, $eventId, $devices),
                 'devices' => $devices,
             ],
         ]);
@@ -385,7 +386,7 @@ class HouseholdStatusService
         }
 
         if ($status === 'unsafe') {
-            $query->whereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
+            $query->whereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased']);
         }
 
         if ($status === 'device' || $deviceRisk === 'watch') {
@@ -412,7 +413,7 @@ class HouseholdStatusService
             $query->where(function ($urgentQuery): void {
                 $urgentQuery
                     ->where('hd.needs_dispatch', true)
-                    ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'])
+                    ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased'])
                     ->orWhere(function ($criticalDevice): void {
                         $criticalDevice
                             ->where('devices.device_total', '>', 0)
@@ -453,7 +454,7 @@ class HouseholdStatusService
 
         $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
-        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
+        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased']);
         $safeTotal = $safeOnly + $evacuated;
 
         $reported = DB::table('household_disasters')
@@ -481,7 +482,7 @@ class HouseholdStatusService
                 ->where(function ($query): void {
                     $query
                         ->where('hd.needs_dispatch', true)
-                        ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
+                        ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased']);
                 })
                 ->distinct()
                 ->count('hd.household_id'),
@@ -685,8 +686,8 @@ class HouseholdStatusService
                 'dt.last_location_at',
                 'dt.last_seen_at',
                 'dt.is_active',
-                DB::raw("NULLIF(TRIM(CONCAT(COALESCE(hm.first_name, ''), ' ', COALESCE(hm.last_name, ''))), '') as member_name"),
                 'hm.first_name',
+                'hm.middle_name',
                 'hm.last_name',
             ]);
 
@@ -708,7 +709,11 @@ class HouseholdStatusService
                     'device_uuid' => $device->device_uuid,
                     'device_name' => $device->device_name ?: 'Household mobile',
                     'member_id' => $device->member_id,
-                    'member_name' => $this->personName($device->member_name, $device->first_name, $device->last_name, 'Household user'),
+                    'member_name' => trim(implode(' ', array_filter([
+                        $device->first_name,
+                        $device->middle_name,
+                        $device->last_name,
+                    ]))) ?: 'Household user',
                     'platform' => $this->label($device->platform ?: 'mobile'),
                     'app_role' => $this->label($device->app_role ?: 'household'),
                     'battery_level' => $battery,
@@ -728,35 +733,70 @@ class HouseholdStatusService
             ->values();
     }
 
-    private function getMembers(string $householdId, $devices)
+    private function getMembers(string $householdId, ?string $eventId, $devices)
     {
         $devicesByMember = $devices
             ->filter(fn (array $device): bool => ! empty($device['member_id']))
             ->groupBy('member_id')
             ->map(fn ($memberDevices) => $memberDevices->first());
 
+        $householdDisplayStatus = $this->householdMemberDisplayStatus($householdId, $eventId);
+
         return DB::table('household_members as hm')
             ->leftJoin('relationships as r', 'r.relationship_id', '=', 'hm.relationship_id')
             ->leftJoin('genders as g', 'g.gender_id', '=', 'hm.gender_id')
+            ->leftJoin('member_disaster_statuses as mds', function ($join) use ($eventId): void {
+                $join->on('mds.member_id', '=', 'hm.member_id')
+                    ->where('mds.disaster_id', '=', $eventId);
+            })
+            ->leftJoin('member_statuses as ms', 'ms.status_id', '=', 'mds.status_id')
             ->where('hm.household_id', $householdId)
             ->whereNull('hm.deleted_at')
-            ->orderByRaw("CASE WHEN r.relationship_key IN ('head', 'household_head') OR r.relationship_label LIKE '%Head%' THEN 0 ELSE 1 END")
+            ->orderByDesc('hm.is_household_head')
+            ->orderBy('hm.last_name')
             ->orderBy('hm.first_name')
             ->get([
-                'hm.*',
-                'r.relationship_label as relation',
-                'g.gender_label as gender',
+                'hm.member_id',
+                'hm.first_name',
+                'hm.middle_name',
+                'hm.last_name',
+                'hm.birth_date',
+                'g.gender_label',
+                'r.relationship_label',
+                'hm.is_household_head',
+                'hm.is_pwd',
+                'hm.is_senior',
+                'hm.is_pregnant',
+                'ms.status_key',
+                'ms.status_label',
+                'ms.color_hex as status_color',
+                'mds.updated_at as status_updated_at',
             ])
-            ->map(function (object $member) use ($devicesByMember): array {
+            ->map(function (object $member) use ($devicesByMember, $householdDisplayStatus): array {
                 $device = $devicesByMember->get($member->member_id);
-                $fullName = trim(($member->first_name ?? '').' '.($member->last_name ?? ''));
+                $fullName = trim(implode(' ', array_filter([
+                    $member->first_name,
+                    $member->middle_name,
+                    $member->last_name,
+                ])));
+                $status = $householdDisplayStatus ?: [
+                    'key' => $member->status_key ?: 'unknown',
+                    'label' => $member->status_label ?: 'Unknown / No Report',
+                    'color' => $member->status_color,
+                ];
 
                 return [
                     'member_id' => $member->member_id,
-                    'name' => $fullName !== '' ? $fullName : 'Household member',
-                    'relation' => $member->relation ?? 'Member',
+                    'name' => $fullName ?: 'Unnamed member',
+                    'relation' => $member->relationship_label ?: 'Not specified',
                     'age' => $this->ageFromBirthDate($member->birth_date),
-                    'gender' => $member->gender ?? 'Unspecified',
+                    'gender' => $member->gender_label ?: 'Not specified',
+                    'is_household_head' => (bool) $member->is_household_head,
+                    'is_pwd' => (bool) $member->is_pwd,
+                    'is_senior' => (bool) $member->is_senior,
+                    'is_pregnant' => (bool) $member->is_pregnant,
+                    'status' => $status,
+                    'status_updated_at' => $this->formatDateTime($member->status_updated_at),
                     'risk_flags' => $this->memberRiskFlags($member),
                     'device_name' => $device['device_name'] ?? 'No assigned mobile',
                     'device_platform' => $device['platform'] ?? null,
@@ -769,6 +809,50 @@ class HouseholdStatusService
                 ];
             })
             ->values();
+    }
+
+    private function householdMemberDisplayStatus(string $householdId, ?string $eventId): ?array
+    {
+        if (! $eventId || ! Schema::hasTable('member_disaster_statuses') || ! Schema::hasTable('member_statuses')) {
+            return null;
+        }
+
+        $statuses = DB::table('member_disaster_statuses as mds')
+            ->join('household_members as hm', 'hm.member_id', '=', 'mds.member_id')
+            ->join('member_statuses as ms', 'ms.status_id', '=', 'mds.status_id')
+            ->where('mds.disaster_id', $eventId)
+            ->where('mds.household_id', $householdId)
+            ->whereNull('hm.deleted_at')
+            ->pluck('ms.status_key');
+
+        $unsafeKeys = [
+            'unsafe',
+            'needs_help',
+            'needs_assistance',
+            'injured',
+            'trapped',
+            'missing',
+            'unreachable',
+            'deceased',
+        ];
+
+        if ($statuses->intersect($unsafeKeys)->isNotEmpty()) {
+            return [
+                'key' => 'unsafe',
+                'label' => 'Unsafe',
+                'color' => '#DC2626',
+            ];
+        }
+
+        if ($statuses->isNotEmpty() && $statuses->every(fn (string $status): bool => in_array($status, ['safe', 'safe_at_home', 'active', 'returned'], true))) {
+            return [
+                'key' => 'safe',
+                'label' => 'Safe',
+                'color' => '#0D9488',
+            ];
+        }
+
+        return null;
     }
 
     private function formatHouseholdRow(object $row, ?object $latestLog, ?object $latestDevice, ?object $accountUser, bool $hasActiveEvent): array
@@ -912,7 +996,7 @@ class HouseholdStatusService
             $label = 'Evacuated';
         }
 
-        if (in_array($statusKey, ['not_evacuated', 'displaced', 'unsafe'], true)) {
+        if (in_array($statusKey, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased'], true)) {
             $key = 'unsafe';
             $label = str_contains(strtolower($label), 'help') || str_contains(strtolower($label), 'assist') ? 'Needs help' : 'Unsafe';
         }
