@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Archive, RefreshCcw, RotateCcw } from 'lucide-react'
-import { createBroadcast, createDisasterEvent, getBroadcastWorkspace } from '../api/broadcastApi'
+import { RefreshCcw, RotateCcw } from 'lucide-react'
+import {
+  createBroadcast,
+  createDisasterEvent,
+  getBroadcastWorkspace,
+  updateDisasterEvent,
+} from '../api/broadcastApi'
 import { closeActiveEvent } from '../api/dashboardApi'
 import BroadcastComposeForm from '../components/broadcast/BroadcastComposeForm'
 import BroadcastSidePanel from '../components/broadcast/BroadcastSidePanel'
 import CloseActiveEventModal from '../components/broadcast/CloseActiveEventModal'
+import UpdateActiveEventModal from '../components/broadcast/UpdateActiveEventModal'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import {
@@ -26,9 +32,14 @@ export default function BroadcastPage() {
   const [directPuroks, setDirectPuroks] = useState([])
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
   const [isClosingEvent, setIsClosingEvent] = useState(false)
   const [closeError, setCloseError] = useState('')
+
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
+  const [isUpdatingEvent, setIsUpdatingEvent] = useState(false)
+  const [updateError, setUpdateError] = useState('')
 
   useEffect(() => {
     let ignore = false
@@ -65,6 +76,9 @@ export default function BroadcastPage() {
   const severityLevels = workspace?.severity_levels || []
   const puroks = workspace?.puroks || []
   const statusOptions = workspace?.status_options || []
+  const evacuationCenters = workspace?.evacuation_centers || []
+  const affectedAreas = workspace?.affected_areas || []
+
   const selectedType = disasterTypes.find((type) => String(type.type_id) === String(form.type_id))
   const currentTypeName = activeEvent?.type_name || selectedType?.type_name || 'Disaster event'
   const recipientNote = useMemo(
@@ -130,7 +144,7 @@ export default function BroadcastPage() {
     }
 
     if (directPuroks.length >= 5) {
-      setFormError('Add up to 5 direct-impact puroks only until the broadcast metadata columns are approved.')
+      setFormError('Add up to 5 direct-impact puroks only.')
       return
     }
 
@@ -153,6 +167,11 @@ export default function BroadcastPage() {
   async function handleSubmit(event) {
     event.preventDefault()
     setFormError('')
+
+    if (!form.broadcast_title.trim() || !form.message.trim()) {
+      setFormError('Broadcast title and official instruction message are required.')
+      return
+    }
 
     if (selectedStatuses.length !== 4) {
       setFormError('Select exactly four household mobile status buttons.')
@@ -211,7 +230,7 @@ export default function BroadcastPage() {
       setWorkspace(updatedWorkspace)
       initForm(updatedWorkspace)
     } catch (saveError) {
-      setFormError(apiErrorMessage(saveError, 'Unable to save this broadcast. Please check the entries and try again.'))
+      setFormError(apiErrorMessage(saveError, 'Unable to save this broadcast. Please check all entries and try again.'))
     } finally {
       setIsSaving(false)
     }
@@ -232,6 +251,23 @@ export default function BroadcastPage() {
     }
   }
 
+  async function handleUpdateActiveEvent(updatedData) {
+    if (!activeEvent) return
+
+    setIsUpdatingEvent(true)
+    setUpdateError('')
+
+    try {
+      await updateDisasterEvent(activeEvent.event_id, updatedData)
+      setIsUpdateModalOpen(false)
+      await loadWorkspace()
+    } catch (err) {
+      setUpdateError(apiErrorMessage(err, 'Unable to update active disaster event.'))
+    } finally {
+      setIsUpdatingEvent(false)
+    }
+  }
+
   return (
     <section className="page broadcast-page active">
       <PageHeader
@@ -246,12 +282,6 @@ export default function BroadcastPage() {
               <RefreshCcw size={14} />
               Refresh
             </button>
-            {activeEvent && (
-              <button className="btn btn-warning btn-sm" type="button" onClick={() => setIsCloseModalOpen(true)}>
-                <Archive size={14} />
-                Close Active Event
-              </button>
-            )}
           </>
         }
       />
@@ -263,6 +293,17 @@ export default function BroadcastPage() {
         closeError={closeError}
         onClose={closeCloseEventModal}
         onConfirm={handleCloseActiveEvent}
+      />
+
+      <UpdateActiveEventModal
+        activeEvent={activeEvent}
+        disasterTypes={disasterTypes}
+        severityLevels={severityLevels}
+        isOpen={isUpdateModalOpen}
+        isUpdating={isUpdatingEvent}
+        updateError={updateError}
+        onClose={() => setIsUpdateModalOpen(false)}
+        onConfirm={handleUpdateActiveEvent}
       />
 
       {isLoading && <LoadingState />}
@@ -296,7 +337,15 @@ export default function BroadcastPage() {
             />
           </main>
 
-          <BroadcastSidePanel activeEvent={activeEvent} broadcasts={broadcasts} />
+          <BroadcastSidePanel
+            activeEvent={activeEvent}
+            broadcasts={broadcasts}
+            evacuationCenters={evacuationCenters}
+            affectedAreas={affectedAreas}
+            onCloseActiveEvent={() => setIsCloseModalOpen(true)}
+            onUpdateActiveEvent={() => setIsUpdateModalOpen(true)}
+            onDeclareActiveEvent={() => initForm()}
+          />
         </div>
       )}
     </section>
