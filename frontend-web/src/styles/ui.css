@@ -1,0 +1,219 @@
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(20px, 5vh, 32px);
+  background: rgba(15, 23, 42, 0.56);
+}
+
+.modal-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, calc(100vw - 48px));
+  max-height: calc(100vh - 72px);
+  overflow: hidden;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+}
+
+.modal-head,
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 13px;
+}
+
+.modal-head {
+  border-bottom: 1px solid var(--color-bg-secondary);
+}
+
+.modal-head h2 {
+  margin: 0;
+  color: var(--color-text-1);
+  font-size: 12px;
+}
+
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  padding: 13px;
+}
+
+.modal-footer {
+  border-top: 1px solid var(--color-bg-secondary);
+  background: var(--color-bg-secondary);
+}
+
+.ra-modal-head,
+.ra-modal-actions,
+.rr-validation-modal-head,
+.rr-validation-modal-actions,
+.sr-gen-head,
+.sr-gen-actions,
+.modal-head,
+.modal-footer,
+.archive-view-head,
+.archive-view-actions {
+  flex-shrink: 0;
+}
+
+.ra-modal-body,
+.rr-validation-modal-body,
+.sr-gen-body,
+.modal-body,
+.archive-view-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ra-modal,
+.rr-validation-modal,
+.sr-gen-modal,
+.modal-panel,
+.archive-view-modal {
+  max-height: min(820px, calc(100dvh - 48px));
+}
+
+.ra-modal-overlay,
+.rr-validation-modal-overlay,
+.sr-gen-overlay,
+.modal-backdrop,
+.archive-view-modal-overlay {
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.close-event-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.close-event-copy p {
+  margin: 0;
+  color: var(--color-text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.close-event-copy strong {
+  color: var(--color-text-1);
+}
+
+.action-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.action-menu-list {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  z-index: 80;
+  display: grid;
+  min-width: 150px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #ffffff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16);
+}
+
+.action-menu-list.action-menu-floating {
+  position: fixed;
+  top: auto;
+  right: auto;
+  z-index: 13000;
+  min-width: 168px;
+  padding: 5px;
+  border-radius: 10px;
+}
+
+.action-menu-list button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  color: var(--color-text-3);
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.action-menu-list.action-menu-floating button {
+  border-radius: 7px;
+  padding: 8px 8px;
+}
+
+.action-menu-list button:hover,
+.action-menu-list button:focus-visible {
+  background: var(--color-bg-secondary);
+  outline: none;
+}
+
+.action-menu-list button.is-danger {
+  color: var(--chart-unsafe);
+}
+
+.action-menu-list button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.action-menu-list button:disabled:hover {
+  background: #ffffff;
+}
+
+.quick-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.quick-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text-2);
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.quick-action-button:hover,
+.quick-action-button:focus-visible {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-secondary);
+  outline: none;
+}
+
+.page-ops-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.page-ops-row .left,
+.page-ops-row .right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
