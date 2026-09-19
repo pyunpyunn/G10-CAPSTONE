@@ -1,11 +1,3 @@
-/* Weather Updates — fully self-scoped module styles.
-   Every rule lives under .weather-page and uses locally-defined
-   --wxc-* custom properties (each falling back to your shared
-   design tokens). No bare/global classnames (.panel, .btn, .log-*,
-   .form-error, etc.) are used anywhere in this file or its markup,
-   so nothing in the app-wide stylesheet can select into or override
-   this module, and this module can't leak out either. */
-
 .weather-page {
   --wxc-radius: 10px;
   --wxc-border: var(--color-border, #e2e8f0);

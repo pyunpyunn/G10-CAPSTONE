@@ -1,6 +1,9 @@
 .app-shell {
   --left-column: var(--left-width);
+  --topbar-height: 64px;
   min-height: 100vh;
+  padding-left: var(--left-column);
+  transition: padding-left 220ms cubic-bezier(0.19, 1, 0.22, 1);
 }
 
 .app-shell.left-hidden {
@@ -8,15 +11,12 @@
 }
 
 .topbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 50;
+  position: relative;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: var(--header-height);
+  height: var(--topbar-height);
   gap: 20px;
   padding: 0 22px;
   color: var(--nav-text);
@@ -34,8 +34,8 @@
 
 .header-brand-logo {
   display: block;
-  width: 72px;
-  height: 38px;
+  width: 58px;
+  height: 30px;
   padding: 0;
   background: transparent;
   object-fit: contain;
@@ -43,14 +43,50 @@
   overflow: hidden;
 }
 
-.header-brand strong {
-  overflow: hidden;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 650;
+.header-brand-wordmark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  color: #f5f7fb;
+  font-family: "Archivo Black", "Arial Black", sans-serif;
   line-height: 1;
-  text-overflow: ellipsis;
+  letter-spacing: 0;
   white-space: nowrap;
+}
+
+.header-brand-wordmark-text {
+  display: inline-block;
+  font-size: 22px;
+  font-weight: 900;
+  text-transform: lowercase;
+}
+
+.header-brand-wordmark-prefix {
+  transform: translateY(-1px);
+}
+
+.header-brand-wordmark-suffix {
+  transform: translateY(-1px);
+}
+
+.header-brand-wordmark-pin {
+  width: 30px;
+  height: 36px;
+  margin: 0 1px -6px 2px;
+  flex: 0 0 auto;
+  color: #f5f7fb;
+  filter: drop-shadow(0 2px 3px rgba(10, 16, 27, 0.32));
+}
+
+.header-brand-wordmark-route {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1px;
+  width: 100%;
+  height: 10px;
+  color: rgba(245, 247, 251, 0.65);
 }
 
 .header-actions {
@@ -65,9 +101,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 42px;
+  height: 36px;
   border: 1px solid var(--color-nav-hover);
-  border-radius: 14px;
+  border-radius: 12px;
   color: var(--color-nav-text);
   background: var(--color-nav-bg);
   box-shadow: 0 4px 12px rgba(5, 10, 18, 0.16);
@@ -77,7 +113,7 @@
 
 .header-action {
   position: relative;
-  width: 46px;
+  width: 38px;
 }
 
 .header-action:hover,
@@ -146,8 +182,8 @@
 .profile-avatar {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 27px;
+  height: 27px;
   border-radius: 50%;
   color: #ffffff;
   background: linear-gradient(135deg, var(--chart-evacuated), var(--chart-safe));
@@ -185,10 +221,10 @@
 
 .leftbar {
   position: fixed;
-  top: var(--header-height);
+  top: 0;
   bottom: 0;
   left: 0;
-  z-index: 30;
+  z-index: 50;
   display: flex;
   flex-direction: column;
   width: var(--left-column);
@@ -202,6 +238,7 @@
 
 .app-shell.left-hidden.left-peeking .leftbar {
   width: var(--left-width);
+  z-index: 60;
   box-shadow: 12px 0 30px rgba(9, 15, 24, 0.08);
 }
 
@@ -441,21 +478,13 @@
 }
 
 .main {
-  position: fixed;
-  top: var(--header-height);
-  right: 0;
-  bottom: 0;
-  left: var(--left-column);
   display: flex;
   align-items: stretch;
   min-width: 0;
   overflow-x: hidden;
-  overflow-y: auto;
   box-sizing: border-box;
   padding-bottom: 26px;
   background: var(--bg);
-  transition: left 220ms cubic-bezier(0.19, 1, 0.22, 1);
-  scrollbar-gutter: stable;
 }
 
 .page {
@@ -464,7 +493,7 @@
   width: 100%;
   flex: 1 0 auto;
   flex-direction: column;
-  min-height: calc(100vh - var(--header-height));
+  min-height: calc(100vh - var(--topbar-height));
   padding: 26px 22px 104px;
 }
 
@@ -502,7 +531,7 @@
 
 .page-loading-card {
   position: fixed;
-  top: calc(var(--header-height) + 24px);
+  top: calc(var(--topbar-height) + 24px);
   left: calc(var(--left-column, var(--left-collapsed)) + ((100vw - var(--left-column, var(--left-collapsed))) / 2));
   z-index: 45;
   display: flex;
