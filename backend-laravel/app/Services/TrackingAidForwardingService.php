@@ -49,6 +49,34 @@ class TrackingAidForwardingService
         }
     }
 
+    public function syncRequestStatus(string $requestId, string $status, ?Carbon $updatedAt = null): void
+    {
+        $connection = (string) config('services.trackingaid.connection', 'trackingaid');
+        $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
+
+        try {
+            if (! Schema::connection($connection)->hasTable($table)) {
+                return;
+            }
+
+            DB::connection($connection)
+                ->table($table)
+                ->where('resqperation_request_id', $requestId)
+                ->update([
+                    'resqperation_status' => strtolower(trim($status)),
+                    'updated_at' => $updatedAt ?: now(),
+                ]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            throw new RuntimeException(
+                'TrackingAid status could not be synchronized. Check the TrackingAid database connection.',
+                0,
+                $exception
+            );
+        }
+    }
+
     private function ensureForwardTable(string $connection, string $table): void
     {
         if (Schema::connection($connection)->hasTable($table)) {

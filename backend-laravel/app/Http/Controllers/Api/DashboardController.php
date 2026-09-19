@@ -21,6 +21,32 @@ class DashboardController extends Controller
         return $this->service->index();
     }
 
+    /** Lightweight first-paint payload for the dashboard shell. */
+    public function summary(): JsonResponse
+    {
+        return $this->service->summary();
+    }
+
+    public function dispatch(): JsonResponse
+    {
+        return $this->service->dispatch();
+    }
+
+    public function weather(): JsonResponse
+    {
+        return $this->service->weather();
+    }
+
+    public function requests(): JsonResponse
+    {
+        return $this->service->requests();
+    }
+
+    public function activity(): JsonResponse
+    {
+        return $this->service->activity();
+    }
+
     public function closeActiveEvent(Request $request): JsonResponse
     {
         return $this->service->closeActiveEvent($request);

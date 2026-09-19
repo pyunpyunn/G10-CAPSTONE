@@ -1,6 +1,5 @@
 import { ShieldCheck } from 'lucide-react'
 import {
-  BatteryDisplay,
   StatusBadge,
 } from './HouseholdTable'
 
@@ -37,23 +36,22 @@ export default function HouseholdDetailContent({ detail, history }) {
 
 function FamilyMembersTable({ members }) {
   return (
-    <DetailSection title="Family members" note={`${members.length} people`}>
+    <DetailSection title="Family members" note={`${members.length} people - household status applies to all`}>
       <table className="hh-detail-table">
         <thead>
           <tr>
             <th>Member</th>
             <th>Role</th>
-            <th>Risk</th>
-            <th>Device</th>
-            <th>Battery</th>
-            <th>Signal</th>
-            <th>Last known location</th>
-            <th>Last seen</th>
+            <th>Gender</th>
+            <th>Head</th>
+            <th>PWD</th>
+            <th>Senior</th>
+            <th>Pregnant</th>
           </tr>
         </thead>
         <tbody>
           {members.length === 0 ? (
-            <EmptyTableRow colSpan={7} text="No household members are synced yet." />
+            <EmptyTableRow colSpan={8} text="No household members are synced yet." />
           ) : (
             members.map((member) => (
               <tr key={member.member_id || member.name}>
@@ -62,15 +60,11 @@ function FamilyMembersTable({ members }) {
                   <div className="hh-household-meta">{member.age ? `${member.age} yrs` : 'Age not recorded'} {member.gender ? `- ${member.gender}` : ''}</div>
                 </td>
                 <td>{member.relation}</td>
-                <td>{member.risk_flags}</td>
-                <td>
-                  <div className="hh-household-name">{member.device_name}</div>
-                  <div className="hh-household-meta">{member.device_platform || 'Mobile'} - {member.last_allowed_location}</div>
-                </td>
-                <td><BatteryDisplay value={member.battery_level} tone={member.battery_tone} /></td>
-                <td>{member.signal_strength !== null && member.signal_strength !== undefined ? `${member.signal_strength}%` : 'No signal'}</td>
-                <td>{member.last_location_label || 'No location yet'}</td>
-                <td>{member.last_seen_at || 'No device seen'}</td>
+                <td>{member.gender}</td>
+                <td>{member.is_household_head ? 'Yes' : 'No'}</td>
+                <td>{member.is_pwd ? 'Yes' : 'No'}</td>
+                <td>{member.is_senior ? 'Yes' : 'No'}</td>
+                <td>{member.is_pregnant ? 'Yes' : 'No'}</td>
               </tr>
             ))
           )}

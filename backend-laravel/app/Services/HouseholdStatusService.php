@@ -2,14 +2,18 @@
 
 namespace App\Services;
 
+use App\Repositories\HouseholdRepository;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class HouseholdStatusService
 {
+    public function __construct(private readonly HouseholdRepository $households) {}
+
     public function index(Request $request): JsonResponse
     {
         $activeEvent = $this->getActiveEvent();
@@ -97,7 +101,7 @@ class HouseholdStatusService
                     $devices,
                     (bool) $activeEvent
                 ),
-                'members' => $this->getMembers($householdId, $devices),
+                'members' => $this->getMembers($householdId, $eventId, $devices),
                 'devices' => $devices,
             ],
         ]);
@@ -107,40 +111,16 @@ class HouseholdStatusService
     {
         $activeEvent = $this->getActiveEvent();
 
-        $logs = DB::table('household_status_logs as hsl')
-            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
-            ->leftJoin('users as u', 'u.user_id', '=', 'hsl.submitted_by_user_id')
-            ->where('hsl.household_id', $householdId)
-            ->when($activeEvent, fn ($query) => $query->where('hsl.disaster_id', $activeEvent->event_id))
-            ->orderByDesc('hsl.submitted_at')
-            ->orderByDesc('hsl.created_at')
-            ->limit(50)
-            ->get([
-                'hsl.status_log_id',
-                'hsl.status_id',
-                'hs.status_key',
-                'hs.status_label',
-                'hsl.source',
-                'hsl.submitted_by_user_id',
-                'u.name as user_name',
-                'u.first_name',
-                'u.last_name',
-                'hsl.location_label',
-                'hsl.location_accuracy_m',
-                'hsl.battery_level',
-                'hsl.signal_strength',
-                'hsl.notes',
-                'hsl.submitted_at',
-                'hsl.created_at',
-            ])
-            ->map(function (object $log): array {
+        $logs = $this->households
+            ->latestStatusLogs($householdId, $activeEvent?->event_id)
+            ->map(function ($log): array {
                 $notes = $this->decodeJson($log->notes);
 
                 return [
                     'status_log_id' => $log->status_log_id,
-                    'status' => $this->formatStatus($log->status_key, $log->status_label, $notes),
+                    'status' => $this->formatStatus($log->status?->status_key, $log->status?->status_label, $notes),
                     'source' => $this->sourceLabel($log->source),
-                    'submitted_by' => $this->personName($log->user_name, $log->first_name, $log->last_name, $log->submitted_by_user_id),
+                    'submitted_by' => $this->personName($log->submittedBy?->name, $log->submittedBy?->first_name, $log->submittedBy?->last_name, $log->submitted_by_user_id),
                     'location_label' => $log->location_label,
                     'location_accuracy_m' => $log->location_accuracy_m,
                     'battery_level' => $log->battery_level,
@@ -255,6 +235,47 @@ class HouseholdStatusService
         ], 201);
     }
 
+    public function confirmStatus(Request $request, string $householdId): JsonResponse
+    {
+        if (! Schema::hasTable('household_status_logs')) {
+            return response()->json([
+                'message' => 'Household status logs are not available in the active database.',
+            ], 503);
+        }
+
+        $log = DB::table('household_status_logs')
+            ->where('household_id', $householdId)
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (! $log) {
+            return response()->json([
+                'message' => 'No household status report is available to confirm yet.',
+            ], 404);
+        }
+
+        $now = now();
+        $userId = $request->user()?->user_id;
+
+        DB::table('household_status_logs')
+            ->where('status_log_id', $log->status_log_id)
+            ->update(array_filter([
+                'reviewed_by_user_id' => Schema::hasColumn('household_status_logs', 'reviewed_by_user_id') ? $userId : null,
+                'reviewed_at' => Schema::hasColumn('household_status_logs', 'reviewed_at') ? $now : null,
+                'updated_at' => Schema::hasColumn('household_status_logs', 'updated_at') ? $now : null,
+            ], fn ($value) => $value !== null));
+
+        return response()->json([
+            'message' => 'Latest household status report confirmed by HQ.',
+            'data' => [
+                'household_id' => $householdId,
+                'status_log_id' => $log->status_log_id,
+                'reviewed_at' => $now->format('M d, Y h:i A'),
+            ],
+        ]);
+    }
+
     private function householdListQuery(?string $eventId)
     {
         $memberCounts = DB::table('household_members')
@@ -299,8 +320,7 @@ class HouseholdStatusService
                 'h.member_count',
                 'a.full_address',
                 'a.purok_sitio',
-                'a.barangay_name',
-                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(a.barangay_name, ''), 'Unassigned') as purok"),
+                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned') as purok"),
                 'hd.current_status_id',
                 'hd.last_status_source',
                 'hd.last_status_notes',
@@ -364,7 +384,7 @@ class HouseholdStatusService
         }
 
         if ($status === 'unsafe') {
-            $query->whereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
+            $query->whereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased']);
         }
 
         if ($status === 'device' || $deviceRisk === 'watch') {
@@ -391,7 +411,7 @@ class HouseholdStatusService
             $query->where(function ($urgentQuery): void {
                 $urgentQuery
                     ->where('hd.needs_dispatch', true)
-                    ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'])
+                    ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased'])
                     ->orWhere(function ($criticalDevice): void {
                         $criticalDevice
                             ->where('devices.device_total', '>', 0)
@@ -432,7 +452,7 @@ class HouseholdStatusService
 
         $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
-        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
+        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased']);
         $safeTotal = $safeOnly + $evacuated;
 
         $reported = DB::table('household_disasters')
@@ -460,7 +480,7 @@ class HouseholdStatusService
                 ->where(function ($query): void {
                     $query
                         ->where('hd.needs_dispatch', true)
-                        ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
+                        ->orWhereIn('hs.status_key', ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased']);
                 })
                 ->distinct()
                 ->count('hd.household_id'),
@@ -469,7 +489,7 @@ class HouseholdStatusService
 
     private function getPurokSummary(?string $eventId)
     {
-        $areaExpression = "COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(a.barangay_name, ''), 'Unassigned')";
+        $areaExpression = "COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned')";
         $unsafeKeys = [
             'not_evacuated',
             'displaced',
@@ -664,8 +684,8 @@ class HouseholdStatusService
                 'dt.last_location_at',
                 'dt.last_seen_at',
                 'dt.is_active',
-                'hm.name as member_name',
                 'hm.first_name',
+                'hm.middle_name',
                 'hm.last_name',
             ]);
 
@@ -687,7 +707,11 @@ class HouseholdStatusService
                     'device_uuid' => $device->device_uuid,
                     'device_name' => $device->device_name ?: 'Household mobile',
                     'member_id' => $device->member_id,
-                    'member_name' => $this->personName($device->member_name, $device->first_name, $device->last_name, 'Household user'),
+                    'member_name' => trim(implode(' ', array_filter([
+                        $device->first_name,
+                        $device->middle_name,
+                        $device->last_name,
+                    ]))) ?: 'Household user',
                     'platform' => $this->label($device->platform ?: 'mobile'),
                     'app_role' => $this->label($device->app_role ?: 'household'),
                     'battery_level' => $battery,
@@ -707,28 +731,70 @@ class HouseholdStatusService
             ->values();
     }
 
-    private function getMembers(string $householdId, $devices)
+    private function getMembers(string $householdId, ?string $eventId, $devices)
     {
         $devicesByMember = $devices
             ->filter(fn (array $device): bool => ! empty($device['member_id']))
             ->groupBy('member_id')
             ->map(fn ($memberDevices) => $memberDevices->first());
 
-        return DB::table('household_members')
-            ->where('household_id', $householdId)
-            ->whereNull('deleted_at')
-            ->orderByRaw('CASE WHEN relation IN ("Head", "head", "Household Head") THEN 0 ELSE 1 END')
-            ->orderBy('name')
-            ->get()
-            ->map(function (object $member) use ($devicesByMember): array {
+        $householdDisplayStatus = $this->householdMemberDisplayStatus($householdId, $eventId);
+
+        return DB::table('household_members as hm')
+            ->leftJoin('relationships as r', 'r.relationship_id', '=', 'hm.relationship_id')
+            ->leftJoin('genders as g', 'g.gender_id', '=', 'hm.gender_id')
+            ->leftJoin('member_disaster_statuses as mds', function ($join) use ($eventId): void {
+                $join->on('mds.member_id', '=', 'hm.member_id')
+                    ->where('mds.disaster_id', '=', $eventId);
+            })
+            ->leftJoin('member_statuses as ms', 'ms.status_id', '=', 'mds.status_id')
+            ->where('hm.household_id', $householdId)
+            ->whereNull('hm.deleted_at')
+            ->orderByDesc('hm.is_household_head')
+            ->orderBy('hm.last_name')
+            ->orderBy('hm.first_name')
+            ->get([
+                'hm.member_id',
+                'hm.first_name',
+                'hm.middle_name',
+                'hm.last_name',
+                'hm.birth_date',
+                'g.gender_label',
+                'r.relationship_label',
+                'hm.is_household_head',
+                'hm.is_pwd',
+                'hm.is_senior',
+                'hm.is_pregnant',
+                'ms.status_key',
+                'ms.status_label',
+                'ms.color_hex as status_color',
+                'mds.updated_at as status_updated_at',
+            ])
+            ->map(function (object $member) use ($devicesByMember, $householdDisplayStatus): array {
                 $device = $devicesByMember->get($member->member_id);
+                $fullName = trim(implode(' ', array_filter([
+                    $member->first_name,
+                    $member->middle_name,
+                    $member->last_name,
+                ])));
+                $status = $householdDisplayStatus ?: [
+                    'key' => $member->status_key ?: 'unknown',
+                    'label' => $member->status_label ?: 'Unknown / No Report',
+                    'color' => $member->status_color,
+                ];
 
                 return [
                     'member_id' => $member->member_id,
-                    'name' => $member->name ?: trim(($member->first_name ?? '').' '.($member->last_name ?? '')),
-                    'relation' => $member->relation ?: 'Member',
-                    'age' => $member->age ?: $this->ageFromBirthDate($member->birth_date),
-                    'gender' => $member->gender ?: $member->sex,
+                    'name' => $fullName ?: 'Unnamed member',
+                    'relation' => $member->relationship_label ?: 'Not specified',
+                    'age' => $this->ageFromBirthDate($member->birth_date),
+                    'gender' => $member->gender_label ?: 'Not specified',
+                    'is_household_head' => (bool) $member->is_household_head,
+                    'is_pwd' => (bool) $member->is_pwd,
+                    'is_senior' => (bool) $member->is_senior,
+                    'is_pregnant' => (bool) $member->is_pregnant,
+                    'status' => $status,
+                    'status_updated_at' => $this->formatDateTime($member->status_updated_at),
                     'risk_flags' => $this->memberRiskFlags($member),
                     'device_name' => $device['device_name'] ?? 'No assigned mobile',
                     'device_platform' => $device['platform'] ?? null,
@@ -741,6 +807,50 @@ class HouseholdStatusService
                 ];
             })
             ->values();
+    }
+
+    private function householdMemberDisplayStatus(string $householdId, ?string $eventId): ?array
+    {
+        if (! $eventId || ! Schema::hasTable('member_disaster_statuses') || ! Schema::hasTable('member_statuses')) {
+            return null;
+        }
+
+        $statuses = DB::table('member_disaster_statuses as mds')
+            ->join('household_members as hm', 'hm.member_id', '=', 'mds.member_id')
+            ->join('member_statuses as ms', 'ms.status_id', '=', 'mds.status_id')
+            ->where('mds.disaster_id', $eventId)
+            ->where('mds.household_id', $householdId)
+            ->whereNull('hm.deleted_at')
+            ->pluck('ms.status_key');
+
+        $unsafeKeys = [
+            'unsafe',
+            'needs_help',
+            'needs_assistance',
+            'injured',
+            'trapped',
+            'missing',
+            'unreachable',
+            'deceased',
+        ];
+
+        if ($statuses->intersect($unsafeKeys)->isNotEmpty()) {
+            return [
+                'key' => 'unsafe',
+                'label' => 'Unsafe',
+                'color' => '#DC2626',
+            ];
+        }
+
+        if ($statuses->isNotEmpty() && $statuses->every(fn (string $status): bool => in_array($status, ['safe', 'safe_at_home', 'active', 'returned'], true))) {
+            return [
+                'key' => 'safe',
+                'label' => 'Safe',
+                'color' => '#0D9488',
+            ];
+        }
+
+        return null;
     }
 
     private function formatHouseholdRow(object $row, ?object $latestLog, ?object $latestDevice, ?object $accountUser, bool $hasActiveEvent): array
@@ -884,7 +994,7 @@ class HouseholdStatusService
             $label = 'Evacuated';
         }
 
-        if (in_array($statusKey, ['not_evacuated', 'displaced', 'unsafe'], true)) {
+        if (in_array($statusKey, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased'], true)) {
             $key = 'unsafe';
             $label = str_contains(strtolower($label), 'help') || str_contains(strtolower($label), 'assist') ? 'Needs help' : 'Unsafe';
         }
@@ -1029,7 +1139,7 @@ class HouseholdStatusService
             $flags[] = 'Pregnant';
         }
 
-        if ($member->special_needs) {
+        if (! empty($member->special_needs)) {
             $flags[] = $member->special_needs;
         }
 

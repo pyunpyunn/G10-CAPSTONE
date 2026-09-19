@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ResourceRequest;
 use App\Services\BarangayProfileService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -484,7 +485,7 @@ class SituationReportService
 
     private function resourceSummary(string $eventId): array
     {
-        $requests = DB::table('resource_requests')
+        $requests = ResourceRequest::query()
             ->where(function ($query) use ($eventId): void {
                 $query->where('source_reference', $eventId)
                     ->orWhereNull('source_reference');

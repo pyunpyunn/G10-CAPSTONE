@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ResourceRequest;
 use App\Services\BarangayProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -658,7 +659,8 @@ class ArchiveService
 
     private function resourceRequestRows(Request $request, int $perPage = 25): array
     {
-        $query = DB::table('resource_requests as rr')
+        $query = ResourceRequest::query()
+            ->from('resource_requests as rr')
             ->leftJoin('disaster_events as de', 'de.event_id', '=', 'rr.source_reference')
             ->leftJoin('evacuation_centers as ec', 'ec.evacuation_center_id', '=', 'rr.evacuation_center_id')
             ->leftJoin('urgency_levels as ul', 'ul.urgency_id', '=', 'rr.urgency_id')

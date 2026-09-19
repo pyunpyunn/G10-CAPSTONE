@@ -18,10 +18,8 @@ class WeatherService
 
     public function workspace(): JsonResponse
     {
-        $activeEvent = $this->weather->getActiveEvent();
-
         return response()->json([
-            'data' => $this->weather->pageData($activeEvent?->event_id),
+            'data' => $this->weather->pageData(null),
         ]);
     }
 
@@ -42,9 +40,7 @@ class WeatherService
 
     public function refreshWorkspace(Request $request): JsonResponse
     {
-        $activeEvent = $this->weather->getActiveEvent();
-
-        return $this->saveRefresh($activeEvent?->event_id);
+        return $this->saveRefresh(null);
     }
 
     public function refreshEvent(Request $request, string $eventId): JsonResponse
@@ -55,7 +51,7 @@ class WeatherService
             ], 404);
         }
 
-        return $this->saveRefresh($eventId);
+        return $this->saveRefresh(null);
     }
 
     private function saveRefresh(?string $eventId): JsonResponse

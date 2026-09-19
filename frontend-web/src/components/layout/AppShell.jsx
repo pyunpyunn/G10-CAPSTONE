@@ -24,7 +24,9 @@ export default function AppShell({ user, pages, onLogout, onUserChange }) {
       />
       <Topbar user={user} />
       <main className="main">
-        <Outlet context={{ user, onUserChange }} />
+        <div className="main-view">
+          <Outlet context={{ user, onUserChange }} />
+        </div>
       </main>
     </div>
   )

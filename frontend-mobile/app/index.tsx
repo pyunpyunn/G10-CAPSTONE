@@ -29,7 +29,7 @@ export default function MobileLoginScreen() {
 
   async function handleLogin() {
     if (!login.trim() || !password.trim()) {
-      Alert.alert('Missing details', 'Enter your account ID and password.');
+      Alert.alert('Missing details', 'Enter your user ID and password.');
       return;
     }
 
@@ -58,7 +58,7 @@ export default function MobileLoginScreen() {
         error?.userMessage ||
         error?.response?.data?.message ||
         error?.response?.data?.errors?.login?.[0] ||
-        'Unable to sign in. Please check your account ID and password.';
+        'Unable to sign in. Please check your user ID and password.';
 
       Alert.alert('Login failed', message);
     } finally {
@@ -91,14 +91,14 @@ export default function MobileLoginScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Account ID</Text>
+              <Text style={styles.label}>User ID</Text>
               <View style={styles.inputShell}>
                 <Ionicons name="person-outline" size={19} color={palette.textSoft} />
                 <TextInput
                   style={styles.input}
                   value={login}
                   onChangeText={setLogin}
-                  placeholder="Example: 2024035501"
+                  placeholder="Example: USR-HH-2024035501"
                   placeholderTextColor="#7d8da0"
                   autoCapitalize="none"
                   autoCorrect={false}

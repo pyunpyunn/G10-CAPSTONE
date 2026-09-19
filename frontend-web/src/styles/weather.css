@@ -1,0 +1,639 @@
+/* Weather Updates — fully self-scoped module styles.
+   Every rule lives under .weather-page and uses locally-defined
+   --wxc-* custom properties (each falling back to your shared
+   design tokens). No bare/global classnames (.panel, .btn, .log-*,
+   .form-error, etc.) are used anywhere in this file or its markup,
+   so nothing in the app-wide stylesheet can select into or override
+   this module, and this module can't leak out either. */
+
+.weather-page {
+  --wxc-radius: 10px;
+  --wxc-border: var(--color-border, #e2e8f0);
+  --wxc-card: var(--color-bg-primary, #ffffff);
+  --wxc-muted-bg: var(--color-bg-secondary, #f1f5f9);
+  --wxc-text-1: var(--color-text-1, #0f172a);
+  --wxc-text-2: var(--color-text-2, #334155);
+  --wxc-text-3: var(--color-text-3, #64748b);
+
+  --wxc-primary: var(--color-nav-active, #2563eb);
+  --wxc-success: var(--color-safe-text, #16a34a);
+  --wxc-warning: var(--color-warn-text, #b45309);
+  --wxc-critical: var(--color-unsafe-text, #b91c1c);
+  --wxc-accent: var(--color-evac-text, #7c3aed);
+
+  --wxc-primary-soft: color-mix(in srgb, var(--wxc-primary) 12%, white);
+  --wxc-success-soft: color-mix(in srgb, var(--wxc-success) 12%, white);
+  --wxc-warning-soft: color-mix(in srgb, var(--wxc-warning) 12%, white);
+  --wxc-critical-soft: color-mix(in srgb, var(--wxc-critical) 12%, white);
+  --wxc-accent-soft: color-mix(in srgb, var(--wxc-accent) 12%, white);
+
+  display: grid;
+  gap: 16px;
+  color: var(--wxc-text-1);
+}
+
+/* ---------- Header ---------- */
+
+.weather-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 4px;
+}
+
+.weather-page-header h1 {
+  margin: 0;
+  color: var(--wxc-text-1);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.weather-page-header p {
+  margin: 5px 0 0;
+  color: var(--wxc-text-3);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.weather-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.weather-live-status {
+  display: grid;
+  gap: 2px;
+  color: var(--wxc-text-3);
+  text-align: right;
+}
+
+.weather-live-status strong {
+  color: var(--wxc-text-1);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.weather-live-status span {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.wx-refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--wxc-primary);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.wx-refresh-button:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.wx-refresh-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---------- Banners ---------- */
+
+.wx-error-banner {
+  border: 1px solid color-mix(in srgb, var(--wxc-critical) 30%, white);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--wxc-critical);
+  background: var(--wxc-critical-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.wx-save-message {
+  border: 1px solid color-mix(in srgb, var(--wxc-success) 30%, white);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--wxc-success);
+  background: var(--wxc-success-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* ---------- Dashboard grid: 3 / 6 / 3 ---------- */
+
+.weather-dashboard {
+  display: grid;
+  grid-template-columns: minmax(200px, 3fr) minmax(0, 6fr) minmax(200px, 3fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.weather-left-column,
+.weather-main-column,
+.weather-side-column {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.weather-left-column {
+  grid-column: 1;
+  align-content: start;
+}
+
+.weather-main-column {
+  grid-column: 2;
+}
+
+.weather-side-column {
+  grid-column: 3;
+  align-content: start;
+  position: sticky;
+  top: 16px;
+}
+
+/* ---------- Panel primitive (module-local, not shared) ---------- */
+
+.wx-panel {
+  min-width: 0;
+  border: 1px solid var(--wxc-border);
+  border-radius: var(--wxc-radius);
+  padding: 16px;
+  background: var(--wxc-card);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.wx-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.wx-panel-title {
+  color: var(--wxc-text-3);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wx-panel-location {
+  color: var(--wxc-text-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ---------- Current condition ---------- */
+
+.wx-current-panel .wx-panel-head {
+  margin-bottom: 8px;
+}
+
+.wx-current-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wx-condition-chip {
+  display: grid;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--wxc-primary);
+  background: var(--wxc-primary-soft);
+}
+
+.wx-condition-chip.warning {
+  color: var(--wxc-warning);
+  background: var(--wxc-warning-soft);
+}
+
+.wx-condition-chip.critical {
+  color: var(--wxc-critical);
+  background: var(--wxc-critical-soft);
+}
+
+.wx-condition-name {
+  color: var(--wxc-text-1);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* ---------- Metric cards (temperature / rainfall / wind) ---------- */
+
+.wx-metric-label {
+  color: var(--wxc-text-3);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wx-metric-value {
+  display: block;
+  margin-top: 8px;
+  color: var(--wxc-text-1);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.wx-metric-value--lg {
+  font-size: 26px;
+}
+
+.wx-metric-detail {
+  margin-top: 6px;
+  color: var(--wxc-text-3);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+/* ---------- Forecast ---------- */
+
+.wx-forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.wx-forecast-card {
+  display: grid;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--wxc-muted-bg);
+}
+
+.wx-forecast-date {
+  color: var(--wxc-text-3);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.wx-forecast-temp {
+  color: var(--wxc-text-1);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.wx-forecast-meta {
+  color: var(--wxc-text-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.wx-forecast-extra {
+  color: var(--wxc-text-3);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ---------- Advisory ---------- */
+
+.wx-advisory-list {
+  display: grid;
+  gap: 8px;
+}
+
+.wx-advisory-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.wx-advisory-source {
+  color: var(--wxc-text-3);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.wx-status-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: var(--wxc-primary);
+  background: var(--wxc-primary-soft);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.wx-status-pill.warning {
+  color: var(--wxc-warning);
+  background: var(--wxc-warning-soft);
+}
+
+.wx-status-pill.critical {
+  color: var(--wxc-critical);
+  background: var(--wxc-critical-soft);
+}
+
+.wx-advisory-title {
+  margin-bottom: 4px;
+  color: var(--wxc-text-1);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wx-advisory-text {
+  color: var(--wxc-text-3);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.wx-advisory-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--wxc-text-3);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.wx-advisory-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wxc-accent);
+}
+
+/* ---------- Official sources ---------- */
+
+.wx-source-links {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .wx-source-links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .wx-source-links {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.wx-source-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  padding: 12px;
+  background: var(--wxc-card);
+  border: 1px solid var(--wxc-border);
+  border-radius: 8px;
+  text-align: left;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.wx-source-card:hover {
+  border-color: var(--wxc-primary);
+  background: var(--wxc-primary-soft);
+}
+
+.wx-source-name {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--wxc-text-1);
+  line-height: 1.25;
+  transition: color 0.15s ease;
+}
+
+.wx-source-card:hover .wx-source-name {
+  color: var(--wxc-primary);
+}
+
+.wx-source-phrase {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--wxc-text-3);
+  line-height: 1.35;
+}
+
+.wx-source-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--wxc-text-3);
+  align-self: flex-start;
+  transition: color 0.15s ease;
+}
+
+.wx-source-card:hover .wx-source-action {
+  color: var(--wxc-primary);
+}
+
+/* ---------- Sidebar: source freshness ---------- */
+
+.wx-freshness-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--wxc-text-1);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.wx-freshness-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wxc-success);
+}
+
+.wx-freshness-meta {
+  margin-top: 4px;
+  color: var(--wxc-text-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ---------- Sidebar: alert history ---------- */
+
+.wx-history-list {
+  display: grid;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.wx-history-item {
+  display: flex;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--wxc-border);
+}
+
+.wx-history-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.wx-history-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--wxc-primary);
+}
+
+.wx-history-dot.warning {
+  background: var(--wxc-warning);
+}
+
+.wx-history-dot.critical {
+  background: var(--wxc-critical);
+}
+
+.wx-history-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wx-history-title {
+  color: var(--wxc-text-1);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.wx-history-meta {
+  color: var(--wxc-text-3);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.wx-footnote {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--wxc-border);
+  color: var(--wxc-text-3);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1180px) {
+  .weather-dashboard {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+
+  .weather-left-column,
+  .weather-main-column {
+    grid-column: 1;
+  }
+
+  .weather-side-column {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 760px) {
+  .weather-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .weather-page-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .weather-live-status {
+    text-align: left;
+  }
+
+  .weather-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .weather-left-column,
+  .weather-main-column,
+  .weather-side-column {
+    grid-column: 1;
+  }
+
+  .weather-side-column {
+    position: static;
+  }
+
+  .wx-forecast-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Dismissible Banner Styles ---------- */
+
+.wx-save-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wx-banner-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.wx-banner-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+}

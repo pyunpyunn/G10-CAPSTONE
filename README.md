@@ -149,6 +149,7 @@ Important development rule:
 - `docs/RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, and TrackingAid/MappingAid integration draft.
 - `docs/RESQPERATION_TRACKINGAID_REQUEST_INTEGRATION_GUIDE.md` - complete EvaTrack intake and TrackingAid request handoff guide.
 - `docs/RESQPERATION_ONESIGNAL_MOBILE_SETUP.md` - OneSignal mobile setup and token registration flow.
+- `docs/RESQPERATION_MOBILE_INSTALL_DEV_BUILD_ONESIGNAL_GUIDE.md` - groupmate guide for installing the mobile APK, running Expo Go/dev build, and verifying OneSignal subscriptions.
 - `docs/RESQPERATION_SYSTEM_CLEANUP_AND_CURRENT_STATE.md` - latest cleanup notes and current system status.
 - `docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md` - current build checklist.
 - `docs/RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - shared MySQL connection guide using only `backend-laravel/.env`.

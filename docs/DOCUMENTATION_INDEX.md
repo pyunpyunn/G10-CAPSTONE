@@ -22,6 +22,7 @@ Local-only reference folders such as `FOR DEV/` and `prototype/` are ignored fro
 - `RESQPERATION_SHARED_DB_DATA_SOURCE_RULES.md` - rule that web pages must display only records from the active database connection.
 - `RESQPERATION_SHARED_DB_AUDIT_AND_PUSH_TOKENS.md` - shared DB connectivity, safe seeder review, OneSignal Player ID storage, and duplicate-data checks.
 - `RESQPERATION_ONESIGNAL_MOBILE_SETUP.md` - OneSignal mobile setup, Player ID flow, and authentication rules.
+- `RESQPERATION_MOBILE_INSTALL_DEV_BUILD_ONESIGNAL_GUIDE.md` - complete groupmate guide for installing the mobile APK, running Expo Go/dev build, and verifying OneSignal subscriptions.
 - `sql_proposals/` - review-only SQL scripts. Do not run on shared DB without DB member approval.
 - `sql_proposals/2026_06_25_shared_db_read_only_audit.sql` - read-only lookup, duplicate, and device-token audit.
 - `sql_proposals/initial/2026_06_12_g10_trackingaid_mappingaid_integration_draft.sql` - historical draft only; current TrackingAid handoff is documented in `RESQPERATION_TRACKINGAID_REQUEST_INTEGRATION_GUIDE.md`.

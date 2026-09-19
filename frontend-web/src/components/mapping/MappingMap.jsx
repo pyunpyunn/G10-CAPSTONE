@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
-import { ArrowLeft, EyeOff, Layers, MapPin, Maximize2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, EyeOff, Layers3, MapPin, Maximize2, Minimize2 } from 'lucide-react'
 import {
   CircleMarker,
   MapContainer,
@@ -15,6 +15,7 @@ import {
 import 'leaflet/dist/leaflet.css'
 import {
   escapeMarkerLabel,
+  isHouseholdRouteAllowed,
   labelize,
   markerGroups,
   percent,
@@ -29,25 +30,86 @@ export default function MappingMap({
   rescueTeams,
   visibleRoutes,
   selectedRoute,
+  selectedHousehold,
   mapCenter,
   mapBounds,
   onChangeLayer,
+  onSelectHousehold,
+  onRouteToDispatch,
   isFullscreen = false,
   onToggleFullscreen,
 }) {
+  const shellRef = useRef(null)
+  const dragRef = useRef(null)
+  const [layersExpanded, setLayersExpanded] = useState(true)
+  const [legendExpanded, setLegendExpanded] = useState(true)
+  const [layersPanelStyle, setLayersPanelStyle] = useState({ top: 12, right: 12 })
+  const [legendPanelStyle, setLegendPanelStyle] = useState({ left: 12, bottom: 12 })
+
+  useEffect(() => {
+    function handlePointerMove(event) {
+      if (!dragRef.current || !shellRef.current) return
+
+      const shellRect = shellRef.current.getBoundingClientRect()
+      const { key, width, height, offsetX, offsetY } = dragRef.current
+      const maxLeft = Math.max(8, shellRect.width - width - 8)
+      const maxTop = Math.max(8, shellRect.height - height - 8)
+
+      let nextLeft = event.clientX - shellRect.left - offsetX
+      let nextTop = event.clientY - shellRect.top - offsetY
+
+      nextLeft = Math.min(Math.max(nextLeft, 8), maxLeft)
+      nextTop = Math.min(Math.max(nextTop, 8), maxTop)
+
+      const nextStyle = { left: nextLeft, top: nextTop, right: 'auto', bottom: 'auto' }
+
+      if (key === 'layers') {
+        setLayersPanelStyle(nextStyle)
+      } else {
+        setLegendPanelStyle(nextStyle)
+      }
+    }
+
+    function handlePointerUp() {
+      dragRef.current = null
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [])
+
+  function beginDrag(event, key) {
+    const panel = event.currentTarget.closest('.mapmate-overlay-panel')
+    if (!panel) return
+
+    const rect = panel.getBoundingClientRect()
+    dragRef.current = {
+      key,
+      width: rect.width,
+      height: rect.height,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    }
+  }
+
   return (
-    <section className={`mapping-map-shell ${isFullscreen ? 'fullscreen' : ''}`}>
+    <section ref={shellRef} className={`mapmate-map-shell ${isFullscreen ? 'is-fullscreen' : ''}`} aria-label="Barangay operational map">
       <MapContainer
         center={mapCenter}
         zoom={workspace.barangay.zoom}
-        minZoom={15}
-        maxZoom={19}
+        minZoom={13}
+        maxZoom={18}
         maxBounds={mapBounds}
         maxBoundsViscosity={1}
         zoomSnap={0.25}
         zoomDelta={0.5}
         scrollWheelZoom
-        className="mapping-leaflet"
+        className="mapmate-leaflet"
       >
         <FitBarangay center={mapCenter} bounds={mapBounds} zoom={workspace.barangay.zoom} />
         <ResizeMapWhenFullscreen isFullscreen={isFullscreen} />
@@ -56,10 +118,16 @@ export default function MappingMap({
           url={workspace.barangay.tile_url}
           maxZoom={19}
         />
-        <Rectangle bounds={mapBounds} pathOptions={{ color: '#1f3e5a', weight: 2, fillOpacity: 0.03 }} />
+        <Rectangle bounds={mapBounds} pathOptions={{ color: '#173b5f', weight: 3, opacity: 0.95, fillColor: '#b9d8ed', fillOpacity: 0.04 }} />
 
         {hasActiveEvent && layers.households && households.map((household) => (
-          <HouseholdMarker household={household} key={household.id} />
+          <HouseholdMarker
+            household={household}
+            selected={selectedHousehold?.id === household.id}
+            onSelect={onSelectHousehold}
+            onRouteToDispatch={onRouteToDispatch}
+            key={household.id}
+          />
         ))}
 
         {hasActiveEvent && layers.evacuationSites && evacuationSites.map((site) => (
@@ -101,10 +169,10 @@ export default function MappingMap({
         ))}
       </MapContainer>
 
-      <button className="map-fullscreen-button" type="button" onClick={onToggleFullscreen}>
-        {isFullscreen ? <ArrowLeft size={15} /> : <Maximize2 size={15} />}
-        {isFullscreen ? 'Back' : 'Full screen'}
+      <div className="mapmate-map-tools"><button type="button" onClick={onToggleFullscreen} aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'} title={isFullscreen ? 'Exit full screen' : 'Full screen'}>
+        {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
       </button>
+      </div>
 
       {!hasActiveEvent && (
         <div className="map-standby-note">
@@ -113,30 +181,62 @@ export default function MappingMap({
         </div>
       )}
 
-      <div className="map-layers-box">
-        <div className="mapping-layer-card">
-          <div className="mapping-card-title"><Layers size={14} /> Layers</div>
-          <LayerToggle label="Household GPS" active={hasActiveEvent && layers.households} disabled={!hasActiveEvent} onClick={() => onChangeLayer('households')} />
-          <LayerToggle label="Evacuation pins" active={hasActiveEvent && layers.evacuationSites} disabled={!hasActiveEvent} onClick={() => onChangeLayer('evacuationSites')} />
-          <LayerToggle label="Rescue teams" active={hasActiveEvent && layers.rescueTeams} disabled={!hasActiveEvent} onClick={() => onChangeLayer('rescueTeams')} />
-          <LayerToggle label="Dispatch routes" active={hasActiveEvent && layers.routes} disabled={!hasActiveEvent} onClick={() => onChangeLayer('routes')} />
+      <div className={`mapmate-overlay-panel mapmate-layers-panel ${layersExpanded ? '' : 'is-collapsed'}`} style={layersPanelStyle}>
+        <div className="mapmate-panel-header" onPointerDown={(event) => beginDrag(event, 'layers')}>
+          <div className="mapmate-overlay-title"><Layers3 size={14} /><strong>Map layers</strong></div>
+          <button
+            type="button"
+            className="mapmate-panel-toggle"
+            title={layersExpanded ? 'Collapse panel' : 'Expand panel'}
+            aria-label={layersExpanded ? 'Collapse map layers panel' : 'Expand map layers panel'}
+            onClick={(event) => {
+              event.stopPropagation()
+              setLayersExpanded((current) => !current)
+            }}
+          >
+            {layersExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
         </div>
+        {layersExpanded && (
+          <div className="mapmate-panel-body">
+            <LayerToggle label="Household GPS" active={hasActiveEvent && layers.households} disabled={!hasActiveEvent} onClick={() => onChangeLayer('households')} />
+            <LayerToggle label="Evacuation pins" active={hasActiveEvent && layers.evacuationSites} disabled={!hasActiveEvent} onClick={() => onChangeLayer('evacuationSites')} />
+            <LayerToggle label="Rescue teams" active={hasActiveEvent && layers.rescueTeams} disabled={!hasActiveEvent} onClick={() => onChangeLayer('rescueTeams')} />
+            <LayerToggle label="Dispatch routes" active={hasActiveEvent && layers.routes} disabled={!hasActiveEvent} onClick={() => onChangeLayer('routes')} />
+          </div>
+        )}
       </div>
 
-      <div className="map-legend-box">
-        <div className="mapping-legend-card">
-          <div className="mapping-card-title"><MapPin size={14} /> Legend</div>
-          {Object.entries(markerGroups).map(([key, item]) => (
-            <div className="legend-row" key={key}>
-              <span className={`status-swatch ${key}`} />
-              <span>{item.label}</span>
-            </div>
-          ))}
-          <div className="legend-row">
-            <span className="route-swatch" />
-            <span>Rescue route</span>
-          </div>
+      <div className={`mapmate-overlay-panel mapmate-legend-panel ${legendExpanded ? '' : 'is-collapsed'}`} style={legendPanelStyle}>
+        <div className="mapmate-panel-header" onPointerDown={(event) => beginDrag(event, 'legend')}>
+          <div className="mapmate-overlay-title"><MapPin size={14} /><strong>Status</strong></div>
+          <button
+            type="button"
+            className="mapmate-panel-toggle"
+            title={legendExpanded ? 'Collapse panel' : 'Expand panel'}
+            aria-label={legendExpanded ? 'Collapse status legend panel' : 'Expand status legend panel'}
+            onClick={(event) => {
+              event.stopPropagation()
+              setLegendExpanded((current) => !current)
+            }}
+          >
+            {legendExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
         </div>
+        {legendExpanded && (
+          <div className="mapmate-panel-body">
+            {Object.entries(markerGroups).map(([key, item]) => (
+              <div className="legend-row" key={key}>
+                <span className={`status-swatch ${key}`} />
+                <span>{item.label}</span>
+              </div>
+            ))}
+            <div className="legend-row">
+              <span className="route-swatch" />
+              <span>Rescue route</span>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )
@@ -240,14 +340,16 @@ function routeArrowIcon(angle, isSelected) {
   })
 }
 
-function HouseholdMarker({ household }) {
+function HouseholdMarker({ household, selected, onSelect, onRouteToDispatch }) {
   const color = markerGroups[household.marker_group]?.color || markerGroups.gray.color
+  const dispatchAllowed = isHouseholdRouteAllowed(household)
 
   return (
     <CircleMarker
       center={[household.latitude, household.longitude]}
-      pathOptions={{ color, fillColor: color, fillOpacity: 0.92, weight: 2 }}
-      radius={8}
+      eventHandlers={{ click: () => onSelect(household) }}
+      pathOptions={{ color, fillColor: color, fillOpacity: 0.92, weight: selected ? 4 : 2 }}
+      radius={selected ? 10 : 8}
     >
       <Popup>
         <MapPopupTitle title={household.label} sub={`${household.purok} - ${household.status_label}`} />
@@ -256,6 +358,17 @@ function HouseholdMarker({ household }) {
           <span>Battery</span><strong>{percent(household.last_battery_level)}</strong>
           <span>Reported</span><strong>{household.last_reported_at || '-'}</strong>
         </div>
+        {dispatchAllowed ? (
+          <button
+            type="button"
+            className="map-route-dispatch-trigger"
+            onClick={() => onRouteToDispatch?.(household)}
+          >
+            Route dispatch
+          </button>
+        ) : (
+          <div className="map-popup-dispatch-blocked">Only red-status households can route to dispatch.</div>
+        )}
       </Popup>
     </CircleMarker>
   )
@@ -285,7 +398,7 @@ function FitBarangay({ center, bounds, zoom }) {
   useEffect(() => {
     if (bounds?.length === 2) {
       map.setMaxBounds(bounds)
-      map.fitBounds(bounds, { padding: [8, 8], maxZoom: zoom })
+      map.fitBounds(bounds, { padding: [24, 24], maxZoom: zoom })
       return
     }
 

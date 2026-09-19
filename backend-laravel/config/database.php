@@ -17,7 +17,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => env('DB_CONNECTION', 'resq_local'),
 
     /*
     |--------------------------------------------------------------------------
@@ -62,6 +62,27 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
                 \PDO::ATTR_TIMEOUT => env('DB_CONNECTION_TIMEOUT', 5),
+            ]) : [],
+        ],
+
+        'resq_local' => [
+            'driver' => env('RESQ_LOCAL_DB_CONNECTION', 'mysql'),
+            'url' => env('RESQ_LOCAL_DB_URL'),
+            'host' => env('RESQ_LOCAL_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('RESQ_LOCAL_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('RESQ_LOCAL_DB_DATABASE', 'resq_local'),
+            'username' => env('RESQ_LOCAL_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('RESQ_LOCAL_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'unix_socket' => env('RESQ_LOCAL_DB_SOCKET', env('DB_SOCKET', '')),
+            'charset' => env('RESQ_LOCAL_DB_CHARSET', 'utf8mb4'),
+            'collation' => env('RESQ_LOCAL_DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                Mysql::ATTR_SSL_CA => env('RESQ_LOCAL_MYSQL_ATTR_SSL_CA', env('MYSQL_ATTR_SSL_CA')),
+                \PDO::ATTR_TIMEOUT => env('RESQ_LOCAL_DB_TIMEOUT', env('DB_CONNECTION_TIMEOUT', 5)),
             ]) : [],
         ],
 

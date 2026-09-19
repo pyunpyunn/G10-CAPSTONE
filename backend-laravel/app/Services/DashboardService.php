@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Services\BarangayProfileService;
+use App\Models\ResourceRequest;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +37,54 @@ class DashboardService
                 'map' => $this->getMapSummary($eventId, $householdSummary),
                 'recent_activity' => $this->getRecentActivity($eventId),
             ],
+        ]);
+    }
+
+    /**
+     * First-paint section. Cleanup stays here so read-only widget endpoints
+     * never mutate shared-database state while a browser is rendering.
+     */
+    public function summary(): JsonResponse
+    {
+        $this->clearEndedEventReferences();
+
+        $activeEvent = $this->getActiveEvent();
+        $eventId = $activeEvent?->event_id;
+
+        return response()->json([
+            'data' => [
+                'barangay_profile' => $this->barangayProfile->current(),
+                'active_event' => $activeEvent ? $this->formatActiveEvent($activeEvent) : null,
+                'households' => $this->getHouseholdSummary($eventId),
+            ],
+        ]);
+    }
+
+    public function dispatch(): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->getDispatchSummary($this->getActiveEvent()?->event_id),
+        ]);
+    }
+
+    public function weather(): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->getWeatherSnapshot($this->getActiveEvent()?->event_id),
+        ]);
+    }
+
+    public function requests(): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->getRequestSummary(),
+        ]);
+    }
+
+    public function activity(): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->getRecentActivity($this->getActiveEvent()?->event_id),
         ]);
     }
 
@@ -167,33 +215,39 @@ class DashboardService
                 'total' => $total,
                 'reported' => 0,
                 'reporting_percent' => 0,
-                'unchecked' => 0,
+                'unchecked' => $total,
                 'safe_total' => 0,
                 'safe_only' => 0,
                 'evacuated' => 0,
                 'unsafe' => 0,
-                'bars' => $this->householdBars(0, 0, 0, 0, 0),
+                'bars' => $this->householdBars(0, 0, 0, 0, $total),
             ];
         }
 
         $counts = DB::table('household_disasters as hd')
+            ->join('households as h', 'h.household_id', '=', 'hd.household_id')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
             ->where('hd.disaster_id', $eventId)
+            ->whereNull('h.deleted_at')
             ->select('hs.status_key', DB::raw('COUNT(DISTINCT hd.household_id) as total'))
             ->groupBy('hs.status_key')
             ->pluck('total', 'status_key');
 
-        $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
+        $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe', 'safe_at_home']);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
-        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
+        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased']);
         $safeTotal = $safeOnly + $evacuated;
 
-        $reported = DB::table('household_disasters')
+        $reportedRows = DB::table('household_disasters as hd')
+            ->join('households as h', 'h.household_id', '=', 'hd.household_id')
             ->where('disaster_id', $eventId)
             ->whereNotNull('current_status_id')
+            ->whereNull('h.deleted_at')
             ->distinct()
-            ->count('household_id');
+            ->count('hd.household_id');
 
+        $unknown = (int) ($counts['unknown'] ?? 0);
+        $reported = max($reportedRows - $unknown, 0);
         $unchecked = max($total - $reported, 0);
         $reportingPercent = $total > 0 ? round(($reported / $total) * 100) : 0;
 
@@ -300,12 +354,12 @@ class DashboardService
             ];
         }
 
-        $counts = DB::table('resource_requests')
+        $counts = ResourceRequest::query()
             ->select('validation_status', DB::raw('COUNT(*) as total'))
             ->groupBy('validation_status')
             ->pluck('total', 'validation_status');
 
-        $latest = DB::table('resource_requests')
+        $latest = ResourceRequest::query()
             ->orderByDesc('created_at')
             ->limit(4)
             ->get([
@@ -330,7 +384,7 @@ class DashboardService
         return [
             'needs_validation' => (int) ($counts['needs_validation'] ?? 0),
             'validated' => (int) ($counts['validated'] ?? 0),
-            'released' => DB::table('resource_requests')->whereNotNull('released_for_tracking_at')->count(),
+            'released' => ResourceRequest::query()->whereNotNull('released_for_tracking_at')->count(),
             'latest' => $latest,
         ];
     }
@@ -458,7 +512,7 @@ class DashboardService
         $householdSummary = $this->getHouseholdSummary($event->event_id);
         $statusLogs = DB::table('household_status_logs')->where('disaster_id', $event->event_id)->count();
         $dispatches = DB::table('responder_assignments')->where('disaster_id', $event->event_id)->count();
-        $requests = DB::table('resource_requests')->where('source_reference', $event->event_id)->count();
+        $requests = ResourceRequest::query()->where('source_reference', $event->event_id)->count();
         $weatherSnapshots = DB::table('weather_logs')->where('disaster_id', $event->event_id)->count();
         $broadcasts = DB::table('disaster_broadcasts')->where('disaster_id', $event->event_id)->count();
         $situationReports = DB::table('situation_reports')->where('disaster_id', $event->event_id)->count();
@@ -578,8 +632,7 @@ class DashboardService
         string $closureNote,
         Request $request,
         int $releasedEvacuationCenters
-    ): void
-    {
+    ): void {
         DB::table('audit_logs')->insert([
             'user_id' => $user?->user_id,
             'role_key' => $user?->role?->role_key,
