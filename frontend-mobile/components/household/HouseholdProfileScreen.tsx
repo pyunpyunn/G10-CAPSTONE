@@ -8,10 +8,7 @@ import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection } fro
 
 type ProfileProps = {
   overview: any;
-  deviceUuid: string;
   currentDevice: any;
-  realBatteryLevel?: number | null;
-  connectionLabel?: string;
   onUpdateMember: (memberId: string, payload: any) => Promise<void>;
   onUpdateGeotag: (payload: any) => Promise<void>;
   onLogout: () => void;
@@ -19,10 +16,7 @@ type ProfileProps = {
 
 export function HouseholdProfileScreen({
   overview,
-  deviceUuid,
   currentDevice,
-  realBatteryLevel,
-  connectionLabel,
   onUpdateMember,
   onUpdateGeotag,
   onLogout,
@@ -44,13 +38,10 @@ export function HouseholdProfileScreen({
     setMemberForm(memberFormFrom(selectedMember));
   }, [selectedMember]);
 
-  const deviceUser = selectedMember?.name || currentDevice?.member_name || 'No member selected';
+  const deviceOwnerName = user.full_name || user.username || 'Household user';
   const householdName = household.household_name || 'Household';
   const householdIdentifier = household.household_id || user.username || 'No household ID';
   const memberCount = members.length || Number(household.member_count || 0);
-  const batteryValue = realBatteryLevel !== null && realBatteryLevel !== undefined ? `${realBatteryLevel}%` : 'Not sent';
-  const connectionValue = connectionLabel || 'Offline';
-  const lastLocationValue = currentDevice?.last_location_label || geotag?.location_label || 'Not recorded';
   const hasGeotag = Boolean(geotag?.latitude && geotag?.longitude);
 
   async function handleSaveMemberInfo() {
@@ -133,32 +124,20 @@ export function HouseholdProfileScreen({
             <Text style={styles.name}>{householdName}</Text>
             <Text style={styles.meta}>{householdIdentifier}</Text>
           </View>
-          <HouseholdBadge label={overview.active_event ? 'Disaster mode' : 'Standby'} tone={overview.active_event ? 'danger' : 'safe'} />
         </View>
 
       </View>
 
       <View style={styles.card}>
-        <HouseholdSection
-          title="Device owner"
-          action={<HouseholdBadge label={connectionValue} tone={connectionValue === 'Offline' ? 'warning' : 'active'} />}
-        />
+        <HouseholdSection title="Device owner" />
 
         <View style={styles.devicePanel}>
           <View style={styles.deviceIcon}>
             <Ionicons name="phone-portrait-outline" size={24} color={palette.navActive} />
           </View>
           <View style={styles.panelText}>
-            <Text style={styles.panelLabel}>Assigned member</Text>
-            <Text style={styles.panelTitle}>{deviceUser}</Text>
-            <Text style={styles.panelMeta}>{shortDeviceId(deviceUuid)}</Text>
+            <Text style={styles.panelTitle}>{deviceOwnerName}</Text>
           </View>
-        </View>
-
-        <View style={styles.metricGrid}>
-          <MetricTile icon="battery-half-outline" label="Battery" value={batteryValue} />
-          <MetricTile icon="wifi-outline" label="Connection" value={connectionValue} />
-          <MetricTile icon="navigate-outline" label="Last location" value={lastLocationValue} />
         </View>
       </View>
 
@@ -391,11 +370,6 @@ function initials(value: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('');
-}
-
-function shortDeviceId(value: string) {
-  if (!value) return 'Not recorded';
-  return value.length > 18 ? `${value.slice(0, 9)}...${value.slice(-5)}` : value;
 }
 
 function coordinatesLabel(geotag: any) {
