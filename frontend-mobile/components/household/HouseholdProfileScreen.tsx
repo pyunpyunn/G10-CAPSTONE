@@ -21,7 +21,16 @@ export function HouseholdProfileScreen({
   const user = overview.profile?.user || {};
   const members = useMemo(() => overview.members || [], [overview.members]);
   const geotag = overview.geotag || null;
+  const selectedMemberId = String(user.member_id || members[0]?.member_id || '');
   const [savingGeotag, setSavingGeotag] = useState(false);
+
+  const selectedMember = useMemo(() => {
+    return members.find((member: any) => String(member.member_id) === String(selectedMemberId)) || members[0] || null;
+  }, [members, selectedMemberId]);
+
+  const householdMembers = useMemo(() => {
+    return members.filter((member: any) => String(member.member_id) !== String(user.member_id));
+  }, [members, user.member_id]);
 
   const deviceOwnerName = user.full_name || user.username || 'Household user';
   const householdName = household.household_name || 'Household';
@@ -48,7 +57,7 @@ export function HouseholdProfileScreen({
         longitude: location.coords.longitude,
         accuracy_m: location.coords.accuracy,
         address_label: address.label || household.address || 'Updated household geotag',
-        member_id: selectedMemberId,
+        member_id: selectedMemberId || undefined,
         relationship_to_family: selectedMember?.relationship || 'Household member',
       });
 
@@ -77,16 +86,36 @@ export function HouseholdProfileScreen({
       </View>
 
       <View style={styles.card}>
-        <HouseholdSection title="Device owner" />
+        <HouseholdSection title="User Information" />
 
         <View style={styles.devicePanel}>
           <View style={styles.deviceIcon}>
             <Ionicons name="phone-portrait-outline" size={24} color={palette.navActive} />
           </View>
           <View style={styles.panelText}>
+            <Text style={styles.panelLabel}>User</Text>
             <Text style={styles.panelTitle}>{deviceOwnerName}</Text>
           </View>
         </View>
+
+        {householdMembers.length ? (
+          <View style={styles.memberProfilePanel}>
+            <Text style={styles.panelLabel}>Member profile</Text>
+            {householdMembers.map((member: any) => {
+              return (
+                <View key={member.member_id || member.name || member.full_name || `${member.first_name || 'member'}-${member.last_name || ''}`} style={styles.memberRow}>
+                  <View style={styles.memberAvatar}>
+                    <Text style={styles.memberAvatarText}>{initials(member.name || `${member.first_name || ''} ${member.last_name || ''}` || 'H')}</Text>
+                  </View>
+                  <View style={styles.panelText}>
+                    <Text style={styles.panelTitle}>{member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'Household member'}</Text>
+                    <Text style={styles.panelMeta}>Member: {member.member_id || 'No member ID'}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.card}>
@@ -230,6 +259,36 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
     backgroundColor: palette.secondary,
+  },
+  memberProfilePanel: {
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: '#f8fafc',
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.xs,
+  },
+  memberAvatar: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: palette.secondary,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  memberAvatarText: {
+    color: palette.navActive,
+    fontSize: 12,
+    fontWeight: '900',
   },
   deviceIcon: {
     width: 48,
