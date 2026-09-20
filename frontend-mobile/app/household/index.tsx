@@ -463,8 +463,6 @@ export default function HouseholdHomeScreen() {
       return (
         <HouseholdProfileScreen
           overview={overview}
-          currentDevice={currentDevice}
-          onUpdateMember={handleUpdateMember}
           onUpdateGeotag={handleUpdateGeotag}
           onLogout={handleLogout}
         />

@@ -8,16 +8,12 @@ import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection } fro
 
 type ProfileProps = {
   overview: any;
-  currentDevice: any;
-  onUpdateMember: (memberId: string, payload: any) => Promise<void>;
   onUpdateGeotag: (payload: any) => Promise<void>;
   onLogout: () => void;
 };
 
 export function HouseholdProfileScreen({
   overview,
-  currentDevice,
-  onUpdateMember,
   onUpdateGeotag,
   onLogout,
 }: ProfileProps) {
@@ -25,18 +21,7 @@ export function HouseholdProfileScreen({
   const user = overview.profile?.user || {};
   const members = useMemo(() => overview.members || [], [overview.members]);
   const geotag = overview.geotag || null;
-  const selectedMemberId = String(currentDevice?.member_id || members[0]?.member_id || '');
-  const [memberForm, setMemberForm] = useState(memberFormFrom(null));
-  const [savingMemberInfo, setSavingMemberInfo] = useState(false);
   const [savingGeotag, setSavingGeotag] = useState(false);
-
-  const selectedMember = useMemo(() => {
-    return members.find((member: any) => String(member.member_id) === String(selectedMemberId)) || null;
-  }, [members, selectedMemberId]);
-
-  useEffect(() => {
-    setMemberForm(memberFormFrom(selectedMember));
-  }, [selectedMember]);
 
   const deviceOwnerName = user.full_name || user.username || 'Household user';
   const householdName = household.household_name || 'Household';
@@ -44,44 +29,7 @@ export function HouseholdProfileScreen({
   const memberCount = members.length || Number(household.member_count || 0);
   const hasGeotag = Boolean(geotag?.latitude && geotag?.longitude);
 
-  async function handleSaveMemberInfo() {
-    if (!selectedMemberId) {
-      Alert.alert('Select member', 'Choose which household member you want to update.');
-      return;
-    }
-
-    if (!memberForm.first_name.trim() || !memberForm.last_name.trim() || !memberForm.relationship.trim()) {
-      Alert.alert('Missing details', 'First name, last name, and relationship are required.');
-      return;
-    }
-
-    setSavingMemberInfo(true);
-
-    try {
-      await onUpdateMember(selectedMemberId, {
-        first_name: memberForm.first_name.trim(),
-        middle_name: memberForm.middle_name.trim() || null,
-        last_name: memberForm.last_name.trim(),
-        relationship: memberForm.relationship.trim(),
-        gender: memberForm.gender.trim() || null,
-        age: memberForm.age ? Number(memberForm.age) : null,
-        birth_date: memberForm.birth_date.trim() || null,
-        special_needs: memberForm.special_needs.trim() || null,
-      });
-      Alert.alert('Member saved', 'Family member information was updated.');
-    } catch {
-      // Parent screen already shows the API error message.
-    } finally {
-      setSavingMemberInfo(false);
-    }
-  }
-
   async function handleUpdateGeotag() {
-    if (!selectedMemberId) {
-      Alert.alert('Select member', 'Choose the member using this device before updating the geotag.');
-      return;
-    }
-
     const permission = await Location.requestForegroundPermissionsAsync();
 
     if (permission.status !== 'granted') {
@@ -143,140 +91,6 @@ export function HouseholdProfileScreen({
 
       <View style={styles.card}>
         <HouseholdSection
-          title="Member profile"
-          action={selectedMember ? <HouseholdBadge label={selectedMember.relationship || 'Member'} tone="info" /> : undefined}
-        />
-        {selectedMember ? (
-          <>
-            <View style={styles.memberProfileHeader}>
-              <MemberInitialAvatar name={selectedMember.name} selected size="large" />
-              <View style={styles.panelText}>
-                <Text style={styles.panelLabel}>Editing</Text>
-                <Text style={styles.panelTitle}>{selectedMember.name || 'Household member'}</Text>
-                <Text style={styles.panelMeta}>{selectedMember.relationship || 'Member'}</Text>
-              </View>
-            </View>
-
-            <View style={styles.metricGrid}>
-              <MetricTile icon="pulse-outline" label="Device check" value={deviceCheckLabel(selectedMember)} />
-              <MetricTile icon="location-outline" label="Location" value={selectedMember.device?.last_location_label || 'No device location'} />
-              <MetricTile icon="time-outline" label="Last seen" value={selectedMember.device?.last_seen_label || 'Not recorded'} />
-            </View>
-
-            <View style={styles.formCluster}>
-              <View style={styles.twoColumn}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.formLabel}>First name</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={memberForm.first_name}
-                    onChangeText={(value) => setMemberForm((current) => ({ ...current, first_name: value }))}
-                    placeholder="First name"
-                    placeholderTextColor="#7d8da0"
-                    autoCapitalize="words"
-                  />
-                </View>
-                <View style={styles.inputGroupSmall}>
-                  <Text style={styles.formLabel}>MI.</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={memberForm.middle_name}
-                    onChangeText={(value) => setMemberForm((current) => ({ ...current, middle_name: value }))}
-                    placeholder="MI."
-                    placeholderTextColor="#7d8da0"
-                    autoCapitalize="words"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.formLabel}>Last name</Text>
-                <TextInput
-                  style={styles.input}
-                  value={memberForm.last_name}
-                  onChangeText={(value) => setMemberForm((current) => ({ ...current, last_name: value }))}
-                  placeholder="Last name"
-                  placeholderTextColor="#7d8da0"
-                  autoCapitalize="words"
-                />
-              </View>
-
-              <View style={styles.twoColumn}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.formLabel}>Relationship</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={memberForm.relationship}
-                    onChangeText={(value) => setMemberForm((current) => ({ ...current, relationship: value }))}
-                    placeholder="Relationship"
-                    placeholderTextColor="#7d8da0"
-                    autoCapitalize="words"
-                  />
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.formLabel}>Gender</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={memberForm.gender}
-                    onChangeText={(value) => setMemberForm((current) => ({ ...current, gender: value }))}
-                    placeholder="Gender"
-                    placeholderTextColor="#7d8da0"
-                    autoCapitalize="words"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.twoColumn}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.formLabel}>Age</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={memberForm.age}
-                    onChangeText={(value) => setMemberForm((current) => ({ ...current, age: value.replace(/[^0-9]/g, '') }))}
-                    keyboardType="number-pad"
-                    placeholder="Age"
-                    placeholderTextColor="#7d8da0"
-                  />
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.formLabel}>Birth date</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={memberForm.birth_date}
-                    onChangeText={(value) => setMemberForm((current) => ({ ...current, birth_date: value }))}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#7d8da0"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.formLabel}>Special needs</Text>
-                <TextInput
-                  style={[styles.input, styles.multilineInput]}
-                  value={memberForm.special_needs}
-                  onChangeText={(value) => setMemberForm((current) => ({ ...current, special_needs: value }))}
-                  placeholder="None, PWD, senior, pregnant, medication needs..."
-                  placeholderTextColor="#7d8da0"
-                  multiline
-                />
-              </View>
-            </View>
-
-            <HouseholdButton
-              label={savingMemberInfo ? 'Saving member...' : 'Save member information'}
-              icon="save-outline"
-              disabled={savingMemberInfo}
-              onPress={handleSaveMemberInfo}
-            />
-          </>
-        ) : (
-          <HouseholdEmpty icon="person-outline" title="Select a member first" />
-        )}
-      </View>
-
-      <View style={styles.card}>
-        <HouseholdSection
           title="Household geotag"
           action={<HouseholdBadge label={hasGeotag ? 'Saved' : 'Missing'} tone={hasGeotag ? 'safe' : 'warning'} />}
         />
@@ -319,38 +133,6 @@ export function HouseholdProfileScreen({
   );
 }
 
-function MetricTile({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
-  return (
-    <View style={styles.metricTile}>
-      <Ionicons name={icon} size={17} color={palette.navActive} />
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue} numberOfLines={2}>{value}</Text>
-    </View>
-  );
-}
-
-function MemberInitialAvatar({
-  name,
-  selected = false,
-  size = 'normal',
-}: {
-  name: string;
-  selected?: boolean;
-  size?: 'normal' | 'large';
-}) {
-  return (
-    <View style={[
-      styles.choiceAvatar,
-      size === 'large' && styles.choiceAvatarLarge,
-      selected && styles.choiceAvatarSelected,
-    ]}>
-      <Text style={[styles.choiceAvatarText, size === 'large' && styles.choiceAvatarTextLarge, selected && styles.choiceAvatarTextSelected]}>
-        {String(name || 'H')[0]?.toUpperCase()}
-      </Text>
-    </View>
-  );
-}
-
 function InfoRow({ icon, label, value }: { icon?: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
@@ -378,39 +160,6 @@ function coordinatesLabel(geotag: any) {
   }
 
   return `${Number(geotag.latitude).toFixed(6)}, ${Number(geotag.longitude).toFixed(6)}`;
-}
-
-function memberFormFrom(member: any) {
-  const nameParts = String(member?.name || '').split(' ').filter(Boolean);
-  const firstName = member?.first_name || nameParts[0] || '';
-  const lastName = member?.last_name || (nameParts.length > 1 ? nameParts[nameParts.length - 1] : '');
-  const middleName = member?.middle_name || (nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '');
-
-  return {
-    first_name: firstName,
-    middle_name: middleName,
-    last_name: lastName,
-    relationship: member?.relationship || '',
-    gender: member?.gender || '',
-    age: member?.age !== null && member?.age !== undefined ? String(member.age) : '',
-    birth_date: member?.birth_date || '',
-    special_needs: member?.special_needs || '',
-  };
-}
-
-function deviceCheckLabel(member: any) {
-  const device = member?.device;
-
-  if (!device) {
-    return 'No device registered';
-  }
-
-  const battery = device.battery_level !== null && device.battery_level !== undefined
-    ? `${device.battery_level}% battery`
-    : 'Battery not sent';
-  const active = device.is_active ? 'Active' : 'Inactive';
-
-  return `${active} · ${battery}`;
 }
 
 const styles = StyleSheet.create({
@@ -514,32 +263,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  metricGrid: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  metricTile: {
-    flex: 1,
-    minHeight: 86,
-    gap: 5,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    backgroundColor: '#f8fafc',
-  },
-  metricLabel: {
-    color: palette.textSoft,
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  metricValue: {
-    color: palette.text,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '900',
-  },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -566,87 +289,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     textAlign: 'right',
-  },
-  memberProfileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: palette.secondary,
-  },
-  twoColumn: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  formCluster: {
-    gap: spacing.sm,
-  },
-  inputGroup: {
-    flex: 1,
-    gap: 6,
-  },
-  inputGroupSmall: {
-    width: 92,
-    gap: 6,
-  },
-  formLabel: {
-    color: palette.textSoft,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  input: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    color: palette.text,
-    fontSize: 14,
-    fontWeight: '800',
-    backgroundColor: '#fff',
-  },
-  multilineInput: {
-    minHeight: 76,
-    paddingTop: 12,
-    textAlignVertical: 'top',
-  },
-  helperText: {
-    color: palette.textSoft,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '800',
-  },
-  choiceAvatar: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 17,
-    backgroundColor: palette.secondary,
-  },
-  choiceAvatarLarge: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  choiceAvatarSelected: {
-    borderColor: '#ffffff80',
-    backgroundColor: '#ffffff24',
-  },
-  choiceAvatarText: {
-    color: palette.navActive,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  choiceAvatarTextLarge: {
-    fontSize: 18,
-  },
-  choiceAvatarTextSelected: {
-    color: '#fff',
   },
   locationPanel: {
     flexDirection: 'row',
