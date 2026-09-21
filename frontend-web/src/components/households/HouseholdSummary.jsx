@@ -1,6 +1,5 @@
 import {
   makeProgress,
-  percent,
 } from '../../utils/householdStatusHelpers'
 
 export default function HouseholdSummary({ summary }) {
@@ -8,50 +7,44 @@ export default function HouseholdSummary({ summary }) {
 
   return (
     <>
-      <SummaryCards summary={summary} />
-      <ProgressBar progress={progress} />
+      <section className="summary-section">
+        <div className="summary-header-row">
+          <span>Household summary</span>
+          <span className="summary-total-badge">{summary.total || 0} total</span>
+        </div>
+        <div className="summary-grid compact-summary-grid">
+          <Metric label="Unchecked" value={String(summary.unchecked || 0)} tone="neutral" />
+          <Metric label="Safe" value={String(summary.safe_total || summary.safe_only || 0)} tone="safe" />
+          <Metric label="Evacuated" value={String(summary.evacuated || 0)} tone="evacuated" />
+          <Metric label="Unsafe" value={String(summary.unsafe || 0)} tone="unsafe" />
+        </div>
+      </section>
+
+      <section className="progress-section">
+        <div className="side-heading">
+          <span>Progress</span>
+          <span>{summary.reported || 0}% reported</span>
+        </div>
+        <div className="progress-track" aria-label="Household status progress">
+          {progress.map((item) => (
+            <span key={item.label} className={`progress-${item.className}`} style={{ width: `${item.percent}%` }} />
+          ))}
+        </div>
+        <div className="progress-legend">
+          {progress.map((item) => (
+            <span key={item.label}><i className={`${item.className}-dot`} />{item.label} {item.percent}%</span>
+          ))}
+        </div>
+      </section>
     </>
   )
 }
 
-function SummaryCards({ summary }) {
-  const cards = [
-    { label: 'Unchecked', value: summary.unchecked, percent: percent(summary.unchecked, summary.total), className: 'c-unch' },
-    { label: 'Safe total', value: summary.safe_total, percent: percent(summary.safe_total, summary.total), className: 'c-safeT' },
-    { label: 'Safe only', value: summary.safe_only, percent: percent(summary.safe_only, summary.total), className: 'c-safe' },
-    { label: 'Evacuated', value: summary.evacuated, percent: percent(summary.evacuated, summary.total), className: 'c-evac' },
-    { label: 'Unsafe', value: summary.unsafe, percent: percent(summary.unsafe, summary.total), className: 'c-unsafe' },
-  ]
-
+function Metric({ label, value, tone }) {
   return (
-    <div className="hh-summary-bar">
-      {cards.map((card) => (
-        <div className={`hh-sum-card ${card.className}`} key={card.label}>
-          <div className="sl">{card.label}</div>
-          <div className="sv">{card.value || 0}</div>
-          <div className="ss">{card.percent}%</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ProgressBar({ progress }) {
-  return (
-    <div className="hh-progress">
-      <div className="hh-prog-bar" aria-label="Household status progress">
-        {progress.map((item) => (
-          <div className={`hh-prog-seg ${item.className}`} style={{ width: `${item.percent}%` }} key={item.label} />
-        ))}
-      </div>
-      <div className="hh-prog-legend">
-        {progress.map((item) => (
-          <div className="hh-prog-leg" key={item.label}>
-            <span className={`hh-prog-leg-sq ${item.className}`} />
-            {item.label} {item.percent}%
-          </div>
-        ))}
-      </div>
+    <div className={`metric ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   )
 }

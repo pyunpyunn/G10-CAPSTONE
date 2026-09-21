@@ -10,6 +10,7 @@ import {
 import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
 import PlaceholderPage from './pages/PlaceholderPage'
+import HouseholdReviewPage from './pages/HouseholdReviewPage'
 import { getCurrentUser, loginUser, logoutUser } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
 import './App.css'
@@ -224,6 +225,7 @@ function AuthRoutes() {
             element={<LazyPage page={page} />}
           />
         ))}
+        <Route path="households/:householdId" element={<HouseholdReviewPage />} />
         <Route path="notifications" element={<LazyPage page={{ path: '/notifications' }} />} />
         <Route path="profile" element={<LazyPage page={{ path: '/profile' }} />} />
       </Route>

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\HouseholdStatusLog;
 use App\Repositories\HouseholdRepository;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -111,8 +112,14 @@ class HouseholdStatusService
     {
         $activeEvent = $this->getActiveEvent();
 
-        $logs = $this->households
-            ->latestStatusLogs($householdId, $activeEvent?->event_id)
+        $logs = HouseholdStatusLog::query()
+            ->with(['status', 'submittedBy'])
+            ->where('household_id', $householdId)
+            ->when($activeEvent?->event_id, fn ($query, $eventId) => $query->where('disaster_id', $eventId))
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get()
             ->map(function ($log): array {
                 $notes = $this->decodeJson($log->notes);
 
@@ -777,11 +784,13 @@ class HouseholdStatusService
                     $member->middle_name,
                     $member->last_name,
                 ])));
-                $status = $householdDisplayStatus ?: [
-                    'key' => $member->status_key ?: 'unknown',
-                    'label' => $member->status_label ?: 'Unknown / No Report',
-                    'color' => $member->status_color,
-                ];
+                $status = $member->status_key
+                    ? $this->formatStatus($member->status_key, $member->status_label)
+                    : ($householdDisplayStatus ?? [
+                        'key' => 'unchecked',
+                        'label' => 'No report',
+                        'tone' => 'gray',
+                    ]);
 
                 return [
                     'member_id' => $member->member_id,
