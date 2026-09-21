@@ -596,9 +596,20 @@ class RescueDispatchService
             ->whereNull('deleted_at')
             ->count();
 
+        $activeMemberCount = DB::table('responders')
+            ->where('team_id', $team->team_id)
+            ->whereNull('deleted_at')
+            ->where(function ($query): void {
+                $query->where('is_deployed', 1)
+                    ->orWhereIn('duty_status', ['on_duty', 'dispatched', 'accepted', 'en_route', 'on_scene']);
+            })
+            ->count();
+
         $outcomes = $this->decodeJson($activeAssignment?->outcome_notes);
         $route = $this->decodeJson($activeAssignment?->route_notes);
-        $status = $this->formatStatus($eventId ? ($activeAssignment?->status ?: $team->duty_status) : 'standby');
+        $status = $this->formatStatus($eventId
+            ? ($activeAssignment?->status ?: 'standby')
+            : $team->duty_status);
         $availableResponderId = $this->availableResponderQuery($eventId)
             ->where('r.team_id', $team->team_id)
             ->orderBy('r.responder_id')
@@ -613,6 +624,7 @@ class RescueDispatchService
             'status_label' => $status['label'],
             'leader_name' => $team->leader_name ?: 'No team leader assigned',
             'member_count' => $memberCount,
+            'active_member_count' => $activeMemberCount,
             'assigned_households' => (int) ($route['households_to_cover'] ?? 0),
             'assigned_area' => $activeAssignment?->assigned_area ?: 'No active dispatch',
             'active_assignment_id' => $activeAssignment?->assignment_id,
@@ -729,6 +741,7 @@ class RescueDispatchService
                 'h.household_id',
                 'h.household_code',
                 'h.household_name',
+                'h.member_count',
                 'a.full_address',
                 'a.street_address',
                 'a.house_number',
@@ -1276,9 +1289,11 @@ class RescueDispatchService
             'household_id' => $item->household_id,
             'household_code' => $item->household_code,
             'household_name' => $item->household_name ?: $item->household_code ?: $item->household_id,
+            'member_count' => (int) ($item->member_count ?? 0),
             'address' => $item->geotag_label ?: ($item->full_address ?: trim(($item->house_number ? $item->house_number.' ' : '').($item->street_address ?: ''))),
             'status_key' => $statusKey,
             'status_label' => $item->status_label ?: 'Unchecked',
+            'reported_unsafe_count' => in_array($statusKey, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'], true) ? 1 : 0,
             'priority_level' => $item->priority_level ?: 'watch',
             'needs_dispatch' => (bool) $item->needs_dispatch,
             'has_geotag' => (bool) $item->has_geotag,

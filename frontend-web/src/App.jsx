@@ -44,6 +44,7 @@ const pageComponents = {
   '/mapping': lazy(() => import('./pages/MappingPage')),
   '/households': lazy(() => import('./pages/HouseholdStatusPage')),
   '/dispatch': lazy(() => import('./pages/RescueDispatchPage')),
+  '/dispatch/new': lazy(() => import('./pages/NewDispatchPage')),
   '/rescuers': lazy(() => import('./pages/RescuerAccountsPage')),
   '/resources-requests': lazy(() => import('./pages/ResourcesRequestsPage')),
   '/situation': lazy(() => import('./pages/SituationReportPage')),
@@ -218,6 +219,7 @@ function AuthRoutes() {
         }
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dispatch/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
         {pagesForUser(user).map((page) => (
           <Route
             key={page.path}
