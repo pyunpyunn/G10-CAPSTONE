@@ -11,31 +11,13 @@ import {
 
 export default function DispatchSidePanel({
   teams,
-  responders,
   logs,
   historyLogs = [],
-  dispatches,
-  filter,
-  setFilter,
-  searchText,
-  setSearchText,
-  onSearch,
-  isUpdating = false,
 }) {
   return (
-    <aside className="dp-side-panel dp-info-panel">
+    <aside className="dp-side-panel dp-info-panel dispatch-side-panel-shell">
       <CoveragePanel teams={teams} />
-      <ResponderAvailability responders={responders} />
       <DispatchLog logs={logs} historyLogs={historyLogs} />
-      <DispatchTable
-        dispatches={dispatches}
-        filter={filter}
-        setFilter={setFilter}
-        searchText={searchText}
-        setSearchText={setSearchText}
-        onSearch={onSearch}
-        isUpdating={isUpdating}
-      />
     </aside>
   )
 }

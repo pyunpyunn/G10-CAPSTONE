@@ -10,6 +10,7 @@ import {
 import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
 import PlaceholderPage from './pages/PlaceholderPage'
+import HouseholdReviewPage from './pages/HouseholdReviewPage'
 import { getCurrentUser, loginUser, logoutUser } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
 import './App.css'
@@ -43,8 +44,15 @@ const pageComponents = {
   '/mapping': lazy(() => import('./pages/MappingPage')),
   '/households': lazy(() => import('./pages/HouseholdStatusPage')),
   '/dispatch': lazy(() => import('./pages/RescueDispatchPage')),
+  '/dispatch/new': lazy(() => import('./pages/NewDispatchPage')),
   '/rescuers': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/new': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/teams': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/view': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/edit': lazy(() => import('./pages/RescuerAccountsPage')),
   '/resources-requests': lazy(() => import('./pages/ResourcesRequestsPage')),
+  '/resources-requests/new': lazy(() => import('./pages/ResourceRequestEditorPage')),
+  '/resources-requests/edit': lazy(() => import('./pages/ResourceRequestEditorPage')),
   '/situation': lazy(() => import('./pages/SituationReportPage')),
   '/archive': lazy(() => import('./pages/ArchivePage')),
   '/notifications': lazy(() => import('./pages/NotificationsPage')),
@@ -217,6 +225,13 @@ function AuthRoutes() {
         }
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dispatch/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
+        <Route path="rescuers/new" element={<LazyPage page={{ path: '/rescuers/new' }} />} />
+        <Route path="rescuers/teams" element={<LazyPage page={{ path: '/rescuers/teams' }} />} />
+        <Route path="rescuers/view" element={<LazyPage page={{ path: '/rescuers/view' }} />} />
+        <Route path="rescuers/edit" element={<LazyPage page={{ path: '/rescuers/edit' }} />} />
+        <Route path="resources-requests/new" element={<LazyPage page={{ path: '/resources-requests/new' }} />} />
+        <Route path="resources-requests/:requestId/:mode" element={<LazyPage page={{ path: '/resources-requests/edit' }} />} />
         {pagesForUser(user).map((page) => (
           <Route
             key={page.path}
@@ -224,6 +239,7 @@ function AuthRoutes() {
             element={<LazyPage page={page} />}
           />
         ))}
+        <Route path="households/:householdId" element={<HouseholdReviewPage />} />
         <Route path="notifications" element={<LazyPage page={{ path: '/notifications' }} />} />
         <Route path="profile" element={<LazyPage page={{ path: '/profile' }} />} />
       </Route>

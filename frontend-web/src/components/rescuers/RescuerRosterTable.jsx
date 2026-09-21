@@ -3,10 +3,12 @@ import ActionMenu from '../ui/ActionMenu'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 
-export default function RescuerRosterTable({ rescuers, pagination, onView, onEdit, onDeactivate }) {
+export default function RescuerRosterTable({ rescuers, pagination, onPageChange, onView, onEdit, onDeactivate }) {
   const from = pagination?.from || 0
   const to = pagination?.to || 0
   const total = pagination?.total || 0
+  const currentPage = pagination?.current_page || 1
+  const lastPage = pagination?.last_page || 1
 
   return (
     <div className="ra-panel">
@@ -25,7 +27,7 @@ export default function RescuerRosterTable({ rescuers, pagination, onView, onEdi
                 <th>Team / role</th>
                 <th>Contact / ICE</th>
                 <th>Duty status</th>
-                <th />
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -64,6 +66,15 @@ export default function RescuerRosterTable({ rescuers, pagination, onView, onEdi
           </table>
         )}
       </div>
+      {total > 0 && (
+        <div className="ra-roster-pagination">
+          <span>Page {currentPage} of {lastPage}</span>
+          <div>
+            <button type="button" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>Previous</button>
+            <button type="button" disabled={currentPage >= lastPage} onClick={() => onPageChange(currentPage + 1)}>Next</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

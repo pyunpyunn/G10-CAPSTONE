@@ -17,7 +17,6 @@ class RescuerAccountService
     private const ACCOUNT_SEQUENCE_LENGTH = 3;
 
     private const TEAM_CATALOG = [
-        ['team_name' => 'HQ Command Center', 'team_type' => 'Command Center', 'team_code' => 'HQCC'],
         ['team_name' => 'Search & Rescue', 'team_type' => 'SAR', 'team_code' => 'SAR'],
         ['team_name' => 'Evacuation', 'team_type' => 'Evacuation', 'team_code' => 'EVC'],
         ['team_name' => 'Medical / First Aid', 'team_type' => 'Medical', 'team_code' => 'MED'],
@@ -102,6 +101,7 @@ class RescuerAccountService
                     'current_page' => $paginator->currentPage(),
                     'per_page' => $paginator->perPage(),
                     'total' => $paginator->total(),
+                    'last_page' => $paginator->lastPage(),
                     'from' => $paginator->firstItem(),
                     'to' => $paginator->lastItem(),
                 ],
@@ -527,29 +527,7 @@ class RescuerAccountService
             ])
             ->map(fn (object $team): array => $this->formatTeamConfigCard($team, 'database'));
 
-        $databaseTeamNames = $databaseTeams
-            ->pluck('team_name')
-            ->map(fn ($name) => strtolower((string) $name))
-            ->all();
-
-        $catalogTeams = collect(self::TEAM_CATALOG)
-            ->reject(fn (array $team): bool => in_array(strtolower($team['team_name']), $databaseTeamNames, true))
-            ->map(function (array $team): array {
-                return $this->formatTeamConfigCard((object) [
-                    'team_id' => null,
-                    'team_code' => $team['team_code'],
-                    'team_name' => $team['team_name'],
-                    'team_type' => $team['team_type'],
-                    'assigned_purok_id' => null,
-                    'leader_responder_id' => null,
-                    'duty_status' => 'standby',
-                    'leader_name' => null,
-                    'purok_sitio' => null,
-                    'barangay_name' => null,
-                ], 'catalog');
-            });
-
-        return $databaseTeams->merge($catalogTeams)->sortBy('team_name')->values()->all();
+        return $databaseTeams->sortBy('team_name')->values()->all();
     }
 
     private function formatTeamConfigCard(object $team, string $source): array
@@ -576,7 +554,7 @@ class RescuerAccountService
             'team_type' => $team->team_type,
             'assigned_purok_id' => $team->assigned_purok_id,
             'assigned_purok' => $team->purok_sitio,
-            'barangay_name' => $team->barangay_name,
+            'barangay_name' => null,
             'leader_responder_id' => $team->leader_responder_id,
             'leader_name' => $team->leader_name,
             'duty_status' => $team->duty_status,
@@ -644,7 +622,7 @@ class RescuerAccountService
             ])
             ->map(fn (object $row): array => [
                 'address_id' => (int) $row->address_id,
-                'label' => $row->barangay_name ? "{$row->purok_sitio} - {$row->barangay_name}" : $row->purok_sitio,
+                'label' => $row->purok_sitio,
             ])
             ->values()
             ->all();
@@ -657,7 +635,8 @@ class RescuerAccountService
             ->where('team_type', '<>', '')
             ->pluck('team_type');
 
-        return $databaseTypes
+        return collect(array_column(self::TEAM_CATALOG, 'team_type'))
+            ->merge($databaseTypes)
             ->unique()
             ->sort()
             ->values()
@@ -1210,7 +1189,18 @@ class RescuerAccountService
             ->values()
             ->all();
 
-        return empty($puroks) ? ['Purok 1', 'Purok 2', 'Purok 3', 'Purok 4', 'Purok 5'] : $puroks;
+        return empty($puroks) ? [
+            'Sitio Alaska',
+            'Sitio Viking',
+            'Sitio Abya',
+            'Sitio Wangyu',
+            'Sitio Puntod',
+            'Sitio Pagtinabangay',
+            'Sitio Ybañez',
+            'Sitio Ipil-ipil',
+            'Sitio Tangke',
+            'Sitio Huyong-huyong',
+        ] : $puroks;
     }
 
     private function hasTrainingDue(object $row): bool

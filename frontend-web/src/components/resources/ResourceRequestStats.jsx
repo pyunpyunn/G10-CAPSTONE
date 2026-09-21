@@ -1,7 +1,4 @@
-export default function ResourceRequestStats({ summary = {} }) {
-  const totalRequests = Array.isArray(summary.rows)
-    ? summary.rows.reduce((total, row) => total + Number(row.count || 0), 0)
-    : Number(summary.total || 0)
+export default function ResourceRequestStats({ summary = {}, period = 'week', onPeriodChange }) {
 
   const stats = [
     {
@@ -10,24 +7,33 @@ export default function ResourceRequestStats({ summary = {} }) {
       note: 'awaiting HQ review',
     },
     {
-      label: 'Verified',
-      value: summary.verified ?? 0,
-      note: 'approved requests',
+      label: 'Validated and Forwarded',
+      value: summary.validated_and_forwarded ?? 0,
+      note: 'ready or sent to TrackingAid',
     },
     {
-      label: 'Forwarded today',
-      value: summary.forwarded_today ?? 0,
-      note: 'sent to TrackingAid',
+      label: 'Acknowledged',
+      value: summary.acknowledged ?? 0,
+      note: 'confirmed by TrackingAid',
     },
     {
       label: 'Total requests',
-      value: totalRequests,
-      note: 'shared request records',
+      value: summary.total_requests ?? 0,
+      note: `created ${periodLabel(period)}`,
     },
   ]
 
   return (
-    <div className="rr-stat-row">
+    <div className="rr-stat-stack">
+      <label className="rr-period-filter">
+        <span>Total request period</span>
+        <select value={period} onChange={(event) => onPeriodChange(event.target.value)}>
+          <option value="week">This week</option>
+          <option value="month">This month</option>
+          <option value="year">This year</option>
+        </select>
+      </label>
+      <div className="rr-stat-row">
       {stats.map((stat) => (
         <div className="rr-stat" key={stat.label}>
           <div className="k">{stat.label}</div>
@@ -35,6 +41,11 @@ export default function ResourceRequestStats({ summary = {} }) {
           <div className="n">{stat.note}</div>
         </div>
       ))}
+      </div>
     </div>
   )
+}
+
+function periodLabel(period) {
+  return { week: 'this week', month: 'this month', year: 'this year' }[period] || 'this week'
 }

@@ -335,17 +335,39 @@ class MappingService
 
     private function getPuroks(): array
     {
-        if (! Schema::hasTable('puroks')) {
-            return [];
+        $puroks = collect();
+
+        if (Schema::hasTable('puroks') && Schema::hasColumn('puroks', 'purok_name')) {
+            $query = DB::table('puroks')
+                ->whereNotNull('purok_name')
+                ->where('purok_name', '<>', '');
+
+            if (Schema::hasColumn('puroks', 'deleted_at')) {
+                $query->whereNull('deleted_at');
+            }
+
+            $puroks = $query
+                ->select('purok_name')
+                ->distinct()
+                ->orderBy('purok_name')
+                ->pluck('purok_name')
+                ->filter()
+                ->values();
         }
 
-        return DB::table('puroks')
-            ->whereNotNull('purok_name')
-            ->orderBy('purok_name')
-            ->pluck('purok_name')
-            ->filter()
-            ->values()
-            ->all();
+        if ($puroks->isEmpty() && Schema::hasTable('addresses') && Schema::hasColumn('addresses', 'purok_sitio')) {
+            $puroks = DB::table('addresses')
+                ->whereNotNull('purok_sitio')
+                ->where('purok_sitio', '<>', '')
+                ->select('purok_sitio')
+                ->distinct()
+                ->orderBy('purok_sitio')
+                ->pluck('purok_sitio')
+                ->filter()
+                ->values();
+        }
+
+        return $puroks->values()->all();
     }
 
     private function householdSelectColumns(): array
