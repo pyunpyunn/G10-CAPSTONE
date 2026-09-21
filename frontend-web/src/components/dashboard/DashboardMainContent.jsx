@@ -97,7 +97,7 @@ export default function DashboardMainContent({
         title="Team dispatch overview"
         action={
           <button className="panel-link" type="button" onClick={() => onOpenModule('/dispatch')}>
-            Full dispatch <FontAwesomeIcon icon={faArrowRight} />
+            Full dispatch <ArrowUpRight size={14} />
           </button>
         }
       >
@@ -128,7 +128,7 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
         </div>
         <div className="event-meta-col">
           <span className="standby-hint">
-            Click to declare event <FontAwesomeIcon icon={faArrowRight} />
+            Click to declare event <ArrowUpRight size={14} />
           </span>
         </div>
       </div>
@@ -213,7 +213,7 @@ function ChartCard({ title, bars = [], isLoading, emptyTitle, emptyMessage, onMa
       <div className="dispatch-chart-head">
         <div className="dispatch-chart-title">{title}</div>
         <button className="chart-manage-button" type="button" aria-label={`Open ${title}`} onClick={onManage}>
-          <FontAwesomeIcon icon={faArrowRight} />
+          <ArrowUpRight size={14} />
         </button>
       </div>
       {isLoading ? (

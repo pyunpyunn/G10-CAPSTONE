@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { RefreshCcw, RotateCcw } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AlertOctagon, Edit3, MoreVertical, PlusCircle, RefreshCcw, RotateCcw } from 'lucide-react'
 import {
   createBroadcast,
   createDisasterEvent,
@@ -282,6 +282,12 @@ export default function BroadcastPage() {
               <RefreshCcw size={14} />
               Refresh
             </button>
+            <HeaderActionMenu
+              activeEvent={activeEvent}
+              onCloseActiveEvent={() => setIsCloseModalOpen(true)}
+              onUpdateActiveEvent={() => setIsUpdateModalOpen(true)}
+              onDeclareActiveEvent={() => initForm()}
+            />
           </>
         }
       />
@@ -351,3 +357,76 @@ export default function BroadcastPage() {
     </section>
   )
 }
+
+function HeaderActionMenu({ activeEvent, onCloseActiveEvent, onUpdateActiveEvent, onDeclareActiveEvent }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  return (
+    <div className="bc-card-head-actions" ref={menuRef} style={{ position: 'relative' }}>
+      <button
+        className="btn btn-secondary btn-sm"
+        type="button"
+        aria-label="Disaster options"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((prev) => !prev)}
+      >
+        <MoreVertical size={16} />
+      </button>
+
+      {isOpen && (
+        <div className="bc-card-dropdown" style={{ right: 0, top: 'calc(100% + 6px)' }}>
+          {activeEvent ? (
+            <>
+              <button
+                className="bc-dropdown-item danger"
+                type="button"
+                onClick={() => {
+                  setIsOpen(false)
+                  onCloseActiveEvent?.()
+                }}
+              >
+                <AlertOctagon size={14} />
+                <span>CLOSE ACTIVE EVENT</span>
+              </button>
+              <button
+                className="bc-dropdown-item"
+                type="button"
+                onClick={() => {
+                  setIsOpen(false)
+                  onUpdateActiveEvent?.()
+                }}
+              >
+                <Edit3 size={14} />
+                <span>UPDATE ACTIVE EVENT</span>
+              </button>
+            </>
+          ) : (
+            <button
+              className="bc-dropdown-item primary"
+              type="button"
+              onClick={() => {
+                setIsOpen(false)
+                onDeclareActiveEvent?.()
+              }}
+            >
+              <PlusCircle size={14} />
+              <span>DECLARE ACTIVE EVENT</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

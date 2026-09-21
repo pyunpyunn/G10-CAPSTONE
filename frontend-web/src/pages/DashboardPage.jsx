@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Archive, RefreshCcw, TriangleAlert } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertOctagon, Edit3, MoreVertical, PlusCircle, RefreshCcw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   closeActiveEvent,
@@ -151,17 +151,11 @@ export default function DashboardPage() {
               <RefreshCcw size={14} />
               Refresh
             </button>
-            {hasActiveEvent ? (
-              <button className="btn btn-warning btn-sm" type="button" onClick={() => setIsCloseModalOpen(true)}>
-                <Archive size={14} />
-                Close Active Event
-              </button>
-            ) : (
-              <button className="btn btn-danger btn-sm dashboard-declare-button" type="button" onClick={() => openModule('/broadcast')}>
-                <TriangleAlert size={14} />
-                Declare New Disaster
-              </button>
-            )}
+            <DashboardHeaderActionMenu
+              hasActiveEvent={hasActiveEvent}
+              onCloseActiveEvent={() => setIsCloseModalOpen(true)}
+              onOpenBroadcast={() => openModule('/broadcast')}
+            />
           </>
         }
       />
@@ -194,3 +188,77 @@ export default function DashboardPage() {
     </section>
   )
 }
+
+function DashboardHeaderActionMenu({ hasActiveEvent, onCloseActiveEvent, onOpenBroadcast }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  return (
+    <div className="bc-card-head-actions" ref={menuRef} style={{ position: 'relative' }}>
+      <button
+        className="btn btn-secondary btn-sm"
+        type="button"
+        aria-label="Disaster options"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((prev) => !prev)}
+      >
+        <MoreVertical size={16} />
+      </button>
+
+      {isOpen && (
+        <div className="bc-card-dropdown" style={{ right: 0, top: 'calc(100% + 6px)' }}>
+          {hasActiveEvent ? (
+            <>
+              <button
+                className="bc-dropdown-item danger"
+                type="button"
+                onClick={() => {
+                  setIsOpen(false)
+                  onCloseActiveEvent?.()
+                }}
+              >
+                <AlertOctagon size={14} />
+                <span>CLOSE ACTIVE EVENT</span>
+              </button>
+              <button
+                className="bc-dropdown-item"
+                type="button"
+                onClick={() => {
+                  setIsOpen(false)
+                  onOpenBroadcast?.()
+                }}
+              >
+                <Edit3 size={14} />
+                <span>UPDATE ACTIVE EVENT</span>
+              </button>
+            </>
+          ) : (
+            <button
+              className="bc-dropdown-item primary"
+              type="button"
+              onClick={() => {
+                setIsOpen(false)
+                onOpenBroadcast?.()
+              }}
+            >
+              <PlusCircle size={14} />
+              <span>DECLARE ACTIVE EVENT</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
