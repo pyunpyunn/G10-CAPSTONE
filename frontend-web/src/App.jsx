@@ -46,6 +46,10 @@ const pageComponents = {
   '/dispatch': lazy(() => import('./pages/RescueDispatchPage')),
   '/dispatch/new': lazy(() => import('./pages/NewDispatchPage')),
   '/rescuers': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/new': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/teams': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/view': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/edit': lazy(() => import('./pages/RescuerAccountsPage')),
   '/resources-requests': lazy(() => import('./pages/ResourcesRequestsPage')),
   '/situation': lazy(() => import('./pages/SituationReportPage')),
   '/archive': lazy(() => import('./pages/ArchivePage')),
@@ -220,6 +224,10 @@ function AuthRoutes() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dispatch/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
+        <Route path="rescuers/new" element={<LazyPage page={{ path: '/rescuers/new' }} />} />
+        <Route path="rescuers/teams" element={<LazyPage page={{ path: '/rescuers/teams' }} />} />
+        <Route path="rescuers/view" element={<LazyPage page={{ path: '/rescuers/view' }} />} />
+        <Route path="rescuers/edit" element={<LazyPage page={{ path: '/rescuers/edit' }} />} />
         {pagesForUser(user).map((page) => (
           <Route
             key={page.path}

@@ -59,6 +59,11 @@
   gap: 12px;
 }
 
+.rescuer-page .household-status-page-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .household-status-page-actions .weather-live-status {
   display: grid;
   gap: 2px;
