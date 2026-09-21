@@ -1,51 +1,228 @@
 /* Rescue Dispatch */
 .dispatch-page {
   display: grid;
+  gap: 10px;
+  padding: 0 0 8px;
+}
+
+.dispatch-page-header {
+  padding-bottom: 2px;
+}
+
+.new-dispatch-page {
+  gap: 14px;
+}
+
+.new-dispatch-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-3);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.new-dispatch-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
+  width: 100%;
 }
 
-.dp-summary-grid {
+.new-dispatch-header-row .household-status-header-copy {
+  min-width: 0;
+}
+
+.new-dispatch-header-row .new-dispatch-back {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.new-dispatch-back:hover {
+  color: var(--color-text-1);
+}
+
+.new-dispatch-event-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.new-dispatch-event-status span {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  gap: 2px;
 }
 
-.dp-sum {
+.button.review.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.new-dispatch-shell {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: 12px;
-  text-align: center;
-  background: #ffffff;
+  background: var(--color-bg-secondary);
 }
 
-.dp-sum .dl {
-  margin-bottom: 6px;
-  color: var(--color-text-2);
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
+.new-dispatch-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.dispatch-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.72fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.dispatch-main-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.dispatch-summary-section {
+  margin: 0;
+}
+
+.dispatch-side-panel-shell {
+  gap: 10px;
+}
+
+.dispatch-side-panel {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.dispatch-assignments-card,
+.dispatch-team-panel,
+.dispatch-side-panel .dp-side-card {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.dispatch-assignments-card {
+  overflow: hidden;
+}
+
+.dispatch-assignments-card .dp-side-body {
+  padding-top: 10px;
+}
+
+.dispatch-assignments-card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dispatch-assignments-card th,
+.dispatch-assignments-card td {
+  border-bottom: 1px solid var(--color-bg-secondary);
+  padding: 8px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.dispatch-assignments-card th {
+  color: var(--color-text-3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.dp-sum .dv {
+.dispatch-assignments-card td {
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.empty-state.compact-empty-state {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: 18px 14px;
+  text-align: center;
+  background: var(--color-bg-secondary);
+}
+
+.empty-state.compact-empty-state h3 {
+  margin: 0 0 8px;
   color: var(--color-text-1);
-  font-size: 27px;
-  font-weight: 650;
-  line-height: 1;
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.dp-sum .ds {
-  margin-top: 6px;
+.empty-state.compact-empty-state p {
+  margin: 0;
   color: var(--color-text-3);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
-.dp-sum.c-green .dv { color: var(--color-safe-text); }
-.dp-sum.c-purple .dv { color: var(--color-dispatch-text); }
-.dp-sum.c-blue .dv { color: var(--color-evac-text); }
-.dp-sum.c-red .dv { color: var(--color-unsafe-text); }
+.dispatch-progress-section {
+  border-top: 1px solid var(--color-border);
+}
+
+.dispatch-progress-track {
+  margin-top: 4px;
+}
+
+.dispatch-progress-track span {
+  min-width: 0;
+}
+
+.dispatch-progress-standby {
+  background: var(--color-text-3);
+}
+
+.dispatch-progress-dispatched {
+  background: var(--chart-evacuated);
+}
+
+.dispatch-progress-on-scene {
+  background: var(--chart-safe);
+}
+
+.dispatch-progress-completed {
+  background: var(--chart-unchecked);
+}
+
+.dispatch-progress-legend {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dispatch-progress-legend .dispatch-standby-dot,
+.dispatch-progress-legend .dispatch-dispatched-dot,
+.dispatch-progress-legend .dispatch-on-scene-dot,
+.dispatch-progress-legend .dispatch-completed-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+.dispatch-standby-dot { background: var(--color-text-3); }
+.dispatch-dispatched-dot { background: var(--chart-evacuated); }
+.dispatch-on-scene-dot { background: var(--chart-safe); }
+.dispatch-completed-dot { background: var(--chart-unchecked); }
+
+.dp-main-column,
+.dp-side-panel {
+  min-width: 0;
+}
 
 .dp-dispatch-layout {
   display: grid;
@@ -101,6 +278,59 @@
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.dp-team-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.dp-team-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dp-team-table th,
+.dp-team-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 10px 9px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.dp-team-table th {
+  color: var(--color-text-3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dp-team-table td {
+  color: var(--color-text-2);
+}
+
+.dp-team-table tbody tr:hover {
+  background: var(--color-bg-secondary);
+}
+
+.dp-team-table td strong {
+  display: block;
+  color: var(--color-text-1);
+  font-weight: 700;
+}
+
+.dp-team-table td .dp-table-muted {
+  display: block;
+  margin-top: 2px;
+}
+
+.dp-team-table td:last-child {
+  width: 1%;
+  white-space: nowrap;
 }
 
 .dp-team-card {
@@ -531,8 +761,65 @@
 .dp-dispatch-form {
   display: grid;
   grid-template-columns: minmax(330px, 0.9fr) minmax(430px, 1.1fr);
-  gap: 15px;
+  gap: 10px;
   align-items: stretch;
+}
+
+.dp-dispatch-form.is-areas-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
+.dp-affected-areas-panel {
+  min-width: 0;
+}
+
+.dp-panel-toggle {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  place-items: center;
+  margin-left: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text-2);
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.dp-panel-toggle:hover {
+  border-color: var(--color-nav-active);
+  color: var(--color-nav-active);
+}
+
+.dp-dispatch-form.is-areas-collapsed .dp-modal-section-head {
+  height: 100%;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 10px 5px;
+}
+
+.dp-dispatch-form.is-areas-collapsed .dp-affected-areas-panel .dp-modal-section-title {
+  overflow: hidden;
+  width: 44px;
+  color: var(--color-text-2);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dp-dispatch-form.is-areas-collapsed .dp-affected-areas-body {
+  display: none;
+}
+
+.dp-dispatch-form.is-areas-collapsed > .dp-modal-section:not(.dp-affected-areas-panel) .dp-modal-section-body {
+  max-width: 480px;
+}
+
+.dp-dispatch-form.is-areas-collapsed > .dp-modal-section:not(.dp-affected-areas-panel) {
+  height: fit-content;
+  align-self: start;
 }
 
 .dp-dispatch-form > .dp-modal-section {
@@ -557,7 +844,7 @@
   justify-content: space-between;
   gap: 10px;
   border-bottom: 1px solid var(--color-bg-secondary);
-  padding: 13px 15px;
+  padding: 10px 12px;
 }
 
 .dp-modal-section-title {
@@ -579,7 +866,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 15px;
+  padding: 10px;
 }
 
 .dp-dispatch-form .form-label {
@@ -638,7 +925,128 @@
 
 .dp-risk-selector {
   display: grid;
-  gap: 12px;
+  gap: 8px;
+}
+
+.dp-purok-households {
+  display: grid;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.dp-purok-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dp-purok-summary > div,
+.dp-target-household-grid > div {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--color-border);
+  padding: 7px 8px;
+  background: var(--color-bg-secondary);
+}
+
+.dp-purok-summary strong,
+.dp-target-household-grid strong {
+  color: var(--color-text-1);
+  font-size: 16px;
+}
+
+.dp-purok-summary span,
+.dp-target-household-grid span {
+  color: var(--color-text-3);
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.dp-target-household {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dp-target-household-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+}
+
+.dp-target-household-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dp-target-household-table th,
+.dp-target-household-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.dp-target-household-table th {
+  color: var(--color-text-3);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.dp-target-household-table td {
+  color: var(--color-text-1);
+  font-weight: 650;
+}
+
+.dp-household-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+}
+
+.dp-household-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dp-household-table th,
+.dp-household-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 8px;
+  text-align: left;
+}
+
+.dp-household-table th {
+  color: var(--color-text-3);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.dp-household-table tbody tr.active {
+  background: var(--color-evac-bg);
+}
+
+.dp-household-select-button {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  padding: 5px 9px;
+  color: var(--color-text-2);
+  background: #ffffff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.dp-household-select-button:hover:not(:disabled) {
+  border-color: var(--color-nav-active);
+  color: var(--color-nav-active);
+}
+
+.dp-household-select-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .dp-triage-list {
@@ -1699,4 +2107,96 @@
   right: 18px;
   bottom: 24px;
   left: auto;
+}
+
+@media (max-width: 900px) {
+  .dp-dispatch-form.is-areas-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .dp-dispatch-form.is-areas-collapsed .dp-modal-section-head {
+    height: auto;
+    flex-direction: row;
+    padding: 10px 12px;
+  }
+
+  .dp-dispatch-form.is-areas-collapsed .dp-affected-areas-panel .dp-modal-section-title {
+    writing-mode: initial;
+    transform: none;
+    width: auto;
+    color: var(--color-text-2);
+    font-size: 12px;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+
+  .dp-dispatch-form.is-areas-collapsed .dp-affected-areas-body {
+    display: block;
+  }
+}
+
+/* Keep the two workflow panels independent when the left panel is toggled. */
+.dp-dispatch-form {
+  display: block;
+}
+
+.dp-dispatch-panels {
+  display: grid;
+  grid-template-columns: minmax(330px, 0.9fr) minmax(430px, 1.1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.dp-dispatch-panels.is-areas-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
+.dp-panel-column {
+  min-width: 0;
+}
+
+.dp-panel-column > .dp-modal-section {
+  height: auto;
+}
+
+.dp-dispatch-panels.is-areas-collapsed .dp-dispatch-assignment-column > .dp-modal-section {
+  height: auto;
+}
+
+.dp-dispatch-panels.is-areas-collapsed .dp-affected-areas-panel .dp-modal-section-head {
+  height: auto;
+  min-height: 64px;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 10px 5px;
+}
+
+.dp-dispatch-panels.is-areas-collapsed .dp-affected-areas-panel .dp-modal-section-title {
+  overflow: hidden;
+  width: 44px;
+  color: var(--color-text-2);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .dp-dispatch-panels,
+  .dp-dispatch-panels.is-areas-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .dp-dispatch-panels.is-areas-collapsed .dp-affected-areas-panel .dp-modal-section-head {
+    min-height: 0;
+    flex-direction: row;
+    padding: 10px 12px;
+  }
+
+  .dp-dispatch-panels.is-areas-collapsed .dp-affected-areas-panel .dp-modal-section-title {
+    width: auto;
+    font-size: 12px;
+    letter-spacing: normal;
+    text-transform: none;
+  }
 }

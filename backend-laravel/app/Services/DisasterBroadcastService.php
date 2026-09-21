@@ -680,10 +680,21 @@ class DisasterBroadcastService
         }
 
         if ($puroks->isEmpty()) {
-            $puroks = collect(range(1, 30))->map(fn (int $number): array => [
+            $puroks = collect([
+                'Sitio Alaska',
+                'Sitio Viking',
+                'Sitio Abya',
+                'Sitio Wangyu',
+                'Sitio Puntod',
+                'Sitio Pagtinabangay',
+                'Sitio Ybañez',
+                'Sitio Ipil-ipil',
+                'Sitio Tangke',
+                'Sitio Huyong-huyong',
+            ])->map(fn (string $name): array => [
                 'purok_id' => null,
-                'name' => 'Purok '.$number,
-                'source' => 'prototype_reference',
+                'name' => $name,
+                'source' => 'mambaling_reference',
             ]);
         }
 

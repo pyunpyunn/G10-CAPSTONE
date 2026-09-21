@@ -77,6 +77,105 @@ class TrackingAidForwardingService
         }
     }
 
+    public function acknowledgedResourceRequests(): array
+    {
+        $connection = (string) config('services.trackingaid.connection', 'trackingaid');
+        $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
+
+        try {
+            if (! Schema::connection($connection)->hasTable($table)) {
+                return [];
+            }
+
+            return DB::connection($connection)
+                ->table($table)
+                ->whereIn(DB::raw('LOWER(resqperation_status)'), ['acknowledged', 'received', 'received_by_trackingaid'])
+                ->orderByDesc('updated_at')
+                ->orderByDesc('forwarded_at')
+                ->get([
+                    'tracking_reference',
+                    'resqperation_request_id',
+                    'source_system',
+                    'request_source',
+                    'item_name',
+                    'resource_type',
+                    'quantity',
+                    'unit',
+                    'urgency',
+                    'area_label',
+                    'area_note',
+                    'requested_by',
+                    'description',
+                    'resqperation_status',
+                    'forwarded_at',
+                    'updated_at',
+                ])
+                ->map(fn (object $row): array => [
+                    'tracking_reference' => $row->tracking_reference,
+                    'request_id' => $row->resqperation_request_id,
+                    'label' => $row->item_name ?: $row->resource_type ?: 'Resource request',
+                    'source' => $row->source_system ?: $row->request_source ?: 'TrackingAid',
+                    'status' => $this->statusLabel($row->resqperation_status),
+                    'detail' => trim(implode(' - ', array_filter([
+                        trim((string) ($row->quantity ?? '').' '.(string) ($row->unit ?? '')),
+                        $row->area_label,
+                        $row->area_note,
+                        $row->requested_by,
+                        $row->description,
+                    ]))),
+                    'forwarded_at' => $row->forwarded_at,
+                    'updated_at' => $row->updated_at,
+                ])
+                ->values()
+                ->all();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+    }
+
+    public function requestHandoffStatus(string $requestId, ?string $trackingReference = null): ?array
+    {
+        $connection = (string) config('services.trackingaid.connection', 'trackingaid');
+        $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
+
+        try {
+            if (! Schema::connection($connection)->hasTable($table)) {
+                return null;
+            }
+
+            $row = DB::connection($connection)
+                ->table($table)
+                ->where('resqperation_request_id', $requestId)
+                ->when($trackingReference, fn ($query) => $query->where('tracking_reference', $trackingReference))
+                ->orderByDesc('updated_at')
+                ->first(['tracking_reference', 'resqperation_status', 'updated_at']);
+
+            return $row ? [
+                'tracking_reference' => $row->tracking_reference,
+                'status' => strtolower(trim((string) $row->resqperation_status)),
+                'updated_at' => $row->updated_at,
+            ] : null;
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return null;
+        }
+    }
+
+    private function statusLabel(?string $status): string
+    {
+        $key = strtolower(trim((string) $status));
+
+        return match ($key) {
+            'received_by_trackingaid' => 'Received by TrackingAid',
+            'acknowledged' => 'Acknowledged',
+            'forwarded' => 'Forwarded',
+            default => ucwords(str_replace(['_', '-'], ' ', $key ?: 'Unknown')),
+        };
+    }
+
     private function ensureForwardTable(string $connection, string $table): void
     {
         if (Schema::connection($connection)->hasTable($table)) {

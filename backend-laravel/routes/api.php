@@ -101,6 +101,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/resource-requests', [ResourceRequestController::class, 'index']);
             Route::post('/resource-requests', [ResourceRequestController::class, 'store']);
             Route::get('/resource-requests/{requestId}', [ResourceRequestController::class, 'show']);
+            Route::patch('/resource-requests/{requestId}', [ResourceRequestController::class, 'update']);
             Route::post('/resource-requests/{requestId}/validate', [ResourceRequestController::class, 'validateResource']);
             Route::post('/resource-requests/{requestId}/forward', [ResourceRequestController::class, 'forward']);
             Route::post('/resource-requests/{requestId}/return', [ResourceRequestController::class, 'returnRequest']);

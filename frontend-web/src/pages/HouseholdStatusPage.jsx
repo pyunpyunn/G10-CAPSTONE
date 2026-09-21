@@ -1,21 +1,16 @@
 import { useEffect, useState } from 'react'
 import {
+  Download,
   FileDown,
-  MapPin,
   RefreshCcw,
-  Route,
-  Users,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getHousehold, getHouseholdStatusLogs, getHouseholds } from '../api/householdApi'
-import HouseholdDetailContent from '../components/households/HouseholdDetailContent'
+import { getHouseholds } from '../api/householdApi'
 import HouseholdFilters from '../components/households/HouseholdFilters'
 import HouseholdOpsPanels from '../components/households/HouseholdOpsPanels'
 import HouseholdSummary from '../components/households/HouseholdSummary'
 import HouseholdTable from '../components/households/HouseholdTable'
 import LoadingState from '../components/ui/LoadingState'
-import Modal from '../components/ui/Modal'
-import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   emptySummary,
@@ -24,6 +19,8 @@ import {
   downloadExcelWorkbook,
   downloadPdfReport,
 } from '../utils/exportFileHelpers'
+
+const PAGE_SIZE = 25
 
 export default function HouseholdStatusPage() {
   const navigate = useNavigate()
@@ -35,11 +32,6 @@ export default function HouseholdStatusPage() {
   const [purok, setPurok] = useState('all')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
-  const [selectedId, setSelectedId] = useState('')
-  const [detail, setDetail] = useState(null)
-  const [history, setHistory] = useState([])
-  const [isDetailLoading, setIsDetailLoading] = useState(false)
-  const [detailError, setDetailError] = useState('')
 
   const summary = payload?.summary || emptySummary()
   const households = payload?.households?.data || []
@@ -72,7 +64,7 @@ export default function HouseholdStatusPage() {
           purok,
           status,
           page,
-          per_page: 10,
+          per_page: PAGE_SIZE,
         })
 
         if (!ignore) {
@@ -106,7 +98,7 @@ export default function HouseholdStatusPage() {
         purok,
         status,
         page,
-        per_page: 10,
+        per_page: PAGE_SIZE,
       })
       setPayload(data)
     } catch {
@@ -114,34 +106,6 @@ export default function HouseholdStatusPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  async function openHousehold(householdId) {
-    setSelectedId(householdId)
-    setDetail(null)
-    setHistory([])
-    setDetailError('')
-    setIsDetailLoading(true)
-
-    try {
-      const [detailData, historyData] = await Promise.all([
-        getHousehold(householdId),
-        getHouseholdStatusLogs(householdId),
-      ])
-      setDetail(detailData)
-      setHistory(historyData.logs || [])
-    } catch {
-      setDetailError('Household details cannot be loaded right now.')
-    } finally {
-      setIsDetailLoading(false)
-    }
-  }
-
-  function closeDetail() {
-    setSelectedId('')
-    setDetail(null)
-    setHistory([])
-    setDetailError('')
   }
 
   function changeStatusFilter(nextStatus) {
@@ -152,6 +116,10 @@ export default function HouseholdStatusPage() {
   function changePurok(nextPurok) {
     setPurok(nextPurok)
     setPage(1)
+  }
+
+  function openHousehold(householdId) {
+    navigate(`/households/${householdId}`)
   }
 
   function exportCurrentPage(type) {
@@ -171,98 +139,78 @@ export default function HouseholdStatusPage() {
   }
 
   return (
-    <section className="page active household-page">
-      <PageHeader
-        title="Household Status"
-        actions={
-          <>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={loadHouseholds}>
-              <RefreshCcw size={14} />
-              Refresh
-            </button>
-            <button className="btn btn-secondary btn-sm" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('excel')}>
-              <FileDown size={14} />
-              Export Excel
-            </button>
-            <button className="btn btn-secondary btn-sm" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('pdf')}>
-              <FileDown size={14} />
-              Export PDF
-            </button>
-          </>
-        }
-      />
+    <main className="ops-page household-page">
+      <header className="household-status-page-header">
+        <div className="household-status-header-copy">
+          <h1>Household Status</h1>
+          <p>Barangay Mambaling, Cebu City</p>
+        </div>
+        <div className="weather-page-actions household-status-page-actions">
+          <div className="weather-live-status">
+            <strong>{hasActiveEvent ? 'Live' : 'Standby'}</strong>
+            <span>{hasActiveEvent ? 'Monitoring active event' : 'Waiting for active event'}</span>
+          </div>
+          <button className="button secondary" type="button" onClick={loadHouseholds}>
+            <RefreshCcw size={16} />
+            Refresh
+          </button>
+          <button className="button secondary" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('excel')}>
+            <Download size={16} />
+            Export
+          </button>
+          <button className="button secondary" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('pdf')}>
+            <FileDown size={16} />
+            PDF
+          </button>
+        </div>
+      </header>
 
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {!isInitialLoading && !hasBlockingError && payload && (
-        <>
-          {!hasActiveEvent && (
-            <div className="standby-strip hh-standby-strip">
-              <strong>No active disaster event</strong>
-              <span>Household reporting starts after HQ/Admin broadcasts an active event.</span>
+        <div className="workspace-grid">
+          <section className="household-workspace" aria-label="Household rescue list">
+            <div className="filter-bar household-filter-shell">
+              <HouseholdFilters
+                searchText={searchText}
+                purok={purok}
+                status={status}
+                summary={summary}
+                puroks={puroks}
+                onSearchTextChange={setSearchText}
+                onPurokChange={changePurok}
+                onStatusChange={changeStatusFilter}
+              />
             </div>
-          )}
 
-          <HouseholdSummary summary={summary} />
-          <HouseholdFilters
-            searchText={searchText}
-            purok={purok}
-            status={status}
-            summary={summary}
-            puroks={puroks}
-            onSearchTextChange={setSearchText}
-            onPurokChange={changePurok}
-            onStatusChange={changeStatusFilter}
-          />
+            <div className="data-panel">
+              <RefreshOverlay active={isRefreshing}>
+                <HouseholdTable
+                  households={households}
+                  meta={meta}
+                  selectedPurok={purok}
+                  onOpen={openHousehold}
+                  onPageChange={setPage}
+                  onDispatchPurok={() => navigate('/dispatch')}
+                />
+              </RefreshOverlay>
+            </div>
+          </section>
 
-          <RefreshOverlay active={isRefreshing}>
-            <HouseholdTable
-              households={households}
-              meta={meta}
-              selectedPurok={purok}
-              onOpen={openHousehold}
-              onPageChange={setPage}
-              onDispatchPurok={() => navigate('/dispatch')}
-            />
-          </RefreshOverlay>
-          <HouseholdOpsPanels activities={payload?.recent_activity || []} rows={payload?.purok_summary || []} />
-        </>
+          <aside className="side-panel" aria-label="Household operations summary">
+            {!hasActiveEvent && (
+              <div className="standby-strip hh-standby-strip">
+                <strong>No active disaster event</strong>
+                <span>Household reporting starts after HQ/Admin broadcasts an active event.</span>
+              </div>
+            )}
+            <HouseholdSummary summary={summary} />
+            <HouseholdOpsPanels rows={payload?.purok_summary || []} />
+          </aside>
+        </div>
       )}
-
-      <Modal
-        title={detail?.household?.household_name || 'Household details'}
-        isOpen={Boolean(selectedId)}
-        onClose={closeDetail}
-        className="hh-drawer-modal"
-        footer={
-          detail?.household && (
-            <>
-              <button className="btn btn-secondary btn-sm" type="button" onClick={() => navigate('/mapping')}>
-                <MapPin size={14} />
-                Open map
-              </button>
-              <button className="btn btn-secondary btn-sm" type="button" onClick={() => navigate('/dispatch')}>
-                <Users size={14} />
-                Request check
-              </button>
-              {detail.household.priority?.key === 'urgent' && (
-                <button className="btn btn-danger btn-sm" type="button" onClick={() => navigate('/dispatch')}>
-                  <Route size={14} />
-                  Create dispatch
-                </button>
-              )}
-            </>
-          )
-        }
-      >
-        {isDetailLoading && <LoadingState inline />}
-        {detailError && <div className="form-error">{detailError}</div>}
-        {!isDetailLoading && detail?.household && (
-          <HouseholdDetailContent detail={detail} history={history} />
-        )}
-      </Modal>
-    </section>
+    </main>
   )
 }
 

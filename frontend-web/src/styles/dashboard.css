@@ -927,15 +927,8 @@ th {
 }
 
 .filter-bar {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) repeat(2, minmax(170px, 180px));
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  margin-bottom: 12px;
-  padding: 10px;
-  background: #ffffff;
+  width: 100%;
+  min-width: 0;
 }
 
 .search-input {

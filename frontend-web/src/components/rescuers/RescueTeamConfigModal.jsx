@@ -1,5 +1,5 @@
-import { Plus, Save, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Plus, Save, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import Badge from '../ui/Badge'
 import LoadingState from '../ui/LoadingState'
 import Modal from '../ui/Modal'
@@ -21,22 +21,47 @@ export default function RescueTeamConfigModal({
   isLoading,
   isSaving,
   error,
+  onRetry,
   onClose,
   onSave,
   onDelete,
+  embedded = false,
 }) {
+  const membersPerPage = 7
   const teams = useMemo(() => workspace?.teams || [], [workspace])
   const responders = useMemo(() => workspace?.responders || [], [workspace])
+  const [memberPage, setMemberPage] = useState(1)
   const [form, setForm] = useState(() => {
     const firstTeam = workspace?.teams?.[0]
     return firstTeam ? teamToForm(firstTeam) : blankTeam
   })
+
+  useEffect(() => {
+    if (!workspace) {
+      return
+    }
+
+    setForm((current) => {
+      if (current.team_id || current.team_name) {
+        return current
+      }
+
+      const firstTeam = workspace.teams?.[0]
+      return firstTeam ? teamToForm(firstTeam) : { ...blankTeam, member_ids: [] }
+    })
+  }, [workspace])
 
   const selectedTeam = useMemo(() => (
     teams.find((team) => String(team.team_id || team.team_name) === String(form.team_id || form.team_name))
   ), [teams, form.team_id, form.team_name])
 
   const memberSet = new Set(form.member_ids.map((id) => Number(id)))
+  const memberPageCount = Math.max(1, Math.ceil(responders.length / membersPerPage))
+  const visibleResponders = responders.slice((memberPage - 1) * membersPerPage, memberPage * membersPerPage)
+
+  useEffect(() => {
+    setMemberPage((current) => Math.min(current, memberPageCount))
+  }, [memberPageCount])
 
   function setField(key, value) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -44,10 +69,12 @@ export default function RescueTeamConfigModal({
 
   function selectTeam(team) {
     setForm(teamToForm(team))
+    setMemberPage(1)
   }
 
   function startNewTeam() {
     setForm({ ...blankTeam, duty_status: 'standby' })
+    setMemberPage(1)
   }
 
   function toggleMember(responderId) {
@@ -80,7 +107,7 @@ export default function RescueTeamConfigModal({
 
   const footer = (
     <>
-      <div className="rtc-footer-note">Team changes update responder group assignment only. Rescuer accounts are retained.</div>
+      <div className="rtc-footer-note">This page manages team membership and deployment readiness. It does not create or delete rescuer accounts.</div>
       <div className="rtc-footer-actions">
         {form.team_id && (
           <button className="btn btn-danger btn-sm" type="button" disabled={isSaving || selectedTeam?.can_delete === false} onClick={deleteTeam}>
@@ -99,17 +126,25 @@ export default function RescueTeamConfigModal({
     </>
   )
 
-  return (
-    <Modal title="Configure rescue teams" isOpen={isOpen} onClose={onClose} footer={footer} className="rtc-modal">
+  const body = (
+    <>
       {isLoading ? (
         <LoadingState label="Loading team configuration..." inline />
       ) : (
         <div className="rtc-layout">
           <aside className="rtc-team-list">
+            <div className="rtc-list-heading">
+              <div>
+                <span className="rtc-kicker">Roster structure</span>
+                <strong>{teams.length} configured teams</strong>
+              </div>
+              <span>Saved to the database</span>
+            </div>
             <button className="btn btn-secondary btn-sm rtc-new-team" type="button" onClick={startNewTeam}>
               <Plus size={14} />
               Add rescue team
             </button>
+            {teams.length === 0 && <div className="rtc-empty rtc-team-empty">No rescue teams have been configured yet.</div>}
             {teams.map((team) => {
               const isActive = String(team.team_id || team.team_name) === String(form.team_id || form.team_name)
               return (
@@ -118,7 +153,7 @@ export default function RescueTeamConfigModal({
                     <strong>{team.team_name}</strong>
                     <small>{team.team_code} - {team.member_count || 0} members</small>
                   </span>
-                  <Badge tone={team.is_configured ? 'blue' : 'gray'}>{team.is_configured ? 'Saved' : 'Template'}</Badge>
+                  <Badge tone="blue">Saved</Badge>
                 </button>
               )
             })}
@@ -133,11 +168,12 @@ export default function RescueTeamConfigModal({
               <Badge tone={form.team_id ? 'green' : 'amber'}>{form.team_id ? 'Configured' : 'New'}</Badge>
             </div>
 
-            {error && <div className="form-error">{error}</div>}
-            {selectedTeam?.active_dispatch_count > 0 && (
-              <div className="rtc-warning">This team has an active dispatch. Delete is locked until the dispatch is completed.</div>
+            {error && (
+              <div className="rtc-error">
+                <span>{error}</span>
+                <button className="btn btn-secondary btn-sm" type="button" onClick={onRetry} disabled={isLoading || isSaving}>Retry</button>
+              </div>
             )}
-
             <div className="rtc-grid">
               <label>
                 <span>Team name</span>
@@ -196,7 +232,7 @@ export default function RescueTeamConfigModal({
               {responders.length === 0 ? (
                 <div className="rtc-empty">No rescuer accounts created yet.</div>
               ) : (
-                responders.map((responder) => {
+                visibleResponders.map((responder) => {
                   const checked = memberSet.has(Number(responder.responder_id))
                   const busyInOtherTeam = responder.is_busy && responder.team_id && Number(responder.team_id) !== Number(form.team_id)
                   const busyInCurrentTeam = responder.is_busy && checked
@@ -221,11 +257,28 @@ export default function RescueTeamConfigModal({
                 })
               )}
             </div>
+            {memberPageCount > 1 && (
+              <div className="rtc-member-pagination">
+                <button className="btn btn-secondary btn-sm" type="button" aria-label="Previous members" disabled={memberPage === 1} onClick={() => setMemberPage((current) => current - 1)}>
+                  <ChevronLeft size={14} />
+                </button>
+                <span>Page {memberPage} of {memberPageCount}</span>
+                <button className="btn btn-secondary btn-sm" type="button" aria-label="Next members" disabled={memberPage === memberPageCount} onClick={() => setMemberPage((current) => current + 1)}>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
           </form>
         </div>
       )}
-    </Modal>
+    </>
   )
+
+  if (embedded) {
+    return <div className="rtc-page-form"><div className="rtc-page-form-panel">{body}<div className="rtc-page-footer">{footer}</div></div></div>
+  }
+
+  return <Modal title="Configure rescue teams" isOpen={isOpen} onClose={onClose} footer={footer} className="rtc-modal">{body}</Modal>
 }
 
 function teamToForm(team) {

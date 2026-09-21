@@ -11,7 +11,7 @@ export const statusFilters = [
 export function makeProgress(summary) {
   return [
     { label: 'Safe only', percent: percent(summary.safe_only, summary.total), className: 'safe' },
-    { label: 'Evacuated', percent: percent(summary.evacuated, summary.total), className: 'evac' },
+    { label: 'Evacuated', percent: percent(summary.evacuated, summary.total), className: 'evacuated' },
     { label: 'Unsafe', percent: percent(summary.unsafe, summary.total), className: 'unsafe' },
     { label: 'Unchecked', percent: percent(summary.unchecked, summary.total), className: 'unchecked' },
   ]

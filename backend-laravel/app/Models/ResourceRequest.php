@@ -62,6 +62,21 @@ class ResourceRequest extends Model
         return $this->belongsTo(UrgencyLevel::class, 'urgency_id', 'urgency_id');
     }
 
+    public function evacuationCenter(): BelongsTo
+    {
+        return $this->belongsTo(EvacuationCenter::class, 'evacuation_center_id', 'evacuation_center_id');
+    }
+
+    public function handledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'handled_by', 'user_id');
+    }
+
+    public function validatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'validated_by_user_id', 'user_id');
+    }
+
     public function validationHistory(): HasMany
     {
         return $this->hasMany(RequestValidation::class, 'request_id', 'request_id');

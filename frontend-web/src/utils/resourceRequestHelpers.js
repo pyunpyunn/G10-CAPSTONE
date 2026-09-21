@@ -67,6 +67,10 @@ export function buildCreatePayload(form) {
   }
 }
 
+export function buildUpdatePayload(form) {
+  return buildCreatePayload(form)
+}
+
 export function buildValidationPayload(form) {
   return {
     validation_status: form.validation_status,
@@ -91,15 +95,15 @@ export function buildReturnPayload(form) {
   }
 }
 
-export function filterParams(search, purok, activeChip, page = 1) {
+export function filterParams(search, purok, activeChip, page = 1, period = 'week') {
   const chip = requestChips.find((item) => item.key === activeChip)
 
   return {
     search: search.trim(),
     purok,
     page,
-    per_page: 6,
-    core: 1,
+    per_page: 5,
+    period,
     ...(chip?.params || {}),
   }
 }

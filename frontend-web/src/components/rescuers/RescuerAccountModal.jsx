@@ -1,15 +1,6 @@
-import { CheckCircle2, RotateCcw, Save, UserPlus, X } from 'lucide-react'
+import { RotateCcw, Save, UserPlus, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { accountIdForTeam } from '../../utils/rescuerHelpers'
-
-const completionChecks = [
-  'Identity recorded',
-  'Team assigned',
-  'Contact + ICE',
-  'Training logged',
-  'PPE / equipment',
-  'Audit trail',
-]
 
 export default function RescuerAccountModal({
   mode,
@@ -26,6 +17,7 @@ export default function RescuerAccountModal({
   onClose,
   onReset,
   onSubmit,
+  embedded = false,
 }) {
   if (!isOpen) {
     return null
@@ -50,9 +42,9 @@ export default function RescuerAccountModal({
     }))
   }
 
-  return createPortal(
+  const content = (
     <div
-      className="ra-modal-overlay open"
+      className={embedded ? 'ra-page-form' : 'ra-modal-overlay open'}
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
@@ -60,14 +52,13 @@ export default function RescuerAccountModal({
         }
       }}
     >
-      <div className="ra-modal" role="dialog" aria-modal="true" aria-labelledby="rescuerAccountModalTitle">
+      <div className={embedded ? 'ra-page-form-panel' : 'ra-modal'} role={embedded ? 'region' : 'dialog'} aria-modal={embedded ? undefined : 'true'} aria-labelledby="rescuerAccountModalTitle">
         <div className="ra-modal-head">
           <div>
             <div className="ra-modal-title" id="rescuerAccountModalTitle">
               <UserPlus size={18} />
               {title}
             </div>
-            <div className="ra-modal-sub">HR/HQ records identity, team assignment, credentials, contact, and issued equipment.</div>
           </div>
           <button className="ra-modal-close" type="button" aria-label="Close create account modal" title="Close" onClick={onClose}>
             <X size={16} />
@@ -162,15 +153,10 @@ export default function RescuerAccountModal({
             </Field>
           </form>
 
-          <div className="ra-checks">
-            {completionChecks.map((item) => (
-              <div className="ra-check" key={item}><CheckCircle2 size={14} />{item}</div>
-            ))}
-          </div>
         </div>
 
         <div className="ra-modal-actions">
-          <span className="ra-subtle">Create, view, update, and deactivate actions are audit logged.</span>
+          {!embedded && <span className="ra-subtle">Create, view, update, and deactivate actions are audit logged.</span>}
           <div className="right">
             {!isView && (
               <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={onReset}>
@@ -191,9 +177,10 @@ export default function RescuerAccountModal({
           </div>
         </div>
       </div>
-    </div>,
-    document.body,
+    </div>
   )
+
+  return embedded ? content : createPortal(content, document.body)
 }
 
 function Field({ label, full = false, children }) {
