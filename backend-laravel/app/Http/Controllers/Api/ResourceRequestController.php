@@ -26,6 +26,11 @@ class ResourceRequestController extends Controller
         return $this->service->show($requestId);
     }
 
+    public function update(Request $request, string $requestId): JsonResponse
+    {
+        return $this->service->update($request, $requestId);
+    }
+
     public function store(Request $request): JsonResponse
     {
         return $this->service->store($request);

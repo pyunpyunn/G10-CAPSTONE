@@ -1,9 +1,7 @@
-import { CheckCircle2, FileCheck2, Send, Undo2, X } from 'lucide-react'
-import { createPortal } from 'react-dom'
+import { FileCheck2, Send, Undo2, X } from 'lucide-react'
 
 export default function ResourceValidationModal({
   mode,
-  isOpen,
   form,
   setForm,
   options = {},
@@ -12,20 +10,20 @@ export default function ResourceValidationModal({
   selectedRequestId,
   onClose,
   onSubmit,
+  onValidate,
+  onOpenReturn,
   onForward,
   onReturn,
 }) {
-  if (!isOpen) {
-    return null
-  }
-
   const isView = mode === 'view'
   const isCreate = mode === 'create'
+  const isEdit = mode === 'edit'
   const isValidate = mode === 'validate'
   const isReturn = mode === 'return'
   const isForward = mode === 'forward'
-  const isReadOnly = isView || isForward
-  const requestFieldsDisabled = !isCreate
+  const canReview = isView && ['needs_validation', 'returned'].includes(form.validation_status)
+  const isReadOnly = isView || isForward || isEdit
+  const requestFieldsDisabled = !isCreate && !isEdit
   const decisionDisabled = !isValidate
   const modalTitle = modalTitleFor(mode)
   const modalSub = modalSubFor(mode, selectedRequestId)
@@ -70,13 +68,9 @@ export default function ResourceValidationModal({
     return center.name
   }
 
-  return createPortal(
-    <div className="rr-validation-modal-overlay open" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) {
-        onClose()
-      }
-    }}>
-      <section className="rr-validation-modal" role="dialog" aria-modal="true" aria-labelledby="resourceValidationTitle">
+  return (
+    <div className="rr-validation-page-panel">
+      <section className="rr-validation-page-card" role="region" aria-labelledby="resourceValidationTitle">
         <div className="rr-validation-modal-head">
           <div>
             <div className="rr-validation-modal-title" id="resourceValidationTitle">
@@ -85,7 +79,7 @@ export default function ResourceValidationModal({
             </div>
             <div className="rr-validation-modal-sub">{modalSub}</div>
           </div>
-          <button className="rr-validation-modal-close" type="button" onClick={onClose} aria-label="Close validation modal" title="Close">
+          <button className="rr-validation-modal-close" type="button" onClick={onClose} aria-label="Close request page" title="Close">
             <X size={16} />
           </button>
         </div>
@@ -226,32 +220,36 @@ export default function ResourceValidationModal({
               </div>
             </div>
 
-            <div className="rr-checklist">
-              <div className="rr-check"><CheckCircle2 size={14} />Requester identity confirmed</div>
-              <div className="rr-check"><CheckCircle2 size={14} />Incident and location matched</div>
-              <div className="rr-check"><CheckCircle2 size={14} />Quantity is reasonable</div>
-              <div className="rr-check"><CheckCircle2 size={14} />No duplicate active request</div>
-              <div className="rr-check"><CheckCircle2 size={14} />TrackingAid handoff logged after forwarding</div>
-            </div>
-
             {formError && <div className="form-error rr-modal-error">{formError}</div>}
           </div>
 
           <div className="rr-validation-modal-actions">
             <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={onClose}>
               <X size={14} />
-              {isView ? 'Close' : 'Cancel'}
+              {isView ? 'Close' : isEdit ? 'Discard' : 'Cancel'}
             </button>
+            {canReview && (
+              <>
+                <button className="btn btn-warning btn-sm" type="button" disabled={isSaving} onClick={onOpenReturn}>
+                  <Undo2 size={14} />
+                  Return request
+                </button>
+                <button className="btn btn-primary btn-sm" type="button" disabled={isSaving} onClick={onValidate}>
+                  <FileCheck2 size={14} />
+                  Validate and forward
+                </button>
+              </>
+            )}
             {isCreate && (
               <button className="btn btn-primary btn-sm" type="submit" disabled={isSaving}>
                 <FileCheck2 size={14} />
                 {isSaving ? 'Saving...' : 'Save request'}
               </button>
             )}
-            {isValidate && (
+            {isEdit && (
               <button className="btn btn-primary btn-sm" type="submit" disabled={isSaving}>
                 <FileCheck2 size={14} />
-                {isSaving ? 'Saving...' : 'Save validation'}
+                {isSaving ? 'Saving...' : 'Save changes'}
               </button>
             )}
             {isReturn && (
@@ -269,14 +267,14 @@ export default function ResourceValidationModal({
           </div>
         </form>
       </section>
-    </div>,
-    document.body,
+    </div>
   )
 }
 
 function modalTitleFor(mode) {
   return {
     create: 'New request record',
+    edit: 'Edit request record',
     validate: 'Validate request',
     return: 'Return request',
     forward: 'Forward request',
@@ -291,6 +289,10 @@ function modalSubFor(mode, requestId) {
 
   if (mode === 'validate') {
     return `${requestId || 'Request'} - save validation decision`
+  }
+
+  if (mode === 'edit') {
+    return `${requestId || 'Request'} - edit saved request details`
   }
 
   if (mode === 'return') {

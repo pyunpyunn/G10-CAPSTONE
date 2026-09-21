@@ -15,6 +15,11 @@ export async function createResourceRequest(payload) {
   return response.data.data
 }
 
+export async function updateResourceRequest(requestId, payload) {
+  const response = await api.patch(`/resource-requests/${requestId}`, payload)
+  return response.data.data
+}
+
 export async function validateResourceRequest(requestId, payload) {
   const response = await api.post(`/resource-requests/${requestId}/validate`, payload)
   return response.data.data

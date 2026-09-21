@@ -43,7 +43,7 @@ class ResourceRequestService
 
     private const VALIDATION_STATUSES = [
         'needs_validation' => 'Pending',
-        'verified' => 'Approved',
+        'verified' => 'Validated',
         'forwarded' => 'In Progress',
         'returned' => 'Returned',
         'fulfilled' => 'Completed',
@@ -59,8 +59,9 @@ class ResourceRequestService
         $category = $this->categoryKey((string) $request->query('category', 'all'));
         $purok = trim((string) $request->query('purok', 'all'));
         $eventId = trim((string) $request->query('event_id', ''));
+        $period = $this->periodKey((string) $request->query('period', 'week'));
         $coreOnly = $request->boolean('core');
-        $perPage = min(50, max(6, (int) $request->query('per_page', 25)));
+        $perPage = min(50, max(5, (int) $request->query('per_page', 25)));
 
         $query = $this->requestQuery();
 
@@ -125,7 +126,7 @@ class ResourceRequestService
                 'active_event' => $coreOnly ? null : $this->formatActiveEvent($this->getActiveEvent()),
                 'summary' => $coreOnly
                     ? $this->coreSummary($items, $paginator->total())
-                    : $this->summary(),
+                    : $this->summary($period),
                 'requests' => [
                     'data' => $items,
                     'current_page' => $paginator->currentPage(),
@@ -135,8 +136,7 @@ class ResourceRequestService
                     'from' => $paginator->firstItem(),
                     'to' => $paginator->lastItem(),
                 ],
-                // Keep the primary queue independent from the optional TrackingAid database.
-                'tracking_mirror' => [],
+                'tracking_mirror' => $this->trackingAid->acknowledgedResourceRequests(),
                 'options' => $coreOnly ? [] : [
                     'sources' => $this->sourceOptions(),
                     'categories' => $this->categoryOptions(),
@@ -213,6 +213,60 @@ class ResourceRequestService
                 'request' => $created,
             ],
         ], 201);
+    }
+
+    public function update(Request $request, string $requestId): JsonResponse
+    {
+        $resourceRequest = ResourceRequest::query()->where('request_id', $requestId)->first();
+
+        if (! $resourceRequest) {
+            return response()->json([
+                'message' => 'Resource request was not found.',
+            ], 404);
+        }
+
+        $currentStatus = $this->statusKey($resourceRequest->validation_status ?? 'needs_validation');
+
+        if (! in_array($currentStatus, ['needs_validation', 'returned'], true)) {
+            return response()->json([
+                'message' => 'Only pending or returned requests can be edited.',
+            ], 422);
+        }
+
+        $validated = $this->validateRequestPayload($request);
+
+        $updated = DB::transaction(function () use ($request, $resourceRequest, $validated, $requestId): array {
+            $now = now();
+            $oldValues = $this->formatRequest($this->findRequest($requestId), true);
+
+            $resourceRequest->fill([
+                'request_source' => $validated['request_source'],
+                'source_reference' => $validated['source_reference'] ?? null,
+                'request_category' => $validated['request_category'],
+                'evacuation_center_id' => $validated['evacuation_center_id'] ?? null,
+                'requested_by' => $validated['requested_by'],
+                'resource_type' => $validated['resource_type'],
+                'item_name' => $validated['item_name'] ?? null,
+                'quantity' => (int) $validated['quantity'],
+                'unit' => $validated['unit'] ?? 'units',
+                'description' => $validated['description'] ?? null,
+                'urgency_id' => (int) ($validated['urgency_id'] ?? $resourceRequest->urgency_id),
+                'updated_at' => $now,
+            ]);
+            $resourceRequest->save();
+
+            $updatedRequest = $this->formatRequest($this->findRequest($requestId), true);
+            $this->writeAuditLog($request, 'update', $requestId, $oldValues, $updatedRequest);
+
+            return $updatedRequest;
+        });
+
+        return response()->json([
+            'message' => 'Resource request updated.',
+            'data' => [
+                'request' => $updated,
+            ],
+        ]);
     }
 
     public function storeExternal(Request $request): JsonResponse
@@ -818,6 +872,17 @@ class ResourceRequestService
         $validation = $this->validationStatus($row->validation_status ?? 'needs_validation');
         $quantityText = trim((string) ($row->quantity ?? '') . ' ' . (string) ($row->unit ?? ''));
         $area = $row->evacuation_center_name ?: $row->evacuation_center_id ?: 'Area not recorded';
+        $handoff = $this->handoffStatus($row);
+        $validationKey = $this->statusKey($row->validation_status ?? '');
+        $statusLabel = $row->request_status_label ?: 'Pending';
+
+        if ($validationKey === 'verified' || $validationKey === 'forwarded') {
+            $statusLabel = 'Validated';
+        }
+
+        if ($handoff['label'] === 'Acknowledged') {
+            $statusLabel = 'Acknowledged';
+        }
 
         $data = [
             'request_id' => $row->request_id,
@@ -860,10 +925,10 @@ class ResourceRequestService
                 'label' => $row->urgency_label ?: 'Medium',
             ],
             'validation' => $validation,
-            'handoff' => $this->handoffStatus($row),
+            'handoff' => $handoff,
             'status' => [
                 'key' => $row->request_status_key ?: 'pending',
-                'label' => $row->request_status_label ?: 'Pending',
+                'label' => $statusLabel,
             ],
             'validation_notes' => $row->validation_notes,
             'validated_by_user_id' => $row->validated_by_user_id,
@@ -881,19 +946,29 @@ class ResourceRequestService
         return $data;
     }
 
-    private function summary(): array
+    private function summary(string $period = 'week'): array
     {
         $counts = ResourceRequest::query()
             ->select('validation_status', DB::raw('COUNT(*) as total'))
             ->groupBy('validation_status')
             ->pluck('total', 'validation_status');
 
+        $periodStart = match ($period) {
+            'month' => Carbon::now()->startOfMonth(),
+            'year' => Carbon::now()->startOfYear(),
+            default => Carbon::now()->startOfWeek(),
+        };
+        $periodQuery = ResourceRequest::query()->where('created_at', '>=', $periodStart);
+
         return [
             'needs_validation' => (int) ($counts['needs_validation'] ?? 0),
             'verified' => (int) (($counts['verified'] ?? 0) + ($counts['validated'] ?? 0)),
+            'validated_and_forwarded' => (int) ($counts['verified'] ?? 0) + (int) ($counts['forwarded'] ?? 0),
+            'acknowledged' => count($this->trackingAid->acknowledgedResourceRequests()),
             'forwarded_today' => ResourceRequest::query()
                 ->whereDate('released_for_tracking_at', Carbon::today())
                 ->count(),
+            'total_requests' => (int) $periodQuery->count(),
             'returned' => (int) ($counts['returned'] ?? 0),
             'status_ids' => [
                 'needs_validation' => $this->resourceStatusId('needs_validation'),
@@ -932,6 +1007,13 @@ class ResourceRequestService
                 ],
             ],
         ];
+    }
+
+    private function periodKey(string $period): string
+    {
+        return in_array(strtolower(trim($period)), ['week', 'month', 'year'], true)
+            ? strtolower(trim($period))
+            : 'week';
     }
 
     private function coreSummary(array $items, int $total): array
@@ -1260,21 +1342,26 @@ class ResourceRequestService
 
     private function handoffStatus(object $row): array
     {
-        if ($row->tracking_reference) {
+        $tracking = $this->trackingAid->requestHandoffStatus($row->request_id, $row->tracking_reference);
+        $trackingStatus = $tracking['status'] ?? null;
+        $isAcknowledged = in_array($trackingStatus, ['acknowledged', 'received', 'received_by_trackingaid'], true);
+
+        if ($isAcknowledged && $tracking) {
             return [
-                'label' => $row->tracking_reference,
+                'label' => 'Acknowledged',
                 'tone' => 'green',
-                'meta' => $row->released_for_tracking_at ? 'accepted ' . $this->formatTime($row->released_for_tracking_at) : 'forwarded',
+                'tracking_reference' => $tracking['tracking_reference'],
+                'meta' => $tracking['updated_at'] ? 'acknowledged ' . $this->formatTime($tracking['updated_at']) : null,
             ];
         }
 
         $status = $this->statusKey($row->validation_status ?? 'needs_validation');
 
-        if ($status === 'verified') {
-            return ['label' => 'Ready', 'tone' => 'green', 'meta' => 'ready for TrackingAid'];
+        if ($status === 'verified' || $status === 'forwarded' || $row->tracking_reference) {
+            return ['label' => 'Ready', 'tone' => 'green', 'tracking_reference' => null, 'meta' => 'ready for TrackingAid'];
         }
 
-        return ['label' => 'Not forwarded', 'tone' => 'gray', 'meta' => null];
+        return ['label' => 'Not forwarded', 'tone' => 'gray', 'tracking_reference' => null, 'meta' => null];
     }
 
     private function statusKey(?string $status): string
