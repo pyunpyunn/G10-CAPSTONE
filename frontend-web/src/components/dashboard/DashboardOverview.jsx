@@ -9,6 +9,7 @@ import {
 } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
+  ArrowUpRight,
   CloudSun,
   Map,
   PackageCheck,
@@ -51,7 +52,7 @@ function WeatherCard({ weatherState, hasActiveEvent, onOpenWeather }) {
       <div className="panel-head">
         <span className="panel-title"><CloudSun size={15} />Weather update</span>
         <button className="panel-link" type="button" onClick={onOpenWeather}>
-          Full view <FontAwesomeIcon icon={faArrowRight} />
+          Full view <ArrowUpRight size={14} />
         </button>
       </div>
 
@@ -129,7 +130,7 @@ function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
       <div className="panel-head">
         <span className="panel-title"><Map size={15} />Household map</span>
         <button className="panel-link" type="button" onClick={onOpenMap}>
-          Full view <FontAwesomeIcon icon={faArrowRight} />
+          Full view <ArrowUpRight size={14} />
         </button>
       </div>
 
@@ -213,7 +214,7 @@ function RequestCard({ requestsState, onOpenRequests }) {
       <div className="panel-head">
         <span className="panel-title"><PackageCheck size={15} />Requests</span>
         <button className="panel-link" type="button" onClick={onOpenRequests}>
-          Full view <FontAwesomeIcon icon={faArrowRight} />
+          Full view <ArrowUpRight size={14} />
         </button>
       </div>
 

@@ -25,12 +25,6 @@ export default function BroadcastLifecycleCard({ state, activeEvent, broadcastCo
         </div>
         {isActive && <ActiveEventDetails activeEvent={activeEvent} />}
       </div>
-      {isActive && (
-        <button className="btn btn-warning btn-sm" type="button" onClick={onCloseEvent}>
-          <Archive size={14} />
-          Close Active Event
-        </button>
-      )}
     </section>
   )
 }
