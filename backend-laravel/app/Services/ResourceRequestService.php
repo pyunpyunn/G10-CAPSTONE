@@ -1193,7 +1193,18 @@ class ResourceRequestService
             ->values()
             ->all();
 
-        return empty($puroks) ? ['Purok 1', 'Purok 2', 'Purok 3', 'Purok 4', 'Purok 5'] : $puroks;
+        return empty($puroks) ? [
+            'Sitio Alaska',
+            'Sitio Viking',
+            'Sitio Abya',
+            'Sitio Wangyu',
+            'Sitio Puntod',
+            'Sitio Pagtinabangay',
+            'Sitio Ybañez',
+            'Sitio Ipil-ipil',
+            'Sitio Tangke',
+            'Sitio Huyong-huyong',
+        ] : $puroks;
     }
 
     private function getActiveEvent(): ?object
