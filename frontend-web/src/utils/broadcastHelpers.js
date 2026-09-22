@@ -34,6 +34,8 @@ export function defaultForm(workspace = {}) {
     broadcast_title: 'Official disaster advisory',
     message: 'Stay alert and follow official barangay instructions. Use the household mobile status buttons to report your current situation.',
     attach_route: false,
+    attached_evacuation_center_id: '',
+    attached_affected_area_ids: [],
   }
 }
 

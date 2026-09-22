@@ -216,6 +216,8 @@ export default function BroadcastPage() {
         target_area: targetAreaLabel(form.scope_type, directPuroks),
         estimated_duration: form.estimated_duration,
         attach_route: form.attach_route,
+        attached_evacuation_center_id: form.attached_evacuation_center_id || null,
+        attached_affected_area_ids: form.attached_affected_area_ids || [],
         allowed_statuses: selectedStatuses,
         direct_puroks: directPuroks,
       })
@@ -324,6 +326,8 @@ export default function BroadcastPage() {
               disasterTypes={disasterTypes}
               severityLevels={severityLevels}
               puroks={puroks}
+              evacuationCenters={evacuationCenters}
+              affectedAreas={affectedAreas}
               statusOptions={statusOptions}
               selectedPurok={selectedPurok}
               selectedPriority={selectedPriority}

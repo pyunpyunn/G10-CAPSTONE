@@ -183,6 +183,21 @@ function BroadcastLog({ broadcasts }) {
                   <span><strong>Recipients:</strong> {broadcast.recipient_count || 0}</span>
                   <span><strong>Status:</strong> {broadcast.status || 'Sent'}</span>
                 </div>
+
+                {(broadcast.attached_evacuation_center || broadcast.evacuation_route) && (
+                  <div className="bc-log-route-info" style={{ marginTop: '0.4rem', fontSize: '0.775rem', color: '#10b981', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                    {broadcast.attached_evacuation_center && (
+                      <span style={{ background: 'rgba(16,185,129,0.12)', padding: '0.15rem 0.4rem', borderRadius: '0.25rem' }}>
+                        📍 Evac Center: <strong>{broadcast.attached_evacuation_center.name}</strong> (Active)
+                      </span>
+                    )}
+                    {broadcast.evacuation_route && (
+                      <span style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', padding: '0.15rem 0.4rem', borderRadius: '0.25rem' }}>
+                        🗺️ Route: {broadcast.evacuation_route.distance_km}km ({broadcast.evacuation_route.estimated_minutes} mins)
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </article>
           ))}
