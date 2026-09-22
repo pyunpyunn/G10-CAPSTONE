@@ -479,7 +479,6 @@ export default function HouseholdHomeScreen() {
         onSaveStatus={handleSaveStatus}
         onEditStatus={() => setEditingStatus(true)}
         onToggleHistory={() => setShowHistory((value) => !value)}
-        onOpenQr={() => setShowQr(true)}
         onOpenMap={() => setActiveTab('route')}
         onSaveMemberStatus={handleSaveMemberStatus}
       />

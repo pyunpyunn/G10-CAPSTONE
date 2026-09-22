@@ -14,7 +14,6 @@ type DashboardProps = {
   onSaveStatus: () => void;
   onEditStatus: () => void;
   onToggleHistory: () => void;
-  onOpenQr: () => void;
   onOpenMap: () => void;
   onSaveMemberStatus?: (memberId: string, status: string) => Promise<void>;
 };
@@ -37,7 +36,6 @@ export function HouseholdDashboardScreen({
   onSaveStatus,
   onEditStatus,
   onToggleHistory,
-  onOpenQr,
   onOpenMap,
   onSaveMemberStatus,
 }: DashboardProps) {
@@ -124,7 +122,6 @@ export function HouseholdDashboardScreen({
             ) : (
               <HouseholdButton label="Edit status" icon="create-outline" tone="light" onPress={onEditStatus} />
             )}
-            <HouseholdButton label="Evacuation QR" icon="qr-code-outline" tone="light" onPress={onOpenQr} />
           </View>
 
           {showHistory ? (
@@ -147,10 +144,7 @@ export function HouseholdDashboardScreen({
       ) : null}
 
       <View style={styles.card}>
-        <HouseholdSection
-          title="Family members"
-          action={<HouseholdButton label="QR" icon="qr-code-outline" tone="light" onPress={onOpenQr} />}
-        />
+        <HouseholdSection title="Family members" />
         {members.length === 0 ? (
           <HouseholdEmpty icon="people-outline" title="No members listed" />
         ) : (
