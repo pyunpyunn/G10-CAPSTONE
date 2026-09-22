@@ -1839,6 +1839,8 @@
   justify-content: flex-end;
 }
 
+/* SitRep styles moved to situation.css. */
+/*
 .sitrep-event-panel {
   display: grid;
   grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
@@ -2523,6 +2525,7 @@
   background: var(--color-bg-secondary);
   outline: none;
 }
+*/
 
 .module-preview-grid {
   display: grid;

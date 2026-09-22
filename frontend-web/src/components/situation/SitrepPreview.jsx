@@ -1,14 +1,23 @@
+import { Plus, X } from 'lucide-react'
 import Badge from '../ui/Badge'
 import { displayValue, percentLabel } from '../../utils/situationReportHelpers'
 
-export default function SitrepPreview({ summary }) {
-  if (!summary) {
-    return null
-  }
+const sectionOptions = [
+  ['I', 'Situation Overview'],
+  ['II', 'Affected Population'],
+  ['III', 'Casualties and Immediate Needs'],
+  ['IV', 'Evacuation Centers'],
+  ['V', 'Rescue Operations Timeline'],
+  ['VI', 'Initial Damage Assessment'],
+  ['VII', 'Resources Deployed and Requests'],
+  ['VIII', 'Actions Taken and Recommendations'],
+]
 
-  const household = summary.household
-  const event = summary.event
-  const casualties = summary.casualties
+export default function SitrepPreview({ summary, includedSections = [], actionsText = '', onToggleSection, onActionsChange }) {
+  const data = summary || emptySummary
+  const household = data.household
+  const event = data.event
+  const casualties = data.casualties
 
   return (
     <section className="sr-panel active" id="sr-tab-live">
@@ -30,23 +39,56 @@ export default function SitrepPreview({ summary }) {
           <Meta label="Date declared" value={event.declared_at} />
           <Meta label="Date finished" value={event.finished_at} />
           <Meta label="Alert level" value={event.severity} />
-          <Meta label="Reporting period" value={`${summary.report.period_start} - ${summary.report.period_end}`} />
+          <Meta label="Reporting period" value={`${data.report.period_start || ''} - ${data.report.period_end || ''}`} />
           <Meta label="Area coverage" value={event.coverage} />
           <Meta label="Situation status" value={event.situation_status} />
-          <Meta label="Prepared by" value={summary.report.prepared_by} />
+          <Meta label="Prepared by" value={data.report.prepared_by} />
         </div>
 
-        <SituationOverview summary={summary} />
-        <AffectedPopulation household={household} casualties={casualties} />
-        <Casualties casualties={casualties} />
-        <EvacuationCenters rows={summary.evacuation} />
-        <RescueTimeline dispatch={summary.dispatch} />
-        <DamageAssessment damage={summary.damage} />
-        <ResourcesRequests resources={summary.resources} />
-        <ActionsTaken actions={summary.actions} />
-        <NextActions summary={summary} />
+        <div className="sr-section-stream" aria-label="SitRep sections">
+          {sectionOptions.map(([number, title]) => (
+            includedSections.includes(number)
+              ? (
+                <SectionFrame key={number} number={number} onRemove={() => onToggleSection?.(number)}>
+                  {renderSection(number, data, household, casualties, actionsText, onActionsChange)}
+                </SectionFrame>
+              )
+              : (
+                <button className="sr-add-section" type="button" key={number} onClick={() => onToggleSection?.(number)}>
+                  <Plus size={15} />
+                  <span>Add Section {number}</span>
+                  <small>{title}</small>
+                </button>
+              )
+          ))}
+        </div>
       </article>
     </section>
+  )
+}
+
+function renderSection(number, data, household, casualties, actionsText, onActionsChange) {
+  switch (number) {
+    case 'I': return <SituationOverview summary={data} />
+    case 'II': return <AffectedPopulation household={household} casualties={casualties} />
+    case 'III': return <Casualties casualties={casualties} />
+    case 'IV': return <EvacuationCenters rows={data.evacuation} />
+    case 'V': return <RescueTimeline dispatch={data.dispatch} />
+    case 'VI': return <DamageAssessment damage={data.damage} />
+    case 'VII': return <ResourcesRequests resources={data.resources} />
+    case 'VIII': return <ActionsTaken actionsText={actionsText} onChange={onActionsChange} />
+    default: return null
+  }
+}
+
+function SectionFrame({ number, onRemove, children }) {
+  return (
+    <div className="sr-section-frame">
+      <button className="sr-remove-section" type="button" onClick={onRemove} aria-label={`Remove Section ${number}`} title={`Remove Section ${number}`}>
+        <X size={15} />
+      </button>
+      {children}
+    </div>
   )
 }
 
@@ -129,7 +171,6 @@ function Casualties({ casualties }) {
         <MiniCard label="Injured" value={`${casualties.injured} persons`} tone="warn" />
         <MiniCard label="Rescued" value={`${casualties.rescued} persons assisted`} tone="safe" />
       </div>
-      <div className="sr-law">Priority validation is required for children, senior citizens, persons with disability, pregnant women, and households with missing or injured members.</div>
     </DocSection>
   )
 }
@@ -200,7 +241,6 @@ function DamageAssessment({ damage }) {
       <div className="sr-dmg-row">
         <MiniCard label="Partially damaged houses" value={damage.partial} tone="warn" />
         <MiniCard label="Totally damaged houses" value={damage.total} tone="danger" />
-        <MiniCard label="Estimated cost" value={damage.cost} />
       </div>
     </DocSection>
   )
@@ -237,30 +277,31 @@ function ResourcesRequests({ resources }) {
   )
 }
 
-function ActionsTaken({ actions }) {
+function ActionsTaken({ actionsText, onChange }) {
   return (
     <DocSection number="VIII" title="Actions Taken and Recommendations" subtitle="Command actions and required next decisions.">
-      <div className="sr-action-grid">
-        {actions.map((action) => (
-          <MiniCard label={action.unit} value={action.action} key={action.unit} />
-        ))}
-      </div>
-      <div className="sr-note">Recommendations: continue evacuation advisories in high-risk zones, validate all injured/missing household entries, and prepare relief pack release after request approval.</div>
+      <textarea
+        className="sr-actions-input"
+        value={actionsText}
+        onChange={(event) => onChange?.(event.target.value)}
+        placeholder="Type actions taken and recommendations..."
+        aria-label="Actions taken and recommendations"
+        rows="6"
+      />
     </DocSection>
   )
 }
 
-function NextActions({ summary }) {
-  return (
-    <DocSection number="IX" title="Next Actions and Report Schedule" subtitle="Report custody, next reporting time, and sign-off trail.">
-      <div className="sr-signature-grid">
-        <Meta label="Next SitRep" value={summary.report.next_report} />
-        <Meta label="Submitted by" value={summary.report.prepared_by} />
-        <Meta label="Reviewed by" value={summary.report.reviewed_by} />
-      </div>
-      <div className="sr-law">Archive rule: once generated and approved, the SitRep is stored with the disaster event log and remains downloadable as PDF or Excel for audit and post-disaster review.</div>
-    </DocSection>
-  )
+const emptySummary = {
+  report: {},
+  event: { name: '', status: '', type: '', declared_at: '', finished_at: '', severity: '', coverage: '', situation_status: '' },
+  weather: { condition: '', wind: '', rainfall: '', temperature: '', source: '', advisory: '' },
+  household: { total: '', safe_total: '', evacuated: '', unsafe: '', unchecked: '', progress_text: '', progress_sub: '', puroks: [] },
+  casualties: { deaths: '', missing: '', injured: '', rescued: '' },
+  evacuation: [],
+  dispatch: { timeline: [], rows: [] },
+  damage: { partial: '', total: '' },
+  resources: { rows: [] },
 }
 
 function DocSection({ number, title, subtitle, children }) {

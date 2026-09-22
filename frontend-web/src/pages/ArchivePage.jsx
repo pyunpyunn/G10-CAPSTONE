@@ -15,7 +15,6 @@ import ArchiveSelectionTools from '../components/archive/ArchiveSelectionTools'
 import ArchiveTable from '../components/archive/ArchiveTable'
 import ArchiveTabs from '../components/archive/ArchiveTabs'
 import LoadingState from '../components/ui/LoadingState'
-import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   ARCHIVE_TABS,
@@ -45,6 +44,11 @@ export default function ArchivePage() {
   const [openGroupId, setOpenGroupId] = useState('')
   const [isSavedGroupsOpen, setIsSavedGroupsOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [search, setSearch] = useState('')
+  const [purok, setPurok] = useState('all')
+  const [eventId, setEventId] = useState('all')
+  const [status, setStatus] = useState('all')
 
   useEffect(() => {
     let ignore = false
@@ -54,7 +58,7 @@ export default function ArchivePage() {
       setError('')
 
       try {
-        const params = archiveParams({ search: '', purok: 'all', eventId: 'all', status: 'all', page })
+        const params = archiveParams({ search, purok, eventId, status, page })
         const data = await getArchiveRecords(activeCategory, params)
 
         if (!ignore) {
@@ -76,7 +80,7 @@ export default function ArchivePage() {
     return () => {
       ignore = true
     }
-  }, [activeCategory, page, refreshKey])
+  }, [activeCategory, eventId, page, purok, refreshKey, search, status])
 
   useEffect(() => {
     let ignore = false
@@ -103,7 +107,7 @@ export default function ArchivePage() {
   }, [])
 
   function currentParams() {
-    return archiveParams({ search: '', purok: 'all', eventId: 'all', status: 'all', page })
+    return archiveParams({ search, purok, eventId, status, page })
   }
 
   function changeCategory(category) {
@@ -112,6 +116,10 @@ export default function ArchivePage() {
     setSelectedRecordCategory(category)
     setMessage('')
     setPage(1)
+    setSearch('')
+    setPurok('all')
+    setEventId('all')
+    setStatus('all')
   }
 
   async function downloadCategory(type) {
@@ -349,17 +357,43 @@ export default function ArchivePage() {
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
   const hasBlockingError = error && !payload
+  const filters = payload?.filters || {}
+  const counts = { [activeCategory]: pagination.total || 0 }
 
   return (
     <section className="page active archive-page">
-      <PageHeader
-        title="Archive"
-        actions={
-          <ArchiveDownloadMenu disabled={!payload || isLoading} onDownload={downloadCategory} />
-        }
-      />
-
-      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} />
+      <div className="archive-workspace-body">
+        <ArchiveTabs
+          activeCategory={activeCategory}
+          onChange={changeCategory}
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen((value) => !value)}
+          counts={counts}
+        />
+        <main className="archive-workspace-main">
+          <div className="archive-section-head">
+            <div className="archive-section-title">
+              <h1>{categoryLabel}</h1>
+              <span>{pagination.total || 0} records</span>
+            </div>
+            <div className="archive-inline-filters">
+              <label className="archive-filter-search">
+                <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search records..." aria-label="Search records" />
+              </label>
+              <select aria-label="Purok" value={purok} onChange={(event) => { setPurok(event.target.value); setPage(1) }}>
+                <option value="all">All puroks</option>
+                {(filters.puroks || []).map((item) => <option value={item} key={item}>{item}</option>)}
+              </select>
+              <select aria-label="Event" value={eventId} onChange={(event) => { setEventId(event.target.value); setPage(1) }}>
+                <option value="all">All events</option>
+                {(filters.events || []).map((item) => <option value={item.event_id} key={item.event_id}>{item.label || item.name}</option>)}
+              </select>
+              <select aria-label="Status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }}>
+                <option value="all">All statuses</option>
+                {(filters.statuses || []).map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}
+              </select>
+            </div>
+          </div>
 
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
@@ -416,6 +450,8 @@ export default function ArchivePage() {
         onClose={() => setSelectedRecord(null)}
         onDownload={downloadSelectedRecord}
       />
+        </main>
+      </div>
     </section>
   )
 }
