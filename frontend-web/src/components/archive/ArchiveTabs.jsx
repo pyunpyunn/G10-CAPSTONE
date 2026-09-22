@@ -4,10 +4,12 @@ import { Archive, Menu } from 'lucide-react'
 export default function ArchiveTabs({ activeCategory, onChange, isOpen, onToggle, counts = {} }) {
   return (
     <aside className={`archive-category-rail ${isOpen ? 'is-open' : 'is-collapsed'}`}>
-      <button className="archive-rail-toggle" type="button" aria-label="Toggle archive categories" onClick={onToggle}>
-        <Menu size={15} />
-      </button>
-      <p className="archive-rail-label">Archive categories</p>
+      <div className="archive-rail-head">
+        <p className="archive-rail-label">Archive categories</p>
+        <button className="archive-rail-toggle" type="button" aria-label="Toggle archive categories" onClick={onToggle}>
+          <Menu size={15} />
+        </button>
+      </div>
       <nav className="archive-tabs" role="tablist" aria-label="Archive categories">
         {ARCHIVE_TABS.map((tab) => (
           <button
