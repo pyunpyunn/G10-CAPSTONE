@@ -14,6 +14,8 @@ export default function BroadcastComposeForm({
   disasterTypes,
   severityLevels,
   puroks,
+  evacuationCenters = [],
+  affectedAreas = [],
   statusOptions,
   selectedPurok,
   selectedPriority,
@@ -44,6 +46,8 @@ export default function BroadcastComposeForm({
       <BroadcastAreaFields
         form={form}
         puroks={puroks}
+        evacuationCenters={evacuationCenters}
+        affectedAreas={affectedAreas}
         selectedPurok={selectedPurok}
         selectedPriority={selectedPriority}
         directPuroks={directPuroks}
@@ -61,7 +65,11 @@ export default function BroadcastComposeForm({
         onToggleStatus={onToggleStatus}
       />
 
-      <BroadcastMessageFields form={form} onChange={onChange} />
+      <BroadcastMessageFields
+        form={form}
+        evacuationCenters={evacuationCenters}
+        onChange={onChange}
+      />
 
       {formError && <div className="form-error">{formError}</div>}
 
@@ -147,6 +155,8 @@ function BroadcastEventFields({ activeEvent, form, disasterTypes, severityLevels
 function BroadcastAreaFields({
   form,
   puroks,
+  evacuationCenters = [],
+  affectedAreas = [],
   selectedPurok,
   selectedPriority,
   directPuroks,
@@ -162,7 +172,7 @@ function BroadcastAreaFields({
   return (
     <section className="broadcast-section">
       <div className="broadcast-section-head">
-        <span>Affected Areas</span>
+        <span>Affected Areas & Evacuation Destination</span>
         <MapPin size={15} />
       </div>
       <div className="broadcast-field-grid">
@@ -183,10 +193,69 @@ function BroadcastAreaFields({
             ))}
           </select>
         </label>
+        <label>
+          <span>Active Evacuation Center (Route Destination)</span>
+          <select
+            value={form.attached_evacuation_center_id || ''}
+            onChange={(event) => onChange('attached_evacuation_center_id', event.target.value)}
+          >
+            <option value="">-- Select Active Evacuation Center --</option>
+            {evacuationCenters.map((center) => (
+              <option value={center.evacuation_center_id} key={center.evacuation_center_id}>
+                {center.name} ({center.available_capacity} available / {center.capacity} capacity - {center.status})
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+
+      {affectedAreas.length > 0 && (
+        <div className="bc-affected-areas-box" style={{ marginTop: '0.75rem' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #94a3b8)', display: 'block', marginBottom: '0.25rem' }}>
+            Database Affected Areas & Linkages
+          </span>
+          <div className="bc-direct-list">
+            {affectedAreas.map((area) => {
+              const selectedAreaIds = form.attached_affected_area_ids || []
+              const isAttached = selectedAreaIds.includes(area.affected_area_id)
+              return (
+                <button
+                  type="button"
+                  key={area.affected_area_id}
+                  className={`bc-direct-chip ${isAttached ? 'selected' : ''}`}
+                  style={{
+                    cursor: 'pointer',
+                    border: isAttached ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
+                    background: isAttached ? 'rgba(59,130,246,0.15)' : 'transparent',
+                    padding: '0.25rem 0.6rem',
+                    borderRadius: '0.375rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.375rem',
+                    fontSize: '0.8rem',
+                  }}
+                  onClick={() => {
+                    const nextIds = isAttached
+                      ? selectedAreaIds.filter((id) => id !== area.affected_area_id)
+                      : [...selectedAreaIds, area.affected_area_id]
+                    onChange('attached_affected_area_ids', nextIds)
+                  }}
+                >
+                  <span>{area.area_name || area.purok_name}</span>
+                  <Badge tone={area.severity_key === 'high' ? 'red' : 'amber'}>
+                    {area.recipient_count} recipients
+                  </Badge>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <div className={`bc-recipient-note ${needsPuroks ? 'local' : 'wide'}`}>
         {recipientNote}
       </div>
+
       {needsPuroks && (
         <div className="bc-purok-tools">
           <div className="bc-purok-add">
@@ -256,11 +325,15 @@ function BroadcastStatusFields({ statusOptions, selectedStatuses, onToggleStatus
   )
 }
 
-function BroadcastMessageFields({ form, onChange }) {
+function BroadcastMessageFields({ form, evacuationCenters = [], onChange }) {
+  const selectedCenter = evacuationCenters.find(
+    (c) => String(c.evacuation_center_id) === String(form.attached_evacuation_center_id)
+  )
+
   return (
     <section className="broadcast-section">
       <div className="broadcast-section-head">
-        <span>Message</span>
+        <span>Message & Route Options</span>
         <Bell size={15} />
       </div>
       <div className="broadcast-field-grid one">
@@ -284,6 +357,14 @@ function BroadcastMessageFields({ form, onChange }) {
           />
         </label>
       </div>
+
+      {selectedCenter && (
+        <div style={{ marginTop: '0.5rem', fontSize: '0.825rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+          <MapPin size={14} />
+          Evacuation Route attached destination: <strong>{selectedCenter.name}</strong> (Active Evacuation Center)
+        </div>
+      )}
+
       <label className="bc-check-row">
         <input
           type="checkbox"

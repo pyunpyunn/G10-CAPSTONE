@@ -28,6 +28,8 @@ class DisasterBroadcastService
                 'disaster_types' => $this->getDisasterTypes(),
                 'severity_levels' => $this->getSeverityLevels(),
                 'puroks' => $this->getPuroks(),
+                'affected_areas' => $this->getAffectedAreas(),
+                'evacuation_centers' => $this->getActiveEvacuationCenters(),
                 'status_options' => $this->statusOptions(),
             ],
         ]);
@@ -156,6 +158,25 @@ class DisasterBroadcastService
                 $data['push_status'] = 'pending_mobile_push';
             }
 
+            if (Schema::hasColumn('disaster_broadcasts', 'attached_evacuation_center_id')) {
+                $data['attached_evacuation_center_id'] = $metadata['attached_evacuation_center_id'];
+            }
+
+            if (Schema::hasColumn('disaster_broadcasts', 'attached_affected_area_ids_json')) {
+                $data['attached_affected_area_ids_json'] = $this->jsonText($metadata['attached_affected_area_ids']);
+            }
+
+            if (Schema::hasColumn('disaster_broadcasts', 'evacuation_route_json')) {
+                $routeData = $metadata['route']
+                    ? $this->calculateEvacuationRoute(
+                        $metadata['attached_evacuation_center_id'],
+                        $metadata['attached_affected_area_ids'],
+                        $metadata['puroks']
+                    )
+                    : null;
+                $data['evacuation_route_json'] = $routeData ? $this->jsonText($routeData) : null;
+            }
+
             DB::table('disaster_broadcasts')->insert($data);
 
             return $broadcastId;
@@ -239,6 +260,9 @@ class DisasterBroadcastService
             'target_area' => ['nullable', 'string', 'max:150'],
             'estimated_duration' => ['nullable', 'string', 'max:50'],
             'attach_route' => ['nullable', 'boolean'],
+            'attached_evacuation_center_id' => ['nullable', 'string', 'max:255'],
+            'attached_affected_area_ids' => ['nullable', 'array'],
+            'attached_affected_area_ids.*' => ['nullable', 'integer'],
             'channel' => ['nullable', 'string', 'max:50'],
             'allowed_statuses' => ['required', 'array', 'size:4'],
             'allowed_statuses.*' => ['required', 'string', 'max:40'],
@@ -262,6 +286,25 @@ class DisasterBroadcastService
             ]);
         }
 
+        if (! empty($validated['attached_evacuation_center_id']) && Schema::hasTable('evacuation_centers')) {
+            $center = DB::table('evacuation_centers')
+                ->where('evacuation_center_id', $validated['attached_evacuation_center_id'])
+                ->first(['status']);
+
+            if (! $center) {
+                throw ValidationException::withMessages([
+                    'attached_evacuation_center_id' => ['The selected evacuation center record was not found.'],
+                ]);
+            }
+
+            $centerStatus = strtolower(trim((string) ($center->status ?? '')));
+            if (! in_array($centerStatus, ['active', 'open', 'available'], true)) {
+                throw ValidationException::withMessages([
+                    'attached_evacuation_center_id' => ['Only active evacuation centers can be attached to a disaster broadcast route.'],
+                ]);
+            }
+        }
+
         return $validated;
     }
 
@@ -273,6 +316,8 @@ class DisasterBroadcastService
             'area' => $validated['target_area'] ?? $this->scopeLabel($validated['scope_type']),
             'duration' => $validated['estimated_duration'] ?? null,
             'route' => (bool) ($validated['attach_route'] ?? false),
+            'attached_evacuation_center_id' => $validated['attached_evacuation_center_id'] ?? null,
+            'attached_affected_area_ids' => array_filter(array_map('intval', $validated['attached_affected_area_ids'] ?? [])),
         ];
     }
 
@@ -393,6 +438,9 @@ class DisasterBroadcastService
             'allowed_statuses_json',
             'recipient_count',
             'push_status',
+            'attached_evacuation_center_id',
+            'attached_affected_area_ids_json',
+            'evacuation_route_json',
         ] as $column) {
             if (Schema::hasColumn('disaster_broadcasts', $column)) {
                 $columns[] = 'db.'.$column;
@@ -524,6 +572,17 @@ class DisasterBroadcastService
         }
 
         $recipientCount = $broadcast->recipient_count ?? null;
+        $centerId = $broadcast->attached_evacuation_center_id ?? $metadata['attached_evacuation_center_id'] ?? null;
+        $affectedAreaIds = $this->decodeJsonArray($broadcast->attached_affected_area_ids_json ?? null);
+        if (empty($affectedAreaIds)) {
+            $affectedAreaIds = $metadata['attached_affected_area_ids'] ?? [];
+        }
+        $route = $this->decodeMetadata($broadcast->evacuation_route_json ?? null);
+        if (empty($route) && ! empty($metadata['route']) && $centerId) {
+            $route = $this->calculateEvacuationRoute($centerId, $affectedAreaIds, $directPuroks);
+        }
+
+        $attachedCenter = $centerId ? $this->findEvacuationCenter($centerId) : null;
 
         return [
             'broadcast_id' => $broadcast->broadcast_id,
@@ -539,7 +598,11 @@ class DisasterBroadcastService
             'direct_puroks' => $directPuroks,
             'allowed_statuses' => $statusKeys,
             'estimated_duration' => $metadata['duration'] ?? null,
-            'attach_route' => (bool) ($metadata['route'] ?? false),
+            'attach_route' => (bool) ($metadata['route'] ?? false || ! empty($route)),
+            'attached_evacuation_center_id' => $centerId,
+            'attached_affected_area_ids' => $affectedAreaIds,
+            'attached_evacuation_center' => $attachedCenter,
+            'evacuation_route' => $route,
             'recipient_count' => $recipientCount === null
                 ? $this->recipientCount($broadcast->scope_type, $directPuroks)
                 : (int) $recipientCount,
@@ -810,5 +873,261 @@ class DisasterBroadcastService
         }
 
         return Carbon::parse($value)->format('h:i A');
+    }
+
+    private function getAffectedAreas(): array
+    {
+        if (! Schema::hasTable('affected_areas')) {
+            return [];
+        }
+
+        $query = DB::table('affected_areas as aa')
+            ->leftJoin('puroks as p', 'p.purok_id', '=', 'aa.purok_id')
+            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'aa.severity_id');
+
+        $hasDeleted = Schema::hasColumn('affected_areas', 'deleted_at');
+        if ($hasDeleted) {
+            $query->whereNull('aa.deleted_at');
+        }
+
+        return $query->select([
+            'aa.affected_area_id',
+            'aa.area_name',
+            'aa.disaster_id',
+            'aa.purok_id',
+            'aa.sitio_id',
+            'aa.barangay_id',
+            'aa.description',
+            'aa.hazard_type',
+            'aa.latitude',
+            'aa.longitude',
+            'aa.boundary_geojson',
+            'aa.status',
+            'p.purok_name',
+            'sl.severity_key',
+            'sl.severity_label',
+        ])
+        ->get()
+        ->map(function (object $row): array {
+            $purokName = $row->purok_name ?? $row->area_name ?? 'Affected area';
+            $recipients = 0;
+
+            if (Schema::hasTable('households') && Schema::hasTable('addresses')) {
+                $recipients = DB::table('households as h')
+                    ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
+                    ->where(function ($sub) use ($row, $purokName): void {
+                        if ($row->purok_id) {
+                            $sub->where('a.purok_id', $row->purok_id);
+                        }
+                        if ($purokName) {
+                            $sub->orWhere('a.purok_sitio', $purokName);
+                        }
+                    })
+                    ->count();
+            }
+
+            return [
+                'affected_area_id' => (int) $row->affected_area_id,
+                'area_name' => $row->area_name ?: $purokName,
+                'purok_name' => $purokName,
+                'purok_id' => $row->purok_id ? (int) $row->purok_id : null,
+                'hazard_type' => $row->hazard_type ?: 'General Hazard',
+                'description' => $row->description,
+                'severity_key' => $row->severity_key ?: 'medium',
+                'severity_label' => $row->severity_label ?: 'Medium',
+                'latitude' => $row->latitude ? (float) $row->latitude : null,
+                'longitude' => $row->longitude ? (float) $row->longitude : null,
+                'boundary_geojson' => $row->boundary_geojson ? json_decode((string) $row->boundary_geojson, true) : null,
+                'status' => $row->status ?: 'active',
+                'recipient_count' => $recipients,
+            ];
+        })
+        ->values()
+        ->all();
+    }
+
+    private function getActiveEvacuationCenters(): array
+    {
+        if (! Schema::hasTable('evacuation_centers')) {
+            return [];
+        }
+
+        $query = DB::table('evacuation_centers')
+            ->whereIn(DB::raw('LOWER(status)'), ['active', 'open', 'available']);
+
+        if (Schema::hasColumn('evacuation_centers', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        return $query->orderBy('name')
+            ->get([
+                'evacuation_center_id',
+                'name',
+                'center_type',
+                'latitude',
+                'longitude',
+                'capacity',
+                'current_occupancy',
+                'contact_person',
+                'contact_number',
+                'osm_address',
+                'status',
+            ])
+            ->map(function (object $center): array {
+                $capacity = max(0, (int) ($center->capacity ?? 0));
+                $occupancy = max(0, (int) ($center->current_occupancy ?? 0));
+
+                return [
+                    'evacuation_center_id' => (string) $center->evacuation_center_id,
+                    'name' => $center->name ?: 'Evacuation Center',
+                    'center_type' => $center->center_type ?: 'General Evacuation Center',
+                    'latitude' => $center->latitude ? (float) $center->latitude : 10.2922,
+                    'longitude' => $center->longitude ? (float) $center->longitude : 123.8763,
+                    'capacity' => $capacity,
+                    'current_occupancy' => $occupancy,
+                    'available_capacity' => max(0, $capacity - $occupancy),
+                    'contact_person' => $center->contact_person,
+                    'contact_number' => $center->contact_number,
+                    'osm_address' => $center->osm_address,
+                    'status' => $center->status ?: 'active',
+                    'is_active' => true,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function findEvacuationCenter(string $centerId): ?array
+    {
+        if (! Schema::hasTable('evacuation_centers')) {
+            return null;
+        }
+
+        $center = DB::table('evacuation_centers')
+            ->where('evacuation_center_id', $centerId)
+            ->first([
+                'evacuation_center_id',
+                'name',
+                'center_type',
+                'latitude',
+                'longitude',
+                'capacity',
+                'current_occupancy',
+                'contact_person',
+                'contact_number',
+                'osm_address',
+                'status',
+            ]);
+
+        if (! $center) {
+            return null;
+        }
+
+        $capacity = max(0, (int) ($center->capacity ?? 0));
+        $occupancy = max(0, (int) ($center->current_occupancy ?? 0));
+        $statusKey = strtolower(trim((string) ($center->status ?? '')));
+
+        return [
+            'evacuation_center_id' => (string) $center->evacuation_center_id,
+            'name' => $center->name ?: 'Evacuation Center',
+            'center_type' => $center->center_type ?: 'Evacuation Center',
+            'latitude' => $center->latitude ? (float) $center->latitude : 10.2922,
+            'longitude' => $center->longitude ? (float) $center->longitude : 123.8763,
+            'capacity' => $capacity,
+            'current_occupancy' => $occupancy,
+            'available_capacity' => max(0, $capacity - $occupancy),
+            'contact_person' => $center->contact_person,
+            'contact_number' => $center->contact_number,
+            'osm_address' => $center->osm_address,
+            'status' => $center->status ?: 'active',
+            'is_active' => in_array($statusKey, ['active', 'open', 'available'], true),
+        ];
+    }
+
+    private function calculateEvacuationRoute(?string $centerId, array $affectedAreaIds, ?array $directPuroks): ?array
+    {
+        if (! $centerId) {
+            return null;
+        }
+
+        $center = $this->findEvacuationCenter($centerId);
+        if (! $center || ! $center['is_active']) {
+            return null;
+        }
+
+        $destLat = $center['latitude'];
+        $destLng = $center['longitude'];
+
+        $origins = [];
+        if (! empty($affectedAreaIds) && Schema::hasTable('affected_areas')) {
+            $areas = DB::table('affected_areas')
+                ->whereIn('affected_area_id', $affectedAreaIds)
+                ->get(['affected_area_id', 'area_name', 'latitude', 'longitude']);
+
+            foreach ($areas as $a) {
+                $origins[] = [
+                    'id' => (string) $a->affected_area_id,
+                    'name' => $a->area_name ?: "Area {$a->affected_area_id}",
+                    'lat' => $a->latitude ? (float) $a->latitude : 10.2922,
+                    'lng' => $a->longitude ? (float) $a->longitude : 123.8763,
+                ];
+            }
+        }
+
+        if (empty($origins) && ! empty($directPuroks)) {
+            foreach ($directPuroks as $idx => $p) {
+                $origins[] = [
+                    'id' => "purok-{$idx}",
+                    'name' => $p['name'] ?? 'Affected Purok',
+                    'lat' => 10.2922 + ($idx * 0.0008),
+                    'lng' => 123.8763 + ($idx * 0.0008),
+                ];
+            }
+        }
+
+        if (empty($origins)) {
+            $origins[] = [
+                'id' => 'default-origin',
+                'name' => 'Affected Area',
+                'lat' => 10.2922,
+                'lng' => 123.8763,
+            ];
+        }
+
+        $primaryOrigin = $origins[0];
+        $distanceKm = round($this->haversineDistance($primaryOrigin['lat'], $primaryOrigin['lng'], $destLat, $destLng), 2);
+        $estMinutes = max(5, (int) round($distanceKm * 12 + 5));
+
+        $waypoints = [
+            [$primaryOrigin['lat'], $primaryOrigin['lng']],
+            [($primaryOrigin['lat'] + $destLat) / 2, ($primaryOrigin['lng'] + $destLng) / 2],
+            [$destLat, $destLng],
+        ];
+
+        return [
+            'route_title' => "Evacuation Route to {$center['name']}",
+            'destination' => $center,
+            'origins' => $origins,
+            'primary_origin' => $primaryOrigin,
+            'distance_km' => $distanceKm,
+            'estimated_minutes' => $estMinutes,
+            'waypoints' => $waypoints,
+            'is_active_destination' => true,
+        ];
+    }
+
+    private function haversineDistance(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadius = 6371; // km
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+
+        $a = sin($dLat / 2) * sin($dLat / 2) +
+            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+            sin($dLng / 2) * sin($dLng / 2);
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return $earthRadius * $c;
     }
 }
