@@ -341,77 +341,79 @@ function MemberRow({
 
   return (
     <View style={styles.memberRow}>
-      <View style={styles.memberAvatar}>
-        <Text style={styles.memberInitial}>{String(member.name || 'H')[0]?.toUpperCase()}</Text>
-      </View>
-      <View style={styles.memberText}>
-        <Text style={styles.rowTitle}>{member.name}</Text>
-        <Text style={styles.rowMeta}>{member.relationship || 'Member'}</Text>
-        <Text style={styles.deviceText}>
-          {device
-            ? `${batteryText} · ${activityText} · ${locationText}`
-            : 'No device registered'}
-        </Text>
-        {specialNeeds.length > 0 ? (
-          <View style={styles.memberTags}>
-            {specialNeeds.map((tag) => (
-              <HouseholdBadge key={tag} label={tag} tone="warning" />
-            ))}
-          </View>
-        ) : null}
-        {hasLocation && onOpenMap ? (
-          <Pressable style={styles.mapLink} onPress={onOpenMap}>
-            <Ionicons name="map-outline" size={15} color={palette.navActive} />
-            <Text style={styles.mapLinkText}>View on map</Text>
-          </Pressable>
-        ) : null}
-        {activeEvent ? (
-          <View style={styles.memberStatusBox}>
-            <View style={styles.memberStatusTop}>
-              <Text style={styles.memberStatusLabel}>Status</Text>
-              <HouseholdBadge
-                label={currentStatus?.status_label || 'Unchecked'}
-                tone={currentStatus?.status_key || 'neutral'}
-              />
+      <View style={styles.memberInfo}>
+        <View style={styles.memberAvatar}>
+          <Text style={styles.memberInitial}>{String(member.name || 'H')[0]?.toUpperCase()}</Text>
+        </View>
+        <View style={styles.memberText}>
+          <Text style={styles.rowTitle}>{member.name}</Text>
+          <Text style={styles.rowMeta}>{member.relationship || 'Member'}</Text>
+          <Text style={styles.deviceText}>
+            {device
+              ? `${batteryText} · ${activityText} · ${locationText}`
+              : 'No device registered'}
+          </Text>
+          {specialNeeds.length > 0 ? (
+            <View style={styles.memberTags}>
+              {specialNeeds.map((tag) => (
+                <HouseholdBadge key={tag} label={tag} tone="warning" />
+              ))}
             </View>
-            {currentStatus?.submitted_label ? (
-              <Text style={styles.memberStatusTime}>{currentStatus.submitted_label}</Text>
-            ) : null}
-            {canEditStatus ? (
-              <>
-                <View style={styles.memberStatusGrid}>
-                  {statusOptions.map((status: any) => {
-                    const isSelected = selectedStatus === status.key;
-
-                    return (
-                      <Pressable
-                        key={status.key}
-                        style={[
-                          styles.memberStatusChoice,
-                          { borderColor: statusColor(status.key) },
-                          isSelected && { backgroundColor: statusColor(status.key) },
-                        ]}
-                        onPress={() => setSelectedStatus(status.key)}
-                      >
-                        <Text style={[styles.memberStatusChoiceText, isSelected && styles.memberStatusChoiceTextActive]}>
-                          {status.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <HouseholdButton
-                  label={saving ? 'Saving...' : 'Save member status'}
-                  icon="save-outline"
-                  tone="light"
-                  disabled={saving}
-                  onPress={handleSave}
-                />
-              </>
-            ) : null}
-          </View>
-        ) : null}
+          ) : null}
+          {hasLocation && onOpenMap ? (
+            <Pressable style={styles.mapLink} onPress={onOpenMap}>
+              <Ionicons name="map-outline" size={15} color={palette.navActive} />
+              <Text style={styles.mapLinkText}>View on map</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
+      {activeEvent ? (
+        <View style={styles.memberStatusBox}>
+          <View style={styles.memberStatusTop}>
+            <Text style={styles.memberStatusLabel}>Status</Text>
+            <HouseholdBadge
+              label={currentStatus?.status_label || 'Unchecked'}
+              tone={currentStatus?.status_key || 'neutral'}
+            />
+          </View>
+          {currentStatus?.submitted_label ? (
+            <Text style={styles.memberStatusTime}>{currentStatus.submitted_label}</Text>
+          ) : null}
+          {canEditStatus ? (
+            <>
+              <View style={styles.memberStatusGrid}>
+                {statusOptions.map((status: any) => {
+                  const isSelected = selectedStatus === status.key;
+
+                  return (
+                    <Pressable
+                      key={status.key}
+                      style={[
+                        styles.memberStatusChoice,
+                        { borderColor: statusColor(status.key) },
+                        isSelected && { backgroundColor: statusColor(status.key) },
+                      ]}
+                      onPress={() => setSelectedStatus(status.key)}
+                    >
+                      <Text style={[styles.memberStatusChoiceText, isSelected && styles.memberStatusChoiceTextActive]}>
+                        {status.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <HouseholdButton
+                label={saving ? 'Saving...' : 'Save member status'}
+                icon="save-outline"
+                tone="light"
+                disabled={saving}
+                onPress={handleSave}
+              />
+            </>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -627,13 +629,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   memberRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: radius.md,
     padding: spacing.md,
     backgroundColor: palette.card,
+  },
+  memberInfo: {
+    flexDirection: 'row',
+    gap: spacing.md,
   },
   memberAvatar: {
     width: 42,
@@ -695,11 +700,10 @@ const styles = StyleSheet.create({
   },
   memberStatusBox: {
     gap: spacing.sm,
-    marginTop: spacing.sm,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: radius.md,
-    padding: spacing.sm,
+    padding: spacing.md,
     backgroundColor: palette.secondary,
   },
   memberStatusTop: {
@@ -726,7 +730,7 @@ const styles = StyleSheet.create({
   },
   memberStatusChoice: {
     flexBasis: '48%',
-    minHeight: 36,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -736,7 +740,7 @@ const styles = StyleSheet.create({
   },
   memberStatusChoiceText: {
     color: palette.text,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
   },
   memberStatusChoiceTextActive: {
