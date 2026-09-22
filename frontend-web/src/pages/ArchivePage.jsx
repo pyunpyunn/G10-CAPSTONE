@@ -370,7 +370,7 @@ export default function ArchivePage() {
           onToggle={() => setSidebarOpen((value) => !value)}
           counts={counts}
         />
-        <main className="archive-workspace-main">
+        <div className="archive-workspace-main">
           <div className="archive-section-head">
             <div className="archive-section-title">
               <h1>{categoryLabel}</h1>
@@ -450,7 +450,7 @@ export default function ArchivePage() {
         onClose={() => setSelectedRecord(null)}
         onDownload={downloadSelectedRecord}
       />
-        </main>
+        </div>
       </div>
     </section>
   )
