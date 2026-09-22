@@ -1,4 +1,4 @@
-import { Download, FileCheck2, X } from 'lucide-react'
+import { FileCheck2, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 
 export default function SitrepGenerateModal({
@@ -10,7 +10,6 @@ export default function SitrepGenerateModal({
   isSaving,
   onClose,
   onSubmit,
-  onPreviewPdf,
 }) {
   if (!isOpen || !summary) {
     return null
@@ -38,7 +37,6 @@ export default function SitrepGenerateModal({
         </div>
         <form id="sitrepGenerateForm" onSubmit={onSubmit}>
           <div className="sr-gen-body">
-            <div className="sr-gen-guidance">Generate a locked SitRep after verifying household status, dispatch status, weather, resources, and casualty fields for the selected event.</div>
             <div className="sr-gen-grid">
               <div className="form-group">
                 <label className="form-label" htmlFor="srReportNo">SitRep number</label>
@@ -65,20 +63,10 @@ export default function SitrepGenerateModal({
                 <input id="srApprovedBy" type="text" value={form.reviewed_by} onChange={(event) => setField('reviewed_by', event.target.value)} />
               </div>
             </div>
-            <div className="sr-checklist">
-              <label className="sr-check"><input type="checkbox" checked readOnly /> Household status verified</label>
-              <label className="sr-check"><input type="checkbox" checked readOnly /> Dispatch logs included</label>
-              <label className="sr-check"><input type="checkbox" checked readOnly /> Weather source attached</label>
-              <label className="sr-check"><input type="checkbox" checked readOnly /> Resources and requests included</label>
-            </div>
             {formError && <div className="form-error sr-form-error">{formError}</div>}
           </div>
           <div className="sr-gen-actions">
             <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={onClose}>Cancel</button>
-            <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={onPreviewPdf}>
-              <Download size={14} />
-              Export PDF
-            </button>
             <button className="btn btn-primary btn-sm" type="submit" disabled={isSaving}>
               <FileCheck2 size={14} />
               {isSaving ? 'Generating...' : 'Generate & lock'}

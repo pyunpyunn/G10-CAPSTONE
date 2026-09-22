@@ -31,6 +31,7 @@ import './styles/weather.css'
 import './styles/broadcast.css'
 import './styles/mapping.css'
 import './styles/dispatch.css'
+import './styles/situation.css'
 import './styles/responsive.css'
 import './styles/mapmate-reference.css'
 

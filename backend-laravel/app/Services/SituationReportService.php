@@ -57,6 +57,9 @@ class SituationReportService
             'period_end' => ['nullable', 'date', 'after_or_equal:period_start'],
             'prepared_by' => ['nullable', 'string', 'max:150'],
             'reviewed_by' => ['nullable', 'string', 'max:150'],
+            'actions_text' => ['nullable', 'string'],
+            'included_sections' => ['nullable', 'array'],
+            'included_sections.*' => ['string', 'in:I,II,III,IV,V,VI,VII,VIII'],
             'report_status' => ['nullable', 'string', 'in:draft,generated,reviewed,archived'],
         ], [
             'event_id.required' => 'Select a disaster event before generating a SitRep.',
@@ -81,6 +84,8 @@ class SituationReportService
                 'period_end' => $validated['period_end'] ?? null,
                 'prepared_by' => $validated['prepared_by'] ?? 'HQ/Admin Desk',
                 'reviewed_by' => $validated['reviewed_by'] ?? 'Incident Commander',
+                'actions_text' => $validated['actions_text'] ?? '',
+                'included_sections' => $validated['included_sections'] ?? ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'],
                 'generated_at' => $now->toDateTimeString(),
             ]);
 
@@ -235,7 +240,8 @@ class SituationReportService
                 'cost' => 'For validation',
             ],
             'resources' => $resources,
-            'actions' => $this->actionRecommendations($household, $dispatch, $resources),
+            'actions_text' => $meta['actions_text'] ?? '',
+            'included_sections' => $meta['included_sections'] ?? [],
         ];
     }
 
@@ -506,24 +512,6 @@ class SituationReportService
                 'status' => $this->label($request->validation_status ?: 'needs_validation'),
                 'status_tone' => $this->statusTone($request->validation_status),
             ])->values()->all(),
-        ];
-    }
-
-    private function actionRecommendations(array $household, array $dispatch, array $resources): array
-    {
-        return [
-            [
-                'unit' => 'BDRRMC EOC',
-                'action' => $household['unchecked'] > 0 ? 'Continue household status monitoring' : 'Maintain event watch',
-            ],
-            [
-                'unit' => 'Search and rescue',
-                'action' => $dispatch['total'] > 0 ? 'Update dispatch outcome counts' : 'Prepare dispatch teams for priority areas',
-            ],
-            [
-                'unit' => 'Resources desk',
-                'action' => $resources['needs_validation'] > 0 ? 'Validate pending requests before handoff' : 'Monitor TrackingAid handoff references',
-            ],
         ];
     }
 

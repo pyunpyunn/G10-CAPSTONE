@@ -1,3 +1,7 @@
+import { createElement } from 'react'
+import { pdf } from '@react-pdf/renderer'
+import SitrepPdfDocument from '../components/situation/SitrepPdfDocument'
+
 export function downloadBlob(fileName, blob) {
   const url = window.URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -84,9 +88,59 @@ export function downloadExcelWorkbook(fileName, title, rows) {
   downloadBlob(forceExtension(fileName, 'xls'), blob)
 }
 
+export function downloadStructuredExcel(fileName, sections) {
+  const rows = sections.flatMap((section) => [
+    { type: 'section', number: section.number, title: section.title },
+    ...section.rows.map(([label, value]) => ({ type: 'data', number: section.number, label, value })),
+  ])
+  const widths = [
+    Math.min(Math.max(...rows.map((row) => cellText(row.number).length + 2), 10), 18),
+    Math.min(Math.max(...rows.map((row) => cellText(row.label || row.title).length + 2), 16), 56),
+    Math.min(Math.max(...rows.map((row) => cellText(row.value).length + 2), 16), 80),
+  ]
+  const html = `
+    <html>
+      <head><meta charset="UTF-8" /></head>
+      <body>
+        <table style="border-collapse:collapse;table-layout:fixed;font-family:Arial,sans-serif;font-size:11pt;">
+          <colgroup>${widths.map((width) => `<col style="width:${width}ch" />`).join('')}</colgroup>
+          <thead>
+            <tr>
+              <th style="border:1px solid #aebdca;padding:7px;text-align:left;">No.</th>
+              <th style="border:1px solid #aebdca;padding:7px;text-align:left;">Label</th>
+              <th style="border:1px solid #aebdca;padding:7px;text-align:left;">Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((row) => row.type === 'section'
+              ? `<tr><th colspan="3" style="border:1px solid #8298aa;padding:8px;text-align:left;background:#dce8f0;color:#173d58;font-weight:bold;">${escapeHtml(row.number)} - ${escapeHtml(row.title)}</th></tr>`
+              : `<tr><td style="border:1px solid #c4d0d9;padding:6px;vertical-align:top;">${escapeHtml(row.number)}</td><td style="border:1px solid #c4d0d9;padding:6px;vertical-align:top;">${escapeHtml(row.label)}</td><td style="border:1px solid #c4d0d9;padding:6px;vertical-align:top;white-space:normal;">${escapeHtml(row.value)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+
+  downloadBlob(forceExtension(fileName, 'xls'), blob)
+}
+
 export function downloadPdfReport(fileName, title, rows) {
   const blob = makePdfBlob(title, rows)
 
+  downloadBlob(forceExtension(fileName, 'pdf'), blob)
+}
+
+export async function downloadSitrepPdf(fileName, summary, includedSections, actionsText) {
+  if (!summary) {
+    return
+  }
+
+  const report = createElement(
+    SitrepPdfDocument,
+    { summary, includedSections, actionsText },
+  )
+  const blob = await pdf(report).toBlob()
   downloadBlob(forceExtension(fileName, 'pdf'), blob)
 }
 
