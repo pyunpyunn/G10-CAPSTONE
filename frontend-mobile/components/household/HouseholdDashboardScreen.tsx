@@ -43,8 +43,15 @@ export function HouseholdDashboardScreen({
 }: DashboardProps) {
   const activeEvent = overview.active_event;
   const currentStatus = overview.current_status;
-  const members = overview.members || [];
+  const currentUser = overview.profile?.user || {};
+  const currentUserMemberIds = new Set(
+    [currentUser.member_id, currentUser.user_id].filter(Boolean).map(String)
+  );
+  const members = (overview.members || []).filter(
+    (member: any) => !currentUserMemberIds.has(String(member.member_id))
+  );
   const statusOptions = overview.status_options?.length ? overview.status_options : defaultStatusOptions;
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
   return (
     <View style={styles.stack}>
@@ -147,17 +154,30 @@ export function HouseholdDashboardScreen({
         {members.length === 0 ? (
           <HouseholdEmpty icon="people-outline" title="No members listed" />
         ) : (
-          members.map((member: any) => (
-            <MemberRow
-              key={member.member_id || member.name}
-              member={member}
-              activeEvent={activeEvent}
-              statusOptions={statusOptions}
-              canEditStatus
-              onOpenMap={onOpenMap}
-              onSaveMemberStatus={onSaveMemberStatus}
-            />
-          ))
+          members.map((member: any) => {
+            const memberId = String(member.member_id);
+            const isExpanded = selectedMemberId === memberId;
+
+            return (
+              <View key={member.member_id || member.name} style={styles.memberDropdown}>
+                <MemberSummary
+                  member={member}
+                  isExpanded={isExpanded}
+                  onPress={() => setSelectedMemberId(isExpanded ? null : memberId)}
+                />
+                {isExpanded ? (
+                  <MemberRow
+                    member={member}
+                    activeEvent={activeEvent}
+                    statusOptions={statusOptions}
+                    canEditStatus
+                    showMemberInfo={false}
+                    onSaveMemberStatus={onSaveMemberStatus}
+                  />
+                ) : null}
+              </View>
+            );
+          })
         )}
       </View>
     </View>
@@ -292,11 +312,44 @@ function TrustedHouseholdList({
   );
 }
 
+function MemberSummary({
+  member,
+  isExpanded,
+  onPress,
+}: {
+  member: any;
+  isExpanded: boolean;
+  onPress: () => void;
+}) {
+  const device = member.device;
+  const deviceLabel = device?.is_active ? 'Device active' : device ? 'Device inactive' : 'No device registered';
+
+  return (
+    <Pressable
+      style={styles.memberSummary}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${member.name || 'family member'} details`}
+      accessibilityState={{ expanded: isExpanded }}
+    >
+      <View style={styles.memberAvatar}>
+        <Text style={styles.memberInitial}>{String(member.name || 'H')[0]?.toUpperCase()}</Text>
+      </View>
+      <View style={styles.memberSummaryText}>
+        <Text style={styles.rowTitle}>{member.name}</Text>
+        <Text style={styles.rowMeta}>{member.relationship || 'Member'} · {deviceLabel}</Text>
+      </View>
+      <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={palette.navMuted} />
+    </Pressable>
+  );
+}
+
 function MemberRow({
   member,
   activeEvent,
   statusOptions,
   canEditStatus = false,
+  showMemberInfo = true,
   onOpenMap,
   onSaveMemberStatus,
 }: {
@@ -304,6 +357,7 @@ function MemberRow({
   activeEvent?: any;
   statusOptions: any[];
   canEditStatus?: boolean;
+  showMemberInfo?: boolean;
   onOpenMap?: () => void;
   onSaveMemberStatus?: (memberId: string, status: string) => Promise<void>;
 }) {
@@ -341,6 +395,7 @@ function MemberRow({
 
   return (
     <View style={styles.memberRow}>
+      {showMemberInfo ? (
       <View style={styles.memberInfo}>
         <View style={styles.memberAvatar}>
           <Text style={styles.memberInitial}>{String(member.name || 'H')[0]?.toUpperCase()}</Text>
@@ -368,6 +423,7 @@ function MemberRow({
           ) : null}
         </View>
       </View>
+      ) : null}
       {activeEvent ? (
         <View style={styles.memberStatusBox}>
           <View style={styles.memberStatusTop}>
@@ -627,6 +683,22 @@ const styles = StyleSheet.create({
     color: palette.textSoft,
     fontSize: 13,
     fontWeight: '800',
+  },
+  memberSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: palette.card,
+  },
+  memberDropdown: {
+    gap: spacing.xs,
+  },
+  memberSummaryText: {
+    flex: 1,
   },
   memberRow: {
     gap: spacing.sm,
