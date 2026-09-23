@@ -55,7 +55,7 @@ export default function LoginLanding({ onOpenLogin }) {
             </span>
             <span className="landing-brand-text">
               <strong>RESQPERATION</strong>
-              <span>Barangay rescue operations</span>
+              <span>Barangay Command Center</span>
             </span>
           </a>
 
@@ -349,14 +349,19 @@ function ContactSection() {
           </div>
 
           <form className="soft-card contact-form" onSubmit={submitInquiry}>
-            <div className="form-row">
-              <input type="text" name="name" placeholder="Name" aria-label="Name" />
-              <input type="text" name="organization" placeholder="Organization" aria-label="Organization" />
-            </div>
-            <input type="email" name="email" placeholder="Email" aria-label="Email" />
-            <textarea name="message" placeholder="Message" aria-label="Message" />
-            {status && <div className="landing-form-note">{status}</div>}
-            <button className="primary-button" type="submit" disabled={isSending}>{isSending ? 'Sending...' : 'Send inquiry'}</button>
+              <div className="form-row">
+                 <input type="text" name="name" placeholder="Name" aria-label="Name" required />
+                 <input type="text"name="organization" placeholder="Organization" aria-label="Organization" required />
+          </div>
+
+                <input type="email" name="email" placeholder="Email" aria-label="Email" required title="Please enter a valid email address." />
+                <textarea name="message" placeholder="Message" aria-label="Message" minLength={20} maxLength={100} required title="Message must be between 20 and 100 characters."
+                    onChange={(e) => {  e.target.nextElementSibling.textContent = `${e.target.value.length} / 100`; }} />
+                <small className="message-counter">0 / 100 characters</small>
+
+                  {status && <div className="landing-form-note">{status}</div>}
+                  <button className="primary-button" type="submit" disabled={isSending} >
+                {isSending ? 'Sending...' : 'Send inquiry'} </button>
           </form>
         </div>
       </div>

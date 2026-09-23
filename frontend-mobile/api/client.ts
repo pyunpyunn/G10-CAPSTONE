@@ -6,22 +6,17 @@ const tokenKey = 'resqperation_mobile_token';
 
 function getApiBaseUrl() {
   const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-
-  if (configuredUrl && !isLocalhostUrl(configuredUrl)) {
-    return configuredUrl;
-  }
-
   const expoHost = getExpoHost();
 
   if (expoHost) {
     return `http://${expoHost}:8000/api/v1`;
   }
 
-  return configuredUrl || 'http://127.0.0.1:8000/api/v1';
-}
+  if (configuredUrl) {
+    return configuredUrl;
+  }
 
-function isLocalhostUrl(url: string) {
-  return url.includes('127.0.0.1') || url.includes('localhost');
+  return 'http://127.0.0.1:8000/api/v1';
 }
 
 function getExpoHost() {

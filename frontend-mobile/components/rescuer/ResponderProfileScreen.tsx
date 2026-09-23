@@ -110,7 +110,6 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
         <SectionHeader title="Responder details" />
         <InfoRow label="Team" value={responder.team_name || 'Unassigned'} />
         <InfoRow label="Team code" value={responder.team_code || 'Not recorded'} />
-        <InfoRow label="Title" value={responder.title || 'Responder'} />
         <InfoRow label="Blood type" value={responder.blood_type || 'Unknown'} />
         <InfoRow label="Skills" value={responder.skills || 'Not recorded'} />
       </View>
