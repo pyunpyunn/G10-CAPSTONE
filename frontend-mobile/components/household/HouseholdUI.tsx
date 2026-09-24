@@ -65,7 +65,8 @@ export function HouseholdEmpty({ icon, title, body }: { icon: keyof typeof Ionic
 export function statusColor(tone: string) {
   if (['safe', 'validated', 'active'].includes(tone)) return palette.safe;
   if (['evacuated', 'info'].includes(tone)) return palette.evacuated;
-  if (['unsafe', 'needs_help', 'critical', 'danger'].includes(tone)) return palette.unsafe;
+  if (tone === 'unsafe') return '#E85D3F';
+  if (['needs_help', 'critical', 'danger'].includes(tone)) return palette.unsafe;
   if (['pending', 'warning'].includes(tone)) return palette.warning;
   return palette.textSoft;
 }

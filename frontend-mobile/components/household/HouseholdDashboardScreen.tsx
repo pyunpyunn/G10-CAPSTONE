@@ -9,12 +9,12 @@ type DashboardProps = {
   overview: any;
   pendingStatus: string;
   editingStatus: boolean;
+  savingStatus: boolean;
   showHistory: boolean;
   onSelectStatus: (status: string) => void;
   onSaveStatus: () => void;
   onEditStatus: () => void;
   onToggleHistory: () => void;
-  onOpenQr: () => void;
   onOpenMap: () => void;
   onSaveMemberStatus?: (memberId: string, status: string) => Promise<void>;
 };
@@ -32,12 +32,12 @@ export function HouseholdDashboardScreen({
   overview,
   pendingStatus,
   editingStatus,
+  savingStatus,
   showHistory,
   onSelectStatus,
   onSaveStatus,
   onEditStatus,
   onToggleHistory,
-  onOpenQr,
   onOpenMap,
   onSaveMemberStatus,
 }: DashboardProps) {
@@ -45,6 +45,7 @@ export function HouseholdDashboardScreen({
   const currentStatus = overview.current_status;
   const members = overview.members || [];
   const statusOptions = overview.status_options?.length ? overview.status_options : defaultStatusOptions;
+  const hasStatusChanged = !currentStatus || pendingStatus !== currentStatus.status_key;
 
   return (
     <View style={styles.stack}>
@@ -112,12 +113,18 @@ export function HouseholdDashboardScreen({
           </View>
 
           <View style={styles.actionRow}>
-            {editingStatus || !currentStatus ? (
-              <HouseholdButton label="Save update" icon="save-outline" onPress={onSaveStatus} />
-            ) : (
-              <HouseholdButton label="Edit status" icon="create-outline" tone="light" onPress={onEditStatus} />
-            )}
-            <HouseholdButton label="Evacuation QR" icon="qr-code-outline" tone="light" onPress={onOpenQr} />
+            <View style={styles.actionButton}>
+              {editingStatus || !currentStatus ? (
+                <HouseholdButton
+                  label={savingStatus ? 'Saving...' : 'Save update'}
+                  icon="save-outline"
+                  disabled={savingStatus || !hasStatusChanged}
+                  onPress={onSaveStatus}
+                />
+              ) : (
+                <HouseholdButton label="Edit status" icon="create-outline" tone="light" onPress={onEditStatus} />
+              )}
+            </View>
           </View>
 
           {showHistory ? (
@@ -140,10 +147,7 @@ export function HouseholdDashboardScreen({
       ) : null}
 
       <View style={styles.card}>
-        <HouseholdSection
-          title="Family members"
-          action={<HouseholdButton label="QR" icon="qr-code-outline" tone="light" onPress={onOpenQr} />}
-        />
+        <HouseholdSection title="Family members" />
         {members.length === 0 ? (
           <HouseholdEmpty icon="people-outline" title="No members listed" />
         ) : (
@@ -311,6 +315,7 @@ function MemberRow({
   const currentStatus = member.current_status || null;
   const [selectedStatus, setSelectedStatus] = useState(currentStatus?.status_key || 'safe');
   const [saving, setSaving] = useState(false);
+  const hasStatusChanged = !currentStatus || selectedStatus !== currentStatus.status_key;
   const batteryText = device?.battery_level === null || device?.battery_level === undefined
     ? 'Battery not sent'
     : `${device.battery_level}% battery`;
@@ -403,8 +408,7 @@ function MemberRow({
                 <HouseholdButton
                   label={saving ? 'Saving...' : 'Save member status'}
                   icon="save-outline"
-                  tone="light"
-                  disabled={saving}
+                  disabled={saving || !hasStatusChanged}
                   onPress={handleSave}
                 />
               </>
@@ -600,6 +604,9 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  actionButton: {
+    flex: 1,
   },
   historyBox: {
     gap: spacing.sm,
