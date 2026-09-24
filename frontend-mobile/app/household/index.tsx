@@ -66,6 +66,7 @@ export default function HouseholdHomeScreen() {
   const [realBatteryLevel, setRealBatteryLevel] = useState<number | null>(null);
   const [pendingStatus, setPendingStatus] = useState('safe');
   const [editingStatus, setEditingStatus] = useState(true);
+  const [savingStatus, setSavingStatus] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [trustedPin, setTrustedPin] = useState('');
@@ -105,7 +106,7 @@ export default function HouseholdHomeScreen() {
       setOverview(data);
       const savedStatus = data.current_status?.status_key || data.status_options?.[0]?.key || 'safe';
       setPendingStatus(savedStatus);
-      setEditingStatus(!data.current_status);
+      setEditingStatus(true);
     } catch (error: any) {
       Alert.alert('Unable to load household data', errorMessage(error));
     } finally {
@@ -276,6 +277,8 @@ export default function HouseholdHomeScreen() {
       locationPayload.location_accuracy_m = overview.geotag.accuracy_m;
     }
 
+    setSavingStatus(true);
+
     try {
       await saveHouseholdStatus({
         status_key: pendingStatus,
@@ -284,11 +287,11 @@ export default function HouseholdHomeScreen() {
         ...locationPayload,
         notes: pendingStatus === 'needs_help' ? 'Household requested assistance from mobile.' : null,
       });
-      Alert.alert('Status saved', 'Your household status update was sent to HQ.');
-      setEditingStatus(false);
       await loadOverview(true);
     } catch (error: any) {
       Alert.alert('Unable to save status', errorMessage(error));
+    } finally {
+      setSavingStatus(false);
     }
   }
 
@@ -474,6 +477,7 @@ export default function HouseholdHomeScreen() {
         overview={overview}
         pendingStatus={pendingStatus}
         editingStatus={editingStatus}
+        savingStatus={savingStatus}
         showHistory={showHistory}
         onSelectStatus={setPendingStatus}
         onSaveStatus={handleSaveStatus}
