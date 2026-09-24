@@ -454,7 +454,6 @@ export default function HouseholdHomeScreen() {
         <HouseholdTrustedScreen
           overview={overview}
           viewingTrusted={viewingTrusted}
-          onOpenQr={() => setShowQr(true)}
           onAddTrusted={openAddTrusted}
           onOpenTrusted={openTrusted}
           onBackFamily={() => setViewingTrusted(null)}

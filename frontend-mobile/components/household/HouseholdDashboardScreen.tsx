@@ -22,7 +22,6 @@ type DashboardProps = {
 type TrustedScreenProps = {
   overview: any;
   viewingTrusted: any;
-  onOpenQr: () => void;
   onAddTrusted: () => void;
   onOpenTrusted: (household: any) => void;
   onBackFamily: () => void;
@@ -191,7 +190,6 @@ export function HouseholdDashboardScreen({
 export function HouseholdTrustedScreen({
   overview,
   viewingTrusted,
-  onOpenQr,
   onAddTrusted,
   onOpenTrusted,
   onBackFamily,
@@ -253,11 +251,6 @@ export function HouseholdTrustedScreen({
           activeEvent={activeEvent}
           onOpenTrusted={onOpenTrusted}
         />
-      </View>
-
-      <View style={styles.card}>
-        <HouseholdSection title="Evacuation QR" />
-        <HouseholdButton label="Open QR" icon="qr-code-outline" onPress={onOpenQr} />
       </View>
     </View>
   );
