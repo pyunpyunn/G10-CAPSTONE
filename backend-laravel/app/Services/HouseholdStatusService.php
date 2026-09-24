@@ -761,7 +761,12 @@ class HouseholdStatusService
 
         $householdDisplayStatus = $this->householdMemberDisplayStatus($householdId, $eventId);
 
-        return HouseholdMember::query()
+        // Use the query builder here because some deployed household-member
+        // tables predate the soft-delete column.  The Eloquent model's
+        // SoftDeletes global scope would otherwise add an invalid
+        // `household_members.deleted_at` predicate before the guarded check
+        // below can run.
+        return DB::table('household_members as hm')
             ->from('household_members as hm')
             ->leftJoin('relationships as r', 'r.relationship_id', '=', 'hm.relationship_id')
             ->leftJoin('genders as g', 'g.gender_id', '=', 'hm.gender_id')
@@ -844,7 +849,7 @@ class HouseholdStatusService
             ->join('member_statuses as ms', 'ms.status_id', '=', 'mds.status_id')
             ->where('mds.disaster_id', $eventId)
             ->where('mds.household_id', $householdId)
-            ->whereNull('hm.deleted_at')
+            ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('hm.deleted_at'))
             ->pluck('ms.status_key');
 
         $unsafeKeys = [
