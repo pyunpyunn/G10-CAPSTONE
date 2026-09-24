@@ -12,7 +12,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
-import * as Network from 'expo-network';
 import { type Href, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logoutMobile } from '@/api/auth';
@@ -65,7 +64,6 @@ export default function HouseholdHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [deviceUuid, setDeviceUuid] = useState('');
   const [realBatteryLevel, setRealBatteryLevel] = useState<number | null>(null);
-  const [connectionLabel, setConnectionLabel] = useState('Offline');
   const [pendingStatus, setPendingStatus] = useState('safe');
   const [editingStatus, setEditingStatus] = useState(true);
   const [savingStatus, setSavingStatus] = useState(false);
@@ -128,17 +126,6 @@ export default function HouseholdHomeScreen() {
       setRealBatteryLevel(null);
     }
 
-    try {
-      const network = await Network.getNetworkStateAsync();
-
-      if (!network.isConnected) {
-        setConnectionLabel('Offline');
-      } else {
-        setConnectionLabel(labelizeNetwork(network.type));
-      }
-    } catch {
-      setConnectionLabel('Online');
-    }
   }, []);
 
   const syncDeviceLocation = useCallback(async () => {
@@ -257,33 +244,6 @@ export default function HouseholdHomeScreen() {
       await loadOverview(true);
     } catch (error: any) {
       Alert.alert('Unable to update geotag', errorMessage(error));
-      throw error;
-    }
-  }
-
-  async function handleSaveDeviceUser(memberId: string) {
-    const payload: any = {
-      device_uuid: deviceUuid,
-      member_id: memberId,
-      location_permission_status: 'granted',
-      battery_level: realBatteryLevel ?? undefined,
-    };
-
-    if (currentDevice?.latitude && currentDevice?.longitude) {
-      payload.latitude = currentDevice.latitude;
-      payload.longitude = currentDevice.longitude;
-      payload.location_label = currentDevice.last_location_label;
-    } else if (overview?.geotag?.latitude && overview?.geotag?.longitude) {
-      payload.latitude = overview.geotag.latitude;
-      payload.longitude = overview.geotag.longitude;
-      payload.location_label = overview.geotag.location_label;
-    }
-
-    try {
-      await updateHouseholdDeviceLocation(payload);
-      await loadOverview(true);
-    } catch (error: any) {
-      Alert.alert('Unable to save device user', errorMessage(error));
       throw error;
     }
   }
@@ -506,12 +466,6 @@ export default function HouseholdHomeScreen() {
       return (
         <HouseholdProfileScreen
           overview={overview}
-          deviceUuid={deviceUuid}
-          currentDevice={currentDevice}
-          realBatteryLevel={realBatteryLevel}
-          connectionLabel={connectionLabel}
-          onSaveDeviceUser={handleSaveDeviceUser}
-          onUpdateMember={handleUpdateMember}
           onUpdateGeotag={handleUpdateGeotag}
           onLogout={handleLogout}
         />
@@ -545,10 +499,7 @@ export default function HouseholdHomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <HouseholdHeader
-        connectionLabel={connectionLabel}
-        onRefresh={() => loadOverview(true)}
-      />
+      <HouseholdHeader isDisasterMode={Boolean(overview.active_event)} />
 
       <ScrollView
         style={styles.scroll}
@@ -629,14 +580,6 @@ function errorMessage(error: any) {
   }
 
   return error?.response?.data?.message || 'Please check the API connection and try again.';
-}
-
-function labelizeNetwork(type?: Network.NetworkStateType) {
-  if (type === Network.NetworkStateType.WIFI) return 'Wi-Fi';
-  if (type === Network.NetworkStateType.CELLULAR) return 'Cellular';
-  if (type === Network.NetworkStateType.ETHERNET) return 'Ethernet';
-  if (type === Network.NetworkStateType.NONE) return 'Offline';
-  return 'Online';
 }
 
 const styles = StyleSheet.create({
