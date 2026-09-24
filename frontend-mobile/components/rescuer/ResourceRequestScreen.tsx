@@ -14,7 +14,6 @@ type ResourceRequestProps = {
 
 const defaultCategories = [
   { key: 'resource', label: 'Resource' },
-  { key: 'personnel', label: 'Personnel' },
   { key: 'vehicle', label: 'Transport' },
 ];
 

@@ -30,22 +30,14 @@ export function RescuerDashboardScreen({
     <View style={styles.stack}>
       <View style={styles.identityCard}>
         <View style={styles.identityTop}>
-          <View style={styles.identityText}>
-            <Text style={styles.kicker}>Field console</Text>
-            <Text style={styles.name}>{responder.full_name || profile.user?.full_name || 'Responder'}</Text>
-            <Text style={styles.meta}>
-              {responder.responder_code || profile.user?.username || 'Mobile account'} ·{' '}
-              {responder.team_name || 'No team assigned'}
-            </Text>
-          </View>
           <View style={styles.statusWrap}>
-            <StatusBadge label={responder.duty_status || 'Stand-by'} tone={responder.duty_status || 'neutral'} />
+            
           </View>
         </View>
 
         {activeEvent ? (
           <View style={styles.eventStrip}>
-            <Ionicons name="warning-outline" size={18} color={palette.warning} />
+            <Ionicons name="warning-outline" size={26} color={palette.warning} />
             <View style={styles.eventCopy}>
               <Text style={styles.eventTitle}>{activeEvent.name}</Text>
               <Text style={styles.eventMeta}>
@@ -199,28 +191,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   eventStrip: {
-    marginTop: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: '#ffffff12',
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: spacing.md,
+  borderRadius: radius.md,
+  padding: spacing.lg,
+  minHeight: 110,
+  backgroundColor: '#ffffff12',
+},
   eventCopy: {
     flex: 1,
   },
   eventTitle: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  eventMeta: {
-    marginTop: 2,
-    color: palette.navMuted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  color: '#fff',
+  fontSize: 30,
+  fontWeight: '900',
+},
+
+eventMeta: {
+  marginTop: 4,
+  color: palette.navMuted,
+  fontSize: 14,
+  fontWeight: '700',
+},
   statsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
