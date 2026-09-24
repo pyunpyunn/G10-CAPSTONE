@@ -51,7 +51,7 @@ class WeatherService
             ], 404);
         }
 
-        return $this->saveRefresh(null);
+        return $this->saveRefresh($eventId);
     }
 
     private function saveRefresh(?string $eventId): JsonResponse

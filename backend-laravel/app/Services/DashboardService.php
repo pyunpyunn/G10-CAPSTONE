@@ -2,7 +2,18 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
+use App\Models\DisasterBroadcast;
+use App\Models\DisasterEvent;
+use App\Models\EvacuationCenter;
+use App\Models\Household;
+use App\Models\HouseholdDisaster;
+use App\Models\HouseholdStatusLog;
 use App\Models\ResourceRequest;
+use App\Models\ResponderAssignment;
+use App\Models\RescueTeam;
+use App\Models\SituationReport;
+use App\Models\WeatherLog;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -91,7 +102,7 @@ class DashboardService
     public function closeActiveEvent(Request $request): JsonResponse
     {
         $closedEvent = DB::transaction(function () use ($request): ?array {
-            $event = DB::table('disaster_events')
+            $event = DisasterEvent::query()
                 ->whereNull('deleted_at')
                 ->whereNull('ended_at')
                 ->orderByDesc('started_at')
@@ -106,7 +117,7 @@ class DashboardService
             $closureNote = $this->buildClosureNote($event);
             $user = $request->user();
 
-            DB::table('disaster_events')
+            DisasterEvent::query()
                 ->where('event_id', $event->event_id)
                 ->update([
                     'ended_at' => $endedAt,
@@ -181,7 +192,7 @@ class DashboardService
 
     private function formatActiveEvent(object $event): array
     {
-        $latestBroadcast = DB::table('disaster_broadcasts')
+        $latestBroadcast = DisasterBroadcast::query()
             ->where('disaster_id', $event->event_id)
             ->orderByDesc('sent_at')
             ->first(['broadcast_title', 'scope_type', 'sent_at']);
@@ -205,7 +216,7 @@ class DashboardService
         $total = 0;
 
         if (Schema::hasTable('households')) {
-            $total = DB::table('households')
+            $total = Household::query()
                 ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
                 ->count();
         }
@@ -224,7 +235,8 @@ class DashboardService
             ];
         }
 
-        $counts = DB::table('household_disasters as hd')
+        $counts = HouseholdDisaster::query()
+            ->from('household_disasters as hd')
             ->join('households as h', 'h.household_id', '=', 'hd.household_id')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
             ->where('hd.disaster_id', $eventId)
@@ -238,10 +250,11 @@ class DashboardService
         $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased']);
         $safeTotal = $safeOnly + $evacuated;
 
-        $reportedRows = DB::table('household_disasters as hd')
+        $reportedRows = HouseholdDisaster::query()
+            ->from('household_disasters as hd')
             ->join('households as h', 'h.household_id', '=', 'hd.household_id')
-            ->where('disaster_id', $eventId)
-            ->whereNotNull('current_status_id')
+            ->where('hd.disaster_id', $eventId)
+            ->whereNotNull('hd.current_status_id')
             ->whereNull('h.deleted_at')
             ->distinct()
             ->count('hd.household_id');
@@ -273,7 +286,7 @@ class DashboardService
             ];
         }
 
-        $statusCounts = DB::table('responder_assignments')
+        $statusCounts = ResponderAssignment::query()
             ->where('disaster_id', $eventId)
             ->select('status', DB::raw('COUNT(*) as total'))
             ->groupBy('status')
@@ -282,10 +295,11 @@ class DashboardService
         $dispatched = $this->sumStatusKeys($statusCounts, ['dispatched', 'assigned', 'accepted', 'en_route']);
         $onScene = $this->sumStatusKeys($statusCounts, ['on_scene', 'on-scene', 'arrived']);
         $standby = Schema::hasTable('rescue_teams')
-            ? DB::table('rescue_teams')->where('duty_status', 'standby')->count()
+            ? RescueTeam::query()->where('duty_status', 'standby')->count()
             : 0;
 
-        $teams = DB::table('responder_assignments as ra')
+        $teams = ResponderAssignment::query()
+            ->from('responder_assignments as ra')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')
             ->where('ra.disaster_id', $eventId)
             ->orderByDesc('ra.assigned_at')
@@ -321,7 +335,7 @@ class DashboardService
             return null;
         }
 
-        $weather = DB::table('weather_logs')
+        $weather = WeatherLog::query()
             ->where('disaster_id', $eventId)
             ->orderByDesc('observed_at')
             ->orderByDesc('created_at')
@@ -399,7 +413,7 @@ class DashboardService
             ];
         }
 
-        $evacuationSites = DB::table('evacuation_centers')
+        $evacuationSites = EvacuationCenter::query()
             ->whereNull('deleted_at')
             ->where(function ($query) use ($eventId): void {
                 $query->where('current_event_id', $eventId)
@@ -420,7 +434,8 @@ class DashboardService
             return [];
         }
 
-        return DB::table('household_status_logs as hsl')
+        return HouseholdStatusLog::query()
+            ->from('household_status_logs as hsl')
             ->leftJoin('households as h', 'h.household_id', '=', 'hsl.household_id')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
             ->where('hsl.disaster_id', $eventId)
@@ -510,12 +525,12 @@ class DashboardService
     private function buildClosureNote(object $event): string
     {
         $householdSummary = $this->getHouseholdSummary($event->event_id);
-        $statusLogs = DB::table('household_status_logs')->where('disaster_id', $event->event_id)->count();
-        $dispatches = DB::table('responder_assignments')->where('disaster_id', $event->event_id)->count();
+        $statusLogs = HouseholdStatusLog::query()->where('disaster_id', $event->event_id)->count();
+        $dispatches = ResponderAssignment::query()->where('disaster_id', $event->event_id)->count();
         $requests = ResourceRequest::query()->where('source_reference', $event->event_id)->count();
-        $weatherSnapshots = DB::table('weather_logs')->where('disaster_id', $event->event_id)->count();
-        $broadcasts = DB::table('disaster_broadcasts')->where('disaster_id', $event->event_id)->count();
-        $situationReports = DB::table('situation_reports')->where('disaster_id', $event->event_id)->count();
+        $weatherSnapshots = WeatherLog::query()->where('disaster_id', $event->event_id)->count();
+        $broadcasts = DisasterBroadcast::query()->where('disaster_id', $event->event_id)->count();
+        $situationReports = SituationReport::query()->where('disaster_id', $event->event_id)->count();
 
         return sprintf(
             'Closed active event "%s". Summary: %s/%s households reported; safe total %s; evacuated %s; unsafe %s; status logs %s; dispatch assignments %s; resource requests %s; weather snapshots %s; broadcasts %s; situation reports %s.',
@@ -553,7 +568,7 @@ class DashboardService
 
     private function archiveSituationReports(string $eventId, Carbon $endedAt): void
     {
-        DB::table('situation_reports')
+        SituationReport::query()
             ->where('disaster_id', $eventId)
             ->where(function ($query): void {
                 $query->whereNull('is_archived')
@@ -580,7 +595,7 @@ class DashboardService
             $updates['updated_at'] = $endedAt;
         }
 
-        return DB::table('evacuation_centers')
+        return EvacuationCenter::query()
             ->where('current_event_id', $eventId)
             ->update($updates);
     }
@@ -614,7 +629,7 @@ class DashboardService
             $updates['updated_at'] = now();
         }
 
-        return DB::table('evacuation_centers')
+        return EvacuationCenter::query()
             ->whereIn('current_event_id', $endedEventIds)
             ->update($updates);
     }
@@ -633,7 +648,7 @@ class DashboardService
         Request $request,
         int $releasedEvacuationCenters
     ): void {
-        DB::table('audit_logs')->insert([
+        AuditLog::query()->insert([
             'user_id' => $user?->user_id,
             'role_key' => $user?->role?->role_key,
             'module' => 'dashboard',

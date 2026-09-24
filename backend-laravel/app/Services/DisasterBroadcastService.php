@@ -2,6 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\DisasterBroadcast;
+use App\Models\DisasterEvent;
+use App\Models\DisasterType;
+use App\Models\Household;
+use App\Models\Purok;
+use App\Models\SeverityLevel;
+use App\Models\WeatherLog;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -52,7 +59,7 @@ class DisasterBroadcastService
             $now = now();
             $eventId = 'EVT-'.$now->format('Ymd').'-'.Str::upper(Str::random(5));
 
-            DB::table('disaster_events')->insert([
+            DisasterEvent::query()->create([
                 'event_id' => $eventId,
                 'name' => $validated['name'],
                 'type_id' => $validated['type_id'],
@@ -156,7 +163,7 @@ class DisasterBroadcastService
                 $data['push_status'] = 'pending_mobile_push';
             }
 
-            DB::table('disaster_broadcasts')->insert($data);
+            DisasterBroadcast::query()->create($data);
 
             return $broadcastId;
         });
@@ -209,7 +216,7 @@ class DisasterBroadcastService
             return;
         }
 
-        DB::table('disaster_broadcasts')
+        DisasterBroadcast::query()
             ->where('broadcast_id', $broadcastId)
             ->update($this->filterColumns('disaster_broadcasts', [
                 'push_status' => 'onesignal_'.$pushResult['status'],
@@ -278,19 +285,19 @@ class DisasterBroadcastService
 
     private function getActiveEvent(): ?object
     {
-        return DB::table('disaster_events as de')
-            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
-            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
-            ->whereNull('de.deleted_at')
-            ->whereNull('de.ended_at')
-            ->orderByDesc('de.started_at')
+        return DisasterEvent::query()
+            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'disaster_events.type_id')
+            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'disaster_events.severity_level_id')
+            ->whereNull('disaster_events.deleted_at')
+            ->whereNull('disaster_events.ended_at')
+            ->orderByDesc('disaster_events.started_at')
             ->select([
-                'de.event_id',
-                'de.name',
-                'de.type_id',
-                'de.severity_level_id',
-                'de.started_at',
-                'de.ended_at',
+                'disaster_events.event_id',
+                'disaster_events.name',
+                'disaster_events.type_id',
+                'disaster_events.severity_level_id',
+                'disaster_events.started_at',
+                'disaster_events.ended_at',
                 'dt.type_code',
                 'dt.type_name',
                 'sl.severity_key',
@@ -301,18 +308,18 @@ class DisasterBroadcastService
 
     private function findEvent(string $eventId): ?object
     {
-        return DB::table('disaster_events as de')
-            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
-            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
-            ->where('de.event_id', $eventId)
-            ->whereNull('de.deleted_at')
+        return DisasterEvent::query()
+            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'disaster_events.type_id')
+            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'disaster_events.severity_level_id')
+            ->where('disaster_events.event_id', $eventId)
+            ->whereNull('disaster_events.deleted_at')
             ->select([
-                'de.event_id',
-                'de.name',
-                'de.type_id',
-                'de.severity_level_id',
-                'de.started_at',
-                'de.ended_at',
+                'disaster_events.event_id',
+                'disaster_events.name',
+                'disaster_events.type_id',
+                'disaster_events.severity_level_id',
+                'disaster_events.started_at',
+                'disaster_events.ended_at',
                 'dt.type_code',
                 'dt.type_name',
                 'sl.severity_key',
@@ -323,19 +330,19 @@ class DisasterBroadcastService
 
     private function getEventHistory(): array
     {
-        return DB::table('disaster_events as de')
-            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
-            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
-            ->whereNull('de.deleted_at')
-            ->orderByDesc('de.started_at')
+        return DisasterEvent::query()
+            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'disaster_events.type_id')
+            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'disaster_events.severity_level_id')
+            ->whereNull('disaster_events.deleted_at')
+            ->orderByDesc('disaster_events.started_at')
             ->limit(20)
             ->get([
-                'de.event_id',
-                'de.name',
-                'de.type_id',
-                'de.severity_level_id',
-                'de.started_at',
-                'de.ended_at',
+                'disaster_events.event_id',
+                'disaster_events.name',
+                'disaster_events.type_id',
+                'disaster_events.severity_level_id',
+                'disaster_events.started_at',
+                'disaster_events.ended_at',
                 'dt.type_code',
                 'dt.type_name',
                 'sl.severity_key',
@@ -348,10 +355,10 @@ class DisasterBroadcastService
 
     private function getBroadcastsForEvent(string $eventId): array
     {
-        return DB::table('disaster_broadcasts as db')
-            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'db.severity_id')
-            ->where('db.disaster_id', $eventId)
-            ->orderByDesc('db.sent_at')
+        return DisasterBroadcast::query()
+            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'disaster_broadcasts.severity_id')
+            ->where('disaster_broadcasts.disaster_id', $eventId)
+            ->orderByDesc('disaster_broadcasts.sent_at')
             ->limit(30)
             ->get($this->broadcastSelectColumns())
             ->map(fn (object $broadcast): array => $this->formatBroadcast($broadcast))
@@ -361,9 +368,9 @@ class DisasterBroadcastService
 
     private function findBroadcast(int $broadcastId): array
     {
-        $broadcast = DB::table('disaster_broadcasts as db')
-            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'db.severity_id')
-            ->where('db.broadcast_id', $broadcastId)
+        $broadcast = DisasterBroadcast::query()
+            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'disaster_broadcasts.severity_id')
+            ->where('disaster_broadcasts.broadcast_id', $broadcastId)
             ->first($this->broadcastSelectColumns());
 
         return $this->formatBroadcast($broadcast);
@@ -372,17 +379,17 @@ class DisasterBroadcastService
     private function broadcastSelectColumns(): array
     {
         $columns = [
-            'db.broadcast_id',
-            'db.broadcast_title',
-            'db.disaster_id',
-            'db.sent_by_admin_id',
-            'db.severity_id',
-            'db.scope_type',
-            'db.message',
-            'db.allowed_statuses',
-            'db.channel',
-            'db.status',
-            'db.sent_at',
+            'disaster_broadcasts.broadcast_id',
+            'disaster_broadcasts.broadcast_title',
+            'disaster_broadcasts.disaster_id',
+            'disaster_broadcasts.sent_by_admin_id',
+            'disaster_broadcasts.severity_id',
+            'disaster_broadcasts.scope_type',
+            'disaster_broadcasts.message',
+            'disaster_broadcasts.allowed_statuses',
+            'disaster_broadcasts.channel',
+            'disaster_broadcasts.status',
+            'disaster_broadcasts.sent_at',
             'sl.severity_key',
             'sl.severity_label',
         ];
@@ -395,7 +402,7 @@ class DisasterBroadcastService
             'push_status',
         ] as $column) {
             if (Schema::hasColumn('disaster_broadcasts', $column)) {
-                $columns[] = 'db.'.$column;
+                $columns[] = 'disaster_broadcasts.'.$column;
             }
         }
 
@@ -470,27 +477,11 @@ class DisasterBroadcastService
             ];
         }
 
-        $columns = Schema::getColumnListing('weather_logs');
-        $eventColumn = collect(['disaster_id', 'event_id'])
-            ->first(fn (string $column): bool => in_array($column, $columns, true));
-
-        if (! $eventColumn) {
-            return [
-                'condition' => 'Weather not linked',
-                'temperature' => null,
-                'wind_speed' => null,
-                'rainfall' => null,
-            ];
-        }
-
-        $orderColumn = collect(['logged_at', 'created_at', 'weather_log_id', 'id'])
-            ->first(fn (string $column): bool => in_array($column, $columns, true));
-
-        $query = DB::table('weather_logs')
-            ->where($eventColumn, $eventId)
-            ->when($orderColumn, fn ($weatherQuery) => $weatherQuery->orderByDesc($orderColumn));
-
-        $row = $query->first();
+        $row = WeatherLog::query()
+            ->where('disaster_id', $eventId)
+            ->orderByDesc('observed_at')
+            ->orderByDesc('created_at')
+            ->first();
 
         if (! $row) {
             return [
@@ -502,10 +493,10 @@ class DisasterBroadcastService
         }
 
         return [
-            'condition' => $row->condition ?? $row->weather_condition ?? $row->summary ?? 'Weather saved',
-            'temperature' => $row->temperature_c ?? $row->temperature ?? null,
-            'wind_speed' => $row->wind_speed_kmh ?? $row->wind_speed ?? null,
-            'rainfall' => $row->rainfall_mm ?? $row->rainfall ?? null,
+            'condition' => $row->condition_name ?? $row->advisory_title ?? 'Weather saved',
+            'temperature' => $row->temperature ?? null,
+            'wind_speed' => $row->wind_speed ?? null,
+            'rainfall' => $row->rainfall_mm ?? null,
         ];
     }
 
@@ -576,8 +567,12 @@ class DisasterBroadcastService
             ->all();
     }
 
-    private function decodeJsonArray(?string $text): array
+    private function decodeJsonArray(mixed $text): array
     {
+        if (is_array($text)) {
+            return $text;
+        }
+
         if (! $text) {
             return [];
         }
@@ -603,7 +598,7 @@ class DisasterBroadcastService
 
     private function getDisasterTypes(): array
     {
-        $query = DB::table('disaster_types');
+        $query = DisasterType::query();
 
         if (Schema::hasColumn('disaster_types', 'deleted_at')) {
             $query->whereNull('deleted_at');
@@ -626,11 +621,7 @@ class DisasterBroadcastService
 
     private function getSeverityLevels(): array
     {
-        $query = DB::table('severity_levels');
-
-        if (Schema::hasColumn('severity_levels', 'deleted_at')) {
-            $query->whereNull('deleted_at');
-        }
+        $query = SeverityLevel::query();
 
         return $query->orderByRaw("FIELD(severity_key, 'low', 'medium', 'high', 'critical')")
             ->get(['severity_id', 'severity_key', 'severity_label'])
@@ -648,12 +639,7 @@ class DisasterBroadcastService
         $puroks = collect();
 
         if (Schema::hasTable('puroks') && Schema::hasColumn('puroks', 'purok_name')) {
-            $query = DB::table('puroks')
-                ->whereNotNull('purok_name');
-
-            if (Schema::hasColumn('puroks', 'deleted_at')) {
-                $query->whereNull('deleted_at');
-            }
+            $query = Purok::query()->whereNotNull('purok_name');
 
             $puroks = $query->orderBy('purok_name')
                 ->get(['purok_id', 'purok_name'])
@@ -747,7 +733,7 @@ class DisasterBroadcastService
             return $rescuers;
         }
 
-        $householdQuery = DB::table('households');
+        $householdQuery = Household::query();
 
         if (Schema::hasColumn('households', 'deleted_at')) {
             $householdQuery->whereNull('deleted_at');

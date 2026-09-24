@@ -138,7 +138,28 @@ class NotificationService
 
     private function outgoingNotificationRows(): array
     {
+        if (! Schema::hasTable('notifications')) {
+            return [];
+        }
+
         return Notification::query()
+            ->select([
+                'notif_id',
+                'message',
+                'sent_by',
+                'evacuation_event_id',
+                'evacuation_center_id',
+                'urgency_level_id',
+                'scheduled_at',
+                'is_recurring',
+                'recurrence_type_id',
+                'recurrence_end_at',
+                'last_sent_at',
+                'created_at',
+                'channel',
+                'status',
+                'target_filter',
+            ])
             ->orderByDesc('created_at')
             ->limit(20)
             ->get()
@@ -160,6 +181,10 @@ class NotificationService
 
     private function householdAlertRows(): array
     {
+        if (! Schema::hasTable('household_status_logs')) {
+            return [];
+        }
+
         return HouseholdStatusLog::query()
             ->with(['household.address', 'status'])
             ->whereHas('status', fn ($query) => $query->whereIn('status_key', ['unsafe', 'injured', 'missing', 'not_evacuated', 'displaced']))
@@ -187,6 +212,10 @@ class NotificationService
 
     private function dispatchRows(): array
     {
+        if (! Schema::hasTable('responder_assignments')) {
+            return [];
+        }
+
         return ResponderAssignment::query()
             ->with(['team', 'responder'])
             ->orderByDesc('assigned_at')
@@ -212,7 +241,35 @@ class NotificationService
 
     private function resourceRequestRows(): array
     {
+        if (! Schema::hasTable('resource_requests')) {
+            return [];
+        }
+
         return ResourceRequest::query()
+            ->select([
+                'request_id',
+                'request_source',
+                'source_reference',
+                'request_category',
+                'evacuation_center_id',
+                'requested_by',
+                'handled_by',
+                'resource_type',
+                'item_name',
+                'quantity',
+                'unit',
+                'description',
+                'urgency_id',
+                'status_id',
+                'validation_status',
+                'validation_notes',
+                'validated_by_user_id',
+                'validated_at',
+                'released_for_tracking_at',
+                'tracking_reference',
+                'created_at',
+                'updated_at',
+            ])
             ->orderByDesc('created_at')
             ->limit(20)
             ->get()
@@ -236,7 +293,29 @@ class NotificationService
 
     private function weatherRows(): array
     {
+        if (! Schema::hasTable('weather_logs')) {
+            return [];
+        }
+
         return WeatherLog::query()
+            ->select([
+                'weather_log_id',
+                'disaster_id',
+                'source_name',
+                'source_url',
+                'condition_name',
+                'temperature',
+                'rainfall_mm',
+                'wind_speed',
+                'wind_direction',
+                'humidity',
+                'advisory_title',
+                'advisory_text',
+                'raw_payload',
+                'observed_at',
+                'created_at',
+                'updated_at',
+            ])
             ->orderByDesc('observed_at')
             ->orderByDesc('created_at')
             ->limit(10)
@@ -260,6 +339,10 @@ class NotificationService
 
     private function broadcastRows(): array
     {
+        if (! Schema::hasTable('disaster_broadcasts')) {
+            return [];
+        }
+
         return DisasterBroadcast::query()
             ->with('severity')
             ->orderByDesc('sent_at')

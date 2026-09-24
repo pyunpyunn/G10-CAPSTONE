@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
 use App\Models\LandingInquiry;
 use App\Models\User;
 use Carbon\Carbon;
@@ -36,7 +37,7 @@ class InquiryService
 
         $now = now();
 
-        $insert = [
+        $insert = $this->onlyExistingColumns([
             'name' => trim($validated['name']),
             'organization' => $this->emptyToNull($validated['organization'] ?? null),
             'email' => $this->emptyToNull($validated['email'] ?? null),
@@ -47,9 +48,28 @@ class InquiryService
             'user_agent' => substr((string) $request->userAgent(), 0, 255),
             'created_at' => $now,
             'updated_at' => $now,
-        ];
+        ]);
 
         $inquiry = LandingInquiry::query()->create($insert);
+
+        $this->recordAuditLog([
+            'user_id' => null,
+            'role_key' => 'anonymous',
+            'module' => 'inquiry',
+            'action' => 'created',
+            'reference_table' => 'landing_inquiries',
+            'reference_id' => $inquiry->inquiry_id,
+            'old_values' => null,
+            'new_values' => [
+                'status' => 'new',
+                'name' => $inquiry->name,
+                'organization' => $inquiry->organization,
+                'email' => $inquiry->email,
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            'created_at' => $now,
+        ]);
 
         return response()->json([
             'message' => 'Inquiry sent.',
@@ -77,7 +97,7 @@ class InquiryService
         $search = trim((string) $request->query('search', ''));
         $perPage = min(50, max(10, (int) $request->query('per_page', 10)));
 
-        $query = LandingInquiry::query();
+        $query = LandingInquiry::query()->select($this->landingInquiryColumns());
 
         if ($status !== '' && $status !== 'all') {
             $query->where('status', $status);
@@ -128,21 +148,47 @@ class InquiryService
             return response()->json(['message' => 'Inquiry was not found.'], 404);
         }
 
-        $update = [
+        $oldValues = [
+            'status' => $row->status,
+            'handled_by_user_id' => $row->handled_by_user_id,
+            'responded_at' => $row->responded_at,
+        ];
+
+        $update = $this->onlyExistingColumns([
             'status' => $validated['status'],
             'handled_by_user_id' => $request->user()?->user_id,
             'responded_at' => $validated['status'] === 'responded' ? now() : $row->responded_at,
             'updated_at' => now(),
-        ];
+        ]);
 
         LandingInquiry::query()
             ->whereKey($inquiryId)
-            ->update($this->onlyExistingColumns($update));
+            ->update($update);
+
+        $updatedRow = LandingInquiry::query()->whereKey($inquiryId)->first();
+
+        $this->recordAuditLog([
+            'user_id' => $request->user()?->user_id,
+            'role_key' => $request->user()?->roleKey(),
+            'module' => 'inquiry',
+            'action' => 'status_updated',
+            'reference_table' => 'landing_inquiries',
+            'reference_id' => $inquiryId,
+            'old_values' => $oldValues,
+            'new_values' => [
+                'status' => $updatedRow?->status,
+                'handled_by_user_id' => $updatedRow?->handled_by_user_id,
+                'responded_at' => $updatedRow?->responded_at,
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            'created_at' => now(),
+        ]);
 
         return response()->json([
             'message' => 'Inquiry updated.',
             'data' => [
-                'inquiry' => $this->formatInquiry(LandingInquiry::query()->whereKey($inquiryId)->first()),
+                'inquiry' => $this->formatInquiry($updatedRow),
             ],
         ]);
     }
@@ -175,6 +221,7 @@ class InquiryService
         $hasDeletedAt = Schema::hasColumn('users', 'deleted_at');
 
         $rows = User::query()
+            ->select($this->userOverviewColumns())
             ->with('role')
             ->when($hasDeletedAt, fn ($query) => $query->whereNull('deleted_at'))
             ->orderByDesc('created_at')
@@ -217,11 +264,62 @@ class InquiryService
         ];
     }
 
+    private function landingInquiryColumns(): array
+    {
+        return [
+            'inquiry_id',
+            'name',
+            'organization',
+            'email',
+            'message',
+            'status',
+            'source_page',
+            'ip_address',
+            'user_agent',
+            'responded_at',
+            'handled_by_user_id',
+            'created_at',
+            'updated_at',
+        ];
+    }
+
+    private function userOverviewColumns(): array
+    {
+        return [
+            'user_id',
+            'username',
+            'login_id',
+            'name',
+            'email',
+            'role_id',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ];
+    }
+
     private function onlyExistingColumns(array $data): array
     {
         return collect($data)
             ->filter(fn ($value, string $column): bool => Schema::hasColumn(self::TABLE, $column))
             ->all();
+    }
+
+    private function recordAuditLog(array $payload): void
+    {
+        if (! Schema::hasTable('audit_logs')) {
+            return;
+        }
+
+        $logData = collect($payload)
+            ->filter(fn ($value, string $column): bool => Schema::hasColumn('audit_logs', $column) || in_array($column, ['created_at'], true))
+            ->all();
+
+        if ($logData === []) {
+            return;
+        }
+
+        AuditLog::query()->create($logData);
     }
 
     private function emptyToNull(?string $value): ?string

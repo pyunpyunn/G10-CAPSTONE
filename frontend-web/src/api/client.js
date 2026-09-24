@@ -3,15 +3,25 @@ import { getToken } from './token'
 
 function getApiBaseUrl() {
   const configuredUrl = import.meta.env.VITE_API_BASE_URL
+  const browserHost = window.location.hostname
+  const isLocalBrowser = ['localhost', '127.0.0.1', '0.0.0.0'].includes(browserHost)
 
   if (configuredUrl) {
-    return configuredUrl
+    try {
+      const parsedUrl = new URL(configuredUrl)
+
+      if (!isLocalBrowser && ['localhost', '127.0.0.1', '0.0.0.0'].includes(parsedUrl.hostname)) {
+        parsedUrl.hostname = browserHost
+        return parsedUrl.toString().replace(/\/$/, '')
+      }
+
+      return configuredUrl
+    } catch {
+      return configuredUrl
+    }
   }
 
-  const browserHost = window.location.hostname
-  const openedFromNetwork = browserHost !== 'localhost' && browserHost !== '127.0.0.1'
-
-  if (openedFromNetwork) {
+  if (!isLocalBrowser) {
     return `${window.location.protocol}//${browserHost}:8000/api/v1`
   }
 

@@ -58,7 +58,12 @@ class AuthService
             return response()->json(['message' => 'This household account is not linked to a registered household record. Please contact SafeTrack or HQ/Admin.'], 409);
         }
 
-        $token = $user->createToken($request->input('device_name', 'resqperation-client'))->plainTextToken;
+        $token = null;
+        if (Schema::hasTable('personal_access_tokens')) {
+            $token = $user->createToken($request->input('device_name', 'resqperation-client'))->plainTextToken;
+        } elseif (app()->environment('local', 'testing')) {
+            Log::warning('Sanctum personal_access_tokens table is missing; login has no token to issue.', ['user_id' => $user->user_id]);
+        }
 
         return response()->json(['message' => 'Login successful.', 'token' => $token, 'user' => new UserResource($user)]);
     }
@@ -209,12 +214,23 @@ class AuthService
 
     private function userFromResponderLogin(string $login): ?User
     {
-        $responder = Responder::query()
-            ->where(function ($query) use ($login): void {
-                $query->where('responder_code', $login)
-                    ->orWhere('username', $login)
-                    ->orWhere('user_id', $login);
-            })
+        $loginTerm = trim($login);
+        $search = strtolower($loginTerm);
+
+        $responderQuery = Responder::query();
+        if (Schema::hasColumn('responders', 'responder_code')) {
+            $responderQuery->whereRaw('LOWER(responder_code) = ?', [$search]);
+        }
+
+        if (Schema::hasColumn('responders', 'username')) {
+            $responderQuery->orWhereRaw('LOWER(username) = ?', [$search]);
+        }
+
+        if (Schema::hasColumn('responders', 'user_id')) {
+            $responderQuery->orWhereRaw('LOWER(user_id) = ?', [$search]);
+        }
+
+        $responder = $responderQuery
             ->when(Schema::hasColumn('responders', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->first();
 
@@ -222,30 +238,72 @@ class AuthService
             return null;
         }
 
-        $user = User::query()
-            ->where(function ($query) use ($responder): void {
-                $query->when($responder->user_id !== null, fn ($q) => $q->orWhere('user_id', $responder->user_id))
-                    ->when($responder->username !== null, fn ($q) => $q->orWhere('username', $responder->username));
-            })
+        $userQuery = User::query();
+        if (Schema::hasColumn('users', 'user_id') && ! empty($responder->user_id)) {
+            $userQuery->orWhere('user_id', $responder->user_id);
+        }
+
+        if (Schema::hasColumn('users', 'username') && ! empty($responder->username)) {
+            $userQuery->orWhere('username', $responder->username);
+        }
+
+        if (Schema::hasColumn('users', 'login_id') && ! empty($responder->username)) {
+            $userQuery->orWhere('login_id', $responder->username);
+        }
+
+        if ($loginTerm !== '') {
+            if (Schema::hasColumn('users', 'username')) {
+                $userQuery->orWhere('username', $loginTerm);
+            }
+
+            if (Schema::hasColumn('users', 'login_id')) {
+                $userQuery->orWhere('login_id', $loginTerm);
+            }
+
+            if (Schema::hasColumn('users', 'email')) {
+                $userQuery->orWhere('email', $loginTerm);
+            }
+        }
+
+        $user = $userQuery
             ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->first();
 
-        return $user ?: $this->userFromSharedUserTable($responder->username ?? $responder->user_id ?? $login);
+        return $user ?: $this->userFromSharedUserTable($responder->username ?? $responder->user_id ?? $loginTerm);
     }
 
     private function userFromSharedUserTable(string $login): ?User
     {
-        $query = User::query()
-            ->where(function ($inner) use ($login): void {
-                $inner->where('username', $login)
-                    ->orWhere('email', $login)
-                    ->orWhere('user_id', $login);
-            })
-            ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'));
+        $loginTerm = trim($login);
+        $search = strtolower($loginTerm);
+
+        $query = User::query();
+
+        if (Schema::hasColumn('users', 'username')) {
+            $query->where(function ($inner) use ($search): void {
+                $inner->whereRaw('LOWER(username) = ?', [$search]);
+            });
+        }
+
+        if (Schema::hasColumn('users', 'login_id')) {
+            $query->orWhereRaw('LOWER(login_id) = ?', [$search]);
+        }
+
+        if (Schema::hasColumn('users', 'email')) {
+            $query->orWhereRaw('LOWER(email) = ?', [$search]);
+        }
+
+        if (Schema::hasColumn('users', 'user_id')) {
+            $query->orWhereRaw('LOWER(user_id) = ?', [$search]);
+        }
+
+        if (Schema::hasColumn('users', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
 
         $user = $query->first();
 
-        return $user ?: $this->userFromHouseholdIdentifier($login);
+        return $user ?: $this->userFromHouseholdIdentifier($loginTerm);
     }
 
     private function userFromHouseholdIdentifier(string $login): ?User
@@ -312,13 +370,18 @@ class AuthService
 
     private function databaseUnavailableResponse(): ?JsonResponse
     {
-        if (app()->runningUnitTests()) {
+        if (app()->runningUnitTests() || app()->environment('testing') || app()->environment('local')) {
             return null;
         }
 
         $connectionName = config('database.default');
         $connection = config("database.connections.$connectionName", []);
         $driver = $connection['driver'] ?? DB::connection()->getDriverName();
+        $databaseName = (string) ($connection['database'] ?? '');
+
+        if (in_array($driver, ['sqlite'], true) || $databaseName === ':memory:' || str_contains($databaseName, 'database.sqlite')) {
+            return null;
+        }
 
         if (! in_array($driver, ['mysql', 'mariadb'], true)) {
             return null;

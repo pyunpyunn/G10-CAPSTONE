@@ -2,6 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\DisasterEvent;
+use App\Models\EvacuationCenter;
+use App\Models\GeotaggedLocation;
+use App\Models\Household;
+use App\Models\Purok;
+use App\Models\ResponderLocationLog;
+use App\Models\ResponderRoute;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -132,7 +139,8 @@ class MappingService
             ? 'hd.current_status_id'
             : 'hd.initial_status_id';
 
-        $query = DB::table('geotagged_locations as gl')
+        $query = GeotaggedLocation::query()
+            ->from('geotagged_locations as gl')
             ->leftJoin('households as h', 'h.household_id', '=', 'gl.household_id')
             ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->leftJoin('puroks as p', 'p.purok_id', '=', 'a.purok_id')
@@ -192,7 +200,7 @@ class MappingService
             return [];
         }
 
-        $query = DB::table('evacuation_centers')
+        $query = EvacuationCenter::query()
             ->whereNotNull('latitude')
             ->whereNotNull('longitude');
 
@@ -223,13 +231,14 @@ class MappingService
             return [];
         }
 
-        $latestLogs = DB::table('responder_location_logs')
+        $latestLogs = ResponderLocationLog::query()
             ->select('responder_id', DB::raw('MAX(logged_at) as latest_logged_at'))
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->groupBy('responder_id');
 
-        $query = DB::table('responder_location_logs as rll')
+        $query = ResponderLocationLog::query()
+            ->from('responder_location_logs as rll')
             ->joinSub($latestLogs, 'latest', function ($join): void {
                 $join->on('latest.responder_id', '=', 'rll.responder_id')
                     ->on('latest.latest_logged_at', '=', 'rll.logged_at');
@@ -266,7 +275,8 @@ class MappingService
             return [];
         }
 
-        $query = DB::table('responder_routes as rr')
+        $query = ResponderRoute::query()
+            ->from('responder_routes as rr')
             ->leftJoin('responder_assignments as ra', 'ra.assignment_id', '=', 'rr.assignment_id')
             ->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'r.team_id');
@@ -314,13 +324,13 @@ class MappingService
             : 0;
 
         $gpsTagged = Schema::hasTable('geotagged_locations')
-            ? DB::table('geotagged_locations')->whereNotNull('latitude')->whereNotNull('longitude')->distinct()->count('household_id')
+            ? GeotaggedLocation::query()->whereNotNull('latitude')->whereNotNull('longitude')->distinct()->count('household_id')
             : 0;
 
         $averageAccuracy = null;
 
         if (Schema::hasTable('geotagged_locations') && $this->hasColumn('geotagged_locations', 'accuracy_m')) {
-            $averageAccuracy = DB::table('geotagged_locations')
+            $averageAccuracy = GeotaggedLocation::query()
                 ->whereNotNull('accuracy_m')
                 ->avg('accuracy_m');
         }
@@ -338,13 +348,9 @@ class MappingService
         $puroks = collect();
 
         if (Schema::hasTable('puroks') && Schema::hasColumn('puroks', 'purok_name')) {
-            $query = DB::table('puroks')
+            $query = Purok::query()
                 ->whereNotNull('purok_name')
                 ->where('purok_name', '<>', '');
-
-            if (Schema::hasColumn('puroks', 'deleted_at')) {
-                $query->whereNull('deleted_at');
-            }
 
             $puroks = $query
                 ->select('purok_name')
@@ -604,7 +610,8 @@ class MappingService
             return null;
         }
 
-        $query = DB::table('disaster_events as de')
+        $query = DisasterEvent::query()
+            ->from('disaster_events as de')
             ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
             ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
             ->whereNull('de.ended_at');

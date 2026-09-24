@@ -656,7 +656,7 @@ class RescueDispatchService
             ->withoutGlobalScopes()
             ->from('responders as r')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'r.team_id')
-            ->whereNull('r.deleted_at')
+            ->when(Schema::hasColumn('responders', 'deleted_at'), fn ($query) => $query->whereNull('r.deleted_at'))
             ->orderBy('r.full_name')
             ->get([
                 'r.responder_id',
@@ -752,7 +752,7 @@ class RescueDispatchService
                     ->where('hd.disaster_id', '=', $eventId);
             })
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
-            ->whereNull('h.deleted_at')
+            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('h.deleted_at'))
             ->whereNotNull('h.household_id')
             ->select([
                 'h.household_id',
@@ -760,7 +760,6 @@ class RescueDispatchService
                 'h.household_name',
                 'h.member_count',
                 'a.full_address',
-                'a.street_address',
                 'a.house_number',
                 DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned') as area_name"),
                 DB::raw("(
@@ -1305,7 +1304,7 @@ class RescueDispatchService
             'household_code' => $item->household_code,
             'household_name' => $item->household_name ?: $item->household_code ?: $item->household_id,
             'member_count' => (int) ($item->member_count ?? 0),
-            'address' => $item->geotag_label ?: ($item->full_address ?: trim(($item->house_number ? $item->house_number.' ' : '').($item->street_address ?: ''))),
+            'address' => $item->geotag_label ?: ($item->full_address ?: trim(($item->house_number ? $item->house_number.' ' : '').($item->area_name ?: ''))),
             'status_key' => $statusKey,
             'status_label' => $item->status_label ?: 'Unchecked',
             'reported_unsafe_count' => in_array($statusKey, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'], true) ? 1 : 0,
@@ -1434,6 +1433,7 @@ class RescueDispatchService
     {
         return DisasterEvent::query()
             ->with(['type', 'severity'])
+            ->when(Schema::hasColumn('disaster_events', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->whereNull('ended_at')
             ->orderByDesc('started_at')
             ->first();
