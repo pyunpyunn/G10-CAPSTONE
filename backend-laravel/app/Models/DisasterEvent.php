@@ -17,7 +17,7 @@ class DisasterEvent extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['name', 'type_id', 'severity_level_id', 'started_at', 'ended_at'];
+    protected $fillable = ['event_id', 'name', 'type_id', 'severity_level_id', 'started_at', 'ended_at'];
 
     protected function casts(): array
     {

@@ -2,6 +2,19 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
+use App\Models\DisasterEvent;
+use App\Models\GeotaggedLocation;
+use App\Models\Household;
+use App\Models\HouseholdDisaster;
+use App\Models\HouseholdStatus;
+use App\Models\HouseholdStatusLog;
+use App\Models\Responder;
+use App\Models\ResponderAssignment;
+use App\Models\ResponderLocationLog;
+use App\Models\ResponderRoute;
+use App\Models\RescueTeam;
+use App\Models\RouteCoordinate;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -58,7 +71,8 @@ class RescueDispatchService
             ]);
         }
 
-        $query = DB::table('responder_assignments as ra')
+        $query = ResponderAssignment::query()
+            ->from('responder_assignments as ra')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')
             ->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')
             ->where('ra.disaster_id', $eventId)
@@ -157,7 +171,7 @@ class RescueDispatchService
                 $this->ensureHouseholdCanReceiveDispatch($validated['household_id'], $activeEvent->event_id);
             }
 
-            DB::table('responder_assignments')->insert([
+            ResponderAssignment::query()->create([
                 'assignment_id' => $assignmentId,
                 'assignment_code' => 'DSP-'.$now->format('Ymd').'-'.str_pad((string) $assignmentId, 4, '0', STR_PAD_LEFT),
                 'responder_id' => $responderId,
@@ -267,7 +281,7 @@ class RescueDispatchService
                 $updates['completed_at'] = $now;
             }
 
-            DB::table('responder_assignments')
+            ResponderAssignment::query()
                 ->where('assignment_id', $assignmentId)
                 ->update($updates);
 
@@ -304,7 +318,7 @@ class RescueDispatchService
         DB::transaction(function () use ($request, $assignmentId, $dispatch, $validated): void {
             $now = now();
 
-            DB::table('responder_assignments')
+            ResponderAssignment::query()
                 ->where('assignment_id', $assignmentId)
                 ->update([
                     'status' => 'completed',
@@ -348,7 +362,7 @@ class RescueDispatchService
             $now = now();
             $logId = $this->nextId('responder_location_logs', 'log_id');
 
-            DB::table('responder_location_logs')->insert([
+            ResponderLocationLog::query()->create([
                 'log_id' => $logId,
                 'responder_id' => $dispatch->responder_id,
                 'latitude' => $validated['latitude'],
@@ -360,7 +374,7 @@ class RescueDispatchService
 
             $this->saveRouteCoordinate($assignmentId, $validated, $now);
 
-            DB::table('responders')
+            Responder::query()
                 ->where('responder_id', $dispatch->responder_id)
                 ->update([
                     'last_active_at' => $now,
@@ -438,7 +452,8 @@ class RescueDispatchService
 
     private function getDispatchRecord(int $assignmentId): ?object
     {
-        return DB::table('responder_assignments as ra')
+        return ResponderAssignment::query()
+            ->from('responder_assignments as ra')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')
             ->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')
             ->where('ra.assignment_id', $assignmentId)
@@ -498,7 +513,8 @@ class RescueDispatchService
 
     private function getTeamCards(?string $eventId)
     {
-        $teams = DB::table('rescue_teams as rt')
+        $teams = RescueTeam::query()
+            ->from('rescue_teams as rt')
             ->leftJoin('responders as leader', 'leader.responder_id', '=', 'rt.leader_responder_id')
             ->orderBy('rt.team_name')
             ->get([
@@ -515,8 +531,7 @@ class RescueDispatchService
             ->values();
 
         if ($cards->isEmpty()) {
-            $unassignedResponders = DB::table('responders')
-                ->whereNull('deleted_at')
+            $unassignedResponders = Responder::query()
                 ->where(function ($query): void {
                     $query->whereNull('team_id')->orWhere('team_id', 0);
                 })
@@ -583,7 +598,7 @@ class RescueDispatchService
         $activeAssignment = null;
 
         if ($eventId) {
-            $activeAssignment = DB::table('responder_assignments')
+            $activeAssignment = ResponderAssignment::query()
                 ->where('team_id', $team->team_id)
                 ->where('disaster_id', $eventId)
                 ->whereNotIn('status', ['completed', 'cancelled'])
@@ -591,14 +606,12 @@ class RescueDispatchService
                 ->first();
         }
 
-        $memberCount = DB::table('responders')
+        $memberCount = Responder::query()
             ->where('team_id', $team->team_id)
-            ->whereNull('deleted_at')
             ->count();
 
-        $activeMemberCount = DB::table('responders')
+        $activeMemberCount = Responder::query()
             ->where('team_id', $team->team_id)
-            ->whereNull('deleted_at')
             ->where(function ($query): void {
                 $query->where('is_deployed', 1)
                     ->orWhereIn('duty_status', ['on_duty', 'dispatched', 'accepted', 'en_route', 'on_scene']);
@@ -639,7 +652,9 @@ class RescueDispatchService
 
     private function getResponders(?string $eventId)
     {
-        return DB::table('responders as r')
+        return Responder::query()
+            ->withoutGlobalScopes()
+            ->from('responders as r')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'r.team_id')
             ->whereNull('r.deleted_at')
             ->orderBy('r.full_name')
@@ -695,7 +710,7 @@ class RescueDispatchService
         $statusCounts = collect();
 
         if ($eventId) {
-            $statusCounts = DB::table('responder_assignments')
+            $statusCounts = ResponderAssignment::query()
                 ->where('disaster_id', $eventId)
                 ->select('status', DB::raw('COUNT(*) as total'))
                 ->groupBy('status')
@@ -728,7 +743,9 @@ class RescueDispatchService
             return collect();
         }
 
-        $rows = DB::table('households as h')
+        $rows = Household::query()
+            ->withoutGlobalScopes()
+            ->from('households as h')
             ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->leftJoin('household_disasters as hd', function ($join) use ($eventId): void {
                 $join->on('hd.household_id', '=', 'h.household_id')
@@ -769,7 +786,7 @@ class RescueDispatchService
             ])
             ->get();
 
-        $busyHouseholdIds = DB::table('responder_assignments')
+        $busyHouseholdIds = ResponderAssignment::query()
             ->where('disaster_id', $eventId)
             ->whereNotNull('household_id')
             ->whereIn('status', $this->activeAssignmentStatuses())
@@ -823,7 +840,8 @@ class RescueDispatchService
 
     private function getDispatchActivity(?string $eventId, int $limit = 10)
     {
-        $query = DB::table('responder_assignments as ra')
+        $query = ResponderAssignment::query()
+            ->from('responder_assignments as ra')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')
             ->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')
             ->orderByDesc('ra.updated_at')
@@ -883,28 +901,27 @@ class RescueDispatchService
             'updated_at' => $now,
         ]);
 
-        $existing = DB::table('household_disasters')
+        $existing = HouseholdDisaster::query()
             ->where('disaster_id', $dispatch->disaster_id)
             ->where('household_id', $dispatch->household_id)
             ->first();
 
         if ($existing) {
-            DB::table('household_disasters')
+            HouseholdDisaster::query()
                 ->where('household_disaster_id', $existing->household_disaster_id)
                 ->update($data);
         } else {
-            DB::table('household_disasters')->insert($this->filterColumns('household_disasters', array_merge($data, [
+            HouseholdDisaster::query()->create(array_merge($data, [
                 'household_disaster_id' => $this->nextId('household_disasters', 'household_disaster_id'),
                 'household_id' => $dispatch->household_id,
                 'disaster_id' => $dispatch->disaster_id,
                 'initial_status_id' => $statusId,
                 'created_at' => $now,
-            ])));
+            ]));
         }
 
         if (Schema::hasTable('household_status_logs')) {
-            DB::table('household_status_logs')->insert($this->filterColumns('household_status_logs', [
-                'status_log_id' => $this->nextId('household_status_logs', 'status_log_id'),
+            HouseholdStatusLog::query()->create([
                 'disaster_id' => $dispatch->disaster_id,
                 'household_id' => $dispatch->household_id,
                 'status_id' => $statusId,
@@ -915,7 +932,7 @@ class RescueDispatchService
                 'submitted_at' => $now,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]));
+            ]);
         }
     }
 
@@ -949,7 +966,7 @@ class RescueDispatchService
             default => [$statusKey],
         };
 
-        return DB::table('household_statuses')
+        return HouseholdStatus::query()
             ->whereIn('status_key', $candidates)
             ->orderByRaw('CASE '.collect($candidates)->map(fn (string $key, int $index): string => 'WHEN status_key = ? THEN '.$index)->implode(' ').' ELSE 999 END', $candidates)
             ->value('status_id');
@@ -957,7 +974,7 @@ class RescueDispatchService
 
     private function getRoute(int $assignmentId): ?array
     {
-        $route = DB::table('responder_routes')
+        $route = ResponderRoute::query()
             ->where('assignment_id', $assignmentId)
             ->orderByDesc('created_at')
             ->first();
@@ -966,7 +983,7 @@ class RescueDispatchService
             return null;
         }
 
-        $coordinates = DB::table('route_coordinates')
+        $coordinates = RouteCoordinate::query()
             ->where('route_id', $route->route_id)
             ->orderBy('sequence_order')
             ->get(['latitude', 'longitude', 'sequence_order', 'recorded_at', 'accuracy_m']);
@@ -983,7 +1000,7 @@ class RescueDispatchService
 
     private function saveRouteCoordinate(int $assignmentId, array $validated, Carbon $now): void
     {
-        $route = DB::table('responder_routes')
+        $route = ResponderRoute::query()
             ->where('assignment_id', $assignmentId)
             ->orderByDesc('created_at')
             ->first();
@@ -991,7 +1008,7 @@ class RescueDispatchService
         if (! $route) {
             $routeId = $this->nextId('responder_routes', 'route_id');
 
-            DB::table('responder_routes')->insert([
+            ResponderRoute::query()->create([
                 'route_id' => $routeId,
                 'assignment_id' => $assignmentId,
                 'route_name' => 'Responder mobile route',
@@ -1010,9 +1027,9 @@ class RescueDispatchService
             $route = (object) ['route_id' => $routeId];
         }
 
-        $nextOrder = ((int) DB::table('route_coordinates')->where('route_id', $route->route_id)->max('sequence_order')) + 1;
+        $nextOrder = ((int) RouteCoordinate::query()->where('route_id', $route->route_id)->max('sequence_order')) + 1;
 
-        DB::table('route_coordinates')->insert([
+        RouteCoordinate::query()->create([
             'coordinate_id' => $this->nextId('route_coordinates', 'coordinate_id'),
             'route_id' => $route->route_id,
             'latitude' => $validated['latitude'],
@@ -1037,7 +1054,7 @@ class RescueDispatchService
             return null;
         }
 
-        $leaderId = DB::table('rescue_teams')
+        $leaderId = RescueTeam::query()
             ->where('team_id', $validated['team_id'])
             ->value('leader_responder_id');
 
@@ -1075,10 +1092,9 @@ class RescueDispatchService
             return;
         }
 
-        $validCount = DB::table('responders')
+        $validCount = Responder::query()
             ->whereIn('responder_id', $responderIds)
             ->where('team_id', $teamId)
-            ->whereNull('deleted_at')
             ->count();
 
         if ($validCount === count($responderIds)) {
@@ -1098,7 +1114,7 @@ class RescueDispatchService
             return;
         }
 
-        $responder = DB::table('responders')
+        $responder = Responder::query()
             ->where('user_id', $request->user()?->user_id)
             ->orWhere('username', $request->user()?->username)
             ->first();
@@ -1115,7 +1131,7 @@ class RescueDispatchService
         $isActive = in_array($status, ['accepted', 'dispatched', 'en_route', 'on_scene'], true);
         $now = now();
 
-        DB::table('responders')
+        Responder::query()
             ->where('responder_id', $responderId)
             ->update([
                 'is_deployed' => $isActive,
@@ -1125,7 +1141,7 @@ class RescueDispatchService
             ]);
 
         if ($teamId) {
-            DB::table('rescue_teams')
+            RescueTeam::query()
                 ->where('team_id', $teamId)
                 ->update([
                     'duty_status' => $isActive ? $status : 'standby',
@@ -1164,7 +1180,7 @@ class RescueDispatchService
             return null;
         }
 
-        return DB::table('responder_assignments')
+        return ResponderAssignment::query()
             ->where('responder_id', $responderId)
             ->where('disaster_id', $eventId)
             ->whereIn('status', $this->activeAssignmentStatuses())
@@ -1174,8 +1190,9 @@ class RescueDispatchService
 
     private function availableResponderQuery(?string $eventId = null)
     {
-        $query = DB::table('responders as r')
-            ->whereNull('r.deleted_at');
+        $query = Responder::query()
+            ->withoutGlobalScopes()
+            ->from('responders as r');
 
         if (! $eventId) {
             return $query->where(function ($query): void {
@@ -1193,8 +1210,7 @@ class RescueDispatchService
                     ->orWhereNotIn('r.duty_status', ['deployed', 'dispatched', 'accepted', 'en_route', 'on_scene', 'off_duty']);
             })
             ->whereNotExists(function ($query) use ($eventId): void {
-                $query->select(DB::raw(1))
-                    ->from('responder_assignments as active_ra')
+                $query->from('responder_assignments as active_ra')
                     ->whereColumn('active_ra.responder_id', 'r.responder_id')
                     ->where('active_ra.disaster_id', $eventId)
                     ->whereIn('active_ra.status', $this->activeAssignmentStatuses());
@@ -1239,9 +1255,8 @@ class RescueDispatchService
             return;
         }
 
-        $householdExists = DB::table('households')
+        $householdExists = Household::query()
             ->where('household_id', $householdId)
-            ->whereNull('deleted_at')
             ->exists();
 
         if (! $householdExists) {
@@ -1250,7 +1265,7 @@ class RescueDispatchService
             ]);
         }
 
-        $hasGeotag = DB::table('geotagged_locations')
+        $hasGeotag = GeotaggedLocation::query()
             ->where('household_id', $householdId)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
@@ -1262,7 +1277,7 @@ class RescueDispatchService
             ]);
         }
 
-        $activeAssignment = DB::table('responder_assignments')
+        $activeAssignment = ResponderAssignment::query()
             ->where('household_id', $householdId)
             ->where('disaster_id', $eventId)
             ->whereIn('status', $this->activeAssignmentStatuses())
@@ -1316,7 +1331,7 @@ class RescueDispatchService
 
         $selectedResponders = empty($selectedResponderIds)
             ? ($current['selected_responders'] ?? [])
-            : DB::table('responders')
+            : Responder::query()
                 ->whereIn('responder_id', $selectedResponderIds)
                 ->orderBy('full_name')
                 ->pluck('full_name')
@@ -1417,20 +1432,10 @@ class RescueDispatchService
 
     private function getActiveEvent(): ?object
     {
-        return DB::table('disaster_events as de')
-            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
-            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
-            ->whereNull('de.deleted_at')
-            ->whereNull('de.ended_at')
-            ->orderByDesc('de.started_at')
-            ->select([
-                'de.event_id',
-                'de.name',
-                'de.started_at',
-                'dt.type_name',
-                'sl.severity_key',
-                'sl.severity_label',
-            ])
+        return DisasterEvent::query()
+            ->with(['type', 'severity'])
+            ->whereNull('ended_at')
+            ->orderByDesc('started_at')
             ->first();
     }
 
@@ -1439,9 +1444,9 @@ class RescueDispatchService
         return [
             'event_id' => $event->event_id,
             'name' => $event->name,
-            'type' => $event->type_name ?? 'Disaster event',
-            'severity' => $event->severity_label ?? 'Unspecified',
-            'severity_key' => $event->severity_key ?? 'medium',
+            'type' => $event->type_name ?? $event->type?->type_name ?? 'Disaster event',
+            'severity' => $event->severity_label ?? $event->severity?->severity_label ?? 'Unspecified',
+            'severity_key' => $event->severity_key ?? $event->severity?->severity_key ?? 'medium',
             'started_at' => $this->formatDateTime($event->started_at),
             'started_time' => $this->formatTime($event->started_at),
         ];
@@ -1449,7 +1454,16 @@ class RescueDispatchService
 
     private function nextId(string $table, string $column): int
     {
-        return ((int) DB::table($table)->lockForUpdate()->max($column)) + 1;
+        $query = match ($table) {
+            'responder_assignments' => ResponderAssignment::query(),
+            'responder_location_logs' => ResponderLocationLog::query(),
+            'household_disasters' => HouseholdDisaster::query(),
+            'responder_routes' => ResponderRoute::query(),
+            'route_coordinates' => RouteCoordinate::query(),
+            default => throw new \InvalidArgumentException('Unsupported dispatch ID table: '.$table),
+        };
+
+        return ((int) $query->lockForUpdate()->max($column)) + 1;
     }
 
     private function filterColumns(string $table, array $data): array
@@ -1484,7 +1498,7 @@ class RescueDispatchService
     private function teamResponderCount(?int $teamId, ?int $responderId): int
     {
         if ($teamId) {
-            return DB::table('responders')
+            return Responder::query()
                 ->where('team_id', $teamId)
                 ->whereNull('deleted_at')
                 ->count();
@@ -1513,7 +1527,7 @@ class RescueDispatchService
 
     private function writeAuditLog(Request $request, string $action, string $table, string $referenceId, mixed $oldValues, mixed $newValues): void
     {
-        DB::table('audit_logs')->insert([
+        AuditLog::query()->create([
             'user_id' => $request->user()?->user_id,
             'role_key' => $request->user()?->role?->role_key,
             'module' => 'rescue_dispatch',

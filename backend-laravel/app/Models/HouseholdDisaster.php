@@ -11,7 +11,7 @@ class HouseholdDisaster extends Model
 
     public $incrementing = false;
 
-    protected $fillable = ['household_id', 'disaster_id', 'initial_status_id', 'current_status_id', 'last_status_source', 'last_status_notes', 'last_reported_by_user_id', 'last_responder_id', 'last_device_token_id', 'last_latitude', 'last_longitude', 'last_battery_level', 'last_reported_at', 'needs_dispatch', 'priority_level'];
+    protected $fillable = ['household_disaster_id', 'household_id', 'disaster_id', 'initial_status_id', 'current_status_id', 'last_status_source', 'last_status_notes', 'last_reported_by_user_id', 'last_responder_id', 'last_device_token_id', 'last_latitude', 'last_longitude', 'last_battery_level', 'last_reported_at', 'needs_dispatch', 'priority_level'];
 
     protected function casts(): array
     {

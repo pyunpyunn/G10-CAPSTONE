@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
+use App\Models\Household;
+use App\Models\Responder;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -170,13 +172,18 @@ class AuthService
             return response()->json(['message' => 'The recovery answers are incorrect.'], 422);
         }
 
-        DB::table('users')->where('user_id', $user->user_id)->update(['password' => Hash::make($validated['password']), 'password_changed_at' => now(), 'must_change_password' => 0, 'updated_at' => now()]);
+        User::query()->whereKey($user->user_id)->update([
+            'password' => Hash::make($validated['password']),
+            'password_changed_at' => now(),
+            'must_change_password' => 0,
+            'updated_at' => now(),
+        ]);
         return response()->json(['message' => 'Password reset successfully. You can now sign in.']);
     }
 
     private function storeRecoveryQuestions(User $user, array $values): void
     {
-        DB::table('users')->where('user_id', $user->user_id)->update([
+        User::query()->whereKey($user->user_id)->update([
             'security_question_1' => $values['question_1'],
             'security_answer_1' => Hash::make($this->normalizeAnswer($values['answer_1'])),
             'security_question_2' => $values['question_2'],
@@ -202,83 +209,126 @@ class AuthService
 
     private function userFromResponderLogin(string $login): ?User
     {
-        $responderTable = $this->firstExistingTable(['responders', 'responder']);
-        if (! $responderTable) return null;
+        $responder = Responder::query()
+            ->where(function ($query) use ($login): void {
+                $query->where('responder_code', $login)
+                    ->orWhere('username', $login)
+                    ->orWhere('user_id', $login);
+            })
+            ->when(Schema::hasColumn('responders', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->first();
 
-        $responder = DB::table($responderTable)->where(function ($query) use ($login, $responderTable): void {
-            $this->orWhereExisting($query, $responderTable, ['responder_code', 'username', 'login_id', 'user_id'], $login);
-        })->when(Schema::hasColumn($responderTable, 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))->first();
+        if (! $responder) {
+            return null;
+        }
 
-        if (! $responder) return null;
+        $user = User::query()
+            ->where(function ($query) use ($responder): void {
+                $query->when($responder->user_id !== null, fn ($q) => $q->orWhere('user_id', $responder->user_id))
+                    ->when($responder->username !== null, fn ($q) => $q->orWhere('username', $responder->username));
+            })
+            ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->first();
 
-        $query = $this->userQuery()->where(function ($inner) use ($responder): void {
-            $this->orWhereExisting($inner, 'users', ['user_id', 'username', 'login_id', 'id'], $responder->user_id ?? $responder->username ?? $responder->login_id ?? null);
-        });
-        if (Schema::hasColumn('users', 'deleted_at')) $query->whereNull('deleted_at');
-        return $query->first();
+        return $user ?: $this->userFromSharedUserTable($responder->username ?? $responder->user_id ?? $login);
     }
 
     private function userFromSharedUserTable(string $login): ?User
     {
-        $query = $this->userQuery();
-        if (Schema::hasColumn('users', 'deleted_at')) $query->whereNull('deleted_at');
-        $query->where(function ($inner) use ($login): void {
-            $this->orWhereExisting($inner, 'users', ['username', 'login_id', 'email', 'user_id', 'id'], $login);
-            if (Schema::hasColumn('users', 'household_id')) $inner->orWhere('household_id', $login);
-        });
+        $query = User::query()
+            ->where(function ($inner) use ($login): void {
+                $inner->where('username', $login)
+                    ->orWhere('email', $login)
+                    ->orWhere('user_id', $login);
+            })
+            ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'));
+
         $user = $query->first();
+
         return $user ?: $this->userFromHouseholdIdentifier($login);
     }
 
     private function userFromHouseholdIdentifier(string $login): ?User
     {
-        $householdTable = $this->firstExistingTable(['households', 'household']);
-        if (! $householdTable || ! Schema::hasColumn('users', 'household_id')) return null;
+        if (! Schema::hasTable('households') || ! Schema::hasColumn('users', 'household_id')) {
+            return null;
+        }
 
-        $householdQuery = DB::table($householdTable);
-        if (Schema::hasColumn($householdTable, 'deleted_at')) $householdQuery->whereNull('deleted_at');
-        $householdQuery->where(function ($inner) use ($login, $householdTable): void {
-            $this->orWhereExisting($inner, $householdTable, ['household_id', 'household_code', 'household_number'], $login);
-        });
-        $householdId = $householdQuery->value('household_id');
-        if (! $householdId) return null;
+        $householdId = Household::query()
+            ->where(function ($query) use ($login): void {
+                $query->where('household_id', $login)
+                    ->orWhere('household_code', $login)
+                    ->orWhere('household_number', $login);
+            })
+            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->value('household_id');
 
-        return $this->userQuery()->where('household_id', $householdId)->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))->first();
+        if (! $householdId) {
+            return null;
+        }
+
+        return User::query()
+            ->where('household_id', $householdId)
+            ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->first();
     }
 
     private function isHouseholdAccountReady(User $user): bool
     {
-        if ($user->roleKey() !== 'household_resident') return true;
-        $householdTable = $this->firstExistingTable(['households', 'household']);
-        if (! $user->household_id || ! $householdTable) return false;
-        $query = DB::table($householdTable)->where('household_id', $user->household_id);
-        if (Schema::hasColumn($householdTable, 'deleted_at')) $query->whereNull('deleted_at');
-        return $query->exists();
+        if ($user->roleKey() !== 'household_resident') {
+            return true;
+        }
+
+        if (! $user->household_id || ! Schema::hasTable('households')) {
+            return false;
+        }
+
+        return Household::query()
+            ->whereKey($user->household_id)
+            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->exists();
     }
 
     private function isUnvalidatedResponder(User $user): bool
     {
-        if (! in_array($user->roleKey(), ['rescuer', 'responder'], true)) return false;
-        $responderTable = $this->firstExistingTable(['responders', 'responder']);
-        if (! $responderTable || ! Schema::hasColumn($responderTable, 'is_validated')) return false;
-        $query = DB::table($responderTable);
-        if (Schema::hasColumn($responderTable, 'deleted_at')) $query->whereNull('deleted_at');
-        $query->where(function ($inner) use ($responderTable, $user): void {
-            $this->orWhereExisting($inner, $responderTable, ['user_id', 'username', 'login_id'], $user->user_id ?? $user->username ?? $user->id);
-        });
-        $isValidated = $query->value('is_validated');
+        if (! in_array($user->roleKey(), ['rescuer', 'responder'], true)) {
+            return false;
+        }
+
+        if (! Schema::hasTable('responders') || ! Schema::hasColumn('responders', 'is_validated')) {
+            return false;
+        }
+
+        $isValidated = Responder::query()
+            ->where(function ($query) use ($user): void {
+                $query->where('user_id', $user->user_id)
+                    ->orWhere('username', $user->username);
+            })
+            ->when(Schema::hasColumn('responders', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->value('is_validated');
+
         return $isValidated !== null && (int) $isValidated !== 1;
     }
 
     private function databaseUnavailableResponse(): ?JsonResponse
     {
+        if (app()->runningUnitTests()) {
+            return null;
+        }
+
         $connectionName = config('database.default');
         $connection = config("database.connections.$connectionName", []);
-        $driver = $connection['driver'] ?? null;
-        if (! in_array($driver, ['mysql', 'mariadb'], true)) return null;
+        $driver = $connection['driver'] ?? DB::connection()->getDriverName();
+
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            return null;
+        }
+
         $host = (string) ($connection['host'] ?? '');
         $port = (int) ($connection['port'] ?? 3306);
-        if ($host === '') return null;
+        if ($host === '') {
+            return null;
+        }
 
         $timeout = max(1.0, (float) env('DB_CONNECTION_TIMEOUT', 5));
         $target = str_contains($host, ':') ? "tcp://[$host]:$port" : "tcp://$host:$port";
@@ -294,7 +344,10 @@ class AuthService
     private function userQuery()
     {
         $query = User::query();
-        if (Schema::hasTable('roles') && Schema::hasColumn('users', 'role_id')) $query->with('role');
+        if (Schema::hasTable('roles') && Schema::hasColumn('users', 'role_id')) {
+            $query->with('role');
+        }
+
         return $query;
     }
 

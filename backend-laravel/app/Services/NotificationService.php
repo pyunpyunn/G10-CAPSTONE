@@ -2,12 +2,17 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
+use App\Models\DisasterBroadcast;
+use App\Models\HouseholdStatusLog;
+use App\Models\Notification;
 use App\Models\ResourceRequest;
+use App\Models\ResponderAssignment;
+use App\Models\WeatherLog;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class NotificationService
@@ -133,11 +138,11 @@ class NotificationService
 
     private function outgoingNotificationRows(): array
     {
-        return DB::table('notifications')
+        return Notification::query()
             ->orderByDesc('created_at')
             ->limit(20)
             ->get()
-            ->map(function (object $row): array {
+            ->map(function (Notification $row): array {
                 $priority = $this->priorityFromUrgency($row->urgency_level_id);
 
                 return $this->notice(
@@ -155,34 +160,24 @@ class NotificationService
 
     private function householdAlertRows(): array
     {
-        return DB::table('household_status_logs as hsl')
-            ->leftJoin('households as h', 'h.household_id', '=', 'hsl.household_id')
-            ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
-            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
-            ->whereIn('hs.status_key', ['unsafe', 'injured', 'missing', 'not_evacuated', 'displaced'])
-            ->orderByDesc('hsl.submitted_at')
+        return HouseholdStatusLog::query()
+            ->with(['household.address', 'status'])
+            ->whereHas('status', fn ($query) => $query->whereIn('status_key', ['unsafe', 'injured', 'missing', 'not_evacuated', 'displaced']))
+            ->orderByDesc('submitted_at')
             ->limit(20)
-            ->get([
-                'hsl.status_log_id',
-                'hsl.submitted_at',
-                'hsl.reviewed_at',
-                'hsl.location_label',
-                'hsl.notes',
-                'h.household_name',
-                'a.purok_sitio',
-                'hs.status_label',
-            ])
-            ->map(function (object $row): array {
-                $purok = $row->purok_sitio ?: 'unassigned area';
-                $household = $row->household_name ?: 'Household';
-                $status = $row->status_label ?: 'Unsafe';
+            ->get()
+            ->map(function (HouseholdStatusLog $row): array {
+                $household = $row->household;
+                $purok = $household?->address?->purok_sitio ?: 'unassigned area';
+                $householdName = $household?->household_name ?: 'Household';
+                $status = $row->status?->status_label ?: 'Unsafe';
 
                 return $this->notice(
                     'household-'.$row->status_log_id,
                     'Household status',
                     'Critical',
                     $status.' household report from '.$purok,
-                    $household.' reported '.$status.'. '.($row->notes ?: $row->location_label ?: 'HQ review is required.'),
+                    $householdName.' reported '.$status.'. '.($row->notes ?: $row->location_label ?: 'HQ review is required.'),
                     $row->submitted_at,
                     (bool) $row->reviewed_at
                 );
@@ -192,24 +187,13 @@ class NotificationService
 
     private function dispatchRows(): array
     {
-        return DB::table('responder_assignments as ra')
-            ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')
-            ->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')
-            ->orderByDesc('ra.assigned_at')
+        return ResponderAssignment::query()
+            ->with(['team', 'responder'])
+            ->orderByDesc('assigned_at')
             ->limit(20)
-            ->get([
-                'ra.assignment_id',
-                'ra.assignment_code',
-                'ra.assigned_area',
-                'ra.priority_level',
-                'ra.status',
-                'ra.assigned_at',
-                'ra.completed_at',
-                'rt.team_name',
-                'r.full_name as responder_name',
-            ])
-            ->map(function (object $row): array {
-                $team = $row->team_name ?: $row->responder_name ?: 'Responder team';
+            ->get()
+            ->map(function (ResponderAssignment $row): array {
+                $team = $row->team?->team_name ?: $row->responder?->full_name ?: 'Responder team';
                 $priority = in_array($row->priority_level, ['high', 'critical', 'urgent'], true) ? 'High' : 'Medium';
                 $read = in_array($row->status, ['completed', 'cancelled'], true) || (bool) $row->completed_at;
 
@@ -232,7 +216,7 @@ class NotificationService
             ->orderByDesc('created_at')
             ->limit(20)
             ->get()
-            ->map(function (object $row): array {
+            ->map(function (ResourceRequest $row): array {
                 $priority = $row->validation_status === 'needs_validation' ? 'Medium' : 'Normal';
                 $item = $row->item_name ?: $row->resource_type ?: 'Request';
                 $read = ! in_array($row->validation_status, ['needs_validation', 'returned'], true);
@@ -252,12 +236,12 @@ class NotificationService
 
     private function weatherRows(): array
     {
-        return DB::table('weather_logs')
+        return WeatherLog::query()
             ->orderByDesc('observed_at')
             ->orderByDesc('created_at')
             ->limit(10)
             ->get()
-            ->map(function (object $row): array {
+            ->map(function (WeatherLog $row): array {
                 $text = strtolower(trim(($row->condition_name ?? '').' '.($row->advisory_title ?? '').' '.($row->advisory_text ?? '')));
                 $isCritical = str_contains($text, 'storm') || str_contains($text, 'heavy') || str_contains($text, 'flood');
 
@@ -276,22 +260,14 @@ class NotificationService
 
     private function broadcastRows(): array
     {
-        return DB::table('disaster_broadcasts as db')
-            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'db.severity_id')
-            ->orderByDesc('db.sent_at')
+        return DisasterBroadcast::query()
+            ->with('severity')
+            ->orderByDesc('sent_at')
             ->limit(20)
-            ->get([
-                'db.broadcast_id',
-                'db.broadcast_title',
-                'db.message',
-                'db.scope_type',
-                'db.status',
-                'db.sent_at',
-                'sl.severity_key',
-                'sl.severity_label',
-            ])
-            ->map(function (object $row): array {
-                $priority = in_array($row->severity_key, ['high', 'critical', 'severe'], true) ? 'Critical' : 'High';
+            ->get()
+            ->map(function (DisasterBroadcast $row): array {
+                $severityKey = $row->severity?->severity_key ?? null;
+                $priority = in_array($severityKey, ['high', 'critical', 'severe'], true) ? 'Critical' : 'High';
 
                 return $this->notice(
                     'broadcast-'.$row->broadcast_id,
@@ -312,12 +288,12 @@ class NotificationService
             return [];
         }
 
-        return DB::table('audit_logs')
+        return AuditLog::query()
             ->where('module', '<>', 'notifications')
             ->orderByDesc('created_at')
             ->limit(12)
             ->get()
-            ->map(fn (object $row): array => $this->notice(
+            ->map(fn (AuditLog $row): array => $this->notice(
                 'audit-'.$row->audit_log_id,
                 'System activity',
                 'Normal',
@@ -384,7 +360,7 @@ class NotificationService
             ];
         }
 
-        $rows = DB::table('audit_logs')
+        $rows = AuditLog::query()
             ->where('user_id', $request->user()->user_id)
             ->where('module', 'notifications')
             ->whereIn('action', ['mark_read', 'delete_selected', 'clear_all'])
@@ -396,7 +372,7 @@ class NotificationService
         $clearAllTime = null;
 
         foreach ($rows as $row) {
-            $values = $this->decodeJson($row->new_values);
+            $values = $this->decodeJson($row->new_values ?? null);
             $time = Carbon::parse($row->created_at)->timestamp;
 
             if ($row->action === 'mark_read') {
@@ -433,9 +409,13 @@ class NotificationService
         ];
     }
 
-    private function decodeJson(?string $value): array
+    private function decodeJson(mixed $value): array
     {
-        if (! $value) {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (! is_string($value) || $value === '') {
             return [];
         }
 
@@ -524,7 +504,7 @@ class NotificationService
         };
     }
 
-    private function notificationTitle(object $row): string
+    private function notificationTitle(Notification $row): string
     {
         $status = $row->status ? $this->label($row->status) : 'Saved';
 
@@ -555,7 +535,7 @@ class NotificationService
             return;
         }
 
-        DB::table('audit_logs')->insert([
+        AuditLog::query()->create([
             'user_id' => $request->user()?->user_id,
             'role_key' => $request->user()?->role?->role_key,
             'module' => 'notifications',
@@ -563,7 +543,7 @@ class NotificationService
             'reference_table' => 'notifications',
             'reference_id' => 'hq-view',
             'old_values' => null,
-            'new_values' => json_encode($values, JSON_UNESCAPED_SLASHES),
+            'new_values' => $values,
             'ip_address' => $request->ip(),
             'user_agent' => substr((string) $request->userAgent(), 0, 255),
             'created_at' => now(),
