@@ -46,6 +46,12 @@ return [
         'base_url' => env('ONESIGNAL_BASE_URL', 'https://api.onesignal.com'),
     ],
 
+    'semaphore' => [
+        'api_key' => env('SEMAPHORE_API_KEY'),
+        'sender_name' => env('SEMAPHORE_SENDER_NAME', 'ResQperation'),
+        'inbound_secret' => env('SEMAPHORE_INBOUND_SECRET'),
+    ],
+
     'trackingaid' => [
         'connection' => env('TRACKINGAID_DB_CONNECTION_NAME', 'trackingaid'),
         'forward_table' => env('TRACKINGAID_FORWARD_TABLE', 'resqperation_forwarded_requests'),

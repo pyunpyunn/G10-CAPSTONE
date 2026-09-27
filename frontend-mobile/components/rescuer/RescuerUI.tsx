@@ -24,12 +24,12 @@ export function ActionButton({ label, icon, tone = 'primary', disabled = false, 
   );
 }
 
-export function StatusBadge({ label, tone = 'neutral' }: { label: string; tone?: string }) {
+export function StatusBadge({ label, tone = 'neutral', textColor }: { label: string; tone?: string; textColor?: string }) {
   const color = toneColor(tone);
 
   return (
     <View style={[styles.badge, { backgroundColor: `${color}18`, borderColor: `${color}55` }]}>
-      <Text style={[styles.badgeText, { color }]}>{label}</Text>
+      <Text style={[styles.badgeText, { color: textColor || color }]}>{label}</Text>
     </View>
   );
 }

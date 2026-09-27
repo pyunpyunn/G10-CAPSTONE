@@ -64,7 +64,7 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
             @{user.username || 'username'} · {responder.responder_code || 'No account ID'} · {responder.team_name || 'No team'}
           </Text>
         </View>
-        <StatusBadge label={responder.duty_status || 'Stand-by'} tone={responder.duty_status || 'neutral'} />
+        <StatusBadge label={responder.duty_status || 'Stand-by'} tone={responder.duty_status || 'neutral'} textColor="#ffffff" />
       </View>
 
       <View style={styles.card}>
@@ -76,25 +76,30 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
             </Pressable>
           }
         />
-        <InfoRow label="Account ID" value={responder.responder_code || 'Not recorded'} />
-        <InfoRow label="Username" value={user.username ? `@${user.username}` : 'Not recorded'} />
-        <InfoRow label="Role" value={user.role?.role_name || 'Rescuer'} />
-        <InfoRow label="Email" value={user.email || 'Not recorded'} />
-        <InfoRow label="Mobile" value={user.contact_number || responder.contact_number || 'Not recorded'} />
+        <InfoRow icon="card-outline" label="Account ID" value={responder.responder_code || 'Not recorded'} />
+        <InfoRow icon="at-outline" label="Username" value={user.username ? `@${user.username}` : 'Not recorded'} />
+        <InfoRow icon="shield-checkmark-outline" label="Role" value={user.role?.role_name || 'Rescuer'} />
+        <InfoRow icon="mail-outline" label="Email" value={user.email || 'Not recorded'} />
+        <InfoRow icon="call-outline" label="Mobile" value={user.contact_number || responder.contact_number || 'Not recorded'} />
       </View>
 
       {isEditing ? (
         <View style={styles.card}>
           <SectionHeader title="Edit profile" />
           <View style={styles.formGrid}>
+            <Text style={styles.formSectionTitle}>Identity</Text>
             <ProfileInput label="Username" value={form.username} onChangeText={(value) => updateForm(setForm, 'username', value)} />
             <ProfileInput label="First name" value={form.first_name} onChangeText={(value) => updateForm(setForm, 'first_name', value)} />
             <ProfileInput label="MI" value={form.middle_initial} onChangeText={(value) => updateForm(setForm, 'middle_initial', value)} />
             <ProfileInput label="Last name" value={form.last_name} onChangeText={(value) => updateForm(setForm, 'last_name', value)} />
+
+            <Text style={styles.formSectionTitle}>Contact</Text>
             <ProfileInput label="Email" value={form.email} onChangeText={(value) => updateForm(setForm, 'email', value)} keyboardType="email-address" />
             <ProfileInput label="Mobile" value={form.contact_number} onChangeText={(value) => updateForm(setForm, 'contact_number', value)} keyboardType="phone-pad" />
             <ProfileInput label="Emergency contact name" value={form.emergency_contact_name} onChangeText={(value) => updateForm(setForm, 'emergency_contact_name', value)} />
             <ProfileInput label="Emergency contact mobile" value={form.emergency_contact_number} onChangeText={(value) => updateForm(setForm, 'emergency_contact_number', value)} keyboardType="phone-pad" />
+
+            <Text style={styles.formSectionTitle}>Field readiness</Text>
             <ProfileInput label="Blood type" value={form.blood_type} onChangeText={(value) => updateForm(setForm, 'blood_type', value)} />
             <ProfileInput label="Address" value={form.address} onChangeText={(value) => updateForm(setForm, 'address', value)} multiline />
             <ProfileInput label="Skills" value={form.skills} onChangeText={(value) => updateForm(setForm, 'skills', value)} multiline />
@@ -108,17 +113,17 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
 
       <View style={styles.card}>
         <SectionHeader title="Responder details" />
-        <InfoRow label="Team" value={responder.team_name || 'Unassigned'} />
-        <InfoRow label="Team code" value={responder.team_code || 'Not recorded'} />
-        <InfoRow label="Title" value={responder.title || 'Responder'} />
-        <InfoRow label="Blood type" value={responder.blood_type || 'Unknown'} />
-        <InfoRow label="Skills" value={responder.skills || 'Not recorded'} />
+        <InfoRow icon="people-outline" label="Team" value={responder.team_name || 'Unassigned'} />
+        <InfoRow icon="key-outline" label="Team code" value={responder.team_code || 'Not recorded'} />
+        <InfoRow icon="briefcase-outline" label="Title" value={responder.title || 'Responder'} />
+        <InfoRow icon="water-outline" label="Blood type" value={responder.blood_type || 'Unknown'} />
+        <InfoRow icon="construct-outline" label="Skills" value={responder.skills || 'Not recorded'} />
       </View>
 
       <View style={styles.card}>
         <SectionHeader title="Emergency contact" />
-        <InfoRow label="Name" value={responder.emergency_contact_name || 'Not recorded'} />
-        <InfoRow label="Mobile" value={responder.emergency_contact_number || 'Not recorded'} />
+        <InfoRow icon="person-outline" label="Name" value={responder.emergency_contact_name || 'Not recorded'} />
+        <InfoRow icon="call-outline" label="Mobile" value={responder.emergency_contact_number || 'Not recorded'} />
       </View>
 
       <ActionButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
@@ -155,12 +160,14 @@ function ProfileInput({
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
+      <View style={styles.infoLabelWrap}>
+        <Ionicons name={icon} size={16} color={palette.navActive} />
+        <Text style={styles.infoLabel}>{label}</Text>
+      </View>
       <View style={styles.infoValueWrap}>
-        <Ionicons name="ellipse" size={6} color={palette.navMuted} />
         <Text style={styles.infoValue}>{value}</Text>
       </View>
     </View>
@@ -308,6 +315,15 @@ const styles = StyleSheet.create({
   formGrid: {
     gap: spacing.sm,
   },
+  formSectionTitle: {
+    marginTop: spacing.sm,
+    marginBottom: 2,
+    color: palette.navActive,
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   inputGroup: {
     gap: 6,
   },
@@ -350,6 +366,12 @@ const styles = StyleSheet.create({
     color: palette.textSoft,
     fontSize: 12,
     fontWeight: '800',
+  },
+  infoLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minWidth: 112,
   },
   infoValueWrap: {
     flex: 1,

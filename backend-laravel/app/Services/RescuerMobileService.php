@@ -507,7 +507,7 @@ class RescuerMobileService
 
         $validated = $request->validate([
             'location' => ['required', 'string', 'min:3', 'max:255'],
-            'cluster' => ['nullable', 'string', 'max:100'],
+            'cluster' => [Rule::requiredIf(fn () => in_array($request->input('request_category'), ['personnel', 'vehicle'], true)), 'nullable', 'string', 'max:100'],
             'request_category' => ['required', Rule::in(['resource', 'personnel', 'vehicle'])],
             'resource_type' => ['required', 'string', 'min:2', 'max:100'],
             'item_name' => ['nullable', 'string', 'max:150'],
@@ -517,6 +517,7 @@ class RescuerMobileService
             'urgency_key' => ['required', Rule::in(['low', 'medium', 'high', 'urgent', 'critical'])],
         ], [
             'location.required' => 'Location is required.',
+            'cluster.required' => 'Purok or cluster is required for personnel and vehicle requests.',
             'request_category.required' => 'Request type is required.',
             'resource_type.required' => 'Need/category is required.',
             'quantity.required' => 'Quantity is required.',

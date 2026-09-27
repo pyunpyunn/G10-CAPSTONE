@@ -31,10 +31,14 @@ export function ResourceRequestScreen({
   const [resourceType, setResourceType] = useState('');
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [personnelCount, setPersonnelCount] = useState('');
   const [unit, setUnit] = useState('');
   const [urgencyKey, setUrgencyKey] = useState('medium');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const isPersonnelRequest = requestCategory === 'personnel';
+  const isVehicleRequest = requestCategory === 'vehicle';
+  const needsCluster = isPersonnelRequest || isVehicleRequest;
 
   async function handleSubmit() {
     const cleanLocation = location.trim();
@@ -44,18 +48,29 @@ export function ResourceRequestScreen({
     const cleanUnit = unit.trim();
     const cleanDescription = description.trim();
     const quantityValue = Number(quantity.trim());
+    const personnelCountValue = Number(personnelCount.trim());
 
-    if (!cleanLocation || !cleanResourceType || !quantity.trim()) {
+    if (!cleanLocation || !cleanResourceType || !quantity.trim() || (needsCluster && !cleanCluster)) {
+      if (needsCluster && !cleanCluster) {
+        Alert.alert('Missing Purok / cluster', 'Enter the Purok or cluster where assistance is needed.');
+        return;
+      }
+
       Alert.alert('Missing request details', 'Enter location, need type, and quantity.');
       return;
     }
 
-    if (!Number.isInteger(quantityValue) || quantityValue < 1) {
+    if (!isPersonnelRequest && (!Number.isInteger(quantityValue) || quantityValue < 1)) {
       Alert.alert('Invalid quantity', 'Quantity must be a whole number greater than zero.');
       return;
     }
 
-    if (!cleanUnit) {
+    if (isPersonnelRequest && (!Number.isInteger(personnelCountValue) || personnelCountValue < 1)) {
+      Alert.alert('Invalid personnel count', 'Enter the whole number of rescuers needed.');
+      return;
+    }
+
+    if (!isPersonnelRequest && !cleanUnit) {
       Alert.alert('Missing unit', 'Enter the unit, such as packs, kits, liters, or persons.');
       return;
     }
@@ -73,9 +88,9 @@ export function ResourceRequestScreen({
         cluster: cleanCluster,
         request_category: requestCategory,
         resource_type: cleanResourceType,
-        item_name: cleanItemName,
-        quantity: quantityValue,
-        unit: cleanUnit,
+        item_name: isPersonnelRequest || isVehicleRequest ? null : cleanItemName,
+        quantity: isPersonnelRequest ? personnelCountValue : quantityValue,
+        unit: isPersonnelRequest ? 'persons' : isVehicleRequest ? 'vehicles' : cleanUnit,
         urgency_key: urgencyKey,
         description: cleanDescription,
       });
@@ -85,6 +100,7 @@ export function ResourceRequestScreen({
       setResourceType('');
       setItemName('');
       setQuantity('1');
+      setPersonnelCount('');
       setUnit('');
       setUrgencyKey('medium');
       setDescription('');
@@ -124,58 +140,128 @@ export function ResourceRequestScreen({
           style={styles.input}
           value={cluster}
           onChangeText={setCluster}
-          placeholder="Purok / cluster"
+          placeholder={needsCluster ? 'Purok / cluster (required)' : 'Purok / cluster'}
           placeholderTextColor="#7d8da0"
         />
 
-        <View style={styles.twoColumn}>
-          <TextInput
-            style={[styles.input, styles.flexInput]}
-            value={resourceType}
-            onChangeText={setResourceType}
-            placeholder="Need type"
-            placeholderTextColor="#7d8da0"
-          />
-          <TextInput
-            style={[styles.input, styles.flexInput]}
-            value={itemName}
-            onChangeText={setItemName}
-            placeholder="Item name"
-            placeholderTextColor="#7d8da0"
-          />
-        </View>
+        {isPersonnelRequest ? (
+          <>
+            <TextInput
+              style={styles.input}
+              value={resourceType}
+              onChangeText={setResourceType}
+              placeholder="Type of rescuer needed"
+              placeholderTextColor="#7d8da0"
+            />
 
-        <View style={styles.twoColumn}>
-          <TextInput
-            style={[styles.input, styles.flexInput]}
-            value={quantity}
-            onChangeText={setQuantity}
-            placeholder="Quantity"
-            placeholderTextColor="#7d8da0"
-            keyboardType="number-pad"
-          />
-          <TextInput
-            style={[styles.input, styles.flexInput]}
-            value={unit}
-            onChangeText={setUnit}
-            placeholder="Unit"
-            placeholderTextColor="#7d8da0"
-          />
-        </View>
+            <TextInput
+              style={styles.input}
+              value={personnelCount}
+              onChangeText={setPersonnelCount}
+              placeholder="Number of personnel needed"
+              placeholderTextColor="#7d8da0"
+              keyboardType="number-pad"
+            />
 
-        <View style={styles.chipRow}>
-          {['low', 'medium', 'high', 'urgent'].map((urgency) => (
-            <Pressable
-              key={urgency}
-              style={[styles.chip, urgencyKey === urgency && styles.chipActive]}
-              onPress={() => setUrgencyKey(urgency)}
-            >
-              <Text style={[styles.chipText, urgencyKey === urgency && styles.chipTextActive]}>
-                {labelize(urgency)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+            <View style={styles.chipRow}>
+              {['low', 'medium', 'high', 'urgent'].map((urgency) => (
+                <Pressable
+                  key={urgency}
+                  style={[styles.chip, urgencyKey === urgency && styles.chipActive]}
+                  onPress={() => setUrgencyKey(urgency)}
+                >
+                  <Text style={[styles.chipText, urgencyKey === urgency && styles.chipTextActive]}>
+                    {labelize(urgency)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : isVehicleRequest ? (
+          <>
+            <TextInput
+              style={styles.input}
+              value={resourceType}
+              onChangeText={setResourceType}
+              placeholder="Vehicle type"
+              placeholderTextColor="#7d8da0"
+            />
+
+            <TextInput
+              style={styles.input}
+              value={quantity}
+              onChangeText={setQuantity}
+              placeholder="Quantity"
+              placeholderTextColor="#7d8da0"
+              keyboardType="number-pad"
+            />
+
+            <View style={styles.chipRow}>
+              {['low', 'medium', 'high', 'urgent'].map((urgency) => (
+                <Pressable
+                  key={urgency}
+                  style={[styles.chip, urgencyKey === urgency && styles.chipActive]}
+                  onPress={() => setUrgencyKey(urgency)}
+                >
+                  <Text style={[styles.chipText, urgencyKey === urgency && styles.chipTextActive]}>
+                    {labelize(urgency)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.twoColumn}>
+              <TextInput
+                style={[styles.input, styles.flexInput]}
+                value={resourceType}
+                onChangeText={setResourceType}
+                placeholder="Need type"
+                placeholderTextColor="#7d8da0"
+              />
+              <TextInput
+                style={[styles.input, styles.flexInput]}
+                value={itemName}
+                onChangeText={setItemName}
+                placeholder="Item name"
+                placeholderTextColor="#7d8da0"
+              />
+            </View>
+
+            <View style={styles.twoColumn}>
+              <TextInput
+                style={[styles.input, styles.flexInput]}
+                value={quantity}
+                onChangeText={setQuantity}
+                placeholder="Quantity"
+                placeholderTextColor="#7d8da0"
+                keyboardType="number-pad"
+              />
+              <TextInput
+                style={[styles.input, styles.flexInput]}
+                value={unit}
+                onChangeText={setUnit}
+                placeholder="Unit"
+                placeholderTextColor="#7d8da0"
+              />
+            </View>
+
+            <View style={styles.chipRow}>
+              {['low', 'medium', 'high', 'urgent'].map((urgency) => (
+                <Pressable
+                  key={urgency}
+                  style={[styles.chip, urgencyKey === urgency && styles.chipActive]}
+                  onPress={() => setUrgencyKey(urgency)}
+                >
+                  <Text style={[styles.chipText, urgencyKey === urgency && styles.chipTextActive]}>
+                    {labelize(urgency)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
 
         <TextInput
           style={[styles.input, styles.textArea]}

@@ -31,8 +31,7 @@ export function RescuerDashboardScreen({
       <View style={styles.identityCard}>
         <View style={styles.identityTop}>
           <View style={styles.identityText}>
-            <Text style={styles.kicker}>Field console</Text>
-            <Text style={styles.name}>{responder.full_name || profile.user?.full_name || 'Responder'}</Text>
+            <Text style={styles.kicker}>Emergency event</Text>
             <Text style={styles.meta}>
               {responder.responder_code || profile.user?.username || 'Mobile account'} ·{' '}
               {responder.team_name || 'No team assigned'}
@@ -44,8 +43,8 @@ export function RescuerDashboardScreen({
         </View>
 
         {activeEvent ? (
-          <View style={styles.eventStrip}>
-            <Ionicons name="warning-outline" size={18} color={palette.warning} />
+          <View style={[styles.eventStrip, styles.activeEventStrip]}>
+            <Ionicons name="warning" size={24} color={palette.warning} />
             <View style={styles.eventCopy}>
               <Text style={styles.eventTitle}>{activeEvent.name}</Text>
               <Text style={styles.eventMeta}>
@@ -186,14 +185,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-  name: {
-    marginTop: 4,
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: '900',
-  },
   meta: {
-    marginTop: 3,
+    marginTop: 6,
     color: palette.navMuted,
     fontSize: 13,
     fontWeight: '700',
@@ -207,12 +200,17 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: '#ffffff12',
   },
+  activeEventStrip: {
+    borderWidth: 1,
+    borderColor: `${palette.warning}88`,
+    backgroundColor: `${palette.warning}20`,
+  },
   eventCopy: {
     flex: 1,
   },
   eventTitle: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '900',
   },
   eventMeta: {

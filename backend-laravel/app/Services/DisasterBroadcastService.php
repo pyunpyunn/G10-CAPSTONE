@@ -20,7 +20,10 @@ use Illuminate\Validation\ValidationException;
 
 class DisasterBroadcastService
 {
-    public function __construct(private OneSignalNotificationService $oneSignal) {}
+    public function __construct(
+        private OneSignalNotificationService $oneSignal,
+        private SmsGatewayService $smsGateway,
+    ) {}
 
     public function index(): JsonResponse
     {
@@ -197,15 +200,45 @@ class DisasterBroadcastService
 
         $pushResult = $this->sendBroadcastPush($broadcastId, $validated, $metadata, $event);
         $this->updateBroadcastPushStatus($broadcastId, $pushResult);
+        $smsResult = $this->sendBroadcastSms($validated, $metadata);
+        $this->updateBroadcastSmsStatus($broadcastId, $smsResult);
 
         return response()->json([
-            'message' => $this->broadcastSaveMessage($pushResult),
+            'message' => $this->broadcastSaveMessage($pushResult, $smsResult),
             'data' => [
                 'broadcast' => $this->findBroadcast($broadcastId),
                 'broadcasts' => $this->getBroadcastsForEvent($event->event_id),
                 'push_delivery' => $pushResult,
+                'sms_delivery' => $smsResult,
             ],
         ], 201);
+    }
+
+    private function sendBroadcastSms(array $validated, array $metadata): array
+    {
+        if ($validated['scope_type'] === 'rescuers_only') {
+            return ['status' => 'skipped', 'recipient_count' => 0, 'sent_count' => 0,
+                'provider_ids' => [], 'message' => 'SMS targets households only.', 'errors' => []];
+        }
+
+        $puroks = in_array($validated['scope_type'], ['selected_puroks', 'local_direct_impact'], true)
+            ? collect($metadata['puroks'])->pluck('name')->filter()->values()->all()
+            : [];
+
+        return $this->smsGateway->sendBroadcastSms(
+            $validated['broadcast_title'].': '.$validated['message'],
+            ['household_puroks' => $puroks]
+        );
+    }
+
+    private function updateBroadcastSmsStatus(int $broadcastId, array $result): void
+    {
+        if (Schema::hasTable('disaster_broadcasts') && Schema::hasColumn('disaster_broadcasts', 'sms_status')) {
+            DisasterBroadcast::query()->where('broadcast_id', $broadcastId)->update([
+                'sms_status' => 'semaphore_'.$result['status'],
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     private function sendBroadcastPush(int $broadcastId, array $validated, array $metadata, object $event): array
@@ -252,15 +285,17 @@ class DisasterBroadcastService
             ]));
     }
 
-    private function broadcastSaveMessage(array $pushResult): string
+    private function broadcastSaveMessage(array $pushResult, array $smsResult): string
     {
-        return match ($pushResult['status']) {
+        $pushMessage = match ($pushResult['status']) {
             'sent' => 'Broadcast saved and sent through OneSignal to '.$pushResult['sent_count'].' device(s).',
             'partial' => 'Broadcast saved. OneSignal sent to '.$pushResult['sent_count'].' of '.$pushResult['recipient_count'].' device(s).',
             'no_recipients' => 'Broadcast saved, but no OneSignal-ready mobile devices were found.',
             'not_configured' => 'Broadcast saved, but OneSignal credentials are not configured.',
             default => 'Broadcast saved, but OneSignal delivery failed. Check backend logs and OneSignal credentials.',
         };
+
+        return $pushMessage.' SMS: '.$smsResult['status'].'.';
     }
 
     private function validateBroadcast(Request $request): array
@@ -454,6 +489,7 @@ class DisasterBroadcastService
             'attached_evacuation_center_id',
             'attached_affected_area_ids_json',
             'evacuation_route_json',
+            'sms_status',
         ] as $column) {
             if (Schema::hasColumn('disaster_broadcasts', $column)) {
                 $columns[] = 'disaster_broadcasts.'.$column;
@@ -606,6 +642,7 @@ class DisasterBroadcastService
             'message' => $broadcast->message,
             'channel' => $broadcast->channel,
             'push_status' => $broadcast->push_status ?? null,
+            'sms_status' => $broadcast->sms_status ?? null,
             'status' => $broadcast->status,
             'sent_at' => $this->formatDateTime($broadcast->sent_at),
             'sent_time' => $this->formatTime($broadcast->sent_at),
