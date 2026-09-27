@@ -12,9 +12,47 @@ export type PushRegistration = {
 let oneSignalReady = false;
 let unsupportedNoticeShown = false;
 let settingsNoticeShown = false;
+const broadcastListeners = new Set<() => void>();
 
-export async function configureNotificationHandler() {
+export function subscribeToBroadcastNotifications(listener: () => void) {
+  broadcastListeners.add(listener);
+
+  return () => {
+    broadcastListeners.delete(listener);
+  };
+}
+
+export async function configureNotificationHandler(onBroadcastOpened?: () => void) {
   await initializeOneSignal();
+
+  if (!oneSignalReady) {
+    return () => undefined;
+  }
+
+  const { OneSignal } = await import('react-native-onesignal');
+  const onForeground = (event: { notification: { additionalData?: object } }) => {
+    if (isDisasterBroadcast(event.notification.additionalData)) {
+      broadcastListeners.forEach((listener) => listener());
+    }
+  };
+  const onClick = (event: { notification: { additionalData?: object } }) => {
+    if (isDisasterBroadcast(event.notification.additionalData)) {
+      broadcastListeners.forEach((listener) => listener());
+      onBroadcastOpened?.();
+    }
+  };
+
+  OneSignal.Notifications.addEventListener('foregroundWillDisplay', onForeground);
+  OneSignal.Notifications.addEventListener('click', onClick);
+
+  return () => {
+    OneSignal.Notifications.removeEventListener('foregroundWillDisplay', onForeground);
+    OneSignal.Notifications.removeEventListener('click', onClick);
+  };
+}
+
+function isDisasterBroadcast(data?: object) {
+  return (data as { type?: string } | undefined)?.type === 'disaster_broadcast';
 }
 
 export async function getPushRegistration(externalUserId?: string): Promise<PushRegistration> {
