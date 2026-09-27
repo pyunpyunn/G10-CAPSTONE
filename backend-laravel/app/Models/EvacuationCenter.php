@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\DB;
 
 class EvacuationCenter extends Model
 {
-    use SoftDeletes;
     protected $table = 'evacuation_centers';
     protected $primaryKey = 'evacuation_center_id';
     public $incrementing = false;

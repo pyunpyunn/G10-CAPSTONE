@@ -67,6 +67,7 @@ const modulePages = [
     kicker: 'Super Admin',
     summary: 'Review landing page inquiries and manage command-level account access.',
     superOnly: true,
+    navHidden: true,
   },
   {
     path: '/dashboard',

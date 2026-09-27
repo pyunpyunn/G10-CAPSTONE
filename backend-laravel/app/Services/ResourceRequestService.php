@@ -2,9 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
+use App\Models\DisasterEvent;
+use App\Models\EvacuationCenter;
 use App\Models\RequestValidation;
 use App\Models\ResourceRequest;
 use App\Models\ResourceRequestStatus;
+use App\Models\UrgencyLevel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -1207,7 +1211,7 @@ class ResourceRequestService
 
     private function urgencyOptions(): array
     {
-        return DB::table('urgency_levels')
+        return UrgencyLevel::query()
             ->orderBy('urgency_id')
             ->get(['urgency_id', 'urgency_key', 'urgency_label'])
             ->map(fn (object $row): array => [
@@ -1221,15 +1225,16 @@ class ResourceRequestService
 
     private function evacuationCenters(): array
     {
-        return DB::table('evacuation_centers')
-            ->leftJoin('disaster_events as de', 'de.event_id', '=', 'evacuation_centers.current_event_id')
-            ->whereNull('evacuation_centers.deleted_at')
-            ->orderBy('evacuation_centers.name')
+        return EvacuationCenter::query()
+            ->from('evacuation_centers as ec')
+            ->leftJoin('disaster_events as de', 'de.event_id', '=', 'ec.current_event_id')
+            ->when(Schema::hasColumn('evacuation_centers', 'deleted_at'), fn ($query) => $query->whereNull('ec.deleted_at'))
+            ->orderBy('ec.name')
             ->get([
-                'evacuation_centers.evacuation_center_id',
-                'evacuation_centers.name',
-                'evacuation_centers.osm_address',
-                'evacuation_centers.current_event_id',
+                'ec.evacuation_center_id',
+                'ec.name',
+                'ec.osm_address',
+                'ec.current_event_id',
                 'de.name as current_event_name',
                 'de.ended_at as current_event_ended_at',
                 'de.deleted_at as current_event_deleted_at',
@@ -1291,10 +1296,11 @@ class ResourceRequestService
 
     private function getActiveEvent(): ?object
     {
-        return DB::table('disaster_events as de')
+        return DisasterEvent::query()
+            ->from('disaster_events as de')
             ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
             ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
-            ->whereNull('de.deleted_at')
+            ->when(Schema::hasColumn('disaster_events', 'deleted_at'), fn ($query) => $query->whereNull('de.deleted_at'))
             ->whereNull('de.ended_at')
             ->orderByDesc('de.started_at')
             ->select([
@@ -1440,7 +1446,7 @@ class ResourceRequestService
 
     private function urgencyId(string $urgencyKey): ?int
     {
-        return DB::table('urgency_levels')
+        return UrgencyLevel::query()
             ->where('urgency_key', $urgencyKey)
             ->value('urgency_id');
     }
@@ -1480,7 +1486,7 @@ class ResourceRequestService
             return;
         }
 
-        DB::table('audit_logs')->insert([
+        AuditLog::query()->create([
             'user_id' => $request->user()?->user_id,
             'role_key' => $request->user()?->role?->role_key,
             'module' => 'resources_requests',

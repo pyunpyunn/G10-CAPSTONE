@@ -5,11 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DisasterEvent extends Model
 {
-    use SoftDeletes;
 
     protected $primaryKey = 'event_id';
 
@@ -17,7 +15,7 @@ class DisasterEvent extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['name', 'type_id', 'severity_level_id', 'started_at', 'ended_at'];
+    protected $fillable = ['event_id', 'name', 'type_id', 'severity_level_id', 'started_at', 'ended_at'];
 
     protected function casts(): array
     {

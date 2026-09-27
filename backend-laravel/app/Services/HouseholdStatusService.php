@@ -2,7 +2,16 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
+use App\Models\DeviceToken;
+use App\Models\DeviceTrackingLog;
+use App\Models\DisasterEvent;
+use App\Models\Household;
+use App\Models\HouseholdDisaster;
+use App\Models\HouseholdMember;
+use App\Models\HouseholdStatus;
 use App\Models\HouseholdStatusLog;
+use App\Models\User;
 use App\Repositories\HouseholdRepository;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -166,9 +175,9 @@ class HouseholdStatusService
             ], 409);
         }
 
-        $household = DB::table('households')
+        $household = Household::query()
             ->where('household_id', $householdId)
-            ->whereNull('deleted_at')
+            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->first();
 
         if (! $household) {
@@ -300,7 +309,8 @@ class HouseholdStatusService
             )
             ->groupBy('household_id');
 
-        return DB::table('households as h')
+        return Household::query()
+            ->from('households as h')
             ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->leftJoin('barangays as b', 'b.barangay_id', '=', 'a.barangay_id')
             ->leftJoin('household_disasters as hd', function ($join) use ($eventId): void {
@@ -316,7 +326,7 @@ class HouseholdStatusService
             ->leftJoin('users as reporter', 'reporter.user_id', '=', 'hd.last_reported_by_user_id')
             ->leftJoinSub($memberCounts, 'members', 'members.household_id', '=', 'h.household_id')
             ->leftJoinSub($deviceSummary, 'devices', 'devices.household_id', '=', 'h.household_id')
-            ->whereNull('h.deleted_at')
+            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('h.deleted_at'))
             ->whereNotNull('h.household_id')
             ->select([
                 'h.household_id',
@@ -574,7 +584,8 @@ class HouseholdStatusService
             return collect();
         }
 
-        return DB::table('household_status_logs as hsl')
+        return HouseholdStatusLog::query()
+            ->from('household_status_logs as hsl')
             ->leftJoin('households as h', 'h.household_id', '=', 'hsl.household_id')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
             ->where('hsl.disaster_id', $eventId)
@@ -617,7 +628,8 @@ class HouseholdStatusService
             return collect();
         }
 
-        return DB::table('household_status_logs as hsl')
+        return HouseholdStatusLog::query()
+            ->from('household_status_logs as hsl')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
             ->whereIn('hsl.household_id', $householdIds)
             ->when($eventId, fn ($query) => $query->where('hsl.disaster_id', $eventId))
@@ -638,7 +650,7 @@ class HouseholdStatusService
             return collect();
         }
 
-        return DB::table('device_tokens')
+        return DeviceToken::query()
             ->whereIn('household_id', $householdIds)
             ->orderByDesc(DB::raw('COALESCE(last_seen_at, logged_at, updated_at, created_at)'))
             ->get()
@@ -652,11 +664,12 @@ class HouseholdStatusService
             return collect();
         }
 
-        return DB::table('users as u')
+        return User::query()
+            ->from('users as u')
             ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
             ->whereIn('u.household_id', $householdIds)
             ->where('r.role_key', 'household_resident')
-            ->whereNull('u.deleted_at')
+            ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('u.deleted_at'))
             ->orderBy('u.created_at')
             ->get([
                 'u.household_id',
@@ -673,7 +686,8 @@ class HouseholdStatusService
 
     private function getDevices(string $householdId)
     {
-        $devices = DB::table('device_tokens as dt')
+        $devices = DeviceToken::query()
+            ->from('device_tokens as dt')
             ->leftJoin('household_members as hm', 'hm.member_id', '=', 'dt.member_id')
             ->where('dt.household_id', $householdId)
             ->orderByDesc(DB::raw('COALESCE(dt.last_seen_at, dt.logged_at, dt.updated_at, dt.created_at)'))
@@ -698,7 +712,7 @@ class HouseholdStatusService
                 'hm.last_name',
             ]);
 
-        $trackingLogs = DB::table('device_tracking_logs')
+        $trackingLogs = DeviceTrackingLog::query()
             ->where('household_id', $householdId)
             ->orderByDesc('logged_at')
             ->get()
@@ -749,7 +763,13 @@ class HouseholdStatusService
 
         $householdDisplayStatus = $this->householdMemberDisplayStatus($householdId, $eventId);
 
+        // Use the query builder here because some deployed household-member
+        // tables predate the soft-delete column.  The Eloquent model's
+        // SoftDeletes global scope would otherwise add an invalid
+        // `household_members.deleted_at` predicate before the guarded check
+        // below can run.
         return DB::table('household_members as hm')
+            ->from('household_members as hm')
             ->leftJoin('relationships as r', 'r.relationship_id', '=', 'hm.relationship_id')
             ->leftJoin('genders as g', 'g.gender_id', '=', 'hm.gender_id')
             ->leftJoin('member_disaster_statuses as mds', function ($join) use ($eventId): void {
@@ -758,7 +778,7 @@ class HouseholdStatusService
             })
             ->leftJoin('member_statuses as ms', 'ms.status_id', '=', 'mds.status_id')
             ->where('hm.household_id', $householdId)
-            ->whereNull('hm.deleted_at')
+            ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('hm.deleted_at'))
             ->orderByDesc('hm.is_household_head')
             ->orderBy('hm.last_name')
             ->orderBy('hm.first_name')
@@ -831,7 +851,7 @@ class HouseholdStatusService
             ->join('member_statuses as ms', 'ms.status_id', '=', 'mds.status_id')
             ->where('mds.disaster_id', $eventId)
             ->where('mds.household_id', $householdId)
-            ->whereNull('hm.deleted_at')
+            ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('hm.deleted_at'))
             ->pluck('ms.status_key');
 
         $unsafeKeys = [
@@ -951,10 +971,11 @@ class HouseholdStatusService
 
     private function getActiveEvent(): ?object
     {
-        return DB::table('disaster_events as de')
+        return DisasterEvent::query()
+            ->from('disaster_events as de')
             ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
             ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
-            ->whereNull('de.deleted_at')
+            ->when(Schema::hasColumn('disaster_events', 'deleted_at'), fn ($query) => $query->whereNull('de.deleted_at'))
             ->whereNull('de.ended_at')
             ->orderByDesc('de.started_at')
             ->select([
@@ -1198,7 +1219,7 @@ class HouseholdStatusService
 
     private function saveLatestHouseholdDisaster(string $eventId, string $householdId, array $validated, ?string $userId, string $source, Carbon $now, ?int $deviceId): void
     {
-        $existing = DB::table('household_disasters')
+        $existing = HouseholdDisaster::query()
             ->where('disaster_id', $eventId)
             ->where('household_id', $householdId)
             ->lockForUpdate()
@@ -1220,16 +1241,16 @@ class HouseholdStatusService
         ];
 
         if ($existing) {
-            DB::table('household_disasters')
+            HouseholdDisaster::query()
                 ->where('household_disaster_id', $existing->household_disaster_id)
                 ->update($data);
 
             return;
         }
 
-        $nextId = ((int) DB::table('household_disasters')->lockForUpdate()->max('household_disaster_id')) + 1;
+        $nextId = ((int) HouseholdDisaster::query()->lockForUpdate()->max('household_disaster_id')) + 1;
 
-        DB::table('household_disasters')->insert(array_merge($data, [
+        HouseholdDisaster::query()->create(array_merge($data, [
             'household_disaster_id' => $nextId,
             'household_id' => $householdId,
             'disaster_id' => $eventId,
@@ -1244,7 +1265,7 @@ class HouseholdStatusService
             return;
         }
 
-        DB::table('device_tokens')
+        DeviceToken::query()
             ->where('id', $deviceId)
             ->where('household_id', $householdId)
             ->update([
@@ -1264,9 +1285,9 @@ class HouseholdStatusService
             return;
         }
 
-        $nextTrackingId = ((int) DB::table('device_tracking_logs')->lockForUpdate()->max('tracking_id')) + 1;
+        $nextTrackingId = ((int) DeviceTrackingLog::query()->lockForUpdate()->max('tracking_id')) + 1;
 
-        DB::table('device_tracking_logs')->insert([
+        DeviceTrackingLog::query()->create([
             'tracking_id' => $nextTrackingId,
             'device_token_id' => $deviceId,
             'household_id' => $householdId,
@@ -1284,7 +1305,7 @@ class HouseholdStatusService
 
     private function deviceBelongsToHousehold(int $deviceId, string $householdId): bool
     {
-        return DB::table('device_tokens')
+        return DeviceToken::query()
             ->where('id', $deviceId)
             ->where('household_id', $householdId)
             ->exists();
@@ -1294,7 +1315,7 @@ class HouseholdStatusService
     {
         $user = $request->user();
 
-        DB::table('audit_logs')->insert([
+        AuditLog::query()->create([
             'user_id' => $user?->user_id,
             'role_key' => $user?->role?->role_key,
             'module' => 'household_status',

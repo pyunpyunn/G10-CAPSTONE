@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
-use Carbon\Carbon;
+use App\Models\DisasterEvent;
 use App\Models\WeatherLog;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -78,7 +79,7 @@ class WeatherSnapshotService
         $observedAt = $this->observedAt($current['time'] ?? null);
 
         WeatherLog::query()->create([
-            'disaster_id' => null,
+            'disaster_id' => $eventId,
             'source_name' => 'Open-Meteo Forecast API',
             'source_url' => $this->openMeteoUrl(),
             'condition_name' => $summary['condition_name'],
@@ -89,7 +90,7 @@ class WeatherSnapshotService
             'humidity' => $current['relative_humidity_2m'] ?? null,
             'advisory_title' => $summary['advisory_title'],
             'advisory_text' => $summary['advisory_text'],
-            'raw_payload' => json_encode($weather, JSON_UNESCAPED_SLASHES),
+            'raw_payload' => $weather,
             'observed_at' => $observedAt,
             'created_at' => now(),
             'updated_at' => now(),
@@ -98,29 +99,29 @@ class WeatherSnapshotService
         return [
             'status' => 201,
             'saved' => true,
-            'message' => 'Weather monitoring snapshot saved independently of disaster events.',
-            'data' => $this->pageData(null),
+            'message' => $eventId ? 'Weather snapshot saved for the active disaster event.' : 'Weather monitoring snapshot saved independently of disaster events.',
+            'data' => $this->pageData($eventId),
         ];
     }
 
     public function getActiveEvent(): ?object
     {
-        $query = DB::table('disaster_events as de')
-            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
-            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
-            ->whereNull('de.ended_at');
+        $query = DisasterEvent::query()
+            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'disaster_events.type_id')
+            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'disaster_events.severity_level_id')
+            ->whereNull('disaster_events.ended_at');
 
         if (Schema::hasColumn('disaster_events', 'deleted_at')) {
-            $query->whereNull('de.deleted_at');
+            $query->whereNull('disaster_events.deleted_at');
         }
 
         return $query
-            ->orderByDesc('de.started_at')
+            ->orderByDesc('disaster_events.started_at')
             ->select([
-                'de.event_id',
-                'de.name',
-                'de.started_at',
-                'de.ended_at',
+                'disaster_events.event_id',
+                'disaster_events.name',
+                'disaster_events.started_at',
+                'disaster_events.ended_at',
                 'dt.type_name',
                 'sl.severity_key',
                 'sl.severity_label',
@@ -130,21 +131,21 @@ class WeatherSnapshotService
 
     public function findEvent(string $eventId): ?object
     {
-        $query = DB::table('disaster_events as de')
-            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
-            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
-            ->where('de.event_id', $eventId);
+        $query = DisasterEvent::query()
+            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'disaster_events.type_id')
+            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'disaster_events.severity_level_id')
+            ->where('disaster_events.event_id', $eventId);
 
         if (Schema::hasColumn('disaster_events', 'deleted_at')) {
-            $query->whereNull('de.deleted_at');
+            $query->whereNull('disaster_events.deleted_at');
         }
 
         return $query
             ->select([
-                'de.event_id',
-                'de.name',
-                'de.started_at',
-                'de.ended_at',
+                'disaster_events.event_id',
+                'disaster_events.name',
+                'disaster_events.started_at',
+                'disaster_events.ended_at',
                 'dt.type_name',
                 'sl.severity_key',
                 'sl.severity_label',
