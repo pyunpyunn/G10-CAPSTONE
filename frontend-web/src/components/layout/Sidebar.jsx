@@ -82,9 +82,9 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
       </div>
 
       <nav className="left-nav">
-        <NavGroup title="Main Views" pages={pages.slice(0, 3)} isOpen={openGroups.has('Main Views')} onToggle={toggleGroup} />
-        <NavGroup title="Response Operations" pages={pages.slice(3, 6)} isOpen={openGroups.has('Response Operations')} onToggle={toggleGroup} />
-        <NavGroup title="Management & Reports" pages={pages.slice(6)} isOpen={openGroups.has('Management & Reports')} onToggle={toggleGroup} />
+        <NavGroup title="Main Views" pages={pages.filter((page) => !page.navHidden).slice(0, 3)} isOpen={openGroups.has('Main Views')} onToggle={toggleGroup} />
+        <NavGroup title="Response Operations" pages={pages.filter((page) => !page.navHidden).slice(3, 6)} isOpen={openGroups.has('Response Operations')} onToggle={toggleGroup} />
+        <NavGroup title="Management & Reports" pages={pages.filter((page) => !page.navHidden).slice(6)} isOpen={openGroups.has('Management & Reports')} onToggle={toggleGroup} />
       </nav>
 
       <div className="left-sidebar-logout">

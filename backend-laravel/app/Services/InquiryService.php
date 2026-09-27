@@ -2,6 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
+use App\Models\LandingInquiry;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +37,7 @@ class InquiryService
 
         $now = now();
 
-        $insert = [
+        $insert = $this->onlyExistingColumns([
             'name' => trim($validated['name']),
             'organization' => $this->emptyToNull($validated['organization'] ?? null),
             'email' => $this->emptyToNull($validated['email'] ?? null),
@@ -44,14 +48,33 @@ class InquiryService
             'user_agent' => substr((string) $request->userAgent(), 0, 255),
             'created_at' => $now,
             'updated_at' => $now,
-        ];
+        ]);
 
-        $inquiryId = DB::table(self::TABLE)->insertGetId($this->onlyExistingColumns($insert));
+        $inquiry = LandingInquiry::query()->create($insert);
+
+        $this->recordAuditLog([
+            'user_id' => null,
+            'role_key' => 'anonymous',
+            'module' => 'inquiry',
+            'action' => 'created',
+            'reference_table' => 'landing_inquiries',
+            'reference_id' => $inquiry->inquiry_id,
+            'old_values' => null,
+            'new_values' => [
+                'status' => 'new',
+                'name' => $inquiry->name,
+                'organization' => $inquiry->organization,
+                'email' => $inquiry->email,
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            'created_at' => $now,
+        ]);
 
         return response()->json([
             'message' => 'Inquiry sent.',
             'data' => [
-                'inquiry' => $this->formatInquiry(DB::table(self::TABLE)->where('inquiry_id', $inquiryId)->first()),
+                'inquiry' => $this->formatInquiry($inquiry),
             ],
         ], 201);
     }
@@ -74,7 +97,7 @@ class InquiryService
         $search = trim((string) $request->query('search', ''));
         $perPage = min(50, max(10, (int) $request->query('per_page', 10)));
 
-        $query = DB::table(self::TABLE);
+        $query = LandingInquiry::query()->select($this->landingInquiryColumns());
 
         if ($status !== '' && $status !== 'all') {
             $query->where('status', $status);
@@ -119,27 +142,53 @@ class InquiryService
             return response()->json(['message' => 'Inquiry storage is not available yet.'], 503);
         }
 
-        $row = DB::table(self::TABLE)->where('inquiry_id', $inquiryId)->first();
+        $row = LandingInquiry::query()->whereKey($inquiryId)->first();
 
         if (! $row) {
             return response()->json(['message' => 'Inquiry was not found.'], 404);
         }
 
-        $update = [
+        $oldValues = [
+            'status' => $row->status,
+            'handled_by_user_id' => $row->handled_by_user_id,
+            'responded_at' => $row->responded_at,
+        ];
+
+        $update = $this->onlyExistingColumns([
             'status' => $validated['status'],
             'handled_by_user_id' => $request->user()?->user_id,
             'responded_at' => $validated['status'] === 'responded' ? now() : $row->responded_at,
             'updated_at' => now(),
-        ];
+        ]);
 
-        DB::table(self::TABLE)
-            ->where('inquiry_id', $inquiryId)
-            ->update($this->onlyExistingColumns($update));
+        LandingInquiry::query()
+            ->whereKey($inquiryId)
+            ->update($update);
+
+        $updatedRow = LandingInquiry::query()->whereKey($inquiryId)->first();
+
+        $this->recordAuditLog([
+            'user_id' => $request->user()?->user_id,
+            'role_key' => $request->user()?->roleKey(),
+            'module' => 'inquiry',
+            'action' => 'status_updated',
+            'reference_table' => 'landing_inquiries',
+            'reference_id' => $inquiryId,
+            'old_values' => $oldValues,
+            'new_values' => [
+                'status' => $updatedRow?->status,
+                'handled_by_user_id' => $updatedRow?->handled_by_user_id,
+                'responded_at' => $updatedRow?->responded_at,
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            'created_at' => now(),
+        ]);
 
         return response()->json([
             'message' => 'Inquiry updated.',
             'data' => [
-                'inquiry' => $this->formatInquiry(DB::table(self::TABLE)->where('inquiry_id', $inquiryId)->first()),
+                'inquiry' => $this->formatInquiry($updatedRow),
             ],
         ]);
     }
@@ -150,7 +199,7 @@ class InquiryService
             return ['new' => 0, 'in_review' => 0, 'responded' => 0, 'closed' => 0];
         }
 
-        $counts = DB::table(self::TABLE)
+        $counts = LandingInquiry::query()
             ->select('status', DB::raw('COUNT(*) as total'))
             ->groupBy('status')
             ->pluck('total', 'status');
@@ -169,62 +218,30 @@ class InquiryService
             return ['summary' => ['hq_web' => 0, 'rescuer_mobile' => 0], 'latest' => []];
         }
 
-        $hasRoles = Schema::hasTable('roles') && Schema::hasColumn('users', 'role_id');
-        $hasUserRole = Schema::hasColumn('users', 'role');
+        $hasDeletedAt = Schema::hasColumn('users', 'deleted_at');
 
-        if (! $hasRoles && ! $hasUserRole) {
-            return ['summary' => ['hq_web' => 0, 'rescuer_mobile' => 0], 'latest' => []];
-        }
-
-        $query = DB::table('users as u');
-
-        if ($hasRoles) {
-            $query->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id');
-        }
-
-        $roleExpression = match (true) {
-            $hasRoles && $hasUserRole => 'COALESCE(r.role_key, u.role)',
-            $hasRoles => 'r.role_key',
-            $hasUserRole => 'u.role',
-            default => "''",
-        };
-
-        $rows = $query
-            ->select([
-                'u.user_id',
-                'u.username',
-                'u.name',
-                'u.email',
-                'u.is_active',
-                'u.created_at',
-                DB::raw($roleExpression.' as role_key'),
-            ])
-            ->where(function ($inner) use ($hasRoles, $hasUserRole): void {
-                if ($hasRoles) {
-                    $inner->whereIn('r.role_key', ['super_admin', 'admin', 'rescuer']);
-                }
-
-                if ($hasUserRole) {
-                    $method = $hasRoles ? 'orWhereIn' : 'whereIn';
-                    $inner->{$method}('u.role', ['super_admin', 'admin', 'rescuer']);
-                }
-            })
-            ->orderByDesc('u.created_at')
+        $rows = User::query()
+            ->select($this->userOverviewColumns())
+            ->with('role')
+            ->when($hasDeletedAt, fn ($query) => $query->whereNull('deleted_at'))
+            ->orderByDesc('created_at')
             ->limit(12)
             ->get();
 
+        $eligibleRows = $rows->filter(fn (User $user): bool => in_array($user->roleKey(), ['super_admin', 'admin', 'rescuer'], true));
+
         return [
             'summary' => [
-                'hq_web' => $rows->whereIn('role_key', ['super_admin', 'admin'])->count(),
-                'rescuer_mobile' => $rows->where('role_key', 'rescuer')->count(),
+                'hq_web' => $eligibleRows->filter(fn (User $user): bool => in_array($user->roleKey(), ['super_admin', 'admin'], true))->count(),
+                'rescuer_mobile' => $eligibleRows->filter(fn (User $user): bool => $user->roleKey() === 'rescuer')->count(),
             ],
-            'latest' => $rows->map(fn (object $row): array => [
-                'user_id' => $row->user_id,
-                'username' => $row->username,
-                'name' => $row->name ?: $row->username,
-                'email' => $row->email,
-                'role_key' => $row->role_key,
-                'is_active' => (bool) $row->is_active,
+            'latest' => $eligibleRows->map(fn (User $user): array => [
+                'user_id' => $user->user_id,
+                'username' => $user->username,
+                'name' => $user->name ?: $user->username,
+                'email' => $user->email,
+                'role_key' => $user->roleKey(),
+                'is_active' => (bool) $user->is_active,
             ])->values()->all(),
         ];
     }
@@ -242,8 +259,42 @@ class InquiryService
             'email' => $row->email,
             'message' => $row->message,
             'status' => $row->status ?: 'new',
-            'created_at' => $row->created_at ? date('M d, Y g:i A', strtotime($row->created_at)) : null,
-            'responded_at' => $row->responded_at ? date('M d, Y g:i A', strtotime($row->responded_at)) : null,
+            'created_at' => $row->created_at ? Carbon::parse($row->created_at)->format('M d, Y g:i A') : null,
+            'responded_at' => $row->responded_at ? Carbon::parse($row->responded_at)->format('M d, Y g:i A') : null,
+        ];
+    }
+
+    private function landingInquiryColumns(): array
+    {
+        return [
+            'inquiry_id',
+            'name',
+            'organization',
+            'email',
+            'message',
+            'status',
+            'source_page',
+            'ip_address',
+            'user_agent',
+            'responded_at',
+            'handled_by_user_id',
+            'created_at',
+            'updated_at',
+        ];
+    }
+
+    private function userOverviewColumns(): array
+    {
+        return [
+            'user_id',
+            'username',
+            'login_id',
+            'name',
+            'email',
+            'role_id',
+            'is_active',
+            'created_at',
+            'updated_at',
         ];
     }
 
@@ -252,6 +303,23 @@ class InquiryService
         return collect($data)
             ->filter(fn ($value, string $column): bool => Schema::hasColumn(self::TABLE, $column))
             ->all();
+    }
+
+    private function recordAuditLog(array $payload): void
+    {
+        if (! Schema::hasTable('audit_logs')) {
+            return;
+        }
+
+        $logData = collect($payload)
+            ->filter(fn ($value, string $column): bool => Schema::hasColumn('audit_logs', $column) || in_array($column, ['created_at'], true))
+            ->all();
+
+        if ($logData === []) {
+            return;
+        }
+
+        AuditLog::query()->create($logData);
     }
 
     private function emptyToNull(?string $value): ?string

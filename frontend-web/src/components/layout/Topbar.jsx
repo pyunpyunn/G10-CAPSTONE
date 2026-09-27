@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, Eye } from 'lucide-react'
+import { Bell, CheckCircle2, Eye, Inbox } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getNotifications, markNotificationsRead } from '../../api/notificationApi'
@@ -15,6 +15,7 @@ export default function Topbar({ user }) {
   const displayName = user?.full_name || 'HQ Admin'
   const initials = getInitials(user?.full_name)
   const unreadLabel = unreadCount > 99 ? '99+' : String(unreadCount)
+  const canViewInquiries = user?.role?.role_key === 'super_admin'
 
   useEffect(() => {
     let ignore = false
@@ -101,6 +102,10 @@ export default function Topbar({ user }) {
     navigate('/notifications')
   }
 
+  function openInquiryPage() {
+    navigate('/super-admin')
+  }
+
   async function openNotification(item) {
     try {
       await markNotificationsRead([item.id])
@@ -136,6 +141,18 @@ export default function Topbar({ user }) {
       </div>
 
       <div className="header-actions" aria-label="Header actions">
+        {canViewInquiries && (
+          <button
+            className="header-action"
+            type="button"
+            title="Inquiries"
+            aria-label="Open admin inquiries"
+            onClick={openInquiryPage}
+          >
+            <Inbox size={16} />
+          </button>
+        )}
+
         <button
           className="header-action"
           ref={bellButtonRef}

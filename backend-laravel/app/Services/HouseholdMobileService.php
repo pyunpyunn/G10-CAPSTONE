@@ -1779,9 +1779,31 @@ class HouseholdMobileService
             return null;
         }
 
+        $member = null;
+        $memberKeyColumn = $this->memberKeyColumn();
+
+        if ($memberKeyColumn && ! empty($user->member_id)) {
+            $member = DB::table('household_members')
+                ->where($memberKeyColumn, $user->member_id)
+                ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+                ->first([
+                    $this->firstExistingColumnSelect('household_members', ['name', 'full_name'], 'name'),
+                    $this->optionalColumnSelect('household_members', 'first_name', 'first_name'),
+                    $this->optionalColumnSelect('household_members', 'middle_name', 'middle_name'),
+                    $this->optionalColumnSelect('household_members', 'last_name', 'last_name'),
+                ]);
+        }
+
+        $memberFullName = trim(implode(' ', array_filter([
+            $member?->first_name ?? null,
+            $member?->middle_name ?? null,
+            $member?->last_name ?? null,
+        ])));
+
         return [
             'user_id' => $user->user_id,
-            'full_name' => $user->full_name ?? trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: $user->username,
+            'member_id' => $user->member_id,
+            'full_name' => $memberFullName ?: ($member?->name ?? null) ?: ($user->full_name ?? trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: $user->username),
             'username' => $user->username,
             'email' => $user->email,
             'contact_number' => $user->contact_number,

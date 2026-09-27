@@ -2,7 +2,17 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
+use App\Models\DisasterBroadcast;
+use App\Models\DisasterEvent;
+use App\Models\EvacuationCenter;
+use App\Models\Household;
+use App\Models\HouseholdDisaster;
+use App\Models\HouseholdStatus;
+use App\Models\ResponderAssignment;
 use App\Models\ResourceRequest;
+use App\Models\SituationReport;
+use App\Models\WeatherLog;
 use App\Services\BarangayProfileService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -156,33 +166,12 @@ class SituationReportService
 
     private function eventOptions(): array
     {
-        return DB::table('disaster_events as de')
+        $query = DisasterEvent::query()
+            ->from('disaster_events as de')
             ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
             ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
-            ->whereNull('de.deleted_at')
             ->orderByDesc('de.started_at')
             ->limit(50)
-            ->get([
-                'de.event_id',
-                'de.name',
-                'de.started_at',
-                'de.ended_at',
-                'dt.type_name',
-                'sl.severity_label',
-                'sl.severity_key',
-            ])
-            ->map(fn (object $event): array => $this->formatEventOption($event))
-            ->values()
-            ->all();
-    }
-
-    private function findEvent(string $eventId): ?object
-    {
-        return DB::table('disaster_events as de')
-            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
-            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
-            ->where('de.event_id', $eventId)
-            ->whereNull('de.deleted_at')
             ->select([
                 'de.event_id',
                 'de.name',
@@ -191,8 +180,37 @@ class SituationReportService
                 'dt.type_name',
                 'sl.severity_label',
                 'sl.severity_key',
-            ])
-            ->first();
+            ]);
+
+        if (Schema::hasColumn('disaster_events', 'deleted_at')) {
+            $query->whereNull('de.deleted_at');
+        }
+
+        return $query->get()->map(fn (object $event): array => $this->formatEventOption($event))->values()->all();
+    }
+
+    private function findEvent(string $eventId): ?object
+    {
+        $query = DisasterEvent::query()
+            ->from('disaster_events as de')
+            ->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')
+            ->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')
+            ->where('de.event_id', $eventId)
+            ->select([
+                'de.event_id',
+                'de.name',
+                'de.started_at',
+                'de.ended_at',
+                'dt.type_name',
+                'sl.severity_label',
+                'sl.severity_key',
+            ]);
+
+        if (Schema::hasColumn('disaster_events', 'deleted_at')) {
+            $query->whereNull('de.deleted_at');
+        }
+
+        return $query->first();
     }
 
     private function buildSummary(object $event, array $meta = []): array
@@ -247,9 +265,14 @@ class SituationReportService
 
     private function householdSummary(string $eventId): array
     {
-        $total = DB::table('households')->whereNull('deleted_at')->count();
+        $householdQuery = Household::query();
+        if (Schema::hasColumn('households', 'deleted_at')) {
+            $householdQuery->whereNull('deleted_at');
+        }
+        $total = $householdQuery->count();
 
-        $counts = DB::table('household_disasters as hd')
+        $counts = HouseholdDisaster::query()
+            ->from('household_disasters as hd')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
             ->where('hd.disaster_id', $eventId)
             ->select('hs.status_key', DB::raw('COUNT(DISTINCT hd.household_id) as total'))
@@ -259,10 +282,10 @@ class SituationReportService
         $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
         $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
-        $reported = DB::table('household_disasters')
+        $reported = HouseholdDisaster::query()
             ->where('disaster_id', $eventId)
             ->whereNotNull('current_status_id')
-            ->distinct()
+            ->distinct('household_id')
             ->count('household_id');
 
         $safeTotal = $safeOnly + $evacuated;
@@ -290,20 +313,25 @@ class SituationReportService
 
     private function purokRows(string $eventId): array
     {
-        $rows = DB::table('households as h')
+        $query = Household::query()
+            ->from('households as h')
             ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->leftJoin('household_disasters as hd', function ($join) use ($eventId): void {
                 $join->on('hd.household_id', '=', 'h.household_id')
                     ->where('hd.disaster_id', '=', $eventId);
             })
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
-            ->whereNull('h.deleted_at')
-            ->get([
+            ->select([
                 'h.household_id',
                 'a.purok_sitio',
                 'hs.status_key',
-            ])
-            ->groupBy(fn (object $row): string => $row->purok_sitio ?: 'Unassigned');
+            ]);
+
+        if (Schema::hasColumn('households', 'deleted_at')) {
+            $query->whereNull('h.deleted_at');
+        }
+
+        $rows = $query->get()->groupBy(fn (object $row): string => $row->purok_sitio ?: 'Unassigned');
 
         return $rows->map(function ($items, string $purok): array {
             $total = $items->count();
@@ -325,7 +353,7 @@ class SituationReportService
 
     private function weatherSummary(string $eventId): array
     {
-        $weather = DB::table('weather_logs')
+        $weather = WeatherLog::query()
             ->where(function ($query) use ($eventId): void {
                 $query->where('disaster_id', $eventId)
                     ->orWhereNull('disaster_id');
@@ -358,47 +386,50 @@ class SituationReportService
 
     private function evacuationSummary(string $eventId): array
     {
-        return DB::table('evacuation_centers')
-            ->whereNull('deleted_at')
+        $query = EvacuationCenter::query()
             ->where(function ($query) use ($eventId): void {
                 $query->where('current_event_id', $eventId)
                     ->orWhereNull('current_event_id');
             })
             ->orderBy('name')
-            ->limit(8)
-            ->get()
-            ->map(function (object $center): array {
-                $capacity = (int) ($center->capacity ?? 0);
-                $occupancy = (int) ($center->current_occupancy ?? 0);
-                $remaining = max($capacity - $occupancy, 0);
+            ->limit(8);
 
-                return [
-                    'name' => $center->name ?: $center->evacuation_center_id,
-                    'type' => $center->center_type ?: 'Evacuation site',
-                    'status' => $center->status ?: 'active',
-                    'families' => 'For update',
-                    'persons' => $occupancy > 0 ? $occupancy.' persons' : 'Occupancy not encoded',
-                    'capacity_status' => $capacity > 0 ? $remaining.' slots left' : 'Capacity not encoded',
-                    'capacity_tone' => $capacity > 0 && $remaining <= 10 ? 'amber' : 'green',
-                ];
-            })
-            ->values()
-            ->all();
+        if (Schema::hasColumn('evacuation_centers', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        return $query->get()->map(function (object $center): array {
+            $capacity = (int) ($center->capacity ?? 0);
+            $occupancy = (int) ($center->current_occupancy ?? 0);
+            $remaining = max($capacity - $occupancy, 0);
+
+            return [
+                'name' => $center->name ?: $center->evacuation_center_id,
+                'type' => $center->center_type ?: 'Evacuation site',
+                'status' => $center->status ?: 'active',
+                'families' => 'For update',
+                'persons' => $occupancy > 0 ? $occupancy.' persons' : 'Occupancy not encoded',
+                'capacity_status' => $capacity > 0 ? $remaining.' slots left' : 'Capacity not encoded',
+                'capacity_tone' => $capacity > 0 && $remaining <= 10 ? 'amber' : 'green',
+            ];
+        })->values()->all();
     }
 
     private function dispatchSummary(string $eventId): array
     {
-        $assignments = DB::table('responder_assignments as ra')
+        $assignments = ResponderAssignment::query()
+            ->from('responder_assignments as ra')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')
             ->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')
             ->where('ra.disaster_id', $eventId)
             ->orderByDesc('ra.assigned_at')
-            ->get([
+            ->select([
                 'ra.*',
                 'rt.team_name',
                 'rt.team_code',
                 'r.full_name as responder_name',
-            ]);
+            ])
+            ->get();
 
         $rows = $assignments->take(8)->map(function (object $assignment): array {
             $route = $this->decodeJson($assignment->route_notes);
@@ -431,7 +462,7 @@ class SituationReportService
 
     private function timelineRows(string $eventId, $assignments): array
     {
-        $broadcasts = DB::table('disaster_broadcasts')
+        $broadcasts = DisasterBroadcast::query()
             ->where('disaster_id', $eventId)
             ->orderBy('sent_at')
             ->limit(4)
@@ -517,14 +548,16 @@ class SituationReportService
 
     private function savedReports(): array
     {
-        return DB::table('situation_reports as sr')
+        return SituationReport::query()
+            ->from('situation_reports as sr')
             ->leftJoin('disaster_events as de', 'de.event_id', '=', 'sr.disaster_id')
             ->orderByDesc('sr.generated_at')
             ->limit(20)
-            ->get([
+            ->select([
                 'sr.*',
                 'de.name as event_name',
             ])
+            ->get()
             ->map(fn (object $report): array => $this->formatSavedReport($report))
             ->values()
             ->all();
@@ -579,7 +612,7 @@ class SituationReportService
     private function nextReportNumber(): string
     {
         $prefix = 'SITREP-'.now()->format('Y').'-';
-        $count = DB::table('situation_reports')
+        $count = SituationReport::query()
             ->where('report_number', 'like', $prefix.'%')
             ->count() + 1;
 
@@ -683,7 +716,7 @@ class SituationReportService
             return;
         }
 
-        DB::table('audit_logs')->insert([
+        AuditLog::query()->create([
             'user_id' => $request->user()?->user_id,
             'role_key' => $request->user()?->role?->role_key,
             'module' => 'situation_reporting',

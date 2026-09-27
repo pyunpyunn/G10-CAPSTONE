@@ -17,8 +17,8 @@
   align-items: center;
   justify-content: space-between;
   height: var(--topbar-height);
-  gap: 20px;
-  padding: 0 22px;
+  gap: 16px;
+  padding: 0 16px;
   color: var(--nav-text);
   background: var(--nav);
   border-bottom: 1px solid var(--nav-line);
@@ -92,7 +92,7 @@
 .header-actions {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin-left: auto;
 }
 
@@ -101,19 +101,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
+  height: 34px;
   border: 1px solid var(--color-nav-hover);
-  border-radius: 12px;
+  border-radius: 10px;
   color: var(--color-nav-text);
   background: var(--color-nav-bg);
-  box-shadow: 0 4px 12px rgba(5, 10, 18, 0.16);
+  box-shadow: 0 3px 10px rgba(5, 10, 18, 0.12);
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease, color 150ms ease, background 150ms ease, border-color 150ms ease;
 }
 
 .header-action {
   position: relative;
-  width: 38px;
+  width: 34px;
 }
 
 .header-action:hover,
@@ -176,7 +176,7 @@
   min-width: 150px;
   justify-content: flex-start;
   gap: 8px;
-  padding: 0 12px 0 6px;
+  padding: 0 10px 0 6px;
 }
 
 .profile-avatar {

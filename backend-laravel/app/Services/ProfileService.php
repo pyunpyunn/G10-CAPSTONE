@@ -3,6 +3,10 @@
 namespace App\Services;
 
 use App\Http\Resources\UserResource;
+use App\Models\AuditLog;
+use App\Models\Barangay;
+use App\Models\BarangayProfile;
+use App\Models\User;
 use App\Services\BarangayProfileService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -56,8 +60,8 @@ class ProfileService
 
         $oldValues = $this->identity($user);
 
-        DB::table('users')
-            ->where('user_id', $user->user_id)
+        User::query()
+            ->where($user->getKeyName(), $user->getKey())
             ->update([
                 'first_name' => $validated['first_name'],
                 'last_name' => $validated['last_name'],
@@ -101,8 +105,8 @@ class ProfileService
             ], 422);
         }
 
-        DB::table('users')
-            ->where('user_id', $user->user_id)
+        User::query()
+            ->where($user->getKeyName(), $user->getKey())
             ->update([
                 'password' => Hash::make($validated['password']),
                 'password_changed_at' => now(),
@@ -179,12 +183,12 @@ class ProfileService
                 'updated_at' => now(),
             ];
             $values = array_intersect_key($values, array_flip($columns));
-            $profileId = $validated['profile_id'] ?? DB::table('barangay_profiles')->where('is_active', 1)->value('profile_id');
+            $profileId = $validated['profile_id'] ?? BarangayProfile::query()->where('is_active', 1)->value('profile_id');
 
-            DB::table('barangay_profiles')->update(['is_active' => 0]);
+            BarangayProfile::query()->update(['is_active' => 0]);
 
-            if ($profileId && DB::table('barangay_profiles')->where('profile_id', $profileId)->exists()) {
-                DB::table('barangay_profiles')
+            if ($profileId && BarangayProfile::query()->where('profile_id', $profileId)->exists()) {
+                BarangayProfile::query()
                     ->where('profile_id', $profileId)
                     ->update($values);
 
@@ -196,7 +200,7 @@ class ProfileService
                 'created_at' => now(),
             ], array_flip($columns));
 
-            DB::table('barangay_profiles')->insert($values);
+            BarangayProfile::query()->create($values);
         });
 
         $updatedValues = $this->barangayProfileData();
@@ -221,6 +225,9 @@ class ProfileService
             ->first();
         $lastSeen = $lastToken?->last_used_at ?: $lastToken?->created_at ?: $user->updated_at;
 
+        $roleKey = $user->roleKey();
+        $roleName = $user->roleName();
+
         return [
             [
                 'label' => 'Account ID',
@@ -229,12 +236,12 @@ class ProfileService
             ],
             [
                 'label' => 'Role',
-                'value' => $this->roleShortName($user->role?->role_key),
-                'note' => $user->role?->role_name ?: 'HQ/Admin',
+                'value' => $this->roleShortName($roleKey),
+                'note' => $roleName ?: 'HQ/Admin',
             ],
             [
                 'label' => 'Access level',
-                'value' => $user->role?->role_key === 'super_admin' ? 'Full+' : 'Full',
+                'value' => $roleKey === 'super_admin' ? 'Full+' : 'Full',
                 'note' => 'Broadcast, SitRep, archive, dispatch',
             ],
             [
@@ -257,8 +264,8 @@ class ProfileService
             'contact_number' => $user->contact_number ?: 'No mobile recorded',
             'status' => $user->is_active ? 'Active and verified' : 'Inactive',
             'assigned_station' => $user->assigned_center_id ?: 'Command desk',
-            'role_name' => $user->role?->role_name ?: 'HQ/Admin',
-            'role_key' => $user->role?->role_key ?: 'admin',
+            'role_name' => $user->roleName() ?: 'HQ/Admin',
+            'role_key' => $user->roleKey() ?: 'admin',
         ];
     }
 
@@ -302,7 +309,7 @@ class ProfileService
             return [];
         }
 
-        return DB::table('audit_logs')
+        return AuditLog::query()
             ->where('user_id', $userId)
             ->orderByDesc('created_at')
             ->limit(8)
@@ -346,7 +353,7 @@ class ProfileService
             return null;
         }
 
-        $query = DB::table('barangays');
+        $query = Barangay::query();
 
         if ($barangayId) {
             $query->where('barangay_id', $barangayId);
@@ -380,7 +387,7 @@ class ProfileService
             return [];
         }
 
-        return DB::table('barangays')
+        return Barangay::query()
             ->orderBy('barangay_name')
             ->limit(80)
             ->get()
@@ -429,9 +436,9 @@ class ProfileService
             return;
         }
 
-        DB::table('audit_logs')->insert([
+        AuditLog::query()->create([
             'user_id' => $request->user()?->user_id,
-            'role_key' => $request->user()?->role?->role_key,
+            'role_key' => $request->user()?->roleKey(),
             'module' => 'profile',
             'action' => $action,
             'reference_table' => 'users',
