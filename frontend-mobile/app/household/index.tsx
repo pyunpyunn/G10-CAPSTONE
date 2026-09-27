@@ -40,7 +40,7 @@ import { HouseholdSetupScreen } from '@/components/household/HouseholdSetupScree
 import { HouseholdLoading } from '@/components/household/HouseholdUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
-import { getPushRegistration } from '@/utils/pushNotifications';
+import { getPushRegistration, subscribeToBroadcastNotifications } from '@/utils/pushNotifications';
 
 const deviceUuidKey = 'resq_household_device_uuid';
 const trustedPinKey = 'resq_household_trusted_pin';
@@ -157,6 +157,8 @@ export default function HouseholdHomeScreen() {
     loadOverview();
     refreshDeviceSensors();
   }, [loadLocalKeys, loadOverview, refreshDeviceSensors]);
+
+  useEffect(() => subscribeToBroadcastNotifications(() => loadOverview(true)), [loadOverview]);
 
   useEffect(() => {
     refreshDeviceSensors();

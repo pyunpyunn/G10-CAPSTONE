@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\RescuerAccountController;
 use App\Http\Controllers\Api\RescuerMobileController;
 use App\Http\Controllers\Api\ResourceRequestController;
 use App\Http\Controllers\Api\SituationReportController;
+use App\Http\Controllers\Api\SmsInboundController;
 use App\Http\Controllers\Api\WeatherController;
 use Illuminate\Support\Facades\Route;
 
@@ -32,6 +33,8 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:10,1');
 
     Route::post('/external/resource-requests', [ResourceRequestController::class, 'externalStore'])
+        ->middleware('throttle:60,1');
+    Route::post('/sms/inbound', [SmsInboundController::class, 'handle'])
         ->middleware('throttle:60,1');
 
     Route::post('/auth/login', [AuthController::class, 'login'])
