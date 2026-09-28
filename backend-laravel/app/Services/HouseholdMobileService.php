@@ -501,8 +501,11 @@ class HouseholdMobileService
         $now = now();
         $statusLogId = null;
         $deviceId = $this->deviceIdForUuid($householdId, $validated['device_uuid'] ?? null);
+        $reportingMember = ! empty($user?->member_id)
+            ? $this->householdMember($householdId, (string) $user->member_id)
+            : null;
 
-        DB::transaction(function () use ($request, $householdId, $user, $activeEvent, $validated, $status, $now, &$statusLogId, $deviceId): void {
+        DB::transaction(function () use ($request, $householdId, $user, $activeEvent, $validated, $status, $now, &$statusLogId, $deviceId, $reportingMember): void {
             $data = $this->filterColumns('household_status_logs', [
                 'disaster_id' => $activeEvent['event_id'],
                 'household_id' => $householdId,
@@ -524,6 +527,49 @@ class HouseholdMobileService
 
             $statusLogId = DB::table('household_status_logs')->insertGetId($data, 'status_log_id');
             $this->saveLatestDisasterStatus($activeEvent['event_id'], $householdId, $status['status_id'], $validated, $user?->user_id, $deviceId, $now);
+
+            if ($reportingMember) {
+                $memberId = (string) $reportingMember->member_id;
+                $memberName = $this->personName($reportingMember->name ?? null, $reportingMember->first_name ?? null, $reportingMember->last_name ?? null, 'Household member');
+                $householdNotes = $this->decodeJson($validated['notes'] ?? null);
+
+                DB::table('household_status_logs')->insert($this->filterColumns('household_status_logs', [
+                    'disaster_id' => $activeEvent['event_id'],
+                    'household_id' => $householdId,
+                    'status_id' => $status['status_id'],
+                    'source' => 'household_member_mobile',
+                    'submitted_by_user_id' => $user?->user_id,
+                    'device_token_id' => $deviceId,
+                    'latitude' => $validated['latitude'] ?? null,
+                    'longitude' => $validated['longitude'] ?? null,
+                    'location_label' => $validated['location_label'] ?? null,
+                    'location_accuracy_m' => $validated['location_accuracy_m'] ?? null,
+                    'battery_level' => $validated['battery_level'] ?? null,
+                    'signal_strength' => $validated['signal_strength'] ?? null,
+                    'notes' => json_encode([
+                        'report_type' => 'member_status',
+                        'member_id' => $memberId,
+                        'member_name' => $memberName,
+                        'mobile_status_key' => $validated['status_key'],
+                        'mobile_status_label' => $this->mobileStatusLabel($validated['status_key'], null),
+                        'member_notes' => $householdNotes['user_notes'] ?? null,
+                    ], JSON_UNESCAPED_SLASHES),
+                    'submitted_at' => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]));
+
+                $this->saveMemberDisasterStatus(
+                    $activeEvent['event_id'],
+                    $householdId,
+                    $memberId,
+                    $validated,
+                    $user?->user_id,
+                    $deviceId,
+                    $now
+                );
+            }
+
             $this->saveLatestDeviceForStatus($householdId, $deviceId, $validated, $now);
             $this->writeAuditLog($request, 'mobile_household_status', 'household_status_logs', (string) $statusLogId, $validated);
         });
