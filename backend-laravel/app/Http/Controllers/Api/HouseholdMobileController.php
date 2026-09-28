@@ -41,6 +41,11 @@ class HouseholdMobileController extends Controller
         return $this->service->storeMemberStatus($request, $memberId);
     }
 
+    public function storeTrustedMemberStatus(Request $request, string $connectionId, string $memberId): JsonResponse
+    {
+        return $this->service->storeTrustedMemberStatus($request, $connectionId, $memberId);
+    }
+
     public function storeStatus(Request $request): JsonResponse
     {
         return $this->service->storeStatus($request);

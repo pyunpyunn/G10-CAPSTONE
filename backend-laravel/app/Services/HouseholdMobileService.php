@@ -263,12 +263,70 @@ class HouseholdMobileService
 
     public function storeMemberStatus(Request $request, string $memberId): JsonResponse
     {
-        $user = $request->user();
-        $householdId = $this->householdId($user);
+        $householdId = $this->householdId($request->user());
 
         if (! $householdId) {
             return response()->json(['message' => 'This account is not linked to a household record.'], 403);
         }
+
+        return $this->saveMemberStatusForHousehold(
+            $request,
+            $householdId,
+            $householdId,
+            $memberId,
+            'mobile_member_status',
+            'Family member status saved.'
+        );
+    }
+
+    public function storeTrustedMemberStatus(Request $request, string $connectionId, string $memberId): JsonResponse
+    {
+        if (! Schema::hasTable('trusted_households')) {
+            return $this->missingTableResponse('trusted_households');
+        }
+
+        $reportingHouseholdId = $this->householdId($request->user());
+
+        if (! $reportingHouseholdId) {
+            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
+        }
+
+        $connection = DB::table('trusted_households')
+            ->where('connection_id', $connectionId)
+            ->whereIn('validation_status', ['validated', 'approved'])
+            ->where(function ($query) use ($reportingHouseholdId): void {
+                $query->where('requesting_household_id', $reportingHouseholdId)
+                    ->orWhere('trusted_household_id', $reportingHouseholdId);
+            })
+            ->first(['requesting_household_id', 'trusted_household_id']);
+
+        if (! $connection) {
+            return response()->json(['message' => 'Trusted household connection was not found.'], 404);
+        }
+
+        $trustedHouseholdId = (string) ((string) $connection->requesting_household_id === $reportingHouseholdId
+            ? $connection->trusted_household_id
+            : $connection->requesting_household_id);
+
+        return $this->saveMemberStatusForHousehold(
+            $request,
+            $trustedHouseholdId,
+            $reportingHouseholdId,
+            $memberId,
+            'mobile_trusted_member_status',
+            'Trusted household member status saved.'
+        );
+    }
+
+    private function saveMemberStatusForHousehold(
+        Request $request,
+        string $householdId,
+        string $reportingHouseholdId,
+        string $memberId,
+        string $auditAction,
+        string $successMessage
+    ): JsonResponse {
+        $user = $request->user();
 
         foreach (['household_status_logs', 'household_statuses', 'household_members', 'household_disasters'] as $table) {
             if (! Schema::hasTable($table)) {
@@ -315,10 +373,10 @@ class HouseholdMobileService
 
         $now = now();
         $statusLogId = null;
-        $deviceId = $this->deviceIdForUuid($householdId, $validated['device_uuid'] ?? null);
+        $deviceId = $this->deviceIdForUuid($reportingHouseholdId, $validated['device_uuid'] ?? null);
         $memberName = $this->personName($member->name ?? null, $member->first_name ?? null, $member->last_name ?? null, 'Household member');
 
-        DB::transaction(function () use ($request, $householdId, $user, $activeEvent, $validated, $status, $now, &$statusLogId, $deviceId, $memberId, $memberName): void {
+        DB::transaction(function () use ($request, $householdId, $user, $activeEvent, $validated, $status, $now, &$statusLogId, $deviceId, $memberId, $memberName, $auditAction): void {
             $notes = [
                 'report_type' => 'member_status',
                 'member_id' => $memberId,
@@ -366,14 +424,15 @@ class HouseholdMobileService
                 $now
             );
 
-            $this->writeAuditLog($request, 'mobile_member_status', 'household_status_logs', (string) $statusLogId, array_merge($validated, [
+            $this->writeAuditLog($request, $auditAction, 'household_status_logs', (string) $statusLogId, array_merge($validated, [
+                'household_id' => $householdId,
                 'member_id' => $memberId,
                 'member_name' => $memberName,
             ]));
         });
 
         return response()->json([
-            'message' => 'Family member status saved.',
+            'message' => $successMessage,
             'data' => [
                 'status_log_id' => $statusLogId,
                 'member_status' => [
@@ -1459,6 +1518,7 @@ class HouseholdMobileService
                 return [
                     'connection_id' => $row->connection_id,
                     'household_id' => $trustedHouseholdId,
+                    'household_name' => $trustedHouseholdName,
                     'family_name' => $this->familyName($trustedHouseholdName),
                     'reason' => $row->reason,
                     'validation_status' => $row->validation_status ?? 'pending',

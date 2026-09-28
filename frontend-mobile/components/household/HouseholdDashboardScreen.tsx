@@ -27,6 +27,7 @@ type TrustedScreenProps = {
   onBackFamily: () => void;
   onRespondToIncomingRequest: (requestItem: any, decision: 'accept' | 'reject') => void;
   respondingConnectionId: string | null;
+  onSaveTrustedMemberStatus: (connectionId: string, memberId: string, status: string) => Promise<void>;
 };
 
 export function HouseholdDashboardScreen({
@@ -197,18 +198,24 @@ export function HouseholdTrustedScreen({
   onBackFamily,
   onRespondToIncomingRequest,
   respondingConnectionId,
+  onSaveTrustedMemberStatus,
 }: TrustedScreenProps) {
   const activeEvent = overview.active_event;
   const incomingRequests = overview.trusted?.incoming_requests || [];
   const members = viewingTrusted ? trustedMembers(viewingTrusted) : [];
   const trustedStatus = viewingTrusted?.current_status || null;
+  const [selectedTrustedMemberId, setSelectedTrustedMemberId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedTrustedMemberId(null);
+  }, [viewingTrusted?.connection_id]);
 
   if (viewingTrusted) {
     return (
       <View style={styles.stack}>
         <View style={styles.card}>
           <HouseholdSection
-            title={`${viewingTrusted.family_name} household`}
+            title={trustedHouseholdName(viewingTrusted)}
             action={<HouseholdButton label="Back" icon="arrow-back-outline" tone="light" onPress={onBackFamily} />}
           />
           {activeEvent ? (
@@ -228,15 +235,30 @@ export function HouseholdTrustedScreen({
           {members.length === 0 ? (
             <HouseholdEmpty icon="people-outline" title="No members listed" />
           ) : (
-            members.map((member: any) => (
-              <MemberRow
-                key={member.member_id || member.name}
-                member={member}
-                activeEvent={activeEvent}
-                statusOptions={defaultStatusOptions}
-                canEditStatus={false}
-              />
-            ))
+            members.map((member: any) => {
+              const memberId = String(member.member_id);
+              const isExpanded = selectedTrustedMemberId === memberId;
+
+              return (
+                <View key={member.member_id || member.name} style={styles.memberDropdown}>
+                  <MemberSummary
+                    member={member}
+                    isExpanded={isExpanded}
+                    onPress={() => setSelectedTrustedMemberId(isExpanded ? null : memberId)}
+                  />
+                  {isExpanded ? (
+                    <MemberRow
+                      member={member}
+                      activeEvent={activeEvent}
+                      statusOptions={overview.status_options?.length ? overview.status_options : defaultStatusOptions}
+                      canEditStatus={isTrustedValidated(viewingTrusted)}
+                      showMemberInfo={false}
+                      onSaveMemberStatus={(memberId, status) => onSaveTrustedMemberStatus(viewingTrusted.connection_id, memberId, status)}
+                    />
+                  ) : null}
+                </View>
+              );
+            })
           )}
         </View>
       </View>
@@ -378,7 +400,7 @@ function TrustedHouseholdList({
             />
           </View>
           <View style={styles.trustedText}>
-            <Text style={styles.rowTitle}>{householdItem.family_name}</Text>
+            <Text style={styles.rowTitle}>{trustedHouseholdName(householdItem)}</Text>
             <Text style={styles.rowMeta}>
               {householdItem.household_id} · {householdItem.reason || 'Trusted household request'}
             </Text>
@@ -584,6 +606,12 @@ function trustedMembers(household: any) {
     relationship: item.relationship_to_family || 'Trusted household member',
     device: null,
   }));
+}
+
+function trustedHouseholdName(household: any): string {
+  const name = String(household.household_name || household.family_name || household.household_id || 'Trusted household').trim();
+
+  return /household$/i.test(name) ? name : `${name} Household`;
 }
 
 const defaultStatusOptions = [

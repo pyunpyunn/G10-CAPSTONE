@@ -23,6 +23,7 @@ import {
   lookupTrustedHousehold,
   respondToTrustedHouseholdRequest,
   saveHouseholdMemberStatus,
+  saveTrustedHouseholdMemberStatus,
   saveHouseholdStatus,
   updateHouseholdDeviceLocation,
   updateHouseholdMember,
@@ -106,6 +107,11 @@ export default function HouseholdHomeScreen() {
     try {
       const data = await getHouseholdOverview();
       setOverview(data);
+      setViewingTrusted((current) =>
+        current
+          ? data.trusted?.households?.find((household: any) => household.connection_id === current.connection_id) || null
+          : null
+      );
       const savedStatus = data.current_status?.status_key || data.status_options?.[0]?.key || 'safe';
       setPendingStatus(savedStatus);
       setEditingStatus(true);
@@ -336,6 +342,39 @@ export default function HouseholdHomeScreen() {
     }
   }
 
+  async function handleSaveTrustedMemberStatus(connectionId: string, memberId: string, statusKey: string) {
+    if (!overview?.active_event) {
+      Alert.alert('No active disaster', 'Family member status can only be saved during an active disaster event.');
+      return;
+    }
+
+    const locationPayload: any = {};
+
+    if (currentDevice?.latitude && currentDevice?.longitude) {
+      locationPayload.latitude = currentDevice.latitude;
+      locationPayload.longitude = currentDevice.longitude;
+      locationPayload.location_label = currentDevice.last_location_label;
+    } else if (overview?.geotag?.latitude && overview?.geotag?.longitude) {
+      locationPayload.latitude = overview.geotag.latitude;
+      locationPayload.longitude = overview.geotag.longitude;
+      locationPayload.location_label = overview.geotag.location_label;
+      locationPayload.location_accuracy_m = overview.geotag.accuracy_m;
+    }
+
+    try {
+      await saveTrustedHouseholdMemberStatus(connectionId, memberId, {
+        status_key: statusKey,
+        device_uuid: deviceUuid,
+        battery_level: realBatteryLevel ?? undefined,
+        ...locationPayload,
+      });
+      await loadOverview(true);
+    } catch (error: any) {
+      Alert.alert('Unable to save trusted member status', errorMessage(error));
+      throw error;
+    }
+  }
+
   function openTrusted(household: any) {
     const status = String(household.validation_status || '').toLowerCase();
 
@@ -502,6 +541,7 @@ export default function HouseholdHomeScreen() {
           onBackFamily={() => setViewingTrusted(null)}
           onRespondToIncomingRequest={handleRespondToTrustedRequest}
           respondingConnectionId={respondingTrustedConnectionId}
+          onSaveTrustedMemberStatus={handleSaveTrustedMemberStatus}
         />
       );
     }
