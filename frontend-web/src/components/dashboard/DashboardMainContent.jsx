@@ -1,7 +1,5 @@
-import {
-  Radio,
-  TriangleAlert,
-} from 'lucide-react'
+import { X } from 'lucide-react'
+import { useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import Badge from '../ui/Badge'
@@ -21,16 +19,26 @@ export default function DashboardMainContent({
   hasActiveEvent,
   onOpenModule,
 }) {
+  const [isStandbyStripVisible, setIsStandbyStripVisible] = useState(true)
+
   return (
     <div className="dashboard-main">
       {hasActiveEvent && (
         <ActiveEventBanner activeEvent={dashboard.active_event} onOpenBroadcast={() => onOpenModule('/broadcast')} />
       )}
 
-      {!hasActiveEvent && (
+      {!hasActiveEvent && isStandbyStripVisible && (
         <div className="standby-strip">
-          <strong>Standby mode</strong>
-          <span>Household reporting, dispatch charts, weather snapshots, and activity logs will appear after an active disaster event is declared.</span>
+          <strong>NO ACTIVE DISASTER</strong>
+          <button
+            className="standby-strip-close"
+            type="button"
+            aria-label="Dismiss no active disaster message"
+            title="Dismiss"
+            onClick={() => setIsStandbyStripVisible(false)}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
         </div>
       )}
 
@@ -54,8 +62,7 @@ export default function DashboardMainContent({
           <ChartCard
             title="Dispatch status - team count"
             bars={dashboard.dispatch.counts}
-            emptyTitle="No dispatch yet"
-            emptyMessage="Teams will appear after HQ assigns responders to an active event."
+            alwaysShowChart
             onManage={() => onOpenModule('/dispatch')}
           />
         </div>
@@ -172,7 +179,7 @@ function ReportingProgress({ households, hasActiveEvent }) {
   )
 }
 
-function ChartCard({ title, bars = [], emptyTitle, emptyMessage, onManage }) {
+function ChartCard({ title, bars = [], emptyTitle, emptyMessage, alwaysShowChart = false, onManage }) {
   const hasValues = bars.some((bar) => Number(bar.value) > 0)
   const axis = makeAxis(bars)
 
@@ -184,7 +191,7 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, onManage }) {
           <FontAwesomeIcon icon={faArrowRight} />
         </button>
       </div>
-      {hasValues ? (
+      {hasValues || alwaysShowChart ? (
         <div className="team-count-chart" role="img" aria-label={title}>
           <div className="chart-y-axis" aria-hidden="true">
             {axis.map((item) => <span key={item}>{item}</span>)}

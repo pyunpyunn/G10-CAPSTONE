@@ -190,7 +190,7 @@ class DisasterBroadcastService
     private function sendBroadcastSms(array $validated, array $metadata): array
     {
         if ($validated['scope_type'] === 'rescuers_only') {
-            return ['status' => 'skipped', 'recipient_count' => 0, 'sent_count' => 0,
+            return ['status' => 'skipped', 'recipient_count' => 0, 'accepted_count' => 0,
                 'provider_ids' => [], 'message' => 'SMS targets households only.', 'errors' => []];
         }
 
@@ -208,7 +208,7 @@ class DisasterBroadcastService
     {
         if (Schema::hasTable('disaster_broadcasts') && Schema::hasColumn('disaster_broadcasts', 'sms_status')) {
             DisasterBroadcast::query()->where('broadcast_id', $broadcastId)->update([
-                'sms_status' => 'semaphore_'.$result['status'],
+                'sms_status' => 'smsgate_'.$result['status'],
                 'updated_at' => now(),
             ]);
         }

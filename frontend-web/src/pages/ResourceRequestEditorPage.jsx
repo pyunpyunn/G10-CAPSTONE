@@ -1,4 +1,4 @@
-import { ArrowLeft, RefreshCcw } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -12,6 +12,7 @@ import {
 } from '../api/resourceRequestApi'
 import ResourceValidationModal from '../components/resources/ResourceValidationModal'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import {
   buildCreatePayload,
   buildForwardPayload,
@@ -169,17 +170,11 @@ export default function ResourceRequestEditorPage() {
 
   return (
     <section className="page active resources-page resource-request-editor">
-      <header className="household-status-page-header">
-        <div className="household-status-header-copy">
-          <h1>{editorTitle(mode)}</h1>
-          <p>Barangay Mambaling, Cebu City</p>
-        </div>
-        <div className="weather-page-actions household-status-page-actions">
-          <div className="weather-live-status"><strong>Requests</strong><span>Validation and handoff records</span></div>
-          <button className="button secondary" type="button" onClick={closePage}><ArrowLeft size={16} />Back to requests</button>
-          {requestId && <button className="button secondary" type="button" onClick={() => window.location.reload()}><RefreshCcw size={16} />Reload</button>}
-        </div>
-      </header>
+      <PageHeader
+        title={editorTitle(mode)}
+        subtitle="Barangay Mambaling, Cebu City"
+        actions={<button className="button secondary" type="button" onClick={closePage}><ArrowLeft size={15} />Back to requests</button>}
+      />
 
       {isLoading ? <LoadingState /> : error ? <div className="form-error">{error}</div> : (
         <ResourceValidationModal

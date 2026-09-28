@@ -2,9 +2,8 @@ import { Bell, CheckCircle2, Eye, Inbox } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getNotifications, markNotificationsRead } from '../../api/notificationApi'
-import resqperationLogo from '../../assets/resqperation-logo.png'
 
-export default function Topbar({ user }) {
+export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCapture, onBlurCapture }) {
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
@@ -117,29 +116,13 @@ export default function Topbar({ user }) {
   }
 
   return (
-    <header className="topbar">
-      <div className="header-brand" aria-label="ResQperation">
-        <img className="header-brand-logo" src={resqperationLogo} alt="" aria-hidden="true" />
-
-        <div className="header-brand-wordmark" role="img" aria-label="ResQperation">
-          <span className="header-brand-wordmark-text header-brand-wordmark-prefix">res</span>
-          <svg className="header-brand-wordmark-pin" viewBox="0 0 32 39" focusable="false" aria-hidden="true">
-            <path
-              fill="currentColor"
-              fillRule="evenodd"
-              d="M16 1C7.72 1 1 7.72 1 16c0 10.38 15 22 15 22s15-11.62 15-22C31 7.72 24.28 1 16 1Zm0 8.25a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5Z"
-              clipRule="evenodd"
-            />
-            <path d="M19 22.4 27.5 30" fill="none" stroke="var(--nav)" strokeWidth="4.5" strokeLinecap="round" />
-          </svg>
-          <span className="header-brand-wordmark-text header-brand-wordmark-suffix">peration</span>
-          <svg className="header-brand-wordmark-route" viewBox="0 0 176 10" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M2 5h49c13 0 12-3 24-3h29c12 0 12 6 24 6h42" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="5 5" strokeLinecap="round" />
-            <circle cx="173" cy="5" r="2.5" fill="currentColor" />
-          </svg>
-        </div>
-      </div>
-
+    <header
+      className="topbar"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onFocusCapture={onFocusCapture}
+      onBlurCapture={onBlurCapture}
+    >
       <div className="header-actions" aria-label="Header actions">
         {canViewInquiries && (
           <button

@@ -3,6 +3,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getHousehold, getHouseholdStatusLogs } from '../api/householdApi'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import { StatusBadge } from '../components/households/HouseholdTable'
 
 const HISTORY_PAGE_SIZE = 5
@@ -67,26 +68,20 @@ export default function HouseholdReviewPage() {
 
   return (
     <main className="household-review-page">
-      <div className="household-review-topbar">
-        <div className="household-review-summary">
-          <div className="summary-primary-row">
-            <div className="review-meta-inline headline-inline">
-              <div className="review-header-title-wrap">
-                <span className="review-header-kicker">Household</span>
-                <h1 className="review-header-title">{detail?.household?.household_name || 'Household record'}</h1>
-                <div className="review-header-subtitle">{detail?.household?.purok || 'Purok not assigned'}</div>
-              </div>
-              <span className={`review-header-status status-badge ${detail?.household?.status?.key || 'unchecked'}`}>
-                {detail?.household?.status?.label || 'Status not reported'}
-              </span>
-            </div>
+      <PageHeader
+        title={detail?.household?.household_name || 'Household record'}
+        subtitle={detail?.household?.purok || 'Purok not assigned'}
+        actions={(
+          <>
+            <span className={`review-header-status status-badge ${detail?.household?.status?.key || 'unchecked'}`}>
+              {detail?.household?.status?.label || 'Status not reported'}
+            </span>
             <button type="button" className="button secondary compact-button" onClick={() => navigate('/households')}>
-              <ArrowLeft size={15} />
-              GO BACK TO
+              <ArrowLeft size={15} /> Back to households
             </button>
-          </div>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}

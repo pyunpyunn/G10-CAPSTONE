@@ -11,6 +11,7 @@ import HouseholdOpsPanels from '../components/households/HouseholdOpsPanels'
 import HouseholdSummary from '../components/households/HouseholdSummary'
 import HouseholdTable from '../components/households/HouseholdTable'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   emptySummary,
@@ -140,30 +141,22 @@ export default function HouseholdStatusPage() {
 
   return (
     <main className="ops-page household-page">
-      <header className="household-status-page-header">
-        <div className="household-status-header-copy">
-          <h1>Household Status</h1>
-          <p>Barangay Mambaling, Cebu City</p>
-        </div>
-        <div className="weather-page-actions household-status-page-actions">
-          <div className="weather-live-status">
-            <strong>{hasActiveEvent ? 'Live' : 'Standby'}</strong>
-            <span>{hasActiveEvent ? 'Monitoring active event' : 'Waiting for active event'}</span>
-          </div>
-          <button className="button secondary" type="button" onClick={loadHouseholds}>
-            <RefreshCcw size={16} />
-            Refresh
-          </button>
-          <button className="button secondary" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('excel')}>
-            <Download size={16} />
-            Export
-          </button>
-          <button className="button secondary" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('pdf')}>
-            <FileDown size={16} />
-            PDF
-          </button>
-        </div>
-      </header>
+      <PageHeader
+        title="Household Status"
+        subtitle="Barangay Mambaling, Cebu City"
+        filters={payload && (
+          <HouseholdFilters
+            searchText={searchText}
+            purok={purok}
+            status={status}
+            summary={summary}
+            puroks={puroks}
+            onSearchTextChange={setSearchText}
+            onPurokChange={changePurok}
+            onStatusChange={changeStatusFilter}
+          />
+        )}
+      />
 
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
@@ -171,19 +164,6 @@ export default function HouseholdStatusPage() {
       {!isInitialLoading && !hasBlockingError && payload && (
         <div className="workspace-grid">
           <section className="household-workspace" aria-label="Household rescue list">
-            <div className="filter-bar household-filter-shell">
-              <HouseholdFilters
-                searchText={searchText}
-                purok={purok}
-                status={status}
-                summary={summary}
-                puroks={puroks}
-                onSearchTextChange={setSearchText}
-                onPurokChange={changePurok}
-                onStatusChange={changeStatusFilter}
-              />
-            </div>
-
             <div className="data-panel">
               <RefreshOverlay active={isRefreshing}>
                 <HouseholdTable
@@ -193,6 +173,19 @@ export default function HouseholdStatusPage() {
                   onOpen={openHousehold}
                   onPageChange={setPage}
                   onDispatchPurok={() => navigate('/dispatch')}
+                  actions={(
+                    <>
+                      <button className="button secondary" type="button" onClick={loadHouseholds}>
+                        <RefreshCcw size={14} /> Refresh
+                      </button>
+                      <button className="button secondary" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('excel')}>
+                        <Download size={14} /> Export
+                      </button>
+                      <button className="button secondary" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('pdf')}>
+                        <FileDown size={14} /> PDF
+                      </button>
+                    </>
+                  )}
                 />
               </RefreshOverlay>
             </div>

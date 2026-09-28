@@ -1,4 +1,4 @@
-import { Inbox, RefreshCcw } from 'lucide-react'
+import { Inbox } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getInquiries, updateInquiryStatus } from '../api/inquiryApi'
 import Badge from '../components/ui/Badge'
@@ -7,6 +7,7 @@ import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import PaginationBar from '../components/ui/PaginationBar'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
+import DataFilterBar from '../components/ui/DataFilterBar'
 
 const statuses = [
   { key: 'all', label: 'All' },
@@ -91,12 +92,17 @@ export default function SuperAdminPage() {
     <section className="page active super-admin-page">
       <PageHeader
         title="Super Admin"
-        actions={
-          <button className="btn btn-secondary btn-sm" type="button" onClick={refresh}>
-            <RefreshCcw size={14} />
-            Refresh
-          </button>
-        }
+        filters={(
+          <DataFilterBar
+            className="page-heading-filter"
+            filters={[{
+              id: 'inquiry-status', label: 'Inquiry status', value: status,
+              onChange: (value) => { setPage(1); setStatus(value) },
+              options: statuses.map((item) => ({ value: item.key, label: item.label })),
+            }]}
+            onReset={() => { setPage(1); setStatus('all') }}
+          />
+        )}
       />
 
       {isInitialLoading && <LoadingState />}
@@ -132,12 +138,6 @@ export default function SuperAdminPage() {
               <Inbox size={16} />
               Landing page inquiries
             </div>
-            <select value={status} onChange={(event) => {
-              setPage(1)
-              setStatus(event.target.value)
-            }}>
-              {statuses.map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}
-            </select>
           </div>
 
           {!payload.table_ready && (

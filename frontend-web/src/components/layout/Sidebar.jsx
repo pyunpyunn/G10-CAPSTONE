@@ -68,6 +68,20 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
         }
       }}
     >
+      <div className="left-sidebar-brand" role="img" aria-label="ResQperation">
+        <span className="left-sidebar-brand-text">res</span>
+        <svg className="left-sidebar-brand-pin" viewBox="0 0 32 39" focusable="false" aria-hidden="true">
+          <path
+            fill="currentColor"
+            fillRule="evenodd"
+            d="M16 1C7.72 1 1 7.72 1 16c0 10.38 15 22 15 22s15-11.62 15-22C31 7.72 24.28 1 16 1Zm0 8.25a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5Z"
+            clipRule="evenodd"
+          />
+          <path d="M19 22.4 27.5 30" fill="none" stroke="var(--nav)" strokeWidth="4.5" strokeLinecap="round" />
+        </svg>
+        <span className="left-sidebar-brand-text">peration</span>
+      </div>
+
       <div className="left-sidebar-actions" aria-label="Navigation controls">
         <button
           className="left-pin-button"

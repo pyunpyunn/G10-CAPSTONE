@@ -9,12 +9,14 @@ import {
   getSavedArchiveGroups,
 } from '../api/archiveApi'
 import ArchiveDownloadMenu from '../components/archive/ArchiveDownloadMenu'
+import ArchiveFilters from '../components/archive/ArchiveFilters'
 import ArchiveRecordModal from '../components/archive/ArchiveRecordModal'
 import ArchiveSavedLogsModal from '../components/archive/ArchiveSavedLogsModal'
 import ArchiveSelectionTools from '../components/archive/ArchiveSelectionTools'
 import ArchiveTable from '../components/archive/ArchiveTable'
 import ArchiveTabs from '../components/archive/ArchiveTabs'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   ARCHIVE_TABS,
@@ -371,29 +373,30 @@ export default function ArchivePage() {
           counts={counts}
         />
         <div className="archive-workspace-main">
-          <div className="archive-section-head">
-            <div className="archive-section-title">
-              <h1>{categoryLabel}</h1>
-              <span>{pagination.total || 0} records</span>
-            </div>
-            <div className="archive-inline-filters">
-              <label className="archive-filter-search">
-                <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search records..." aria-label="Search records" />
-              </label>
-              <select aria-label="Purok" value={purok} onChange={(event) => { setPurok(event.target.value); setPage(1) }}>
-                <option value="all">All puroks</option>
-                {(filters.puroks || []).map((item) => <option value={item} key={item}>{item}</option>)}
-              </select>
-              <select aria-label="Event" value={eventId} onChange={(event) => { setEventId(event.target.value); setPage(1) }}>
-                <option value="all">All events</option>
-                {(filters.events || []).map((item) => <option value={item.event_id} key={item.event_id}>{item.label || item.name}</option>)}
-              </select>
-              <select aria-label="Status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }}>
-                <option value="all">All statuses</option>
-                {(filters.statuses || []).map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}
-              </select>
-            </div>
-          </div>
+          <PageHeader
+            title={categoryLabel}
+            subtitle={`${pagination.total || 0} records`}
+            filters={(
+              <ArchiveFilters
+              search={search}
+              onSearchChange={(value) => { setSearch(value); setPage(1) }}
+              purok={purok}
+              onPurokChange={(value) => { setPurok(value); setPage(1) }}
+              eventId={eventId}
+              onEventChange={(value) => { setEventId(value); setPage(1) }}
+              status={status}
+              onStatusChange={(value) => { setStatus(value); setPage(1) }}
+              onReset={() => {
+                setSearch('')
+                setPurok('all')
+                setEventId('all')
+                setStatus('all')
+                setPage(1)
+              }}
+              filters={filters}
+              />
+            )}
+          />
 
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}

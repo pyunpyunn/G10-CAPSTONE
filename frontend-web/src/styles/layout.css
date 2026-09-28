@@ -1,6 +1,8 @@
 .app-shell {
   --left-column: var(--left-width);
+  --topbar-left: var(--left-column);
   --topbar-height: 64px;
+  --topbar-offset: var(--topbar-height);
   min-height: 100vh;
   padding-left: var(--left-column);
   transition: padding-left 220ms cubic-bezier(0.19, 1, 0.22, 1);
@@ -10,83 +12,99 @@
   --left-column: var(--left-collapsed);
 }
 
+.app-shell.left-hidden.left-peeking {
+  --topbar-left: var(--left-width);
+}
+
+.app-shell.topbar-hidden {
+  --topbar-offset: 0px;
+}
+
 .topbar {
-  position: relative;
-  z-index: 20;
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: var(--topbar-left);
+  z-index: 70;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: var(--topbar-height);
-  gap: 16px;
-  padding: 0 16px;
+  gap: clamp(5px, 1.2vw, 16px);
+  padding: 0 clamp(4px, 1vw, 16px);
   color: var(--nav-text);
   background: var(--nav);
   border-bottom: 1px solid var(--nav-line);
+  transform: translateY(0);
+  transition: left 220ms cubic-bezier(0.19, 1, 0.22, 1), transform 220ms cubic-bezier(0.19, 1, 0.22, 1);
+  will-change: transform;
+  container-name: topbar;
+  container-type: inline-size;
 }
 
-.header-brand {
-  display: inline-flex;
+.app-shell.topbar-hidden .topbar {
+  transform: translateY(-100%);
+}
+
+.topbar-hover-zone {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: var(--topbar-left);
+  z-index: 80;
+  height: 12px;
+  cursor: default;
+}
+
+.left-sidebar-brand {
+  display: flex;
   align-items: center;
-  gap: 13px;
-  width: 240px;
+  justify-content: center;
   min-width: 0;
-}
-
-.header-brand-logo {
-  display: block;
-  width: 58px;
-  height: 30px;
-  padding: 0;
-  background: transparent;
-  object-fit: contain;
-  flex: 0 0 auto;
+  height: 58px;
+  margin: 0 12px 8px;
   overflow: hidden;
-}
-
-.header-brand-wordmark {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: 40px;
   color: #f5f7fb;
   font-family: "Archivo Black", "Arial Black", sans-serif;
   line-height: 1;
   letter-spacing: 0;
   white-space: nowrap;
+  transition: margin 220ms cubic-bezier(0.19, 1, 0.22, 1);
 }
 
-.header-brand-wordmark-text {
+.left-sidebar-brand-text {
   display: inline-block;
   font-size: 22px;
   font-weight: 900;
   text-transform: lowercase;
 }
 
-.header-brand-wordmark-prefix {
-  transform: translateY(-1px);
-}
-
-.header-brand-wordmark-suffix {
-  transform: translateY(-1px);
-}
-
-.header-brand-wordmark-pin {
-  width: 30px;
-  height: 36px;
-  margin: 0 1px -6px 2px;
+.left-sidebar-brand-pin {
+  width: 28px;
+  height: 34px;
+  margin: 0 1px -5px 2px;
   flex: 0 0 auto;
   color: #f5f7fb;
   filter: drop-shadow(0 2px 3px rgba(10, 16, 27, 0.32));
 }
 
-.header-brand-wordmark-route {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 1px;
-  width: 100%;
-  height: 10px;
-  color: rgba(245, 247, 251, 0.65);
+.left-sidebar-brand-pin path:last-child {
+  stroke: var(--nav);
+}
+
+.app-shell.left-hidden .left-sidebar-brand {
+  margin-right: 8px;
+  margin-left: 8px;
+}
+
+.app-shell.left-hidden:not(.left-peeking):not(.left-pinned) .left-sidebar-brand-text {
+  display: none;
+}
+
+.app-shell.left-hidden:not(.left-peeking):not(.left-pinned) .left-sidebar-brand-pin {
+  width: 26px;
+  height: 32px;
+  margin: 0;
 }
 
 .header-actions {

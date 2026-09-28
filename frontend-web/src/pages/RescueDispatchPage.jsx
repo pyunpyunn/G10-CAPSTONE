@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RefreshCcw, Route } from 'lucide-react'
+import { Route } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { getDispatchDashboard } from '../api/dispatchApi'
 import DispatchSidePanel from '../components/dispatch/DispatchSidePanel'
@@ -7,6 +7,8 @@ import DispatchSummary from '../components/dispatch/DispatchSummary'
 import DispatchStatusBadge from '../components/dispatch/DispatchStatusBadge'
 import DispatchTeamGrid from '../components/dispatch/DispatchTeamGrid'
 import LoadingState from '../components/ui/LoadingState'
+import DataFilterBar from '../components/ui/DataFilterBar'
+import PageHeader from '../components/ui/PageHeader'
 import {
   emptySummary,
   teamFilters,
@@ -21,6 +23,12 @@ export default function RescueDispatchPage() {
   const [teamFilter, setTeamFilter] = useState('all')
   const [dispatchFilter, setDispatchFilter] = useState('all')
   const [searchText, setSearchText] = useState('')
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setSearch(searchText.trim()), 300)
+    return () => window.clearTimeout(timeoutId)
+  }, [searchText])
 
   useEffect(() => {
     let ignore = false
@@ -32,7 +40,7 @@ export default function RescueDispatchPage() {
       try {
         const data = await getDispatchDashboard({
           status: dispatchFilter,
-          search: searchText.trim(),
+          search,
           per_page: 20,
         })
 
@@ -55,25 +63,7 @@ export default function RescueDispatchPage() {
     return () => {
       ignore = true
     }
-  }, [dispatchFilter, searchText])
-
-  async function loadDispatch() {
-    setIsLoading(true)
-    setError('')
-
-    try {
-      const data = await getDispatchDashboard({
-        status: dispatchFilter,
-        search: searchText.trim(),
-        per_page: 20,
-      })
-      setPayload(data)
-    } catch {
-      setError('Rescue dispatch records cannot be loaded right now. Please check the backend or database connection.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  }, [dispatchFilter, search])
 
   const teams = payload?.teams || []
   const riskAreas = payload?.risk_areas || []
@@ -118,26 +108,28 @@ export default function RescueDispatchPage() {
 
   return (
     <main className="ops-page dispatch-page">
-      <header className="household-status-page-header dispatch-page-header">
-        <div className="household-status-header-copy">
-          <h1>Rescue Dispatch</h1>
-          <p>Barangay Mambaling, Cebu City</p>
-        </div>
-        <div className="weather-page-actions household-status-page-actions">
-          <div className="weather-live-status">
-            <strong>{hasActiveEvent ? 'Live' : 'Standby'}</strong>
-            <span>{hasActiveEvent ? 'Dispatch operations active' : 'Waiting for active event'}</span>
-          </div>
-          <button className="button secondary" type="button" onClick={loadDispatch}>
-            <RefreshCcw size={16} />
-            Refresh
-          </button>
+      <PageHeader
+        title="Rescue Dispatch"
+        subtitle="Barangay Mambaling, Cebu City"
+        filters={payload && (
+          <DataFilterBar
+            className="page-heading-filter"
+            search={searchText}
+            onSearchChange={setSearchText}
+            searchPlaceholder="Search assignment, area, team..."
+            filters={[{
+              id: 'dispatch-status', label: 'Status', value: dispatchFilter, onChange: setDispatchFilter,
+              options: [{ value: 'all', label: 'All statuses' }, ...teamFilters.filter((filter) => filter.key !== 'all').map((filter) => ({ value: filter.key, label: filter.label }))],
+            }]}
+            onReset={() => { setSearchText(''); setSearch(''); setDispatchFilter('all') }}
+          />
+        )}
+        actions={(
           <Link className={`button review ${!hasActiveEvent ? 'disabled' : ''}`} to={hasActiveEvent ? '/dispatch/new' : '/dispatch'} aria-disabled={!hasActiveEvent} onClick={(event) => !hasActiveEvent && event.preventDefault()}>
-            <Route size={16} />
-            New dispatch
+            <Route size={15} /> New dispatch
           </Link>
-        </div>
-      </header>
+        )}
+      />
 
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
@@ -156,12 +148,6 @@ export default function RescueDispatchPage() {
               <div className="dp-side-card dispatch-assignments-card">
                 <div className="dp-side-head">
                   <span className="dp-side-title">Active dispatch assignments</span>
-                  <select className="dp-filter-select" value={dispatchFilter} onChange={(event) => setDispatchFilter(event.target.value)}>
-                    <option value="all">All</option>
-                    {teamFilters.map((filter) => (
-                      <option value={filter.key} key={filter.key}>{filter.label}</option>
-                    ))}
-                  </select>
                 </div>
                 <div className="dp-side-body dp-table-body">
                   {dispatches.length === 0 ? (
@@ -197,11 +183,14 @@ export default function RescueDispatchPage() {
               <main className="dp-main-column dp-team-side-panel dispatch-team-panel">
                 <div className="dp-team-toolbar">
                   <span>Team status cards</span>
-                  <select className="dp-filter-select" value={teamFilter} onChange={(event) => setTeamFilter(event.target.value)} aria-label="Filter team status cards">
-                    {teamFilters.map((filter) => (
-                      <option value={filter.key} key={filter.key}>{filter.label}</option>
-                    ))}
-                  </select>
+                  <DataFilterBar
+                    className="dispatch-inline-filter"
+                    filters={[{
+                      id: 'team-status', label: 'Team status', value: teamFilter, onChange: setTeamFilter,
+                      options: teamFilters.map((filter) => ({ value: filter.key, label: filter.label })),
+                    }]}
+                    onReset={() => setTeamFilter('all')}
+                  />
                 </div>
 
                 <DispatchTeamGrid teams={filteredTeams} onOpenUpdate={openUpdateDispatch} onOpenNew={openNewDispatch} />

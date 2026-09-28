@@ -1,4 +1,4 @@
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal, RefreshCcw } from 'lucide-react'
 import ActionMenu from '../ui/ActionMenu'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
@@ -12,6 +12,7 @@ export default function ResourceRequestQueueTable({
   onView,
   onEdit,
   onPageChange,
+  onSync,
 }) {
   const total = pagination?.total || 0
   const from = pagination?.from || 0
@@ -21,7 +22,10 @@ export default function ResourceRequestQueueTable({
     <div className="rr-panel">
       <div className="rr-panel-head">
         <span className="rr-title">Validation queue</span>
-        <span className="rr-subtle">{total ? `Showing ${from}-${to} of ${total}` : 'No records yet'}</span>
+        <div className="rr-queue-tools">
+          <span className="rr-subtle">{total ? `Showing ${from}-${to} of ${total}` : 'No records yet'}</span>
+          {onSync && <button className="button secondary" type="button" onClick={onSync}><RefreshCcw size={14} />Sync requests</button>}
+        </div>
       </div>
       <div className="rr-table-wrap">
         {loading ? (
