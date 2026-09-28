@@ -431,7 +431,7 @@ function MemberSummary({
 
   return (
     <Pressable
-      style={styles.memberSummary}
+      style={[styles.memberSummary, isExpanded && styles.memberSummaryExpanded]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Open ${member.name || 'family member'} details`}
@@ -531,7 +531,7 @@ function MemberRow({
       </View>
       ) : null}
       {activeEvent ? (
-        <View style={styles.memberStatusBox}>
+        <View style={[styles.memberStatusBox, !showMemberInfo && styles.memberStatusBoxNested]}>
           <View style={styles.memberStatusTop}>
             <Text style={styles.memberStatusLabel}>Status</Text>
             <HouseholdBadge
@@ -802,23 +802,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
     padding: spacing.sm,
     backgroundColor: palette.card,
   },
+  memberSummaryExpanded: {
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+  },
   memberDropdown: {
-    gap: spacing.xs,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    backgroundColor: palette.card,
   },
   memberSummaryText: {
     flex: 1,
   },
   memberRow: {
     gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
     padding: spacing.md,
     backgroundColor: palette.card,
   },
@@ -891,6 +893,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
     backgroundColor: palette.secondary,
+  },
+  memberStatusBoxNested: {
+    borderWidth: 0,
+    borderRadius: 0,
+    padding: 0,
+    backgroundColor: 'transparent',
   },
   memberStatusTop: {
     flexDirection: 'row',
