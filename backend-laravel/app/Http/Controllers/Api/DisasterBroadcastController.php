@@ -26,6 +26,16 @@ class DisasterBroadcastController extends Controller
         return $this->service->storeEvent($request);
     }
 
+    public function updateEvent(Request $request, string $eventId): JsonResponse
+    {
+        return $this->service->updateEvent($request, $eventId);
+    }
+
+    public function show(string $eventId): JsonResponse
+    {
+        return $this->service->show($eventId);
+    }
+
     public function broadcasts(string $eventId): JsonResponse
     {
         return $this->service->broadcasts($eventId);

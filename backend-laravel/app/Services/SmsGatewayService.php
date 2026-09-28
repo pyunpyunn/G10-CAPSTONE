@@ -75,12 +75,19 @@ class SmsGatewayService
 
         $puroks = collect($options['household_puroks'] ?? [])->map(fn ($name) => trim((string) $name))->filter()->unique()->values()->all();
         if ($puroks !== [] && (! Schema::hasColumn('households', 'address_id')
-            || ! Schema::hasTable('addresses') || ! Schema::hasColumn('addresses', 'purok_sitio'))) {
+            || ! Schema::hasTable('addresses')
+            || ! Schema::hasColumn('addresses', 'purok_sitio'))) {
             // Never broaden a scoped broadcast when the target location cannot be verified.
             return [];
         }
         if ($puroks !== []) {
-            $query->join('addresses as a_sms', 'a_sms.address_id', '=', 'h.address_id')->whereIn('a_sms.purok_sitio', $puroks);
+            $query
+                ->join('addresses as a_sms', 'a_sms.address_id', '=', 'h.address_id')
+                ->whereIn('a_sms.purok_sitio', $puroks);
+
+            if (Schema::hasColumn('addresses', 'deleted_at')) {
+                $query->whereNull('a_sms.deleted_at');
+            }
         }
 
         $householdIds = collect($options['household_ids'] ?? [])->filter()->unique()->values()->all();

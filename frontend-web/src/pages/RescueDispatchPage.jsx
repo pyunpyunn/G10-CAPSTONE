@@ -21,14 +21,6 @@ export default function RescueDispatchPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [teamFilter, setTeamFilter] = useState('all')
-  const [dispatchFilter, setDispatchFilter] = useState('all')
-  const [searchText, setSearchText] = useState('')
-  const [search, setSearch] = useState('')
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => setSearch(searchText.trim()), 300)
-    return () => window.clearTimeout(timeoutId)
-  }, [searchText])
 
   useEffect(() => {
     let ignore = false
@@ -38,11 +30,7 @@ export default function RescueDispatchPage() {
       setError('')
 
       try {
-        const data = await getDispatchDashboard({
-          status: dispatchFilter,
-          search,
-          per_page: 20,
-        })
+        const data = await getDispatchDashboard({ per_page: 20 })
 
         if (!ignore) {
           setPayload(data)
@@ -63,7 +51,7 @@ export default function RescueDispatchPage() {
     return () => {
       ignore = true
     }
-  }, [dispatchFilter, search])
+  }, [])
 
   const teams = payload?.teams || []
   const riskAreas = payload?.risk_areas || []
@@ -111,19 +99,6 @@ export default function RescueDispatchPage() {
       <PageHeader
         title="Rescue Dispatch"
         subtitle="Barangay Mambaling, Cebu City"
-        filters={payload && (
-          <DataFilterBar
-            className="page-heading-filter"
-            search={searchText}
-            onSearchChange={setSearchText}
-            searchPlaceholder="Search assignment, area, team..."
-            filters={[{
-              id: 'dispatch-status', label: 'Status', value: dispatchFilter, onChange: setDispatchFilter,
-              options: [{ value: 'all', label: 'All statuses' }, ...teamFilters.filter((filter) => filter.key !== 'all').map((filter) => ({ value: filter.key, label: filter.label }))],
-            }]}
-            onReset={() => { setSearchText(''); setSearch(''); setDispatchFilter('all') }}
-          />
-        )}
         actions={(
           <Link className={`button review ${!hasActiveEvent ? 'disabled' : ''}`} to={hasActiveEvent ? '/dispatch/new' : '/dispatch'} aria-disabled={!hasActiveEvent} onClick={(event) => !hasActiveEvent && event.preventDefault()}>
             <Route size={15} /> New dispatch

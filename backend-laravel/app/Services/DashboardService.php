@@ -22,12 +22,10 @@ use Illuminate\Support\Facades\Schema;
 
 class DashboardService
 {
-    private BarangayProfileService $barangayProfile;
-
-    public function __construct(BarangayProfileService $barangayProfile)
-    {
-        $this->barangayProfile = $barangayProfile;
-    }
+    public function __construct(
+        private BarangayProfileService $barangayProfile,
+        private SituationReportService $situationReports,
+    ) {}
 
     public function index(): JsonResponse
     {
@@ -126,14 +124,24 @@ class DashboardService
 
             $releasedEvacuationCenters = $this->clearCurrentEventReferences($event->event_id, $endedAt);
             $this->archiveSituationReports($event->event_id, $endedAt);
+            $closureSitRepId = $this->situationReports->createClosureSnapshot(
+                $event->event_id,
+                $user?->user_id,
+                $endedAt,
+                $closureNote
+            );
             $this->writeIncidentArchive($event, $user?->user_id, $closureNote, $endedAt);
-            $this->writeAuditLog($event, $user, $endedAt, $closureNote, $request, $releasedEvacuationCenters);
+            $this->closeHouseholdReporting($event->event_id, $endedAt);
+            $closedAssignments = $this->closeOpenAssignments($event->event_id, $endedAt);
+            $this->writeAuditLog($event, $user, $endedAt, $closureNote, $request, $releasedEvacuationCenters, $closureSitRepId, $closedAssignments);
 
             return [
                 'event_id' => $event->event_id,
                 'name' => $event->name,
                 'ended_at' => $this->formatDateTime($endedAt->toDateTimeString()),
                 'released_evacuation_centers' => $releasedEvacuationCenters,
+                'closure_sitrep_id' => $closureSitRepId,
+                'closed_assignments' => $closedAssignments,
             ];
         });
 
@@ -150,7 +158,7 @@ class DashboardService
         $householdSummary = $this->getHouseholdSummary($eventId);
 
         return response()->json([
-            'message' => 'Active event closed and saved to the Disaster Event Log.',
+            'message' => 'Active event closed, saved to the Disaster Event Log, and queued for SitRep/archive.',
             'data' => [
                 'closed_event' => $closedEvent,
                 'dashboard' => [
@@ -640,18 +648,76 @@ class DashboardService
             && Schema::hasColumn('evacuation_centers', 'current_event_id');
     }
 
+    private function closeHouseholdReporting(string $eventId, Carbon $endedAt): void
+    {
+        if (! Schema::hasTable('household_disasters')) {
+            return;
+        }
+
+        $updates = [];
+
+        if (Schema::hasColumn('household_disasters', 'needs_dispatch')) {
+            $updates['needs_dispatch'] = 0;
+        }
+
+        if (Schema::hasColumn('household_disasters', 'updated_at')) {
+            $updates['updated_at'] = $endedAt;
+        }
+
+        if ($updates === []) {
+            return;
+        }
+
+        HouseholdDisaster::query()->where('disaster_id', $eventId)->update($updates);
+    }
+
+    private function closeOpenAssignments(string $eventId, Carbon $endedAt): int
+    {
+        if (! Schema::hasTable('responder_assignments')) {
+            return 0;
+        }
+
+        $query = ResponderAssignment::query()->where('disaster_id', $eventId);
+
+        if (Schema::hasColumn('responder_assignments', 'status')) {
+            $query->whereNotIn('status', ['completed', 'cancelled']);
+        }
+
+        $updates = [];
+
+        if (Schema::hasColumn('responder_assignments', 'status')) {
+            $updates['status'] = 'cancelled';
+        }
+
+        if (Schema::hasColumn('responder_assignments', 'outcome_notes')) {
+            $updates['outcome_notes'] = 'Automatically closed because the disaster event ended.';
+        }
+
+        if (Schema::hasColumn('responder_assignments', 'updated_at')) {
+            $updates['updated_at'] = $endedAt;
+        }
+
+        if ($updates === []) {
+            return 0;
+        }
+
+        return $query->update($updates);
+    }
+
     private function writeAuditLog(
         object $event,
         mixed $user,
         Carbon $endedAt,
         string $closureNote,
         Request $request,
-        int $releasedEvacuationCenters
+        int $releasedEvacuationCenters,
+        ?int $closureSitRepId = null,
+        int $closedAssignments = 0
     ): void {
         AuditLog::query()->insert([
             'user_id' => $user?->user_id,
             'role_key' => $user?->role?->role_key,
-            'module' => 'dashboard',
+            'module' => 'disaster_broadcasting',
             'action' => 'close_active_event',
             'reference_table' => 'disaster_events',
             'reference_id' => $event->event_id,
@@ -662,6 +728,8 @@ class DashboardService
                 'ended_at' => $endedAt->toDateTimeString(),
                 'archive_note' => $closureNote,
                 'released_evacuation_centers' => $releasedEvacuationCenters,
+                'closure_sitrep_id' => $closureSitRepId,
+                'closed_assignments' => $closedAssignments,
             ]),
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),

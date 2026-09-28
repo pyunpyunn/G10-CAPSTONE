@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Archive, RefreshCcw, RotateCcw } from 'lucide-react'
-import { createBroadcast, createDisasterEvent, getBroadcastWorkspace } from '../api/broadcastApi'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Archive, ArrowLeft } from 'lucide-react'
+import { createBroadcast, createDisasterEvent, getBroadcastWorkspace, updateDisasterEvent } from '../api/broadcastApi'
 import { closeActiveEvent } from '../api/dashboardApi'
 import BroadcastComposeForm from '../components/broadcast/BroadcastComposeForm'
 import BroadcastSidePanel from '../components/broadcast/BroadcastSidePanel'
@@ -11,21 +12,23 @@ import {
   apiErrorMessage,
   defaultForm,
   defaultStatusKeys,
-  getRecipientNote,
   targetAreaLabel,
 } from '../utils/broadcastHelpers'
 
 export default function BroadcastPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const requestedEventId = searchParams.get('event_id')
   const [workspace, setWorkspace] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [form, setForm] = useState(defaultForm())
   const [selectedStatuses, setSelectedStatuses] = useState(defaultStatusKeys)
   const [selectedPurok, setSelectedPurok] = useState('')
-  const [selectedPriority, setSelectedPriority] = useState('high')
   const [directPuroks, setDirectPuroks] = useState([])
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [formNotice, setFormNotice] = useState('')
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
   const [isClosingEvent, setIsClosingEvent] = useState(false)
   const [closeError, setCloseError] = useState('')
@@ -35,9 +38,14 @@ export default function BroadcastPage() {
 
     async function loadInitialWorkspace() {
       try {
-        const data = await getBroadcastWorkspace()
+        const data = await getBroadcastWorkspace(requestedEventId)
 
         if (!ignore) {
+          if (requestedEventId && data.current_event?.status !== 'active') {
+            setError('This disaster event is no longer active and cannot be updated.')
+            return
+          }
+
           setWorkspace(data)
           initForm(data)
         }
@@ -57,28 +65,22 @@ export default function BroadcastPage() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [requestedEventId])
 
-  const activeEvent = workspace?.active_event || null
+  const activeEvent = requestedEventId
+    ? workspace?.current_event?.status === 'active' ? workspace.current_event : null
+    : workspace?.active_event || null
   const broadcasts = workspace?.broadcasts || []
   const disasterTypes = workspace?.disaster_types || []
   const severityLevels = workspace?.severity_levels || []
   const puroks = workspace?.puroks || []
   const statusOptions = workspace?.status_options || []
-  const selectedType = disasterTypes.find((type) => String(type.type_id) === String(form.type_id))
-  const currentTypeName = activeEvent?.type_name || selectedType?.type_name || 'Disaster event'
-  const recipientNote = useMemo(
-    () => getRecipientNote(currentTypeName, form.scope_type, directPuroks),
-    [currentTypeName, form.scope_type, directPuroks],
-  )
-
   function initForm(wsData) {
     const currentWorkspace = wsData || workspace
     const nextForm = defaultForm(currentWorkspace)
     const active = currentWorkspace?.active_event
 
     if (active) {
-      nextForm.broadcast_title = `${active.type_name} update`
       nextForm.type_id = active.type_id || nextForm.type_id
       nextForm.severity_id = active.severity_level_id || nextForm.severity_id
       nextForm.event_name = active.name
@@ -89,6 +91,7 @@ export default function BroadcastPage() {
     setSelectedPurok(currentWorkspace?.puroks?.[0]?.name || '')
     setDirectPuroks([])
     setFormError('')
+    setFormNotice('')
   }
 
   async function loadWorkspace() {
@@ -96,7 +99,7 @@ export default function BroadcastPage() {
     setError('')
 
     try {
-      const data = await getBroadcastWorkspace()
+      const data = await getBroadcastWorkspace(requestedEventId)
       setWorkspace(data)
       initForm(data)
     } catch {
@@ -108,6 +111,10 @@ export default function BroadcastPage() {
 
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }))
+    if (field === 'scope_type' && value === 'barangay_wide') {
+      setDirectPuroks([])
+    }
+    setFormNotice('')
   }
 
   function toggleStatus(statusKey) {
@@ -130,11 +137,11 @@ export default function BroadcastPage() {
     }
 
     if (directPuroks.length >= 5) {
-      setFormError('Add up to 5 direct-impact puroks only until the broadcast metadata columns are approved.')
+      setFormError('Select up to five puroks per broadcast.')
       return
     }
 
-    setDirectPuroks((current) => [...current, { name: selectedPurok, priority: selectedPriority }])
+    setDirectPuroks((current) => [...current, { name: selectedPurok }])
   }
 
   function removeDirectPurok(name) {
@@ -160,11 +167,16 @@ export default function BroadcastPage() {
     }
 
     if (!activeEvent && !form.event_name.trim()) {
-      setFormError('Enter the disaster event name before sending the first broadcast.')
+      setFormError('Enter the disaster event name before posting the broadcast.')
       return
     }
 
-    if (['selected_puroks', 'local_direct_impact'].includes(form.scope_type) && directPuroks.length === 0) {
+    if (!form.broadcast_title.trim() || form.message.trim().length < 10) {
+      setFormError('Enter a broadcast title and an official instruction of at least 10 characters.')
+      return
+    }
+
+    if (form.scope_type === 'selected_puroks' && directPuroks.length === 0) {
       setFormError('Select at least one directly affected purok.')
       return
     }
@@ -172,11 +184,17 @@ export default function BroadcastPage() {
     setIsSaving(true)
 
     try {
-      let eventId = activeEvent?.event_id
-      let nextActiveEvent = activeEvent
-      let nextEvents = workspace.events
+      let eventId
 
-      if (!eventId) {
+      if (activeEvent) {
+        eventId = activeEvent.event_id
+        const updatedEventWorkspace = await updateDisasterEvent(eventId, {
+          name: form.event_name.trim(),
+          type_id: form.type_id,
+          severity_level_id: form.severity_id,
+        })
+        setWorkspace(updatedEventWorkspace)
+      } else {
         const eventResult = await createDisasterEvent({
           name: form.event_name,
           type_id: form.type_id,
@@ -185,8 +203,6 @@ export default function BroadcastPage() {
         })
 
         eventId = eventResult.active_event.event_id
-        nextActiveEvent = eventResult.active_event
-        nextEvents = eventResult.events
       }
 
       const broadcastResult = await createBroadcast(eventId, {
@@ -196,20 +212,13 @@ export default function BroadcastPage() {
         scope_type: form.scope_type,
         target_area: targetAreaLabel(form.scope_type, directPuroks),
         estimated_duration: form.estimated_duration,
-        attach_route: form.attach_route,
         allowed_statuses: selectedStatuses,
         direct_puroks: directPuroks,
       })
 
-      const updatedWorkspace = {
-        ...workspace,
-        active_event: nextActiveEvent,
-        events: nextEvents,
-        broadcasts: broadcastResult.broadcasts,
-      }
-
-      setWorkspace(updatedWorkspace)
-      initForm(updatedWorkspace)
+      setWorkspace(broadcastResult)
+      initForm(broadcastResult)
+      setFormNotice(activeEvent ? 'Disaster updated and broadcast posted.' : 'Disaster declared and broadcast posted.')
     } catch (saveError) {
       setFormError(apiErrorMessage(saveError, 'Unable to save this broadcast. Please check the entries and try again.'))
     } finally {
@@ -238,13 +247,9 @@ export default function BroadcastPage() {
         title="Disaster Broadcasting"
         actions={
           <>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={() => initForm()}>
-              <RotateCcw size={14} />
-              Reset Form
-            </button>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={loadWorkspace}>
-              <RefreshCcw size={14} />
-              Refresh
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft size={14} />
+              Go Back to Dashboard
             </button>
             {activeEvent && (
               <button className="btn btn-warning btn-sm" type="button" onClick={() => setIsCloseModalOpen(true)}>
@@ -279,20 +284,17 @@ export default function BroadcastPage() {
               puroks={puroks}
               statusOptions={statusOptions}
               selectedPurok={selectedPurok}
-              selectedPriority={selectedPriority}
               selectedStatuses={selectedStatuses}
               directPuroks={directPuroks}
-              recipientNote={recipientNote}
               formError={formError}
+              formNotice={formNotice}
               isSaving={isSaving}
               onChange={updateForm}
               onSelectPurok={setSelectedPurok}
-              onSelectPriority={setSelectedPriority}
               onAddPurok={addDirectPurok}
               onRemovePurok={removeDirectPurok}
               onToggleStatus={toggleStatus}
               onSubmit={handleSubmit}
-              onCancel={() => initForm()}
             />
           </main>
 

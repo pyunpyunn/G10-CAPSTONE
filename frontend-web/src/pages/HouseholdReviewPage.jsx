@@ -98,6 +98,7 @@ export default function HouseholdReviewPage() {
                 <thead>
                   <tr>
                     <th>Member</th>
+                    <th>Member ID</th>
                     <th>Role</th>
                     <th>Gender</th>
                     <th>Head</th>
@@ -110,7 +111,7 @@ export default function HouseholdReviewPage() {
                 </thead>
                 <tbody>
                   {(!detail.members || detail.members.length === 0) ? (
-                    <EmptyTableRow colSpan={9} text="No household members are synced yet." />
+                    <EmptyTableRow colSpan={10} text="No household members are synced yet." />
                   ) : (
                     detail.members.map((member) => (
                       <tr key={member.member_id || member.name}>
@@ -118,6 +119,7 @@ export default function HouseholdReviewPage() {
                           <div className="hh-household-name">{member.name}</div>
                           <div className="hh-household-meta">{member.age ? `${member.age} yrs` : 'Age not recorded'}</div>
                         </td>
+                        <td>{member.member_id}</td>
                         <td>{member.relation}</td>
                         <td>{member.gender}</td>
                         <td>{member.is_household_head ? 'Yes' : 'No'}</td>

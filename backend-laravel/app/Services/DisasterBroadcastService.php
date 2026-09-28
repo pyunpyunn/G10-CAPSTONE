@@ -6,7 +6,6 @@ use App\Models\DisasterBroadcast;
 use App\Models\DisasterEvent;
 use App\Models\DisasterType;
 use App\Models\Household;
-use App\Models\Purok;
 use App\Models\SeverityLevel;
 use App\Models\WeatherLog;
 use Carbon\Carbon;
@@ -31,15 +30,22 @@ class DisasterBroadcastService
         $eventId = $activeEvent?->event_id;
 
         return response()->json([
-            'data' => [
-                'active_event' => $activeEvent ? $this->formatEvent($activeEvent) : null,
-                'events' => $this->getEventHistory(),
-                'broadcasts' => $eventId ? $this->getBroadcastsForEvent($eventId) : [],
-                'disaster_types' => $this->getDisasterTypes(),
-                'severity_levels' => $this->getSeverityLevels(),
-                'puroks' => $this->getPuroks(),
-                'status_options' => $this->statusOptions(),
-            ],
+            'data' => $this->workspacePayload($activeEvent, $eventId ? $this->getBroadcastsForEvent($eventId) : []),
+        ]);
+    }
+
+    public function show(string $eventId): JsonResponse
+    {
+        $event = $this->findEvent($eventId);
+
+        if (! $event) {
+            return response()->json([
+                'message' => 'Disaster event record was not found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'data' => $this->workspacePayload($event, $this->getBroadcastsForEvent($event->event_id)),
         ]);
     }
 
@@ -81,11 +87,53 @@ class DisasterBroadcastService
 
         return response()->json([
             'message' => 'Disaster event declared. Household reporting can now start after the broadcast is saved.',
-            'data' => [
-                'active_event' => $this->formatEvent($event),
-                'events' => $this->getEventHistory(),
-            ],
+            'data' => $this->workspacePayload($event, []),
         ], 201);
+    }
+
+    public function updateEvent(Request $request, string $eventId): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'type_id' => ['required', 'integer', 'exists:disaster_types,type_id'],
+            'severity_level_id' => ['required', 'integer', 'exists:severity_levels,severity_id'],
+        ]);
+
+        $result = DB::transaction(function () use ($eventId, $validated): string {
+            $event = DisasterEvent::query()
+                ->where('event_id', $eventId)
+                ->whereNull('deleted_at')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $event) {
+                return 'not_found';
+            }
+
+            if ($event->ended_at) {
+                return 'closed';
+            }
+
+            $event->fill($validated);
+            $event->save();
+
+            return 'updated';
+        });
+
+        if ($result !== 'updated') {
+            return response()->json([
+                'message' => $result === 'closed'
+                    ? 'This disaster event is already closed and cannot be updated.'
+                    : 'Disaster event record was not found.',
+            ], $result === 'closed' ? 409 : 404);
+        }
+
+        $event = $this->findEvent($eventId);
+
+        return response()->json([
+            'message' => 'Disaster event updated.',
+            'data' => $this->workspacePayload($event, $this->getBroadcastsForEvent($eventId)),
+        ]);
     }
 
     public function broadcasts(string $eventId): JsonResponse
@@ -178,23 +226,17 @@ class DisasterBroadcastService
 
         return response()->json([
             'message' => $this->broadcastSaveMessage($pushResult, $smsResult),
-            'data' => [
+            'data' => array_merge($this->workspacePayload($event, $this->getBroadcastsForEvent($event->event_id)), [
                 'broadcast' => $this->findBroadcast($broadcastId),
-                'broadcasts' => $this->getBroadcastsForEvent($event->event_id),
                 'push_delivery' => $pushResult,
                 'sms_delivery' => $smsResult,
-            ],
+            ]),
         ], 201);
     }
 
     private function sendBroadcastSms(array $validated, array $metadata): array
     {
-        if ($validated['scope_type'] === 'rescuers_only') {
-            return ['status' => 'skipped', 'recipient_count' => 0, 'accepted_count' => 0,
-                'provider_ids' => [], 'message' => 'SMS targets households only.', 'errors' => []];
-        }
-
-        $puroks = in_array($validated['scope_type'], ['selected_puroks', 'local_direct_impact'], true)
+        $puroks = $validated['scope_type'] === 'selected_puroks'
             ? collect($metadata['puroks'])->pluck('name')->filter()->values()->all()
             : [];
 
@@ -217,15 +259,11 @@ class DisasterBroadcastService
     private function sendBroadcastPush(int $broadcastId, array $validated, array $metadata, object $event): array
     {
         $scope = $validated['scope_type'];
-        $purokNames = in_array($scope, ['selected_puroks', 'local_direct_impact'], true)
+        $purokNames = $scope === 'selected_puroks'
             ? collect($metadata['puroks'])->pluck('name')->filter()->values()->all()
             : [];
 
-        $roles = match ($scope) {
-            'rescuers_only' => ['rescuer'],
-            'selected_puroks', 'local_direct_impact' => ['household'],
-            default => ['household', 'rescuer'],
-        };
+        $roles = $scope === 'selected_puroks' ? ['household'] : ['household', 'rescuer'];
 
         return $this->oneSignal->sendToMobileDevices(
             $validated['broadcast_title'],
@@ -238,6 +276,7 @@ class DisasterBroadcastService
                     'event_id' => $event->event_id,
                     'broadcast_id' => (string) $broadcastId,
                     'scope_type' => $scope,
+                    'allowed_statuses' => array_values($validated['allowed_statuses']),
                 ],
             ]
         );
@@ -277,16 +316,15 @@ class DisasterBroadcastService
             'broadcast_title' => ['required', 'string', 'max:150'],
             'message' => ['required', 'string', 'min:10', 'max:2000'],
             'severity_id' => ['nullable', 'integer', 'exists:severity_levels,severity_id'],
-            'scope_type' => ['required', 'string', Rule::in(['barangay_wide', 'selected_puroks', 'local_direct_impact', 'rescuers_only'])],
+            'scope_type' => ['required', 'string', Rule::in(['barangay_wide', 'selected_puroks'])],
             'target_area' => ['nullable', 'string', 'max:150'],
             'estimated_duration' => ['nullable', 'string', 'max:50'],
-            'attach_route' => ['nullable', 'boolean'],
             'channel' => ['nullable', 'string', 'max:50'],
             'allowed_statuses' => ['required', 'array', 'size:4'],
             'allowed_statuses.*' => ['required', 'string', 'max:40'],
             'direct_puroks' => ['nullable', 'array', 'max:5'],
             'direct_puroks.*.name' => ['required_with:direct_puroks', 'string', 'max:80'],
-            'direct_puroks.*.priority' => ['required_with:direct_puroks', 'string', Rule::in(['critical', 'high', 'watch', 'monitor'])],
+            'direct_puroks.*.priority' => ['nullable', 'string', Rule::in(['critical', 'high', 'watch', 'monitor'])],
         ]);
 
         $statusKeys = array_values($validated['allowed_statuses']);
@@ -297,11 +335,51 @@ class DisasterBroadcastService
             ]);
         }
 
-        if (in_array($validated['scope_type'], ['selected_puroks', 'local_direct_impact'], true)
-            && empty($validated['direct_puroks'])) {
+        if ($validated['scope_type'] === 'selected_puroks' && empty($validated['direct_puroks'])) {
             throw ValidationException::withMessages([
                 'direct_puroks' => ['Select at least one directly affected purok for this broadcast scope.'],
             ]);
+        }
+
+        if ($validated['scope_type'] === 'selected_puroks') {
+            if (! Schema::hasTable('households')
+                || ! Schema::hasColumn('households', 'address_id')
+                || ! Schema::hasTable('addresses')
+                || ! Schema::hasColumn('addresses', 'purok_sitio')) {
+                throw ValidationException::withMessages([
+                    'direct_puroks' => ['Household purok locations are unavailable. Select Barangay-wide or contact the system administrator.'],
+                ]);
+            }
+
+            $selectedNames = collect($validated['direct_puroks'])
+                ->map(fn (array $purok): string => trim($purok['name']))
+                ->unique()
+                ->values();
+            $knownNameQuery = DB::table('households as h')
+                ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
+                ->whereIn('a.purok_sitio', $selectedNames)
+                ->whereNotNull('a.purok_sitio')
+                ->where('a.purok_sitio', '<>', '');
+
+            if (Schema::hasColumn('households', 'deleted_at')) {
+                $knownNameQuery->whereNull('h.deleted_at');
+            }
+
+            if (Schema::hasColumn('addresses', 'deleted_at')) {
+                $knownNameQuery->whereNull('a.deleted_at');
+            }
+
+            $knownNames = $knownNameQuery->distinct()->pluck('a.purok_sitio');
+
+            if ($knownNames->count() !== $selectedNames->count()) {
+                throw ValidationException::withMessages([
+                    'direct_puroks' => ['One or more selected puroks are not in the database. Refresh and select them again.'],
+                ]);
+            }
+
+            $validated['direct_puroks'] = $selectedNames
+                ->map(fn (string $name): array => ['name' => $name])
+                ->all();
         }
 
         return $validated;
@@ -314,7 +392,27 @@ class DisasterBroadcastService
             'puroks' => array_values($validated['direct_puroks'] ?? []),
             'area' => $validated['target_area'] ?? $this->scopeLabel($validated['scope_type']),
             'duration' => $validated['estimated_duration'] ?? null,
-            'route' => (bool) ($validated['attach_route'] ?? false),
+        ];
+    }
+
+    private function workspacePayload(?object $event, array $broadcasts): array
+    {
+        $formattedEvent = $event ? $this->formatEvent($event) : null;
+        $isRequestedEventActive = $formattedEvent && $formattedEvent['status'] === 'active';
+        $globalActive = $this->getActiveEvent();
+        $activeEvent = $isRequestedEventActive
+            ? $formattedEvent
+            : ($globalActive ? $this->formatEvent($globalActive) : null);
+
+        return [
+            'current_event' => $formattedEvent,
+            'active_event' => $activeEvent,
+            'events' => $this->getEventHistory(),
+            'broadcasts' => $broadcasts,
+            'disaster_types' => $this->getDisasterTypes(),
+            'severity_levels' => $this->getSeverityLevels(),
+            'puroks' => $this->getPuroks(),
+            'status_options' => $this->statusOptions(),
         ];
     }
 
@@ -566,7 +664,6 @@ class DisasterBroadcastService
             'direct_puroks' => $directPuroks,
             'allowed_statuses' => $statusKeys,
             'estimated_duration' => $metadata['duration'] ?? null,
-            'attach_route' => (bool) ($metadata['route'] ?? false),
             'recipient_count' => $recipientCount === null
                 ? $this->recipientCount($broadcast->scope_type, $directPuroks)
                 : (int) $recipientCount,
@@ -629,7 +726,6 @@ class DisasterBroadcastService
         return $this->jsonText([
             'statuses' => $metadata['statuses'],
             'duration' => $metadata['duration'],
-            'route' => $metadata['route'],
         ]);
     }
 
@@ -673,55 +769,38 @@ class DisasterBroadcastService
 
     private function getPuroks(): array
     {
-        $puroks = collect();
-
-        if (Schema::hasTable('puroks') && Schema::hasColumn('puroks', 'purok_name')) {
-            $query = Purok::query()->whereNotNull('purok_name');
-
-            $puroks = $query->orderBy('purok_name')
-                ->get(['purok_id', 'purok_name'])
-                ->map(fn (object $purok): array => [
-                    'purok_id' => $purok->purok_id,
-                    'name' => $purok->purok_name,
-                    'source' => 'puroks',
-                ]);
+        if (! Schema::hasTable('households')
+            || ! Schema::hasColumn('households', 'address_id')
+            || ! Schema::hasTable('addresses')
+            || ! Schema::hasColumn('addresses', 'purok_sitio')) {
+            return [];
         }
 
-        if ($puroks->isEmpty() && Schema::hasTable('addresses') && Schema::hasColumn('addresses', 'purok_sitio')) {
-            $puroks = DB::table('addresses')
-                ->whereNotNull('purok_sitio')
-                ->where('purok_sitio', '<>', '')
-                ->select('purok_sitio')
-                ->distinct()
-                ->orderBy('purok_sitio')
-                ->get()
-                ->map(fn (object $address): array => [
-                    'purok_id' => null,
-                    'name' => $address->purok_sitio,
-                    'source' => 'addresses',
-                ]);
+        $query = DB::table('households as h')
+            ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->whereNotNull('a.purok_sitio')
+            ->where('a.purok_sitio', '<>', '');
+
+        if (Schema::hasColumn('households', 'deleted_at')) {
+            $query->whereNull('h.deleted_at');
         }
 
-        if ($puroks->isEmpty()) {
-            $puroks = collect([
-                'Sitio Alaska',
-                'Sitio Viking',
-                'Sitio Abya',
-                'Sitio Wangyu',
-                'Sitio Puntod',
-                'Sitio Pagtinabangay',
-                'Sitio Ybañez',
-                'Sitio Ipil-ipil',
-                'Sitio Tangke',
-                'Sitio Huyong-huyong',
-            ])->map(fn (string $name): array => [
+        if (Schema::hasColumn('addresses', 'deleted_at')) {
+            $query->whereNull('a.deleted_at');
+        }
+
+        return $query
+            ->select('a.purok_sitio')
+            ->distinct()
+            ->orderBy('a.purok_sitio')
+            ->get()
+            ->map(fn (object $purok): array => [
                 'purok_id' => null,
-                'name' => $name,
-                'source' => 'mambaling_reference',
-            ]);
-        }
-
-        return $puroks->values()->all();
+                'name' => $purok->purok_sitio,
+                'source' => 'household_addresses',
+            ])
+            ->values()
+            ->all();
     }
 
     private function statusOptions(): array
@@ -766,24 +845,32 @@ class DisasterBroadcastService
             $rescuers = $responderQuery->count();
         }
 
-        if ($scopeType === 'rescuers_only') {
-            return $rescuers;
-        }
-
         $householdQuery = Household::query();
 
         if (Schema::hasColumn('households', 'deleted_at')) {
-            $householdQuery->whereNull('deleted_at');
+            $householdQuery->whereNull('households.deleted_at');
         }
 
-        if (in_array($scopeType, ['selected_puroks', 'local_direct_impact'], true) && Schema::hasTable('addresses')) {
+        if ($scopeType === 'selected_puroks') {
             $purokNames = collect($directPuroks)->pluck('name')->filter()->values()->all();
 
-            if (! empty($purokNames)) {
-                $householdQuery
-                    ->leftJoin('addresses as a', 'a.address_id', '=', 'households.address_id')
-                    ->whereIn('a.purok_sitio', $purokNames);
+            if ($purokNames === []
+                || ! Schema::hasTable('addresses')
+                || ! Schema::hasColumn('addresses', 'purok_sitio')) {
+                return 0;
             }
+
+            $householdQuery
+                ->join('addresses as a', 'a.address_id', '=', 'households.address_id')
+                ->whereIn('a.purok_sitio', $purokNames);
+
+            if (Schema::hasColumn('addresses', 'deleted_at')) {
+                $householdQuery->whereNull('a.deleted_at');
+            }
+
+            return $householdQuery
+                ->distinct()
+                ->count('households.household_id');
         }
 
         return $householdQuery->count() + $rescuers;
@@ -793,8 +880,6 @@ class DisasterBroadcastService
     {
         return match ($scopeType) {
             'selected_puroks' => 'Selected puroks',
-            'local_direct_impact' => 'Direct-impact puroks',
-            'rescuers_only' => 'Responders only',
             default => 'Barangay-wide',
         };
     }

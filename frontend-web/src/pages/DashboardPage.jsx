@@ -1,25 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Archive, RefreshCcw, TriangleAlert } from 'lucide-react'
+import { Pencil, RefreshCcw, TriangleAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { closeActiveEvent, getDashboard } from '../api/dashboardApi'
-import DashboardCloseEventModal from '../components/dashboard/DashboardCloseEventModal'
+import { getDashboard } from '../api/dashboardApi'
 import DashboardMainContent from '../components/dashboard/DashboardMainContent'
 import DashboardOverview from '../components/dashboard/DashboardOverview'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
-import {
-  getCloseEventMessage,
-  getStats,
-} from '../utils/dashboardHelpers'
+import { getStats } from '../utils/dashboardHelpers'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [dashboard, setDashboard] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
-  const [isClosingEvent, setIsClosingEvent] = useState(false)
-  const [closeError, setCloseError] = useState('')
 
   useEffect(() => {
     let ignore = false
@@ -69,30 +62,6 @@ export default function DashboardPage() {
     navigate(path)
   }
 
-  function closeModal() {
-    if (isClosingEvent) {
-      return
-    }
-
-    setIsCloseModalOpen(false)
-    setCloseError('')
-  }
-
-  async function handleCloseActiveEvent() {
-    setIsClosingEvent(true)
-    setCloseError('')
-
-    try {
-      const result = await closeActiveEvent()
-      setDashboard(result.dashboard)
-      setIsCloseModalOpen(false)
-    } catch (closeEventError) {
-      setCloseError(getCloseEventMessage(closeEventError))
-    } finally {
-      setIsClosingEvent(false)
-    }
-  }
-
   return (
     <section className="page active">
       <PageHeader
@@ -104,9 +73,9 @@ export default function DashboardPage() {
               Refresh
             </button>
             {hasActiveEvent ? (
-              <button className="btn btn-warning btn-sm" type="button" onClick={() => setIsCloseModalOpen(true)}>
-                <Archive size={14} />
-                Close Active Event
+              <button className="btn btn-warning btn-sm" type="button" onClick={() => openModule(`/broadcast?event_id=${encodeURIComponent(dashboard.active_event.event_id)}`)}>
+                <Pencil size={14} />
+                UPDATE DISASTER
               </button>
             ) : (
               <button className="btn btn-danger btn-sm dashboard-declare-button" type="button" onClick={() => openModule('/broadcast')}>
@@ -116,15 +85,6 @@ export default function DashboardPage() {
             )}
           </>
         }
-      />
-
-      <DashboardCloseEventModal
-        activeEvent={dashboard?.active_event}
-        isOpen={isCloseModalOpen}
-        isClosingEvent={isClosingEvent}
-        closeError={closeError}
-        onClose={closeModal}
-        onConfirm={handleCloseActiveEvent}
       />
 
       {isLoading && <LoadingState />}

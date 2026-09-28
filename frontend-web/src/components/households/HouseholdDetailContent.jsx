@@ -41,6 +41,7 @@ function FamilyMembersTable({ members }) {
         <thead>
           <tr>
             <th>Member</th>
+            <th>Member ID</th>
             <th>Role</th>
             <th>Gender</th>
             <th>Head</th>
@@ -59,6 +60,7 @@ function FamilyMembersTable({ members }) {
                   <div className="hh-household-name">{member.name}</div>
                   <div className="hh-household-meta">{member.age ? `${member.age} yrs` : 'Age not recorded'} {member.gender ? `- ${member.gender}` : ''}</div>
                 </td>
+                <td>{member.member_id}</td>
                 <td>{member.relation}</td>
                 <td>{member.gender}</td>
                 <td>{member.is_household_head ? 'Yes' : 'No'}</td>

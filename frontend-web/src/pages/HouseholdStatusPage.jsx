@@ -6,7 +6,6 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getHouseholds } from '../api/householdApi'
-import HouseholdFilters from '../components/households/HouseholdFilters'
 import HouseholdOpsPanels from '../components/households/HouseholdOpsPanels'
 import HouseholdSummary from '../components/households/HouseholdSummary'
 import HouseholdTable from '../components/households/HouseholdTable'
@@ -28,29 +27,15 @@ export default function HouseholdStatusPage() {
   const [payload, setPayload] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [searchText, setSearchText] = useState('')
-  const [search, setSearch] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
 
   const summary = payload?.summary || emptySummary()
   const households = payload?.households?.data || []
   const meta = payload?.households?.meta || {}
-  const puroks = payload?.filters?.puroks || []
   const hasActiveEvent = Boolean(payload?.active_event)
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
   const hasBlockingError = error && !payload
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setSearch(searchText.trim())
-      setPage(1)
-    }, 300)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [searchText])
 
   useEffect(() => {
     let ignore = false
@@ -61,9 +46,6 @@ export default function HouseholdStatusPage() {
 
       try {
         const data = await getHouseholds({
-          search,
-          purok,
-          status,
           page,
           per_page: PAGE_SIZE,
         })
@@ -87,7 +69,7 @@ export default function HouseholdStatusPage() {
     return () => {
       ignore = true
     }
-  }, [search, purok, status, page])
+  }, [page])
 
   async function loadHouseholds() {
     setIsLoading(true)
@@ -95,9 +77,6 @@ export default function HouseholdStatusPage() {
 
     try {
       const data = await getHouseholds({
-        search,
-        purok,
-        status,
         page,
         per_page: PAGE_SIZE,
       })
@@ -107,16 +86,6 @@ export default function HouseholdStatusPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  function changeStatusFilter(nextStatus) {
-    setStatus(nextStatus)
-    setPage(1)
-  }
-
-  function changePurok(nextPurok) {
-    setPurok(nextPurok)
-    setPage(1)
   }
 
   function openHousehold(householdId) {
@@ -144,18 +113,6 @@ export default function HouseholdStatusPage() {
       <PageHeader
         title="Household Status"
         subtitle="Barangay Mambaling, Cebu City"
-        filters={payload && (
-          <HouseholdFilters
-            searchText={searchText}
-            purok={purok}
-            status={status}
-            summary={summary}
-            puroks={puroks}
-            onSearchTextChange={setSearchText}
-            onPurokChange={changePurok}
-            onStatusChange={changeStatusFilter}
-          />
-        )}
       />
 
       {isInitialLoading && <LoadingState />}
@@ -169,7 +126,7 @@ export default function HouseholdStatusPage() {
                 <HouseholdTable
                   households={households}
                   meta={meta}
-                  selectedPurok={purok}
+                  selectedPurok="all"
                   onOpen={openHousehold}
                   onPageChange={setPage}
                   onDispatchPurok={() => navigate('/dispatch')}

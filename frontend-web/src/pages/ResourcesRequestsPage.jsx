@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getResourceRequests } from '../api/resourceRequestApi'
 import ResourceRequestQueueTable from '../components/resources/ResourceRequestQueueTable'
-import ResourceRequestFilters from '../components/resources/ResourceRequestFilters'
 import ResourceRequestStats from '../components/resources/ResourceRequestStats'
 import TrackingAidMirror from '../components/resources/TrackingAidMirror'
 import LoadingState from '../components/ui/LoadingState'
@@ -19,15 +18,6 @@ export default function ResourcesRequestsPage() {
   const [message, setMessage] = useState('')
   const [queuePage, setQueuePage] = useState(1)
   const [summaryPeriod, setSummaryPeriod] = useState('week')
-  const [searchText, setSearchText] = useState('')
-  const [search, setSearch] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [activeChip, setActiveChip] = useState('all')
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => setSearch(searchText.trim()), 300)
-    return () => window.clearTimeout(timeoutId)
-  }, [searchText])
 
   useEffect(() => {
     let ignore = false
@@ -37,7 +27,7 @@ export default function ResourcesRequestsPage() {
       setError('')
 
       try {
-        const data = await getResourceRequests(filterParams(search, purok, activeChip, queuePage, summaryPeriod))
+        const data = await getResourceRequests(filterParams('', 'all', 'all', queuePage, summaryPeriod))
 
         if (!ignore) {
           setPayload(data)
@@ -58,7 +48,7 @@ export default function ResourcesRequestsPage() {
     return () => {
       ignore = true
     }
-  }, [queuePage, summaryPeriod, search, purok, activeChip])
+  }, [queuePage, summaryPeriod])
 
   async function loadRequests(showMessage = '') {
     setIsLoading(true)
@@ -66,7 +56,7 @@ export default function ResourcesRequestsPage() {
     setMessage('')
 
     try {
-      const data = await getResourceRequests(filterParams(search, purok, activeChip, queuePage, summaryPeriod))
+      const data = await getResourceRequests(filterParams('', 'all', 'all', queuePage, summaryPeriod))
       setPayload(data)
 
       if (showMessage) {
@@ -84,11 +74,6 @@ export default function ResourcesRequestsPage() {
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
   const hasBlockingError = error && !payload
-
-  function changeFilter(setter, value) {
-    setter(value)
-    setQueuePage(1)
-  }
 
   function openCreateModal() {
     navigate('/resources-requests/new')
@@ -111,17 +96,6 @@ export default function ResourcesRequestsPage() {
       <PageHeader
         title="Resources & Requests"
         subtitle="Barangay Mambaling, Cebu City"
-        filters={payload && (
-          <ResourceRequestFilters
-            search={searchText}
-            onSearchChange={(value) => changeFilter(setSearchText, value)}
-            purok={purok}
-            onPurokChange={(value) => changeFilter(setPurok, value)}
-            puroks={payload?.options?.puroks || []}
-            activeChip={activeChip}
-            onChipChange={(value) => changeFilter(setActiveChip, value)}
-          />
-        )}
         actions={<button className="button review" type="button" onClick={openCreateModal}><PackageCheck size={16} />New request</button>}
       />
 

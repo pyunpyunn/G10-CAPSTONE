@@ -146,6 +146,51 @@ class SituationReportService
         ]);
     }
 
+    public function createClosureSnapshot(string $eventId, ?string $adminId, Carbon $endedAt, string $closureNote): ?int
+    {
+        if (! Schema::hasTable('situation_reports')) {
+            return null;
+        }
+
+        $event = $this->findEvent($eventId);
+
+        if (! $event) {
+            return null;
+        }
+
+        $sitRepId = $this->nextId('situation_reports', 'sit_rep_id');
+        $reportNumber = $this->nextReportNumber();
+        $summary = $this->buildSummary($event, [
+            'report_number' => $reportNumber,
+            'period_start' => $event->started_at,
+            'period_end' => $endedAt->toDateTimeString(),
+            'prepared_by' => 'HQ/Admin Desk',
+            'reviewed_by' => 'Incident Commander',
+            'actions_text' => $closureNote,
+            'included_sections' => ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'],
+            'generated_at' => $endedAt->toDateTimeString(),
+        ]);
+
+        DB::table('situation_reports')->insert([
+            'sit_rep_id' => $sitRepId,
+            'report_number' => $reportNumber,
+            'disaster_id' => $event->event_id,
+            'created_by_admin_id' => $adminId,
+            'household_id' => null,
+            'summary' => json_encode($summary, JSON_UNESCAPED_SLASHES),
+            'report_status' => 'generated',
+            'reviewed_by_user_id' => null,
+            'reviewed_at' => null,
+            'escalated_to' => 'Incident Commander',
+            'is_archived' => 0,
+            'generated_at' => $endedAt,
+            'archived_at' => null,
+            'updated_at' => $endedAt,
+        ]);
+
+        return $sitRepId;
+    }
+
     public function pdf(int $sitRepId): JsonResponse
     {
         $report = DB::table('situation_reports')->where('sit_rep_id', $sitRepId)->first();

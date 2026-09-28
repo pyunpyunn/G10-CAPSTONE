@@ -13,7 +13,6 @@ import {
   updateRescuer,
 } from '../api/rescuerApi'
 import RescuerAccountModal from '../components/rescuers/RescuerAccountModal'
-import RescuerFilters from '../components/rescuers/RescuerFilters'
 import RescuerRosterTable from '../components/rescuers/RescuerRosterTable'
 import RescuerTeamGrid from '../components/rescuers/RescuerTeamGrid'
 import RescueTeamConfigModal from '../components/rescuers/RescueTeamConfigModal'
@@ -37,9 +36,6 @@ export default function RescuerAccountsPage() {
   const [payload, setPayload] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [activeChip, setActiveChip] = useState('all')
   const [page, setPage] = useState(1)
   const [modalMode, setModalMode] = useState('create')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -87,7 +83,7 @@ export default function RescuerAccountsPage() {
       setError('')
 
       try {
-        const data = await getRescuers(filterParams(search, purok, activeChip, page))
+        const data = await getRescuers({ page, per_page: 10 })
 
         if (!ignore) {
           setPayload(data)
@@ -108,7 +104,7 @@ export default function RescuerAccountsPage() {
     return () => {
       ignore = true
     }
-  }, [search, purok, activeChip, page])
+  }, [page])
 
   const rescuers = payload?.rescuers?.data || []
   const pagination = payload?.rescuers || {}
@@ -125,7 +121,7 @@ export default function RescuerAccountsPage() {
     setError('')
 
     try {
-      const data = await getRescuers(filterParams(search, purok, activeChip, page))
+      const data = await getRescuers({ page, per_page: 10 })
       setPayload(data)
     } catch {
       setError('Rescuer accounts cannot be loaded right now. Please check the backend or database connection.')
@@ -287,18 +283,6 @@ export default function RescuerAccountsPage() {
       <PageHeader
         title={workflow ? (workflowType === 'teams' ? 'Configure rescue teams' : modalMode === 'view' ? 'View rescuer account' : modalMode === 'edit' ? 'Update rescuer account' : 'New rescuer account') : 'Rescuer Accounts'}
         subtitle="Barangay Mambaling, Cebu City"
-        filters={!workflow && payload && (
-          <RescuerFilters
-            search={search}
-            onSearchChange={(value) => { setSearch(value); setPage(1) }}
-            purok={purok}
-            onPurokChange={(value) => { setPurok(value); setPage(1) }}
-            puroks={filters.puroks || []}
-            teamOptions={teamOptions}
-            activeChip={activeChip}
-            onChipChange={(value) => { setActiveChip(value); setPage(1) }}
-          />
-        )}
         actions={workflow ? (
           <button className="button secondary" type="button" onClick={() => navigate('/rescuers')}><ArrowLeft size={15} />Back to roster</button>
         ) : (
@@ -327,21 +311,4 @@ export default function RescuerAccountsPage() {
 
     </main>
   )
-}
-
-function filterParams(search, purok, activeChip, page) {
-  const params = {
-    search: search.trim(),
-    purok,
-    page,
-    per_page: 10,
-  }
-
-  if (activeChip.startsWith('team:')) {
-    params.team = activeChip.replace('team:', '')
-  } else {
-    params.duty_status = activeChip
-  }
-
-  return params
 }

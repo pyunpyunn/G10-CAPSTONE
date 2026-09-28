@@ -150,7 +150,10 @@ class OneSignalNotificationService
 
         $this->applyRoleFilter($query, $options['roles'] ?? []);
         $this->applyResponderFilter($query, $options['responder_ids'] ?? []);
-        $this->applyPurokFilter($query, $options['household_puroks'] ?? []);
+
+        if (! $this->applyPurokFilter($query, $options['household_puroks'] ?? [])) {
+            return [];
+        }
 
         return $query
             ->distinct()
@@ -206,7 +209,7 @@ class OneSignalNotificationService
         }
     }
 
-    private function applyPurokFilter($query, array $purokNames): void
+    private function applyPurokFilter($query, array $purokNames): bool
     {
         $purokNames = collect($purokNames)
             ->map(fn (mixed $name): string => trim((string) $name))
@@ -218,16 +221,28 @@ class OneSignalNotificationService
         if (empty($purokNames)
             || ! Schema::hasColumn('device_tokens', 'household_id')
             || ! Schema::hasTable('households')
+            || ! Schema::hasColumn('households', 'household_id')
             || ! Schema::hasColumn('households', 'address_id')
             || ! Schema::hasTable('addresses')
+            || ! Schema::hasColumn('addresses', 'address_id')
             || ! Schema::hasColumn('addresses', 'purok_sitio')) {
-            return;
+            return empty($purokNames);
         }
 
         $query
             ->join('households as h_filter', 'h_filter.household_id', '=', 'dt.household_id')
             ->join('addresses as a_filter', 'a_filter.address_id', '=', 'h_filter.address_id')
             ->whereIn('a_filter.purok_sitio', $purokNames);
+
+        if (Schema::hasColumn('households', 'deleted_at')) {
+            $query->whereNull('h_filter.deleted_at');
+        }
+
+        if (Schema::hasColumn('addresses', 'deleted_at')) {
+            $query->whereNull('a_filter.deleted_at');
+        }
+
+        return true;
     }
 
     private function isConfigured(): bool

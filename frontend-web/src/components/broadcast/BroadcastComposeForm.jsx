@@ -1,11 +1,8 @@
-import { Bell, CheckCircle2, MapPin, Plus, Send, Trash2 } from 'lucide-react'
+import { Bell, CheckCircle2, MapPin, Pencil, Plus, Send, Trash2 } from 'lucide-react'
 import Badge from '../ui/Badge'
 import {
   durationOptions,
   eventTone,
-  labelFromValue,
-  priorityOptions,
-  priorityTone,
 } from '../../utils/broadcastHelpers'
 
 export default function BroadcastComposeForm({
@@ -16,25 +13,25 @@ export default function BroadcastComposeForm({
   puroks,
   statusOptions,
   selectedPurok,
-  selectedPriority,
   selectedStatuses,
   directPuroks,
-  recipientNote,
   formError,
+  formNotice,
   isSaving,
   onChange,
   onSelectPurok,
-  onSelectPriority,
   onAddPurok,
   onRemovePurok,
   onToggleStatus,
   onSubmit,
-  onCancel,
 }) {
+  const isUpdateMode = Boolean(activeEvent)
+
   return (
     <form className="broadcast-compose" onSubmit={onSubmit}>
       <BroadcastEventFields
         activeEvent={activeEvent}
+        isUpdateMode={isUpdateMode}
         form={form}
         disasterTypes={disasterTypes}
         severityLevels={severityLevels}
@@ -45,12 +42,9 @@ export default function BroadcastComposeForm({
         form={form}
         puroks={puroks}
         selectedPurok={selectedPurok}
-        selectedPriority={selectedPriority}
         directPuroks={directPuroks}
-        recipientNote={recipientNote}
         onChange={onChange}
         onSelectPurok={onSelectPurok}
-        onSelectPriority={onSelectPriority}
         onAddPurok={onAddPurok}
         onRemovePurok={onRemovePurok}
       />
@@ -64,25 +58,23 @@ export default function BroadcastComposeForm({
       <BroadcastMessageFields form={form} onChange={onChange} />
 
       {formError && <div className="form-error">{formError}</div>}
+      {formNotice && <div className="form-success" role="status">{formNotice}</div>}
 
       <div className="broadcast-form-actions">
-        <button className="btn btn-secondary" type="button" disabled={isSaving} onClick={onCancel}>
-          Cancel
-        </button>
         <button className="btn btn-primary" type="submit" disabled={isSaving}>
-          <Send size={15} />
-          {isSaving ? 'Saving...' : 'Save Broadcast'}
+          {isUpdateMode ? <Pencil size={15} /> : <Send size={15} />}
+          {isSaving ? (isUpdateMode ? 'Updating...' : 'Posting...') : (isUpdateMode ? 'UPDATE DISASTER' : 'POST BROADCAST')}
         </button>
       </div>
     </form>
   )
 }
 
-function BroadcastEventFields({ activeEvent, form, disasterTypes, severityLevels, onChange }) {
+function BroadcastEventFields({ activeEvent, isUpdateMode, form, disasterTypes, severityLevels, onChange }) {
   return (
     <section className="broadcast-section">
       <div className="broadcast-section-head">
-        <span>Declaring Disaster</span>
+        <span>{activeEvent ? 'Update Disaster Details' : 'Declaring Disaster'}</span>
         {activeEvent && <Badge tone={eventTone(activeEvent.severity_key)}>Active</Badge>}
       </div>
       <div className="broadcast-field-grid">
@@ -91,7 +83,6 @@ function BroadcastEventFields({ activeEvent, form, disasterTypes, severityLevels
           <input
             type="text"
             value={form.event_name}
-            disabled={Boolean(activeEvent)}
             maxLength={100}
             onChange={(event) => onChange('event_name', event.target.value)}
             placeholder="Example: Flood Monitoring"
@@ -102,7 +93,6 @@ function BroadcastEventFields({ activeEvent, form, disasterTypes, severityLevels
           <span>Disaster type</span>
           <select
             value={form.type_id}
-            disabled={Boolean(activeEvent)}
             onChange={(event) => onChange('type_id', event.target.value)}
             required
           >
@@ -148,16 +138,13 @@ function BroadcastAreaFields({
   form,
   puroks,
   selectedPurok,
-  selectedPriority,
   directPuroks,
-  recipientNote,
   onChange,
   onSelectPurok,
-  onSelectPriority,
   onAddPurok,
   onRemovePurok,
 }) {
-  const needsPuroks = ['selected_puroks', 'local_direct_impact'].includes(form.scope_type)
+  const needsPuroks = form.scope_type === 'selected_puroks'
 
   return (
     <section className="broadcast-section">
@@ -169,50 +156,46 @@ function BroadcastAreaFields({
         <label>
           <span>Recipients</span>
           <select value={form.scope_type} onChange={(event) => onChange('scope_type', event.target.value)}>
-            <option value="barangay_wide">Barangay-wide households + responders</option>
-            <option value="selected_puroks">Selected puroks + responders</option>
-            <option value="local_direct_impact">Direct-impact puroks</option>
-            <option value="rescuers_only">Responders only</option>
+            <option value="barangay_wide">Barangay-wide</option>
+            <option value="selected_puroks">Selected puroks</option>
           </select>
         </label>
-        <label>
-          <span>Base priority</span>
-          <select value={form.base_priority} onChange={(event) => onChange('base_priority', event.target.value)}>
-            {priorityOptions.map((option) => (
-              <option value={option.value} key={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <div className={`bc-recipient-note ${needsPuroks ? 'local' : 'wide'}`}>
-        {recipientNote}
       </div>
       {needsPuroks && (
         <div className="bc-purok-tools">
-          <div className="bc-purok-add">
-            <select value={selectedPurok} onChange={(event) => onSelectPurok(event.target.value)}>
-              {puroks.map((purok) => (
-                <option value={purok.name} key={`${purok.name}-${purok.source}`}>{purok.name}</option>
-              ))}
-            </select>
-            <select value={selectedPriority} onChange={(event) => onSelectPriority(event.target.value)}>
-              {priorityOptions.map((option) => (
-                <option value={option.value} key={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={onAddPurok}>
+          <div className="bc-purok-add-grid">
+            <label className="bc-purok-select-col">
+              <span>Purok</span>
+              <select
+                aria-label="Select a purok"
+                value={selectedPurok}
+                onChange={(event) => onSelectPurok(event.target.value)}
+              >
+                <option value="">Select a purok</option>
+                {puroks.map((purok) => (
+                  <option value={purok.name} key={purok.name}>
+                    {purok.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="btn btn-secondary btn-sm bc-purok-btn-col"
+              type="button"
+              disabled={!selectedPurok}
+              onClick={onAddPurok}
+            >
               <Plus size={14} />
               Add
             </button>
           </div>
           <div className="bc-direct-list">
             {directPuroks.length === 0 ? (
-              <span className="bc-direct-empty">No direct-impact purok selected.</span>
+              <span className="bc-direct-empty">No purok selected.</span>
             ) : (
               directPuroks.map((purok) => (
                 <span className="bc-direct-chip" key={purok.name}>
                   {purok.name}
-                  <Badge tone={priorityTone(purok.priority)}>{labelFromValue(priorityOptions, purok.priority)}</Badge>
                   <button type="button" aria-label={`Remove ${purok.name}`} onClick={() => onRemovePurok(purok.name)}>
                     <Trash2 size={12} />
                   </button>
@@ -284,14 +267,6 @@ function BroadcastMessageFields({ form, onChange }) {
           />
         </label>
       </div>
-      <label className="bc-check-row">
-        <input
-          type="checkbox"
-          checked={form.attach_route}
-          onChange={(event) => onChange('attach_route', event.target.checked)}
-        />
-        <span>Attach evacuation route when map routing is available</span>
-      </label>
     </section>
   )
 }

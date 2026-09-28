@@ -24,7 +24,10 @@ export default function DashboardMainContent({
   return (
     <div className="dashboard-main">
       {hasActiveEvent && (
-        <ActiveEventBanner activeEvent={dashboard.active_event} onOpenBroadcast={() => onOpenModule('/broadcast')} />
+        <ActiveEventBanner
+          activeEvent={dashboard.active_event}
+          onOpenBroadcast={(eventId) => onOpenModule(`/broadcast?event_id=${encodeURIComponent(eventId)}`)}
+        />
       )}
 
       {!hasActiveEvent && isStandbyStripVisible && (
@@ -92,7 +95,7 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
     return (
       <div 
         className="event-banner standby" 
-        onClick={onOpenBroadcast}
+        onClick={() => onOpenBroadcast()}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast()}
@@ -115,10 +118,10 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
   return (
     <div 
       className={`event-banner active-state tone-${tone}`}
-      onClick={onOpenBroadcast}
+      onClick={() => onOpenBroadcast(activeEvent.event_id)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast()}
+      onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast(activeEvent.event_id)}
     >
       {/* Left Section: White/Light Event Info */}
       <div className="event-main-col">
