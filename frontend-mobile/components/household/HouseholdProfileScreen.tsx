@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
@@ -74,7 +74,11 @@ export function HouseholdProfileScreen({
       <View style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials(householdName || user.full_name || 'H')}</Text>
+            <Image
+              source={require('@/assets/images/household-default-profile.jpg')}
+              style={styles.avatarImage}
+              resizeMode="contain"
+            />
           </View>
           <View style={styles.heroText}>
             <Text style={styles.role}>Household account</Text>
@@ -215,12 +219,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ffffff66',
     borderRadius: 31,
-    backgroundColor: '#ffffff1f',
+    backgroundColor: '#fff',
   },
-  avatarText: {
-    color: '#fff',
-    fontSize: 21,
-    fontWeight: '900',
+  avatarImage: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
   },
   heroText: {
     flex: 1,
