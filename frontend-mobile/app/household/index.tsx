@@ -21,6 +21,7 @@ import {
   createTrustedHousehold,
   getHouseholdOverview,
   lookupTrustedHousehold,
+  respondToTrustedHouseholdRequest,
   saveHouseholdMemberStatus,
   saveHouseholdStatus,
   updateHouseholdDeviceLocation,
@@ -78,6 +79,7 @@ export default function HouseholdHomeScreen() {
   const [showAddTrusted, setShowAddTrusted] = useState(false);
   const [trustedLookup, setTrustedLookup] = useState<any>(null);
   const [trustedLoading, setTrustedLoading] = useState(false);
+  const [respondingTrustedConnectionId, setRespondingTrustedConnectionId] = useState<string | null>(null);
 
   const loadLocalKeys = useCallback(async () => {
     const existingDeviceUuid = await getStoredItem(deviceUuidKey);
@@ -157,6 +159,12 @@ export default function HouseholdHomeScreen() {
     loadOverview();
     refreshDeviceSensors();
   }, [loadLocalKeys, loadOverview, refreshDeviceSensors]);
+
+  useEffect(() => {
+    if (activeTab === 'trusted') {
+      void loadOverview(true);
+    }
+  }, [activeTab, loadOverview]);
 
   useEffect(() => {
     refreshDeviceSensors();
@@ -431,6 +439,41 @@ export default function HouseholdHomeScreen() {
     }
   }
 
+  function handleRespondToTrustedRequest(requestItem: any, decision: 'accept' | 'reject') {
+    const accepting = decision === 'accept';
+
+    Alert.alert(
+      accepting ? 'Accept trusted request?' : 'Decline trusted request?',
+      accepting
+        ? `Both households will be able to view each other's trusted household details.`
+        : `This will decline the request from ${requestItem.family_name || 'this household'}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: accepting ? 'Accept' : 'Decline',
+          style: accepting ? 'default' : 'destructive',
+          onPress: () => {
+            void saveTrustedRequestDecision(requestItem.connection_id, decision);
+          },
+        },
+      ]
+    );
+  }
+
+  async function saveTrustedRequestDecision(connectionId: string, decision: 'accept' | 'reject') {
+    setRespondingTrustedConnectionId(connectionId);
+
+    try {
+      const response = await respondToTrustedHouseholdRequest(connectionId, decision);
+      Alert.alert('Trusted households', response.message || 'Trusted household request updated.');
+      await loadOverview(true);
+    } catch (error: any) {
+      Alert.alert('Unable to update request', errorMessage(error));
+    } finally {
+      setRespondingTrustedConnectionId(null);
+    }
+  }
+
   function renderContent() {
     if (!overview) {
       return null;
@@ -457,6 +500,8 @@ export default function HouseholdHomeScreen() {
           onAddTrusted={openAddTrusted}
           onOpenTrusted={openTrusted}
           onBackFamily={() => setViewingTrusted(null)}
+          onRespondToIncomingRequest={handleRespondToTrustedRequest}
+          respondingConnectionId={respondingTrustedConnectionId}
         />
       );
     }

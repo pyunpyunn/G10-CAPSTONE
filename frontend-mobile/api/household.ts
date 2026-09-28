@@ -21,6 +21,7 @@ export type HouseholdOverview = {
   trusted: {
     is_available: boolean;
     households: any[];
+    incoming_requests: any[];
   };
   qr: any;
 };
@@ -67,5 +68,10 @@ export async function lookupTrustedHousehold(householdId: string) {
 
 export async function createTrustedHousehold(payload: any) {
   const response = await api.post('/household/trusted-households', payload);
+  return response.data;
+}
+
+export async function respondToTrustedHouseholdRequest(connectionId: string, decision: 'accept' | 'reject') {
+  const response = await api.patch(`/household/trusted-households/${connectionId}`, { decision });
   return response.data;
 }

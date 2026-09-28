@@ -13,6 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 class HouseholdMobileService
 {
+    public function __construct(private OneSignalNotificationService $oneSignal) {}
+
     public function overview(Request $request): JsonResponse
     {
         $user = $request->user()?->load('role');
@@ -64,6 +66,7 @@ class HouseholdMobileService
                 'trusted' => [
                     'is_available' => Schema::hasTable('trusted_households'),
                     'households' => $this->trustedRows($householdId),
+                    'incoming_requests' => $this->incomingTrustedRows($householdId),
                 ],
                 'qr' => $this->qrPayload($household, $activeEvent),
             ],
@@ -512,6 +515,7 @@ class HouseholdMobileService
             'data' => [
                 'is_available' => Schema::hasTable('trusted_households'),
                 'households' => $householdId ? $this->trustedRows($householdId) : [],
+                'incoming_requests' => $householdId ? $this->incomingTrustedRows($householdId) : [],
             ],
         ]);
     }
@@ -628,6 +632,101 @@ class HouseholdMobileService
                 'validation_status' => 'pending',
             ],
         ], 201);
+    }
+
+    public function respondToTrustedHousehold(Request $request, string $connectionId): JsonResponse
+    {
+        if (! Schema::hasTable('trusted_households')) {
+            return $this->missingTableResponse('trusted_households');
+        }
+
+        $user = $request->user();
+        $householdId = $this->householdId($user);
+
+        if (! $householdId) {
+            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
+        }
+
+        $validated = $request->validate([
+            'decision' => ['required', 'string', Rule::in(['accept', 'reject'])],
+        ]);
+
+        $accepting = $validated['decision'] === 'accept';
+        $validationStatus = $accepting ? 'validated' : 'rejected';
+        $now = now();
+        $updated = 0;
+        $rejectedRequest = null;
+
+        DB::transaction(function () use ($request, $connectionId, $householdId, $user, $accepting, $validationStatus, $validated, $now, &$updated, &$rejectedRequest): void {
+            $connection = DB::table('trusted_households')
+                ->where('connection_id', $connectionId)
+                ->where('trusted_household_id', $householdId)
+                ->where('validation_status', 'pending')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $connection) {
+                return;
+            }
+
+            if ($accepting) {
+                $updated = DB::table('trusted_households')
+                    ->where('connection_id', $connectionId)
+                    ->where('validation_status', 'pending')
+                    ->update($this->filterColumns('trusted_households', [
+                        'validation_status' => $validationStatus,
+                        'validated_by_user_id' => $user?->user_id,
+                        'validated_at' => $now,
+                        'updated_at' => $now,
+                    ]));
+            } else {
+                $updated = DB::table('trusted_households')
+                    ->where('connection_id', $connectionId)
+                    ->where('validation_status', 'pending')
+                    ->delete();
+                $rejectedRequest = $connection;
+            }
+
+            if ($updated === 1) {
+                $this->writeAuditLog($request, 'mobile_trusted_household_'.$validated['decision'], 'trusted_households', $connectionId, [
+                    'decision' => $validated['decision'],
+                    'validation_status' => $validationStatus,
+                    'trusted_household_id' => $householdId,
+                ]);
+            }
+        });
+
+        if ($updated !== 1) {
+            return response()->json([
+                'message' => 'This pending trusted household request was not found or was already answered.',
+            ], 404);
+        }
+
+        if (! $accepting && $rejectedRequest?->created_by_user_id) {
+            $this->oneSignal->sendToMobileDevices(
+                'Trusted household request declined',
+                'Your trusted household connection request was declined.',
+                [
+                    'roles' => ['household'],
+                    'user_ids' => [$rejectedRequest->created_by_user_id],
+                    'data' => [
+                        'type' => 'trusted_household_request_declined',
+                        'connection_id' => $connectionId,
+                    ],
+                ]
+            );
+        }
+
+        return response()->json([
+            'message' => $validated['decision'] === 'accept'
+                ? 'Trusted household request accepted.'
+                : 'Trusted household request declined.',
+            'data' => [
+                'connection_id' => $connectionId,
+                'validation_status' => $validationStatus,
+                'validated_at' => $now->toDateTimeString(),
+            ],
+        ]);
     }
 
     private function householdId($user): ?string
@@ -1322,28 +1421,45 @@ class HouseholdMobileService
         $activeEvent = $this->activeEvent();
 
         return DB::table('trusted_households as th')
-            ->leftJoin('households as h', 'h.household_id', '=', 'th.trusted_household_id')
-            ->where('th.requesting_household_id', $householdId)
+            ->leftJoin('households as requesting_household', 'requesting_household.household_id', '=', 'th.requesting_household_id')
+            ->leftJoin('households as trusted_household', 'trusted_household.household_id', '=', 'th.trusted_household_id')
+            ->whereNotIn('th.validation_status', ['rejected', 'declined'])
+            ->where(function ($query) use ($householdId): void {
+                $query->where('th.requesting_household_id', $householdId)
+                    ->orWhere(function ($query) use ($householdId): void {
+                        $query->where('th.trusted_household_id', $householdId)
+                            ->whereIn('th.validation_status', ['validated', 'approved']);
+                    });
+            })
             ->orderByDesc('th.created_at')
             ->get([
                 'th.connection_id',
+                'th.requesting_household_id',
                 'th.trusted_household_id',
                 'th.reason',
                 'th.validation_status',
                 'th.member_relationships',
                 'th.created_at',
-                'h.household_name',
-                'h.household_code',
+                'requesting_household.household_name as requesting_household_name',
+                'requesting_household.household_code as requesting_household_code',
+                'trusted_household.household_name as trusted_household_name',
+                'trusted_household.household_code as trusted_household_code',
             ])
-            ->map(function (object $row) use ($activeEvent): array {
-                $trustedHouseholdId = (string) $row->trusted_household_id;
+            ->map(function (object $row) use ($activeEvent, $householdId): array {
+                $isRequestingHousehold = (string) $row->requesting_household_id === $householdId;
+                $trustedHouseholdId = (string) ($isRequestingHousehold
+                    ? $row->trusted_household_id
+                    : $row->requesting_household_id);
+                $trustedHouseholdName = $isRequestingHousehold
+                    ? ($row->trusted_household_name ?? $row->trusted_household_code ?? $row->trusted_household_id)
+                    : ($row->requesting_household_name ?? $row->requesting_household_code ?? $row->requesting_household_id);
                 $isValidated = in_array(strtolower((string) ($row->validation_status ?? 'pending')), ['validated', 'approved'], true);
                 $devices = $isValidated ? $this->devices($trustedHouseholdId) : collect();
 
                 return [
                     'connection_id' => $row->connection_id,
                     'household_id' => $trustedHouseholdId,
-                    'family_name' => $this->familyName($row->household_name ?? $row->household_code ?? $row->trusted_household_id),
+                    'family_name' => $this->familyName($trustedHouseholdName),
                     'reason' => $row->reason,
                     'validation_status' => $row->validation_status ?? 'pending',
                     'member_relationships' => $this->decodeJson($row->member_relationships),
@@ -1353,6 +1469,39 @@ class HouseholdMobileService
                     'created_at' => $row->created_at,
                 ];
             })
+            ->values()
+            ->all();
+    }
+
+    private function incomingTrustedRows(string $householdId): array
+    {
+        if (! Schema::hasTable('trusted_households')) {
+            return [];
+        }
+
+        return DB::table('trusted_households as th')
+            ->leftJoin('households as h', 'h.household_id', '=', 'th.requesting_household_id')
+            ->where('th.trusted_household_id', $householdId)
+            ->where('th.validation_status', 'pending')
+            ->orderByDesc('th.created_at')
+            ->get([
+                'th.connection_id',
+                'th.requesting_household_id',
+                'th.reason',
+                'th.member_relationships',
+                'th.created_at',
+                'h.household_name',
+                'h.household_code',
+            ])
+            ->map(fn (object $row): array => [
+                'connection_id' => $row->connection_id,
+                'requesting_household_id' => $row->requesting_household_id,
+                'family_name' => $this->familyName($row->household_name ?? $row->household_code ?? $row->requesting_household_id),
+                'reason' => $row->reason,
+                'member_relationships' => $this->decodeJson($row->member_relationships),
+                'created_at' => $row->created_at,
+                'created_label' => $this->dateLabel($row->created_at),
+            ])
             ->values()
             ->all();
     }

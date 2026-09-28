@@ -25,6 +25,8 @@ type TrustedScreenProps = {
   onAddTrusted: () => void;
   onOpenTrusted: (household: any) => void;
   onBackFamily: () => void;
+  onRespondToIncomingRequest: (requestItem: any, decision: 'accept' | 'reject') => void;
+  respondingConnectionId: string | null;
 };
 
 export function HouseholdDashboardScreen({
@@ -193,8 +195,11 @@ export function HouseholdTrustedScreen({
   onAddTrusted,
   onOpenTrusted,
   onBackFamily,
+  onRespondToIncomingRequest,
+  respondingConnectionId,
 }: TrustedScreenProps) {
   const activeEvent = overview.active_event;
+  const incomingRequests = overview.trusted?.incoming_requests || [];
   const members = viewingTrusted ? trustedMembers(viewingTrusted) : [];
   const trustedStatus = viewingTrusted?.current_status || null;
 
@@ -240,6 +245,21 @@ export function HouseholdTrustedScreen({
 
   return (
     <View style={styles.stack}>
+      {incomingRequests.length ? (
+        <View style={styles.card}>
+          <HouseholdSection
+            title="Requests"
+            action={<HouseholdBadge label={`${incomingRequests.length} pending`} tone="warning" />}
+          />
+          <IncomingTrustedRequestList
+            overview={overview}
+            requests={incomingRequests}
+            respondingConnectionId={respondingConnectionId}
+            onRespond={onRespondToIncomingRequest}
+          />
+        </View>
+      ) : null}
+
       <View style={styles.card}>
         <HouseholdSection
           title="Trusted households"
@@ -252,6 +272,72 @@ export function HouseholdTrustedScreen({
           onOpenTrusted={onOpenTrusted}
         />
       </View>
+    </View>
+  );
+}
+
+function IncomingTrustedRequestList({
+  overview,
+  requests,
+  respondingConnectionId,
+  onRespond,
+}: {
+  overview: any;
+  requests: any[];
+  respondingConnectionId: string | null;
+  onRespond: (requestItem: any, decision: 'accept' | 'reject') => void;
+}) {
+  if (!overview.trusted?.is_available) {
+    return <HouseholdEmpty icon="lock-closed-outline" title="Trusted household storage not ready" />;
+  }
+
+  if (requests.length === 0) {
+    return <HouseholdEmpty icon="mail-outline" title="No pending connection requests" />;
+  }
+
+  return (
+    <View style={styles.incomingRequestList}>
+      {requests.map((requestItem: any) => {
+        const isSaving = respondingConnectionId === requestItem.connection_id;
+
+        return (
+          <View key={requestItem.connection_id} style={styles.incomingRequest}>
+            <View style={styles.incomingRequestHeader}>
+              <View style={styles.trustedIcon}>
+                <Ionicons name="people-outline" size={18} color={palette.navActive} />
+              </View>
+              <View style={styles.incomingRequestText}>
+                <Text style={styles.rowTitle}>{requestItem.family_name}</Text>
+                <Text style={styles.rowMeta}>{requestItem.requesting_household_id}</Text>
+              </View>
+              <HouseholdBadge label="Pending" tone="warning" />
+            </View>
+
+            <Text style={styles.incomingRequestReason}>{requestItem.reason || 'Trusted household connection request'}</Text>
+            <Text style={styles.incomingRequestDate}>Received {requestItem.created_label || formatDate(requestItem.created_at)}</Text>
+
+            <View style={styles.incomingRequestActions}>
+              <View style={styles.incomingRequestAction}>
+                <HouseholdButton
+                  label={isSaving ? 'Saving...' : 'Decline'}
+                  icon="close-outline"
+                  tone="light"
+                  disabled={isSaving}
+                  onPress={() => onRespond(requestItem, 'reject')}
+                />
+              </View>
+              <View style={styles.incomingRequestAction}>
+                <HouseholdButton
+                  label={isSaving ? 'Saving...' : 'Accept'}
+                  icon="checkmark-outline"
+                  disabled={isSaving}
+                  onPress={() => onRespond(requestItem, 'accept')}
+                />
+              </View>
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -817,6 +903,43 @@ const styles = StyleSheet.create({
   },
   memberStatusChoiceTextActive: {
     color: '#fff',
+  },
+  incomingRequestList: {
+    gap: spacing.sm,
+  },
+  incomingRequest: {
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: palette.secondary,
+  },
+  incomingRequestHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  incomingRequestText: {
+    flex: 1,
+  },
+  incomingRequestReason: {
+    color: palette.text,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+  },
+  incomingRequestDate: {
+    color: palette.textSoft,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  incomingRequestActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  incomingRequestAction: {
+    flex: 1,
   },
   trustedRow: {
     flexDirection: 'row',

@@ -145,6 +145,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/household/trusted-households', [HouseholdMobileController::class, 'trustedHouseholds']);
             Route::get('/household/trusted-households/lookup/{householdId}', [HouseholdMobileController::class, 'lookupTrustedHousehold']);
             Route::post('/household/trusted-households', [HouseholdMobileController::class, 'storeTrustedHousehold']);
+            Route::patch('/household/trusted-households/{connectionId}', [HouseholdMobileController::class, 'respondToTrustedHousehold']);
         });
 
         Route::middleware('role:super_admin,admin,rescuer')->group(function () {
