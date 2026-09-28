@@ -59,7 +59,11 @@ export default function DashboardOverview({
   return (
     <aside className="dashboard-overview" aria-label="Dashboard side information">
       <WeatherCard weather={latestSavedWeather || dashboard.weather} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
-      <DashboardMapCard hasActiveEvent={hasActiveEvent} onOpenMap={() => onOpenModule('/mapping')} />
+      <DashboardMapCard
+        hasActiveEvent={hasActiveEvent}
+        reportedHouseholds={dashboard.households.reported}
+        onOpenMap={() => onOpenModule('/mapping')}
+      />
       <RequestCard requests={dashboard.requests} onOpenRequests={() => onOpenModule('/resources-requests')} />
     </aside>
   )
@@ -104,7 +108,7 @@ function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
   )
 }
 
-function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
+function DashboardMapCard({ hasActiveEvent, reportedHouseholds, onOpenMap }) {
   const [workspace, setWorkspace] = useState(defaultWorkspace)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -181,9 +185,9 @@ function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
       </div>
 
       <div className="dashboard-side-metrics">
-        <div><strong>{workspace.summary.gps_tagged_households || households.length}</strong><span>GPS tagged</span></div>
-        <div><strong>{workspace.summary.evacuation_sites || 0}</strong><span>Evac sites</span></div>
-        <div><strong>{hasActiveEvent ? households.length : 0}</strong><span>Status points</span></div>
+        <div><strong>{workspace.summary.gps_tagged_households ?? 0}</strong><span>GPS tagged</span></div>
+        <div><strong>{workspace.summary.evacuation_sites ?? 0}</strong><span>Active evac sites</span></div>
+        <div><strong>{hasActiveEvent ? reportedHouseholds ?? 0 : 0}</strong><span>Status reported</span></div>
       </div>
     </section>
   )
