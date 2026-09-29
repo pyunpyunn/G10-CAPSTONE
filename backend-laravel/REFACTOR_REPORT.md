@@ -138,6 +138,10 @@ No blanket transaction edits were made. Existing transaction closures span sever
 
 Archive export currently formats six unrelated categories through category-specific query methods, and there are no export fixtures that pin CSV headers, row order, byte output, or the current 1,000-row ceiling. A safe chunkById rewrite needs a separately reviewed query for each category and stable ordering keys. I did not change the CSV response to streaming. I did correct the Step 2 list cap so interactive pages remain capped at 100 while archive CSV export retains its existing fixed 1,000-row ceiling; export uses an internal request attribute so a caller cannot activate the higher ceiling on ordinary list requests.
 
+## Step 9: index migrations — skipped
+
+No index migration files were added. The audit shows common join/filter candidates, but no representative EXPLAIN plans or verified canonical schema snapshot was used to check current indexes, column type/length, or duplicate index coverage. Adding speculative indexes could slow high-write status/location tables or fail when applied to the deployed schema. Produce plans against a sanitized schema copy and a representative local dataset before drafting one migration per table. No migrations were run.
+
 ## Assumptions / open decisions
 
 - Existing route URLs, HTTP methods, field names, and JSON response shapes are compatibility constraints.
@@ -164,7 +168,8 @@ Archive export currently formats six unrelated categories through category-speci
 - Step 6: pending report commit; skipped as above.
 - Step 7: pending report commit; skipped as above.
 - Step 8: pending report/code commit; streaming skipped as above.
-- Steps 9–10: pending or explicitly skipped/blocked in final notes.
+- Step 9: pending report commit; skipped as above.
+- Step 10: pending implementation.
 
 ### Appendix A. JSON encode/decode calls
 
