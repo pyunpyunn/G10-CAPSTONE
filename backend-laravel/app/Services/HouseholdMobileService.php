@@ -1263,6 +1263,7 @@ class HouseholdMobileService
                 'member_id' => $fallbackUser?->user_id ?? 'household-user',
                 'name' => $fallbackUser?->full_name ?? $fallbackUser?->username ?? 'Household user',
                 'relationship' => 'Household member',
+                'is_registered_user' => $fallbackUser !== null,
                 'device' => collect($devices)->first(),
                 'current_status' => null,
             ]]);
@@ -1299,9 +1300,11 @@ class HouseholdMobileService
             $membersQuery->orderBy('full_name');
         }
 
-        $members = $membersQuery
-            ->get($memberColumns)
-            ->map(function (object $member) use ($devicesByMember, $statusesByMember): array {
+        $memberRows = $membersQuery->get($memberColumns);
+        $registeredMemberIds = $this->registeredMemberIds($memberRows->pluck('member_id'));
+
+        $members = $memberRows
+            ->map(function (object $member) use ($devicesByMember, $statusesByMember, $registeredMemberIds): array {
                 $device = $devicesByMember->get($member->member_id);
                 $memberStatus = $statusesByMember[(string) $member->member_id] ?? null;
 
@@ -1317,6 +1320,7 @@ class HouseholdMobileService
                     'birth_date' => $member->birth_date ?? null,
                     'gender' => $member->gender ?? null,
                     'special_needs' => $member->special_needs ?? null,
+                    'is_registered_user' => isset($registeredMemberIds[(string) $member->member_id]),
                     'device' => $device ?: null,
                     'current_status' => $memberStatus,
                 ];
@@ -1331,9 +1335,31 @@ class HouseholdMobileService
             'member_id' => $fallbackUser?->user_id ?? 'household-user',
             'name' => $fallbackUser?->full_name ?? $fallbackUser?->username ?? 'Household user',
             'relationship' => 'Household member',
+            'is_registered_user' => $fallbackUser !== null,
             'device' => collect($devices)->first(),
             'current_status' => null,
         ]]);
+    }
+
+    private function registeredMemberIds($memberIds): array
+    {
+        $memberIds = collect($memberIds)
+            ->filter(fn ($memberId): bool => filled($memberId))
+            ->map(fn ($memberId): string => (string) $memberId)
+            ->unique()
+            ->values();
+
+        if ($memberIds->isEmpty() || ! Schema::hasTable('users') || ! Schema::hasColumn('users', 'member_id')) {
+            return [];
+        }
+
+        return DB::table('users')
+            ->whereIn('member_id', $memberIds->all())
+            ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->pluck('member_id')
+            ->map(fn ($memberId): string => (string) $memberId)
+            ->flip()
+            ->all();
     }
 
     private function memberStatusRows(string $householdId, ?string $eventId): array

@@ -427,7 +427,9 @@ function MemberSummary({
   onPress: () => void;
 }) {
   const device = member.device;
-  const deviceLabel = device?.is_active ? 'Device active' : device ? 'Device inactive' : 'No device registered';
+  const memberLabel = member.is_registered_user
+    ? 'Registered User'
+    : device?.is_active ? 'Device active' : device ? 'Device inactive' : 'No device registered';
 
   return (
     <Pressable
@@ -442,7 +444,7 @@ function MemberSummary({
       </View>
       <View style={styles.memberSummaryText}>
         <Text style={styles.rowTitle}>{member.name}</Text>
-        <Text style={styles.rowMeta}>{member.relationship || 'Member'} · {deviceLabel}</Text>
+        <Text style={styles.rowMeta}>{member.relationship || 'Member'} · {memberLabel}</Text>
       </View>
       <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={palette.navMuted} />
     </Pressable>
