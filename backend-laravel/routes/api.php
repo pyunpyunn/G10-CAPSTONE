@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DisasterBroadcastController;
 use App\Http\Controllers\Api\EvacuationCheckInController;
 use App\Http\Controllers\Api\GlobalSearchController;
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\HouseholdMobileController;
 use App\Http\Controllers\Api\HouseholdStatusController;
 use App\Http\Controllers\Api\InquiryController;
@@ -29,6 +30,9 @@ Route::prefix('v1')->group(function () {
             'documentation' => 'Use /dashboard, /auth/login, /auth/me, or other documented endpoints under /api/v1.',
         ]);
     });
+
+    Route::get('/health/live', [HealthController::class, 'live'])->name('api.health.live');
+    Route::get('/health/ready', [HealthController::class, 'ready'])->name('api.health.ready');
 
     Route::post('/inquiries', [InquiryController::class, 'store'])
         ->middleware('throttle:10,1');

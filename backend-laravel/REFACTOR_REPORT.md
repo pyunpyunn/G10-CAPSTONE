@@ -103,7 +103,7 @@ Added checks covering unauthenticated JSON status/body for representative archiv
 ## Step 1: repository hygiene
 
 - Removed the tracked `DisasterBroadcastService - Shortcut.lnk` shortcut.
-- Added `/debug_auth.php` to `.gitignore` and removed it from Git tracking. Its local copy remains on disk and was not opened or printed.
+- Added `/debug_auth.php` to `.gitignore` and removed the file from the worktree and Git tracking. It was not opened or printed.
 - Added `/storage/**/*.sql` to `.gitignore` and removed the two tracked SQL dumps from the Git index. Both local dump files remain on disk and were not opened or printed.
 - Git history still contains the previously committed debug file and SQL dumps. Treat this as a history exposure: if any credentials were embedded, rotate them; coordinate history rewriting if the repository has been shared. No secret values were inspected or copied.
 
@@ -142,6 +142,15 @@ Archive export currently formats six unrelated categories through category-speci
 
 No index migration files were added. The audit shows common join/filter candidates, but no representative EXPLAIN plans or verified canonical schema snapshot was used to check current indexes, column type/length, or duplicate index coverage. Adding speculative indexes could slow high-write status/location tables or fail when applied to the deployed schema. Produce plans against a sanitized schema copy and a representative local dataset before drafting one migration per table. No migrations were run.
 
+## Step 10: resilience and diagnostics — implemented
+
+- Kept Laravel `/up` as app liveness and added public `/api/v1/health/live` plus `/api/v1/health/ready` routes. Readiness executes `SELECT 1` only on `resq_local`; the optional TrackingAid integration is not probed.
+- Readiness failure returns safe JSON with HTTP 503, `Database unreachable.`, a generated request ID, and `X-Request-ID`. Logs contain request ID, route, connection name, and exception class only; no exception message, SQL bindings, credentials, or household data is written.
+- API `QueryException` handling now distinguishes connection-class PDO failures (503) from other database query errors (generic safe 500), with sanitized diagnostic context. A local-only test simulates connection refusal on `127.0.0.1:1`; no remote host is contacted.
+- Main, operational, TrackingAid, and MariaDB configs have environment-driven connect timeout (existing) and `net_read_timeout` values. `.env.example` documents connect/read timeout variables and explicitly says production must use `APP_DEBUG=false`.
+- Tests cover liveness, successful readiness against an in-memory SQLite connection, and failed readiness against loopback port 1.
+- Final local suite after all steps: `php artisan test --compact` — 12 tests, 53 assertions, passing.
+
 ## Assumptions / open decisions
 
 - Existing route URLs, HTTP methods, field names, and JSON response shapes are compatibility constraints.
@@ -149,6 +158,40 @@ No index migration files were added. The audit shows common join/filter candidat
 - SQL dump working copies must remain on disk but must not remain tracked.
 - Keep `RepositoryInterface` and `HouseholdRepository`; do not add repositories for every model.
 - No before/after query count is claimed without repeatable local fixtures.
+
+## Before / after service line counts
+
+Only `ArchiveService` changed during this run; its additional 5 lines isolate the higher export ceiling from interactive pagination. All other service files are unchanged in line count. “Before” is the Step 0 count above.
+
+| Service | Before | After |
+|---|---:|---:|
+| ArchiveService.php | 1,493 | 1,498 |
+| AuthService.php | 347 | 347 |
+| BarangayProfileService.php | 211 | 211 |
+| DashboardService.php | 651 | 651 |
+| DisasterBroadcastService.php | 781 | 781 |
+| EvacuationCheckInService.php | 167 | 167 |
+| GlobalSearchService.php | 203 | 203 |
+| HouseholdMobileService.php | 1,841 | 1,841 |
+| HouseholdStatusService.php | 1,225 | 1,225 |
+| InquiryService.php | 285 | 285 |
+| MappingService.php | 695 | 695 |
+| MobileDeviceService.php | 208 | 208 |
+| NotificationService.php | 556 | 556 |
+| OneSignalNotificationService.php | 234 | 234 |
+| ProfileService.php | 396 | 396 |
+| RescueDispatchService.php | 1,352 | 1,352 |
+| RescuerAccountService.php | 1,226 | 1,226 |
+| RescuerMobileService.php | 1,880 | 1,880 |
+| ResourceRequestService.php | 1,307 | 1,307 |
+| RoutingService.php | 51 | 51 |
+| SituationReportService.php | 683 | 683 |
+| SmsGatewayService.php | 108 | 108 |
+| TrackingAidForwardingService.php | 280 | 280 |
+| WeatherService.php | 60 | 60 |
+| WeatherSnapshotService.php | 419 | 419 |
+
+Query counts before/after: not measurable with current fixtures; no claim made.
 
 ## Manual steps for me
 
@@ -159,17 +202,17 @@ No index migration files were added. The audit shows common join/filter candidat
 
 ## Commit log
 
-- Step 0: committed as `f029810` (`docs: audit backend hardening baseline`).
-- Step 1: pending commit.
-- Step 2: pending commit.
-- Step 3: pending report commit; skipped as above.
-- Step 4: pending report commit; skipped as above.
-- Step 5: pending report commit; skipped as above.
-- Step 6: pending report commit; skipped as above.
-- Step 7: pending report commit; skipped as above.
-- Step 8: pending report/code commit; streaming skipped as above.
-- Step 9: pending report commit; skipped as above.
-- Step 10: pending implementation.
+- Step 0: `f029810` (`docs: audit backend hardening baseline`).
+- Step 1: `1646693` (`chore: remove tracked debug and data artifacts`).
+- Step 2: `88e1255` (`feat: validate and cap paginated list inputs`).
+- Step 3: `1b43759` (`docs: record schema refactor safety limits`), skipped.
+- Step 4: `c54e3f2` (`docs: record query refactor constraints`), skipped.
+- Step 5: `4011a3c` (`docs: defer resource extraction until contracts are pinned`), skipped.
+- Step 6: `6c02393` (`docs: defer service decomposition pending workflow tests`), skipped.
+- Step 7: `c4c5e10` (`docs: defer transaction changes pending write audit`), skipped.
+- Step 8: `73cf309` (`fix: preserve archive export row ceiling`), streaming skipped.
+- Step 9: `71387d7` (`docs: defer index migrations until query plans are reviewed`), skipped.
+- Step 10: `237bf70` (`feat: add database readiness and safe diagnostics`).
 
 ### Appendix A. JSON encode/decode calls
 
