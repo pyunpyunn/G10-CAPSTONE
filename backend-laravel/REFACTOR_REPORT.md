@@ -134,6 +134,10 @@ No large service was split. The line counts identify priority but do not establi
 
 No blanket transaction edits were made. Existing transaction closures span several operational write paths, and side effects/connection ownership have not been exhaustively confirmed. Adding retry attempts can re-run closure side effects; adding locks without an identified counter row and consistent lock order can introduce contention/deadlocks. Failure-mid-transaction tests also need schema-complete fixtures for the target workflow. The scan appendix identifies transaction, lock, increment, and external-service candidates for a deliberate per-operation audit.
 
+## Step 8: streamed, chunked exports — skipped, with pagination compatibility fix
+
+Archive export currently formats six unrelated categories through category-specific query methods, and there are no export fixtures that pin CSV headers, row order, byte output, or the current 1,000-row ceiling. A safe chunkById rewrite needs a separately reviewed query for each category and stable ordering keys. I did not change the CSV response to streaming. I did correct the Step 2 list cap so interactive pages remain capped at 100 while archive CSV export retains its existing fixed 1,000-row ceiling; export uses an internal request attribute so a caller cannot activate the higher ceiling on ordinary list requests.
+
 ## Assumptions / open decisions
 
 - Existing route URLs, HTTP methods, field names, and JSON response shapes are compatibility constraints.
@@ -159,7 +163,8 @@ No blanket transaction edits were made. Existing transaction closures span sever
 - Step 5: pending report commit; skipped as above.
 - Step 6: pending report commit; skipped as above.
 - Step 7: pending report commit; skipped as above.
-- Steps 8–10: pending or explicitly skipped/blocked in final notes.
+- Step 8: pending report/code commit; streaming skipped as above.
+- Steps 9–10: pending or explicitly skipped/blocked in final notes.
 
 ### Appendix A. JSON encode/decode calls
 

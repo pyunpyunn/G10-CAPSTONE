@@ -99,6 +99,10 @@ class ArchiveService
             ], 422);
         }
 
+        // Exports have a separate fixed ceiling from interactive list pages.
+        $request->attributes->set('archive_export', true);
+        $request->query->set('per_page', 1000);
+        $request->query->set('page', 1);
         [$paginator, $records] = $this->categoryRows($category, $request, 1000);
         $headers = $this->csvHeaders($category);
         $handle = fopen('php://temp', 'r+');
@@ -1551,7 +1555,9 @@ class ArchiveService
 
     private function perPage(Request $request, int $fallback): int
     {
-        return \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page', $fallback));
+        $maximum = $request->attributes->get('archive_export') ? 1000 : 100;
+
+        return min($maximum, max(1, (int) $request->query('per_page', $fallback)));
     }
 
     private function deleteMap(): array
