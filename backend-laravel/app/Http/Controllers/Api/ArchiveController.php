@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ListRequest;
 use App\Services\ArchiveService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,32 +18,32 @@ class ArchiveController extends Controller
         $this->service = $service;
     }
 
-    public function disasterEvents(Request $request): JsonResponse
+    public function disasterEvents(ListRequest $request): JsonResponse
     {
         return $this->service->disasterEvents($request);
     }
 
-    public function householdStatusLogs(Request $request): JsonResponse
+    public function householdStatusLogs(ListRequest $request): JsonResponse
     {
         return $this->service->householdStatusLogs($request);
     }
 
-    public function dispatchLogs(Request $request): JsonResponse
+    public function dispatchLogs(ListRequest $request): JsonResponse
     {
         return $this->service->dispatchLogs($request);
     }
 
-    public function radioCommunicationLogs(Request $request): JsonResponse
+    public function radioCommunicationLogs(ListRequest $request): JsonResponse
     {
         return $this->service->radioCommunicationLogs($request);
     }
 
-    public function resourceRequests(Request $request): JsonResponse
+    public function resourceRequests(ListRequest $request): JsonResponse
     {
         return $this->service->resourceRequests($request);
     }
 
-    public function situationReports(Request $request): JsonResponse
+    public function situationReports(ListRequest $request): JsonResponse
     {
         return $this->service->situationReports($request);
     }
@@ -52,7 +53,7 @@ class ArchiveController extends Controller
         return $this->service->export($request);
     }
 
-    public function savedGroups(Request $request): JsonResponse
+    public function savedGroups(ListRequest $request): JsonResponse
     {
         return $this->service->savedGroups($request);
     }

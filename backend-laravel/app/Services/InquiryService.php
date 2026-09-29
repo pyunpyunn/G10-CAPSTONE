@@ -95,7 +95,7 @@ class InquiryService
 
         $status = strtolower(trim((string) $request->query('status', 'all')));
         $search = trim((string) $request->query('search', ''));
-        $perPage = min(50, max(10, (int) $request->query('per_page', 10)));
+        $perPage = \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page'));
 
         $query = LandingInquiry::query()->select($this->landingInquiryColumns());
 

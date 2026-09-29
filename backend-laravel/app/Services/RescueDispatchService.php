@@ -44,7 +44,7 @@ class RescueDispatchService
     {
         $activeEvent = $this->getActiveEvent();
         $eventId = $request->query('event_id') ?: $activeEvent?->event_id;
-        $perPage = min(max((int) $request->query('per_page', 20), 10), 50);
+        $perPage = \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page'));
 
         if (! $eventId) {
             return response()->json([

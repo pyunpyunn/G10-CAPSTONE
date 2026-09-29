@@ -65,7 +65,7 @@ class ResourceRequestService
         $eventId = trim((string) $request->query('event_id', ''));
         $period = $this->periodKey((string) $request->query('period', 'week'));
         $coreOnly = $request->boolean('core');
-        $perPage = min(50, max(5, (int) $request->query('per_page', 25)));
+        $perPage = \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page'));
 
         $query = $this->requestQuery();
 

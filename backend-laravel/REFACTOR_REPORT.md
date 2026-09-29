@@ -107,9 +107,16 @@ Added checks covering unauthenticated JSON status/body for representative archiv
 - Added `/storage/**/*.sql` to `.gitignore` and removed the two tracked SQL dumps from the Git index. Both local dump files remain on disk and were not opened or printed.
 - Git history still contains the previously committed debug file and SQL dumps. Treat this as a history exposure: if any credentials were embedded, rotate them; coordinate history rewriting if the repository has been shared. No secret values were inspected or copied.
 
-## Steps 2–10
+## Step 2: pagination ceiling
 
-Not implemented yet. Refactors should be incremental and contract-preserving. Pagination applies to actual growing lists, not dashboard summary payloads. New index migrations may be authored but must never be run remotely. Step 10 must distinguish liveness from readiness and must keep diagnostics free of secrets and personal household data.
+- Added `ListRequest` with page >= 1, per_page 1–100, defaults page 1 / per_page 15, plus safe internal clamp helpers.
+- Applied it to the existing paginator-backed archive collection routes, household registry, dispatch list, responder account list, resource request list, and inquiry list. Updated those internal page-size clamps so direct service callers cannot exceed 100 and may request page sizes down to 1.
+- Added validation/clamp tests. Full suite: 8 tests, 36 assertions, passing.
+- Not all list-shaped endpoints have been changed. Mobile feeds, notifications, map layer payloads, dashboard summaries, SitRep options, team/lookup lists, and several service methods materialize arrays with endpoint-specific shapes or bounded semantics. Changing them to paginators or adding list metadata could break mobile/web clients. These require per-endpoint contract characterization and bounded-query design; the source match appendix lists `get()` candidates. This step is partial rather than claiming every list endpoint is paginated.
+
+## Steps 3–10
+
+Not implemented yet. Refactors should be incremental and contract-preserving. New index migrations may be authored but must never be run remotely. Step 10 must distinguish liveness from readiness and must keep diagnostics free of secrets and personal household data.
 
 ## Assumptions / open decisions
 
@@ -130,7 +137,8 @@ Not implemented yet. Refactors should be incremental and contract-preserving. Pa
 
 - Step 0: committed as `f029810` (`docs: audit backend hardening baseline`).
 - Step 1: pending commit.
-- Steps 2–10: pending or explicitly skipped/blocked in final notes.
+- Step 2: pending commit.
+- Steps 3–10: pending or explicitly skipped/blocked in final notes.
 
 ### Appendix A. JSON encode/decode calls
 

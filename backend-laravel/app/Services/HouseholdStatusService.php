@@ -28,7 +28,7 @@ class HouseholdStatusService
     {
         $activeEvent = $this->getActiveEvent();
         $eventId = $activeEvent?->event_id;
-        $perPage = min(max((int) $request->query('per_page', 10), 10), 50);
+        $perPage = \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page'));
 
         $query = $this->householdListQuery($eventId);
         $this->applyListFilters($query, $request);

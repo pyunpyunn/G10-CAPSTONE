@@ -33,7 +33,7 @@ class RescuerAccountService
         $team = trim((string) $request->query('team', 'all'));
         $dutyStatus = trim((string) $request->query('duty_status', 'all'));
         $purok = trim((string) $request->query('purok', 'all'));
-        $perPage = min(50, max(10, (int) $request->query('per_page', 25)));
+        $perPage = \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page'));
 
         $query = $this->responderQuery();
 

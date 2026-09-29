@@ -1551,7 +1551,7 @@ class ArchiveService
 
     private function perPage(Request $request, int $fallback): int
     {
-        return min(1000, max(6, (int) $request->query('per_page', $fallback)));
+        return \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page', $fallback));
     }
 
     private function deleteMap(): array

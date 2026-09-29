@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ListRequest;
 use App\Services\ResourceRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class ResourceRequestController extends Controller
         $this->service = $service;
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(ListRequest $request): JsonResponse
     {
         return $this->service->index($request);
     }

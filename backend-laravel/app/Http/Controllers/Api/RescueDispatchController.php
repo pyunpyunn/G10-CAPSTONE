@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ListRequest;
 use App\Services\RescueDispatchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class RescueDispatchController extends Controller
         return $this->service->teams();
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(ListRequest $request): JsonResponse
     {
         return $this->service->index($request);
     }
