@@ -1,13 +1,9 @@
 import { useState } from 'react'
-import { Search, XCircle } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
+import DataFilterBar from '../ui/DataFilterBar'
 import Modal from '../ui/Modal'
-import RefreshOverlay from '../ui/RefreshOverlay'
 import DispatchStatusBadge from './DispatchStatusBadge'
-import {
-  dispatchStatuses,
-  initials,
-} from '../../utils/dispatchHelpers'
+import { initials } from '../../utils/dispatchHelpers'
 
 export default function DispatchSidePanel({
   teams,
@@ -64,19 +60,15 @@ function ResponderAvailability({ responders }) {
     <section className="dp-side-card">
       <div className="dp-side-head">
         <span className="dp-side-title">Rescuer availability</span>
-        <select
-          className="dp-filter-select"
-          value={teamFilter}
-          onChange={(event) => {
-            setTeamFilter(event.target.value)
-            setPage(1)
-          }}
-        >
-          <option value="all">All teams</option>
-          {teams.map((team) => (
-            <option value={team.id} key={team.id}>{team.name}</option>
-          ))}
-        </select>
+        <DataFilterBar
+          className="dispatch-inline-filter"
+          filters={[{
+            id: 'responder-team', label: 'Team', value: teamFilter,
+            onChange: (value) => { setTeamFilter(value); setPage(1) },
+            options: [{ value: 'all', label: 'All teams' }, ...teams.map((team) => ({ value: String(team.id), label: team.name }))],
+          }]}
+          onReset={() => { setTeamFilter('all'); setPage(1) }}
+        />
       </div>
       <div className="dp-side-body dp-table-body">
         {responders.length === 0 ? (
@@ -182,55 +174,6 @@ function DispatchLog({ logs, historyLogs }) {
           </div>
         )}
       </Modal>
-    </section>
-  )
-}
-
-function DispatchTable({ dispatches, filter, setFilter, searchText, setSearchText, onSearch, isUpdating }) {
-  return (
-    <section className="dp-side-card">
-      <div className="dp-side-head">
-        <span className="dp-side-title">Active dispatch assignments</span>
-        <select className="dp-filter-select" value={filter} onChange={(event) => setFilter(event.target.value)}>
-          <option value="all">All</option>
-          {dispatchStatuses.map((status) => (
-            <option value={status.value} key={status.value}>{status.label}</option>
-          ))}
-        </select>
-      </div>
-      <div className="dp-dispatch-search">
-        <Search size={14} />
-        <input value={searchText} placeholder="Search assignment, area, team..." onChange={(event) => setSearchText(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && onSearch()} />
-        {searchText && <button type="button" onClick={() => setSearchText('')}><XCircle size={14} /></button>}
-      </div>
-      <RefreshOverlay active={isUpdating}>
-        <div className="dp-side-body dp-table-body">
-          {dispatches.length === 0 ? (
-            <EmptyState title="No dispatch assignments yet" message="Use New dispatch after an active event and registered responders are available." />
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Team</th>
-                  <th>Area</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dispatches.map((dispatch) => (
-                  <tr key={dispatch.assignment_id}>
-                    <td>{dispatch.assignment_code}</td>
-                    <td>{dispatch.team_name}</td>
-                    <td>{dispatch.assigned_area}</td>
-                    <td><DispatchStatusBadge status={dispatch.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </RefreshOverlay>
     </section>
   )
 }

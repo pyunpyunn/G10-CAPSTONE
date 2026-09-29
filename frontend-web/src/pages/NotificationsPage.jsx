@@ -166,15 +166,18 @@ export default function NotificationsPage() {
 
   return (
     <section className="page active notifications-page">
-      <PageHeader title="Notifications" />
-
-      <NotificationToolbar
-        statusFilter={statusFilter}
-        onFilterChange={changeFilter}
-        onMarkAllRead={markAllRead}
-        onDeleteSelected={deleteSelected}
-        onClearAll={clearAll}
-        disabled={isSaving}
+      <PageHeader
+        title="Notifications"
+        filters={(
+          <NotificationToolbar
+            statusFilter={statusFilter}
+            onFilterChange={changeFilter}
+            onMarkAllRead={markAllRead}
+            onDeleteSelected={deleteSelected}
+            onClearAll={clearAll}
+            disabled={isSaving}
+          />
+        )}
       />
 
       {message && <div className="notification-page-message">{message}</div>}

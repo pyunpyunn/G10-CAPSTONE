@@ -46,10 +46,13 @@ return [
         'base_url' => env('ONESIGNAL_BASE_URL', 'https://api.onesignal.com'),
     ],
 
-    'semaphore' => [
-        'api_key' => env('SEMAPHORE_API_KEY'),
-        'sender_name' => env('SEMAPHORE_SENDER_NAME', 'ResQperation'),
-        'inbound_secret' => env('SEMAPHORE_INBOUND_SECRET'),
+    'sms_gateway' => [
+        'base_url' => env('SMS_GATEWAY_BASE_URL'),
+        'username' => env('SMS_GATEWAY_USERNAME'),
+        'password' => env('SMS_GATEWAY_PASSWORD'),
+        'message_path' => env('SMS_GATEWAY_MESSAGE_PATH', '/message'),
+        'batch_size' => env('SMS_GATEWAY_BATCH_SIZE', 20),
+        'webhook_signing_key' => env('SMS_GATEWAY_WEBHOOK_SIGNING_KEY'),
     ],
 
     'trackingaid' => [

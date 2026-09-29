@@ -1,6 +1,6 @@
 .main {
   position: fixed;
-  top: var(--header-height);
+  top: var(--topbar-offset, var(--header-height));
   right: 0;
   bottom: 0;
   left: var(--left-column);
@@ -12,7 +12,7 @@
   box-sizing: border-box;
   padding-bottom: 26px;
   background: var(--bg);
-  transition: left 220ms cubic-bezier(0.19, 1, 0.22, 1);
+  transition: top 220ms cubic-bezier(0.19, 1, 0.22, 1), left 220ms cubic-bezier(0.19, 1, 0.22, 1);
   scrollbar-gutter: stable;
 }
 
@@ -60,7 +60,7 @@
 
 .page-loading-card {
   position: fixed;
-  top: calc(var(--header-height) + 24px);
+  top: calc(var(--topbar-offset, var(--header-height)) + 24px);
   left: calc(var(--left-column, var(--left-collapsed)) + ((100vw - var(--left-column, var(--left-collapsed))) / 2));
   z-index: 45;
   display: flex;

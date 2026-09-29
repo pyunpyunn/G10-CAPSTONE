@@ -80,6 +80,7 @@ const modulePages = [
     title: 'Disaster Broadcasting',
     kicker: 'Alerts',
     summary: 'Create disaster events and send official barangay or purok-specific instructions.',
+    navHidden: true,
   },
   {
     path: '/weather',

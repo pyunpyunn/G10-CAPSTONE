@@ -635,8 +635,7 @@ class RescuerAccountService
             ->where('team_type', '<>', '')
             ->pluck('team_type');
 
-        return collect(array_column(self::TEAM_CATALOG, 'team_type'))
-            ->merge($databaseTypes)
+        return $databaseTypes
             ->unique()
             ->sort()
             ->values()
@@ -1038,22 +1037,7 @@ class RescuerAccountService
                 'source' => 'database',
             ]);
 
-        $databaseTeamNames = $databaseTeams
-            ->pluck('team_name')
-            ->map(fn ($name) => strtolower((string) $name))
-            ->all();
-
-        $catalogTeams = collect(self::TEAM_CATALOG)
-            ->reject(fn (array $team): bool => in_array(strtolower($team['team_name']), $databaseTeamNames, true))
-            ->map(fn (array $team): array => [
-                'team_id' => '',
-                'team_code' => $team['team_code'],
-                'team_name' => $team['team_name'],
-                'team_type' => $team['team_type'],
-                'source' => 'catalog',
-            ]);
-
-        return $databaseTeams->merge($catalogTeams)->sortBy('team_name')->values()->all();
+        return $databaseTeams->values()->all();
     }
 
     private function accountIdOptions(array $teamOptions): array

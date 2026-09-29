@@ -141,7 +141,7 @@ class MappingService
 
         $query = GeotaggedLocation::query()
             ->from('geotagged_locations as gl')
-            ->leftJoin('households as h', 'h.household_id', '=', 'gl.household_id')
+                ->join('households as h', 'h.household_id', '=', 'gl.household_id')
             ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->leftJoin('puroks as p', 'p.purok_id', '=', 'a.purok_id')
             ->leftJoin('household_disasters as hd', function ($join) use ($eventId): void {
@@ -323,9 +323,15 @@ class MappingService
             ? DB::table('households')->when($this->hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))->count()
             : 0;
 
-        $gpsTagged = Schema::hasTable('geotagged_locations')
-            ? GeotaggedLocation::query()->whereNotNull('latitude')->whereNotNull('longitude')->distinct()->count('household_id')
-            : 0;
+            $gpsTagged = Schema::hasTable('geotagged_locations') && Schema::hasTable('households')
+                ? DB::table('geotagged_locations as gl')
+                    ->join('households as h', 'h.household_id', '=', 'gl.household_id')
+                    ->when($this->hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('h.deleted_at'))
+                    ->whereNotNull('gl.latitude')
+                    ->whereNotNull('gl.longitude')
+                    ->distinct()
+                    ->count('gl.household_id')
+                : 0;
 
         $averageAccuracy = null;
 
@@ -339,8 +345,32 @@ class MappingService
             'gps_tagged_households' => (int) $gpsTagged,
             'no_verified_geotag' => max((int) $totalHouseholds - (int) $gpsTagged, 0),
             'average_accuracy_m' => $averageAccuracy ? round((float) $averageAccuracy, 1) : null,
-            'evacuation_sites' => $hasActiveEvent ? count($this->getEvacuationSites($eventId)) : 0,
+            'evacuation_sites' => $this->countActiveEvacuationSites($eventId, $hasActiveEvent),
         ];
+    }
+
+    private function countActiveEvacuationSites(?string $eventId, bool $hasActiveEvent): int
+    {
+        if (! $hasActiveEvent
+            || ! Schema::hasTable('evacuation_centers')
+            || ! $this->hasColumn('evacuation_centers', 'status')) {
+            return 0;
+        }
+
+        $query = EvacuationCenter::query()->where('status', 'active');
+
+        if ($this->hasColumn('evacuation_centers', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        if ($this->hasColumn('evacuation_centers', 'current_event_id')) {
+            $query->where(function ($where) use ($eventId): void {
+                $where->where('current_event_id', $eventId)
+                    ->orWhereNull('current_event_id');
+            });
+        }
+
+        return $query->count();
     }
 
     private function getPuroks(): array

@@ -53,6 +53,11 @@ class DisasterEvent extends Model
         return $this->hasMany(WeatherLog::class, 'disaster_id', 'event_id');
     }
 
+    public function broadcasts(): HasMany
+    {
+        return $this->hasMany(DisasterBroadcast::class, 'disaster_id', 'event_id');
+    }
+
     public function scopeActive($query)
     {
         return $query->whereNotNull('started_at')->whereNull('ended_at');

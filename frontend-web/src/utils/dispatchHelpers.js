@@ -2,6 +2,9 @@ export const teamFilters = [
   { key: 'all', label: 'All' },
   { key: 'on_scene', label: 'On-scene' },
   { key: 'dispatched', label: 'Dispatched' },
+  { key: 'accepted', label: 'Accepted' },
+  { key: 'en_route', label: 'En route' },
+  { key: 'returning', label: 'Returning to base' },
   { key: 'standby', label: 'Stand-by' },
 ]
 

@@ -181,7 +181,6 @@ function BroadcastLog({ broadcasts }) {
                   <span><strong>Sent:</strong> {broadcast.sent_time || '-'}</span>
                   <span><strong>Target:</strong> {broadcast.scope_label || broadcast.target_area || 'All'}</span>
                   <span><strong>Recipients:</strong> {broadcast.recipient_count || 0}</span>
-                  <span><strong>Status:</strong> {broadcast.status || 'Sent'}</span>
                 </div>
 
                 {(broadcast.attached_evacuation_center || broadcast.evacuation_route) && (

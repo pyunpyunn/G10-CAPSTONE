@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { completeDispatch, createDispatch, getDispatchDashboard, updateDispatch } from '../api/dispatchApi'
 import DispatchModalForm from '../components/dispatch/DispatchModalForm'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import {
   buildRequestBody,
   defaultForm,
@@ -191,17 +192,14 @@ export default function NewDispatchPage() {
 
   return (
     <main className="ops-page new-dispatch-page">
-      <header className="household-status-page-header dispatch-page-header">
-        <div className="new-dispatch-header-row">
-          <div className="household-status-header-copy">
-            <h1>{editingDispatch ? 'Update dispatch' : 'New dispatch'}</h1>
-          </div>
+      <PageHeader
+        title={editingDispatch ? 'Update dispatch' : 'New dispatch'}
+        actions={(
           <button className="new-dispatch-back" type="button" onClick={() => navigate('/dispatch')}>
-            <ArrowLeft size={16} />
-            Back to dispatch
+            <ArrowLeft size={15} /> Back to dispatch
           </button>
-        </div>
-      </header>
+        )}
+      />
 
       {error && <div className="form-error">{error}</div>}
       {!hasActiveEvent && (

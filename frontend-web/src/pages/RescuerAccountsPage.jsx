@@ -1,4 +1,4 @@
-import { RefreshCcw, Settings2, UserPlus } from 'lucide-react'
+import { ArrowLeft, Settings2, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -13,12 +13,12 @@ import {
   updateRescuer,
 } from '../api/rescuerApi'
 import RescuerAccountModal from '../components/rescuers/RescuerAccountModal'
-import RescuerFilters from '../components/rescuers/RescuerFilters'
 import RescuerRosterTable from '../components/rescuers/RescuerRosterTable'
 import RescuerTeamGrid from '../components/rescuers/RescuerTeamGrid'
 import RescueTeamConfigModal from '../components/rescuers/RescueTeamConfigModal'
 import LoadingState from '../components/ui/LoadingState'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
+import PageHeader from '../components/ui/PageHeader'
 import {
   buildRescuerPayload,
   emptyRescuerForm,
@@ -36,9 +36,6 @@ export default function RescuerAccountsPage() {
   const [payload, setPayload] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [activeChip, setActiveChip] = useState('all')
   const [page, setPage] = useState(1)
   const [modalMode, setModalMode] = useState('create')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -86,7 +83,7 @@ export default function RescuerAccountsPage() {
       setError('')
 
       try {
-        const data = await getRescuers(filterParams(search, purok, activeChip, page))
+        const data = await getRescuers({ page, per_page: 10 })
 
         if (!ignore) {
           setPayload(data)
@@ -107,7 +104,7 @@ export default function RescuerAccountsPage() {
     return () => {
       ignore = true
     }
-  }, [search, purok, activeChip, page])
+  }, [page])
 
   const rescuers = payload?.rescuers?.data || []
   const pagination = payload?.rescuers || {}
@@ -124,7 +121,7 @@ export default function RescuerAccountsPage() {
     setError('')
 
     try {
-      const data = await getRescuers(filterParams(search, purok, activeChip, page))
+      const data = await getRescuers({ page, per_page: 10 })
       setPayload(data)
     } catch {
       setError('Rescuer accounts cannot be loaded right now. Please check the backend or database connection.')
@@ -283,22 +280,18 @@ export default function RescuerAccountsPage() {
 
   return (
     <main className="ops-page rescuer-page">
-      <header className="household-status-page-header">
-        <div className="household-status-header-copy">
-          <h1>{workflow ? (workflowType === 'teams' ? 'Configure rescue teams' : modalMode === 'view' ? 'View rescuer account' : modalMode === 'edit' ? 'Update rescuer account' : 'New rescuer account') : 'Rescuer Accounts'}</h1>
-          <p>Barangay Mambaling, Cebu City</p>
-        </div>
-        <div className="weather-page-actions household-status-page-actions">
-          <div className="weather-live-status"><strong>{workflow ? 'Roster' : 'Live'}</strong><span>{workflow ? 'Verified responder administration' : 'Verified roster management'}</span></div>
-          {workflow ? <button className="button secondary" type="button" onClick={() => navigate('/rescuers')}><RefreshCcw size={16} />Back to roster</button> : (
-            <>
-              <button className="button secondary" type="button" onClick={loadRescuers}><RefreshCcw size={16} />Refresh</button>
-              <button className="button secondary" type="button" onClick={openTeamConfig}><Settings2 size={16} />Configure rescue teams</button>
-              <button className="button review" type="button" onClick={openCreateModal}><UserPlus size={16} />Create verified account</button>
-            </>
-          )}
-        </div>
-      </header>
+      <PageHeader
+        title={workflow ? (workflowType === 'teams' ? 'Configure rescue teams' : modalMode === 'view' ? 'View rescuer account' : modalMode === 'edit' ? 'Update rescuer account' : 'New rescuer account') : 'Rescuer Accounts'}
+        subtitle="Barangay Mambaling, Cebu City"
+        actions={workflow ? (
+          <button className="button secondary" type="button" onClick={() => navigate('/rescuers')}><ArrowLeft size={15} />Back to roster</button>
+        ) : (
+          <>
+            <button className="button secondary" type="button" onClick={openTeamConfig}><Settings2 size={15} />Configure teams</button>
+            <button className="button review" type="button" onClick={openCreateModal}><UserPlus size={15} />Create account</button>
+          </>
+        )}
+      />
 
       {workflow && workflowType === 'teams' && <RescueTeamConfigModal embedded isOpen workspace={teamConfig} isLoading={teamConfigLoading} isSaving={teamConfigSaving} error={teamConfigError} onRetry={loadTeamConfig} onClose={() => navigate('/rescuers')} onSave={saveTeamConfig} onDelete={removeTeamConfig} />}
       {workflow && workflowType !== 'teams' && <RescuerAccountModal embedded mode={modalMode} isOpen form={form} setForm={setForm} formError={formError} isSaving={isSaving} teamOptions={teamOptions} accountIdOptions={accountIdOptions} fallbackAccountId={payload?.next_account_id || ''} roles={filters.roles || ['Responder']} bloodTypes={filters.blood_types || ['Unknown']} onClose={() => navigate('/rescuers')} onReset={resetForm} onSubmit={submitForm} />}
@@ -309,7 +302,7 @@ export default function RescuerAccountsPage() {
           {!isInitialLoading && !hasBlockingError && payload && (
             <div className="ra-workspace">
               <div className="ra-main-panel">
-                <div className="ra-panel roster-filter-panel"><RescuerFilters search={search} onSearchChange={(value) => { setSearch(value); setPage(1) }} purok={purok} onPurokChange={(value) => { setPurok(value); setPage(1) }} puroks={filters.puroks || []} teamOptions={teamOptions} activeChip={activeChip} onChipChange={(value) => { setActiveChip(value); setPage(1) }} /><RefreshOverlay active={isRefreshing}><RescuerRosterTable rescuers={rescuers} pagination={pagination} onPageChange={setPage} onView={openViewModal} onEdit={openEditModal} onDeactivate={handleDeactivate} /></RefreshOverlay></div>
+                <div className="ra-panel roster-filter-panel"><RefreshOverlay active={isRefreshing}><RescuerRosterTable rescuers={rescuers} pagination={pagination} onPageChange={setPage} onView={openViewModal} onEdit={openEditModal} onDeactivate={handleDeactivate} /></RefreshOverlay></div>
               </div>
               <aside className="ra-side-panel"><div className="ra-side-head"><span className="ra-title">Team cards</span></div><RescuerTeamGrid teams={teams} /></aside>
             </div>
@@ -318,21 +311,4 @@ export default function RescuerAccountsPage() {
 
     </main>
   )
-}
-
-function filterParams(search, purok, activeChip, page) {
-  const params = {
-    search: search.trim(),
-    purok,
-    page,
-    per_page: 10,
-  }
-
-  if (activeChip.startsWith('team:')) {
-    params.team = activeChip.replace('team:', '')
-  } else {
-    params.duty_status = activeChip
-  }
-
-  return params
 }
