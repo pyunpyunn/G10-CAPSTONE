@@ -102,7 +102,10 @@ Added checks covering unauthenticated JSON status/body for representative archiv
 
 ## Step 1: repository hygiene
 
-Pending. Initial scan found a shortcut file, a `debug_auth.php` file, and two SQL dump files under `storage/`; both SQL dumps are tracked by Git. The repository must stop tracking these data dumps while preserving the developer's local copies. Names and tracking status are recorded here without opening or printing dump contents.
+- Removed the tracked `DisasterBroadcastService - Shortcut.lnk` shortcut.
+- Added `/debug_auth.php` to `.gitignore` and removed it from Git tracking. Its local copy remains on disk and was not opened or printed.
+- Added `/storage/**/*.sql` to `.gitignore` and removed the two tracked SQL dumps from the Git index. Both local dump files remain on disk and were not opened or printed.
+- Git history still contains the previously committed debug file and SQL dumps. Treat this as a history exposure: if any credentials were embedded, rotate them; coordinate history rewriting if the repository has been shared. No secret values were inspected or copied.
 
 ## Steps 2–10
 
@@ -125,8 +128,8 @@ Not implemented yet. Refactors should be incremental and contract-preserving. Pa
 
 ## Commit log
 
-- Step 0: pending.
-- Step 1: pending.
+- Step 0: committed as `f029810` (`docs: audit backend hardening baseline`).
+- Step 1: pending commit.
 - Steps 2–10: pending or explicitly skipped/blocked in final notes.
 
 ### Appendix A. JSON encode/decode calls
