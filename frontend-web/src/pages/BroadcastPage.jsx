@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertOctagon, Edit3, MoreVertical, PlusCircle, RefreshCcw, RotateCcw } from 'lucide-react'
 import {
   createBroadcast,
@@ -22,6 +23,9 @@ import {
 } from '../utils/broadcastHelpers'
 
 export default function BroadcastPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const requestedEventId = searchParams.get('event_id')
   const [workspace, setWorkspace] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -32,6 +36,7 @@ export default function BroadcastPage() {
   const [directPuroks, setDirectPuroks] = useState([])
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [formNotice, setFormNotice] = useState('')
 
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
   const [isClosingEvent, setIsClosingEvent] = useState(false)
@@ -46,9 +51,14 @@ export default function BroadcastPage() {
 
     async function loadInitialWorkspace() {
       try {
-        const data = await getBroadcastWorkspace()
+        const data = await getBroadcastWorkspace(requestedEventId)
 
         if (!ignore) {
+          if (requestedEventId && data.current_event?.status !== 'active') {
+            setError('This disaster event is no longer active and cannot be updated.')
+            return
+          }
+
           setWorkspace(data)
           initForm(data)
         }
@@ -68,9 +78,11 @@ export default function BroadcastPage() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [requestedEventId])
 
-  const activeEvent = workspace?.active_event || null
+  const activeEvent = requestedEventId
+    ? workspace?.current_event?.status === 'active' ? workspace.current_event : null
+    : workspace?.active_event || null
   const broadcasts = workspace?.broadcasts || []
   const disasterTypes = workspace?.disaster_types || []
   const severityLevels = workspace?.severity_levels || []
@@ -103,6 +115,7 @@ export default function BroadcastPage() {
     setSelectedPurok(currentWorkspace?.puroks?.[0]?.name || '')
     setDirectPuroks([])
     setFormError('')
+    setFormNotice('')
   }
 
   async function loadWorkspace() {
@@ -110,7 +123,7 @@ export default function BroadcastPage() {
     setError('')
 
     try {
-      const data = await getBroadcastWorkspace()
+      const data = await getBroadcastWorkspace(requestedEventId)
       setWorkspace(data)
       initForm(data)
     } catch {
@@ -122,6 +135,7 @@ export default function BroadcastPage() {
 
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }))
+    setFormNotice('')
   }
 
   function toggleStatus(statusKey) {
@@ -206,6 +220,12 @@ export default function BroadcastPage() {
         eventId = eventResult.active_event.event_id
         nextActiveEvent = eventResult.active_event
         nextEvents = eventResult.events
+      } else {
+        await updateDisasterEvent(eventId, {
+          name: form.event_name.trim(),
+          type_id: form.type_id,
+          severity_level_id: form.severity_id,
+        })
       }
 
       const broadcastResult = await createBroadcast(eventId, {
@@ -226,11 +246,12 @@ export default function BroadcastPage() {
         ...workspace,
         active_event: nextActiveEvent,
         events: nextEvents,
-        broadcasts: broadcastResult.broadcasts,
+        broadcasts: broadcastResult.broadcasts || broadcastResult,
       }
 
       setWorkspace(updatedWorkspace)
       initForm(updatedWorkspace)
+      setFormNotice(activeEvent ? 'Disaster updated and broadcast posted.' : 'Disaster declared and broadcast posted.')
     } catch (saveError) {
       setFormError(apiErrorMessage(saveError, 'Unable to save this broadcast. Please check all entries and try again.'))
     } finally {
@@ -335,6 +356,7 @@ export default function BroadcastPage() {
               directPuroks={directPuroks}
               recipientNote={recipientNote}
               formError={formError}
+              formNotice={formNotice}
               isSaving={isSaving}
               onChange={updateForm}
               onSelectPurok={setSelectedPurok}
@@ -433,4 +455,4 @@ function HeaderActionMenu({ activeEvent, onCloseActiveEvent, onUpdateActiveEvent
       )}
     </div>
   )
-}
+}

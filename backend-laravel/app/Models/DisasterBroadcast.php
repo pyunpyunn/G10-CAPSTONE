@@ -11,7 +11,10 @@ class DisasterBroadcast extends Model
 
     protected $primaryKey = 'broadcast_id';
 
+    public $incrementing = false;
+
     protected $fillable = [
+        'broadcast_id',
         'broadcast_title',
         'disaster_id',
         'sent_by_admin_id',
@@ -31,6 +34,7 @@ class DisasterBroadcast extends Model
         'allowed_statuses_json',
         'recipient_count',
         'push_status',
+        'sms_status',
     ];
 
     protected function casts(): array

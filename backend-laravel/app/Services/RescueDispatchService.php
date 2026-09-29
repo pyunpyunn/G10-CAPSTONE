@@ -620,10 +620,12 @@ class RescueDispatchService
 
         $memberCount = Responder::query()
             ->where('team_id', $team->team_id)
+            ->when(Schema::hasColumn('responders', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->count();
 
         $activeMemberCount = Responder::query()
             ->where('team_id', $team->team_id)
+            ->when(Schema::hasColumn('responders', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->where(function ($query): void {
                 $query->where('is_deployed', 1)
                     ->orWhereIn('duty_status', ['on_duty', 'dispatched', 'accepted', 'en_route', 'on_scene']);
@@ -1408,6 +1410,8 @@ class RescueDispatchService
         return [
             'key' => $key,
             'label' => match ($key) {
+                'accepted' => 'Accepted',
+                'returning' => 'Returning to base',
                 'on_scene' => 'On-scene',
                 'en_route' => 'En route',
                 'dispatched' => 'Dispatched',
@@ -1420,6 +1424,7 @@ class RescueDispatchService
             'tone' => match ($key) {
                 'on_scene', 'completed', 'available' => 'green',
                 'dispatched', 'en_route', 'accepted', 'deployed' => 'purple',
+                'returning' => 'amber',
                 'cancelled' => 'red',
                 default => 'gray',
             },

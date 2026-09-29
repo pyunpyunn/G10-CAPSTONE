@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertOctagon, Edit3, MoreVertical, PlusCircle, RefreshCcw } from 'lucide-react'
+import { AlertOctagon, Edit3, MoreVertical, Pencil, PlusCircle, RefreshCcw, TriangleAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   closeActiveEvent,
@@ -13,14 +13,10 @@ import DashboardCloseEventModal from '../components/dashboard/DashboardCloseEven
 import DashboardMainContent from '../components/dashboard/DashboardMainContent'
 import DashboardOverview from '../components/dashboard/DashboardOverview'
 import PageHeader from '../components/ui/PageHeader'
-import {
-  getCloseEventMessage,
-  getStats,
-} from '../utils/dashboardHelpers'
+import { getStats } from '../utils/dashboardHelpers'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-
   const [summaryState, setSummaryState] = useState({ data: null, isLoading: true, error: '' })
   const [dispatchState, setDispatchState] = useState({ data: null, isLoading: true, error: '' })
   const [weatherState, setWeatherState] = useState({ data: null, isLoading: true, error: '' })
@@ -135,12 +131,11 @@ export default function DashboardPage() {
       }
       setIsCloseModalOpen(false)
     } catch (closeEventError) {
-      setCloseError(getCloseEventMessage(closeEventError))
+      setCloseError(closeEventError?.response?.data?.message || 'Unable to close active disaster event.')
     } finally {
       setIsClosingEvent(false)
     }
   }
-
   return (
     <section className="page active">
       <PageHeader
@@ -154,7 +149,7 @@ export default function DashboardPage() {
             <DashboardHeaderActionMenu
               hasActiveEvent={hasActiveEvent}
               onCloseActiveEvent={() => setIsCloseModalOpen(true)}
-              onOpenBroadcast={() => openModule('/broadcast')}
+              onOpenBroadcast={() => openModule(hasActiveEvent ? `/broadcast?event_id=${encodeURIComponent(summaryState.data.active_event.event_id)}` : '/broadcast')}
             />
           </>
         }

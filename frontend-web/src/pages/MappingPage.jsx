@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getHouseholdGeotags, getMappingOverview, getRouteToSite } from '../api/mappingApi'
 import MappingMap from '../components/mapping/MappingMap'
 import MappingSidebar from '../components/mapping/MappingSidebar'
 import LoadingState from '../components/ui/LoadingState'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
+import DataFilterBar from '../components/ui/DataFilterBar'
+import PageHeader from '../components/ui/PageHeader'
 import {
   apiErrorMessage,
   defaultWorkspace,
@@ -210,19 +211,35 @@ export default function MappingPage() {
 
   return (
     <section className="page mapping-page active mapmate-page">
+      <PageHeader
+        title="Mapping"
+        subtitle="Barangay Mambaling, Cebu City"
+        filters={hasLoaded && (
+          <DataFilterBar
+            className="page-heading-filter"
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search household"
+            filters={[
+              {
+                id: 'purok', label: 'Area', value: purok, onChange: setPurok,
+                options: [{ value: 'all', label: 'All puroks' }, ...(filters?.puroks || []).map((item) => ({ value: item, label: item }))],
+              },
+              {
+                id: 'status', label: 'Status', value: status, onChange: setStatus,
+                options: (filters?.statuses || []).map((item) => ({ value: item.key, label: item.label })),
+              },
+            ]}
+            onReset={() => { setSearch(''); setPurok('all'); setStatus('all') }}
+            trailing={<span className="data-filter-result-count">{visibleHouseholds.length} results</span>}
+          />
+        )}
+      />
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
       {hasLoaded && (
         <>
-          <section className="mapmate-filter-bar" aria-label="Map filters">
-            <div className="mapmate-filter-heading"><span>View</span><strong>Map filters</strong></div>
-            <label className="mapmate-search"><Search size={14} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search household" aria-label="Search household" /></label>
-            <SelectField label="Area" value={purok} onChange={setPurok} options={[{ key: 'all', label: 'All puroks' }, ...((filters?.puroks || []).map((item) => ({ key: item, label: item })))]} />
-            <SelectField label="Status" value={status} onChange={setStatus} options={((filters?.statuses || []).map((item) => ({ key: item.key, label: item.label })))} />
-            <span className="mapmate-result-count">{visibleHouseholds.length} results</span>
-          </section>
-
           <div className="mapmate-grid">
             <main className="mapmate-main">
               <RefreshOverlay active={isRefreshing}>
@@ -264,14 +281,5 @@ export default function MappingPage() {
         </>
       )}
     </section>
-  )
-}
-
-function SelectField({ label, value, onChange, options }) {
-  return (
-    <label className="mapmate-select-field">
-      <span>{label}</span>
-      <div><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select><ChevronDown size={13} /></div>
-    </label>
   )
 }

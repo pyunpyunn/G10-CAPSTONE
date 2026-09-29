@@ -1,9 +1,5 @@
-import {
-  ArrowUpRight,
-  Radio,
-  Settings,
-  TriangleAlert,
-} from 'lucide-react'
+import { ArrowUpRight, Radio, Settings, TriangleAlert, X } from 'lucide-react'
+import { useState } from 'react'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 import LoadingState from '../ui/LoadingState'
@@ -24,6 +20,8 @@ export default function DashboardMainContent({
   hasActiveEvent,
   onOpenModule,
 }) {
+  const [isStandbyStripVisible, setIsStandbyStripVisible] = useState(true)
+
   const households = summaryState?.data?.households || {
     total: 0,
     reported: 0,
@@ -85,9 +83,6 @@ export default function DashboardMainContent({
           <ChartCard
             title="Dispatch status - team count"
             bars={dispatchData.counts}
-            isLoading={dispatchState?.isLoading}
-            emptyTitle="No dispatch yet"
-            emptyMessage="Teams will appear after HQ assigns responders to an active event."
             onManage={() => onOpenModule('/dispatch')}
           />
         </div>
@@ -117,7 +112,7 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
     return (
       <div 
         className="event-banner standby" 
-        onClick={onOpenBroadcast}
+        onClick={() => onOpenBroadcast()}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast()}
@@ -140,10 +135,10 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
   return (
     <div 
       className={`event-banner active-state tone-${tone}`}
-      onClick={onOpenBroadcast}
+      onClick={() => onOpenBroadcast(activeEvent.event_id)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast()}
+      onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast(activeEvent.event_id)}
     >
       {/* Left Section: White/Light Event Info */}
       <div className="event-main-col">
@@ -204,7 +199,7 @@ function ReportingProgress({ households, hasActiveEvent }) {
   )
 }
 
-function ChartCard({ title, bars = [], isLoading, emptyTitle, emptyMessage, onManage }) {
+function ChartCard({ title, bars = [], isLoading, emptyTitle, emptyMessage, alwaysShowChart = false, onManage }) {
   const hasValues = bars.some((bar) => Number(bar.value) > 0)
   const axis = makeAxis(bars)
 
@@ -218,7 +213,7 @@ function ChartCard({ title, bars = [], isLoading, emptyTitle, emptyMessage, onMa
       </div>
       {isLoading ? (
         <LoadingState inline />
-      ) : hasValues ? (
+      ) : (hasValues || alwaysShowChart) ? (
         <div className="team-count-chart" role="img" aria-label={title}>
           <div className="chart-y-axis" aria-hidden="true">
             {axis.map((item) => <span key={item}>{item}</span>)}

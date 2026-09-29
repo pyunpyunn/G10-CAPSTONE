@@ -368,9 +368,32 @@
 }
 
 .standby-strip {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   background: var(--color-bg-secondary);
+}
+
+.standby-strip-close {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -5px -5px -5px auto;
+  border: 0;
+  border-radius: 6px;
+  color: var(--color-text-3);
+  background: transparent;
+  cursor: pointer;
+}
+
+.standby-strip-close:hover,
+.standby-strip-close:focus-visible {
+  color: var(--color-text-1);
+  background: rgba(15, 23, 42, 0.08);
+  outline: none;
 }
 
 .standby-strip strong,

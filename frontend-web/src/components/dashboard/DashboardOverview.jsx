@@ -17,6 +17,7 @@ import {
   Wind,
 } from 'lucide-react'
 import { getMappingOverview } from '../../api/mappingApi'
+import { getWeatherWorkspace } from '../../api/weatherApi'
 import {
   defaultWorkspace,
   markerGroups,
@@ -33,6 +34,28 @@ export default function DashboardOverview({
   hasActiveEvent,
   onOpenModule,
 }) {
+  const [latestSavedWeather, setLatestSavedWeather] = useState(null)
+
+  useEffect(() => {
+    let ignore = false
+
+    getWeatherWorkspace()
+      .then((workspace) => {
+        if (!ignore) {
+          setLatestSavedWeather(workspace.latest_snapshot || null)
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setLatestSavedWeather(null)
+        }
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
   return (
     <aside className="dashboard-overview" aria-label="Dashboard side information">
       <WeatherCard weatherState={weatherState} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
@@ -66,6 +89,7 @@ function WeatherCard({ weatherState, hasActiveEvent, onOpenWeather }) {
           <div className="dashboard-weather-main">
             <span>{weather.condition_name || 'Current weather'}</span>
             <strong>{weather.temperature ?? '-'} C</strong>
+            {weather.observed_at && <small>Updated {weather.observed_at}</small>}
           </div>
           <div className="dashboard-weather-metrics">
             <span><Thermometer size={13} />Temp</span>
@@ -84,7 +108,7 @@ function WeatherCard({ weatherState, hasActiveEvent, onOpenWeather }) {
   )
 }
 
-function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
+function DashboardMapCard({ hasActiveEvent, reportedHouseholds, onOpenMap }) {
   const [workspace, setWorkspace] = useState(defaultWorkspace)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -161,9 +185,9 @@ function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
       </div>
 
       <div className="dashboard-side-metrics">
-        <div><strong>{workspace.summary.gps_tagged_households || households.length}</strong><span>GPS tagged</span></div>
-        <div><strong>{workspace.summary.evacuation_sites || 0}</strong><span>Evac sites</span></div>
-        <div><strong>{hasActiveEvent ? households.length : 0}</strong><span>Status points</span></div>
+        <div><strong>{workspace.summary.gps_tagged_households ?? 0}</strong><span>GPS tagged</span></div>
+        <div><strong>{workspace.summary.evacuation_sites ?? 0}</strong><span>Active evac sites</span></div>
+        <div><strong>{hasActiveEvent ? reportedHouseholds ?? 0 : 0}</strong><span>Status reported</span></div>
       </div>
     </section>
   )

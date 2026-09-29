@@ -1,4 +1,5 @@
 import { CheckCircle2, X } from 'lucide-react'
+import DataFilterBar from '../ui/DataFilterBar'
 
 export default function NotificationToolbar({
   statusFilter,
@@ -9,19 +10,18 @@ export default function NotificationToolbar({
   disabled = false,
 }) {
   return (
-    <div className="page-ops-row">
-      <div className="left">
-        <select
-          className="filter-select notification-filter-select"
-          value={statusFilter}
-          aria-label="Filter notifications"
-          onChange={(event) => onFilterChange(event.target.value)}
-        >
-          <option value="all">All notifications</option>
-          <option value="unread">Unread only</option>
-          <option value="read">Read only</option>
-        </select>
-      </div>
+    <div className="page-ops-row notification-toolbar notification-heading-toolbar">
+      <DataFilterBar
+        filters={[{
+          id: 'read-status', label: 'Read status', value: statusFilter, onChange: onFilterChange,
+          options: [
+            { value: 'all', label: 'All notifications' },
+            { value: 'unread', label: 'Unread only' },
+            { value: 'read', label: 'Read only' },
+          ],
+        }]}
+        onReset={() => onFilterChange('all')}
+      />
       <div className="right">
         <button className="btn btn-secondary btn-sm" type="button" disabled={disabled} onClick={onMarkAllRead}>
           <CheckCircle2 size={14} />

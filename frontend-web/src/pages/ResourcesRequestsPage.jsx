@@ -1,4 +1,4 @@
-import { PackageCheck, RefreshCcw } from 'lucide-react'
+import { PackageCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getResourceRequests } from '../api/resourceRequestApi'
@@ -6,6 +6,7 @@ import ResourceRequestQueueTable from '../components/resources/ResourceRequestQu
 import ResourceRequestStats from '../components/resources/ResourceRequestStats'
 import TrackingAidMirror from '../components/resources/TrackingAidMirror'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
 import { filterParams, resourceRequestErrorMessage } from '../utils/resourceRequestHelpers'
 
@@ -92,17 +93,11 @@ export default function ResourcesRequestsPage() {
 
   return (
     <section className="page active resources-page">
-      <header className="household-status-page-header">
-        <div className="household-status-header-copy">
-          <h1>Resources & Requests</h1>
-          <p>Barangay Mambaling, Cebu City</p>
-        </div>
-        <div className="weather-page-actions household-status-page-actions">
-          <div className="weather-live-status"><strong>Validation queue</strong><span>Review and route request records</span></div>
-          <button className="button secondary" type="button" onClick={handleSyncEvaTrack}><RefreshCcw size={16} />Sync requests</button>
-          <button className="button review" type="button" onClick={openCreateModal}><PackageCheck size={16} />New request</button>
-        </div>
-      </header>
+      <PageHeader
+        title="Resources & Requests"
+        subtitle="Barangay Mambaling, Cebu City"
+        actions={<button className="button review" type="button" onClick={openCreateModal}><PackageCheck size={16} />New request</button>}
+      />
 
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
@@ -121,6 +116,7 @@ export default function ResourcesRequestsPage() {
                   onView={(request) => openExistingModal(request, 'view')}
                   onEdit={openEditPage}
                   onPageChange={setQueuePage}
+                  onSync={handleSyncEvaTrack}
                 />
               </RefreshOverlay>
               <TrackingAidMirror items={payload?.tracking_mirror || []} />

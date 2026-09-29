@@ -3,6 +3,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getHousehold, getHouseholdStatusLogs } from '../api/householdApi'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import { StatusBadge } from '../components/households/HouseholdTable'
 
 const HISTORY_PAGE_SIZE = 5
@@ -67,26 +68,20 @@ export default function HouseholdReviewPage() {
 
   return (
     <main className="household-review-page">
-      <div className="household-review-topbar">
-        <div className="household-review-summary">
-          <div className="summary-primary-row">
-            <div className="review-meta-inline headline-inline">
-              <div className="review-header-title-wrap">
-                <span className="review-header-kicker">Household</span>
-                <h1 className="review-header-title">{detail?.household?.household_name || 'Household record'}</h1>
-                <div className="review-header-subtitle">{detail?.household?.purok || 'Purok not assigned'}</div>
-              </div>
-              <span className={`review-header-status status-badge ${detail?.household?.status?.key || 'unchecked'}`}>
-                {detail?.household?.status?.label || 'Status not reported'}
-              </span>
-            </div>
+      <PageHeader
+        title={detail?.household?.household_name || 'Household record'}
+        subtitle={detail?.household?.purok || 'Purok not assigned'}
+        actions={(
+          <>
+            <span className={`review-header-status status-badge ${detail?.household?.status?.key || 'unchecked'}`}>
+              {detail?.household?.status?.label || 'Status not reported'}
+            </span>
             <button type="button" className="button secondary compact-button" onClick={() => navigate('/households')}>
-              <ArrowLeft size={15} />
-              GO BACK TO
+              <ArrowLeft size={15} /> Back to households
             </button>
-          </div>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
@@ -103,6 +98,7 @@ export default function HouseholdReviewPage() {
                 <thead>
                   <tr>
                     <th>Member</th>
+                    <th>Member ID</th>
                     <th>Role</th>
                     <th>Gender</th>
                     <th>Head</th>
@@ -115,7 +111,7 @@ export default function HouseholdReviewPage() {
                 </thead>
                 <tbody>
                   {(!detail.members || detail.members.length === 0) ? (
-                    <EmptyTableRow colSpan={9} text="No household members are synced yet." />
+                    <EmptyTableRow colSpan={10} text="No household members are synced yet." />
                   ) : (
                     detail.members.map((member) => (
                       <tr key={member.member_id || member.name}>
@@ -123,6 +119,7 @@ export default function HouseholdReviewPage() {
                           <div className="hh-household-name">{member.name}</div>
                           <div className="hh-household-meta">{member.age ? `${member.age} yrs` : 'Age not recorded'}</div>
                         </td>
+                        <td>{member.member_id}</td>
                         <td>{member.relation}</td>
                         <td>{member.gender}</td>
                         <td>{member.is_household_head ? 'Yes' : 'No'}</td>

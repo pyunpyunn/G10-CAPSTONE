@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DisasterBroadcastController;
 use App\Http\Controllers\Api\EvacuationCheckInController;
+use App\Http\Controllers\Api\GlobalSearchController;
 use App\Http\Controllers\Api\HouseholdMobileController;
 use App\Http\Controllers\Api\HouseholdStatusController;
 use App\Http\Controllers\Api\InquiryController;
@@ -56,6 +57,7 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::middleware('role:super_admin,admin')->group(function () {
+            Route::get('/global-search', [GlobalSearchController::class, 'index']);
             Route::get('/dashboard', [DashboardController::class, 'index']);
             Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
             Route::get('/dashboard/dispatch', [DashboardController::class, 'dispatch']);
@@ -73,6 +75,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/dashboard/active-event/close', [DashboardController::class, 'closeActiveEvent']);
             Route::get('/disaster-events', [DisasterBroadcastController::class, 'index']);
             Route::post('/disaster-events', [DisasterBroadcastController::class, 'storeEvent']);
+            Route::get('/disaster-events/{eventId}', [DisasterBroadcastController::class, 'show']);
+            Route::patch('/disaster-events/{eventId}', [DisasterBroadcastController::class, 'updateEvent']);
             Route::get('/disaster-events/{eventId}/broadcasts', [DisasterBroadcastController::class, 'broadcasts']);
             Route::post('/disaster-events/{eventId}/broadcasts', [DisasterBroadcastController::class, 'storeBroadcast']);
             Route::get('/weather', [WeatherController::class, 'workspace']);
