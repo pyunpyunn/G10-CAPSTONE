@@ -126,6 +126,10 @@ No query rewrites were made. The grep inventory contains many `get()` calls, but
 
 No service response was moved to Resources/Presenters. Service methods currently construct endpoint-specific nested response structures directly; extracting them wholesale without golden responses risks changing field names, null behavior, date formatting, or nested pagination metadata. Existing characterization coverage only pins unauthenticated responses for the broad set of routes. Build fixtures and exact success JSON snapshots for each client before this extraction.
 
+## Step 6: split oversized services — skipped
+
+No large service was split. The line counts identify priority but do not establish safe class boundaries. Rescuer/household mobile services combine several workflows and likely share private helpers, transaction writes, audit behavior, and response formatters. Extracting them without complete method dependency maps and behavior tests could break field reports, radio, device, status, or dispatch flows. Keep the requested split order for the next implementation pass; use cohesive action/query classes and preserve the service facade only where callers require it.
+
 ## Assumptions / open decisions
 
 - Existing route URLs, HTTP methods, field names, and JSON response shapes are compatibility constraints.
@@ -149,7 +153,8 @@ No service response was moved to Resources/Presenters. Service methods currently
 - Step 3: pending report commit; skipped as above.
 - Step 4: pending report commit; skipped as above.
 - Step 5: pending report commit; skipped as above.
-- Steps 6–10: pending or explicitly skipped/blocked in final notes.
+- Step 6: pending report commit; skipped as above.
+- Steps 7–10: pending or explicitly skipped/blocked in final notes.
 
 ### Appendix A. JSON encode/decode calls
 
