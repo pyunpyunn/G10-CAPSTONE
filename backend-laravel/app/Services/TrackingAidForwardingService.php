@@ -83,6 +83,9 @@ class TrackingAidForwardingService
         $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
 
         try {
+            // Set 1s timeout for mirror query to avoid blocking page load if remote DB is unreachable
+            config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 1]);
+
             if (! Schema::connection($connection)->hasTable($table)) {
                 return [];
             }
