@@ -99,6 +99,7 @@ export function HouseholdProfileScreen({
           <View style={styles.panelText}>
             <Text style={styles.panelLabel}>User</Text>
             <Text style={styles.panelTitle}>{deviceOwnerName}</Text>
+            <Text style={styles.panelMeta}>{memberIdentifier(user)}</Text>
           </View>
         </View>
 
@@ -113,7 +114,7 @@ export function HouseholdProfileScreen({
                   </View>
                   <View style={styles.panelText}>
                     <Text style={styles.panelTitle}>{member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'Household member'}</Text>
-                    <Text style={styles.panelMeta}>Member: {member.member_id || 'No member ID'}</Text>
+                    <Text style={styles.panelMeta}>{memberIdentifier(member)}</Text>
                   </View>
                 </View>
               );
@@ -185,6 +186,13 @@ function initials(value: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('');
+}
+
+function memberIdentifier(member: any) {
+  const title = member?.relationship || member?.relation || 'Member';
+  const memberId = member?.member_id || 'No member ID';
+
+  return `${title}: ${memberId}`;
 }
 
 function coordinatesLabel(geotag: any) {

@@ -1280,11 +1280,18 @@ class HouseholdMobileService
             $this->optionalColumnSelect('household_members', 'birth_date', 'birth_date'),
             $this->firstExistingColumnSelect('household_members', ['gender', 'sex'], 'gender'),
             $this->optionalColumnSelect('household_members', 'special_needs', 'special_needs'),
+            $this->optionalColumnSelect('relationships', 'relationship_label', 'relationship_title'),
         ];
 
         $membersQuery = DB::table('household_members')
             ->where('household_id', $householdId)
             ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'));
+
+        if (Schema::hasTable('relationships')
+            && Schema::hasColumn('household_members', 'relationship_id')
+            && Schema::hasColumn('relationships', 'relationship_id')) {
+            $membersQuery->leftJoin('relationships', 'relationships.relationship_id', '=', 'household_members.relationship_id');
+        }
 
         if (Schema::hasColumn('household_members', 'name')) {
             $membersQuery->orderBy('name');
@@ -1304,7 +1311,7 @@ class HouseholdMobileService
                     'first_name' => $member->first_name ?? null,
                     'middle_name' => $member->middle_name ?? null,
                     'last_name' => $member->last_name ?? null,
-                    'relationship' => $member->relation ?: 'Member',
+                    'relationship' => $member->relationship_title ?: $member->relation ?: 'Member',
                     'relationship_id' => $member->relationship_id ?? null,
                     'age' => $member->age ?? null,
                     'birth_date' => $member->birth_date ?? null,
@@ -2038,14 +2045,24 @@ class HouseholdMobileService
         $memberKeyColumn = $this->memberKeyColumn();
 
         if ($memberKeyColumn && ! empty($user->member_id)) {
-            $member = DB::table('household_members')
+            $memberQuery = DB::table('household_members')
                 ->where($memberKeyColumn, $user->member_id)
-                ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+                ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'));
+
+            if (Schema::hasTable('relationships')
+                && Schema::hasColumn('household_members', 'relationship_id')
+                && Schema::hasColumn('relationships', 'relationship_id')) {
+                $memberQuery->leftJoin('relationships', 'relationships.relationship_id', '=', 'household_members.relationship_id');
+            }
+
+            $member = $memberQuery
                 ->first([
                     $this->firstExistingColumnSelect('household_members', ['name', 'full_name'], 'name'),
                     $this->optionalColumnSelect('household_members', 'first_name', 'first_name'),
                     $this->optionalColumnSelect('household_members', 'middle_name', 'middle_name'),
                     $this->optionalColumnSelect('household_members', 'last_name', 'last_name'),
+                    $this->firstExistingColumnSelect('household_members', ['relation', 'relationship'], 'relation'),
+                    $this->optionalColumnSelect('relationships', 'relationship_label', 'relationship_title'),
                 ]);
         }
 
@@ -2058,6 +2075,7 @@ class HouseholdMobileService
         return [
             'user_id' => $user->user_id,
             'member_id' => $user->member_id,
+            'relationship' => $member?->relationship_title ?: $member?->relation ?: 'Member',
             'full_name' => $memberFullName ?: ($member?->name ?? null) ?: ($user->full_name ?? trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: $user->username),
             'username' => $user->username,
             'email' => $user->email,
