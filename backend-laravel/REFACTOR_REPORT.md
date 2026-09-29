@@ -118,6 +118,10 @@ Added checks covering unauthenticated JSON status/body for representative archiv
 
 This step is skipped because the repository’s checked-in migrations do not fully define the legacy operational schema consumed by the large services, and the local test suite lacks full fixtures for those tables. Removing probes could convert intentional optional-integration behavior into request failures; changing JSON fields to casts without confirming database types/nullability and historical encodings could change API values. The Archive Group Manager also changes stored sequence/archive payload flows and needs success, rollback, and legacy-data characterization before extraction. No existing migration was changed and no schema operation was run.
 
+## Step 4: query scopes and eager loading — skipped
+
+No query rewrites were made. The grep inventory contains many `get()` calls, but many are bounded lookup lists, page-local enrichment, collection operations, or are grouped for presentation. With incomplete local schema fixtures and no query-count baseline, moving joins to relationships or changing selected columns could silently drop fields relied on by existing presenters/mobile clients. Revisit this one endpoint at a time after success-shape tests and query logging are available.
+
 ## Assumptions / open decisions
 
 - Existing route URLs, HTTP methods, field names, and JSON response shapes are compatibility constraints.
@@ -139,7 +143,8 @@ This step is skipped because the repository’s checked-in migrations do not ful
 - Step 1: pending commit.
 - Step 2: pending commit.
 - Step 3: pending report commit; skipped as above.
-- Steps 4–10: pending or explicitly skipped/blocked in final notes.
+- Step 4: pending report commit; skipped as above.
+- Steps 5–10: pending or explicitly skipped/blocked in final notes.
 
 ### Appendix A. JSON encode/decode calls
 
