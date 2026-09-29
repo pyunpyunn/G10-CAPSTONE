@@ -130,6 +130,10 @@ No service response was moved to Resources/Presenters. Service methods currently
 
 No large service was split. The line counts identify priority but do not establish safe class boundaries. Rescuer/household mobile services combine several workflows and likely share private helpers, transaction writes, audit behavior, and response formatters. Extracting them without complete method dependency maps and behavior tests could break field reports, radio, device, status, or dispatch flows. Keep the requested split order for the next implementation pass; use cohesive action/query classes and preserve the service facade only where callers require it.
 
+## Step 7: transactions and locking — skipped
+
+No blanket transaction edits were made. Existing transaction closures span several operational write paths, and side effects/connection ownership have not been exhaustively confirmed. Adding retry attempts can re-run closure side effects; adding locks without an identified counter row and consistent lock order can introduce contention/deadlocks. Failure-mid-transaction tests also need schema-complete fixtures for the target workflow. The scan appendix identifies transaction, lock, increment, and external-service candidates for a deliberate per-operation audit.
+
 ## Assumptions / open decisions
 
 - Existing route URLs, HTTP methods, field names, and JSON response shapes are compatibility constraints.
@@ -154,7 +158,8 @@ No large service was split. The line counts identify priority but do not establi
 - Step 4: pending report commit; skipped as above.
 - Step 5: pending report commit; skipped as above.
 - Step 6: pending report commit; skipped as above.
-- Steps 7–10: pending or explicitly skipped/blocked in final notes.
+- Step 7: pending report commit; skipped as above.
+- Steps 8–10: pending or explicitly skipped/blocked in final notes.
 
 ### Appendix A. JSON encode/decode calls
 
