@@ -114,9 +114,9 @@ Added checks covering unauthenticated JSON status/body for representative archiv
 - Added validation/clamp tests. Full suite: 8 tests, 36 assertions, passing.
 - Not all list-shaped endpoints have been changed. Mobile feeds, notifications, map layer payloads, dashboard summaries, SitRep options, team/lookup lists, and several service methods materialize arrays with endpoint-specific shapes or bounded semantics. Changing them to paginators or adding list metadata could break mobile/web clients. These require per-endpoint contract characterization and bounded-query design; the source match appendix lists `get()` candidates. This step is partial rather than claiming every list endpoint is paginated.
 
-## Steps 3–10
+## Step 3: runtime schema checks and JSON handling — skipped
 
-Not implemented yet. Refactors should be incremental and contract-preserving. New index migrations may be authored but must never be run remotely. Step 10 must distinguish liveness from readiness and must keep diagnostics free of secrets and personal household data.
+This step is skipped because the repository’s checked-in migrations do not fully define the legacy operational schema consumed by the large services, and the local test suite lacks full fixtures for those tables. Removing probes could convert intentional optional-integration behavior into request failures; changing JSON fields to casts without confirming database types/nullability and historical encodings could change API values. The Archive Group Manager also changes stored sequence/archive payload flows and needs success, rollback, and legacy-data characterization before extraction. No existing migration was changed and no schema operation was run.
 
 ## Assumptions / open decisions
 
@@ -138,7 +138,8 @@ Not implemented yet. Refactors should be incremental and contract-preserving. Ne
 - Step 0: committed as `f029810` (`docs: audit backend hardening baseline`).
 - Step 1: pending commit.
 - Step 2: pending commit.
-- Steps 3–10: pending or explicitly skipped/blocked in final notes.
+- Step 3: pending report commit; skipped as above.
+- Steps 4–10: pending or explicitly skipped/blocked in final notes.
 
 ### Appendix A. JSON encode/decode calls
 
