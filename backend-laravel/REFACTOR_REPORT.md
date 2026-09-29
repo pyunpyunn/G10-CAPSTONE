@@ -122,6 +122,10 @@ This step is skipped because the repository’s checked-in migrations do not ful
 
 No query rewrites were made. The grep inventory contains many `get()` calls, but many are bounded lookup lists, page-local enrichment, collection operations, or are grouped for presentation. With incomplete local schema fixtures and no query-count baseline, moving joins to relationships or changing selected columns could silently drop fields relied on by existing presenters/mobile clients. Revisit this one endpoint at a time after success-shape tests and query logging are available.
 
+## Step 5: API Resources and Presenters — skipped
+
+No service response was moved to Resources/Presenters. Service methods currently construct endpoint-specific nested response structures directly; extracting them wholesale without golden responses risks changing field names, null behavior, date formatting, or nested pagination metadata. Existing characterization coverage only pins unauthenticated responses for the broad set of routes. Build fixtures and exact success JSON snapshots for each client before this extraction.
+
 ## Assumptions / open decisions
 
 - Existing route URLs, HTTP methods, field names, and JSON response shapes are compatibility constraints.
@@ -144,7 +148,8 @@ No query rewrites were made. The grep inventory contains many `get()` calls, but
 - Step 2: pending commit.
 - Step 3: pending report commit; skipped as above.
 - Step 4: pending report commit; skipped as above.
-- Steps 5–10: pending or explicitly skipped/blocked in final notes.
+- Step 5: pending report commit; skipped as above.
+- Steps 6–10: pending or explicitly skipped/blocked in final notes.
 
 ### Appendix A. JSON encode/decode calls
 
