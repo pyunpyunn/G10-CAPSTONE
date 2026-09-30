@@ -283,14 +283,12 @@ export function HouseholdTrustedScreen({
       ) : null}
 
       <View style={styles.card}>
-        <HouseholdSection
-          title="Trusted households"
-          action={<HouseholdButton label="Add" icon="add-outline" tone="light" onPress={onAddTrusted} />}
-        />
+        <HouseholdSection title="Trusted households" />
         <TrustedHouseholdList
           overview={overview}
           trusted={overview.trusted?.households || []}
           activeEvent={activeEvent}
+          onAddTrusted={onAddTrusted}
           onOpenTrusted={onOpenTrusted}
         />
       </View>
@@ -368,30 +366,62 @@ function TrustedHouseholdList({
   overview,
   trusted,
   activeEvent,
+  onAddTrusted,
   onOpenTrusted,
 }: {
   overview: any;
   trusted: any[];
   activeEvent: any;
+  onAddTrusted: () => void;
   onOpenTrusted: (household: any) => void;
 }) {
+  const addLabel = trusted.length ? 'Add another household' : 'Add a household';
+  const addButton = (
+    <View style={styles.trustedAddSlot}>
+      <Pressable
+        style={styles.trustedAddButton}
+        onPress={onAddTrusted}
+        accessibilityRole="button"
+        accessibilityLabel={addLabel}
+      >
+        <View style={styles.trustedAddIcon}>
+          <Ionicons name="add" size={18} color={palette.navActive} />
+        </View>
+        <Text style={styles.trustedAddText}>{addLabel}</Text>
+        <Ionicons name="arrow-forward" size={18} color={palette.navActive} />
+      </Pressable>
+    </View>
+  );
+
   if (!overview.trusted?.is_available) {
     return (
-      <HouseholdEmpty
-        icon="lock-closed-outline"
-        title="Trusted household storage not ready"
-      />
+      <>
+        <HouseholdEmpty
+          icon="lock-closed-outline"
+          title="Trusted household storage not ready"
+        />
+        {addButton}
+      </>
     );
   }
 
   if (trusted.length === 0) {
-    return <HouseholdEmpty icon="home-outline" title="No trusted households yet" />;
+    return (
+      <>
+        <HouseholdEmpty icon="home-outline" title="No trusted households yet" />
+        {addButton}
+      </>
+    );
   }
 
   return (
     <>
       {trusted.map((householdItem: any) => (
-        <Pressable key={householdItem.connection_id} style={styles.trustedRow} onPress={() => onOpenTrusted(householdItem)}>
+        <Pressable
+          key={householdItem.connection_id}
+          style={styles.trustedRow}
+          onPress={() => onOpenTrusted(householdItem)}
+        >
           <View style={styles.trustedIcon}>
             <Ionicons
               name={isTrustedValidated(householdItem) ? 'home-outline' : 'lock-closed-outline'}
@@ -413,6 +443,7 @@ function TrustedHouseholdList({
           <HouseholdBadge label={labelize(householdItem.validation_status)} tone={householdItem.validation_status} />
         </Pressable>
       ))}
+      {addButton}
     </>
   );
 }
@@ -852,7 +883,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   rowMeta: {
-    marginTop: 2,
+    marginTop: 0,
     color: palette.textSoft,
     fontSize: 12,
     fontWeight: '800',
@@ -868,7 +899,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: spacing.sm,
+    marginTop: 2,
   },
   mapLink: {
     alignSelf: 'flex-start',
@@ -986,6 +1017,36 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: palette.border,
     paddingTop: spacing.md,
+  },
+  trustedAddSlot: {
+    width: '100%',
+    marginTop: 2,
+  },
+  trustedAddButton: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: palette.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: palette.secondary,
+  },
+  trustedAddIcon: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: palette.card,
+  },
+  trustedAddText: {
+    flex: 1,
+    color: palette.navActive,
+    fontSize: 13,
+    fontWeight: '900',
   },
   trustedIcon: {
     width: 38,
