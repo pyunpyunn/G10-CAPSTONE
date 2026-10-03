@@ -112,7 +112,7 @@ export default function HouseholdStatusPage() {
     <main className="ops-page household-page">
       <PageHeader
         title="Household Status"
-        subtitle="Barangay Mambaling, Cebu City"
+        subtitle={payload?.area_label || 'Shared database records'}
       />
 
       {isInitialLoading && <LoadingState />}
