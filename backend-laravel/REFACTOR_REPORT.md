@@ -2,14 +2,109 @@
 
 Branch: `refactor/backend-hardening`
 
-Scope: Step 0 audit and characterization only so far. No remote/shared database was connected, migrated, seeded, or modified.
+Scope: Local backend refactoring and characterization. No remote/shared database was connected, migrated, seeded, or modified in the B1/B2 work.
+
+## Phase C local update (2026-10-02)
+
+- Follow-up: TrackingAid writes from resource-request transactions now enqueue a job in the operational database's `jobs` table; the queue worker processes the other connection after commit. A rollback test proves the queued row disappears when the local transaction fails. This requires the Laravel scheduler or a dedicated `trackingaid_outbox` worker in deployment; it does not make two database commits atomic. Daily tracking references, numeric IDs used by the major writers, and formatted evacuation IDs now use locked sequence rows. Per-route coordinate order locks the assignment row. Account-code allocation and some mobile multi-table writes still need separate handling.
+- Schema capability lookups in 38 service files and 16 query/model/presenter files use a request-scoped cache. A test verifies one metadata query per repeated check within a request and a fresh check on the next request. TrackingAid's table-altering code remains direct.
+- The resource-request fallback mirror reads in 500-row keyset pages; a 1,200-row test confirms bounded query pages. The acknowledged feed caps at 100, and the summary uses an aggregate count. Resource-request list handoff statuses are fetched in one query for the page. Added an authenticated saved archive group response test. Remaining authenticated contracts and unbounded reads are listed in `BACKEND_REQUIREMENTS_STATUS.md`.
+- The new reversible `operational_sequences.sequence_prefix` migration was applied only to local `resq_local` so formatted evacuation IDs can share the locked sequence design. Latest verification: SQLite in-memory suite passed 70 tests and 264 assertions. This does not prove remote page latency or deployed queue processing.
+
+- Corrected broken class/method references in resource requests, rescuer accounts, and weather snapshots. All three affected controllers resolved and their read service calls returned HTTP 200 against the local database. This is a local smoke check, not proof that the deployed pages work.
+- Local `EXPLAIN FORMAT=TRADITIONAL` showed weather latest and event filtered reads scanning `weather_logs` (27 estimated rows). Added reversible indexes on `(observed_at, created_at)` and `(disaster_id, observed_at, created_at)` in a new migration. After applying it to `resq_local` at `127.0.0.1`, the same plans used `weather_logs_latest_idx` (`type=index`) and `weather_logs_event_latest_idx` (`type=ref`) respectively. The small local data set cannot establish production latency gains.
+- Replaced both `incident_archives` `MAX(archive_id) + 1` writers with a dedicated `operational_sequences` row locked with `lockForUpdate()` inside their existing transactions. The sequence migration seeds from the current local maximum. Both new migrations were applied only to local `resq_local`; no remote database was contacted. Added a rollback test for a failure after sequence allocation and a transaction guard test. The full SQLite suite passes: 62 tests, 231 assertions.
+- Phase C remains incomplete. The resource-request workflows still call the separate TrackingAid database inside local transactions; that cross-connection write cannot be made atomic by a local transaction alone. Rescuer-account and resource-request list plans still scan their small local tables, and there is no representative slow-query data to justify more indexes yet. Remote outage diagnosis still needs a failing request and deployed diagnostic evidence.
+
+> **Correction — 2026-10-01:** The A1–A3 refactor is only partially implemented. The prior completion notes below record execution checkpoints, but they do not prove the requested final architecture or every authenticated endpoint. A fresh source and execution audit found four service files over 300 physical lines, response formatting and query construction still inside services, 36 JSON helper call sites, 205 runtime schema capability checks, and unresolved dependencies/method calls in several extracted paths. The passing 55-test suite does not execute those paths. Use [A1_A3_ARCHITECTURE_AUDIT.md](A1_A3_ARCHITECTURE_AUDIT.md) as the current status and evidence.
+
+## B1/B2 update (2026-10-01)
+
+- Archive CSV export now uses `streamDownload` and `lazyByIdDesc(500)` with a hard 1,000-row ceiling. The existing category filters are reused, CSV headings and row mapping live in `ArchiveExportPresenter`, and the response still includes `X-Archive-Total`. Export queries select only fields used by the presenters. Event detail reads are batched for each 500-row export page instead of running once per event.
+- Memory behavior is structurally bounded for the CSV writer and result pages; a peak-memory benchmark was not run. `ArchiveQuery::savedGroupRecordIds()` still materializes all saved group JSON and builds an unbounded exclusion list before export, so flat end-to-end memory is not yet proven. The new ID-descending export order is deterministic but can differ from the previous timestamp-descending CSV order.
+- The web archive client already uses `responseType: 'blob'`; no web change was needed for streaming.
+- The pagination clamp was applied inside the archive, inquiry, and rescuer-account query paths. `ListRequest` now also validates the fixed-size notification and situation-report feed endpoints; those feeds retain their existing five- and 20-row sizes. A missing `Household` import in `RescueDispatchQuery` was corrected while tracing an unbounded dispatch query.
+- Situation-report summaries now aggregate per-purok household counts in SQL, load only eight assignment detail rows, and scan assignment status/outcomes in 500-row keyset pages for exact totals. The response still includes the existing summary and casualty fields; its internal `dispatch.raw_outcomes` array is now one combined entry instead of one entry per assignment.
+- Notification saved-view history now streams audit actions in 500-row pages and retains only IDs present in the bounded current feed. This bounds PHP memory for view state, although it still scans a user's full notification action history; an indexed state snapshot is needed to bound work on a remote DB.
+- [B2_LIST_QUERY_AUDIT.md](B2_LIST_QUERY_AUDIT.md) lists remaining unbounded reads and their endpoints. The map viewport contract, dispatch workspace, recipient delivery, and saved archive group ID storage still need implementation work. B2 is not complete.
+- Verification: SQLite in-memory `php artisan test` passed 59 tests / 226 assertions. The new tests cover streamed CSV output, the 500-row export page size with a 1,000-row ceiling, batched event details, situation summary totals, and bounded notification view-state IDs. No remote database was contacted; no deployed performance or outage result is claimed.
 
 ## Baseline
 
-- Laravel framework: 13.12.0; `composer.json` requires PHP ^8.3.
+- Laravel framework: 13.12.0; local CLI PHP 8.5.1; `composer.json` requires PHP ^8.3.
 - `phpunit.xml` configures SQLite in-memory for tests.
 - Initial suite: 5 of 6 passed. `ExampleTest` expected a missing frontend build although this workspace has `public/frontend-web/index.html`.
 - Corrected the environment-dependent assertion and added unauthenticated response contract checks. Current result: `php artisan test --compact` — 7 tests, 30 assertions, all passing.
+
+## Execution update (2026-09-30)
+
+### Phase 0 — local baseline protected
+
+- Working branch is `refactor/backend-hardening`.
+- `phpunit.xml` explicitly sets `DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`, and clears `DB_URL`; no operational database target is used by the local suite.
+- Baseline rerun: `php artisan test --compact` — 12 tests, 53 assertions, passing.
+- Pre-existing changes remain untouched: the report itself was already modified, the plan and `HqPersonnelSeeder.php` are untracked, and there are unrelated repository documentation deletions and frontend mapping edits. No commit was created to avoid mixing this work with that existing state.
+- Local Laravel/PHP versions were recorded. Per the user's instruction, the configured local `resq_local` MySQL 9.5.0 database was used only for read-only schema inspection and `EXPLAIN`; automated tests remain on SQLite in-memory. Deployment PHP and DB driver versions cannot be verified from this workspace.
+
+### Phase 1 — remote DB incident classification — evidence pending
+
+- Local code already provides independent liveness and `resq_local` readiness endpoints, safe API database exception responses, request IDs, sanitized diagnostics, and configurable DB timeouts (see Step 10 below).
+- No browser request/status/body/request ID or corresponding deployed log entry was supplied or available locally. Therefore the incident cannot be classified from current evidence. No remote/shared DB connection was attempted, and no failure category is asserted.
+- Gate remains open until a sanitized failing request and matching deployed diagnostic evidence are available. This does not prevent independent local characterization work.
+
+### Phase 3 — health endpoint contract slice
+
+- Added a local feature test pinning the exact public liveness and readiness success JSON and readiness `X-Request-ID` header against SQLite in-memory. Existing tests continue to cover failed readiness and safe API connection-failure response behavior.
+- Verification after this change: `php artisan test --compact` — 13 tests, 58 assertions, passing. `git diff --check` on the repository reports only the pre-existing trailing blank line in `frontend-web/src/components/mapping/MappingMap.jsx`; no whitespace issue was introduced in the backend changes.
+
+### Phase 2 — inquiry schema slice
+
+- Read-only inspection of local `resq_local` confirmed `landing_inquiries` exists with the 13 columns declared by its checked-in migration. No inquiry rows were selected or printed.
+- The table currently has only its primary-key index. Local `EXPLAIN` for status filtering plus newest-first ordering shows a table scan followed by sort; this small local dataset is not representative evidence for an index migration, so no index was added.
+
+### Phase 5 — inquiry list read-path slice
+
+- Added `InquiryListQuery` to own selected columns, status/search predicates, deterministic newest-first ordering (`created_at`, then `inquiry_id`), and pagination. `InquiryService` retains use-case orchestration and summary/account composition; response presentation is handled by `InquiryPresenter` (see completion note below).
+- Added an SQLite fixture-based service contract test for filtering, pagination metadata/keys, newest-first output, timestamp formatting, and summary counts. The test passed before and after extraction.
+- Full verification: `php artisan test --compact` — 14 tests, 66 assertions, passing. Scoped `git diff --check` reports no whitespace errors.
+- No query-count or performance improvement is claimed. The extracted query is ready for additional contract coverage; broader service workflows still require their own fixtures.
+
+### Inquiry service completion — presenter extraction
+
+- Completed the first service as one bounded workflow: added `InquiryPresenter` and moved inquiry JSON field mapping, status fallback, ID conversion, and display timestamp formatting out of `InquiryService`.
+- The presenter has no database access. Store, list, and status-update responses use the same presenter; the list fixture pins its exact display output.
+- This is a focused Phase 6 slice, not a presenter-per-service rule. Each additional service will be handled independently after its own response contract is characterized.
+- Verification after presenter extraction: `php artisan test --compact` — 14 tests, 66 assertions, passing; `git diff --check` on the presenter/service/fixture/report paths reports no whitespace errors.
+
+### RescuerMobileService — initial A1 extraction snapshot (superseded below)
+
+- Started with the largest service (2,213 physical lines; 20 mobile routes). Scope includes profile/setup, assignments/status/location, field reports, check-ins, resource requests, and radio; it is not complete yet, and no other service will be started under A1 until this service is finished.
+- Extracted user and responder response mappings into `RescuerMobileUserResource` and `RescuerMobileResponderResource`. The profile and overview GET controllers now return profile/overview Resources; profile update success also returns the profile Resource while preserving its existing validation/not-found JSON responses.
+- User Resource emits `role` with `whenLoaded('role')`; profile service paths explicitly load it, preventing hidden lazy queries.
+- Assignment reads return row collections from the service. Assignment, route, and list Resources own response fields and coordinate output; `RescuerAssignmentPresenter` owns status labels and assignment summary counts. The same Resources serve profile, overview, assignment list/detail, and status-update responses.
+- Field-report, check-in, evacuation-center, resource-request, active-event, and radio-feed reads now pass raw rows into dedicated Resources. `RescuerHouseholdStatusPresenter`, `RescuerResourceRequestPresenter`, and `RescuerRadioPresenter` own option labels, summary rows, location display text, radio labels/messages/timestamps, team-member display, and active-transmission summaries.
+- Added fixture-based exact contract tests for profile, overview, assignments, route geometry, field reports, check-ins, event, evacuation centers, resource requests, radio output, and presenter calculations.
+- Verification: `php artisan test --compact` — 28 tests, 87 assertions, passing. Radio presenter tests: 2 tests, 8 assertions; Resource contract tests: 11 tests, 11 assertions.
+- The A1 read-response formatter extraction is substantially applied, but the service refactor is not complete: `RescuerMobileService` remains 1,853 physical lines and still owns write workflows, validation, database coordination, audit writes, and several simple mutation responses. The requested ~300-line service target requires splitting these cohesive workflows into separate action/domain services and moving their shared query/write helpers; that is the next work on this same service. No other service has been started under A1.
+
+### RescuerMobileService — workflow refactor completed locally (2026-09-30)
+
+- Completed this service as the active A1 slice. `RescuerMobileService` is now a 165-line facade; it has no direct database calls or private helper methods. It composes the profile, overview, assignment, field-report, check-in, resource-request, and radio operations.
+- Extracted focused classes: `RescuerAssignmentQuery`, `RescuerFieldReportQuery`, `RescuerRadioFeedQuery`, and `RescuerMobileReadQuery`; `RescuerMobileSupport` owns the shared responder/event lookup, schema-aware column filtering, ID helper, and audit write; profile, assignment/location, field-report, check-in, resource-request, and radio workflows own their corresponding use cases.
+- Kept the previously extracted Resources and Presenters as the response boundary. Controllers still return those Resources for profile, overview, assignments, field reports, check-ins, resource requests, and radio feeds; simple mutation responses retain their existing JSON response contracts.
+- Wrapped the field-report log, latest household status, responder report row, and audit write in one operational connection transaction. Added local tests for success persistence, validation-before-write, and rollback when the latest household-status write fails. This uses SQLite in-memory only.
+- Added a bounded mobile read query for resource requests, check-ins, and evacuation centers; assignment and radio read paths keep their existing explicit result limits/order.
+- Verification: `php artisan test --compact` — 33 tests, 105 assertions, passing (including a targeted field-report rollback test). PHP syntax checks pass for the extracted PHP classes. Scoped `git diff --check` reports no backend errors; repository-wide checking can report an existing trailing blank line in `frontend-web/src/components/mapping/MappingMap.jsx`, which is outside this task.
+- No shared/operational database was used. The report and plan were already modified in the worktree; unrelated documentation deletions, frontend mapping edits, seeder, and other existing changes remain unstaged and untouched. No commit was created.
+- Scope note: the `RescuerMobileService` slice is complete against the A1 target and tests. Other service domains in the broader plan remain pending, and production/mobile staging smoke tests have not been performed here.
+
+### HouseholdMobileService — workflow refactor completed locally (2026-09-30)
+
+- Reduced `HouseholdMobileService` from 1,841 lines to a 62-line HTTP-facing facade. It now delegates each operation without direct database access or private helpers.
+- Extracted setup/device persistence, household/member status writes and SMS intake, member profile updates, trusted-household operations, and mobile read orchestration into focused workflows. Shared schema-aware persistence/audit helpers live in `HouseholdMobileSupport`; read construction lives in `HouseholdMobileReadQuery`; household/mobile status display mapping lives in `HouseholdMobilePresenter`.
+- The largest extracted workflow is below 300 lines. The read query remains a focused read component larger than 300 lines and is a candidate for further splitting if its domain grows; no other service is over the plan's service-size target in this slice.
+- Added SQLite in-memory tests for setup/device persistence and household status response/persistence, plus missing-member behavior. Full verification: `php artisan test --compact` — 37 tests, 122 assertions, passing. Shared/operational DB was not used.
+- The broad refactor request remains active: `ArchiveService`, `RescueDispatchService`, `ResourceRequestService`, `RescuerAccountService`, and `HouseholdStatusService` are still above 1,000 lines and will be handled one service at a time. No unrelated worktree changes were staged or committed.
 
 ## Step 0: route and service inventory
 
@@ -42,35 +137,37 @@ Authenticated API endpoints are under `/api/v1` and use Sanctum. Most admin acti
 
 Connection note: these are inferred from default configuration and explicit integration boundaries, not proof that each individual query uses the intended connection. Most application queries use Laravel's default connection (`resq_local` in `.env.example`). Verify query/model connection ownership before deployment. Never span `resq_local` and `trackingaid` in one transaction.
 
-### Service file line counts
+### Service file sizes
 
-| Service | Lines |
-|---|---:|
-| RescuerMobileService.php | 1,880 |
-| HouseholdMobileService.php | 1,841 |
-| ArchiveService.php | 1,493 |
-| RescueDispatchService.php | 1,352 |
-| ResourceRequestService.php | 1,307 |
-| RescuerAccountService.php | 1,226 |
-| HouseholdStatusService.php | 1,225 |
-| DisasterBroadcastService.php | 781 |
-| MappingService.php | 695 |
-| SituationReportService.php | 683 |
-| DashboardService.php | 651 |
-| NotificationService.php | 556 |
-| WeatherSnapshotService.php | 419 |
-| ProfileService.php | 396 |
-| InquiryService.php | 285 |
-| TrackingAidForwardingService.php | 280 |
-| OneSignalNotificationService.php | 234 |
-| BarangayProfileService.php | 211 |
-| GlobalSearchService.php | 203 |
-| MobileDeviceService.php | 208 |
-| EvacuationCheckInService.php | 167 |
-| SmsGatewayService.php | 108 |
-| WeatherService.php | 60 |
-| RoutingService.php | 51 |
-| AuthService.php | 347 |
+The first audit table below counted nonblank source lines, not physical file lines. This correction uses physical lines so the size is not understated. The nonblank counts are retained in the second column as logical LOC.
+
+| Service | Physical lines | Nonblank lines |
+|---|---:|---:|
+| RescuerMobileService.php | 2,213 | 1,880 |
+| HouseholdMobileService.php | 2,176 | 1,841 |
+| ArchiveService.php | 1,707 | 1,493 |
+| RescueDispatchService.php | 1,549 | 1,352 |
+| ResourceRequestService.php | 1,503 | 1,307 |
+| RescuerAccountService.php | 1,424 | 1,226 |
+| HouseholdStatusService.php | 1,391 | 1,225 |
+| DisasterBroadcastService.php | 922 | 781 |
+| MappingService.php | 813 | 695 |
+| SituationReportService.php | 781 | 683 |
+| DashboardService.php | 749 | 651 |
+| NotificationService.php | 635 | 556 |
+| WeatherSnapshotService.php | 480 | 419 |
+| ProfileService.php | 453 | 396 |
+| AuthService.php | 427 | 347 |
+| InquiryService.php | 331 | 285 |
+| TrackingAidForwardingService.php | 318 | 280 |
+| OneSignalNotificationService.php | 279 | 234 |
+| MobileDeviceService.php | 250 | 208 |
+| BarangayProfileService.php | 247 | 211 |
+| GlobalSearchService.php | 227 | 203 |
+| EvacuationCheckInService.php | 200 | 167 |
+| SmsGatewayService.php | 130 | 108 |
+| WeatherService.php | 73 | 60 |
+| RoutingService.php | 63 | 51 |
 
 ### Static scan inventory
 
@@ -122,9 +219,9 @@ This step is skipped because the repository’s checked-in migrations do not ful
 
 No query rewrites were made. The grep inventory contains many `get()` calls, but many are bounded lookup lists, page-local enrichment, collection operations, or are grouped for presentation. With incomplete local schema fixtures and no query-count baseline, moving joins to relationships or changing selected columns could silently drop fields relied on by existing presenters/mobile clients. Revisit this one endpoint at a time after success-shape tests and query logging are available.
 
-## Step 5: API Resources and Presenters — skipped
+## Step 5: API Resources and Presenters — one workflow implemented
 
-No service response was moved to Resources/Presenters. Service methods currently construct endpoint-specific nested response structures directly; extracting them wholesale without golden responses risks changing field names, null behavior, date formatting, or nested pagination metadata. Existing characterization coverage only pins unauthenticated responses for the broad set of routes. Build fixtures and exact success JSON snapshots for each client before this extraction.
+`InquiryPresenter` now owns the inquiry response fields and date/status formatting for create, list, and status-update responses. The list contract fixture verifies output structure and formatting. Other service responses remain unchanged; extract them only after route-specific success contracts are pinned.
 
 ## Step 6: split oversized services — skipped
 
@@ -161,35 +258,35 @@ No index migration files were added. The audit shows common join/filter candidat
 
 ## Before / after service line counts
 
-Only `ArchiveService` changed during this run; its additional 5 lines isolate the higher export ceiling from interactive pagination. All other service files are unchanged in line count. “Before” is the Step 0 count above.
+Only `ArchiveService` changed during this run; it has six additional physical lines to isolate the higher export ceiling from interactive pagination. All other service files are unchanged in physical line count. The values below compare the branch base (`main`) to current. Earlier counts labeled “lines” were nonblank LOC and have been corrected above.
 
-| Service | Before | After |
+| Service | Before physical lines | After physical lines |
 |---|---:|---:|
-| ArchiveService.php | 1,493 | 1,498 |
-| AuthService.php | 347 | 347 |
-| BarangayProfileService.php | 211 | 211 |
-| DashboardService.php | 651 | 651 |
-| DisasterBroadcastService.php | 781 | 781 |
-| EvacuationCheckInService.php | 167 | 167 |
-| GlobalSearchService.php | 203 | 203 |
-| HouseholdMobileService.php | 1,841 | 1,841 |
-| HouseholdStatusService.php | 1,225 | 1,225 |
-| InquiryService.php | 285 | 285 |
-| MappingService.php | 695 | 695 |
-| MobileDeviceService.php | 208 | 208 |
-| NotificationService.php | 556 | 556 |
-| OneSignalNotificationService.php | 234 | 234 |
-| ProfileService.php | 396 | 396 |
-| RescueDispatchService.php | 1,352 | 1,352 |
-| RescuerAccountService.php | 1,226 | 1,226 |
-| RescuerMobileService.php | 1,880 | 1,880 |
-| ResourceRequestService.php | 1,307 | 1,307 |
-| RoutingService.php | 51 | 51 |
-| SituationReportService.php | 683 | 683 |
-| SmsGatewayService.php | 108 | 108 |
-| TrackingAidForwardingService.php | 280 | 280 |
-| WeatherService.php | 60 | 60 |
-| WeatherSnapshotService.php | 419 | 419 |
+| ArchiveService.php | 1,707 | 1,713 |
+| AuthService.php | 427 | 427 |
+| BarangayProfileService.php | 247 | 247 |
+| DashboardService.php | 749 | 749 |
+| DisasterBroadcastService.php | 922 | 922 |
+| EvacuationCheckInService.php | 200 | 200 |
+| GlobalSearchService.php | 227 | 227 |
+| HouseholdMobileService.php | 2,176 | 2,176 |
+| HouseholdStatusService.php | 1,391 | 1,391 |
+| InquiryService.php | 331 | 331 |
+| MappingService.php | 813 | 813 |
+| MobileDeviceService.php | 250 | 250 |
+| NotificationService.php | 635 | 635 |
+| OneSignalNotificationService.php | 279 | 279 |
+| ProfileService.php | 453 | 453 |
+| RescueDispatchService.php | 1,549 | 1,549 |
+| RescuerAccountService.php | 1,424 | 1,424 |
+| RescuerMobileService.php | 2,213 | 2,213 |
+| ResourceRequestService.php | 1,503 | 1,503 |
+| RoutingService.php | 63 | 63 |
+| SituationReportService.php | 781 | 781 |
+| SmsGatewayService.php | 130 | 130 |
+| TrackingAidForwardingService.php | 318 | 318 |
+| WeatherService.php | 73 | 73 |
+| WeatherSnapshotService.php | 480 | 480 |
 
 Query counts before/after: not measurable with current fixtures; no claim made.
 
@@ -873,3 +970,69 @@ app/Services\SmsGatewayService.php:31:                $response = Http::withBasi
 app/Services\WeatherService.php:10:class WeatherService
 app/Services\WeatherSnapshotService.php:158:        $request = Http::timeout(15)->retry(1, 300);
 ```
+
+## Current refactor progress — 2026-09-30
+
+This execution handles the remaining services over 1,000 physical lines one at a time, using only the configured local SQLite test database. Shared database access is out of scope.
+
+### Completed in this execution
+
+- `HouseholdMobileService`: reduced from 1,841 to a 62-line facade. Route methods delegate to setup, status, status-write, trusted-household, member-profile, and read workflows. Response shaping lives in `HouseholdMobilePresenter`; reusable reads live in `HouseholdMobileReadQuery`. Local feature coverage: 4 tests across its workflow test file(s), with full backend suite passing at this checkpoint.
+- `ArchiveService`: reduced from 1,305 physical lines at execution start to 57 lines. It delegates category reads to `ArchiveQuery`, event display shaping to `ArchiveEventPresenter` (with supplemental lookups in `ArchiveEventDetailQuery`), saved-group lifecycle to `ArchiveSavedGroupWorkflow`, selected deletion to `ArchiveDeletionWorkflow`, CSV export to `ArchiveExportWorkflow`, and barangay profile lookup to the existing profile service. Display labels, summaries, dates, and saved-group shaping live in `ArchivePresenter`.
+- Archive characterization coverage currently includes saved-group valid and malformed payload presentation. The existing unauthenticated archive endpoint characterization remains in place.
+- Verification: `php artisan test --compact` passed: 39 tests, 129 assertions. PHP syntax checks passed for all new Archive PHP files. Tests run against the local PHPUnit SQLite in-memory configuration; no shared DB was contacted.
+
+### Remaining oversized services
+
+Continue the same one-service-at-a-time extraction for `RescueDispatchService`, `ResourceRequestService`, `RescuerAccountService`, and `HouseholdStatusService`. Re-audit physical line counts before closing this batch; document each service's resulting facade size, extracted collaborators, test evidence, and any follow-up concerns here.
+
+### Rescue dispatch (`RescueDispatchService`, 1,549 physical lines at audit)
+
+**A1 status:** implemented locally on 2026-09-30. The service is a 265-line facade. `RescueDispatchQuery` owns active event, assignment, routes, dispatch board, responders, team cards, risk areas, activity, and summary reads; `RescueDispatchPresenter` owns status/date/outcome and dispatch/risk response shaping; `RescueDispatchWorkflow` owns assignment creation/update/completion/location transactions, responder availability validation and duty updates, household completion status writes, and audit logging. Routes and controllers remain unchanged. `RescueDispatchPresenterTest` covers dispatch response mapping/status aliases. Full local suite: 41 tests, 137 assertions.
+
+## Oversized-service refactor completion — 2026-09-30
+
+The active request to refactor every service above 1,000 lines is complete locally. The original inventory included seven services above the threshold, including `RescuerMobileService`. Final facade sizes are:
+
+| Service | Before this execution | Current facade |
+| --- | ---: | ---: |
+| `RescuerMobileService` | 2,213 | 199 |
+| `HouseholdMobileService` | 2,176 | 80 |
+| `ArchiveService` | 1,305 at execution start | 57 |
+| `RescueDispatchService` | 1,549 | 265 |
+| `ResourceRequestService` | 1,503 | 271 |
+| `RescuerAccountService` | 1,424 | 103 |
+| `HouseholdStatusService` | 1,391 | 103 |
+
+`RescuerAccountService` now delegates roster reads to `RescuerAccountQuery`, response shaping to `RescuerAccountPresenter`, account and team writes to dedicated workflows, account/team validation and ID rules to support/workflow classes, and audit writes to `RescuerAccountAuditLogger`. `HouseholdStatusService` delegates reads to `HouseholdStatusQuery`, household/status/device response shaping to `HouseholdStatusPresenter`, and status report/confirmation transactions to `HouseholdStatusWorkflow`. Existing routes and response envelopes are retained. `HouseholdMemberStatusQueryTest` now targets the extracted query class; new rescuer-account and household-status presenter tests characterize response fields and computed labels.
+
+Verification used the PHPUnit-configured local SQLite in-memory database only; no shared database was contacted. Final `php artisan test --compact`: 47 tests passed, 166 assertions. PHP syntax checks passed for the changed service collaborators. A full `app/**/*.php` physical-line audit found zero files above 1,000 lines. No files were staged or committed.
+## Continuation update — 2026-10-01
+
+### Six requested domains completed
+
+The second A1 pass completed `SituationReportService`, `ProfileService`, `NotificationService`, `MappingService`, `DisasterBroadcastService`, and `DashboardService`. Their current facade sizes are 64, 39, 55, 83, 48, and 95 physical lines. Read queries, display shaping, and write workflows now live in focused collaborators. Mapping layers continue to return no rows when a supplied event ID is not the active event.
+
+### Service namespaces
+
+Moved all 60 service classes into PSR-4 namespaces and matching folders: `app/Services/Mobile` (26), `app/Services/Web` (24), and `app/Services/Shared` (10). Updated constructors, controllers, route references, query/presenter dependencies, and feature-test imports. `AuthService` now delegates account lookup to `AuthAccountQuery`; weather output shaping is in `WeatherSnapshotPresenter`. Every file under `app/Services` is now below 300 physical lines.
+
+### Query and repository convention
+
+Keep `Queries` as the home for complex, page-specific reads that combine filters, joins, ordering, and pagination. Model scopes own small reusable predicates. Repositories remain for the existing core aggregate persistence boundary; do not add repositories that simply wrap one Eloquent model or duplicate a query object. Services coordinate use cases; Actions/workflows own multi-step writes; Resources and Presenters own API/display output. This is an application convention, not a folder Laravel requires. See [Fowler's Query Object pattern](https://martinfowler.com/eaaCatalog/queryObject.html) and [Laravel's application structure guidance](https://laravel.com/docs/13.x/structure).
+
+Verification: `composer dump-autoload --no-scripts --no-interaction --optimize` completed. `php artisan test --compact` passed: 55 tests, 201 assertions, on the PHPUnit SQLite in-memory connection. No shared database was contacted.
+# Shared database read-path measurements — 2026-10-03
+
+Read-only service calls against the configured shared MySQL connection exposed repeated queries. No data migration, write benchmark, or remote index change was run. Initial timings were observed under concurrent diagnostic load and should be treated as indicative; query counts are the more stable comparison.
+
+| Read path | Before | After | Change |
+| --- | ---: | ---: | --- |
+| Dispatch workspace | 125 queries, 8,489 ms | 15 queries, 418 ms on a later sequential run | Batch responder assignments and team counts; reuse team cards for summary. |
+| Rescuer Accounts list | 33 queries, 4,914 ms | 8 queries, 213 ms on a later sequential run | Batch account ID choices and calculate summary with SQL aggregates. |
+| Resource Requests list | 28 queries, 958 ms | 13 queries, 672 ms on a later sequential run | Load status IDs once and use a range predicate for today's releases. |
+
+The Rescuer Accounts summary and all eight account ID suggestions were compared with the previous logic against the current shared data and matched. Operations and TrackingAid queue workers were started locally. The `composer dev` script now starts those two named workers; the previous default-queue listener did not process these jobs. These measurements do not guarantee a fixed response time for every endpoint or under a shared database outage. Continue using request profiling and investigate any remaining slow route by its query count and slowest SQL.
+
+A later sequential sample ranked the sampled reads as Resource Requests (672 ms, 13 queries), Dispatch (418 ms, 15 queries), Dashboard summary (365 ms, 7 queries), Broadcast workspace (253 ms, 15 queries), Rescuer Accounts (213 ms, 8 queries), and Weather workspace (178 ms, 4 queries). These are service-level read timings without browser rendering or authentication middleware. They are not a production latency guarantee.
+
