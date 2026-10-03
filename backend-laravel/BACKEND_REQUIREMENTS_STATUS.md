@@ -1,6 +1,16 @@
-# Backend checklist status — 2026-10-02
+# Backend checklist status — 2026-10-03
 
-This checks the pasted 0.1–C2 checklist against the current working tree. "Partial" means the requirement is **not complete**. Existing audits and the report are evidence of work, not proof that every endpoint is fixed. Only the local `resq_local` database was used for Phase C migrations and EXPLAIN; no remote database was contacted.
+## Latest verification
+
+The SQLite feature suite passes **91 tests and 405 assertions**; the web production build succeeds. All **63** service files are below 300 physical lines. This satisfies the size goal, but not the stricter orchestration-only goal: a current source scan finds **196** `response()->json()` calls, **198** schema capability calls, and **30** JSON encode/decode calls in services. The architecture checklist below therefore remains partial.
+
+Notification feed formatting now lives in a Resource and Presenter, with controllers owning the HTTP responses for feed and notification actions. Weather's controller owns HTTP status codes and its Resource serializes the workspace. Profile's read path is serialized in a Resource; its write workflow now uses a transaction with retry for the profile update and audit write. The authenticated Profile contract caught and fixed a role attribute/relation collision that previously caused a 500. Audit values use the existing Eloquent array casts instead of manual JSON encoding. These are verified changes, not completion of every service boundary.
+
+Shared MySQL read-only inspection found 40 household rows, of which 5 are active. Those active households span 3 barangays. Mapping, household status, dispatch, and resource-request screens now obtain their area labels and Purok options from database records; a contract test covers address labels and catalog fallback. Map rendering now handles an absent center or boundary. Existing geotag and device-token household IDs do not join to active household IDs, so their locations cannot be attributed to households without correcting the shared data. No shared database writes or migrations were run during this check.
+
+The shared DB path is callable locally, but this is not a deployed login, load, concurrency, or remote before/after latency result. The remaining A1/A3 migrations, growing reads, mobile transactions, and EXPLAIN-backed remote indexes must be handled separately before claiming the full 0.1–C2 target is complete.
+
+The table below is the historical 2026-10-02 assessment. Its test counts, service counts, and statement that no shared database was contacted are superseded by the latest verification above. "Partial" means the requirement is **not complete**. Existing audits and the report are evidence of work, not proof that every endpoint is fixed.
 
 | Checklist item | Status | Current evidence and remaining work |
 | --- | --- | --- |

@@ -12,6 +12,35 @@ use Illuminate\Support\Collection;
 
 class NotificationPresenter
 {
+    public function workspace(array $feed): array
+    {
+        $allItems = $feed['items'];
+        $filtered = $feed['filtered'];
+        $status = $feed['status'];
+        $pageSize = 5;
+        $pageCount = max(1, (int) ceil($filtered->count() / $pageSize));
+        $page = min(max(1, $feed['page']), $pageCount);
+
+        return [
+            'summary' => [
+                'total' => $allItems->count(),
+                'unread' => $allItems->where('read', false)->count(),
+                'critical' => $allItems->filter(fn (array $item): bool => in_array($item['priority'], ['Critical', 'High'], true))->count(),
+                'selected' => 0,
+            ],
+            'notifications' => [
+                'data' => $filtered->slice(($page - 1) * $pageSize, $pageSize)->values()->all(),
+                'current_page' => $page,
+                'per_page' => $pageSize,
+                'total' => $filtered->count(),
+                'page_count' => $pageCount,
+            ],
+            'preview' => $allItems->take(5)->values()->all(),
+            'status_filter' => $status,
+            'scope_note' => 'HQ/Admin notification actions hide or mark notices in the current web view only. Delivery logs stay unchanged for audit.',
+        ];
+    }
+
     public function feed(array $sources): Collection
     {
         return collect()

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ProfileWorkspaceResource;
 use App\Services\Web\ProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ class ProfileController extends Controller
 
     public function show(Request $request): JsonResponse
     {
-        return $this->service->show($request);
+        return (new ProfileWorkspaceResource($this->service->show($request)))->response();
     }
 
     public function update(Request $request): JsonResponse

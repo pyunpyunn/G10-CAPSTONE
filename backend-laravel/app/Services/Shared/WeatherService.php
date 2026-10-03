@@ -4,8 +4,6 @@ namespace App\Services\Shared;
 
 use App\Jobs\RefreshWeatherSnapshot;
 use App\Services\Shared\WeatherSnapshotService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class WeatherService
 {
@@ -16,51 +14,35 @@ class WeatherService
         $this->weather = $weather;
     }
 
-    public function workspace(): JsonResponse
+    public function workspace(): array
     {
-        return response()->json([
-            'data' => $this->weather->pageData(null),
-        ]);
+        return $this->weather->pageData(null);
     }
 
-    public function index(string $eventId): JsonResponse
+    public function eventExists(string $eventId): bool
     {
-        if (! $this->weather->findEvent($eventId)) {
-            return response()->json([
-                'message' => 'Disaster event record was not found.',
-            ], 404);
-        }
-
-        return response()->json([
-            'data' => [
-                'logs' => $this->weather->getWeatherLogs($eventId),
-            ],
-        ]);
+        return (bool) $this->weather->findEvent($eventId);
     }
 
-    public function refreshWorkspace(Request $request): JsonResponse
+    public function index(string $eventId): array
+    {
+        return ['logs' => $this->weather->getWeatherLogs($eventId)];
+    }
+
+    public function refreshWorkspace(): array
     {
         return $this->saveRefresh(null);
     }
 
-    public function refreshEvent(Request $request, string $eventId): JsonResponse
+    public function refreshEvent(string $eventId): array
     {
-        if (! $this->weather->findEvent($eventId)) {
-            return response()->json([
-                'message' => 'Disaster event record was not found.',
-            ], 404);
-        }
-
         return $this->saveRefresh($eventId);
     }
 
-    private function saveRefresh(?string $eventId): JsonResponse
+    private function saveRefresh(?string $eventId): array
     {
         RefreshWeatherSnapshot::dispatch($eventId)->onConnection('operations_outbox')->onQueue('operations');
-        return response()->json([
-            'message' => 'Weather refresh queued. The latest snapshot will appear when processing finishes.',
-            'data' => $this->weather->pageData($eventId),
-        ], 202);
+        return $this->weather->pageData($eventId);
     }
 }
 

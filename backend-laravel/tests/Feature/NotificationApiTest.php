@@ -124,7 +124,14 @@ class NotificationApiTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('data.notifications.data.0.type', 'Broadcast')
-            ->assertJsonPath('data.summary.total', 1);
+            ->assertJsonPath('data.summary.total', 1)
+            ->assertJsonPath('data.notifications.current_page', 1)
+            ->assertJsonPath('data.notifications.per_page', 5)
+            ->assertJsonPath('data.notifications.page_count', 1)
+            ->assertJsonPath('data.status_filter', 'all')
+            ->assertJsonStructure(['data' => ['summary' => ['total', 'unread', 'critical', 'selected'],
+                'notifications' => ['data', 'current_page', 'per_page', 'total', 'page_count'],
+                'preview', 'status_filter', 'scope_note']]);
     }
 }
 

@@ -16,15 +16,23 @@ class HouseholdPurokQuery
             ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->when(Schema::hasColumn('households', 'deleted_at'), fn ($builder) => $builder->whereNull('h.deleted_at'));
 
-        if (Schema::hasColumn('addresses', 'purok_sitio')) {
-            return $query->whereNotNull('a.purok_sitio')->where('a.purok_sitio', '<>', '')
-                ->distinct()->orderBy('a.purok_sitio')->pluck('a.purok_sitio')->all();
+        $hasAddressLabel = Schema::hasColumn('addresses', 'purok_sitio');
+        $hasPurokCatalog = Schema::hasTable('puroks') && Schema::hasColumn('addresses', 'purok_id');
+        if (! $hasAddressLabel && ! $hasPurokCatalog) return [];
+
+        if ($hasPurokCatalog) {
+            $query->leftJoin('puroks as p', 'p.purok_id', '=', 'a.purok_id');
         }
 
-        if (! Schema::hasTable('puroks') || ! Schema::hasColumn('addresses', 'purok_id')) return [];
+        $label = match (true) {
+            $hasAddressLabel && $hasPurokCatalog => "COALESCE(NULLIF(a.purok_sitio, ''), NULLIF(p.purok_name, ''))",
+            $hasAddressLabel => "NULLIF(a.purok_sitio, '')",
+            default => "NULLIF(p.purok_name, '')",
+        };
 
-        return $query->join('puroks as p', 'p.purok_id', '=', 'a.purok_id')
-            ->whereNotNull('p.purok_name')->where('p.purok_name', '<>', '')
-            ->distinct()->orderBy('p.purok_name')->pluck('p.purok_name')->all();
+        return $query->whereRaw("$label IS NOT NULL")
+            ->selectRaw("DISTINCT $label AS purok_name")
+            ->orderBy('purok_name')
+            ->pluck('purok_name')->all();
     }
 }

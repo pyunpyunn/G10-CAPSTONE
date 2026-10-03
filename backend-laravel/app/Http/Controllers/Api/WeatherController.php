@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\WeatherWorkspaceResource;
 use App\Services\Shared\WeatherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,22 +19,32 @@ class WeatherController extends Controller
 
     public function workspace(): JsonResponse
     {
-        return $this->service->workspace();
+        return (new WeatherWorkspaceResource($this->service->workspace()))->response();
     }
 
     public function index(string $eventId): JsonResponse
     {
-        return $this->service->index($eventId);
+        if (! $this->service->eventExists($eventId)) {
+            return response()->json(['message' => 'Disaster event record was not found.'], 404);
+        }
+        return (new WeatherWorkspaceResource($this->service->index($eventId)))->response();
     }
 
     public function refreshWorkspace(Request $request): JsonResponse
     {
-        return $this->service->refreshWorkspace($request);
+        return (new WeatherWorkspaceResource($this->service->refreshWorkspace()))->additional([
+            'message' => 'Weather refresh queued. The latest snapshot will appear when processing finishes.',
+        ])->response()->setStatusCode(202);
     }
 
     public function refreshEvent(Request $request, string $eventId): JsonResponse
     {
-        return $this->service->refreshEvent($request, $eventId);
+        if (! $this->service->eventExists($eventId)) {
+            return response()->json(['message' => 'Disaster event record was not found.'], 404);
+        }
+        return (new WeatherWorkspaceResource($this->service->refreshEvent($eventId)))->additional([
+            'message' => 'Weather refresh queued. The latest snapshot will appear when processing finishes.',
+        ])->response()->setStatusCode(202);
     }
 }
 

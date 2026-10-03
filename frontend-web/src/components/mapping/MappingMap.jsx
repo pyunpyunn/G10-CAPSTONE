@@ -125,7 +125,7 @@ export default function MappingMap({
           url={workspace.barangay.tile_url}
           maxZoom={19}
         />
-        <Rectangle bounds={mapBounds} pathOptions={{ color: '#173b5f', weight: 3, opacity: 0.95, fillColor: '#b9d8ed', fillOpacity: 0.04 }} />
+        {mapBounds?.length === 2 && <Rectangle bounds={mapBounds} pathOptions={{ color: '#173b5f', weight: 3, opacity: 0.95, fillColor: '#b9d8ed', fillOpacity: 0.04 }} />}
 
         {hasActiveEvent && layers.households && households.map((household) => (
           <HouseholdMarker

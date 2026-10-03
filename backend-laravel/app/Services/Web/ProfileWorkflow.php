@@ -2,6 +2,7 @@
 
 namespace App\Services\Web;
 
+use App\Http\Resources\UserResource;
 use App\Models\AuditLog;
 use App\Models\BarangayProfile;
 use App\Models\User;
@@ -37,9 +38,8 @@ class ProfileWorkflow
 
         $oldValues = $this->presenter->identity($user);
 
-        User::query()
-            ->where($user->getKeyName(), $user->getKey())
-            ->update([
+        $updatedUser = DB::transaction(function () use ($request, $user, $validated, $oldValues): User {
+            User::query()->where($user->getKeyName(), $user->getKey())->update([
                 'first_name' => $validated['first_name'],
                 'last_name' => $validated['last_name'],
                 'name' => trim($validated['first_name'].' '.$validated['last_name']),
@@ -48,9 +48,10 @@ class ProfileWorkflow
                 'assigned_center_id' => $validated['assigned_center_id'] ?? null,
                 'updated_at' => now(),
             ]);
-
-        $updatedUser = $request->user()->fresh()->load('role');
-        $this->writeAuditLog($request, 'update_profile', $oldValues, $this->presenter->identity($updatedUser));
+            $updatedUser = $user->fresh()->load('role');
+            $this->writeAuditLog($request, 'update_profile', $oldValues, $this->presenter->identity($updatedUser));
+            return $updatedUser;
+        }, 3);
 
         return response()->json([
             'message' => 'Profile details updated.',
@@ -82,19 +83,18 @@ class ProfileWorkflow
             ], 422);
         }
 
-        User::query()
-            ->where($user->getKeyName(), $user->getKey())
-            ->update([
+        DB::transaction(function () use ($request, $user, $validated): void {
+            User::query()->where($user->getKeyName(), $user->getKey())->update([
                 'password' => Hash::make($validated['password']),
                 'password_changed_at' => now(),
                 'must_change_password' => 0,
                 'updated_at' => now(),
             ]);
-
-        $this->writeAuditLog($request, 'change_password', null, [
-            'user_id' => $user->user_id,
-            'changed_at' => now()->toDateTimeString(),
-        ]);
+            $this->writeAuditLog($request, 'change_password', null, [
+                'user_id' => $user->user_id,
+                'changed_at' => now()->toDateTimeString(),
+            ]);
+        }, 3);
 
         return response()->json([
             'message' => 'Password changed successfully.',
@@ -139,7 +139,7 @@ class ProfileWorkflow
             'map_zoom.between' => 'Map zoom must be between 12 and 20.',
         ]);
 
-        DB::transaction(function () use ($request, $validated): void {
+        DB::transaction(function () use ($request, $validated, $oldValues): void {
             $columns = Schema::getColumnListing('barangay_profiles');
             $values = [
                 'barangay_id' => $validated['barangay_id'] ?? null,
@@ -168,20 +168,17 @@ class ProfileWorkflow
                 BarangayProfile::query()
                     ->where('profile_id', $profileId)
                     ->update($values);
-
-                return;
+            } else {
+                $values = array_intersect_key([
+                    ...$values,
+                    'created_at' => now(),
+                ], array_flip($columns));
+                BarangayProfile::query()->create($values);
             }
-
-            $values = array_intersect_key([
-                ...$values,
-                'created_at' => now(),
-            ], array_flip($columns));
-
-            BarangayProfile::query()->create($values);
-        });
+            $this->writeAuditLog($request, 'update_barangay_profile', $oldValues, $this->query->barangayProfileData());
+        }, 3);
 
         $updatedValues = $this->query->barangayProfileData();
-        $this->writeAuditLog($request, 'update_barangay_profile', $oldValues, $updatedValues);
 
         return response()->json([
             'message' => 'Barangay information saved.',
@@ -204,8 +201,8 @@ class ProfileWorkflow
             'action' => $action,
             'reference_table' => 'users',
             'reference_id' => $request->user()?->user_id,
-            'old_values' => $oldValues ? json_encode($oldValues, JSON_UNESCAPED_SLASHES) : null,
-            'new_values' => $newValues ? json_encode($newValues, JSON_UNESCAPED_SLASHES) : null,
+            'old_values' => $oldValues ?: null,
+            'new_values' => $newValues ?: null,
             'ip_address' => $request->ip(),
             'user_agent' => substr((string) $request->userAgent(), 0, 255),
             'created_at' => now(),

@@ -40,9 +40,11 @@ export default function MappingPage() {
   const barangay = workspace?.barangay || defaultWorkspace.barangay
   const filters = workspace?.filters || defaultWorkspace.filters
   const mapCenter = useMemo(() => [
-    Number(barangay?.center?.latitude ?? defaultWorkspace.barangay.center.latitude),
-    Number(barangay?.center?.longitude ?? defaultWorkspace.barangay.center.longitude),
+    barangay?.center?.latitude,
+    barangay?.center?.longitude,
   ], [barangay?.center?.latitude, barangay?.center?.longitude])
+  const hasMapCenter = mapCenter.every((coordinate) => coordinate !== null && coordinate !== undefined
+    && coordinate !== '' && Number.isFinite(Number(coordinate)))
   const mapBounds = useMemo(() => Array.isArray(barangay?.bounds) ? barangay.bounds : defaultWorkspace.barangay.bounds, [barangay?.bounds])
   const households = useMemo(() => (
     hasActiveEvent ? workspace.households : []
@@ -240,7 +242,7 @@ export default function MappingPage() {
           <div className="mapmate-grid">
             <main className="mapmate-main">
               <RefreshOverlay active={isRefreshing}>
-                <MappingMap
+                {hasMapCenter ? <MappingMap
                   workspace={workspace}
                   hasActiveEvent={hasActiveEvent}
                   layers={layers}
@@ -259,7 +261,7 @@ export default function MappingPage() {
                   onRouteToDispatch={handleDispatchRoute}
                   isFullscreen={isMapFullscreen}
                   onToggleFullscreen={() => setIsMapFullscreen((current) => !current)}
-                />
+                /> : <div className="form-error" role="status">No map coordinates are configured or available in the shared database. Add a geotagged location or set the map center in backend configuration.</div>}
               </RefreshOverlay>
             </main>
 

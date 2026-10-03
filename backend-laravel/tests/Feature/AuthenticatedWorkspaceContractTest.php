@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Queries\MappingQuery;
+use App\Queries\HouseholdPurokQuery;
 use App\Jobs\RefreshWeatherSnapshot;
 use App\Jobs\DeliverDisasterBroadcast;
 use Illuminate\Http\Request;
@@ -116,6 +117,89 @@ class AuthenticatedWorkspaceContractTest extends TestCase
             ]]);
     }
 
+    public function test_profile_workspace_keeps_authenticated_json_shape(): void
+    {
+        Schema::create('roles', function (Blueprint $table): void {
+            $table->integer('role_id')->primary();
+            $table->string('role_key');
+            $table->string('role_name');
+        });
+        Schema::create('personal_access_tokens', function (Blueprint $table): void {
+            $table->id();
+            $table->string('tokenable_type');
+            $table->string('tokenable_id');
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
+
+        $this->getJson('/api/v1/profile')
+            ->assertOk()
+            ->assertJsonPath('data.user.user_id', 'ADMIN-TEST')
+            ->assertJsonStructure(['data' => ['user', 'summary', 'identity', 'permissions',
+                'activity', 'barangay_profile']]);
+    }
+
+    public function test_profile_update_rolls_back_when_audit_write_fails(): void
+    {
+        Schema::table('users', function (Blueprint $table): void {
+            $table->string('first_name')->nullable();
+            $table->string('last_name')->nullable();
+            $table->string('name')->nullable();
+            $table->string('email')->nullable();
+            $table->string('contact_number')->nullable();
+            $table->string('assigned_center_id')->nullable();
+        });
+        Schema::create('audit_logs', function (Blueprint $table): void {
+            $table->increments('audit_log_id');
+            $table->string('user_id')->nullable();
+            $table->string('role_key')->nullable();
+            $table->string('module');
+            $table->string('action');
+            $table->string('reference_table');
+            $table->string('reference_id');
+            $table->text('old_values')->nullable();
+            $table->text('new_values')->nullable();
+            $table->string('ip_address')->nullable();
+            $table->string('user_agent')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
+        DB::statement("CREATE TRIGGER fail_profile_audit BEFORE INSERT ON audit_logs BEGIN SELECT RAISE(FAIL, 'audit unavailable'); END");
+
+        $this->patchJson('/api/v1/profile', ['first_name' => 'Changed', 'last_name' => 'Name'])
+            ->assertStatus(500);
+
+        $this->assertNull(DB::table('users')->where('user_id', 'ADMIN-TEST')->value('first_name'));
+        $this->assertSame(0, DB::table('audit_logs')->count());
+    }
+
+    public function test_purok_filters_follow_active_household_addresses_and_catalog_fallback(): void
+    {
+        Schema::create('addresses', function (Blueprint $table): void {
+            $table->integer('address_id')->primary();
+            $table->integer('purok_id')->nullable();
+            $table->string('purok_sitio')->nullable();
+        });
+        Schema::create('puroks', function (Blueprint $table): void {
+            $table->integer('purok_id')->primary();
+            $table->string('purok_name');
+        });
+        DB::table('puroks')->insert([
+            ['purok_id' => 1, 'purok_name' => 'Catalog One'],
+            ['purok_id' => 2, 'purok_name' => 'Catalog Two'],
+            ['purok_id' => 3, 'purok_name' => 'Unused Purok'],
+        ]);
+        DB::table('addresses')->insert([
+            ['address_id' => 1, 'purok_id' => 1, 'purok_sitio' => 'Address Label'],
+            ['address_id' => 2, 'purok_id' => 2, 'purok_sitio' => ''],
+        ]);
+        DB::table('households')->where('household_id', 'HH-1')->update(['address_id' => 1]);
+        DB::table('households')->insert(['household_id' => 'HH-2', 'address_id' => 2]);
+        DB::table('households')->insert(['household_id' => 'HH-DELETED', 'address_id' => 2, 'deleted_at' => now()]);
+
+        $this->assertSame(['Address Label', 'Catalog Two'], app(HouseholdPurokQuery::class)->names());
+        $this->assertSame(['Address Label', 'Catalog Two'], app(MappingQuery::class)->getPuroks());
+    }
+
     public function test_archive_disaster_events_keeps_paginated_json_contract(): void
     {
         Schema::create('weather_logs', function (Blueprint $table): void {
@@ -147,6 +231,10 @@ class AuthenticatedWorkspaceContractTest extends TestCase
 
     public function test_weather_refresh_is_queued_and_keeps_a_readable_response(): void
     {
+        $this->getJson('/api/v1/weather')->assertOk()
+            ->assertJsonStructure(['data' => ['active_event', 'latest_snapshot', 'logs', 'location']]);
+        $this->getJson('/api/v1/disaster-events/EV-MISSING/weather-logs')
+            ->assertNotFound()->assertExactJson(['message' => 'Disaster event record was not found.']);
         Queue::fake();
         $this->postJson('/api/v1/weather/refresh')
             ->assertStatus(202)
