@@ -47,6 +47,11 @@ class HouseholdMobileService
         return $this->statusWorkflow->storeMemberStatus($request, $memberId);
     }
 
+    public function storeTrustedMemberStatus(Request $request, string $connectionId, string $memberId): JsonResponse
+    {
+        return $this->trustedWorkflow->storeTrustedMemberStatus($request, $connectionId, $memberId);
+    }
+
     public function storeStatus(Request $request): JsonResponse
     {
         return $this->statusWorkflow->storeStatus($request);
@@ -67,6 +72,16 @@ class HouseholdMobileService
         return $this->trustedWorkflow->trustedHouseholds($request);
     }
 
+    public function saveTrustedPin(Request $request): JsonResponse
+    {
+        return $this->trustedWorkflow->saveTrustedPin($request);
+    }
+
+    public function verifyTrustedPin(Request $request): JsonResponse
+    {
+        return $this->trustedWorkflow->verifyTrustedPin($request);
+    }
+
     public function lookupTrustedHousehold(Request $request, string $householdId): JsonResponse
     {
         return $this->trustedWorkflow->lookupTrustedHousehold($request, $householdId);
@@ -75,6 +90,11 @@ class HouseholdMobileService
     public function storeTrustedHousehold(Request $request): JsonResponse
     {
         return $this->trustedWorkflow->storeTrustedHousehold($request);
+    }
+
+    public function respondToTrustedHousehold(Request $request, string $connectionId): JsonResponse
+    {
+        return $this->trustedWorkflow->respondToTrustedHousehold($request, $connectionId);
     }
 
 }

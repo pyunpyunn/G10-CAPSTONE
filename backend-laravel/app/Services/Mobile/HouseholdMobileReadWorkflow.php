@@ -55,7 +55,9 @@ class HouseholdMobileReadWorkflow
             'recent_alerts' => $this->query->recentAlerts($activeEvent['event_id'] ?? null),
             'trusted' => [
                 'is_available' => Schema::hasTable('trusted_households'),
+                'pin_configured' => $this->query->hasTrustedPin($householdId),
                 'households' => $this->query->trustedRows($householdId),
+                'incoming_requests' => $this->query->incomingTrustedRows($householdId),
             ],
             'qr' => $this->presenter->qrPayload($household, $activeEvent),
         ]]);

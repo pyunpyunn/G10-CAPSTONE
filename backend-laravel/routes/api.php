@@ -151,12 +151,16 @@ Route::prefix('v1')->group(function () {
             Route::post('/household/device-location', [HouseholdMobileController::class, 'updateDeviceLocation']);
             Route::patch('/household/members/{memberId}', [HouseholdMobileController::class, 'updateMember']);
             Route::post('/household/members/{memberId}/status', [HouseholdMobileController::class, 'storeMemberStatus']);
+            Route::post('/household/trusted-households/{connectionId}/members/{memberId}/status', [HouseholdMobileController::class, 'storeTrustedMemberStatus']);
             Route::post('/household/status', [HouseholdMobileController::class, 'storeStatus']);
             Route::get('/household/status-history', [HouseholdMobileController::class, 'statusHistory']);
             Route::get('/household/qr', [HouseholdMobileController::class, 'qr']);
             Route::get('/household/trusted-households', [HouseholdMobileController::class, 'trustedHouseholds']);
+            Route::put('/household/trusted-pin', [HouseholdMobileController::class, 'saveTrustedPin']);
+            Route::post('/household/trusted-pin/verify', [HouseholdMobileController::class, 'verifyTrustedPin']);
             Route::get('/household/trusted-households/lookup/{householdId}', [HouseholdMobileController::class, 'lookupTrustedHousehold']);
             Route::post('/household/trusted-households', [HouseholdMobileController::class, 'storeTrustedHousehold']);
+            Route::patch('/household/trusted-households/{connectionId}', [HouseholdMobileController::class, 'respondToTrustedHousehold']);
         });
 
         Route::middleware('role:super_admin,admin,rescuer')->group(function () {

@@ -153,6 +153,7 @@ class OneSignalNotificationService
         }
 
         $this->applyRoleFilter($query, $options['roles'] ?? []);
+        $this->applyUserFilter($query, $options['user_ids'] ?? []);
         $this->applyResponderFilter($query, $options['responder_ids'] ?? []);
 
         if (! $this->applyPurokFilter($query, $options['household_puroks'] ?? [])) {
@@ -191,6 +192,22 @@ class OneSignalNotificationService
             ->all();
 
         $query->whereIn('dt.app_role', $normalized);
+    }
+
+    private function applyUserFilter($query, array $userIds): void
+    {
+        $userIds = collect($userIds)
+            ->map(fn (mixed $id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($userIds) || ! Schema::hasColumn('device_tokens', 'user_id')) {
+            return;
+        }
+
+        $query->whereIn('dt.user_id', $userIds);
     }
 
     private function applyResponderFilter($query, array $responderIds): void

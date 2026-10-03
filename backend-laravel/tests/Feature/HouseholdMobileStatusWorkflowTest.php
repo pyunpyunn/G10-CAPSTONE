@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\Mobile\HouseholdMobileStatusWorkflow;
+use App\Services\Mobile\HouseholdTrustedHouseholdWorkflow;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -105,6 +106,45 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
         $this->assertSame(404, $response->getStatusCode());
         $this->assertSame(['message' => 'Household member was not found.'], $response->getData(true));
         $this->assertDatabaseCount('household_status_logs', 0);
+    }
+
+    public function test_trusted_member_status_is_written_to_the_linked_household(): void
+    {
+        Schema::create('household_members', function (Blueprint $table): void {
+            $table->string('member_id')->primary();
+            $table->string('household_id');
+            $table->string('name');
+        });
+        Schema::create('trusted_households', function (Blueprint $table): void {
+            $table->string('connection_id')->primary();
+            $table->string('requesting_household_id');
+            $table->string('trusted_household_id');
+            $table->string('validation_status');
+        });
+        DB::table('household_members')->insert([
+            'member_id' => 'MEMBER-2',
+            'household_id' => 'HH-2',
+            'name' => 'Trusted Member',
+        ]);
+        DB::table('trusted_households')->insert([
+            'connection_id' => 'TH-2',
+            'requesting_household_id' => 'HH-1',
+            'trusted_household_id' => 'HH-2',
+            'validation_status' => 'validated',
+        ]);
+
+        $response = app(HouseholdTrustedHouseholdWorkflow::class)->storeTrustedMemberStatus(
+            $this->householdRequest(['status_key' => 'safe']),
+            'TH-2',
+            'MEMBER-2'
+        );
+
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertDatabaseHas('household_status_logs', [
+            'household_id' => 'HH-2',
+            'submitted_by_user_id' => 'USR-1',
+            'source' => 'household_member_mobile',
+        ]);
     }
 
     private function householdRequest(array $input): Request

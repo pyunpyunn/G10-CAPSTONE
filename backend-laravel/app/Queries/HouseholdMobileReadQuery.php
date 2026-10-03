@@ -640,6 +640,45 @@ class HouseholdMobileReadQuery
             ->all();
     }
 
+    public function incomingTrustedRows(string $householdId): array
+    {
+        if (! Schema::hasTable('trusted_households')) {
+            return [];
+        }
+
+        return DB::table('trusted_households as th')
+            ->leftJoin('households as h', 'h.household_id', '=', 'th.requesting_household_id')
+            ->where('th.trusted_household_id', $householdId)
+            ->where('th.validation_status', 'pending')
+            ->orderByDesc('th.created_at')
+            ->get([
+                'th.connection_id',
+                'th.requesting_household_id',
+                'th.reason',
+                'th.member_relationships',
+                'th.created_at',
+                'h.household_name',
+                'h.household_code',
+            ])
+            ->map(fn (object $row): array => [
+                'connection_id' => $row->connection_id,
+                'requesting_household_id' => $row->requesting_household_id,
+                'family_name' => $this->presenter->familyName($row->household_name ?? $row->household_code ?? $row->requesting_household_id),
+                'reason' => $row->reason,
+                'member_relationships' => $this->decodeJson($row->member_relationships),
+                'created_at' => $row->created_at,
+                'created_label' => $this->presenter->dateLabel($row->created_at),
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function hasTrustedPin(string $householdId): bool
+    {
+        return Schema::hasTable('household_trusted_pins')
+            && DB::table('household_trusted_pins')->where('household_id', $householdId)->exists();
+    }
+
     public function statusOptions(): array
     {
         return collect([
