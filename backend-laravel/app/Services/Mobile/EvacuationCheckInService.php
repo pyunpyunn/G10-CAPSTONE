@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Mobile;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Support\RequestSchema as Schema;
 use Illuminate\Validation\ValidationException;
 
 class EvacuationCheckInService
@@ -46,9 +46,8 @@ class EvacuationCheckInService
         $now = now();
         $userId = $request->user()?->user_id;
         $statusId = $this->resolveStatusId('evacuated');
-        $evacuationId = $this->nextId('evacuation_records', 'evacuation_id');
-
-        DB::transaction(function () use ($validated, $eventId, $now, $userId, $statusId, $evacuationId): void {
+        $evacuationId = DB::transaction(function () use ($validated, $eventId, $now, $userId, $statusId): string {
+            $evacuationId = app(\App\Services\Shared\OperationalSequence::class)->nextEvacuationId();
             DB::table('evacuation_records')->insert($this->filterColumns('evacuation_records', [
                 'evacuation_id' => $evacuationId,
                 'event_id' => $eventId,
@@ -96,7 +95,9 @@ class EvacuationCheckInService
                     ->where('disaster_id', $eventId)
                     ->update($this->filterColumns('household_disasters', $update));
             }
-        });
+
+            return $evacuationId;
+        }, 3);
 
         return response()->json([
             'message' => 'Household evacuation verified and recorded.',
@@ -176,19 +177,7 @@ class EvacuationCheckInService
 
     private function nextId(string $table, string $column): string
     {
-        $latest = DB::table($table)->orderByDesc($column)->value($column);
-
-        if (! $latest) {
-            return '1';
-        }
-
-        if (preg_match('/(\d+)$/', (string) $latest, $matches)) {
-            $prefix = substr((string) $latest, 0, -strlen($matches[1]));
-
-            return $prefix . ((int) $matches[1] + 1);
-        }
-
-        return (string) $latest . '-1';
+        return (string) app(\App\Services\Shared\OperationalSequence::class)->nextNumericId($table, $column);
     }
 
     private function filterColumns(string $table, array $data): array
@@ -198,3 +187,10 @@ class EvacuationCheckInService
             ->all();
     }
 }
+
+
+
+
+
+
+
