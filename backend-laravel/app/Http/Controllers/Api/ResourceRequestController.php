@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ListRequest;
-use App\Services\ResourceRequestService;
+use App\Services\Web\ResourceRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -62,3 +62,6 @@ class ResourceRequestController extends Controller
         return $this->service->complete($request, $requestId);
     }
 }
+
+
+

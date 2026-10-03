@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Services\Web;
+
+use App\Models\AuditLog;
+use App\Models\ResourceRequest;
+use App\Queries\ResourceRequestQuery;
+use App\Presenters\ResourceRequestPresenter;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use App\Support\RequestSchema as Schema;
+
+class ResourceRequestWriteWorkflow
+{
+    public function __construct(private \App\Services\Shared\TrackingAidForwardingService $trackingAid, private ResourceRequestQuery $query, private ResourceRequestPresenter $presenter) {}
+
+    public function create(Request $request,array $v,?object $event):array
+    {
+        return DB::transaction(function()use($request,$v,$event):array{$now=now();$id=$this->query->nextRequestId();ResourceRequest::create(['request_id'=>$id,'request_source'=>$v['request_source'],'source_reference'=>$v['source_reference']??$event?->event_id,'request_category'=>$v['request_category'],'evacuation_center_id'=>$v['evacuation_center_id']??null,'requested_by'=>$v['requested_by'],'handled_by'=>$request->user()?->user_id,'resource_type'=>$v['resource_type'],'item_name'=>$v['item_name']??null,'quantity'=>(int)$v['quantity'],'unit'=>$v['unit']??'units','description'=>$v['description']??null,'urgency_id'=>(int)($v['urgency_id']??$this->query->urgencyId('medium')),'status_id'=>$this->query->statusId('needs_validation'),'validation_status'=>'needs_validation','validation_notes'=>null,'validated_by_user_id'=>null,'validated_at'=>null,'released_for_tracking_at'=>null,'tracking_reference'=>null,'created_at'=>$now,'updated_at'=>$now]);$result=$this->format($this->query->find($id),true);$this->audit($request,'create',$id,null,$result);return$result;});
+    }
+    public function update(Request $request,ResourceRequest $row,string $id,array $v):array{return DB::transaction(function()use($request,$row,$id,$v):array{$old=$this->format($this->query->find($id),true);$row->fill(['request_source'=>$v['request_source'],'source_reference'=>$v['source_reference']??null,'request_category'=>$v['request_category'],'evacuation_center_id'=>$v['evacuation_center_id']??null,'requested_by'=>$v['requested_by'],'resource_type'=>$v['resource_type'],'item_name'=>$v['item_name']??null,'quantity'=>(int)$v['quantity'],'unit'=>$v['unit']??'units','description'=>$v['description']??null,'urgency_id'=>(int)($v['urgency_id']??$row->urgency_id),'updated_at'=>now()]);$row->save();$updated=$this->format($this->query->find($id),true);$this->audit($request,'update',$id,$old,$updated);return$updated;}, 3);}
+    public function validate(Request $request,string $id,object $row,array $v):array{return DB::transaction(function()use($request,$id,$row,$v):array{$now=now();$status=$this->presenter->statusKey($v['validation_status']);$old=$this->format($row,true);ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>$status,'validation_notes'=>$v['validation_notes']??null,'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId($status),'updated_at'=>$now]);$this->trackingAid->syncRequestStatus($id,$status,$now);$this->query->insertValidation($id,$status,$request->user()?->user_id,$v['validation_notes']??null,$v['missing_information']??null,$v['duplicate_request_id']??null,$now);$result=$this->format($this->query->find($id),true);$this->audit($request,'validate',$id,$old,$result);return$result;}, 3);}
+    public function returnRequest(Request $request,string $id,object $row,array $v):array{return DB::transaction(function()use($request,$id,$row,$v):array{$now=now();$old=$this->format($row,true);ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>'returned','validation_notes'=>$v['validation_notes'],'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId('returned'),'updated_at'=>$now]);$this->trackingAid->syncRequestStatus($id,'returned',$now);$this->query->insertValidation($id,'returned',$request->user()?->user_id,$v['validation_notes'],$v['missing_information']??null,$v['duplicate_request_id']??null,$now);$result=$this->format($this->query->find($id),true);$this->audit($request,'return',$id,$old,$result);return$result;}, 3);}
+    public function complete(Request $request,string $id,object $row,array $v):array{return DB::transaction(function()use($request,$id,$row,$v):array{$now=now();$old=$this->format($row,true);ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>'fulfilled','validation_notes'=>$v['validation_notes']??$row->validation_notes,'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId('fulfilled'),'updated_at'=>$now]);$this->trackingAid->syncRequestStatus($id,'fulfilled',$now);$this->query->insertValidation($id,'fulfilled',$request->user()?->user_id,$v['validation_notes']??'Request marked completed by HQ.',null,null,$now);$result=$this->format($this->query->find($id),true);$this->audit($request,'complete',$id,$old,$result);return$result;}, 3);}
+    public function forward(Request $request,string $id,object $row,array $v):array{return DB::transaction(function()use($request,$id,$row,$v):array{$now=now();$old=$this->format($row,true);$given=trim((string)($v['tracking_reference']??''));$ref=$given!==''?$given:($row->tracking_reference?:$this->query->nextTrackingReference());$notes=$v['validation_notes']??$row->validation_notes??'Verified request forwarded to TrackingAid.';$this->trackingAid->forwardRequest($row,$ref,$request->user(),$notes);ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>'forwarded','validation_notes'=>$notes,'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$row->validated_at?:$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId('forwarded'),'released_for_tracking_at'=>$row->released_for_tracking_at?:$now,'tracking_reference'=>$ref,'updated_at'=>$now]);$this->query->insertValidation($id,'forwarded',$request->user()?->user_id,$notes,null,null,$now);$result=$this->format($this->query->find($id),true);$this->audit($request,'forward',$id,$old,$result);return$result;}, 3);}
+    public function auditExternal(Request $request,string $action,string $id,mixed $result):void{$this->audit($request,$action,$id,null,$result);}
+    private function format(?object $row,bool $details=false):?array{$history=$details&&$row?$this->query->validationHistory($row->request_id):[];return$this->presenter->format($row,$details,$history);}
+    private function audit(Request $r,string $action,string $id,mixed $old,mixed $new):void{if(!Schema::hasTable('audit_logs'))return;AuditLog::query()->create(['user_id'=>$r->user()?->user_id,'role_key'=>$r->user()?->role?->role_key,'module'=>'resources_requests','action'=>$action,'reference_table'=>'resource_requests','reference_id'=>$id,'old_values'=>$old?json_encode($old,JSON_UNESCAPED_SLASHES):null,'new_values'=>$new?json_encode($new,JSON_UNESCAPED_SLASHES):null,'ip_address'=>$r->ip(),'user_agent'=>substr((string)$r->userAgent(),0,255),'created_at'=>now()]);}
+}
+
+
+
+
+
+
+
