@@ -281,7 +281,6 @@ export function HouseholdTrustedScreen({
         <TrustedHouseholdList
           overview={overview}
           trusted={overview.trusted?.households || []}
-          activeEvent={activeEvent}
           onAddTrusted={onAddTrusted}
           onOpenTrusted={onOpenTrusted}
         />
@@ -293,13 +292,11 @@ export function HouseholdTrustedScreen({
 function TrustedHouseholdList({
   overview,
   trusted,
-  activeEvent,
   onAddTrusted,
   onOpenTrusted,
 }: {
   overview: any;
   trusted: any[];
-  activeEvent: any;
   onAddTrusted: () => void;
   onOpenTrusted: (household: any) => void;
 }) {
@@ -359,23 +356,46 @@ function TrustedHouseholdList({
           </View>
           <View style={styles.trustedText}>
             <Text style={styles.rowTitle}>{trustedHouseholdName(householdItem)}</Text>
-            <Text style={styles.rowMeta}>
+            <Text style={[styles.rowMeta, styles.trustedMeta]}>
               {householdItem.household_id} · {householdItem.reason || 'Trusted household request'}
             </Text>
-            {activeEvent && householdItem.current_status ? (
-              <Text style={styles.trustedStatusText}>
-                {householdItem.current_status.status_label} · {householdItem.current_status.last_saved_label}
-              </Text>
-            ) : null}
           </View>
-          <HouseholdBadge
-            label={householdItem.current_status?.status_label || 'Unchecked'}
-            tone={householdItem.current_status?.status_key || 'neutral'}
-          />
+          <View style={styles.trustedStatusSlot}>
+            <HouseholdBadge
+              label={householdItem.current_status?.status_label || 'Unchecked'}
+              tone={householdItem.current_status?.status_key || 'neutral'}
+            />
+            <MemberStatusDots members={householdItem.members || []} />
+          </View>
         </Pressable>
       ))}
       {addButton}
     </>
+  );
+}
+
+function MemberStatusDots({ members }: { members: any[] }) {
+  if (members.length === 0) {
+    return null;
+  }
+
+  return (
+    <View
+      style={styles.memberStatusDots}
+      accessibilityLabel={`${members.length} trusted household members with their current statuses`}
+    >
+      {members.map((member: any, index: number) => {
+        const status = member.current_status?.status_key || 'neutral';
+
+        return (
+          <View
+            key={member.member_id || index}
+            style={[styles.memberStatusDot, { backgroundColor: statusColor(status) }]}
+            accessibilityLabel={`${member.name || 'Household member'}: ${member.current_status?.status_label || 'Unchecked'}`}
+          />
+        );
+      })}
+    </View>
   );
 }
 
@@ -953,11 +973,26 @@ const styles = StyleSheet.create({
   },
   trustedText: {
     flex: 1,
+    paddingTop: spacing.xs,
   },
-  trustedStatusText: {
-    marginTop: 5,
-    color: palette.navActive,
-    fontSize: 12,
-    fontWeight: '900',
+  trustedMeta: {
+    fontSize: 9,
+  },
+  trustedStatusSlot: {
+    alignSelf: 'center',
+    alignItems: 'flex-end',
+    gap: 5,
+  },
+  memberStatusDots: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 3,
+    maxWidth: 112,
+  },
+  memberStatusDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 4,
   },
 });
