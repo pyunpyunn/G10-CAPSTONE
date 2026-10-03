@@ -295,7 +295,7 @@ class HouseholdMobileService
 
         $connection = DB::table('trusted_households')
             ->where('connection_id', $connectionId)
-            ->whereIn('validation_status', ['validated', 'approved'])
+            ->whereNotIn('validation_status', ['rejected', 'declined'])
             ->where(function ($query) use ($reportingHouseholdId): void {
                 $query->where('requesting_household_id', $reportingHouseholdId)
                     ->orWhere('trusted_household_id', $reportingHouseholdId);
@@ -780,12 +780,12 @@ class HouseholdMobileService
         $existing = DB::table('trusted_households')
             ->where('requesting_household_id', $householdId)
             ->where('trusted_household_id', $trustedHouseholdId)
-            ->whereIn('validation_status', ['pending', 'validated'])
+            ->whereNotIn('validation_status', ['rejected', 'declined'])
             ->first();
 
         if ($existing) {
             return response()->json([
-                'message' => 'Trusted household request already exists.',
+                'message' => 'Trusted household already exists.',
                 'data' => [
                     'connection_id' => $existing->connection_id,
                     'validation_status' => $existing->validation_status,
@@ -801,22 +801,22 @@ class HouseholdMobileService
             'requesting_household_id' => $householdId,
             'trusted_household_id' => $trustedHouseholdId,
             'reason' => $validated['reason'],
-            'validation_status' => 'pending',
+            'validation_status' => 'active',
             'member_relationships' => json_encode($validated['member_relationships'] ?? [], JSON_UNESCAPED_SLASHES),
             'created_by_user_id' => $user?->user_id,
             'created_at' => $now,
             'updated_at' => $now,
         ]));
 
-        $this->writeAuditLog($request, 'mobile_trusted_household_request', 'trusted_households', $connectionId, array_merge($validated, [
+        $this->writeAuditLog($request, 'mobile_trusted_household_added', 'trusted_households', $connectionId, array_merge($validated, [
             'resolved_trusted_household_id' => $trustedHouseholdId,
         ]));
 
         return response()->json([
-            'message' => 'Trusted household request submitted for validation.',
+            'message' => 'Trusted household added.',
             'data' => [
                 'connection_id' => $connectionId,
-                'validation_status' => 'pending',
+                'validation_status' => 'active',
             ],
         ], 201);
     }
@@ -1652,10 +1652,7 @@ class HouseholdMobileService
             ->whereNotIn('th.validation_status', ['rejected', 'declined'])
             ->where(function ($query) use ($householdId): void {
                 $query->where('th.requesting_household_id', $householdId)
-                    ->orWhere(function ($query) use ($householdId): void {
-                        $query->where('th.trusted_household_id', $householdId)
-                            ->whereIn('th.validation_status', ['validated', 'approved']);
-                    });
+                    ->orWhere('th.trusted_household_id', $householdId);
             })
             ->orderByDesc('th.created_at')
             ->get([
@@ -1679,8 +1676,7 @@ class HouseholdMobileService
                 $trustedHouseholdName = $isRequestingHousehold
                     ? ($row->trusted_household_name ?? $row->trusted_household_code ?? $row->trusted_household_id)
                     : ($row->requesting_household_name ?? $row->requesting_household_code ?? $row->requesting_household_id);
-                $isValidated = in_array(strtolower((string) ($row->validation_status ?? 'pending')), ['validated', 'approved'], true);
-                $devices = $isValidated ? $this->devices($trustedHouseholdId) : collect();
+                $devices = $this->devices($trustedHouseholdId);
 
                 return [
                     'connection_id' => $row->connection_id,
@@ -1688,10 +1684,9 @@ class HouseholdMobileService
                     'household_name' => $trustedHouseholdName,
                     'family_name' => $this->familyName($trustedHouseholdName),
                     'reason' => $row->reason,
-                    'validation_status' => $row->validation_status ?? 'pending',
                     'member_relationships' => $this->decodeJson($row->member_relationships),
-                    'current_status' => $isValidated ? $this->currentStatus($trustedHouseholdId, $activeEvent['event_id'] ?? null) : null,
-                    'members' => $isValidated ? $this->members($trustedHouseholdId, $devices, null, $activeEvent['event_id'] ?? null)->values() : [],
+                    'current_status' => $this->currentStatus($trustedHouseholdId, $activeEvent['event_id'] ?? null),
+                    'members' => $this->members($trustedHouseholdId, $devices, null, $activeEvent['event_id'] ?? null)->values(),
                     'devices' => $devices->values(),
                     'created_at' => $row->created_at,
                 ];
