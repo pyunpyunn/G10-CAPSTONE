@@ -48,7 +48,7 @@ export default function ResourceRequestEditorPage() {
         if (!requestId) {
           const workspace = await workspacePromise
           if (!ignore) {
-            setPayload({ options: workspace.options || {} })
+            setPayload({ options: workspace.options || {}, area_label: workspace.area_label })
             setForm(emptyResourceRequestForm(workspace || {}))
           }
           return
@@ -67,7 +67,7 @@ export default function ResourceRequestEditorPage() {
         }
 
         if (!ignore) {
-          setPayload({ ...data, options: workspace.options || {} })
+          setPayload({ ...data, options: workspace.options || {}, area_label: workspace.area_label })
           setForm(nextForm)
         }
       } catch (loadError) {
@@ -172,7 +172,7 @@ export default function ResourceRequestEditorPage() {
     <section className="page active resources-page resource-request-editor">
       <PageHeader
         title={editorTitle(mode)}
-        subtitle="Barangay Mambaling, Cebu City"
+        subtitle={payload?.area_label || 'Shared database records'}
         actions={<button className="button secondary" type="button" onClick={closePage}><ArrowLeft size={15} />Back to requests</button>}
       />
 
