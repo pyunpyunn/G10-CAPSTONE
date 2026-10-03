@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\ProfileService;
+use App\Services\Web\ProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -36,3 +36,5 @@ class ProfileController extends Controller
         return $this->service->updateBarangay($request);
     }
 }
+
+
