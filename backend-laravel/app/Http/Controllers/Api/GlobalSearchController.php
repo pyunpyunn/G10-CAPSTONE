@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\GlobalSearchService;
+use App\Services\Web\GlobalSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -29,3 +29,5 @@ class GlobalSearchController extends Controller
         ]);
     }
 }
+
+

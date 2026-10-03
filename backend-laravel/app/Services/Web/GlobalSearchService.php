@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Web;
 
 use App\Models\DisasterBroadcast;
 use App\Models\DisasterEvent;
@@ -10,7 +10,7 @@ use App\Models\ResponderAssignment;
 use App\Models\ResourceRequest;
 use App\Models\SituationReport;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Schema;
+use App\Support\RequestSchema as Schema;
 
 class GlobalSearchService
 {
@@ -225,3 +225,9 @@ class GlobalSearchService
         return compact('type', 'title', 'subtitle', 'href');
     }
 }
+
+
+
+
+
+
