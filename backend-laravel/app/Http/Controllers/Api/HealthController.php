@@ -20,7 +20,7 @@ class HealthController extends Controller
     public function ready(Request $request): JsonResponse
     {
         $requestId = (string) Str::uuid();
-        $connection = 'resq_local';
+        $connection = (string) config('database.default');
 
         try {
             DB::connection($connection)->select('SELECT 1');
@@ -43,3 +43,5 @@ class HealthController extends Controller
         }
     }
 }
+
+

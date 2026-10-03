@@ -48,3 +48,5 @@ class ListRequest extends FormRequest
         return min(100, max(1, (int) ($perPage ?? $default)));
     }
 }
+
+

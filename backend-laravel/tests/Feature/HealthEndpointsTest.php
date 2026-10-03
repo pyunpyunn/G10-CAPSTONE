@@ -14,8 +14,28 @@ class HealthEndpointsTest extends TestCase
             ->assertExactJson(['status' => 'live']);
     }
 
+    public function test_health_routes_are_public_and_preserve_their_success_contracts(): void
+    {
+        config(['database.default' => 'resq_local']);
+        config(['database.connections.resq_local' => array_merge(
+            config('database.connections.sqlite'),
+            ['database' => ':memory:'],
+        )]);
+        DB::purge('resq_local');
+
+        $this->getJson('/api/v1/health/live')
+            ->assertOk()
+            ->assertExactJson(['status' => 'live']);
+
+        $this->getJson('/api/v1/health/ready')
+            ->assertOk()
+            ->assertExactJson(['status' => 'ready'])
+            ->assertHeader('X-Request-ID');
+    }
+
     public function test_readiness_checks_only_the_operational_database_connection(): void
     {
+        config(['database.default' => 'resq_local']);
         config(['database.connections.resq_local' => array_merge(
             config('database.connections.sqlite'),
             ['database' => ':memory:'],
@@ -30,6 +50,7 @@ class HealthEndpointsTest extends TestCase
 
     public function test_readiness_returns_safe_503_when_local_database_connection_fails(): void
     {
+        config(['database.default' => 'resq_local']);
         config(['database.connections.resq_local' => array_merge(
             config('database.connections.mysql'),
             [
@@ -67,3 +88,5 @@ class HealthEndpointsTest extends TestCase
             ->assertHeader('X-Request-ID');
     }
 }
+
+
