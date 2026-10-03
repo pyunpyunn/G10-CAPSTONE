@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ListRequest;
-use App\Services\RescueDispatchService;
+use App\Services\Web\RescueDispatchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -52,3 +52,6 @@ class RescueDispatchController extends Controller
         return $this->service->updateLocation($request, $assignmentId);
     }
 }
+
+
+
