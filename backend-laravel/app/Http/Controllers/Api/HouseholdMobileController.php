@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\HouseholdMobileService;
+use App\Services\Mobile\HouseholdMobileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -71,3 +71,6 @@ class HouseholdMobileController extends Controller
         return $this->service->storeTrustedHousehold($request);
     }
 }
+
+
+

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ListRequest;
-use App\Services\HouseholdStatusService;
+use App\Services\Mobile\HouseholdStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -42,3 +42,6 @@ class HouseholdStatusController extends Controller
         return $this->service->confirmStatus($request, $householdId);
     }
 }
+
+
+

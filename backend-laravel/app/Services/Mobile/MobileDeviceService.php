@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Mobile;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Support\RequestSchema as Schema;
 use Illuminate\Validation\Rule;
 
 class MobileDeviceService
@@ -109,10 +109,12 @@ class MobileDeviceService
                 return;
             }
 
-            DB::table('device_tokens')->insert($this->filterColumns('device_tokens', array_merge($data, [
-                'id' => $this->nextId('device_tokens', 'id'),
-                'created_at' => $now,
-            ])));
+            DB::table('device_tokens')->insert($this->withGeneratedKey(
+                'device_tokens',
+                'id',
+                array_merge($data, ['created_at' => $now]),
+                $this->nextId('device_tokens', 'id')
+            ));
         });
 
         return response()->json([
@@ -236,7 +238,7 @@ class MobileDeviceService
 
     private function nextId(string $table, string $column): int
     {
-        return ((int) DB::table($table)->max($column)) + 1;
+        return app(\App\Services\Shared\OperationalSequence::class)->nextNumericId($table, $column);
     }
 
     private function filterColumns(string $table, array $data): array
@@ -247,4 +249,19 @@ class MobileDeviceService
             ->filter(fn ($value, string $key): bool => in_array($key, $columns, true))
             ->all();
     }
+
+    private function withGeneratedKey(string $table, string $column, array $data, int $generatedId): array
+    {
+        $filtered = $this->filterColumns($table, $data);
+        $filtered[$column] = $generatedId;
+
+        return $filtered;
+    }
 }
+
+
+
+
+
+
+
