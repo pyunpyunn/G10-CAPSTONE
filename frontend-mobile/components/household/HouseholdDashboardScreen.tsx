@@ -23,6 +23,7 @@ type TrustedScreenProps = {
   overview: any;
   viewingTrusted: any;
   onAddTrusted: () => void;
+  onChangeTrustedPin: () => void;
   onOpenTrusted: (household: any) => void;
   onBackFamily: () => void;
   onRespondToIncomingRequest: (requestItem: any, decision: 'accept' | 'reject') => void;
@@ -194,6 +195,7 @@ export function HouseholdTrustedScreen({
   overview,
   viewingTrusted,
   onAddTrusted,
+  onChangeTrustedPin,
   onOpenTrusted,
   onBackFamily,
   onRespondToIncomingRequest,
@@ -283,7 +285,19 @@ export function HouseholdTrustedScreen({
       ) : null}
 
       <View style={styles.card}>
-        <HouseholdSection title="Trusted households" />
+        <HouseholdSection
+          title="Trusted households"
+          action={
+            <Pressable
+              style={styles.trustedPinButton}
+              onPress={onChangeTrustedPin}
+              accessibilityRole="button"
+              accessibilityLabel="Change household PIN"
+            >
+              <Ionicons name="lock-closed" size={15} color={palette.navActive} />
+            </Pressable>
+          }
+        />
         <TrustedHouseholdList
           overview={overview}
           trusted={overview.trusted?.households || []}
@@ -1021,6 +1035,16 @@ const styles = StyleSheet.create({
   trustedAddSlot: {
     width: '100%',
     marginTop: 2,
+  },
+  trustedPinButton: {
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: palette.navActive,
+    borderRadius: 13,
+    backgroundColor: palette.card,
   },
   trustedAddButton: {
     minHeight: 56,

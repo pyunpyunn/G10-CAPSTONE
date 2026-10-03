@@ -25,8 +25,10 @@ import {
   saveHouseholdMemberStatus,
   saveTrustedHouseholdMemberStatus,
   saveHouseholdStatus,
+  saveTrustedPin,
   updateHouseholdDeviceLocation,
   updateHouseholdMember,
+  verifyTrustedPin,
 } from '@/api/household';
 import type { HouseholdOverview } from '@/api/household';
 import { HouseholdDashboardScreen, HouseholdTrustedScreen } from '@/components/household/HouseholdDashboardScreen';
@@ -45,7 +47,6 @@ import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
 
 const deviceUuidKey = 'resq_household_device_uuid';
-const trustedPinKey = 'resq_household_trusted_pin';
 type TabKey = 'home' | 'route' | 'trusted' | 'profile';
 type TabButtonKey = TabKey | 'qr';
 
@@ -71,10 +72,11 @@ export default function HouseholdHomeScreen() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showQr, setShowQr] = useState(false);
-  const [trustedPin, setTrustedPin] = useState('');
+  const [trustedPinConfigured, setTrustedPinConfigured] = useState(false);
   const [pinError, setPinError] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
   const [showPin, setShowPin] = useState(false);
-  const [pinAction, setPinAction] = useState<'open' | 'add'>('open');
+  const [pinAction, setPinAction] = useState<'open' | 'add' | 'change'>('open');
   const [selectedTrusted, setSelectedTrusted] = useState<any>(null);
   const [viewingTrusted, setViewingTrusted] = useState<any>(null);
   const [showAddTrusted, setShowAddTrusted] = useState(false);
@@ -84,8 +86,6 @@ export default function HouseholdHomeScreen() {
 
   const loadLocalKeys = useCallback(async () => {
     const existingDeviceUuid = await getStoredItem(deviceUuidKey);
-    const existingPin = await getStoredItem(trustedPinKey);
-
     if (existingDeviceUuid) {
       setDeviceUuid(existingDeviceUuid);
     } else {
@@ -94,7 +94,6 @@ export default function HouseholdHomeScreen() {
       setDeviceUuid(nextUuid);
     }
 
-    setTrustedPin(existingPin || '');
   }, []);
 
   const loadOverview = useCallback(async (isRefresh = false) => {
@@ -107,7 +106,8 @@ export default function HouseholdHomeScreen() {
     try {
       const data = await getHouseholdOverview();
       setOverview(data);
-      setViewingTrusted((current) =>
+      setTrustedPinConfigured(Boolean(data.trusted?.pin_configured));
+      setViewingTrusted((current: any) =>
         current
           ? data.trusted?.households?.find((household: any) => household.connection_id === current.connection_id) || null
           : null
@@ -395,47 +395,44 @@ export default function HouseholdHomeScreen() {
   function openAddTrusted() {
     setPinAction('add');
     setPinError('');
-
-    if (trustedPin) {
-      setShowAddTrusted(true);
-      return;
-    }
-
     setShowPin(true);
   }
 
-  async function handlePinConfirm(pin: string) {
-    if (pin.length !== 4) {
-      setPinError('Enter a 4-digit PIN.');
-      return;
-    }
+  function openChangeTrustedPin() {
+    setPinAction('change');
+    setPinError('');
+    setShowPin(true);
+  }
 
-    if (!trustedPin) {
-      await setStoredItem(trustedPinKey, pin);
-      setTrustedPin(pin);
+  async function handlePinConfirm({ pin, currentPin }: { pin: string; currentPin?: string }) {
+    setPinSaving(true);
+    setPinError('');
+
+    try {
+      if (!trustedPinConfigured || pinAction === 'change') {
+        await saveTrustedPin({
+          pin,
+          pin_confirmation: pin,
+          current_pin: pinAction === 'change' ? currentPin : undefined,
+        });
+        setTrustedPinConfigured(true);
+      } else {
+        await verifyTrustedPin(pin);
+      }
+
       setShowPin(false);
 
       if (pinAction === 'add') {
         setShowAddTrusted(true);
-      } else if (selectedTrusted) {
+      } else if (pinAction === 'open' && selectedTrusted) {
         setViewingTrusted(selectedTrusted);
+      } else if (pinAction === 'change') {
+        Alert.alert('Household PIN', 'Your household PIN was changed.');
       }
-
-      return;
-    }
-
-    if (pin !== trustedPin) {
-      setPinError('PIN did not match.');
-      return;
-    }
-
-    setShowPin(false);
-    setPinError('');
-
-    if (pinAction === 'add') {
-      setShowAddTrusted(true);
-    } else if (selectedTrusted) {
-      setViewingTrusted(selectedTrusted);
+    } catch (error: any) {
+      setPinError(errorMessage(error));
+    } finally {
+      setPinSaving(false);
     }
   }
 
@@ -537,6 +534,7 @@ export default function HouseholdHomeScreen() {
           overview={overview}
           viewingTrusted={viewingTrusted}
           onAddTrusted={openAddTrusted}
+          onChangeTrustedPin={openChangeTrustedPin}
           onOpenTrusted={openTrusted}
           onBackFamily={() => setViewingTrusted(null)}
           onRespondToIncomingRequest={handleRespondToTrustedRequest}
@@ -634,7 +632,8 @@ export default function HouseholdHomeScreen() {
       <HouseholdQrModal visible={showQr} qr={overview.qr} onClose={() => setShowQr(false)} />
       <TrustedPinModal
         visible={showPin}
-        hasPin={Boolean(trustedPin)}
+        mode={pinAction === 'change' ? 'change' : trustedPinConfigured ? 'verify' : 'set'}
+        saving={pinSaving}
         error={pinError}
         onClose={() => setShowPin(false)}
         onConfirm={handlePinConfirm}

@@ -20,6 +20,7 @@ export type HouseholdOverview = {
   evacuation_centers: any[];
   trusted: {
     is_available: boolean;
+    pin_configured: boolean;
     households: any[];
     incoming_requests: any[];
   };
@@ -64,6 +65,16 @@ export async function saveHouseholdStatus(payload: any) {
 export async function getHouseholdQr() {
   const response = await api.get('/household/qr');
   return response.data.data;
+}
+
+export async function saveTrustedPin(payload: { pin: string; pin_confirmation: string; current_pin?: string }) {
+  const response = await api.put('/household/trusted-pin', payload);
+  return response.data;
+}
+
+export async function verifyTrustedPin(pin: string) {
+  const response = await api.post('/household/trusted-pin/verify', { pin });
+  return response.data;
 }
 
 export async function lookupTrustedHousehold(householdId: string) {

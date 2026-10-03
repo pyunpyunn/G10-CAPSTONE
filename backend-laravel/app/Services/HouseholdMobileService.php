@@ -6,6 +6,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -65,6 +66,7 @@ class HouseholdMobileService
                 'recent_alerts' => $this->recentAlerts($activeEvent['event_id'] ?? null),
                 'trusted' => [
                     'is_available' => Schema::hasTable('trusted_households'),
+                    'pin_configured' => $this->hasTrustedPin($householdId),
                     'households' => $this->trustedRows($householdId),
                     'incoming_requests' => $this->incomingTrustedRows($householdId),
                 ],
@@ -619,10 +621,90 @@ class HouseholdMobileService
         return response()->json([
             'data' => [
                 'is_available' => Schema::hasTable('trusted_households'),
+                'pin_configured' => $householdId ? $this->hasTrustedPin($householdId) : false,
                 'households' => $householdId ? $this->trustedRows($householdId) : [],
                 'incoming_requests' => $householdId ? $this->incomingTrustedRows($householdId) : [],
             ],
         ]);
+    }
+
+    public function saveTrustedPin(Request $request): JsonResponse
+    {
+        if (! Schema::hasTable('household_trusted_pins')) {
+            return $this->missingTableResponse('household_trusted_pins');
+        }
+
+        $user = $request->user();
+        $householdId = $this->householdId($user);
+
+        if (! $householdId) {
+            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
+        }
+
+        $existingPin = DB::table('household_trusted_pins')->where('household_id', $householdId)->first(['pin_hash']);
+        $validated = $request->validate([
+            'pin' => ['required', 'digits:4', 'confirmed'],
+            'current_pin' => [$existingPin ? 'required' : 'nullable', 'digits:4'],
+        ]);
+
+        if ($existingPin && ! Hash::check($validated['current_pin'], $existingPin->pin_hash)) {
+            return response()->json(['message' => 'Current household PIN did not match.'], 422);
+        }
+
+        if ($existingPin && Hash::check($validated['pin'], $existingPin->pin_hash)) {
+            return response()->json(['message' => 'New household PIN must be different from the current PIN.'], 422);
+        }
+
+        $now = now();
+
+        if ($existingPin) {
+            DB::table('household_trusted_pins')
+                ->where('household_id', $householdId)
+                ->update([
+                    'pin_hash' => Hash::make($validated['pin']),
+                    'updated_by_user_id' => $user?->user_id,
+                    'updated_at' => $now,
+                ]);
+        } else {
+            DB::table('household_trusted_pins')->insert([
+                'household_id' => $householdId,
+                'pin_hash' => Hash::make($validated['pin']),
+                'updated_by_user_id' => $user?->user_id,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        return response()->json([
+            'message' => $existingPin ? 'Household PIN changed.' : 'Household PIN saved.',
+            'data' => ['pin_configured' => true],
+        ]);
+    }
+
+    public function verifyTrustedPin(Request $request): JsonResponse
+    {
+        if (! Schema::hasTable('household_trusted_pins')) {
+            return $this->missingTableResponse('household_trusted_pins');
+        }
+
+        $householdId = $this->householdId($request->user());
+
+        if (! $householdId) {
+            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
+        }
+
+        $validated = $request->validate(['pin' => ['required', 'digits:4']]);
+        $storedPin = DB::table('household_trusted_pins')->where('household_id', $householdId)->first(['pin_hash']);
+
+        if (! $storedPin) {
+            return response()->json(['message' => 'Set a household PIN before opening trusted households.'], 409);
+        }
+
+        if (! Hash::check($validated['pin'], $storedPin->pin_hash)) {
+            return response()->json(['message' => 'Household PIN did not match.'], 422);
+        }
+
+        return response()->json(['message' => 'Household PIN verified.']);
     }
 
     public function lookupTrustedHousehold(Request $request, string $householdId): JsonResponse
@@ -837,6 +919,12 @@ class HouseholdMobileService
     private function householdId($user): ?string
     {
         return $user?->household_id ? (string) $user->household_id : null;
+    }
+
+    private function hasTrustedPin(string $householdId): bool
+    {
+        return Schema::hasTable('household_trusted_pins')
+            && DB::table('household_trusted_pins')->where('household_id', $householdId)->exists();
     }
 
     private function memberKeyColumn(): ?string
