@@ -21,6 +21,8 @@ class TrackingAidForwardingService
         $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
 
         try {
+            config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 2]);
+
             $this->ensureForwardTable($connection, $table);
 
             $now = now();
@@ -51,10 +53,16 @@ class TrackingAidForwardingService
 
     public function syncRequestStatus(string $requestId, string $status, ?Carbon $updatedAt = null): void
     {
+        if (static::$isUnreachable) {
+            return;
+        }
+
         $connection = (string) config('services.trackingaid.connection', 'trackingaid');
         $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
 
         try {
+            config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 1]);
+
             if (! Schema::connection($connection)->hasTable($table)) {
                 return;
             }
@@ -67,18 +75,21 @@ class TrackingAidForwardingService
                     'updated_at' => $updatedAt ?: now(),
                 ]);
         } catch (Throwable $exception) {
+            static::$isUnreachable = true;
             report($exception);
 
-            throw new RuntimeException(
-                'TrackingAid status could not be synchronized. Check the TrackingAid database connection.',
-                0,
-                $exception
-            );
+            return;
         }
     }
 
+    private static bool $isUnreachable = false;
+
     public function acknowledgedResourceRequests(): array
     {
+        if (static::$isUnreachable) {
+            return [];
+        }
+
         $connection = (string) config('services.trackingaid.connection', 'trackingaid');
         $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
 
@@ -132,7 +143,7 @@ class TrackingAidForwardingService
                 ->values()
                 ->all();
         } catch (Throwable $exception) {
-            report($exception);
+            static::$isUnreachable = true;
 
             return [];
         }
@@ -140,10 +151,16 @@ class TrackingAidForwardingService
 
     public function requestHandoffStatus(string $requestId, ?string $trackingReference = null): ?array
     {
+        if (static::$isUnreachable) {
+            return null;
+        }
+
         $connection = (string) config('services.trackingaid.connection', 'trackingaid');
         $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
 
         try {
+            config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 1]);
+
             if (! Schema::connection($connection)->hasTable($table)) {
                 return null;
             }
@@ -161,7 +178,7 @@ class TrackingAidForwardingService
                 'updated_at' => $row->updated_at,
             ] : null;
         } catch (Throwable $exception) {
-            report($exception);
+            static::$isUnreachable = true;
 
             return null;
         }
