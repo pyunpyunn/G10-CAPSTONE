@@ -282,7 +282,7 @@ export default function RescuerAccountsPage() {
     <main className="ops-page rescuer-page">
       <PageHeader
         title={workflow ? (workflowType === 'teams' ? 'Configure rescue teams' : modalMode === 'view' ? 'View rescuer account' : modalMode === 'edit' ? 'Update rescuer account' : 'New rescuer account') : 'Rescuer Accounts'}
-        subtitle="Barangay Mambaling, Cebu City"
+        subtitle={payload?.area_label || 'Shared database records'}
         actions={workflow ? (
           <button className="button secondary" type="button" onClick={() => navigate('/rescuers')}><ArrowLeft size={15} />Back to roster</button>
         ) : (
