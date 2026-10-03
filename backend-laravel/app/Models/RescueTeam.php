@@ -15,3 +15,5 @@ class RescueTeam extends Model
     public function responders(): HasMany { return $this->hasMany(Responder::class, 'team_id', 'team_id'); }
     public function assignments(): HasMany { return $this->hasMany(ResponderAssignment::class, 'team_id', 'team_id'); }
 }
+
+

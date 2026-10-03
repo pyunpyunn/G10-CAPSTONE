@@ -25,3 +25,5 @@ class AccommodationType extends Model
         return $this->hasMany(AccommodationUnit::class, 'type_id', 'type_id');
     }
 }
+
+

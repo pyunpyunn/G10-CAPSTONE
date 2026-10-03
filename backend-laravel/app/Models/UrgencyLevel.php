@@ -18,3 +18,5 @@ class UrgencyLevel extends Model
         return $this->hasMany(ResourceRequest::class, 'urgency_id', 'urgency_id');
     }
 }
+
+

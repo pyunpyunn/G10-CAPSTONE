@@ -48,3 +48,5 @@ class ResponderRoute extends Model
         return $this->hasMany(RouteCoordinate::class, 'route_id', 'route_id');
     }
 }
+
+

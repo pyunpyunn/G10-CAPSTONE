@@ -11,3 +11,5 @@ class VulnerableGroup extends Model
     protected $fillable = ['vulnerable_group_key', 'vulnerable_group_label'];
     public function members(): BelongsToMany { return $this->belongsToMany(HouseholdMember::class, 'member_vulnerable_groups', 'vulnerable_group_id', 'member_id'); }
 }
+
+

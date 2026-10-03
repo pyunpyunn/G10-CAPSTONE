@@ -19,3 +19,5 @@ class ResponderAssignment extends Model
     public function household(): BelongsTo { return $this->belongsTo(Household::class, 'household_id', 'household_id'); }
     public function affectedArea(): BelongsTo { return $this->belongsTo(AffectedArea::class, 'affected_area_id', 'affected_area_id'); }
 }
+
+

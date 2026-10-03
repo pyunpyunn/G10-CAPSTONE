@@ -16,3 +16,5 @@ class EvacuationRecord extends Model
     public function center(): BelongsTo { return $this->belongsTo(EvacuationCenter::class, 'center_id', 'evacuation_center_id'); }
     public function disaster(): BelongsTo { return $this->belongsTo(DisasterEvent::class, 'event_id', 'event_id'); }
 }
+
+

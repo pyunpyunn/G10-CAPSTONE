@@ -17,3 +17,5 @@ class Sitio extends Model
     public function barangay(): BelongsTo { return $this->belongsTo(Barangay::class, 'barangay_id', 'barangay_id'); }
     public function puroks(): HasMany { return $this->hasMany(Purok::class, 'sitio_id', 'sitio_id'); }
 }
+
+

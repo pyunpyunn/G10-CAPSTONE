@@ -60,3 +60,5 @@ class Household extends Model
         return $term === '' ? $query : $query->where(fn (Builder $q) => $q->where('household_name', 'like', "%{$term}%")->orWhere('household_id', 'like', "%{$term}%")->orWhere('household_code', 'like', "%{$term}%")->orWhere('contact_number', 'like', "%{$term}%"));
     }
 }
+
+
