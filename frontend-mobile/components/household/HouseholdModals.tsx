@@ -30,69 +30,141 @@ export function HouseholdQrModal({ visible, qr, onClose }: QrModalProps) {
 
 type PinModalProps = {
   visible: boolean;
-  hasPin: boolean;
+  mode: 'set' | 'verify' | 'change';
+  saving: boolean;
   error: string;
   onClose: () => void;
-  onConfirm: (pin: string) => void;
+  onConfirm: (payload: { pin: string; currentPin?: string }) => Promise<void>;
 };
 
-export function TrustedPinModal({ visible, hasPin, error, onClose, onConfirm }: PinModalProps) {
+export function TrustedPinModal({ visible, mode, saving, error, onClose, onConfirm }: PinModalProps) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [currentPin, setCurrentPin] = useState('');
+  const [showCurrentPin, setShowCurrentPin] = useState(false);
+  const [showPin, setShowPin] = useState(false);
+  const [showConfirmPin, setShowConfirmPin] = useState(false);
+  const needsConfirmation = mode !== 'verify';
+  const needsCurrentPin = mode === 'change';
+
+  const title = mode === 'change'
+    ? 'Change household PIN'
+    : mode === 'set'
+      ? 'Set household PIN'
+      : 'Enter household PIN';
 
   useEffect(() => {
     if (!visible) {
       setPin('');
       setConfirmPin('');
+      setCurrentPin('');
+      setShowCurrentPin(false);
+      setShowPin(false);
+      setShowConfirmPin(false);
     }
   }, [visible]);
 
   function submit() {
-    if (!hasPin && pin !== confirmPin) {
+    if (needsConfirmation && pin !== confirmPin) {
       return;
     }
 
-    onConfirm(pin);
+    if (needsCurrentPin && pin === currentPin) {
+      return;
+    }
+
+    onConfirm({ pin, currentPin: needsCurrentPin ? currentPin : undefined });
   }
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.modalCard}>
-          <ModalHeader title={hasPin ? 'Enter trusted PIN' : 'Set trusted PIN'} onClose={onClose} />
+          <ModalHeader title={title} onClose={onClose} />
           <Text style={styles.note}>
-            {hasPin
-              ? 'Required before opening trusted details.'
-              : 'Used for all trusted households on this device.'}
+            {mode === 'change'
+              ? 'Enter your current PIN, then choose a new 4-digit PIN.'
+              : mode === 'verify'
+                ? 'Required before opening trusted household details.'
+                : 'This PIN protects trusted household details for your household.'}
           </Text>
-          <TextInput
-            style={styles.input}
+          {needsCurrentPin ? (
+            <PinInput
+              value={currentPin}
+              onChangeText={(value) => setCurrentPin(value.replace(/[^0-9]/g, '').slice(0, 4))}
+              placeholder="Current 4-digit PIN"
+              isVisible={showCurrentPin}
+              onToggleVisibility={() => setShowCurrentPin((current) => !current)}
+            />
+          ) : null}
+          <PinInput
             value={pin}
             onChangeText={(value) => setPin(value.replace(/[^0-9]/g, '').slice(0, 4))}
             placeholder="4-digit PIN"
-            placeholderTextColor="#7d8da0"
-            keyboardType="number-pad"
-            secureTextEntry
+            isVisible={showPin}
+            onToggleVisibility={() => setShowPin((current) => !current)}
           />
-          {!hasPin ? (
-            <TextInput
-              style={styles.input}
+          {needsConfirmation ? (
+            <PinInput
               value={confirmPin}
               onChangeText={(value) => setConfirmPin(value.replace(/[^0-9]/g, '').slice(0, 4))}
               placeholder="Confirm PIN"
-              placeholderTextColor="#7d8da0"
-              keyboardType="number-pad"
-              secureTextEntry
+              isVisible={showConfirmPin}
+              onToggleVisibility={() => setShowConfirmPin((current) => !current)}
             />
           ) : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          {!hasPin && pin !== confirmPin && confirmPin.length === 4 ? (
+          {needsConfirmation && pin !== confirmPin && confirmPin.length === 4 ? (
             <Text style={styles.error}>PIN confirmation does not match.</Text>
           ) : null}
-          <HouseholdButton label={hasPin ? 'Open trusted household' : 'Save PIN'} icon="lock-open-outline" onPress={submit} />
+          {needsCurrentPin && pin === currentPin && pin.length === 4 ? (
+            <Text style={styles.error}>New PIN must be different from the current PIN.</Text>
+          ) : null}
+          <HouseholdButton
+            label={saving ? 'Saving...' : mode === 'change' ? 'Change PIN' : mode === 'set' ? 'Save PIN' : 'Open trusted household'}
+            icon={mode === 'change' ? 'lock-closed-outline' : 'lock-open-outline'}
+            disabled={saving}
+            onPress={submit}
+          />
         </View>
       </View>
     </Modal>
+  );
+}
+
+function PinInput({
+  value,
+  onChangeText,
+  placeholder,
+  isVisible,
+  onToggleVisibility,
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  isVisible: boolean;
+  onToggleVisibility: () => void;
+}) {
+  return (
+    <View style={styles.pinInputWrap}>
+      <TextInput
+        style={styles.pinInput}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#7d8da0"
+        keyboardType="number-pad"
+        secureTextEntry={!isVisible}
+      />
+      <Pressable
+        style={styles.pinVisibilityButton}
+        onPress={onToggleVisibility}
+        accessibilityRole="button"
+        accessibilityLabel={isVisible ? 'Hide PIN' : 'Show PIN'}
+      >
+        <Ionicons name={isVisible ? 'eye-off-outline' : 'eye-outline'} size={20} color={palette.textSoft} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -339,6 +411,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     backgroundColor: '#fff',
+  },
+  pinInputWrap: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: radius.md,
+    backgroundColor: '#fff',
+  },
+  pinInput: {
+    flex: 1,
+    minHeight: 46,
+    paddingLeft: spacing.md,
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  pinVisibilityButton: {
+    width: 46,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   textArea: {
     minHeight: 90,
