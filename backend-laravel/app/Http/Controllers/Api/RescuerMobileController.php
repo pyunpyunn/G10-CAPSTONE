@@ -3,7 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\RescuerMobileService;
+use App\Http\Resources\RescuerMobileOverviewResource;
+use App\Http\Resources\RescuerMobileAssignmentDetailResource;
+use App\Http\Resources\RescuerMobileAssignmentListResource;
+use App\Http\Resources\RescuerMobileFieldReportsResource;
+use App\Http\Resources\RescuerMobileAdminFieldReportsResource;
+use App\Http\Resources\RescuerMobileCheckInsResource;
+use App\Http\Resources\RescuerMobileResourceRequestsResource;
+use App\Http\Resources\RescuerMobileRadioFeedResource;
+use App\Http\Resources\RescuerMobileProfileResource;
+use App\Services\Mobile\RescuerMobileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,32 +27,44 @@ class RescuerMobileController extends Controller
 
     public function profile(Request $request): JsonResponse
     {
-        return $this->service->profile($request);
+        return (new RescuerMobileProfileResource($this->service->profile($request)))->response();
     }
 
     public function updateProfile(Request $request): JsonResponse
     {
-        return $this->service->updateProfile($request);
+        $result = $this->service->updateProfile($request);
+
+        return $result instanceof JsonResponse
+            ? $result
+            : (new RescuerMobileProfileResource($result))->response();
     }
 
     public function overview(Request $request): JsonResponse
     {
-        return $this->service->overview($request);
+        return (new RescuerMobileOverviewResource($this->service->overview($request)))->response();
     }
 
     public function assignments(Request $request): JsonResponse
     {
-        return $this->service->assignments($request);
+        return (new RescuerMobileAssignmentListResource($this->service->assignments($request)))->response();
     }
 
     public function assignment(Request $request, int $assignmentId): JsonResponse
     {
-        return $this->service->assignment($request, $assignmentId);
+        $result = $this->service->assignment($request, $assignmentId);
+
+        return $result instanceof JsonResponse
+            ? $result
+            : (new RescuerMobileAssignmentDetailResource($result))->response();
     }
 
     public function updateAssignmentStatus(Request $request, int $assignmentId): JsonResponse
     {
-        return $this->service->updateAssignmentStatus($request, $assignmentId);
+        $result = $this->service->updateAssignmentStatus($request, $assignmentId);
+
+        return $result instanceof JsonResponse
+            ? $result
+            : (new RescuerMobileAssignmentDetailResource($result))->response();
     }
 
     public function storeLocation(Request $request, int $assignmentId): JsonResponse
@@ -53,7 +74,7 @@ class RescuerMobileController extends Controller
 
     public function fieldReports(Request $request): JsonResponse
     {
-        return $this->service->fieldReports($request);
+        return (new RescuerMobileFieldReportsResource($this->service->fieldReports($request)))->response();
     }
 
     public function storeFieldReport(Request $request): JsonResponse
@@ -63,12 +84,12 @@ class RescuerMobileController extends Controller
 
     public function fieldReportsAdmin(Request $request): JsonResponse
     {
-        return $this->service->fieldReportsAdmin($request);
+        return (new RescuerMobileAdminFieldReportsResource($this->service->fieldReportsAdmin($request)))->response();
     }
 
     public function checkIns(Request $request): JsonResponse
     {
-        return $this->service->checkIns($request);
+        return (new RescuerMobileCheckInsResource($this->service->checkIns($request)))->response();
     }
 
     public function storeCheckIn(Request $request): JsonResponse
@@ -78,7 +99,7 @@ class RescuerMobileController extends Controller
 
     public function resourceRequests(Request $request): JsonResponse
     {
-        return $this->service->resourceRequests($request);
+        return (new RescuerMobileResourceRequestsResource($this->service->resourceRequests($request)))->response();
     }
 
     public function storeResourceRequest(Request $request): JsonResponse
@@ -93,7 +114,11 @@ class RescuerMobileController extends Controller
 
     public function radioFeed(Request $request): JsonResponse
     {
-        return $this->service->radioFeed($request);
+        $result = $this->service->radioFeed($request);
+
+        return $result instanceof JsonResponse
+            ? $result
+            : (new RescuerMobileRadioFeedResource($result))->response();
     }
 
     public function startRadioTransmission(Request $request): JsonResponse
@@ -121,3 +146,6 @@ class RescuerMobileController extends Controller
         return $this->service->storeRadioSignal($request);
     }
 }
+
+
+
