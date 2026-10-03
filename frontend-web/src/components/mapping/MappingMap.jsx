@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
-import { ChevronDown, ChevronUp, EyeOff, Layers3, MapPin, Maximize2, Minimize2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, EyeOff, Layers3, MapPin, Maximize2, Minimize2, X } from 'lucide-react'
 import {
   CircleMarker,
   MapContainer,
@@ -9,13 +9,11 @@ import {
   Popup,
   Rectangle,
   TileLayer,
-  Tooltip,
   useMap,
 } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
   escapeMarkerLabel,
-  isHouseholdRouteAllowed,
   labelize,
   markerGroups,
   percent,
@@ -31,6 +29,8 @@ export default function MappingMap({
   visibleRoutes,
   selectedRoute,
   selectedHousehold,
+  routeLoadingId,
+  routeError,
   mapCenter,
   mapBounds,
   onChangeLayer,
@@ -43,8 +43,15 @@ export default function MappingMap({
   const dragRef = useRef(null)
   const [layersExpanded, setLayersExpanded] = useState(true)
   const [legendExpanded, setLegendExpanded] = useState(true)
+  const [routeDetails, setRouteDetails] = useState(null)
   const [layersPanelStyle, setLayersPanelStyle] = useState({ top: 12, right: 12 })
   const [legendPanelStyle, setLegendPanelStyle] = useState({ left: 12, bottom: 12 })
+  const visibleRouteDetails = routeDetails && hasActiveEvent && layers.routes
+    && visibleRoutes.some((route) => route.route_id === routeDetails.route_id)
+    ? routeDetails
+    : null
+  const selectedHouseholdRoute = selectedRoute?.route_id?.startsWith('household-') ? selectedRoute : null
+  const showHouseholdDetails = hasActiveEvent && Boolean(selectedHousehold)
 
   useEffect(() => {
     function handlePointerMove(event) {
@@ -125,7 +132,6 @@ export default function MappingMap({
             household={household}
             selected={selectedHousehold?.id === household.id}
             onSelect={onSelectHousehold}
-            onRouteToDispatch={onRouteToDispatch}
             key={household.id}
           />
         ))}
@@ -165,9 +171,27 @@ export default function MappingMap({
         ))}
 
         {hasActiveEvent && layers.routes && visibleRoutes.map((route) => (
-          <RouteLine route={route} isSelected={Boolean(selectedRoute)} key={route.route_id} />
+          <RouteLine
+            route={route}
+            isSelected={Boolean(selectedRoute)}
+            onShowDetails={setRouteDetails}
+            key={route.route_id}
+          />
         ))}
       </MapContainer>
+
+      {showHouseholdDetails ? (
+        <RouteDetailsPopup
+          route={selectedHouseholdRoute}
+          household={selectedHousehold}
+          isLoading={routeLoadingId === selectedHousehold.id}
+          error={routeError}
+          onClose={() => onSelectHousehold(null)}
+          onRouteToDispatch={onRouteToDispatch}
+        />
+      ) : visibleRouteDetails && (
+        <RouteDetailsPopup route={visibleRouteDetails} onClose={() => setRouteDetails(null)} />
+      )}
 
       <div className="mapmate-map-tools"><button type="button" onClick={onToggleFullscreen} aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'} title={isFullscreen ? 'Exit full screen' : 'Full screen'}>
         {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -256,7 +280,7 @@ function ResizeMapWhenFullscreen({ isFullscreen }) {
   return null
 }
 
-function RouteLine({ route, isSelected }) {
+function RouteLine({ route, isSelected, onShowDetails }) {
   const coordinates = Array.isArray(route.coordinates) ? route.coordinates : []
 
   if (coordinates.length < 2) {
@@ -284,9 +308,11 @@ function RouteLine({ route, isSelected }) {
           lineJoin: 'round',
         }}
         positions={coordinates}
-      >
-        <Tooltip sticky>{route.route_name}</Tooltip>
-      </Polyline>
+        eventHandlers={{
+          mouseover: () => onShowDetails(route),
+          click: () => onShowDetails(route),
+        }}
+      />
       {routeArrows(coordinates).map((arrow) => (
         <Marker
           icon={routeArrowIcon(arrow.angle, isSelected)}
@@ -296,6 +322,61 @@ function RouteLine({ route, isSelected }) {
         />
       ))}
     </>
+  )
+}
+
+function RouteDetailsPopup({ route, household, isLoading = false, error = '', onClose, onRouteToDispatch }) {
+  if (household) {
+    return (
+      <aside className="mapmate-route-popup" aria-label="Route details" aria-live="polite">
+        <header className="mapmate-route-popup-header">
+          <div className="mapmate-route-popup-title">
+            <span>Route details</span>
+            <strong>{route?.route_name || `Route to ${household.label}`}</strong>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close route details" title="Close route details"><X size={15} /></button>
+        </header>
+        {isLoading ? <p className="mapmate-route-popup-message">Finding a route...</p> : error ? <p className="mapmate-route-popup-message is-error">{error}</p> : route && (
+          <>
+            <div className="mapmate-route-popup-grid">
+              <span>Household</span><strong>{household.label}</strong>
+              <span>Area</span><strong>{household.purok || '-'}</strong>
+              <span>Distance</span><strong>{route.distance_km != null ? `${Number(route.distance_km).toFixed(2)} km` : '-'}</strong>
+              <span>Duration</span><strong>{route.duration_min != null ? `${Math.round(Number(route.duration_min))} min` : '-'}</strong>
+            </div>
+            <button type="button" className="map-route-dispatch-trigger" onClick={() => onRouteToDispatch?.(household)}>Route dispatch</button>
+          </>
+        )}
+      </aside>
+    )
+  }
+
+  const distance = route.distance_km != null && Number.isFinite(Number(route.distance_km))
+    ? `${Number(route.distance_km).toFixed(2)} km`
+    : '-'
+  const duration = route.duration_min != null && Number.isFinite(Number(route.duration_min))
+    ? `${Math.round(Number(route.duration_min))} min`
+    : '-'
+
+  return (
+    <aside className="mapmate-route-popup" aria-label="Route details" aria-live="polite">
+      <header className="mapmate-route-popup-header">
+        <div className="mapmate-route-popup-title">
+          <span>Route details</span>
+          <strong>{route.route_name || 'Rescue route'}</strong>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close route details" title="Close route details">
+          <X size={15} />
+        </button>
+      </header>
+      <div className="mapmate-route-popup-grid">
+        <span>Team</span><strong>{route.team_name || '-'}</strong>
+        <span>Area</span><strong>{route.assigned_area || '-'}</strong>
+        <span>Status</span><strong>{labelize(route.status || 'active')}</strong>
+        <span>Distance</span><strong>{distance}</strong>
+        <span>Duration</span><strong>{duration}</strong>
+      </div>
+    </aside>
   )
 }
 
@@ -340,9 +421,8 @@ function routeArrowIcon(angle, isSelected) {
   })
 }
 
-function HouseholdMarker({ household, selected, onSelect, onRouteToDispatch }) {
+function HouseholdMarker({ household, selected, onSelect }) {
   const color = markerGroups[household.marker_group]?.color || markerGroups.gray.color
-  const dispatchAllowed = isHouseholdRouteAllowed(household)
 
   return (
     <CircleMarker
@@ -351,25 +431,6 @@ function HouseholdMarker({ household, selected, onSelect, onRouteToDispatch }) {
       pathOptions={{ color, fillColor: color, fillOpacity: 0.92, weight: selected ? 4 : 2 }}
       radius={selected ? 10 : 8}
     >
-      <Popup>
-        <MapPopupTitle title={household.label} sub={`${household.purok} - ${household.status_label}`} />
-        <div className="map-popup-grid">
-          <span>Accuracy</span><strong>{household.accuracy_m ? `${household.accuracy_m} m` : '-'}</strong>
-          <span>Battery</span><strong>{percent(household.last_battery_level)}</strong>
-          <span>Reported</span><strong>{household.last_reported_at || '-'}</strong>
-        </div>
-        {dispatchAllowed ? (
-          <button
-            type="button"
-            className="map-route-dispatch-trigger"
-            onClick={() => onRouteToDispatch?.(household)}
-          >
-            Route dispatch
-          </button>
-        ) : (
-          <div className="map-popup-dispatch-blocked">Only red-status households can route to dispatch.</div>
-        )}
-      </Popup>
     </CircleMarker>
   )
 }
@@ -427,3 +488,6 @@ function teamIcon(label) {
     iconAnchor: [18, 18],
   })
 }
+
+
+

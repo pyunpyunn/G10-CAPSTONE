@@ -423,6 +423,86 @@
   border-left-color: #4f93ad;
 }
 
+.mapmate-route-popup {
+  position: absolute;
+  z-index: 850;
+  right: 12px;
+  bottom: 12px;
+  width: min(310px, calc(100% - 24px));
+  padding: 12px;
+  border: 1px solid rgba(23, 59, 95, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 28px rgba(23, 59, 95, 0.2);
+  backdrop-filter: blur(14px);
+}
+
+.mapmate-route-popup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+.mapmate-route-popup-title {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.mapmate-route-popup-title span {
+  color: #6a7f94;
+  font-size: 9px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.mapmate-route-popup-title strong {
+  overflow-wrap: anywhere;
+  color: #173b5f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mapmate-route-popup-header button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #d1dde9;
+  border-radius: 5px;
+  background: #fff;
+  color: #385773;
+  cursor: pointer;
+}
+
+.mapmate-route-popup-header button:hover {
+  border-color: #4e8caf;
+  background: #edf2f8;
+}
+
+.mapmate-route-popup-grid {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 5px 10px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e9f0;
+  font-size: 11px;
+}
+
+.mapmate-route-popup-grid span {
+  color: #6a7f94;
+}
+
+.mapmate-route-popup-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #173b5f;
+  font-weight: 600;
+}
+
 .map-div-icon {
   display: grid;
   place-items: center;

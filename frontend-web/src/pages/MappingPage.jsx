@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getHouseholdGeotags, getMappingOverview, getRouteToSite } from '../api/mappingApi'
+import { getMappingOverview, getRouteToSite } from '../api/mappingApi'
 import MappingMap from '../components/mapping/MappingMap'
 import MappingSidebar from '../components/mapping/MappingSidebar'
 import LoadingState from '../components/ui/LoadingState'
@@ -72,13 +72,10 @@ export default function MappingPage() {
       setRouteError('')
 
       try {
-        const [data, householdGeotags] = await Promise.all([
-          getMappingOverview({ purok, status }),
-          getHouseholdGeotags({ purok, status }),
-        ])
+        const data = await getMappingOverview({ purok, status })
 
         if (!ignore) {
-          setWorkspace(normalizeWorkspaceData({ ...(data || {}), households: householdGeotags }))
+          setWorkspace(normalizeWorkspaceData(data || {}))
           setHasLoaded(true)
         }
       } catch (loadError) {
@@ -213,7 +210,7 @@ export default function MappingPage() {
     <section className="page mapping-page active mapmate-page">
       <PageHeader
         title="Mapping"
-        subtitle="Barangay Mambaling, Cebu City"
+        subtitle={barangay?.name || 'Shared database map'}
         filters={hasLoaded && (
           <DataFilterBar
             className="page-heading-filter"
@@ -253,6 +250,8 @@ export default function MappingPage() {
                   visibleRoutes={visibleRoutes}
                   selectedRoute={selectedRoute}
                   selectedHousehold={selectedHousehold}
+                  routeLoadingId={routeLoadingId}
+                  routeError={routeError}
                   mapCenter={mapCenter}
                   mapBounds={mapBounds}
                   onChangeLayer={changeLayer}
