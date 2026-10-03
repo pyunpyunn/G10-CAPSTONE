@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\WeatherService;
+use App\Services\Shared\WeatherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -36,3 +36,5 @@ class WeatherController extends Controller
         return $this->service->refreshEvent($request, $eventId);
     }
 }
+
+
