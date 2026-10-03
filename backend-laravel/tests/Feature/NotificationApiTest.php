@@ -127,3 +127,5 @@ class NotificationApiTest extends TestCase
             ->assertJsonPath('data.summary.total', 1);
     }
 }
+
+

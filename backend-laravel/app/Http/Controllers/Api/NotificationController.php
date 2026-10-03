@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\NotificationService;
+use App\Http\Requests\ListRequest;
+use App\Services\Web\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,7 +17,7 @@ class NotificationController extends Controller
         $this->service = $service;
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(ListRequest $request): JsonResponse
     {
         return $this->service->index($request);
     }
@@ -36,3 +37,5 @@ class NotificationController extends Controller
         return $this->service->clearAll($request);
     }
 }
+
+
