@@ -98,7 +98,7 @@ export default function RescueDispatchPage() {
     <main className="ops-page dispatch-page">
       <PageHeader
         title="Rescue Dispatch"
-        subtitle="Barangay Mambaling, Cebu City"
+        subtitle={payload?.area_label || 'Shared database records'}
         actions={(
           <Link className={`button review ${!hasActiveEvent ? 'disabled' : ''}`} to={hasActiveEvent ? '/dispatch/new' : '/dispatch'} aria-disabled={!hasActiveEvent} onClick={(event) => !hasActiveEvent && event.preventDefault()}>
             <Route size={15} /> New dispatch
