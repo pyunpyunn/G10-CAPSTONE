@@ -25,6 +25,7 @@ type TrustedScreenProps = {
   onAddTrusted: () => void;
   onChangeTrustedPin: () => void;
   onOpenTrusted: (household: any) => void;
+  onDeleteTrusted: (household: any) => void;
   onBackFamily: () => void;
   onSaveTrustedMemberStatus: (connectionId: string, memberId: string, status: string) => Promise<void>;
 };
@@ -189,6 +190,7 @@ export function HouseholdTrustedScreen({
   onAddTrusted,
   onChangeTrustedPin,
   onOpenTrusted,
+  onDeleteTrusted,
   onBackFamily,
   onSaveTrustedMemberStatus,
 }: TrustedScreenProps) {
@@ -277,6 +279,7 @@ export function HouseholdTrustedScreen({
           trusted={overview.trusted?.households || []}
           onAddTrusted={onAddTrusted}
           onOpenTrusted={onOpenTrusted}
+          onDeleteTrusted={onDeleteTrusted}
         />
       </View>
     </View>
@@ -288,11 +291,13 @@ function TrustedHouseholdList({
   trusted,
   onAddTrusted,
   onOpenTrusted,
+  onDeleteTrusted,
 }: {
   overview: any;
   trusted: any[];
   onAddTrusted: () => void;
   onOpenTrusted: (household: any) => void;
+  onDeleteTrusted: (household: any) => void;
 }) {
   const addLabel = trusted.length ? 'Add another household' : 'Add a household';
   const addButton = (
@@ -338,8 +343,11 @@ function TrustedHouseholdList({
       {trusted.map((householdItem: any) => (
         <Pressable
           key={householdItem.connection_id}
-          style={styles.trustedRow}
+          style={({ pressed }) => [styles.trustedRow, pressed && styles.trustedRowPressed]}
           onPress={() => onOpenTrusted(householdItem)}
+          onLongPress={() => onDeleteTrusted(householdItem)}
+          delayLongPress={500}
+          accessibilityHint="Long press to remove this trusted household"
         >
           <View style={styles.trustedIcon}>
             <Ionicons
@@ -746,7 +754,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: palette.border,
-    paddingTop: spacing.md,
+    minHeight: 64,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
   },
   historyList: {
     maxHeight: 180,
@@ -915,7 +925,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: palette.border,
-    paddingTop: spacing.md,
+    minHeight: 64,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+  },
+  trustedRowPressed: {
+    backgroundColor: palette.secondary,
   },
   trustedAddSlot: {
     width: '100%',
@@ -967,7 +983,7 @@ const styles = StyleSheet.create({
   },
   trustedText: {
     flex: 1,
-    paddingTop: spacing.xs,
+    justifyContent: 'center',
   },
   trustedMeta: {
     fontSize: 9,

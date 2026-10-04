@@ -86,6 +86,11 @@ class HouseholdMobileController extends Controller
         return $this->service->storeTrustedHousehold($request);
     }
 
+    public function deleteTrustedHousehold(Request $request, string $connectionId): JsonResponse
+    {
+        return $this->service->deleteTrustedHousehold($request, $connectionId);
+    }
+
     public function respondToTrustedHousehold(Request $request, string $connectionId): JsonResponse
     {
         return $this->service->respondToTrustedHousehold($request, $connectionId);

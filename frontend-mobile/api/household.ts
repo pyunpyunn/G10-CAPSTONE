@@ -86,3 +86,8 @@ export async function createTrustedHousehold(payload: any) {
   const response = await api.post('/household/trusted-households', payload);
   return response.data;
 }
+
+export async function deleteTrustedHousehold(connectionId: string) {
+  const response = await api.delete(`/household/trusted-households/${connectionId}`);
+  return response.data;
+}

@@ -19,6 +19,7 @@ import { savePushRegistration } from '@/api/device';
 import {
   completeHouseholdSetup,
   createTrustedHousehold,
+  deleteTrustedHousehold,
   getHouseholdOverview,
   lookupTrustedHousehold,
   saveHouseholdMemberStatus,
@@ -463,6 +464,53 @@ export default function HouseholdHomeScreen() {
     }
   }
 
+  function handleDeleteTrusted(household: any) {
+    const householdName = household.household_name || household.family_name || 'this trusted household';
+
+    Alert.alert(
+      'Trusted household options',
+      householdName,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => confirmDeleteTrusted(household),
+        },
+      ]
+    );
+  }
+
+  function confirmDeleteTrusted(household: any) {
+    const householdName = household.household_name || household.family_name || 'this trusted household';
+
+    Alert.alert(
+      'Delete trusted household?',
+      `Remove ${householdName} from your trusted households? This only removes the trusted connection.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete household',
+          style: 'destructive',
+          onPress: () => {
+            void deleteTrusted(household);
+          },
+        },
+      ]
+    );
+  }
+
+  async function deleteTrusted(household: any) {
+    try {
+      const response = await deleteTrustedHousehold(household.connection_id);
+      setViewingTrusted(null);
+      await loadOverview(true);
+      Alert.alert('Trusted household removed', response.message || 'The trusted household was removed successfully.');
+    } catch (error: any) {
+      Alert.alert('Unable to delete trusted household', errorMessage(error));
+    }
+  }
+
   function renderContent() {
     if (!overview) {
       return null;
@@ -489,6 +537,7 @@ export default function HouseholdHomeScreen() {
           onAddTrusted={openAddTrusted}
           onChangeTrustedPin={openChangeTrustedPin}
           onOpenTrusted={openTrusted}
+          onDeleteTrusted={handleDeleteTrusted}
           onBackFamily={() => setViewingTrusted(null)}
           onSaveTrustedMemberStatus={handleSaveTrustedMemberStatus}
         />

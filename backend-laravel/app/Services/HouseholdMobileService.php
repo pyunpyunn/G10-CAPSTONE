@@ -916,6 +916,42 @@ class HouseholdMobileService
         ]);
     }
 
+    public function deleteTrustedHousehold(Request $request, string $connectionId): JsonResponse
+    {
+        if (! Schema::hasTable('trusted_households')) {
+            return $this->missingTableResponse('trusted_households');
+        }
+
+        $householdId = $this->householdId($request->user());
+
+        if (! $householdId) {
+            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
+        }
+
+        $connection = DB::table('trusted_households')
+            ->where('connection_id', $connectionId)
+            ->where(function ($query) use ($householdId): void {
+                $query->where('requesting_household_id', $householdId)
+                    ->orWhere('trusted_household_id', $householdId);
+            })
+            ->first(['connection_id', 'requesting_household_id', 'trusted_household_id']);
+
+        if (! $connection) {
+            return response()->json(['message' => 'Trusted household connection was not found.'], 404);
+        }
+
+        DB::table('trusted_households')
+            ->where('connection_id', $connectionId)
+            ->delete();
+
+        $this->writeAuditLog($request, 'mobile_trusted_household_deleted', 'trusted_households', $connectionId, [
+            'requesting_household_id' => $connection->requesting_household_id,
+            'trusted_household_id' => $connection->trusted_household_id,
+        ]);
+
+        return response()->json(['message' => 'Trusted household removed.']);
+    }
+
     private function householdId($user): ?string
     {
         return $user?->household_id ? (string) $user->household_id : null;
