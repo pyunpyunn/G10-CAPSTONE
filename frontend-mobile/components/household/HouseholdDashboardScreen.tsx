@@ -414,6 +414,7 @@ function MemberSummary({
   const memberLabel = member.is_registered_user
     ? 'Registered User'
     : device?.is_active ? 'Device active' : device ? 'Device inactive' : 'No device registered';
+  const currentStatus = member.current_status || null;
 
   return (
     <Pressable
@@ -430,7 +431,12 @@ function MemberSummary({
         <Text style={styles.rowTitle}>{member.name}</Text>
         <Text style={styles.rowMeta}>{member.relationship || 'Member'} · {memberLabel}</Text>
       </View>
-      <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={palette.navMuted} />
+      <View style={styles.memberSummaryStatus}>
+        <HouseholdBadge
+          label={currentStatus?.status_label || 'Unchecked'}
+          tone={currentStatus?.status_key || 'neutral'}
+        />
+      </View>
     </Pressable>
   );
 }
@@ -516,51 +522,45 @@ function MemberRow({
         </View>
       </View>
       ) : null}
-      {activeEvent ? (
-        <View style={[styles.memberStatusBox, !showMemberInfo && styles.memberStatusBoxNested]}>
-          <View style={styles.memberStatusTop}>
-            <Text style={styles.memberStatusLabel}>Status</Text>
-            <HouseholdBadge
-              label={currentStatus?.status_label || 'Unchecked'}
-              tone={currentStatus?.status_key || 'neutral'}
-            />
-          </View>
+      <View style={[styles.memberStatusBox, !showMemberInfo && styles.memberStatusBoxNested]}>
+        <View style={styles.memberStatusTop}>
+          <Text style={styles.memberStatusLabel}>Status</Text>
           {currentStatus?.submitted_label ? (
             <Text style={styles.memberStatusTime}>{currentStatus.submitted_label}</Text>
           ) : null}
-          {canEditStatus ? (
-            <>
-              <View style={styles.memberStatusGrid}>
-                {statusOptions.map((status: any) => {
-                  const isSelected = selectedStatus === status.key;
-
-                  return (
-                    <Pressable
-                      key={status.key}
-                      style={[
-                        styles.memberStatusChoice,
-                        { borderColor: statusColor(status.key) },
-                        isSelected && { backgroundColor: statusColor(status.key) },
-                      ]}
-                      onPress={() => setSelectedStatus(status.key)}
-                    >
-                      <Text style={[styles.memberStatusChoiceText, isSelected && styles.memberStatusChoiceTextActive]}>
-                        {status.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <HouseholdButton
-                label={saving ? 'Saving...' : 'Save member status'}
-                icon="save-outline"
-                disabled={saving || !hasStatusChanged}
-                onPress={handleSave}
-              />
-            </>
-          ) : null}
         </View>
-      ) : null}
+        {activeEvent && canEditStatus ? (
+          <>
+            <View style={styles.memberStatusGrid}>
+              {statusOptions.map((status: any) => {
+                const isSelected = selectedStatus === status.key;
+
+                return (
+                  <Pressable
+                    key={status.key}
+                    style={[
+                      styles.memberStatusChoice,
+                      { borderColor: statusColor(status.key) },
+                      isSelected && { backgroundColor: statusColor(status.key) },
+                    ]}
+                    onPress={() => setSelectedStatus(status.key)}
+                  >
+                    <Text style={[styles.memberStatusChoiceText, isSelected && styles.memberStatusChoiceTextActive]}>
+                      {status.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <HouseholdButton
+              label={saving ? 'Saving...' : 'Save member status'}
+              icon="save-outline"
+              disabled={saving || !hasStatusChanged}
+              onPress={handleSave}
+            />
+          </>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -798,6 +798,9 @@ const styles = StyleSheet.create({
   memberSummaryText: {
     flex: 1,
   },
+  memberSummaryStatus: {
+    alignItems: 'flex-end',
+  },
   memberRow: {
     gap: spacing.sm,
     padding: spacing.md,
@@ -887,7 +890,7 @@ const styles = StyleSheet.create({
   },
   memberStatusLabel: {
     color: palette.textSoft,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
@@ -895,6 +898,8 @@ const styles = StyleSheet.create({
     color: palette.textSoft,
     fontSize: 11,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   memberStatusGrid: {
     flexDirection: 'row',

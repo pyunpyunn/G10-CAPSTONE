@@ -76,7 +76,7 @@ export default function HouseholdHomeScreen() {
   const [pinError, setPinError] = useState('');
   const [pinSaving, setPinSaving] = useState(false);
   const [showPin, setShowPin] = useState(false);
-  const [pinAction, setPinAction] = useState<'open' | 'add' | 'change'>('open');
+  const [pinAction, setPinAction] = useState<'open' | 'change'>('open');
   const [selectedTrusted, setSelectedTrusted] = useState<any>(null);
   const [viewingTrusted, setViewingTrusted] = useState<any>(null);
   const [showAddTrusted, setShowAddTrusted] = useState(false);
@@ -382,9 +382,8 @@ export default function HouseholdHomeScreen() {
   }
 
   function openAddTrusted() {
-    setPinAction('add');
-    setPinError('');
-    setShowPin(true);
+    setTrustedLookup(null);
+    setShowAddTrusted(true);
   }
 
   function openChangeTrustedPin() {
@@ -411,9 +410,7 @@ export default function HouseholdHomeScreen() {
 
       setShowPin(false);
 
-      if (pinAction === 'add') {
-        setShowAddTrusted(true);
-      } else if (pinAction === 'open' && selectedTrusted) {
+      if (pinAction === 'open' && selectedTrusted) {
         setViewingTrusted(selectedTrusted);
       } else if (pinAction === 'change') {
         Alert.alert('Household PIN', 'Your household PIN was changed.');
