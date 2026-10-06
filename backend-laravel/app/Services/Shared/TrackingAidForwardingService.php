@@ -169,10 +169,16 @@ class TrackingAidForwardingService
 
     public function acknowledgedRequestCount(): int
     {
+        if (static::$isUnreachable) {
+            return 0;
+        }
+
         $connection = (string) config('services.trackingaid.connection', 'trackingaid');
         $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
 
         try {
+            config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 1]);
+
             if (! $this->readTableAvailable($connection, $table)) {
                 return 0;
             }
@@ -181,6 +187,7 @@ class TrackingAidForwardingService
                 ->whereIn(DB::raw('LOWER(resqperation_status)'), ['acknowledged', 'received', 'received_by_trackingaid'])
                 ->count();
         } catch (Throwable $exception) {
+            static::$isUnreachable = true;
             report($exception);
 
             return 0;
@@ -190,6 +197,10 @@ class TrackingAidForwardingService
     /** @param array<string, string> $referencesByRequest */
     public function requestHandoffStatuses(array $referencesByRequest): array
     {
+        if (static::$isUnreachable) {
+            return [];
+        }
+
         $referencesByRequest = array_filter($referencesByRequest, fn (string $reference): bool => $reference !== '');
         if ($referencesByRequest === []) {
             return [];
@@ -199,6 +210,8 @@ class TrackingAidForwardingService
         $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
 
         try {
+            config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 1]);
+
             if (! $this->readTableAvailable($connection, $table)) {
                 return [];
             }
@@ -221,6 +234,7 @@ class TrackingAidForwardingService
 
             return $result;
         } catch (Throwable $exception) {
+            static::$isUnreachable = true;
             report($exception);
 
             return [];
@@ -276,6 +290,10 @@ class TrackingAidForwardingService
 
     private function readTableAvailable(string $connection, string $table): bool
     {
+        if (static::$isUnreachable) {
+            return false;
+        }
+
         $request = app()->bound('request') ? app('request') : null;
         $key = 'trackingaid_table_available:'.$connection.':'.$table;
         if ($request instanceof \Illuminate\Http\Request && $request->attributes->has($key)) {
@@ -283,8 +301,10 @@ class TrackingAidForwardingService
         }
 
         try {
+            config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 1]);
             $available = Schema::connection($connection)->hasTable($table);
         } catch (Throwable $exception) {
+            static::$isUnreachable = true;
             report($exception);
             $available = false;
         }
