@@ -34,6 +34,7 @@ export default function DashboardOverview({
   requestsState,
   hasActiveEvent,
   onOpenModule,
+  disasterAction,
 }) {
   const [latestSavedWeather, setLatestSavedWeather] = useState(null)
 
@@ -59,6 +60,7 @@ export default function DashboardOverview({
 
   return (
     <aside className="dashboard-overview" aria-label="Dashboard side information">
+      {disasterAction && <div className="dashboard-layout-actions">{disasterAction}</div>}
       <WeatherCard weatherState={weatherState} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
       <DashboardMapCard hasActiveEvent={hasActiveEvent} onOpenMap={() => onOpenModule('/mapping')} />
       <RequestCard requestsState={requestsState} onOpenRequests={() => onOpenModule('/resources-requests')} />

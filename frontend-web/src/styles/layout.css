@@ -56,13 +56,35 @@
   cursor: default;
 }
 
-.topbar-search-controls {
-  position: relative;
+.topbar-main-controls {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
   min-width: 0;
-  max-width: min(620px, 68%);
+  gap: clamp(10px, 1.8vw, 24px);
+}
+
+.topbar-page-title {
+  flex: 0 1 auto;
+  max-width: min(260px, 28vw);
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-nav-text);
+  font-size: 17px;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-search-controls {
+  position: relative;
+  display: flex;
+  flex: 1 1 320px;
+  align-items: center;
+  min-width: 0;
+  max-width: 620px;
   gap: 8px;
 }
 

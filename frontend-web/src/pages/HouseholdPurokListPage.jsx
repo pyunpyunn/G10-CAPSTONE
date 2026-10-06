@@ -9,32 +9,40 @@ export default function HouseholdPurokListPage() {
   const [searchParams] = useSearchParams()
   const sitioId = searchParams.get('sitio_id')
   const purokId = searchParams.get('purok_id')
-  const sitioName = searchParams.get('sitio') || 'Selected sitio'
-  const purokName = searchParams.get('purok') || 'Selected purok'
   const [page, setPage] = useState(1)
   const [payload, setPayload] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refreshVersion, setRefreshVersion] = useState(0)
-  const validIds = /^\d+$/.test(sitioId || '') && /^\d+$/.test(purokId || '')
+  const validSitioId = /^\d+$/.test(sitioId || '')
+  const validPurokId = /^\d+$/.test(purokId || '')
+  const validIds = validSitioId && (!purokId || validPurokId)
+  const hasPurokFilter = validPurokId
 
   useEffect(() => {
     if (!validIds) return
     let active = true
-    getHouseholds({ sitio_id: sitioId, purok_id: purokId, page, per_page: 25 })
+    getHouseholds({
+      sitio_id: sitioId,
+      ...(hasPurokFilter ? { purok_id: purokId } : {}),
+      page,
+      per_page: 25,
+    })
       .then((data) => { if (active) { setPayload(data); setError('') } })
       .catch(() => { if (active) setError('Households could not be loaded. Refresh to try again.') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [sitioId, purokId, page, validIds, refreshVersion])
+  }, [sitioId, purokId, page, validIds, hasPurokFilter, refreshVersion])
 
   return (
     <main className="ops-page household-page household-purok-page">
-      <div className="household-list-heading">
-        <div><h1>{purokName} household list</h1><p>{sitioName}</p></div>
-        <button className="button secondary" type="button" onClick={() => navigate('/households')}>Go back to main page</button>
+      <div className="app-page-controls-row household-list-actions">
+        <div />
+        <div className="pg-actions">
+          <button className="button secondary" type="button" onClick={() => navigate('/households')}>Go back to main page</button>
+        </div>
       </div>
-      {!validIds ? <div className="form-error" role="alert">Choose a purok from the sitio ranking.</div>
+      {!validIds ? <div className="form-error" role="alert">Choose a sitio or purok from the ranking.</div>
         : loading && !payload ? <LoadingState />
           : <>
             {error && <div className="form-error" role="alert">{error}</div>}

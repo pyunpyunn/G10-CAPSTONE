@@ -138,10 +138,22 @@ export default function DashboardPage() {
       setIsClosingEvent(false)
     }
   }
+
+  const disasterAction = hasActiveEvent ? (
+    <button className="btn btn-warning btn-sm" type="button" onClick={() => openModule(`/broadcast?event_id=${encodeURIComponent(summaryState.data?.active_event?.event_id || '')}`)}>
+      <Pencil size={14} />
+      UPDATE DISASTER
+    </button>
+  ) : (
+    <button className="btn btn-danger btn-sm dashboard-declare-button" type="button" onClick={() => openModule('/broadcast')}>
+      <TriangleAlert size={14} />
+      Declare New Disaster
+    </button>
+  )
+
   return (
     <section className="page active">
       <PageHeader
-        title="Dashboard"
         actions={
           <>
             <button className="btn btn-secondary btn-sm" type="button" onClick={loadAllWidgets}>
@@ -151,7 +163,7 @@ export default function DashboardPage() {
             <DashboardHeaderActionMenu
               hasActiveEvent={hasActiveEvent}
               onCloseActiveEvent={() => setIsCloseModalOpen(true)}
-              onOpenBroadcast={() => openModule(hasActiveEvent ? `/broadcast?event_id=${encodeURIComponent(summaryState.data.active_event.event_id)}` : '/broadcast')}
+              onOpenBroadcast={() => openModule(hasActiveEvent ? `/broadcast?event_id=${encodeURIComponent(summaryState.data?.active_event?.event_id || '')}` : '/broadcast')}
             />
           </>
         }
@@ -167,6 +179,7 @@ export default function DashboardPage() {
       />
 
       <div className="dashboard-layout">
+        <div className="dashboard-layout-mobile-actions">{disasterAction}</div>
         <DashboardMainContent
           summaryState={summaryState}
           dispatchState={dispatchState}
@@ -181,6 +194,7 @@ export default function DashboardPage() {
           requestsState={requestsState}
           hasActiveEvent={hasActiveEvent}
           onOpenModule={openModule}
+          disasterAction={disasterAction}
         />
       </div>
     </section>
