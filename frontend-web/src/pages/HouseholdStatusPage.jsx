@@ -45,11 +45,11 @@ export default function HouseholdStatusPage() {
       {!isLoading && <div className="workspace-grid">
         <section className="household-workspace" aria-label="Sitio rescue priority ranking">
           {payload && !payload.active_event && <div className="standby-strip hh-standby-strip"><strong>No active disaster event</strong><span>Household reporting starts after HQ/Admin broadcasts an active event.</span></div>}
-          <SitioPriorityChart rows={ranking} selectedSitioId={selectedSitioId} loading={isLoading} onRefresh={load} />
+          <SitioPriorityChart rows={ranking} loading={isLoading} onRefresh={load} />
         </section>
         <aside className="side-panel" aria-label="Sitio ranking">
           {payload && <HouseholdSummaryMetrics summary={payload.summary || emptySummary()} />}
-          <SitioPriorityList rows={ranking} selectedSitioId={selectedSitioId} onSelect={(id) => setSelectedSitioId((current) => String(current) === String(id) ? null : id)} />
+          <SitioPriorityList rows={ranking} selectedSitioId={selectedSitioId} onSelect={setSelectedSitioId} />
         </aside>
       </div>}
     </main>

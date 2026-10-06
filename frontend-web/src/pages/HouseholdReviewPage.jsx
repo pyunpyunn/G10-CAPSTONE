@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getHousehold, getHouseholdStatusLogs } from '../api/householdApi'
 import LoadingState from '../components/ui/LoadingState'
@@ -19,7 +19,8 @@ export default function HouseholdReviewPage() {
   const [error, setError] = useState('')
 
   const totalHistoryPages = Math.max(1, Math.ceil(history.length / HISTORY_PAGE_SIZE))
-  const historyStart = (historyPage - 1) * HISTORY_PAGE_SIZE
+  const currentHistoryPage = Math.min(historyPage, totalHistoryPages)
+  const historyStart = (currentHistoryPage - 1) * HISTORY_PAGE_SIZE
   const paginatedHistory = history.slice(historyStart, historyStart + HISTORY_PAGE_SIZE)
 
   useEffect(() => {
@@ -60,12 +61,6 @@ export default function HouseholdReviewPage() {
     }
   }, [householdId])
 
-  useEffect(() => {
-    if (historyPage > totalHistoryPages) {
-      setHistoryPage(totalHistoryPages)
-    }
-  }, [historyPage, totalHistoryPages])
-
   return (
     <main className="household-review-page">
       <PageHeader
@@ -90,6 +85,75 @@ export default function HouseholdReviewPage() {
         <>
           <div className="hh-detail-group">
             <div className="hh-section-label">
+              <span>Household profile</span>
+              <span>{detail.household?.household_id || 'ID not recorded'}</span>
+            </div>
+            <div className="hh-household-facts">
+              <Fact label="Household code" value={detail.household?.household_code || detail.household?.household_id} />
+              <Fact label="Account holder" value={detail.household?.account_holder} />
+              <Fact label="Account ID" value={detail.household?.account_id} />
+              <Fact label="Contact number" value={detail.household?.contact_number} />
+              <Fact label="Address" value={detail.household?.address} />
+              <Fact label="Purok" value={detail.household?.purok} />
+              <Fact label="Reported by" value={detail.household?.source?.submitted_by} />
+              <Fact label="Report source" value={detail.household?.source?.label} />
+              <Fact label="Last report" value={detail.household?.source?.datetime} />
+              <Fact label="Last location" value={detail.household?.location?.label} />
+              <Fact label="Coordinates" value={coordinateLabel(detail.household?.location)} />
+            </div>
+            <div className="hh-detail-metrics">
+              {(detail.household?.detail_tiles || []).map((tile) => (
+                <div className="hh-detail-metric" key={tile.label}>
+                  <span>{tile.label}</span>
+                  <strong>{tile.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="hh-detail-group">
+            <div className="hh-section-label">
+              <span>Registered devices</span>
+              <span>{detail.devices?.length || 0} devices</span>
+            </div>
+            <div className="hh-detail-table-wrap">
+              <table className="hh-detail-table compact-detail-table">
+                <thead>
+                  <tr>
+                    <th>Device</th>
+                    <th>Member</th>
+                    <th>Platform / role</th>
+                    <th>Battery</th>
+                    <th>Signal</th>
+                    <th>Last location</th>
+                    <th>Location permission</th>
+                    <th>Last seen</th>
+                    <th>State</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!detail.devices?.length ? (
+                    <EmptyTableRow colSpan={9} text="No device records are linked to this household." />
+                  ) : detail.devices.map((device) => (
+                    <tr key={device.id || device.device_uuid}>
+                      <td>{device.device_name || 'Unnamed device'}</td>
+                      <td>{device.member_name || 'Household user'}</td>
+                      <td>{[device.platform, device.app_role].filter(Boolean).join(' / ') || 'Not recorded'}</td>
+                      <td>{formatPercent(device.battery_level)}</td>
+                      <td>{formatPercent(device.signal_strength)}</td>
+                      <td>{device.last_location_label || 'No location yet'}</td>
+                      <td>{device.location_permission_status || 'Unknown'}</td>
+                      <td>{device.last_seen_at || 'Not recorded'}</td>
+                      <td>{device.is_active ? 'Active' : 'Inactive'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="hh-detail-group">
+            <div className="hh-section-label">
               <span>Family members</span>
               <span>{detail.members?.length || 0} members</span>
             </div>
@@ -104,8 +168,8 @@ export default function HouseholdReviewPage() {
                     <th>Head</th>
                     <th>Vulnerable Indicators</th>
                     <th>Last location</th>
-                    <th>Devices connected</th>
-                    <th>Low battery</th>
+                    <th>Device</th>
+                    <th>Battery</th>
                     <th>Status reported</th>
                   </tr>
                 </thead>
@@ -125,9 +189,9 @@ export default function HouseholdReviewPage() {
                         <td>{member.is_household_head ? 'Yes' : 'No'}</td>
                         <td>{getVulnerableIndicators(member)}</td>
                         <td>{member.last_location_label || 'No location yet'}</td>
-                        <td>{Boolean(member.device_name && member.device_name !== 'No assigned mobile') ? 'True' : 'False'}</td>
-                        <td>{isLowBattery(member.battery_level) ? 'True' : 'False'}</td>
-                        <td>{member.status?.label || 'No report'}</td>
+                        <td>{member.device_name || 'No assigned mobile'}{member.device_platform ? ` (${member.device_platform})` : ''}</td>
+                        <td>{formatPercent(member.battery_level)}</td>
+                        <td>{member.status?.label || 'No report'}{member.status_updated_at ? <div className="hh-household-meta">{member.status_updated_at}</div> : null}</td>
                       </tr>
                     ))
                   )}
@@ -185,16 +249,16 @@ export default function HouseholdReviewPage() {
                       type="button"
                       className="button secondary compact-button"
                       onClick={() => setHistoryPage((page) => Math.max(1, page - 1))}
-                      disabled={historyPage === 1}
+                      disabled={currentHistoryPage === 1}
                     >
                       Prev
                     </button>
-                    <span className="hh-history-page-indicator">Page {historyPage} of {totalHistoryPages}</span>
+                    <span className="hh-history-page-indicator">Page {currentHistoryPage} of {totalHistoryPages}</span>
                     <button
                       type="button"
                       className="button secondary compact-button"
                       onClick={() => setHistoryPage((page) => Math.min(totalHistoryPages, page + 1))}
-                      disabled={historyPage >= totalHistoryPages}
+                      disabled={currentHistoryPage >= totalHistoryPages}
                     >
                       Next
                     </button>
@@ -219,24 +283,25 @@ function getVulnerableIndicators(member) {
   return flags.length ? flags.join(' • ') : 'None'
 }
 
-function isLowBattery(batteryLevel) {
-  if (batteryLevel === null || batteryLevel === undefined || batteryLevel === '') {
-    return false
-  }
-
-  const parsed = Number(batteryLevel)
-  return Number.isFinite(parsed) && parsed <= 20
+function formatPercent(value) {
+  return value === null || value === undefined || value === '' ? 'Not recorded' : `${value}%`
 }
 
-function DetailSection({ title, note, children }) {
+function coordinateLabel(location) {
+  if (location?.latitude === null || location?.latitude === undefined
+    || location?.longitude === null || location?.longitude === undefined) {
+    return 'Not recorded'
+  }
+
+  return `${location.latitude}, ${location.longitude}`
+}
+
+function Fact({ label, value }) {
   return (
-    <>
-      <div className="hh-section-label">
-        <span>{title}</span>
-        <span>{note}</span>
-      </div>
-      <div className="hh-detail-table-wrap">{children}</div>
-    </>
+    <div className="hh-household-fact">
+      <span>{label}</span>
+      <strong>{value || 'Not recorded'}</strong>
+    </div>
   )
 }
 

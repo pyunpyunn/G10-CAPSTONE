@@ -1634,6 +1634,17 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .dashboard-layout-mobile-actions {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+    justify-content: flex-end;
+  }
+
+  .dashboard-layout > .dashboard-main { grid-column: 1; grid-row: 2; }
+  .dashboard-layout > .dashboard-overview { grid-column: 1; grid-row: 3; }
+  .dashboard-overview .dashboard-layout-actions { display: none; }
+
   .overview-heading {
     grid-column: 1 / -1;
   }

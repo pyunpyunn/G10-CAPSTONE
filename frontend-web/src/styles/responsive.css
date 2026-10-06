@@ -31,6 +31,15 @@
 }
 
 @container topbar (max-width: 430px) {
+  .topbar-main-controls {
+    gap: 8px;
+  }
+
+  .topbar-page-title {
+    max-width: 120px;
+    font-size: 14px;
+  }
+
   .header-actions {
     gap: 5px;
   }
@@ -53,6 +62,11 @@
 }
 
 @container topbar (max-width: 300px) {
+  .topbar-page-title {
+    max-width: 76px;
+    font-size: 12px;
+  }
+
   .header-actions {
     gap: 2px;
   }
@@ -107,6 +121,7 @@ canvas {
   }
 
   .pg-head,
+  .app-page-controls-row,
   .pg-actions,
   .page-ops-row,
   .footer-inner {
@@ -119,6 +134,25 @@ canvas {
   .page-ops-row .right {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .app-page-controls-row {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .app-page-controls-filters {
+    flex-basis: 100%;
+  }
+
+  .app-page-controls-row .pg-actions {
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-end;
+  }
+
+  .app-page-controls-row .pg-actions .btn {
+    flex: 0 0 auto;
   }
 
   .pg-actions .btn,

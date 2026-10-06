@@ -1,6 +1,6 @@
 import { Bell, CheckCircle2, Eye, Filter, Inbox, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { searchGlobalRecords } from '../../api/globalSearchApi'
 import { getNotifications, markNotificationsRead } from '../../api/notificationApi'
 
@@ -32,17 +32,16 @@ const searchablePages = [
 ]
 
 export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCapture, onBlurCapture }) {
+  const location = useLocation()
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
-  const [recordResults, setRecordResults] = useState([])
+  const [recordSearch, setRecordSearch] = useState({ key: '', status: 'idle', results: [], error: '' })
   const [selectedTypes, setSelectedTypes] = useState(() => searchTypes.map((type) => type.id))
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [isSearching, setIsSearching] = useState(false)
-  const [searchError, setSearchError] = useState('')
   const popoverRef = useRef(null)
   const bellButtonRef = useRef(null)
   const searchControlsRef = useRef(null)
@@ -52,44 +51,41 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   const initials = getInitials(user?.full_name)
   const unreadLabel = unreadCount > 99 ? '99+' : String(unreadCount)
   const canViewInquiries = user?.role?.role_key === 'super_admin'
-  const pageResults = searchTerm.trim().length >= 2 && selectedTypes.includes('pages')
+  const pageTitle = getPageTitle(location.pathname, location.state)
+  const query = searchTerm.trim()
+  const recordTypes = selectedTypes.filter((type) => type !== 'pages')
+  const recordSearchKey = `${query}::${recordTypes.join('|')}`
+  const canSearchRecords = query.length >= 2 && recordTypes.length > 0
+  const currentRecordSearch = canSearchRecords && recordSearch.key === recordSearchKey ? recordSearch : null
+  const isSearching = currentRecordSearch?.status === 'loading'
+  const searchError = currentRecordSearch?.error || ''
+  const pageResults = query.length >= 2 && selectedTypes.includes('pages')
     ? searchablePages
       .filter((page) => (!page.superAdminOnly || canViewInquiries))
-      .filter((page) => `${page.title} ${page.keywords}`.toLowerCase().includes(searchTerm.trim().toLowerCase()))
+      .filter((page) => `${page.title} ${page.keywords}`.toLowerCase().includes(query.toLowerCase()))
       .map((page) => ({ ...page, type: 'pages', subtitle: 'Open page' }))
     : []
-  const searchResults = [...pageResults, ...recordResults]
+  const searchResults = [...pageResults, ...(currentRecordSearch?.results || [])]
 
   useEffect(() => {
-    const query = searchTerm.trim()
+    const currentQuery = searchTerm.trim()
     const types = selectedTypes.filter((type) => type !== 'pages')
+    if (currentQuery.length < 2 || types.length === 0) return undefined
 
-    if (query.length < 2 || types.length === 0) {
-      setRecordResults([])
-      setSearchError('')
-      setIsSearching(false)
-      return undefined
-    }
-
+    const key = `${currentQuery}::${types.join('|')}`
     let ignore = false
     const timeout = window.setTimeout(async () => {
-      setIsSearching(true)
-      setSearchError('')
+      setRecordSearch({ key, status: 'loading', results: [], error: '' })
 
       try {
-        const results = await searchGlobalRecords(query, types)
+        const results = await searchGlobalRecords(currentQuery, types)
 
         if (!ignore) {
-          setRecordResults(results)
+          setRecordSearch({ key, status: 'ready', results, error: '' })
         }
       } catch {
         if (!ignore) {
-          setRecordResults([])
-          setSearchError('Search is unavailable right now.')
-        }
-      } finally {
-        if (!ignore) {
-          setIsSearching(false)
+          setRecordSearch({ key, status: 'error', results: [], error: 'Search is unavailable right now.' })
         }
       }
     }, 220)
@@ -249,7 +245,9 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
       onFocusCapture={onFocusCapture}
       onBlurCapture={onBlurCapture}
     >
-      <div className="topbar-search-controls" ref={searchControlsRef}>
+      <div className="topbar-main-controls">
+        <h1 className="topbar-page-title">{pageTitle}</h1>
+        <div className="topbar-search-controls" ref={searchControlsRef}>
         <label className="topbar-search-field">
           <Search size={16} aria-hidden="true" />
           <span className="sr-only">Search all modules</span>
@@ -348,6 +346,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
             ))}
           </div>
         )}
+        </div>
       </div>
 
       <div className="header-actions" aria-label="Header actions">
@@ -439,6 +438,24 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
       )}
     </header>
   )
+}
+
+function getPageTitle(pathname, state) {
+  const normalizedPath = pathname.replace(/\/$/, '') || '/dashboard'
+  const page = searchablePages.find((item) => item.href === normalizedPath)
+
+  if (page) return page.title
+  if (normalizedPath === '/households/_household-list') return 'Household List'
+  if (normalizedPath.startsWith('/households/')) return 'Household Review'
+  if (normalizedPath === '/dispatch/new') return state?.dispatch ? 'Update Dispatch' : 'New Dispatch'
+  if (normalizedPath === '/rescuers/new') return 'New Rescuer'
+  if (normalizedPath === '/rescuers/teams') return 'Rescue Teams'
+  if (normalizedPath === '/rescuers/view') return 'Responder Profile'
+  if (normalizedPath === '/rescuers/edit') return 'Edit Responder'
+  if (normalizedPath === '/resources-requests/new') return 'New Resource Request'
+  if (normalizedPath.startsWith('/resources-requests/')) return 'Edit Resource Request'
+
+  return 'Dashboard'
 }
 
 function getInitials(name = '') {

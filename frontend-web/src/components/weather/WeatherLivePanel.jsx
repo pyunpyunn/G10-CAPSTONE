@@ -15,9 +15,12 @@ export default function WeatherLivePanel({
   latest,
   activeConditionKey,
   riskTone,
+  locationName,
+  updatedAt,
 }) {
   return (
     <aside className="weather-left-column">
+      <p className="wx-location-updated">{locationName} · Updated {updatedAt}</p>
       <section className="wx-panel wx-current-panel">
         <div className="wx-panel-head"><span className="wx-panel-title">Current condition</span></div>
         <div className="wx-current-row">

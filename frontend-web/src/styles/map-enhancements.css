@@ -1,9 +1,12 @@
 .mapmate-map-shell.is-fullscreen {
   position: fixed;
-  inset: 0;
-  z-index: 2000;
-  width: 100vw;
-  height: 100dvh;
+  top: var(--topbar-offset, var(--topbar-height));
+  right: 0;
+  bottom: 0;
+  left: var(--left-column);
+  z-index: 55;
+  width: auto;
+  height: auto;
   min-height: 0;
   border: 0;
   border-radius: 0;

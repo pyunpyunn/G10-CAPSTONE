@@ -146,6 +146,14 @@
   align-content: start;
 }
 
+.wx-location-updated {
+  margin: 0;
+  color: var(--wxc-text-1);
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .weather-main-column {
   grid-column: 2;
 }
