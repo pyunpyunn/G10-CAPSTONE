@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Route } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { getDispatchDashboard } from '../api/dispatchApi'
+import { getDispatchDashboard, getWelfareChecks, getRescuePriorities, getMemberCheckQueue } from '../api/dispatchApi'
 import DispatchSidePanel from '../components/dispatch/DispatchSidePanel'
 import DispatchSummary from '../components/dispatch/DispatchSummary'
 import DispatchStatusBadge from '../components/dispatch/DispatchStatusBadge'
@@ -11,7 +11,7 @@ import DataFilterBar from '../components/ui/DataFilterBar'
 import PageHeader from '../components/ui/PageHeader'
 import {
   emptySummary,
-  teamFilters,
+  label,
 } from '../utils/dispatchHelpers'
 
 export default function RescueDispatchPage() {
@@ -21,6 +21,9 @@ export default function RescueDispatchPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [teamFilter, setTeamFilter] = useState('all')
+  const [welfareChecks, setWelfareChecks] = useState([])
+  const [priorities, setPriorities] = useState([])
+  const [memberChecks, setMemberChecks] = useState([])
 
   useEffect(() => {
     let ignore = false
@@ -35,6 +38,17 @@ export default function RescueDispatchPage() {
         if (!ignore) {
           setPayload(data)
         }
+        Promise.all([
+          getWelfareChecks({ per_page: 20 }).catch(() => ({ data: [] })),
+          getRescuePriorities({ per_page: 20 }).catch(() => ({ data: [] })),
+          getMemberCheckQueue({ per_page: 20 }).catch(() => ({ data: [] })),
+        ]).then(([welfare, ranked, reminders]) => {
+          if (!ignore) {
+            setWelfareChecks(welfare.data || [])
+            setPriorities(ranked.data || [])
+            setMemberChecks(reminders.data || [])
+          }
+        })
       } catch {
         if (!ignore) {
           setError('Rescue dispatch records cannot be loaded right now. Please check the backend or database connection.')
@@ -58,6 +72,11 @@ export default function RescueDispatchPage() {
   const dispatches = payload?.dispatches?.data || []
   const summary = payload?.summary || emptySummary()
   const hasActiveEvent = Boolean(payload?.active_event)
+  const teamFilters = [
+    { key: 'all', label: 'All' },
+    ...[...new Set(teams.map((team) => team.status_key).filter(Boolean))]
+      .map((key) => ({ key, label: label(key) })),
+  ]
   const filteredTeams = teamFilter === 'all'
     ? teams
     : teams.filter((team) => team.status_key === teamFilter)
@@ -98,7 +117,7 @@ export default function RescueDispatchPage() {
     <main className="ops-page dispatch-page">
       <PageHeader
         title="Rescue Dispatch"
-        subtitle="Barangay Mambaling, Cebu City"
+        subtitle={payload?.area_label || 'Shared database records'}
         actions={(
           <Link className={`button review ${!hasActiveEvent ? 'disabled' : ''}`} to={hasActiveEvent ? '/dispatch/new' : '/dispatch'} aria-disabled={!hasActiveEvent} onClick={(event) => !hasActiveEvent && event.preventDefault()}>
             <Route size={15} /> New dispatch
@@ -181,6 +200,52 @@ export default function RescueDispatchPage() {
               />
             </aside>
           </div>
+
+          <section className="dp-side-card" aria-label="Welfare Check List">
+            <div className="dp-side-head"><span className="dp-side-title">Welfare Check List</span></div>
+            <div className="dp-side-body">
+              {welfareChecks.length === 0 ? <p>No households currently need a contact-channel welfare check.</p> : (
+                <table><thead><tr><th>Household</th><th>Purok</th><th>Contact</th><th>Action</th></tr></thead><tbody>
+                  {welfareChecks.map((household) => <tr key={household.household_id}>
+                    <td>{household.household_name || household.household_code || household.household_id}</td>
+                    <td>{household.purok || household.address || 'Area unavailable'}</td>
+                    <td>{household.contact_channel_label}</td>
+                    <td><button type="button" disabled={!household.has_geotag || !hasActiveEvent} onClick={() => navigate('/dispatch/new', { state: { selectedHousehold: household, dispatchType: 'welfare_check' } })}>Route with 2 rescuers</button></td>
+                  </tr>)}
+                </tbody></table>
+              )}
+            </div>
+          </section>
+
+          <section className="dp-side-card" aria-label="Rescue priority ranking">
+            <div className="dp-side-head"><span className="dp-side-title">Rescue priority</span></div>
+            <div className="dp-side-body">
+              {priorities.length === 0 ? <p>No households to rank for the active event.</p> : (
+                <table><thead><tr><th>Household</th><th>Purok</th><th>Tier</th><th>Score</th></tr></thead><tbody>
+                  {priorities.map((item) => <tr key={item.household_id}>
+                    <td>{item.household_name || item.household_code || item.household_id}</td>
+                    <td>{item.area_name || 'Area unavailable'}</td>
+                    <td>{item.urgent_tier ? 'Urgent report' : item.no_contact_channel ? 'No contact channel' : 'Monitoring'}</td>
+                    <td>{item.priority_score}</td>
+                  </tr>)}
+                </tbody></table>
+              )}
+            </div>
+          </section>
+
+          <section className="dp-side-card" aria-label="Member status check-in queue">
+            <div className="dp-side-head"><span className="dp-side-title">Member status check-in queue</span></div>
+            <div className="dp-side-body">
+              {memberChecks.length === 0 ? <p>No pending member check-ins.</p> : (
+                <table><thead><tr><th>Member</th><th>Household</th><th>Attempt</th><th>State</th></tr></thead><tbody>
+                  {memberChecks.map((item) => <tr key={item.reminder_id}>
+                    <td>{item.member_name || item.member_id}</td><td>{item.household_id}</td>
+                    <td>{item.attempt}</td><td>{item.status}</td>
+                  </tr>)}
+                </tbody></table>
+              )}
+            </div>
+          </section>
         </>
       )}
 

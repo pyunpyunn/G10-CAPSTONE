@@ -62,6 +62,7 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
                 \PDO::ATTR_TIMEOUT => env('DB_CONNECTION_TIMEOUT', 5),
+                Mysql::ATTR_INIT_COMMAND => 'SET SESSION net_read_timeout = '.max(1, (int) env('DB_READ_TIMEOUT', 30)),
             ]) : [],
         ],
 
@@ -83,6 +84,7 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('RESQ_LOCAL_MYSQL_ATTR_SSL_CA', env('MYSQL_ATTR_SSL_CA')),
                 \PDO::ATTR_TIMEOUT => env('RESQ_LOCAL_DB_TIMEOUT', env('DB_CONNECTION_TIMEOUT', 5)),
+                Mysql::ATTR_INIT_COMMAND => 'SET SESSION net_read_timeout = '.max(1, (int) env('RESQ_LOCAL_DB_READ_TIMEOUT', env('DB_READ_TIMEOUT', 30))),
             ]) : [],
         ],
 
@@ -104,6 +106,7 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('TRACKINGAID_MYSQL_ATTR_SSL_CA'),
                 \PDO::ATTR_TIMEOUT => env('TRACKINGAID_DB_TIMEOUT', 5),
+                Mysql::ATTR_INIT_COMMAND => 'SET SESSION net_read_timeout = '.max(1, (int) env('TRACKINGAID_DB_READ_TIMEOUT', env('DB_READ_TIMEOUT', 30))),
             ]) : [],
         ],
 
@@ -125,6 +128,7 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
                 \PDO::ATTR_TIMEOUT => env('DB_CONNECTION_TIMEOUT', 5),
+                Mysql::ATTR_INIT_COMMAND => 'SET SESSION net_read_timeout = '.max(1, (int) env('DB_READ_TIMEOUT', 30)),
             ]) : [],
         ],
 

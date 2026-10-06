@@ -63,3 +63,5 @@ class DisasterEvent extends Model
         return $query->whereNotNull('started_at')->whereNull('ended_at');
     }
 }
+
+

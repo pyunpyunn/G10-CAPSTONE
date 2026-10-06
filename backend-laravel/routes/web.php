@@ -15,3 +15,5 @@ Route::get('/{path?}', function () {
 
     return response()->file($frontendIndex);
 })->where('path', '^(?!api(?:/|$)|frontend-web(?:/|$)|storage(?:/|$)|sanctum(?:/|$)|up$).*$');
+
+

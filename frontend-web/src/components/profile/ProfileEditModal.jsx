@@ -63,7 +63,7 @@ export default function ProfileEditModal({
             type="email"
             value={form.email}
             onChange={(event) => updateField('email', event.target.value)}
-            placeholder="email@example.com"
+            placeholder="Email address"
           />
         </label>
 

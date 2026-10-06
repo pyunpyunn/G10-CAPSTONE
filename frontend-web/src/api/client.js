@@ -11,8 +11,9 @@ function getApiBaseUrl() {
       const parsedUrl = new URL(configuredUrl)
 
       if (!isLocalBrowser && ['localhost', '127.0.0.1', '0.0.0.0'].includes(parsedUrl.hostname)) {
-        parsedUrl.hostname = browserHost
-        return parsedUrl.toString().replace(/\/$/, '')
+        // A LAN browser cannot reach the developer machine's loopback-only
+        // Laravel listener. Vite proxies this same-origin path during development.
+        return parsedUrl.pathname.replace(/\/$/, '')
       }
 
       return configuredUrl
@@ -22,7 +23,7 @@ function getApiBaseUrl() {
   }
 
   if (!isLocalBrowser) {
-    return `${window.location.protocol}//${browserHost}:8000/api/v1`
+    return '/api/v1'
   }
 
   return 'http://127.0.0.1:8000/api/v1'

@@ -56,3 +56,5 @@ class DeviceTrackingLog extends Model
         return $this->belongsTo(DeviceToken::class, 'device_token_id', 'id');
     }
 }
+
+

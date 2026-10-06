@@ -47,8 +47,8 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   const bellButtonRef = useRef(null)
   const searchControlsRef = useRef(null)
   const searchInputRef = useRef(null)
-  const roleName = user?.role?.role_name || 'HQ'
-  const displayName = user?.full_name || 'HQ Admin'
+  const roleName = user?.role?.role_name || 'Role unavailable'
+  const displayName = user?.full_name || user?.name || user?.username || 'Account'
   const initials = getInitials(user?.full_name)
   const unreadLabel = unreadCount > 99 ? '99+' : String(unreadCount)
   const canViewInquiries = user?.role?.role_key === 'super_admin'

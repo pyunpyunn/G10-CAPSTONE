@@ -82,3 +82,4 @@ class ResourceRequest extends Model
         return $this->hasMany(RequestValidation::class, 'request_id', 'request_id');
     }
 }
+

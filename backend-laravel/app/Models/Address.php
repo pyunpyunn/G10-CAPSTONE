@@ -32,3 +32,5 @@ class Address extends Model
         return $this->belongsTo(Purok::class, 'purok_id', 'purok_id');
     }
 }
+
+

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\HouseholdMobileService;
+use App\Services\Mobile\HouseholdMobileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -70,3 +70,6 @@ class SmsInboundController extends Controller
         return $status ? [$code, $status] : null;
     }
 }
+
+
+

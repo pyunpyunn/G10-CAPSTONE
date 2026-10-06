@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\MobileDeviceService;
+use App\Services\Mobile\MobileDeviceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,3 +16,6 @@ class MobileDeviceController extends Controller
         return $this->service->storePushToken($request);
     }
 }
+
+
+

@@ -2,12 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\Household;
-use App\Repositories\HouseholdRepository;
-use App\Services\HouseholdStatusService;
+use App\Presenters\HouseholdStatusPresenter;
+use App\Queries\HouseholdStatusQuery;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use ReflectionMethod;
 use Tests\TestCase;
 
 class HouseholdMemberStatusQueryTest extends TestCase
@@ -22,11 +20,8 @@ class HouseholdMemberStatusQueryTest extends TestCase
 
     public function test_member_statuses_are_loaded_per_member_for_the_active_disaster_event(): void
     {
-        $service = new HouseholdStatusService(new HouseholdRepository(new Household()));
-        $method = new ReflectionMethod(HouseholdStatusService::class, 'getMembers');
-        $method->setAccessible(true);
-
-        $members = $method->invoke($service, 'hh-1', 'evt-1', collect());
+        $query = new HouseholdStatusQuery(new HouseholdStatusPresenter());
+        $members = $query->getMembers('hh-1', 'evt-1', collect());
 
         $this->assertCount(2, $members);
         $this->assertSame('Safe', $members[0]['status']['label']);
@@ -142,3 +137,5 @@ class HouseholdMemberStatusQueryTest extends TestCase
         ]);
     }
 }
+
+

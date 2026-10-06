@@ -55,7 +55,7 @@ export default function RescuerAccountsPage() {
       const defaultTeam = firstTeam(teamOptions)
       setModalMode('create')
       setSelectedRescuerId(null)
-      setForm(emptyRescuerForm(accountIdForTeam(accountIdOptions, defaultTeam?.team_name, payload?.next_account_id || ''), defaultTeam))
+      setForm(emptyRescuerForm(accountIdForTeam(accountIdOptions, defaultTeam?.team_name, payload?.next_account_id || ''), defaultTeam, payload?.filters))
       setIsModalOpen(true)
     }
   }, [workflowType, workflow, payload])
@@ -188,13 +188,17 @@ export default function RescuerAccountsPage() {
   function resetForm() {
     if (modalMode === 'create') {
       const defaultTeam = firstTeam(teamOptions)
-      setForm(emptyRescuerForm(accountIdForTeam(accountIdOptions, defaultTeam?.team_name, payload?.next_account_id || ''), defaultTeam))
+      setForm(emptyRescuerForm(accountIdForTeam(accountIdOptions, defaultTeam?.team_name, payload?.next_account_id || ''), defaultTeam, payload?.filters))
     }
   }
 
   async function submitForm(event) {
     event.preventDefault()
     setFormError('')
+    if (modalMode === 'create' && !form.password.trim()) {
+      setFormError('Enter a temporary password before creating the account.')
+      return
+    }
     setIsSaving(true)
 
     try {
@@ -282,7 +286,7 @@ export default function RescuerAccountsPage() {
     <main className="ops-page rescuer-page">
       <PageHeader
         title={workflow ? (workflowType === 'teams' ? 'Configure rescue teams' : modalMode === 'view' ? 'View rescuer account' : modalMode === 'edit' ? 'Update rescuer account' : 'New rescuer account') : 'Rescuer Accounts'}
-        subtitle="Barangay Mambaling, Cebu City"
+        subtitle={payload?.area_label || 'Shared database records'}
         actions={workflow ? (
           <button className="button secondary" type="button" onClick={() => navigate('/rescuers')}><ArrowLeft size={15} />Back to roster</button>
         ) : (
@@ -294,7 +298,7 @@ export default function RescuerAccountsPage() {
       />
 
       {workflow && workflowType === 'teams' && <RescueTeamConfigModal embedded isOpen workspace={teamConfig} isLoading={teamConfigLoading} isSaving={teamConfigSaving} error={teamConfigError} onRetry={loadTeamConfig} onClose={() => navigate('/rescuers')} onSave={saveTeamConfig} onDelete={removeTeamConfig} />}
-      {workflow && workflowType !== 'teams' && <RescuerAccountModal embedded mode={modalMode} isOpen form={form} setForm={setForm} formError={formError} isSaving={isSaving} teamOptions={teamOptions} accountIdOptions={accountIdOptions} fallbackAccountId={payload?.next_account_id || ''} roles={filters.roles || ['Responder']} bloodTypes={filters.blood_types || ['Unknown']} onClose={() => navigate('/rescuers')} onReset={resetForm} onSubmit={submitForm} />}
+      {workflow && workflowType !== 'teams' && <RescuerAccountModal embedded mode={modalMode} isOpen form={form} setForm={setForm} formError={formError} isSaving={isSaving} teamOptions={teamOptions} accountIdOptions={accountIdOptions} fallbackAccountId={payload?.next_account_id || ''} roles={filters.roles || []} bloodTypes={filters.blood_types || []} onClose={() => navigate('/rescuers')} onReset={resetForm} onSubmit={submitForm} />}
 
       {!workflow && <>
           {isInitialLoading && <LoadingState />}

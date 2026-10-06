@@ -1,11 +1,16 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
 
 const tokenKey = 'resqperation_mobile_token';
 
 function getApiBaseUrl() {
   const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+  if (Platform.OS === 'web' && configuredUrl && isLocalhostUrl(configuredUrl)) {
+    return configuredUrl;
+  }
 
   if (configuredUrl && !isLocalhostUrl(configuredUrl)) {
     return configuredUrl;

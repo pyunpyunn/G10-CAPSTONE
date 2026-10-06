@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HouseholdMember extends Model
@@ -43,4 +44,11 @@ class HouseholdMember extends Model
     {
         return $this->belongsToMany(VulnerableGroup::class, 'member_vulnerable_groups', 'member_id', 'vulnerable_group_id');
     }
+
+    public function disasterStatuses(): HasMany
+    {
+        return $this->hasMany(MemberDisasterStatus::class, 'member_id', 'member_id');
+    }
 }
+
+

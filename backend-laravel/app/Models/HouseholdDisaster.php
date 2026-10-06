@@ -33,3 +33,5 @@ class HouseholdDisaster extends Model
         return $this->belongsTo(DisasterEvent::class, 'disaster_id', 'event_id');
     }
 }
+
+

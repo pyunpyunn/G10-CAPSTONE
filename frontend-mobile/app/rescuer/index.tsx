@@ -244,6 +244,7 @@ export default function RescuerHomeScreen() {
       return (
         <RescueMapScreen
           assignments={assignments}
+          evacuationCenters={overview.evacuation_centers || []}
           activeAssignment={activeAssignment}
           onSendLocation={handleSendLocation}
         />

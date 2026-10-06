@@ -61,3 +61,5 @@ abstract class EloquentRepository implements RepositoryInterface
         return (bool) $model->delete();
     }
 }
+
+

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
@@ -74,7 +74,11 @@ export function HouseholdProfileScreen({
       <View style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials(householdName || user.full_name || 'H')}</Text>
+            <Image
+              source={require('@/assets/images/household-default-profile.jpg')}
+              style={styles.avatarImage}
+              resizeMode="contain"
+            />
           </View>
           <View style={styles.heroText}>
             <Text style={styles.role}>Household account</Text>
@@ -95,6 +99,7 @@ export function HouseholdProfileScreen({
           <View style={styles.panelText}>
             <Text style={styles.panelLabel}>User</Text>
             <Text style={styles.panelTitle}>{deviceOwnerName}</Text>
+            <Text style={styles.panelMeta}>{memberIdentifier(user)}</Text>
           </View>
         </View>
 
@@ -109,7 +114,7 @@ export function HouseholdProfileScreen({
                   </View>
                   <View style={styles.panelText}>
                     <Text style={styles.panelTitle}>{member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'Household member'}</Text>
-                    <Text style={styles.panelMeta}>Member: {member.member_id || 'No member ID'}</Text>
+                    <Text style={styles.panelMeta}>{memberIdentifier(member)}</Text>
                   </View>
                 </View>
               );
@@ -183,6 +188,13 @@ function initials(value: string) {
     .join('');
 }
 
+function memberIdentifier(member: any) {
+  const title = member?.relationship || member?.relation || 'Member';
+  const memberId = member?.member_id || 'No member ID';
+
+  return `${title}: ${memberId}`;
+}
+
 function coordinatesLabel(geotag: any) {
   if (!geotag?.latitude || !geotag?.longitude) {
     return 'Coordinates not recorded';
@@ -215,12 +227,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ffffff66',
     borderRadius: 31,
-    backgroundColor: '#ffffff1f',
+    backgroundColor: '#fff',
   },
-  avatarText: {
-    color: '#fff',
-    fontSize: 21,
-    fontWeight: '900',
+  avatarImage: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
   },
   heroText: {
     flex: 1,

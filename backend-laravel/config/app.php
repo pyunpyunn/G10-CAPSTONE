@@ -2,6 +2,11 @@
 
 return [
 
+    'query_profile_enabled' => (bool) env('LOCAL_QUERY_PROFILE', false),
+    'schema_capability_cache_enabled' => (bool) env('SCHEMA_CAPABILITY_CACHE', true),
+    'schema_capability_cache_store' => env('SCHEMA_CAPABILITY_CACHE_STORE', 'file'),
+    'schema_capability_cache_version' => env('SCHEMA_CACHE_VERSION', '1'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Name

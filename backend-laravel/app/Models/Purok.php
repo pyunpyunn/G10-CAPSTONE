@@ -20,3 +20,5 @@ class Purok extends Model
         return $this->belongsTo(Sitio::class, 'sitio_id', 'sitio_id');
     }
 }
+
+

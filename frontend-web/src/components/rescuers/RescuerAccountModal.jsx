@@ -71,6 +71,7 @@ export default function RescuerAccountModal({
           <form className="ra-form-grid" id="rescuerAccountForm" onSubmit={onSubmit}>
             <Field label="Team">
               <select value={form.team_name} disabled={isView} onChange={(event) => selectTeam(event.target.value)}>
+                <option value="">Select a team</option>
                 {teamOptions.map((team) => (
                   <option value={team.team_name} key={`${team.team_name}-${team.source}`}>{team.team_name}</option>
                 ))}
@@ -100,6 +101,7 @@ export default function RescuerAccountModal({
             </Field>
             <Field label="Role">
               <select value={form.title} disabled={isView} onChange={(event) => updateField('title', event.target.value)}>
+                <option value="">Select a role</option>
                 {roles.map((role) => <option value={role} key={role}>{role}</option>)}
               </select>
             </Field>
@@ -111,7 +113,7 @@ export default function RescuerAccountModal({
             </Field>
             {!isView && (
               <Field label={mode === 'edit' ? 'New password' : 'Temporary password'}>
-                <input value={form.password} type="password" placeholder="minimum 6 characters" onChange={(event) => updateField('password', event.target.value)} />
+                <input value={form.password} type="password" placeholder="Minimum 6 characters" minLength={6} required={mode === 'create'} onChange={(event) => updateField('password', event.target.value)} />
               </Field>
             )}
             <Field label="Emergency contact">
@@ -125,13 +127,14 @@ export default function RescuerAccountModal({
             </Field>
             <Field label="Blood type">
               <select value={form.blood_type} disabled={isView} onChange={(event) => updateField('blood_type', event.target.value)}>
+                <option value="">Select a blood type</option>
                 {bloodTypes.map((type) => <option value={type} key={type}>{type}</option>)}
               </select>
             </Field>
             <Field label="Duty availability">
               <select value={form.duty_status} disabled={isView} onChange={(event) => updateField('duty_status', event.target.value)}>
                 <option value="on_duty">On duty</option>
-                <option value="standby">Stand-by</option>
+                <option value="available">Available</option>
                 <option value="reserve">Reserve</option>
                 <option value="off_duty">Off duty</option>
                 <option value="unavailable">Unavailable</option>

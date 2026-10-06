@@ -19,7 +19,7 @@ export default function MappingSidebar({
   return (
     <aside className="mapmate-data-rail">
       <MappingSummary summary={summary} />
-      <HouseholdRegistry hasActiveEvent={hasActiveEvent} households={households} selectedHousehold={selectedHousehold} routeLoadingId={routeLoadingId} onRouteToHousehold={onRouteToHousehold} />
+      <HouseholdRegistry hasActiveEvent={hasActiveEvent} households={households} unlocatedCount={summary.no_verified_geotag || 0} selectedHousehold={selectedHousehold} routeLoadingId={routeLoadingId} onRouteToHousehold={onRouteToHousehold} />
       <EvacuationPins
         hasActiveEvent={hasActiveEvent}
         evacuationSites={evacuationSites}
@@ -30,14 +30,14 @@ export default function MappingSidebar({
   )
 }
 
-function HouseholdRegistry({ hasActiveEvent, households, selectedHousehold, routeLoadingId, onRouteToHousehold }) {
+function HouseholdRegistry({ hasActiveEvent, households, unlocatedCount, selectedHousehold, routeLoadingId, onRouteToHousehold }) {
   return (
     <section className="mapmate-data-panel grow">
       <header><strong>Household registry</strong><span>{households.length}</span></header>
       {households.length === 0 ? (
         <EmptyState
           title={hasActiveEvent ? 'No geotagged households found' : 'Hidden until event'}
-          message={hasActiveEvent ? 'Only households with latitude and longitude appear here.' : 'The map stays plain before a declared disaster event.'}
+          message={hasActiveEvent ? `${unlocatedCount} registered households have no linked GPS coordinates. Their records remain available in Household Status.` : 'The map stays plain before a declared disaster event.'}
         />
       ) : (
         <div className="mapmate-registry-list">

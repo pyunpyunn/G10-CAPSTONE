@@ -71,13 +71,13 @@ export default function HouseholdTable({ households, meta, selectedPurok, onOpen
 }
 
 export function StatusBadge({ status }) {
-  const key = status?.key || 'unchecked'
-  const label = status?.label || 'Unchecked'
+  const key = status?.key || 'unknown'
+  const label = status?.label || 'Status unavailable'
   return <span className={`status-badge ${key}`}>{label}</span>
 }
 
 export function PriorityPill({ priority }) {
-  return <span className={`risk-pill ${priority?.key || 'stable'}`}>{priority?.label || 'Stable'}</span>
+  return <span className={`risk-pill ${priority?.key || 'unknown'}`}>{priority?.label || 'Priority unavailable'}</span>
 }
 
 function Pagination({ meta, onPageChange }) {

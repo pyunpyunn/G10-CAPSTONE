@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Presenters\UserRolePresenter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,8 +11,9 @@ class UserResource extends JsonResource
     public function toArray(Request $request): array
     {
         $loadedRole = $this->resource->relationLoaded('role') ? $this->resource->getRelation('role') : null;
-        $roleKey = method_exists($this->resource, 'roleKey') ? $this->resource->roleKey() : $loadedRole?->role_key;
-        $roleName = method_exists($this->resource, 'roleName') ? $this->resource->roleName() : $loadedRole?->role_name;
+        $roles = app(UserRolePresenter::class);
+        $roleKey = $roles->key($loadedRole, $this->resource->getAttributes());
+        $roleName = $roles->name($loadedRole, $this->resource->getAttributes(), $roleKey);
 
         return [
             'user_id' => $this->user_id ?? $this->id,
@@ -32,3 +34,5 @@ class UserResource extends JsonResource
         ];
     }
 }
+
+

@@ -31,6 +31,26 @@ return [
 
     'connections' => [
 
+        'operations_outbox' => [
+            'driver' => 'database',
+            'connection' => env('DB_CONNECTION', 'resq_local'),
+            'table' => 'jobs',
+            'queue' => 'operations',
+            'retry_after' => 180,
+            'after_commit' => false,
+        ],
+
+        // The jobs row is inserted through the operational connection within
+        // the same transaction as a resource-request change.
+        'trackingaid_outbox' => [
+            'driver' => 'database',
+            'connection' => env('DB_CONNECTION', 'resq_local'),
+            'table' => 'jobs',
+            'queue' => 'trackingaid',
+            'retry_after' => 180,
+            'after_commit' => false,
+        ],
+
         'sync' => [
             'driver' => 'sync',
         ],

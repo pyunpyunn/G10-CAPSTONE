@@ -8,8 +8,8 @@ export function emptyGenerateForm(summary) {
     report_number: summary?.report?.report_number || '',
     period_start: toDateTimeInput(new Date()),
     period_end: toDateTimeInput(new Date()),
-    prepared_by: summary?.report?.prepared_by || 'HQ/Admin Desk',
-    reviewed_by: summary?.report?.reviewed_by || 'Incident Commander',
+    prepared_by: summary?.report?.prepared_by || '',
+    reviewed_by: summary?.report?.reviewed_by || '',
     actions_text: summary?.actions_text || '',
     included_sections: summary?.included_sections || [],
   }

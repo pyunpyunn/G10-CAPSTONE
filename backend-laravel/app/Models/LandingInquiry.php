@@ -38,3 +38,5 @@ class LandingInquiry extends Model
         return $this->belongsTo(User::class, 'handled_by_user_id', 'user_id');
     }
 }
+
+

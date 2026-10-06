@@ -21,10 +21,14 @@ import {
   createTrustedHousehold,
   getHouseholdOverview,
   lookupTrustedHousehold,
+  respondToTrustedHouseholdRequest,
   saveHouseholdMemberStatus,
+  saveTrustedHouseholdMemberStatus,
   saveHouseholdStatus,
+  saveTrustedPin,
   updateHouseholdDeviceLocation,
   updateHouseholdMember,
+  verifyTrustedPin,
 } from '@/api/household';
 import type { HouseholdOverview } from '@/api/household';
 import { HouseholdDashboardScreen, HouseholdTrustedScreen } from '@/components/household/HouseholdDashboardScreen';
@@ -40,10 +44,9 @@ import { HouseholdSetupScreen } from '@/components/household/HouseholdSetupScree
 import { HouseholdLoading } from '@/components/household/HouseholdUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
-import { getPushRegistration, subscribeToBroadcastNotifications } from '@/utils/pushNotifications';
+import { getPushRegistration } from '@/utils/pushNotifications';
 
 const deviceUuidKey = 'resq_household_device_uuid';
-const trustedPinKey = 'resq_household_trusted_pin';
 type TabKey = 'home' | 'route' | 'trusted' | 'profile';
 type TabButtonKey = TabKey | 'qr';
 
@@ -69,20 +72,20 @@ export default function HouseholdHomeScreen() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showQr, setShowQr] = useState(false);
-  const [trustedPin, setTrustedPin] = useState('');
+  const [trustedPinConfigured, setTrustedPinConfigured] = useState(false);
   const [pinError, setPinError] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
   const [showPin, setShowPin] = useState(false);
-  const [pinAction, setPinAction] = useState<'open' | 'add'>('open');
+  const [pinAction, setPinAction] = useState<'open' | 'add' | 'change'>('open');
   const [selectedTrusted, setSelectedTrusted] = useState<any>(null);
   const [viewingTrusted, setViewingTrusted] = useState<any>(null);
   const [showAddTrusted, setShowAddTrusted] = useState(false);
   const [trustedLookup, setTrustedLookup] = useState<any>(null);
   const [trustedLoading, setTrustedLoading] = useState(false);
+  const [respondingTrustedConnectionId, setRespondingTrustedConnectionId] = useState<string | null>(null);
 
   const loadLocalKeys = useCallback(async () => {
     const existingDeviceUuid = await getStoredItem(deviceUuidKey);
-    const existingPin = await getStoredItem(trustedPinKey);
-
     if (existingDeviceUuid) {
       setDeviceUuid(existingDeviceUuid);
     } else {
@@ -91,7 +94,6 @@ export default function HouseholdHomeScreen() {
       setDeviceUuid(nextUuid);
     }
 
-    setTrustedPin(existingPin || '');
   }, []);
 
   const loadOverview = useCallback(async (isRefresh = false) => {
@@ -104,6 +106,12 @@ export default function HouseholdHomeScreen() {
     try {
       const data = await getHouseholdOverview();
       setOverview(data);
+      setTrustedPinConfigured(Boolean(data.trusted?.pin_configured));
+      setViewingTrusted((current: any) =>
+        current
+          ? data.trusted?.households?.find((household: any) => household.connection_id === current.connection_id) || null
+          : null
+      );
       const savedStatus = data.current_status?.status_key || data.status_options?.[0]?.key || 'safe';
       setPendingStatus(savedStatus);
       setEditingStatus(true);
@@ -158,7 +166,11 @@ export default function HouseholdHomeScreen() {
     refreshDeviceSensors();
   }, [loadLocalKeys, loadOverview, refreshDeviceSensors]);
 
-  useEffect(() => subscribeToBroadcastNotifications(() => loadOverview(true)), [loadOverview]);
+  useEffect(() => {
+    if (activeTab === 'trusted') {
+      void loadOverview(true);
+    }
+  }, [activeTab, loadOverview]);
 
   useEffect(() => {
     refreshDeviceSensors();
@@ -330,6 +342,39 @@ export default function HouseholdHomeScreen() {
     }
   }
 
+  async function handleSaveTrustedMemberStatus(connectionId: string, memberId: string, statusKey: string) {
+    if (!overview?.active_event) {
+      Alert.alert('No active disaster', 'Family member status can only be saved during an active disaster event.');
+      return;
+    }
+
+    const locationPayload: any = {};
+
+    if (currentDevice?.latitude && currentDevice?.longitude) {
+      locationPayload.latitude = currentDevice.latitude;
+      locationPayload.longitude = currentDevice.longitude;
+      locationPayload.location_label = currentDevice.last_location_label;
+    } else if (overview?.geotag?.latitude && overview?.geotag?.longitude) {
+      locationPayload.latitude = overview.geotag.latitude;
+      locationPayload.longitude = overview.geotag.longitude;
+      locationPayload.location_label = overview.geotag.location_label;
+      locationPayload.location_accuracy_m = overview.geotag.accuracy_m;
+    }
+
+    try {
+      await saveTrustedHouseholdMemberStatus(connectionId, memberId, {
+        status_key: statusKey,
+        device_uuid: deviceUuid,
+        battery_level: realBatteryLevel ?? undefined,
+        ...locationPayload,
+      });
+      await loadOverview(true);
+    } catch (error: any) {
+      Alert.alert('Unable to save trusted member status', errorMessage(error));
+      throw error;
+    }
+  }
+
   function openTrusted(household: any) {
     const status = String(household.validation_status || '').toLowerCase();
 
@@ -350,47 +395,44 @@ export default function HouseholdHomeScreen() {
   function openAddTrusted() {
     setPinAction('add');
     setPinError('');
-
-    if (trustedPin) {
-      setShowAddTrusted(true);
-      return;
-    }
-
     setShowPin(true);
   }
 
-  async function handlePinConfirm(pin: string) {
-    if (pin.length !== 4) {
-      setPinError('Enter a 4-digit PIN.');
-      return;
-    }
+  function openChangeTrustedPin() {
+    setPinAction('change');
+    setPinError('');
+    setShowPin(true);
+  }
 
-    if (!trustedPin) {
-      await setStoredItem(trustedPinKey, pin);
-      setTrustedPin(pin);
+  async function handlePinConfirm({ pin, currentPin }: { pin: string; currentPin?: string }) {
+    setPinSaving(true);
+    setPinError('');
+
+    try {
+      if (!trustedPinConfigured || pinAction === 'change') {
+        await saveTrustedPin({
+          pin,
+          pin_confirmation: pin,
+          current_pin: pinAction === 'change' ? currentPin : undefined,
+        });
+        setTrustedPinConfigured(true);
+      } else {
+        await verifyTrustedPin(pin);
+      }
+
       setShowPin(false);
 
       if (pinAction === 'add') {
         setShowAddTrusted(true);
-      } else if (selectedTrusted) {
+      } else if (pinAction === 'open' && selectedTrusted) {
         setViewingTrusted(selectedTrusted);
+      } else if (pinAction === 'change') {
+        Alert.alert('Household PIN', 'Your household PIN was changed.');
       }
-
-      return;
-    }
-
-    if (pin !== trustedPin) {
-      setPinError('PIN did not match.');
-      return;
-    }
-
-    setShowPin(false);
-    setPinError('');
-
-    if (pinAction === 'add') {
-      setShowAddTrusted(true);
-    } else if (selectedTrusted) {
-      setViewingTrusted(selectedTrusted);
+    } catch (error: any) {
+      setPinError(errorMessage(error));
+    } finally {
+      setPinSaving(false);
     }
   }
 
@@ -433,6 +475,41 @@ export default function HouseholdHomeScreen() {
     }
   }
 
+  function handleRespondToTrustedRequest(requestItem: any, decision: 'accept' | 'reject') {
+    const accepting = decision === 'accept';
+
+    Alert.alert(
+      accepting ? 'Accept trusted request?' : 'Decline trusted request?',
+      accepting
+        ? `Both households will be able to view each other's trusted household details.`
+        : `This will decline the request from ${requestItem.family_name || 'this household'}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: accepting ? 'Accept' : 'Decline',
+          style: accepting ? 'default' : 'destructive',
+          onPress: () => {
+            void saveTrustedRequestDecision(requestItem.connection_id, decision);
+          },
+        },
+      ]
+    );
+  }
+
+  async function saveTrustedRequestDecision(connectionId: string, decision: 'accept' | 'reject') {
+    setRespondingTrustedConnectionId(connectionId);
+
+    try {
+      const response = await respondToTrustedHouseholdRequest(connectionId, decision);
+      Alert.alert('Trusted households', response.message || 'Trusted household request updated.');
+      await loadOverview(true);
+    } catch (error: any) {
+      Alert.alert('Unable to update request', errorMessage(error));
+    } finally {
+      setRespondingTrustedConnectionId(null);
+    }
+  }
+
   function renderContent() {
     if (!overview) {
       return null;
@@ -456,10 +533,13 @@ export default function HouseholdHomeScreen() {
         <HouseholdTrustedScreen
           overview={overview}
           viewingTrusted={viewingTrusted}
-          onOpenQr={() => setShowQr(true)}
           onAddTrusted={openAddTrusted}
+          onChangeTrustedPin={openChangeTrustedPin}
           onOpenTrusted={openTrusted}
           onBackFamily={() => setViewingTrusted(null)}
+          onRespondToIncomingRequest={handleRespondToTrustedRequest}
+          respondingConnectionId={respondingTrustedConnectionId}
+          onSaveTrustedMemberStatus={handleSaveTrustedMemberStatus}
         />
       );
     }
@@ -552,7 +632,8 @@ export default function HouseholdHomeScreen() {
       <HouseholdQrModal visible={showQr} qr={overview.qr} onClose={() => setShowQr(false)} />
       <TrustedPinModal
         visible={showPin}
-        hasPin={Boolean(trustedPin)}
+        mode={pinAction === 'change' ? 'change' : trustedPinConfigured ? 'verify' : 'set'}
+        saving={pinSaving}
         error={pinError}
         onClose={() => setShowPin(false)}
         onConfirm={handlePinConfirm}

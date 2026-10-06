@@ -34,6 +34,7 @@ import './styles/dispatch.css'
 import './styles/situation.css'
 import './styles/responsive.css'
 import './styles/mapmate-reference.css'
+import './styles/map-enhancements.css'
 
 const webRoles = ['super_admin', 'admin']
 
@@ -44,6 +45,7 @@ const pageComponents = {
   '/weather': lazy(() => import('./pages/WeatherPage')),
   '/mapping': lazy(() => import('./pages/MappingPage')),
   '/households': lazy(() => import('./pages/HouseholdStatusPage')),
+  '/households/_household-list': lazy(() => import('./pages/HouseholdPurokListPage')),
   '/dispatch': lazy(() => import('./pages/RescueDispatchPage')),
   '/dispatch/new': lazy(() => import('./pages/NewDispatchPage')),
   '/rescuers': lazy(() => import('./pages/RescuerAccountsPage')),
@@ -107,16 +109,16 @@ const modulePages = [
     summary: 'Assign teams, monitor progress, and record field outcomes from rescuer updates.',
   },
   {
-    path: '/rescuers',
-    title: 'Rescuer Accounts',
-    kicker: 'Verified accounts',
-    summary: 'Create and manage HQ-created rescuer accounts, teams, duty status, and contact details.',
-  },
-  {
     path: '/resources-requests',
     title: 'Resources & Requests',
     kicker: 'Validation queue',
     summary: 'Validate EvaTrack/manual requests before forwarding verified records to TrackingAid/HQ.',
+  },
+  {
+    path: '/rescuers',
+    title: 'Rescuer Accounts',
+    kicker: 'Verified accounts',
+    summary: 'Create and manage HQ-created rescuer accounts, teams, duty status, and contact details.',
   },
   {
     path: '/situation',
@@ -242,6 +244,7 @@ function AuthRoutes() {
             element={<LazyPage page={page} />}
           />
         ))}
+        <Route path="households/_household-list" element={<LazyPage page={{ path: '/households/_household-list' }} />} />
         <Route path="households/:householdId" element={<HouseholdReviewPage />} />
         <Route path="notifications" element={<LazyPage page={{ path: '/notifications' }} />} />
         <Route path="profile" element={<LazyPage page={{ path: '/profile' }} />} />

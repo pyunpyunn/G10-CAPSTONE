@@ -95,7 +95,7 @@ export default function ResourcesRequestsPage() {
     <section className="page active resources-page">
       <PageHeader
         title="Resources & Requests"
-        subtitle="Barangay Mambaling, Cebu City"
+        subtitle={payload?.area_label || 'Shared database records'}
         actions={<button className="button review" type="button" onClick={openCreateModal}><PackageCheck size={16} />New request</button>}
       />
 

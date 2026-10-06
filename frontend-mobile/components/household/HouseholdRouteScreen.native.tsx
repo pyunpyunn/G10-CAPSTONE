@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
-import { canUseNativeMap, MobileMapFallback } from '@/components/MobileMapFallback';
+import * as Location from 'expo-location';
+import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
 
@@ -21,6 +21,11 @@ const defaultRegion = {
 export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) {
   const centers = useMemo(() => evacuationCenters || [], [evacuationCenters]);
   const [selectedId, setSelectedId] = useState<string>('');
+  const [originMode, setOriginMode] = useState<'geotag' | 'live'>('geotag');
+  const [livePoint, setLivePoint] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [roadRoute, setRoadRoute] = useState<{ coordinates: { latitude: number; longitude: number }[]; distance_km: number; duration_min: number } | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState('');
 
   useEffect(() => {
     if (!selectedId && centers.length) {
@@ -28,7 +33,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
     }
   }, [centers, selectedId]);
 
-  const householdPoint = geotag
+  const householdPoint = geotag && Number.isFinite(Number(geotag.latitude)) && Number.isFinite(Number(geotag.longitude))
     ? {
         latitude: Number(geotag.latitude),
         longitude: Number(geotag.longitude),
@@ -46,13 +51,85 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
       }
     : null;
 
-  const mapRegion = householdPoint
-    ? { ...householdPoint, latitudeDelta: 0.025, longitudeDelta: 0.025 }
-    : defaultRegion;
+  const originPoint = originMode === 'live' ? livePoint : householdPoint;
+  const originLatitude = originPoint?.latitude;
+  const originLongitude = originPoint?.longitude;
+  const centerLatitude = selectedPoint?.latitude;
+  const centerLongitude = selectedPoint?.longitude;
 
-  const distanceLabel =
-    householdPoint && selectedPoint
-      ? `${distanceKm(householdPoint, selectedPoint).toFixed(2)} km direct distance`
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRoute() {
+      if (originLatitude === undefined || originLongitude === undefined || centerLatitude === undefined || centerLongitude === undefined) {
+        setRoadRoute(null);
+        setRouteError('');
+        return;
+      }
+
+      setRouteLoading(true);
+      setRouteError('');
+
+      try {
+        const start = `${originLongitude},${originLatitude}`;
+        const end = `${centerLongitude},${centerLatitude}`;
+        const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${start};${end}?overview=full&geometries=geojson`);
+        const data = await response.json();
+        const route = data.routes?.[0];
+
+        if (!response.ok || !route) {
+          throw new Error('No road route is available for these locations.');
+        }
+
+        if (!cancelled) {
+          setRoadRoute({
+            distance_km: Number((route.distance / 1000).toFixed(2)),
+            duration_min: Math.max(1, Math.round(route.duration / 60)),
+            coordinates: route.geometry.coordinates.map((point: number[]) => ({ latitude: point[1], longitude: point[0] })),
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setRoadRoute(null);
+          setRouteError('Could not load a road route. Check your connection and try again.');
+        }
+      } finally {
+        if (!cancelled) setRouteLoading(false);
+      }
+    }
+
+    loadRoute();
+    return () => { cancelled = true; };
+  }, [originLatitude, originLongitude, centerLatitude, centerLongitude]);
+
+  async function useLiveGps() {
+    setRouteError('');
+
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== 'granted') {
+        setRouteError('Allow location access to route from your live GPS position.');
+        return;
+      }
+
+      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      setLivePoint({ latitude: current.coords.latitude, longitude: current.coords.longitude });
+      setOriginMode('live');
+    } catch {
+      setRouteError('Unable to get your current location. Use your household geotag instead.');
+    }
+  }
+
+  const mapMarkers = [
+    ...(originPoint ? [{ ...originPoint, label: originMode === 'live' ? 'Live GPS location' : 'Your household', color: palette.navActive }] : []),
+    ...(selectedPoint ? [{ ...selectedPoint, label: selectedCenter?.name || 'Evacuation center', color: palette.safe }] : []),
+  ];
+  const mapRoutes = roadRoute ? [{ id: 'household-evacuation-route', label: 'Route to evacuation center', coordinates: roadRoute.coordinates, color: palette.safe }] : [];
+  const distanceLabel = roadRoute
+    ? `${roadRoute.distance_km} km · ${roadRoute.duration_min} min by road`
+    : routeLoading
+      ? 'Finding road route...'
       : 'Route distance unavailable';
 
   return (
@@ -63,42 +140,27 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
           action={<HouseholdBadge label={selectedCenter ? 'Route ready' : 'No center'} tone={selectedCenter ? 'info' : 'neutral'} />}
         />
 
-        {canUseNativeMap ? (
-          <MapView style={styles.map} initialRegion={mapRegion}>
-            {householdPoint ? (
-              <>
-                <Marker coordinate={householdPoint} title="Your household" description={geotag.location_label} pinColor={palette.navActive} />
-                <Circle center={householdPoint} radius={geotag.accuracy_m || 35} strokeColor="#1f3e5a55" fillColor="#1f3e5a18" />
-              </>
-            ) : null}
+        <View style={styles.originSwitch} accessibilityRole="radiogroup">
+          <Pressable
+            style={[styles.originOption, originMode === 'geotag' && styles.originOptionActive]}
+            onPress={() => setOriginMode('geotag')}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: originMode === 'geotag' }}
+          >
+            <Text style={[styles.originOptionText, originMode === 'geotag' && styles.originOptionTextActive]}>Household geotag</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.originOption, originMode === 'live' && styles.originOptionActive]}
+            onPress={useLiveGps}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: originMode === 'live' }}
+          >
+            <Text style={[styles.originOptionText, originMode === 'live' && styles.originOptionTextActive]}>Use live GPS</Text>
+          </Pressable>
+        </View>
 
-            {centers.map((center) => (
-              <Marker
-                key={center.evacuation_center_id}
-                coordinate={{
-                  latitude: Number(center.latitude),
-                  longitude: Number(center.longitude),
-                }}
-                title={center.name}
-                description={center.address || center.center_type}
-                pinColor={String(center.evacuation_center_id) === selectedId ? palette.safe : palette.evacuated}
-              />
-            ))}
-
-            {householdPoint && selectedPoint ? (
-              <Polyline coordinates={[householdPoint, selectedPoint]} strokeColor={palette.safe} strokeWidth={4} />
-            ) : null}
-          </MapView>
-        ) : (
-          <MobileMapFallback
-            title="Evacuation route map"
-            message="OpenStreetMap preview for your household and selected evacuation center."
-            points={[
-              ...(householdPoint ? [{ ...householdPoint, label: 'Your household', color: palette.navActive }] : []),
-              ...(selectedPoint ? [{ ...selectedPoint, label: selectedCenter?.name || 'Evacuation center', color: palette.safe }] : []),
-            ]}
-          />
-        )}
+        <MobileLeafletMap markers={mapMarkers} routes={mapRoutes} center={originPoint || selectedPoint || defaultRegion} />
+        {routeError ? <Text style={styles.routeError}>{routeError}</Text> : null}
 
         {!householdPoint ? (
           <HouseholdEmpty
@@ -161,24 +223,6 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
   );
 }
 
-function distanceKm(start: { latitude: number; longitude: number }, end: { latitude: number; longitude: number }) {
-  const earthRadiusKm = 6371;
-  const latDistance = toRadians(end.latitude - start.latitude);
-  const lonDistance = toRadians(end.longitude - start.longitude);
-  const a =
-    Math.sin(latDistance / 2) * Math.sin(latDistance / 2) +
-    Math.cos(toRadians(start.latitude)) *
-      Math.cos(toRadians(end.latitude)) *
-      Math.sin(lonDistance / 2) *
-      Math.sin(lonDistance / 2);
-
-  return earthRadiusKm * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-}
-
-function toRadians(value: number) {
-  return (value * Math.PI) / 180;
-}
-
 const styles = StyleSheet.create({
   stack: {
     gap: spacing.md,
@@ -191,11 +235,18 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: palette.card,
   },
-  map: {
-    height: 340,
-    overflow: 'hidden',
+  originSwitch: {
+    flexDirection: 'row',
+    gap: 4,
     borderRadius: radius.md,
+    padding: 4,
+    backgroundColor: palette.secondary,
   },
+  originOption: { flex: 1, alignItems: 'center', borderRadius: radius.sm, paddingVertical: 9 },
+  originOptionActive: { backgroundColor: palette.card },
+  originOptionText: { color: palette.textSoft, fontSize: 12, fontWeight: '800' },
+  originOptionTextActive: { color: palette.nav, fontWeight: '900' },
+  routeError: { color: palette.unsafe, fontSize: 12, fontWeight: '800' },
   selectedBox: {
     flexDirection: 'row',
     alignItems: 'center',

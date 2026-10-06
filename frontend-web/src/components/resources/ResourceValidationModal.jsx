@@ -27,28 +27,9 @@ export default function ResourceValidationModal({
   const decisionDisabled = !isValidate
   const modalTitle = modalTitleFor(mode)
   const modalSub = modalSubFor(mode, selectedRequestId)
-  const sourceOptions = options.sources?.length
-    ? options.sources
-    : [
-      { key: 'hq_desk', label: 'HQ desk' },
-      { key: 'shared_db', label: 'EvaTrack request' },
-      { key: 'rescuer_mobile', label: 'Rescuer mobile' },
-    ]
-  const categoryOptions = options.categories?.length
-    ? options.categories
-    : [
-      { key: 'resource', label: 'Resource' },
-      { key: 'personnel', label: 'Personnel' },
-    ]
-  const statusOptions = options.statuses?.length
-    ? options.statuses
-    : [
-      { key: 'needs_validation', label: 'Needs validation' },
-      { key: 'verified', label: 'Verified' },
-      { key: 'returned', label: 'Returned' },
-      { key: 'forwarded', label: 'Forwarded' },
-      { key: 'cancelled', label: 'Cancelled' },
-    ]
+  const sourceOptions = options.sources || []
+  const categoryOptions = options.categories || []
+  const statusOptions = options.statuses || []
   const validationOptions = statusOptions.filter((status) => ['needs_validation', 'verified', 'cancelled'].includes(status.key))
   const displayedStatusOptions = statusOptionsForMode(mode, form.validation_status, statusOptions, validationOptions)
 

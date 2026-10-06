@@ -38,3 +38,5 @@ class ResponderLocationLog extends Model
         return $this->belongsTo(Responder::class, 'responder_id', 'responder_id');
     }
 }
+
+

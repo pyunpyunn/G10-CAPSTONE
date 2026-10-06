@@ -13,6 +13,7 @@ export type RescuerOverview = {
     urgent_assignments: number;
   };
   assignments: any[];
+  evacuation_centers: any[];
   field_reports: any[];
   resource_requests: any[];
   status_options: any[];

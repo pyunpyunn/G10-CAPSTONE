@@ -54,3 +54,5 @@ class SituationReport extends Model
         return $this->belongsTo(User::class, 'reviewed_by_user_id', 'user_id');
     }
 }
+
+

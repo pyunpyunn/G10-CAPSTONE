@@ -1,12 +1,3 @@
-export const defaultStatusKeys = ['safe', 'evacuated', 'need_help', 'unsafe']
-
-export const priorityOptions = [
-  { value: 'critical', label: 'Critical' },
-  { value: 'high', label: 'High' },
-  { value: 'watch', label: 'Watch' },
-  { value: 'monitor', label: 'Monitor' },
-]
-
 export const durationOptions = [
   { value: '2 hours', label: '2 hours' },
   { value: '6 hours', label: '6 hours' },
@@ -28,7 +19,7 @@ export function defaultForm(workspace = {}) {
     severity_id: preferredSeverityId(severityLevels),
     started_date: date,
     started_time: time,
-    estimated_duration: 'Until further notice',
+    estimated_duration: durationOptions[durationOptions.length - 1].value,
     scope_type: 'barangay_wide',
     broadcast_title: '',
     message: '',

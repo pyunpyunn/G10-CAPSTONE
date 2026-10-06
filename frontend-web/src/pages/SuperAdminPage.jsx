@@ -9,14 +9,6 @@ import PaginationBar from '../components/ui/PaginationBar'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
 import DataFilterBar from '../components/ui/DataFilterBar'
 
-const statuses = [
-  { key: 'all', label: 'All' },
-  { key: 'new', label: 'New' },
-  { key: 'in_review', label: 'In review' },
-  { key: 'responded', label: 'Responded' },
-  { key: 'closed', label: 'Closed' },
-]
-
 export default function SuperAdminPage() {
   const [payload, setPayload] = useState(null)
   const [status, setStatus] = useState('all')
@@ -84,6 +76,11 @@ export default function SuperAdminPage() {
   const inquiries = payload?.inquiries?.data || []
   const pagination = payload?.inquiries || {}
   const summary = payload?.summary || {}
+  const statuses = [
+    { key: 'all', label: 'All' },
+    ...Object.keys(summary).filter((key) => key !== 'total')
+      .map((key) => ({ key, label: key.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) })),
+  ]
   const accounts = payload?.accounts || {}
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)

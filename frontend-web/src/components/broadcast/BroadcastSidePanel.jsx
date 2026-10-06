@@ -179,7 +179,7 @@ function BroadcastLog({ broadcasts }) {
 
                 <div className="bc-log-meta">
                   <span><strong>Sent:</strong> {broadcast.sent_time || '-'}</span>
-                  <span><strong>Target:</strong> {broadcast.scope_label || broadcast.target_area || 'All'}</span>
+                  <span><strong>Target:</strong> {broadcast.scope_label || broadcast.target_area || 'Target unavailable'}</span>
                   <span><strong>Recipients:</strong> {broadcast.recipient_count || 0}</span>
                 </div>
 

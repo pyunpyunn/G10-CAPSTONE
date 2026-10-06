@@ -3,10 +3,16 @@ import {
 } from '../../utils/householdStatusHelpers'
 
 export default function HouseholdSummary({ summary }) {
-  const progress = makeProgress(summary)
-
   return (
     <>
+      <HouseholdSummaryMetrics summary={summary} />
+      <HouseholdProgress summary={summary} />
+    </>
+  )
+}
+
+export function HouseholdSummaryMetrics({ summary }) {
+  return (
       <section className="summary-section">
         <div className="summary-header-row">
           <span>Household summary</span>
@@ -19,24 +25,28 @@ export default function HouseholdSummary({ summary }) {
           <Metric label="Unsafe" value={String(summary.unsafe || 0)} tone="unsafe" />
         </div>
       </section>
+  )
+}
 
+export function HouseholdProgress({ summary }) {
+  const progress = makeProgress(summary)
+  return (
       <section className="progress-section">
         <div className="side-heading">
           <span>Progress</span>
-          <span>{summary.reported || 0}% reported</span>
+          <span>{summary.reporting_percent || 0}% reported</span>
         </div>
-        <div className="progress-track" aria-label="Household status progress">
-          {progress.map((item) => (
-            <span key={item.label} className={`progress-${item.className}`} style={{ width: `${item.percent}%` }} />
-          ))}
-        </div>
-        <div className="progress-legend">
-          {progress.map((item) => (
-            <span key={item.label}><i className={`${item.className}-dot`} />{item.label} {item.percent}%</span>
-          ))}
+        <div className="progress-wrap">
+          <div className="progress-track" tabIndex={0} aria-label={`Household status progress: ${progress.map((item) => `${item.label} ${item.percent}%`).join(', ')}`}>
+            {progress.map((item) => (
+              <span key={item.label} className={`progress-${item.className}`} style={{ width: `${item.width}%` }} title={`${item.label}: ${item.count} households (${item.percent}%)`} />
+            ))}
+          </div>
+          <div className="progress-tooltip" role="tooltip">
+            {progress.map((item) => <span key={item.label}>{item.label}: <strong>{item.count} ({item.percent}%)</strong></span>)}
+          </div>
         </div>
       </section>
-    </>
   )
 }
 

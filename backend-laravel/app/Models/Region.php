@@ -11,3 +11,5 @@ class Region extends Model
     protected $fillable = ['region_code', 'region_name'];
     public function provinces(): HasMany { return $this->hasMany(Province::class, 'region_id', 'region_id'); }
 }
+
+
