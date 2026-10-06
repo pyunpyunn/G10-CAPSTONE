@@ -81,7 +81,7 @@ class TrackingAidForwardingService
         try {
             config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 1]);
 
-            if (! Schema::connection($connection)->hasTable($table)) {
+            if (! $this->readTableAvailable($connection, $table)) {
                 return;
             }
 
