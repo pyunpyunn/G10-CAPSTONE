@@ -17,3 +17,5 @@ class Responder extends Model
     public function team(): BelongsTo { return $this->belongsTo(RescueTeam::class, 'team_id', 'team_id'); }
     public function assignments(): HasMany { return $this->hasMany(ResponderAssignment::class, 'responder_id', 'responder_id'); }
 }
+
+

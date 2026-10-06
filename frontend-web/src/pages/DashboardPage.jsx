@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [weatherState, setWeatherState] = useState({ data: null, isLoading: true, error: '' })
   const [requestsState, setRequestsState] = useState({ data: null, isLoading: true, error: '' })
   const [activityState, setActivityState] = useState({ data: null, isLoading: true, error: '' })
+  const [refreshVersion, setRefreshVersion] = useState(0)
 
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
   const [isClosingEvent, setIsClosingEvent] = useState(false)
@@ -42,6 +43,7 @@ export default function DashboardPage() {
     try {
       const data = await getDashboardDispatch()
       setDispatchState({ data, isLoading: false, error: '' })
+      setRefreshVersion((version) => version + 1)
     } catch {
       setDispatchState({ data: null, isLoading: false, error: 'Dispatch data cannot be loaded right now.' })
     }
@@ -172,6 +174,7 @@ export default function DashboardPage() {
           stats={stats}
           hasActiveEvent={hasActiveEvent}
           onOpenModule={openModule}
+          refreshVersion={refreshVersion}
         />
         <DashboardOverview
           weatherState={weatherState}

@@ -1,5 +1,4 @@
 import DataFilterBar from '../ui/DataFilterBar'
-import { requestChips } from '../../utils/resourceRequestHelpers'
 
 export default function ResourceRequestFilters({
   search,
@@ -7,6 +6,8 @@ export default function ResourceRequestFilters({
   purok,
   onPurokChange,
   puroks = [],
+  statuses = [],
+  categories = [],
   activeChip,
   onChipChange,
 }) {
@@ -29,7 +30,11 @@ export default function ResourceRequestFilters({
           label: 'Status or type',
           value: activeChip,
           onChange: onChipChange,
-          options: requestChips.map((chip) => ({ value: chip.key, label: chip.label })),
+          options: [
+            { value: 'all', label: 'All' },
+            ...statuses.map((item) => ({ value: `status:${item.key}`, label: item.label })),
+            ...categories.map((item) => ({ value: `category:${item.key}`, label: item.label })),
+          ],
         },
       ]}
       onReset={() => {

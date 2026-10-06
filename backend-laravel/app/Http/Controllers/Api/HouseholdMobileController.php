@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\HouseholdMobileService;
+use App\Services\Mobile\HouseholdMobileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -41,6 +41,11 @@ class HouseholdMobileController extends Controller
         return $this->service->storeMemberStatus($request, $memberId);
     }
 
+    public function storeTrustedMemberStatus(Request $request, string $connectionId, string $memberId): JsonResponse
+    {
+        return $this->service->storeTrustedMemberStatus($request, $connectionId, $memberId);
+    }
+
     public function storeStatus(Request $request): JsonResponse
     {
         return $this->service->storeStatus($request);
@@ -61,6 +66,16 @@ class HouseholdMobileController extends Controller
         return $this->service->trustedHouseholds($request);
     }
 
+    public function saveTrustedPin(Request $request): JsonResponse
+    {
+        return $this->service->saveTrustedPin($request);
+    }
+
+    public function verifyTrustedPin(Request $request): JsonResponse
+    {
+        return $this->service->verifyTrustedPin($request);
+    }
+
     public function lookupTrustedHousehold(Request $request, string $householdId): JsonResponse
     {
         return $this->service->lookupTrustedHousehold($request, $householdId);
@@ -70,4 +85,12 @@ class HouseholdMobileController extends Controller
     {
         return $this->service->storeTrustedHousehold($request);
     }
+
+    public function respondToTrustedHousehold(Request $request, string $connectionId): JsonResponse
+    {
+        return $this->service->respondToTrustedHousehold($request, $connectionId);
+    }
 }
+
+
+

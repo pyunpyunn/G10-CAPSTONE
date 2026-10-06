@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\DisasterBroadcastService;
+use App\Services\Web\DisasterBroadcastService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -46,3 +46,5 @@ class DisasterBroadcastController extends Controller
         return $this->service->storeBroadcast($request, $eventId);
     }
 }
+
+

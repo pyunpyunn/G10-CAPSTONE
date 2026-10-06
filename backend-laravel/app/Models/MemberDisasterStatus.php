@@ -15,3 +15,5 @@ class MemberDisasterStatus extends Model
     public function status(): BelongsTo { return $this->belongsTo(MemberStatus::class, 'status_id', 'status_id'); }
     public function disaster(): BelongsTo { return $this->belongsTo(DisasterEvent::class, 'disaster_id', 'event_id'); }
 }
+
+

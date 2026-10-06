@@ -19,14 +19,14 @@ function SourceRule({ autoRefresh }) {
     <section className="wx-panel">
       <div className="wx-panel-head">
         <span className="wx-panel-title">Source freshness</span>
-        <Badge tone="blue">Live</Badge>
+        <Badge tone="blue">Source settings</Badge>
       </div>
       <div className="wx-freshness-row">
         <span className="wx-freshness-dot" aria-hidden="true" />
-        <strong>{autoRefresh?.source || 'Open-Meteo Forecast API'}</strong>
+        <strong>{autoRefresh?.source || 'Source unavailable'}</strong>
       </div>
       <div className="wx-freshness-meta">
-        Latest snapshot refreshes every 3 hours.
+        {autoRefresh?.frequency || 'Refresh schedule unavailable.'}
       </div>
     </section>
   )

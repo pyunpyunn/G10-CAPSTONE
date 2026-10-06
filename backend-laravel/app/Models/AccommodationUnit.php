@@ -36,3 +36,5 @@ class AccommodationUnit extends Model
         return $this->belongsTo(AccommodationType::class, 'type_id', 'type_id');
     }
 }
+
+

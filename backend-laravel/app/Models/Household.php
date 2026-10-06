@@ -53,6 +53,11 @@ class Household extends Model
         return $this->hasMany(DeviceToken::class, 'household_id', 'household_id');
     }
 
+    public function geotags(): HasMany
+    {
+        return $this->hasMany(GeotaggedLocation::class, 'household_id', 'household_id');
+    }
+
     public function scopeSearch(Builder $query, ?string $term): Builder
     {
         $term = trim((string) $term);
@@ -60,3 +65,5 @@ class Household extends Model
         return $term === '' ? $query : $query->where(fn (Builder $q) => $q->where('household_name', 'like', "%{$term}%")->orWhere('household_id', 'like', "%{$term}%")->orWhere('household_code', 'like', "%{$term}%")->orWhere('contact_number', 'like', "%{$term}%"));
     }
 }
+
+

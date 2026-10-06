@@ -1,5 +1,6 @@
 import { ArrowUpRight, Radio, Settings, TriangleAlert, X } from 'lucide-react'
 import { useState } from 'react'
+import RescueCriteriaChart from './RescueCriteriaChart'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 import LoadingState from '../ui/LoadingState'
@@ -19,6 +20,7 @@ export default function DashboardMainContent({
   stats,
   hasActiveEvent,
   onOpenModule,
+  refreshVersion,
 }) {
   const [isStandbyStripVisible, setIsStandbyStripVisible] = useState(true)
 
@@ -98,6 +100,11 @@ export default function DashboardMainContent({
       >
         <TeamDispatchTable teams={dispatchData.teams} isLoading={dispatchState?.isLoading} />
       </Panel>
+
+      <RescueCriteriaChart
+        eventId={summaryState?.data?.active_event?.event_id}
+        refreshVersion={refreshVersion}
+      />
 
       <div className="sep">
         Recent activity log <span>showing latest event reports only</span>
@@ -235,6 +242,7 @@ function ChartCard({ title, bars = [], isLoading, emptyTitle, emptyMessage, alwa
   )
 }
 
+<<<<<<< HEAD
 function TeamDispatchTable({ teams = [], isLoading }) {
   if (isLoading) {
     return <LoadingState inline />
@@ -281,6 +289,9 @@ function ActivityLog({ activities = [], isLoading, onViewAll }) {
     )
   }
 
+=======
+function ActivityLog({ activities = [], onViewAll }) {
+>>>>>>> 352bbe0136bf9d6afdb9a80f56475f54b96661d4
   if (activities.length === 0) {
     return (
       <div className="tbl-wrap">

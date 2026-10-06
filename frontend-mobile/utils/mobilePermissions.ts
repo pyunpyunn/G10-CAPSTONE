@@ -1,10 +1,14 @@
 import * as Location from 'expo-location';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { registerOneSignalDevice } from '@/utils/mobileDeviceRegistration';
 
 type MobileRole = 'household_resident' | 'rescuer';
 
 export async function askStandardMobilePermissions(role: MobileRole) {
+  if (Platform.OS === 'web') {
+    return;
+  }
+
   try {
     await registerOneSignalDevice(
       role,

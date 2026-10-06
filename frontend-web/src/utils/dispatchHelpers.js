@@ -1,15 +1,4 @@
-export const teamFilters = [
-  { key: 'all', label: 'All' },
-  { key: 'on_scene', label: 'On-scene' },
-  { key: 'dispatched', label: 'Dispatched' },
-  { key: 'accepted', label: 'Accepted' },
-  { key: 'en_route', label: 'En route' },
-  { key: 'returning', label: 'Returning to base' },
-  { key: 'standby', label: 'Stand-by' },
-]
-
 export const dispatchStatuses = [
-  { value: 'standby', label: 'Stand-by' },
   { value: 'dispatched', label: 'Assigned / waiting acceptance' },
   { value: 'accepted', label: 'Accepted' },
   { value: 'en_route', label: 'En route' },
@@ -26,15 +15,12 @@ export const priorityOptions = [
 ]
 
 export function buildRequestBody(option, form) {
-  const selectedResponderIds = Array.isArray(form.selected_responder_ids)
-    ? form.selected_responder_ids.map((id) => Number(id)).filter(Boolean)
-    : []
-
   const body = {
     assigned_area: form.assigned_area,
     household_id: form.household_id || null,
     households_to_cover: Number(form.households_to_cover) || 0,
-    responder_count: selectedResponderIds.length || Number(form.responder_count) || 1,
+    responder_count: Number(form.responder_count) || 1,
+    dispatch_type: form.dispatch_type || 'rescue',
     priority_level: form.priority_level,
     status: form.status,
     dispatch_notes: form.dispatch_notes,
@@ -46,10 +32,6 @@ export function buildRequestBody(option, form) {
     missing_count: Number(form.missing_count) || 0,
     pending_count: Number(form.pending_count) || 0,
     outcome_notes: form.outcome_notes,
-  }
-
-  if (selectedResponderIds.length > 0) {
-    body.selected_responder_ids = selectedResponderIds
   }
 
   const [type, id] = option.split(':')
@@ -79,6 +61,7 @@ export function defaultForm() {
     household_id: '',
     households_to_cover: 0,
     responder_count: 1,
+    dispatch_type: 'rescue',
     selected_responder_ids: [],
     priority_level: 'high',
     status: 'dispatched',
@@ -109,7 +92,7 @@ export function emptySummary() {
     total_teams: 0,
     dispatched: 0,
     on_scene: 0,
-    standby: 0,
+    available: 0,
     completed: 0,
     response_rate: 0,
     active_units: 0,

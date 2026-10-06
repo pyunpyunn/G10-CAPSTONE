@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\RescuerAccountService;
+use App\Http\Requests\ListRequest;
+use App\Services\Mobile\RescuerAccountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,7 +17,7 @@ class RescuerAccountController extends Controller
         $this->service = $service;
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(ListRequest $request): JsonResponse
     {
         return $this->service->index($request);
     }
@@ -61,3 +62,6 @@ class RescuerAccountController extends Controller
         return $this->service->deactivate($request, $responderId);
     }
 }
+
+
+

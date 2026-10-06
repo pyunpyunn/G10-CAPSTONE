@@ -16,18 +16,18 @@ export const markerGroups = {
 export const defaultWorkspace = {
   active_event: null,
   barangay: {
-    name: 'Barangay Mambaling',
+    name: 'Shared database map',
     center: {
-      latitude: 10.2922,
-      longitude: 123.8763,
+      latitude: null,
+      longitude: null,
     },
-    bounds: [
-      [10.2820, 123.8700],
-      [10.2972, 123.8842],
-    ],
+    bounds: null,
+    boundary: null,
+    boundary_source: null,
     zoom: 17,
     tile_provider: 'OpenStreetMap Standard',
     tile_url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    basemaps: {},
   },
   summary: {
     gps_tagged_households: 0,
@@ -37,12 +37,7 @@ export const defaultWorkspace = {
   },
   filters: {
     puroks: [],
-    statuses: [
-      { key: 'all', label: 'All GPS-verified statuses' },
-      { key: 'green', label: 'Green - safe / evacuated / checked' },
-      { key: 'red', label: 'Red - unsafe / missing / injured' },
-      { key: 'gray', label: 'Grey - unchecked' },
-    ],
+    statuses: [],
   },
   households: [],
   evacuation_sites: [],

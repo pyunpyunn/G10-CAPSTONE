@@ -69,3 +69,5 @@ class DisasterBroadcast extends Model
         return $this->belongsTo(WeatherLog::class, 'weather_log_id', 'weather_log_id');
     }
 }
+
+

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   CircleMarker,
+  GeoJSON,
   MapContainer,
-  Rectangle,
   TileLayer,
   Tooltip,
   useMap,
@@ -23,6 +23,7 @@ import {
   markerGroups,
   percent as mapPercent,
 } from '../../utils/mappingHelpers'
+import { outsideBoundaryMask } from '../../utils/boundaryMask'
 import { statusTone } from '../../utils/dashboardHelpers'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
@@ -147,6 +148,7 @@ function DashboardMapCard({ hasActiveEvent, reportedHouseholds, onOpenMap }) {
     workspace.barangay.center.longitude,
   ], [workspace.barangay.center.latitude, workspace.barangay.center.longitude])
   const mapBounds = useMemo(() => workspace.barangay.bounds, [workspace.barangay.bounds])
+  const boundaryMask = useMemo(() => outsideBoundaryMask(workspace.barangay.boundary), [workspace.barangay.boundary])
   const households = hasActiveEvent ? workspace.households : []
 
   return (
@@ -176,7 +178,17 @@ function DashboardMapCard({ hasActiveEvent, reportedHouseholds, onOpenMap }) {
               url={workspace.barangay.tile_url}
               maxZoom={19}
             />
-            <Rectangle bounds={mapBounds} pathOptions={{ color: '#1f3e5a', weight: 2, fillOpacity: 0.02 }} />
+            {boundaryMask && <GeoJSON
+              key={`mask-${workspace.barangay.name}-${JSON.stringify(workspace.barangay.boundary)}`}
+              data={boundaryMask}
+              interactive={false}
+              style={{ color: 'transparent', weight: 0, fillColor: '#000000', fillOpacity: 0.2, fillRule: 'evenodd' }}
+            />}
+            {workspace.barangay.boundary && <GeoJSON
+              key={`${workspace.barangay.name}-${JSON.stringify(workspace.barangay.boundary)}`}
+              data={workspace.barangay.boundary}
+              style={{ color: '#1f3e5a', weight: 2, fillOpacity: 0.03 }}
+            />}
             {households.map((household) => (
               <HouseholdPoint household={household} key={household.id} />
             ))}

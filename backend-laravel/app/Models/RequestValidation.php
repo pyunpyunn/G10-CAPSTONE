@@ -40,3 +40,4 @@ class RequestValidation extends Model
         return $this->belongsTo(User::class, 'validator_user_id', 'user_id');
     }
 }
+

@@ -13,3 +13,5 @@ class City extends Model
     public function province(): BelongsTo { return $this->belongsTo(Province::class, 'province_id', 'province_id'); }
     public function barangays(): HasMany { return $this->hasMany(Barangay::class, 'city_id', 'city_id'); }
 }
+
+

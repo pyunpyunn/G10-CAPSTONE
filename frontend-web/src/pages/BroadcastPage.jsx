@@ -30,7 +30,7 @@ export default function BroadcastPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [form, setForm] = useState(defaultForm())
-  const [selectedStatuses, setSelectedStatuses] = useState(defaultStatusKeys)
+  const [selectedStatuses, setSelectedStatuses] = useState([])
   const [selectedPurok, setSelectedPurok] = useState('')
   const [selectedPriority, setSelectedPriority] = useState('high')
   const [directPuroks, setDirectPuroks] = useState([])
@@ -111,7 +111,7 @@ export default function BroadcastPage() {
     }
 
     setForm(nextForm)
-    setSelectedStatuses(defaultStatusKeys)
+    setSelectedStatuses((currentWorkspace?.status_options || []).map((option) => option.key))
     setSelectedPurok(currentWorkspace?.puroks?.[0]?.name || '')
     setDirectPuroks([])
     setFormError('')
@@ -383,6 +383,7 @@ export default function BroadcastPage() {
     </section>
   )
 }
+<<<<<<< HEAD
 
 function HeaderActionMenu({ activeEvent, onCloseActiveEvent, onUpdateActiveEvent, onDeclareActiveEvent }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -456,3 +457,5 @@ function HeaderActionMenu({ activeEvent, onCloseActiveEvent, onUpdateActiveEvent
     </div>
   )
 }
+=======
+>>>>>>> 352bbe0136bf9d6afdb9a80f56475f54b96661d4

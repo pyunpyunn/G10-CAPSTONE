@@ -17,3 +17,5 @@ class Relationship extends Model
         return ['is_head' => 'boolean', 'is_immediate_family' => 'boolean', 'can_report_for_household' => 'boolean', 'sort_order' => 'integer', 'is_active' => 'boolean', 'created_at' => 'datetime', 'updated_at' => 'datetime'];
     }
 }
+
+

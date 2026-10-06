@@ -12,3 +12,5 @@ class RepositoryServiceProvider extends ServiceProvider
         $this->app->scoped(HouseholdRepository::class);
     }
 }
+
+

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getHouseholdGeotags, getMappingOverview, getRouteToSite } from '../api/mappingApi'
+import { getMappingOverview, getRouteToSite } from '../api/mappingApi'
 import MappingMap from '../components/mapping/MappingMap'
 import MappingSidebar from '../components/mapping/MappingSidebar'
 import LoadingState from '../components/ui/LoadingState'
@@ -40,10 +40,12 @@ export default function MappingPage() {
   const barangay = workspace?.barangay || defaultWorkspace.barangay
   const filters = workspace?.filters || defaultWorkspace.filters
   const mapCenter = useMemo(() => [
-    Number(barangay?.center?.latitude ?? defaultWorkspace.barangay.center.latitude),
-    Number(barangay?.center?.longitude ?? defaultWorkspace.barangay.center.longitude),
+    barangay?.center?.latitude,
+    barangay?.center?.longitude,
   ], [barangay?.center?.latitude, barangay?.center?.longitude])
-  const mapBounds = useMemo(() => Array.isArray(barangay?.bounds) ? barangay.bounds : defaultWorkspace.barangay.bounds, [barangay?.bounds])
+  const hasMapCenter = mapCenter.every((coordinate) => coordinate !== null && coordinate !== undefined
+    && coordinate !== '' && Number.isFinite(Number(coordinate)))
+  const mapBounds = Array.isArray(barangay?.bounds) ? barangay.bounds : defaultWorkspace.barangay.bounds
   const households = useMemo(() => (
     hasActiveEvent ? workspace.households : []
   ), [hasActiveEvent, workspace.households])
@@ -72,13 +74,10 @@ export default function MappingPage() {
       setRouteError('')
 
       try {
-        const [data, householdGeotags] = await Promise.all([
-          getMappingOverview({ purok, status }),
-          getHouseholdGeotags({ purok, status }),
-        ])
+        const data = await getMappingOverview({ purok, status })
 
         if (!ignore) {
-          setWorkspace(normalizeWorkspaceData({ ...(data || {}), households: householdGeotags }))
+          setWorkspace(normalizeWorkspaceData(data || {}))
           setHasLoaded(true)
         }
       } catch (loadError) {
@@ -112,6 +111,13 @@ export default function MappingPage() {
 
     return () => window.removeEventListener('keydown', closeFullscreen)
   }, [])
+
+  useEffect(() => {
+    if (!isMapFullscreen) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [isMapFullscreen])
 
   function changeLayer(layerName) {
     setLayers((current) => ({
@@ -213,7 +219,7 @@ export default function MappingPage() {
     <section className="page mapping-page active mapmate-page">
       <PageHeader
         title="Mapping"
-        subtitle="Barangay Mambaling, Cebu City"
+        subtitle={barangay?.name || 'Shared database map'}
         filters={hasLoaded && (
           <DataFilterBar
             className="page-heading-filter"
@@ -243,7 +249,7 @@ export default function MappingPage() {
           <div className="mapmate-grid">
             <main className="mapmate-main">
               <RefreshOverlay active={isRefreshing}>
-                <MappingMap
+                {hasMapCenter ? <MappingMap
                   workspace={workspace}
                   hasActiveEvent={hasActiveEvent}
                   layers={layers}
@@ -253,6 +259,8 @@ export default function MappingPage() {
                   visibleRoutes={visibleRoutes}
                   selectedRoute={selectedRoute}
                   selectedHousehold={selectedHousehold}
+                  routeLoadingId={routeLoadingId}
+                  routeError={routeError}
                   mapCenter={mapCenter}
                   mapBounds={mapBounds}
                   onChangeLayer={changeLayer}
@@ -260,7 +268,7 @@ export default function MappingPage() {
                   onRouteToDispatch={handleDispatchRoute}
                   isFullscreen={isMapFullscreen}
                   onToggleFullscreen={() => setIsMapFullscreen((current) => !current)}
-                />
+                /> : <div className="form-error" role="status">No map coordinates are configured or available in the shared database. Add a geotagged location or set the map center in backend configuration.</div>}
               </RefreshOverlay>
             </main>
 

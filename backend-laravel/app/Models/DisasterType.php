@@ -23,3 +23,5 @@ class DisasterType extends Model
         ];
     }
 }
+
+

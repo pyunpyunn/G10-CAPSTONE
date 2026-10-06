@@ -52,3 +52,5 @@ class HouseholdRepository extends EloquentRepository
             ->get();
     }
 }
+
+

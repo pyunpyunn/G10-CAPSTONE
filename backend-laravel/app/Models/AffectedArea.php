@@ -46,3 +46,5 @@ class AffectedArea extends Model
     public function sitio(): BelongsTo { return $this->belongsTo(Sitio::class, 'sitio_id', 'sitio_id'); }
     public function barangay(): BelongsTo { return $this->belongsTo(Barangay::class, 'barangay_id', 'barangay_id'); }
 }
+
+

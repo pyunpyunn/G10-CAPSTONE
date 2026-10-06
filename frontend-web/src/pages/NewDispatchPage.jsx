@@ -83,9 +83,7 @@ export default function NewDispatchPage() {
       ? `team:${existingDispatch.team_id}`
       : selectedTeam?.team_id && selectedTeam.is_available
       ? `team:${selectedTeam.team_id}`
-      : selectedTeam?.available_responder_id
-        ? `responder:${selectedTeam.available_responder_id}`
-        : firstAssignmentOption(teams)
+      : firstAssignmentOption(teams)
 
     setAssignmentOption(teamOption)
     setSelectedRiskId(matchingArea?.id || '')
@@ -98,7 +96,8 @@ export default function NewDispatchPage() {
       priority_level: selectedHousehold?.priority_level || matchingArea?.priority || existingDispatch?.priority_level || 'high',
       status: existingDispatch?.status?.key || 'dispatched',
       selected_responder_ids: existingDispatch?.selected_responder_ids || [],
-      responder_count: existingDispatch?.responder_count || 1,
+      responder_count: existingDispatch?.responder_count || (location.state?.dispatchType === 'welfare_check' ? 2 : 1),
+      dispatch_type: existingDispatch?.dispatch_type || location.state?.dispatchType || 'rescue',
       dispatch_notes: existingDispatch?.dispatch_notes || '',
       route_notes: existingDispatch?.route_notes || '',
       safe_count: existingDispatch?.outcomes?.safe || 0,
@@ -162,8 +161,9 @@ export default function NewDispatchPage() {
       return
     }
 
-    if (!form.selected_responder_ids || form.selected_responder_ids.length === 0) {
-      setFormError('Select at least one available responder from the selected team.')
+    const selectedTeam = teams.find((team) => String(team.team_id) === String(assignmentOption.split(':')[1]))
+    if (!editingDispatch && (!form.responder_count || form.responder_count < 1 || form.responder_count > (selectedTeam?.available_responder_count || 0))) {
+      setFormError('Choose a number of rescuers within the team’s current available count.')
       return
     }
 

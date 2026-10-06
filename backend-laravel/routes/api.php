@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DisasterBroadcastController;
 use App\Http\Controllers\Api\EvacuationCheckInController;
 use App\Http\Controllers\Api\GlobalSearchController;
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\HouseholdMobileController;
 use App\Http\Controllers\Api\HouseholdStatusController;
 use App\Http\Controllers\Api\InquiryController;
@@ -29,6 +30,9 @@ Route::prefix('v1')->group(function () {
             'documentation' => 'Use /dashboard, /auth/login, /auth/me, or other documented endpoints under /api/v1.',
         ]);
     });
+
+    Route::get('/health/live', [HealthController::class, 'live'])->name('api.health.live');
+    Route::get('/health/ready', [HealthController::class, 'ready'])->name('api.health.ready');
 
     Route::post('/inquiries', [InquiryController::class, 'store'])
         ->middleware('throttle:10,1');
@@ -131,6 +135,14 @@ Route::prefix('v1')->group(function () {
             Route::delete('/archive/saved-groups/{groupId}', [ArchiveController::class, 'deleteSavedGroup']);
             Route::post('/archive/delete-selected', [ArchiveController::class, 'deleteSelected']);
             Route::get('/dispatches', [RescueDispatchController::class, 'index']);
+            Route::get('/dispatches/welfare-checks', [RescueDispatchController::class, 'welfareChecks']);
+            Route::get('/dispatches/member-check-queue', [RescueDispatchController::class, 'memberCheckQueue']);
+            Route::get('/dispatches/priorities', [RescueDispatchController::class, 'priorities']);
+            Route::get('/dispatches/purok-priorities', [RescueDispatchController::class, 'purokPriorities']);
+            Route::get('/dispatches/sitio-priorities', [RescueDispatchController::class, 'sitioPriorities']);
+            Route::get('/dispatches/criteria-timeline', [RescueDispatchController::class, 'criteriaTimeline']);
+            Route::get('/dispatches/priority-settings', [RescueDispatchController::class, 'prioritySettings']);
+            Route::patch('/dispatches/priority-settings', [RescueDispatchController::class, 'updatePrioritySettings']);
             Route::post('/dispatches', [RescueDispatchController::class, 'store']);
             Route::get('/dispatches/{assignmentId}', [RescueDispatchController::class, 'show']);
             Route::post('/dispatches/{assignmentId}/complete', [RescueDispatchController::class, 'complete']);
@@ -147,12 +159,16 @@ Route::prefix('v1')->group(function () {
             Route::post('/household/device-location', [HouseholdMobileController::class, 'updateDeviceLocation']);
             Route::patch('/household/members/{memberId}', [HouseholdMobileController::class, 'updateMember']);
             Route::post('/household/members/{memberId}/status', [HouseholdMobileController::class, 'storeMemberStatus']);
+            Route::post('/household/trusted-households/{connectionId}/members/{memberId}/status', [HouseholdMobileController::class, 'storeTrustedMemberStatus']);
             Route::post('/household/status', [HouseholdMobileController::class, 'storeStatus']);
             Route::get('/household/status-history', [HouseholdMobileController::class, 'statusHistory']);
             Route::get('/household/qr', [HouseholdMobileController::class, 'qr']);
             Route::get('/household/trusted-households', [HouseholdMobileController::class, 'trustedHouseholds']);
+            Route::put('/household/trusted-pin', [HouseholdMobileController::class, 'saveTrustedPin']);
+            Route::post('/household/trusted-pin/verify', [HouseholdMobileController::class, 'verifyTrustedPin']);
             Route::get('/household/trusted-households/lookup/{householdId}', [HouseholdMobileController::class, 'lookupTrustedHousehold']);
             Route::post('/household/trusted-households', [HouseholdMobileController::class, 'storeTrustedHousehold']);
+            Route::patch('/household/trusted-households/{connectionId}', [HouseholdMobileController::class, 'respondToTrustedHousehold']);
         });
 
         Route::middleware('role:super_admin,admin,rescuer')->group(function () {
@@ -187,3 +203,5 @@ Route::prefix('v1')->group(function () {
         });
     });
 });
+
+

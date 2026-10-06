@@ -9,7 +9,7 @@ const blankTeam = {
   team_code: '',
   team_name: '',
   team_type: '',
-  duty_status: 'standby',
+  duty_status: 'available',
   assigned_purok_id: '',
   leader_responder_id: '',
   member_ids: [],
@@ -73,7 +73,7 @@ export default function RescueTeamConfigModal({
   }
 
   function startNewTeam() {
-    setForm({ ...blankTeam, duty_status: 'standby' })
+    setForm({ ...blankTeam, duty_status: 'available' })
     setMemberPage(1)
   }
 
@@ -177,11 +177,11 @@ export default function RescueTeamConfigModal({
             <div className="rtc-grid">
               <label>
                 <span>Team name</span>
-                <input value={form.team_name} onChange={(event) => setField('team_name', event.target.value)} placeholder="Search & Rescue" required />
+                <input value={form.team_name} onChange={(event) => setField('team_name', event.target.value)} placeholder="Team name" required />
               </label>
               <label>
                 <span>Team code</span>
-                <input value={form.team_code} onChange={(event) => setField('team_code', event.target.value.toUpperCase())} placeholder="SAR" maxLength={8} required />
+                <input value={form.team_code} onChange={(event) => setField('team_code', event.target.value.toUpperCase())} placeholder="Team code" maxLength={8} required />
               </label>
               <label>
                 <span>Team type</span>
@@ -287,7 +287,7 @@ function teamToForm(team) {
     team_code: team.team_code || '',
     team_name: team.team_name || '',
     team_type: team.team_type || '',
-    duty_status: team.duty_status === 'not_created' ? 'standby' : team.duty_status || 'standby',
+    duty_status: team.duty_status === 'not_created' ? 'available' : team.duty_status || 'available',
     assigned_purok_id: team.assigned_purok_id || '',
     leader_responder_id: team.leader_responder_id || '',
     member_ids: team.member_ids || [],

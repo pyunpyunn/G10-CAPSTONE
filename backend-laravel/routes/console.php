@@ -1,6 +1,10 @@
 <?php
 
-use App\Services\WeatherSnapshotService;
+use App\Services\Shared\WeatherSnapshotService;
+use App\Services\Shared\StatusReminderScheduler;
+use App\Queries\RescueCriteriaHistoryQuery;
+use App\Queries\RescueDispatchQuery;
+use App\Support\QueryProfileRanking;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +32,32 @@ Artisan::command('weather:refresh', function () {
 
     return 0;
 })->purpose('Fetch Open-Meteo weather data and save it to weather_logs');
+
+Artisan::command('status-reminders:schedule', function (StatusReminderScheduler $scheduler) {
+    $this->info('Scheduled '.$scheduler->scheduleDue().' member status check-ins.');
+})->purpose('Queue check-ins for unreported members of the active disaster event');
+
+Artisan::command('rescue-criteria:capture {--rebase-contact : Recalculate existing contact baselines after a definition change}', function (RescueDispatchQuery $dispatch, RescueCriteriaHistoryQuery $criteria) {
+    $event = $dispatch->activeEvent();
+    if (! $event) {
+        $this->info('No active event to measure.');
+        return;
+    }
+    $count = $criteria->refresh((string) $event->event_id, $event->started_at, null, (bool) $this->option('rebase-contact'));
+    $this->info('Updated '.$count.' three-hour rescue criteria buckets for '.$event->event_id.'.');
+})->purpose('Store a measured rescue criteria point for the active event');
+
+Artisan::command('profiles:rank {--path= : Laravel log path}', function (QueryProfileRanking $ranking) {
+    $path = $this->option('path') ?: storage_path('logs/laravel.log');
+    $rows = $ranking->fromLog($path);
+    if ($rows === []) {
+        $this->warn('No local API query profiles found. Enable LOCAL_QUERY_PROFILE and exercise the affected pages first.');
+        return 0;
+    }
+    $this->table(['Route', 'Requests', 'Avg response ms', 'Avg DB ms', 'Avg queries'],
+        array_map(fn (array $row): array => array_values($row), $rows));
+    return 0;
+})->purpose('Rank the five slowest locally profiled API routes');
 
 Artisan::command('households:provision-logins {--password=marshmallows : Temporary password to hash for household accounts}', function () {
     if (! Schema::hasTable('households') || ! Schema::hasTable('users') || ! Schema::hasTable('roles')) {
@@ -110,3 +140,22 @@ Artisan::command('households:provision-logins {--password=marshmallows : Tempora
 Schedule::command('weather:refresh')
     ->everyThreeHours()
     ->withoutOverlapping();
+
+Schedule::command('status-reminders:schedule')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+Schedule::command('rescue-criteria:capture')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();
+
+Schedule::command('queue:work trackingaid_outbox --queue=trackingaid --stop-when-empty --max-time=50')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('queue:work operations_outbox --queue=operations --stop-when-empty --max-time=50')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+
+

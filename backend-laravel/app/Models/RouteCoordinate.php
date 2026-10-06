@@ -38,3 +38,5 @@ class RouteCoordinate extends Model
         return $this->belongsTo(ResponderRoute::class, 'route_id', 'route_id');
     }
 }
+
+

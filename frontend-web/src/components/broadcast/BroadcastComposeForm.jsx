@@ -93,7 +93,7 @@ function BroadcastEventFields({ activeEvent, isUpdateMode, form, disasterTypes, 
             value={form.event_name}
             maxLength={100}
             onChange={(event) => onChange('event_name', event.target.value)}
-            placeholder="Example: Flood Monitoring"
+            placeholder="Disaster event name"
             required
           />
         </label>

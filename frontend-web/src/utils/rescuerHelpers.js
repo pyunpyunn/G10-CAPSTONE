@@ -1,4 +1,4 @@
-export function emptyRescuerForm(nextAccountId = '', team = null) {
+export function emptyRescuerForm(nextAccountId = '', team = null, filters = {}) {
   return {
     account_id: nextAccountId,
     responder_code: '',
@@ -7,20 +7,20 @@ export function emptyRescuerForm(nextAccountId = '', team = null) {
     middle_initial: '',
     last_name: '',
     email: '',
-    password: 'password',
+    password: '',
     contact_number: '',
     emergency_contact_name: '',
     emergency_contact_number: '',
     date_of_birth: '',
     gender: '',
-    blood_type: 'Unknown',
+    blood_type: filters.blood_types?.[0] || '',
     address: '',
     team_id: '',
-    team_code: team?.team_code || 'SAR',
-    team_name: team?.team_name || 'Search & Rescue',
-    team_type: team?.team_type || 'SAR',
-    title: 'Responder',
-    duty_status: 'standby',
+    team_code: team?.team_code || '',
+    team_name: team?.team_name || '',
+    team_type: team?.team_type || '',
+    title: filters.roles?.[0] || '',
+    duty_status: 'available',
     skills: '',
     training_notes: '',
     certification_reference: '',
@@ -45,14 +45,14 @@ export function formFromRescuer(rescuer) {
     emergency_contact_number: rescuer.emergency_contact_number || '',
     date_of_birth: rescuer.date_of_birth || '',
     gender: rescuer.gender || '',
-    blood_type: rescuer.blood_type || 'Unknown',
+    blood_type: rescuer.blood_type || '',
     address: rescuer.address || '',
     team_id: rescuer.team_id || '',
     team_code: rescuer.team_code || '',
     team_name: rescuer.team_name === 'Unassigned' ? '' : rescuer.team_name || '',
     team_type: rescuer.team_type || '',
-    title: rescuer.title || 'Responder',
-    duty_status: rescuer.duty_status?.key || 'standby',
+    title: rescuer.title || '',
+    duty_status: rescuer.duty_status?.key || 'available',
     skills: rescuer.skills || '',
     training_notes: rescuer.training_notes || '',
     certification_reference: rescuer.certification_reference || '',
@@ -92,8 +92,8 @@ export function buildRescuerPayload(form, mode) {
     payload.account_id = form.account_id
   }
 
-  if (form.password || mode === 'create') {
-    payload.password = form.password || 'password'
+  if (form.password) {
+    payload.password = form.password
   }
 
   return payload
