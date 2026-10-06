@@ -242,7 +242,6 @@ function ChartCard({ title, bars = [], isLoading, emptyTitle, emptyMessage, alwa
   )
 }
 
-<<<<<<< HEAD
 function TeamDispatchTable({ teams = [], isLoading }) {
   if (isLoading) {
     return <LoadingState inline />
@@ -288,10 +287,6 @@ function ActivityLog({ activities = [], isLoading, onViewAll }) {
       </div>
     )
   }
-
-=======
-function ActivityLog({ activities = [], onViewAll }) {
->>>>>>> 352bbe0136bf9d6afdb9a80f56475f54b96661d4
   if (activities.length === 0) {
     return (
       <div className="tbl-wrap">

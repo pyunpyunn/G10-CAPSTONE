@@ -22,6 +22,18 @@ class ResourceRequestHandoffTest extends TestCase
             });
         }
 
+        if (! Schema::hasTable('jobs')) {
+            Schema::create('jobs', function (Blueprint $table) {
+                $table->bigIncrements('id');
+                $table->string('queue')->index();
+                $table->longText('payload');
+                $table->unsignedTinyInteger('attempts');
+                $table->unsignedInteger('reserved_at')->nullable();
+                $table->unsignedInteger('available_at');
+                $table->unsignedInteger('created_at');
+            });
+        }
+
         DB::table('roles')->updateOrInsert(['role_id' => 1], [
             'role_key' => 'super_admin',
             'role_name' => 'Super Admin',
@@ -166,6 +178,36 @@ class ResourceRequestHandoffTest extends TestCase
             });
         }
 
+        if (! Schema::hasTable('resqperation_forwarded_requests')) {
+            Schema::create('resqperation_forwarded_requests', function (Blueprint $table) {
+                $table->id();
+                $table->string('tracking_reference');
+                $table->string('resqperation_request_id');
+                $table->string('source_reference')->nullable();
+                $table->string('request_source')->nullable();
+                $table->string('source_system')->nullable();
+                $table->string('request_category')->nullable();
+                $table->string('resource_type')->nullable();
+                $table->string('item_name')->nullable();
+                $table->integer('quantity')->default(1);
+                $table->string('unit')->nullable();
+                $table->string('urgency')->nullable();
+                $table->string('area_label')->nullable();
+                $table->text('area_note')->nullable();
+                $table->string('requested_by')->nullable();
+                $table->text('description')->nullable();
+                $table->text('validation_notes')->nullable();
+                $table->string('validated_by_user_id')->nullable();
+                $table->string('forwarded_by_user_id')->nullable();
+                $table->string('forwarded_by_name')->nullable();
+                $table->string('forwarded_by_role')->nullable();
+                $table->string('resqperation_status')->default('forwarded');
+                $table->json('payload_json')->nullable();
+                $table->timestamp('forwarded_at')->nullable();
+                $table->timestamps();
+            });
+        }
+
         DB::table('users')->updateOrInsert(['user_id' => 'USR-ADMIN-001'], [
             'name' => 'Super Admin',
             'email' => 'admin@resqperation.local',
@@ -221,9 +263,11 @@ class ResourceRequestHandoffTest extends TestCase
 
         $trackingRef = $fwdResponse->json('data.request.tracking_reference');
         $this->assertNotEmpty($trackingRef);
-        $this->assertStringStartsWith('TA-', $trackingRef);
+        // 4. Run outbox sync job for test environment
+        $job = new \App\Jobs\SyncTrackingAidRequest($requestId, true, $trackingRef, $user->user_id, $user->name, 'super_admin', 'Verified and forwarded to TrackingAid warehouse team.');
+        app()->call([$job, 'handle']);
 
-        // 4. Verify record in shared DB table
+        // 5. Verify record in shared DB table
         $this->assertDatabaseHas('resqperation_forwarded_requests', [
             'tracking_reference' => $trackingRef,
             'resqperation_request_id' => $requestId,

@@ -17,7 +17,6 @@ import PageHeader from '../components/ui/PageHeader'
 import {
   apiErrorMessage,
   defaultForm,
-  defaultStatusKeys,
   getRecipientNote,
   targetAreaLabel,
 } from '../utils/broadcastHelpers'
@@ -383,7 +382,6 @@ export default function BroadcastPage() {
     </section>
   )
 }
-<<<<<<< HEAD
 
 function HeaderActionMenu({ activeEvent, onCloseActiveEvent, onUpdateActiveEvent, onDeclareActiveEvent }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -457,5 +455,3 @@ function HeaderActionMenu({ activeEvent, onCloseActiveEvent, onUpdateActiveEvent
     </div>
   )
 }
-=======
->>>>>>> 352bbe0136bf9d6afdb9a80f56475f54b96661d4
