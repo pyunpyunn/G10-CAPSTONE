@@ -2,6 +2,8 @@
 
 namespace App\Services\Mobile;
 
+use App\Actions\UpdateHouseholdStatus;
+use App\Models\StatusReminder;
 use App\Presenters\HouseholdMobilePresenter;
 use App\Queries\HouseholdMobileReadQuery;
 use Illuminate\Support\Facades\DB;
@@ -17,42 +19,17 @@ class HouseholdMobileStatusWriter
 
     public function saveLatestDisasterStatus(string $eventId, string $householdId, int $statusId, array $validated, ?string $userId, ?int $deviceId, $now): void
     {
-        $existing = DB::table('household_disasters')
-            ->where('disaster_id', $eventId)
-            ->where('household_id', $householdId)
-            ->first();
-        $needsDispatch = in_array($validated['status_key'], ['unsafe', 'needs_help'], true);
-
-        $data = $this->support->filterColumns('household_disasters', [
-            'current_status_id' => $statusId,
-            'last_status_source' => $validated['status_source'] ?? 'household_mobile',
-            'last_status_notes' => $validated['notes'] ?? null,
-            'last_reported_by_user_id' => $userId,
-            'last_device_token_id' => $deviceId,
-            'last_latitude' => $validated['latitude'] ?? null,
-            'last_longitude' => $validated['longitude'] ?? null,
-            'last_battery_level' => $validated['battery_level'] ?? null,
-            'last_reported_at' => $now,
-            'priority_level' => $needsDispatch ? 'urgent' : 'monitor',
-            'needs_dispatch' => $needsDispatch,
-            'updated_at' => $now,
-        ]);
-
-        if ($existing) {
-            DB::table('household_disasters')
-                ->where('household_disaster_id', $existing->household_disaster_id)
-                ->update($data);
-
-            return;
-        }
-
-        DB::table('household_disasters')->insert($this->support->filterColumns('household_disasters', array_merge($data, [
-            'household_disaster_id' => $this->support->nextId('household_disasters', 'household_disaster_id'),
-            'household_id' => $householdId,
-            'disaster_id' => $eventId,
-            'initial_status_id' => $statusId,
-            'created_at' => $now,
-        ])));
+        app(UpdateHouseholdStatus::class)->apply(
+            $eventId,
+            $householdId,
+            $statusId,
+            $validated['status_key'],
+            $validated['status_source'] ?? 'household_mobile',
+            $validated['notes'] ?? null,
+            $userId,
+            $deviceId,
+            $validated,
+        );
     }
 
     public function saveLatestHouseholdStatusFromMemberStatuses(string $eventId, string $householdId, array $validated, ?string $userId, ?int $deviceId, $now): void
@@ -127,6 +104,9 @@ class HouseholdMobileStatusWriter
             ['disaster_id' => $eventId, 'member_id' => $memberId],
             $payload
         );
+        StatusReminder::query()->where('event_id', $eventId)->where('member_id', $memberId)
+            ->whereIn('status', ['pending', 'sending'])
+            ->update(['status' => 'cancelled', 'stopped_at' => $now]);
     }
 
     private function householdRollupStatusKey(string $householdId, string $eventId): string

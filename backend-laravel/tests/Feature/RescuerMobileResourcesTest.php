@@ -84,7 +84,7 @@ class RescuerMobileResourcesTest extends TestCase
                     'team_name' => 'Unassigned',
                     'team_code' => null,
                     'team_type' => null,
-                    'duty_status' => 'standby',
+                'duty_status' => 'available',
                     'is_deployed' => false,
                     'skills' => null,
                     'blood_type' => 'Unknown',

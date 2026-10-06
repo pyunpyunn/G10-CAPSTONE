@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [refreshVersion, setRefreshVersion] = useState(0)
 
   useEffect(() => {
     let ignore = false
@@ -51,6 +52,7 @@ export default function DashboardPage() {
     try {
       const data = await getDashboard()
       setDashboard(data)
+      setRefreshVersion((version) => version + 1)
     } catch {
       setError('Dashboard data cannot be loaded right now. Please check the backend or database connection.')
     } finally {
@@ -97,6 +99,7 @@ export default function DashboardPage() {
             stats={stats}
             hasActiveEvent={hasActiveEvent}
             onOpenModule={openModule}
+            refreshVersion={refreshVersion}
           />
           <DashboardOverview
             dashboard={dashboard}

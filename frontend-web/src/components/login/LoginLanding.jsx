@@ -114,7 +114,7 @@ function HeroSection({ onOpenLogin }) {
         </div>
       </div>
 
-      <div className="hero-visual" role="img" aria-label="Barangay response dashboard and household map visual">
+      <div className="hero-visual" aria-hidden="true">
         <div className="map-route">
           <span className="map-pin" />
           <span className="map-pin red" />
@@ -125,16 +125,15 @@ function HeroSection({ onOpenLogin }) {
         </div>
 
         <div className="visual-panel dispatch-panel">
-          <div className="panel-kicker">Dispatch status</div>
-          <div className="dispatch-team"><strong>Search & Rescue</strong><span>En route</span></div>
-          <div className="dispatch-team"><strong>Evacuation</strong><span>Assigned</span></div>
-          <div className="dispatch-team"><strong>Medical Aid</strong><span>Ready</span></div>
+          <div className="panel-kicker">Dispatch coordination</div>
+          <div className="dispatch-team"><strong>Assign teams</strong></div>
+          <div className="dispatch-team"><strong>Track routes</strong></div>
+          <div className="dispatch-team"><strong>Review outcomes</strong></div>
         </div>
 
         <div className="visual-panel status-panel">
-          <div className="panel-kicker">Household reports</div>
-          <div className="panel-value">64%</div>
-          <div className="panel-line"><span>Accounted households</span><strong>320/500</strong></div>
+          <div className="panel-kicker">Household reporting</div>
+          <div className="panel-line"><span>Live records after sign-in</span></div>
           <div className="mini-bars" aria-hidden="true">
             <span />
             <span />
@@ -315,7 +314,7 @@ function ContactSection() {
       event.currentTarget.reset()
       setStatus('Inquiry sent. The Super Admin can review it in the Inquiries page.')
     } catch (error) {
-      const message = error?.response?.data?.message || 'Inquiry cannot be saved right now. Please contact the development team directly.'
+      const message = error?.response?.data?.message || 'Inquiry cannot be saved right now. Please try again later.'
       setStatus(message)
     } finally {
       setIsSending(false)
@@ -335,7 +334,7 @@ function ContactSection() {
                 <div className="contact-icon"><ShieldUser size={18} /></div>
                 <div>
                   <strong>Capstone Development Team</strong>
-                  <span>resqperation.devteam@example.com</span>
+                  <span>Use the inquiry form to reach the development team.</span>
                 </div>
               </div>
               <div className="contact-item">

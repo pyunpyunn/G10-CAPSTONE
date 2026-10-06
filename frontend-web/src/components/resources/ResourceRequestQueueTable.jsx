@@ -71,7 +71,7 @@ export default function ResourceRequestQueueTable({
                       {request.area.label}
                     </td>
                     <td>
-                      <Badge tone={statusTone(request.status?.key, request.validation?.key)}>{request.status?.label || 'Pending'}</Badge>
+                      <Badge tone={statusTone(request.status?.key, request.validation?.key)}>{request.status?.label || 'Status unavailable'}</Badge>
                     </td>
                     <td>
                       <span className={`rr-system-pill ${request.handoff.tone === 'green' ? 'out' : ''}`}>{request.handoff.label}</span>

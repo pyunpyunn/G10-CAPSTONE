@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useState } from 'react'
+import RescueCriteriaChart from './RescueCriteriaChart'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import Badge from '../ui/Badge'
@@ -18,6 +19,7 @@ export default function DashboardMainContent({
   stats,
   hasActiveEvent,
   onOpenModule,
+  refreshVersion,
 }) {
   const [isStandbyStripVisible, setIsStandbyStripVisible] = useState(true)
 
@@ -71,16 +73,10 @@ export default function DashboardMainContent({
         </div>
       </Panel>
 
-      <Panel
-        title="Team dispatch overview"
-        action={
-          <button className="panel-link" type="button" onClick={() => onOpenModule('/dispatch')}>
-            Full dispatch <FontAwesomeIcon icon={faArrowRight} />
-          </button>
-        }
-      >
-        <TeamDispatchTable teams={dashboard.dispatch.teams} />
-      </Panel>
+      <RescueCriteriaChart
+        eventId={dashboard.active_event?.event_id}
+        refreshVersion={refreshVersion}
+      />
 
       <div className="sep">
         Recent activity log <span>showing latest event reports only</span>
@@ -212,39 +208,6 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, alwaysShowChart
       ) : (
         <EmptyState title={emptyTitle} message={emptyMessage} />
       )}
-    </div>
-  )
-}
-
-function TeamDispatchTable({ teams = [] }) {
-  if (teams.length === 0) {
-    return <EmptyState title="No team assignments yet" message="Dispatch rows will appear after HQ assigns a team to an active event." />
-  }
-
-  return (
-    <div className="tbl-wrap compact-table">
-      <table className="dispatch-overview-table">
-        <thead>
-          <tr>
-            <th>Team</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th>Assigned area</th>
-            <th>Assigned at</th>
-          </tr>
-        </thead>
-        <tbody>
-          {teams.map((team) => (
-            <tr key={`${team.team_name}-${team.assigned_time}`}>
-              <td><span className="team-dot" />{team.team_name}</td>
-              <td>{team.team_type}</td>
-              <td><Badge tone={statusTone(team.status_key)}>{team.status}</Badge></td>
-              <td>{team.assigned_area}</td>
-              <td>{team.assigned_time || '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   )
 }

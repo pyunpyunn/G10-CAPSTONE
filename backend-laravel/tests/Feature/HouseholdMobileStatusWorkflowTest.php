@@ -143,7 +143,7 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
         $this->assertDatabaseHas('household_status_logs', [
             'household_id' => 'HH-2',
             'submitted_by_user_id' => 'USR-1',
-            'source' => 'household_member_mobile',
+            'source' => 'trusted_household',
         ]);
     }
 

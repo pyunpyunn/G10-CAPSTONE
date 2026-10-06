@@ -4,6 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ListRequest;
+use App\Http\Resources\WelfareCheckResource;
+use App\Http\Resources\MemberCheckResource;
+use App\Http\Resources\RescuePriorityResource;
+use App\Actions\UpdateRescuePrioritySettings;
+use App\Models\RescuePrioritySetting;
+use App\Queries\RescuePriorityQuery;
+use App\Queries\RescueCriteriaQuery;
+use App\Queries\RescueCriteriaHistoryQuery;
+use App\Queries\SitioPriorityQuery;
+use App\Queries\WelfareCheckQuery;
+use App\Queries\UnreportedMemberQuery;
+use App\Queries\RescueDispatchQuery;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use App\Services\Web\RescueDispatchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,6 +38,68 @@ class RescueDispatchController extends Controller
     public function index(ListRequest $request): JsonResponse
     {
         return $this->service->index($request);
+    }
+
+    public function welfareChecks(ListRequest $request, WelfareCheckQuery $query, RescueDispatchQuery $dispatch): AnonymousResourceCollection
+    {
+        $event = $dispatch->activeEvent();
+
+        return WelfareCheckResource::collection($event
+            ? $query->households((string) $event->event_id, ListRequest::clampPerPage($request->query('per_page')))
+            : collect());
+    }
+
+    public function memberCheckQueue(ListRequest $request, UnreportedMemberQuery $query, RescueDispatchQuery $dispatch): AnonymousResourceCollection
+    {
+        $event = $dispatch->activeEvent();
+
+        return MemberCheckResource::collection($event
+            ? $query->reminderQueue((string) $event->event_id, ListRequest::clampPerPage($request->query('per_page')))
+            : collect());
+    }
+
+    public function priorities(ListRequest $request, RescuePriorityQuery $query, RescueDispatchQuery $dispatch): AnonymousResourceCollection
+    {
+        $event = $dispatch->activeEvent();
+
+        return RescuePriorityResource::collection($event
+            ? $query->ranked((string) $event->event_id, ListRequest::clampPerPage($request->query('per_page')))
+            : collect());
+    }
+
+    public function purokPriorities(RescueCriteriaQuery $query, RescueDispatchQuery $dispatch): JsonResponse
+    {
+        $event = $dispatch->activeEvent();
+        return response()->json(['data' => $event ? $query->puroks((string) $event->event_id) : []]);
+    }
+
+    public function sitioPriorities(SitioPriorityQuery $query, RescueDispatchQuery $dispatch): JsonResponse
+    {
+        $event = $dispatch->activeEvent();
+        return response()->json(['data' => $event ? $query->ranked((string) $event->event_id) : []]);
+    }
+
+    public function criteriaTimeline(RescueCriteriaHistoryQuery $query, RescueDispatchQuery $dispatch): JsonResponse
+    {
+        $event = $dispatch->activeEvent();
+        return response()->json(['data' => $event ? $query->forEvent((string) $event->event_id, $event->started_at) : []]);
+    }
+
+    public function prioritySettings(): JsonResponse
+    {
+        return response()->json(['data' => RescuePrioritySetting::query()->orderByDesc('version')->first()]);
+    }
+
+    public function updatePrioritySettings(Request $request, UpdateRescuePrioritySettings $action): JsonResponse
+    {
+        $weights = $request->validate([
+            'impact_weight' => ['required', 'integer', 'between:0,100'],
+            'vulnerability_weight' => ['required', 'integer', 'between:0,100'],
+            'unreported_weight' => ['required', 'integer', 'between:0,100'],
+            'no_contact_weight' => ['required', 'integer', 'between:0,100'],
+        ]);
+
+        return response()->json(['data' => $action->apply($weights, $request->user()?->user_id)]);
     }
 
     public function store(Request $request): JsonResponse

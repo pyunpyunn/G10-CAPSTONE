@@ -149,7 +149,7 @@ function TargetHouseholdDetails({ household }) {
               <tr>
                 <td>{household.household_id}</td>
                 <td>{household.member_count || 0}</td>
-                <td>{household.status_label || 'Unchecked'}</td>
+                <td>{household.status_label || 'Status unavailable'}</td>
                 <td>{household.reported_unsafe_count || 0}</td>
               </tr>
             </tbody>
@@ -166,7 +166,8 @@ function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOpti
   const outcomeDisabled = !['on_scene', 'completed'].includes(form.status)
   const isEditing = Boolean(editingDispatch)
   const selectedTeamId = getSelectedTeamId(assignmentOption)
-  const availableTeams = teams.filter((team) => team.team_id && team.is_available)
+  const availableTeams = teams.filter((team) => team.team_id && team.is_available
+    && (form.dispatch_type !== 'welfare_check' || Number(team.available_responder_count) >= 2))
   const currentTeam = teams.find((team) => String(team.team_id) === String(selectedTeamId))
 
   return (
@@ -188,7 +189,7 @@ function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOpti
               ))}
             </select>
             <span className="dp-field-help">
-              {isEditing ? 'Responder cannot be changed after dispatch is created.' : 'Select a team, then choose the available responders to send.'}
+              {isEditing ? 'Assigned responders cannot be changed here.' : 'Choose a team and the number of available rescuers to send.'}
             </span>
           </label>
 
@@ -201,18 +202,27 @@ function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOpti
             </select>
           </label>
 
+          {form.dispatch_type === 'welfare_check' && (
+            <div className="dp-field-help">Welfare Check: exactly two available rescuers are required.</div>
+          )}
+
           <label>
             <span className="form-label">Assigned area</span>
             <input value={form.assigned_area} readOnly />
           </label>
 
-          <ResponderChecklist
-            selectedTeamId={selectedTeamId}
-            responders={responders}
-            selectedIds={form.selected_responder_ids || []}
-            setForm={setForm}
-            disabled={isEditing}
-          />
+          <label>
+            <span className="form-label">Rescuers to dispatch</span>
+            <input
+              type="number"
+              min="1"
+              max={Math.max(1, Number(currentTeam?.available_responder_count) || 0)}
+              value={form.responder_count || 1}
+              disabled={isEditing || !currentTeam || !currentTeam.available_responder_count}
+              onChange={(event) => setFormNumber(setForm, 'responder_count', form.dispatch_type === 'welfare_check' ? 2 : event.target.value)}
+            />
+            <span className="dp-field-help">{currentTeam?.available_responder_count || 0} currently available in this team. The system selects and notifies them.</span>
+          </label>
 
           <label className="dp-field-wide">
             <span className="form-label">Priority level</span>
@@ -288,7 +298,7 @@ function handleTeamChange(value, setAssignmentOption, setForm) {
   setForm((current) => ({
     ...current,
     selected_responder_ids: [],
-    responder_count: 0,
+    responder_count: 1,
   }))
 }
 
@@ -297,78 +307,6 @@ function getSelectedTeamId(option) {
   return type === 'team' ? id : ''
 }
 
-function ResponderChecklist({ selectedTeamId, responders, selectedIds, setForm, disabled }) {
-  const availableResponders = responders.filter((responder) => (
-    responder.is_available && String(responder.team_id || '') === String(selectedTeamId || '')
-  ))
-  const normalizedIds = selectedIds.map((id) => Number(id)).filter(Boolean)
-
-  function toggleResponder(responderId) {
-    setForm((current) => {
-      const currentIds = Array.isArray(current.selected_responder_ids) ? current.selected_responder_ids.map(Number) : []
-      const nextIds = currentIds.includes(responderId)
-        ? currentIds.filter((id) => id !== responderId)
-        : [...currentIds, responderId]
-
-      return {
-        ...current,
-        selected_responder_ids: nextIds,
-        responder_count: nextIds.length,
-      }
-    })
-  }
-
-  if (!selectedTeamId) {
-    return (
-      <label>
-        <span className="form-label">Responders to send</span>
-        <div className="dp-select-placeholder">Select a team first</div>
-      </label>
-    )
-  }
-
-  if (disabled) {
-    return (
-      <label>
-        <span className="form-label">Responders to send</span>
-        <div className="dp-select-placeholder">{normalizedIds.length || 1} assigned responder{(normalizedIds.length || 1) === 1 ? '' : 's'}</div>
-      </label>
-    )
-  }
-
-  if (availableResponders.length === 0) {
-    return (
-      <label>
-        <span className="form-label">Responders to send</span>
-        <div className="dp-select-placeholder">No available rescuer in this team</div>
-      </label>
-    )
-  }
-
-  return (
-    <div className="dp-checklist-dropdown">
-      <span className="form-label">Responders to send</span>
-      <details>
-        <summary>{normalizedIds.length ? `${normalizedIds.length} selected` : 'Select rescuers'}</summary>
-        <div className="dp-checklist-menu">
-          {availableResponders.map((responder) => (
-            <label className="dp-checklist-item" key={responder.responder_id}>
-              <input
-                type="checkbox"
-                checked={normalizedIds.includes(Number(responder.responder_id))}
-                onChange={() => toggleResponder(Number(responder.responder_id))}
-              />
-              <span>
-                <strong>{responder.full_name}</strong>
-                <small>{responder.team_name}</small>
-              </span>
-            </label>
-          ))}
-        </div>
-      </details>
-    </div>
-  )
-}
 
 function OutcomeInput({ label: inputLabel, name, value, disabled, setForm, className }) {
   return (

@@ -2,6 +2,7 @@
 
 namespace App\Services\Mobile;
 
+use App\Actions\UpdateHouseholdStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -81,19 +82,12 @@ class EvacuationCheckInService
                 ]));
             }
 
-            if (Schema::hasTable('household_disasters')) {
-                $update = array_filter([
-                    'current_status_id' => $statusId,
-                    'last_status_source' => 'evacuation_verification',
-                    'last_status_notes' => $validated['notes'] ?? 'Officially evacuated at center.',
-                    'last_reported_by_user_id' => $userId,
-                    'updated_at' => $now,
-                ], fn ($value) => $value !== null);
-
-                DB::table('household_disasters')
-                    ->where('household_id', $validated['household_id'])
-                    ->where('disaster_id', $eventId)
-                    ->update($this->filterColumns('household_disasters', $update));
+            if ($statusId) {
+                app(UpdateHouseholdStatus::class)->apply(
+                    $eventId, $validated['household_id'], (int) $statusId, 'evacuated',
+                    'evacuation_verification', $validated['notes'] ?? 'Officially evacuated at center.',
+                    $userId, null,
+                );
             }
 
             return $evacuationId;

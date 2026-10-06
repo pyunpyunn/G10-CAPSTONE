@@ -3,6 +3,8 @@
 namespace App\Services\Web;
 
 use App\Jobs\SendDispatchPush;
+use App\Jobs\SendDispatchChangePush;
+use App\Queries\WelfareCheckQuery;
 
 use App\Models\AuditLog;
 use App\Models\DisasterEvent;
@@ -117,15 +119,16 @@ class RescueDispatchService
         }
 
         $validated = $this->validateDispatch($request);
-
-        $validated = $this->validateDispatch($request);
+        if (($validated['dispatch_type'] ?? 'rescue') === 'welfare_check') {
+            if ((int) ($validated['responder_count'] ?? 0) !== 2 || empty($validated['household_id'])
+                || ! app(WelfareCheckQuery::class)->qualifies($validated['household_id'], (string) $activeEvent->event_id)) {
+                throw ValidationException::withMessages(['household_id' => ['A welfare check needs an eligible no-contact household and exactly two rescuers.']]);
+            }
+        }
         $creation = $this->workflow->store($request, $validated, $activeEvent);
         $dispatch = $creation['dispatch'];
         $assignmentId = (int) $dispatch['assignment_id'];
         $selectedResponderIds = $creation['responder_ids'];
-
-        $dispatch = $creation['dispatch'];
-        $assignmentId = (int) $dispatch['assignment_id'];
 
         SendDispatchPush::dispatch($selectedResponderIds, $assignmentId, (string) $dispatch['assignment_code'],
             (string) $dispatch['assigned_area'], (string) $activeEvent->event_id)
@@ -136,6 +139,10 @@ class RescueDispatchService
             'message' => 'Dispatch assignment created.',
             'data' => array_merge($dispatch, [
                 'push_delivery' => $pushResult,
+                'requested_responder_count' => $creation['requested_count'],
+                'available_responder_count' => $creation['available_count'],
+                'assigned_responder_count' => $creation['assigned_count'],
+                'quantity_capped' => $creation['assigned_count'] < $creation['requested_count'],
             ]),
         ], 201);
     }
@@ -173,6 +180,11 @@ class RescueDispatchService
         $validated = $this->validateDispatch($request, false);
         $this->workflow->update($request, $assignmentId, $dispatch, $validated);
 
+        $selectedIds = $this->presenter->dispatch($dispatch)['selected_responder_ids'];
+        SendDispatchChangePush::dispatch($selectedIds, $assignmentId, (string) $dispatch->assignment_code,
+            (string) $dispatch->disaster_id, 'updated')
+            ->onConnection('operations_outbox')->onQueue('operations')->afterCommit();
+
         return response()->json([
             'message' => 'Dispatch assignment updated.',
             'data' => $this->getDispatchById($assignmentId),
@@ -196,6 +208,9 @@ class RescueDispatchService
             'outcome_notes' => ['nullable', 'string', 'max:1000'],
         ]);
         $this->workflow->complete($request, $assignmentId, $dispatch, $validated);
+        SendDispatchChangePush::dispatch($this->presenter->dispatch($dispatch)['selected_responder_ids'],
+            $assignmentId, (string) $dispatch->assignment_code, (string) $dispatch->disaster_id, 'completed')
+            ->onConnection('operations_outbox')->onQueue('operations')->afterCommit();
         return response()->json([
             'message' => 'Dispatch assignment completed.',
             'data' => $this->getDispatchById($assignmentId),
@@ -234,16 +249,16 @@ class RescueDispatchService
         $required = $isCreate ? 'required' : 'sometimes';
 
         return $request->validate([
-            'team_id' => ['nullable', 'integer', 'exists:rescue_teams,team_id'],
-            'responder_id' => ['nullable', 'integer', 'exists:responders,responder_id'],
-            'selected_responder_ids' => ['nullable', 'array'],
-            'selected_responder_ids.*' => ['integer', 'exists:responders,responder_id'],
+            'team_id' => [$isCreate ? 'required' : 'sometimes', 'integer', 'exists:rescue_teams,team_id'],
             'household_id' => ['nullable', 'string', 'max:255'],
             'assigned_area' => [$required, 'string', 'max:150'],
             'households_to_cover' => ['nullable', 'integer', 'min:0'],
-            'responder_count' => ['nullable', 'integer', 'min:1'],
+            'responder_count' => [$isCreate ? 'required' : 'sometimes', 'integer', 'min:1', 'max:100'],
+            'dispatch_type' => ['sometimes', 'string', 'in:rescue,welfare_check'],
             'priority_level' => [$required, 'string', 'in:critical,high,watch,monitor'],
-            'status' => [$required, 'string', 'in:standby,dispatched,accepted,en_route,on_scene,onscene,returning,completed,cancelled'],
+            'status' => [$required, 'string', $isCreate
+                ? 'in:dispatched,accepted,en_route,on_scene,onscene,returning'
+                : 'in:dispatched,accepted,en_route,on_scene,onscene,returning,completed,cancelled'],
             'dispatch_notes' => ['nullable', 'string', 'max:1000'],
             'route_notes' => ['nullable', 'string', 'max:1000'],
             'safe_count' => ['nullable', 'integer', 'min:0'],

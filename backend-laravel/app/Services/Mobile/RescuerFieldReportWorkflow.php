@@ -2,6 +2,7 @@
 
 namespace App\Services\Mobile;
 
+use App\Actions\UpdateHouseholdStatus;
 use App\Queries\RescuerFieldReportQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -191,41 +192,15 @@ class RescuerFieldReportWorkflow
 
     private function saveLatestStatus(string $eventId, string $householdId, int $statusId, array $validated, string $notes, ?string $userId, ?int $responderId, $now): void
     {
-        if (! Schema::hasTable('household_disasters')) {
-            return;
-        }
+        app(UpdateHouseholdStatus::class)->apply(
+            $eventId, $householdId, $statusId, $validated['status_key'],
+            'responder_field_report', $notes, $userId, null, $validated,
+        );
 
-        $needsDispatch = in_array($validated['status_key'], ['unsafe', 'needs_help', 'need_help', 'injured', 'missing'], true);
-        $data = $this->support->filterColumns('household_disasters', [
-            'current_status_id' => $statusId,
-            'last_status_source' => 'responder_field_report',
-            'last_status_notes' => $notes,
-            'last_reported_by_user_id' => $userId,
-            'last_latitude' => $validated['latitude'] ?? null,
-            'last_longitude' => $validated['longitude'] ?? null,
-            'last_battery_level' => $validated['battery_level'] ?? null,
-            'last_reported_at' => $now,
-            'priority_level' => $needsDispatch ? 'urgent' : 'monitor',
-            'needs_dispatch' => $needsDispatch,
-            'updated_at' => $now,
-        ]);
-        if (Schema::hasColumn('household_disasters', 'last_responder_id')) {
-            $data['last_responder_id'] = $responderId;
+        if ($responderId && Schema::hasColumn('household_disasters', 'last_responder_id')) {
+            DB::table('household_disasters')->where('disaster_id', $eventId)
+                ->where('household_id', $householdId)->update(['last_responder_id' => $responderId]);
         }
-
-        $existing = DB::table('household_disasters')->where('disaster_id', $eventId)->where('household_id', $householdId)->first();
-        if ($existing) {
-            DB::table('household_disasters')->where('household_disaster_id', $existing->household_disaster_id)->update($data);
-            return;
-        }
-
-        DB::table('household_disasters')->insert($this->support->filterColumns('household_disasters', array_merge($data, [
-            'household_disaster_id' => $this->support->nextId('household_disasters', 'household_disaster_id'),
-            'household_id' => $householdId,
-            'disaster_id' => $eventId,
-            'initial_status_id' => $statusId,
-            'created_at' => $now,
-        ])));
     }
 
     private function missingTableResponse(string $table): JsonResponse

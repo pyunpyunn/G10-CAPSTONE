@@ -13,11 +13,14 @@ class RescuerTeamWorkflow
 {
     public function validateTeamPayload(Request $request, ?int $teamId = null): array
     {
+        if (in_array($request->input('duty_status'), ['standby', 'stand-by'], true)) {
+            $request->merge(['duty_status' => 'available']);
+        }
         $validated = $request->validate([
             'team_code' => ['required', 'string', 'max:8', 'regex:/^[A-Z0-9]+$/i'],
             'team_name' => ['required', 'string', 'max:100'],
             'team_type' => ['required', 'string', 'max:80'],
-            'duty_status' => ['required', Rule::in(['standby', 'on_duty', 'off_duty', 'unavailable'])],
+            'duty_status' => ['required', Rule::in(['available', 'on_duty', 'off_duty', 'unavailable'])],
             'assigned_purok_id' => ['nullable', 'integer', 'exists:addresses,address_id'],
             'leader_responder_id' => ['nullable', 'integer', 'exists:responders,responder_id'],
             'member_ids' => ['nullable', 'array'],

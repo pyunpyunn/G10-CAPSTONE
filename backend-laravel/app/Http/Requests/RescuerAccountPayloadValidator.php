@@ -9,6 +9,9 @@ class RescuerAccountPayloadValidator
 {
     public function validate(Request $request, bool $isUpdate = false): array
     {
+        if (in_array($request->input('duty_status'), ['standby', 'stand-by'], true)) {
+            $request->merge(['duty_status' => 'available']);
+        }
         $rules = [
             'account_id' => ['nullable', 'string', 'max:30', 'regex:/^BDRRM-[A-Z0-9]{2,8}-[0-9]{3}$/i'],
             'responder_code' => ['nullable', 'string', 'max:80', 'regex:/^BDRRM-[A-Z0-9]{2,8}-[0-9]{3}$/i'],
@@ -31,7 +34,7 @@ class RescuerAccountPayloadValidator
             'team_code' => ['nullable', 'string', 'max:20'],
             'team_type' => ['nullable', 'string', 'max:80'],
             'title' => ['required', 'string', 'max:100'],
-            'duty_status' => ['required', Rule::in(['on_duty', 'standby', 'reserve', 'off_duty', 'unavailable', 'dispatched', 'on_scene', 'disabled'])],
+            'duty_status' => ['required', Rule::in(['available', 'on_duty', 'reserve', 'off_duty', 'unavailable', 'dispatched', 'on_scene', 'disabled'])],
             'skills' => ['nullable', 'string', 'max:1000'],
             'training_notes' => ['nullable', 'string', 'max:1500'],
             'certification_reference' => ['nullable', 'string', 'max:150'],

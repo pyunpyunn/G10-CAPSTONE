@@ -3,11 +3,11 @@ import L from 'leaflet'
 import { ChevronDown, ChevronUp, EyeOff, Layers3, MapPin, Maximize2, Minimize2, X } from 'lucide-react'
 import {
   CircleMarker,
+  GeoJSON,
   MapContainer,
   Marker,
   Polyline,
   Popup,
-  Rectangle,
   TileLayer,
   useMap,
 } from 'react-leaflet'
@@ -18,6 +18,7 @@ import {
   markerGroups,
   percent,
 } from '../../utils/mappingHelpers'
+import { outsideBoundaryMask } from '../../utils/boundaryMask'
 
 export default function MappingMap({
   workspace,
@@ -44,6 +45,7 @@ export default function MappingMap({
   const [layersExpanded, setLayersExpanded] = useState(true)
   const [legendExpanded, setLegendExpanded] = useState(true)
   const [routeDetails, setRouteDetails] = useState(null)
+  const [basemap, setBasemap] = useState('street')
   const [layersPanelStyle, setLayersPanelStyle] = useState({ top: 12, right: 12 })
   const [legendPanelStyle, setLegendPanelStyle] = useState({ left: 12, bottom: 12 })
   const visibleRouteDetails = routeDetails && hasActiveEvent && layers.routes
@@ -52,6 +54,13 @@ export default function MappingMap({
     : null
   const selectedHouseholdRoute = selectedRoute?.route_id?.startsWith('household-') ? selectedRoute : null
   const showHouseholdDetails = hasActiveEvent && Boolean(selectedHousehold)
+  const basemaps = workspace.barangay.basemaps || {}
+  const tileLayer = basemaps[basemap] || basemaps.street || {
+    tile_url: workspace.barangay.tile_url,
+    attribution: '&copy; OpenStreetMap contributors',
+    max_zoom: 19,
+  }
+  const boundaryMask = outsideBoundaryMask(workspace.barangay.boundary)
 
   useEffect(() => {
     function handlePointerMove(event) {
@@ -121,11 +130,22 @@ export default function MappingMap({
         <FitBarangay center={mapCenter} bounds={mapBounds} zoom={workspace.barangay.zoom} />
         <ResizeMapWhenFullscreen isFullscreen={isFullscreen} />
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url={workspace.barangay.tile_url}
-          maxZoom={19}
+          key={`${basemap}-${tileLayer.tile_url}`}
+          attribution={tileLayer.attribution}
+          url={tileLayer.tile_url}
+          maxZoom={tileLayer.max_zoom || 19}
         />
-        {mapBounds?.length === 2 && <Rectangle bounds={mapBounds} pathOptions={{ color: '#173b5f', weight: 3, opacity: 0.95, fillColor: '#b9d8ed', fillOpacity: 0.04 }} />}
+        {boundaryMask && <GeoJSON
+          key={`mask-${workspace.barangay.name}-${JSON.stringify(workspace.barangay.boundary)}`}
+          data={boundaryMask}
+          interactive={false}
+          style={{ color: 'transparent', weight: 0, fillColor: '#000000', fillOpacity: 0.2, fillRule: 'evenodd' }}
+        />}
+        {workspace.barangay.boundary && <GeoJSON
+          key={`${workspace.barangay.name}-${JSON.stringify(workspace.barangay.boundary)}`}
+          data={workspace.barangay.boundary}
+          style={{ color: '#173b5f', weight: 3, opacity: 0.95, fillColor: '#b9d8ed', fillOpacity: 0.07 }}
+        />}
 
         {hasActiveEvent && layers.households && households.map((household) => (
           <HouseholdMarker
@@ -193,9 +213,18 @@ export default function MappingMap({
         <RouteDetailsPopup route={visibleRouteDetails} onClose={() => setRouteDetails(null)} />
       )}
 
-      <div className="mapmate-map-tools"><button type="button" onClick={onToggleFullscreen} aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'} title={isFullscreen ? 'Exit full screen' : 'Full screen'}>
-        {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-      </button>
+      <div className="mapmate-map-tools">
+        <div className="mapmate-basemap-switch" role="group" aria-label="Map basemap">
+          {Object.entries(basemaps).map(([key, layer]) => (
+            <button key={key} type="button" aria-pressed={basemap === key}
+              onClick={() => setBasemap(key)}>{layer.label}</button>
+          ))}
+        </div>
+        <button type="button" className="mapmate-full-map-button" onClick={onToggleFullscreen}
+          aria-label={isFullscreen ? 'Exit full map' : 'Open full map'} title={isFullscreen ? 'Exit full map' : 'Open full map'}>
+          {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          <span>{isFullscreen ? 'Exit full map' : 'Full map'}</span>
+        </button>
       </div>
 
       {!hasActiveEvent && (
@@ -259,6 +288,11 @@ export default function MappingMap({
               <span className="route-swatch" />
               <span>Rescue route</span>
             </div>
+            <div className="legend-row">
+              <span className="boundary-swatch" />
+              <span>{workspace.barangay.boundary ? `${workspace.barangay.name} indicative boundary` : 'No verified boundary polygon configured'}</span>
+            </div>
+            {workspace.barangay.boundary_source && <small className="boundary-source">{workspace.barangay.boundary_source}</small>}
           </div>
         )}
       </div>

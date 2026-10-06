@@ -30,7 +30,7 @@ class RescueDispatchQuery
 
     public function dispatches(Request $request, string $eventId): object
     {
-        $query = ResponderAssignment::query()->from('responder_assignments as ra')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')->where('ra.disaster_id', $eventId)->select(['ra.assignment_id', 'ra.assignment_code', 'ra.responder_id', 'ra.team_id', 'ra.disaster_id', 'ra.household_id', 'ra.assigned_area', 'ra.route_notes', 'ra.priority_level', 'ra.dispatch_notes', 'ra.status', 'ra.assigned_at', 'ra.accepted_at', 'ra.en_route_at', 'ra.arrived_at', 'ra.completed_at', 'ra.outcome_notes', 'ra.updated_at', 'rt.team_name', 'rt.team_code', 'rt.team_type', 'r.full_name as responder_name', 'r.contact_number as responder_contact']);
+        $query = ResponderAssignment::query()->from('responder_assignments as ra')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')->where('ra.disaster_id', $eventId)->select(['ra.assignment_id', 'ra.assignment_code', 'ra.responder_id', 'ra.responder_count', 'ra.dispatch_type', 'ra.team_id', 'ra.disaster_id', 'ra.household_id', 'ra.assigned_area', 'ra.route_notes', 'ra.priority_level', 'ra.dispatch_notes', 'ra.status', 'ra.assigned_at', 'ra.accepted_at', 'ra.en_route_at', 'ra.arrived_at', 'ra.completed_at', 'ra.outcome_notes', 'ra.updated_at', 'rt.team_name', 'rt.team_code', 'rt.team_type', 'r.full_name as responder_name', 'r.contact_number as responder_contact']);
         $status = trim((string) $request->query('status', 'all')); $search = trim((string) $request->query('search', ''));
         if ($status !== '' && $status !== 'all') $query->where('ra.status', $this->presenter->statusKey($status));
         if ($search !== '') $query->where(function ($q) use ($search): void { $q->where('ra.assignment_code', 'like', "%{$search}%")->orWhere('ra.assigned_area', 'like', "%{$search}%")->orWhere('rt.team_name', 'like', "%{$search}%")->orWhere('r.full_name', 'like', "%{$search}%"); });
@@ -57,7 +57,7 @@ class RescueDispatchQuery
         return $responders->map(function (object $r) use ($eventId, $activeByResponder): array {
             $active = $activeByResponder->get($r->responder_id);
             $key=$this->presenter->statusKey($r->duty_status);
-            $available = ! $active && ($eventId ? (! (bool) $r->is_deployed && ! in_array($key, ['deployed', 'dispatched', 'accepted', 'en_route', 'on_scene', 'off_duty'], true)) : $key !== 'off_duty');
+            $available = ! $active && ! (bool) $r->is_deployed && $key === 'available';
             return ['responder_id'=>$r->responder_id,'user_id'=>$r->user_id,'team_id'=>$r->team_id,'full_name'=>$r->full_name?:'Unnamed responder','title'=>$r->title?:'Responder','contact_number'=>$r->contact_number,'team_name'=>$r->team_name?:'Unassigned','team_code'=>$r->team_code,'status'=>$this->presenter->status($active?$active->status:($eventId?$r->duty_status:'available')),'is_available'=>$available,'active_assignment_id'=>$active?->assignment_id,'active_assignment_code'=>$active?->assignment_code,'active_assigned_area'=>$active?->assigned_area,'last_active_at'=>$this->presenter->dateTime($r->last_active_at)];
         })->values();
     }
@@ -82,8 +82,8 @@ class RescueDispatchQuery
     public function summary(?string $eventId, $teamCards = null): array
     {
         $teamCards ??= $this->teamCards($eventId); $counts = $eventId ? ResponderAssignment::query()->where('disaster_id', $eventId)->select('status', DB::raw('COUNT(*) as total'))->groupBy('status')->pluck('total', 'status') : collect();
-        $dispatched = collect(['dispatched', 'en_route', 'accepted'])->sum(fn ($key) => (int) ($counts[$key] ?? 0)); $onScene = (int) ($counts['on_scene'] ?? 0) + (int) ($counts['onscene'] ?? 0); $completed = (int) ($counts['completed'] ?? 0); $standby = collect($teamCards)->where('status_key', 'standby')->count(); $active = $dispatched + $onScene;
-        return ['total_teams' => count($teamCards), 'dispatched' => $dispatched, 'on_scene' => $onScene, 'standby' => $standby, 'completed' => $completed, 'response_rate' => count($teamCards) ? round(($active / count($teamCards)) * 100) : 0, 'active_units' => $active];
+        $dispatched = collect(['dispatched', 'en_route', 'accepted'])->sum(fn ($key) => (int) ($counts[$key] ?? 0)); $onScene = (int) ($counts['on_scene'] ?? 0) + (int) ($counts['onscene'] ?? 0); $completed = (int) ($counts['completed'] ?? 0); $available = collect($teamCards)->filter(fn ($team) => ($team['available_responder_count'] ?? 0) > 0)->count(); $active = $dispatched + $onScene;
+        return ['total_teams' => count($teamCards), 'dispatched' => $dispatched, 'on_scene' => $onScene, 'available' => $available, 'completed' => $completed, 'response_rate' => count($teamCards) ? round(($active / count($teamCards)) * 100) : 0, 'active_units' => $active];
     }
 
     public function teamCards(?string $eventId)
@@ -104,33 +104,33 @@ class RescueDispatchQuery
             $activeAssignments = DB::query()->fromSub($ranked, 'ranked_assignments')->where('row_rank', 1)->get()->keyBy('team_id');
         }
         $available = $this->availableResponderQuery($eventId)->whereIn('r.team_id', $teamIds)
-            ->selectRaw('r.team_id, MIN(r.responder_id) as responder_id')->groupBy('r.team_id')->get()->keyBy('team_id');
+            ->selectRaw('r.team_id, MIN(r.responder_id) as responder_id, COUNT(*) as available_count')->groupBy('r.team_id')->get()->keyBy('team_id');
         $cards = $teams->map(fn (object $team): array => $this->teamCard(
             $team, $eventId, $activeAssignments->get($team->team_id),
-            $memberCounts->get($team->team_id), $available->get($team->team_id)?->responder_id,
+            $memberCounts->get($team->team_id), $available->get($team->team_id),
         ))->values();
         if ($cards->isEmpty()) {
             $count = Responder::query()->where(fn ($q) => $q->whereNull('team_id')->orWhere('team_id', 0))->count();
-            if ($count > 0) { $available = $this->availableResponderQuery($eventId)->where(fn ($q) => $q->whereNull('r.team_id')->orWhere('r.team_id', 0))->value('r.responder_id'); $cards->push(['team_id'=>null,'team_code'=>'POOL','team_name'=>'Unassigned responder pool','team_type'=>'Responder pool','status_key'=>'standby','status_label'=>'Stand-by','leader_name'=>'No team leader assigned','member_count'=>$count,'assigned_households'=>0,'assigned_area'=>'No dispatch area yet','active_assignment_id'=>null,'active_responder_id'=>$available?(int)$available:null,'available_responder_id'=>$available?(int)$available:null,'is_available'=>(bool)$available,'outcomes'=>$this->presenter->outcomes([]),'coverage_percent'=>0,'assigned_time'=>null]); }
+            if ($count > 0) { $available = $this->availableResponderQuery($eventId)->where(fn ($q) => $q->whereNull('r.team_id')->orWhere('r.team_id', 0))->count(); $cards->push(['team_id'=>null,'team_code'=>'POOL','team_name'=>'Unassigned responder pool','team_type'=>'Responder pool','status_key'=>'available','status_label'=>'Available','leader_name'=>'No team leader assigned','member_count'=>$count,'available_responder_count'=>$available,'assigned_households'=>0,'assigned_area'=>'No dispatch area yet','active_assignment_id'=>null,'active_responder_id'=>null,'available_responder_id'=>null,'is_available'=>false,'outcomes'=>$this->presenter->outcomes([]),'coverage_percent'=>0,'assigned_time'=>null]); }
         }
         return $cards;
     }
 
     private function teamCard(object $team, ?string $eventId, ?object $active, ?object $counts, mixed $available): array
     {
-        if (! $team->team_id) { $status=$this->presenter->status('standby'); return ['team_id'=>null,'team_code'=>$team->team_code,'team_name'=>$team->team_name,'team_type'=>$team->team_type,'status_key'=>$status['key'],'status_label'=>$status['label'],'leader_name'=>'No team leader assigned','member_count'=>0,'assigned_households'=>0,'assigned_area'=>'No active dispatch','active_assignment_id'=>null,'active_responder_id'=>null,'available_responder_id'=>null,'is_available'=>false,'outcomes'=>$this->presenter->outcomes([]),'coverage_percent'=>0,'assigned_time'=>null]; }
+        if (! $team->team_id) { $status=$this->presenter->status('available'); return ['team_id'=>null,'team_code'=>$team->team_code,'team_name'=>$team->team_name,'team_type'=>$team->team_type,'status_key'=>$status['key'],'status_label'=>$status['label'],'leader_name'=>'No team leader assigned','member_count'=>0,'available_responder_count'=>0,'assigned_households'=>0,'assigned_area'=>'No active dispatch','active_assignment_id'=>null,'active_responder_id'=>null,'available_responder_id'=>null,'is_available'=>false,'outcomes'=>$this->presenter->outcomes([]),'coverage_percent'=>0,'assigned_time'=>null]; }
         $members = (int) ($counts->members ?? 0);
         $activeMembers = (int) ($counts->active_members ?? 0);
-        $out=$this->presenter->decodeJson($active?->outcome_notes); $route=$this->presenter->decodeJson($active?->route_notes); $status=$this->presenter->status($eventId?($active?->status?:'standby'):$team->duty_status);
-        return ['team_id'=>$team->team_id,'team_code'=>$team->team_code,'team_name'=>$team->team_name?:'Unnamed team','team_type'=>$team->team_type?:'Response team','status_key'=>$status['key'],'status_label'=>$status['label'],'leader_name'=>$team->leader_name?:'No team leader assigned','member_count'=>$members,'active_member_count'=>$activeMembers,'assigned_households'=>(int)($route['households_to_cover']??0),'assigned_area'=>$active?->assigned_area?:'No active dispatch','active_assignment_id'=>$active?->assignment_id,'active_responder_id'=>$active?->responder_id,'available_responder_id'=>$available?(int)$available:null,'is_available'=>!$active&&(bool)$available,'outcomes'=>$this->presenter->outcomes($out),'coverage_percent'=>$this->presenter->coveragePercent($out,(int)($route['households_to_cover']??0)),'assigned_time'=>$this->presenter->time($active?->assigned_at)];
+        $out=$this->presenter->decodeJson($active?->outcome_notes); $route=$this->presenter->decodeJson($active?->route_notes); $status=$this->presenter->status($eventId?($active?->status?:'available'):$team->duty_status);
+        return ['team_id'=>$team->team_id,'team_code'=>$team->team_code,'team_name'=>$team->team_name?:'Unnamed team','team_type'=>$team->team_type?:'Response team','status_key'=>$status['key'],'status_label'=>$status['label'],'leader_name'=>$team->leader_name?:'No team leader assigned','member_count'=>$members,'active_member_count'=>$activeMembers,'available_responder_count'=>(int)($available?->available_count??0),'assigned_households'=>(int)($route['households_to_cover']??0),'assigned_area'=>$active?->assigned_area?:'No active dispatch','active_assignment_id'=>$active?->assignment_id,'active_responder_id'=>$active?->responder_id,'available_responder_id'=>$available?->responder_id?(int)$available->responder_id:null,'is_available'=>(int)($available?->available_count??0)>0,'outcomes'=>$this->presenter->outcomes($out),'coverage_percent'=>$this->presenter->coveragePercent($out,(int)($route['households_to_cover']??0)),'assigned_time'=>$this->presenter->time($active?->assigned_at)];
     }
 
     private function availableResponderQuery(?string $eventId = null)
     {
         $query = Responder::query()->withoutGlobalScopes()->from('responders as r');
-        if (! $eventId) return $query->where(function ($q): void { $q->whereNull('r.duty_status')->orWhere('r.duty_status', '<>', 'off_duty'); });
-        return $query->where(function ($q): void { $q->whereNull('r.is_deployed')->orWhere('r.is_deployed', false); })
-            ->where(function ($q): void { $q->whereNull('r.duty_status')->orWhereNotIn('r.duty_status', ['deployed', 'dispatched', 'accepted', 'en_route', 'on_scene', 'off_duty']); })
+        if (! $eventId) return $query->where('r.duty_status', 'available')->where('r.is_deployed', false);
+        return $query->where('r.is_deployed', false)
+            ->where('r.duty_status', 'available')
             ->whereNotExists(function ($q) use ($eventId): void { $q->from('responder_assignments as active_ra')->whereColumn('active_ra.responder_id', 'r.responder_id')->where('active_ra.disaster_id', $eventId)->whereIn('active_ra.status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning']); });
     }
 }

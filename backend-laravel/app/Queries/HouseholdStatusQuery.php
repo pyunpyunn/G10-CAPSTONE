@@ -104,6 +104,37 @@ class HouseholdStatusQuery
         $status = trim((string) $request->query('status', 'all'));
         $deviceRisk = trim((string) $request->query('device_risk', 'all'));
 
+        $sitioId = (string) $request->query('sitio_id', '');
+        $purokId = (string) $request->query('purok_id', '');
+        if (ctype_digit($sitioId) && ctype_digit($purokId)) {
+            $selected = DB::table('puroks as selected_purok')
+                ->join('sitios as selected_sitio', 'selected_sitio.sitio_id', '=', 'selected_purok.sitio_id')
+                ->where('selected_sitio.sitio_id', (int) $sitioId)
+                ->where('selected_purok.purok_id', (int) $purokId)
+                ->first(['selected_purok.purok_name', 'selected_sitio.sitio_name']);
+            if (! $selected) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $composite = $selected->purok_name.', '.$selected->sitio_name;
+                $query->where(function ($q) use ($sitioId, $purokId, $selected, $composite): void {
+                    $q->where('a.purok_id', (int) $purokId)
+                        ->orWhere(function ($named) use ($sitioId, $selected): void {
+                            $named->whereNull('a.purok_id')->where('a.sitio_id', (int) $sitioId)
+                                ->where('a.purok_sitio', $selected->purok_name);
+                        })
+                        ->orWhere(function ($named) use ($composite): void {
+                            $named->whereNull('a.purok_id')->whereNull('a.sitio_id')
+                                ->where('a.purok_sitio', $composite);
+                        });
+                });
+            }
+        } elseif (ctype_digit($sitioId)) {
+            $query->leftJoin('puroks as filter_purok', 'filter_purok.purok_id', '=', 'a.purok_id')
+                ->whereRaw('COALESCE(a.sitio_id, filter_purok.sitio_id) = ?', [(int) $sitioId]);
+        } elseif (ctype_digit($purokId)) {
+            $query->where('a.purok_id', (int) $purokId);
+        }
+
         if ($search !== '') {
             $query->where(function ($searchQuery) use ($search): void {
                 $searchQuery
@@ -203,7 +234,7 @@ class HouseholdStatusQuery
             ->groupBy('hs.status_key')
             ->pluck('total', 'status_key');
 
-        $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
+        $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe', 'safe_at_home']);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
         $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured', 'trapped', 'unreachable', 'deceased']);
         $safeTotal = $safeOnly + $evacuated;

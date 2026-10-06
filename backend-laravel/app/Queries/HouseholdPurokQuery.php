@@ -8,12 +8,13 @@ use Illuminate\Support\Facades\DB;
 class HouseholdPurokQuery
 {
     /** @return list<string> */
-    public function names(): array
+    public function names(int|string|null $barangayId = null): array
     {
         if (! Schema::hasTable('households') || ! Schema::hasTable('addresses')) return [];
 
         $query = DB::table('households as h')
             ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->when($barangayId !== null, fn ($builder) => $builder->where('a.barangay_id', $barangayId))
             ->when(Schema::hasColumn('households', 'deleted_at'), fn ($builder) => $builder->whereNull('h.deleted_at'));
 
         $hasAddressLabel = Schema::hasColumn('addresses', 'purok_sitio');

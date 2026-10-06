@@ -16,7 +16,7 @@ class MappingQuery
 {
     public function __construct(private MappingPresenter $presenter) {}
 
-    public function getHouseholdGeotags(Request $request, ?string $eventId): array
+    public function getHouseholdGeotags(Request $request, ?string $eventId, int|string|null $barangayId = null): array
     {
         if (! Schema::hasTable('geotagged_locations') || ! Schema::hasTable('households')) {
             return [];
@@ -37,7 +37,8 @@ class MappingQuery
             })
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', $statusColumn)
             ->whereNotNull('gl.latitude')
-            ->whereNotNull('gl.longitude');
+            ->whereNotNull('gl.longitude')
+            ->when($barangayId !== null, fn ($builder) => $builder->where('a.barangay_id', $barangayId));
 
         if ($this->hasColumn('households', 'deleted_at')) {
             $query->whereNull('h.deleted_at');
@@ -212,15 +213,19 @@ class MappingQuery
         return true;
     }
 
-    public function getSummary(?string $eventId, bool $hasActiveEvent): array
+    public function getSummary(?string $eventId, bool $hasActiveEvent, int|string|null $barangayId = null, ?int $siteCount = null): array
     {
+        $hasAddresses = Schema::hasTable('addresses');
         $totalHouseholds = Schema::hasTable('households')
-            ? DB::table('households')->when($this->hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))->count()
+            ? DB::table('households as h')
+                ->when($hasAddresses && $barangayId !== null, fn ($query) => $query->join('addresses as a', 'a.address_id', '=', 'h.address_id')->where('a.barangay_id', $barangayId))
+                ->when($this->hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('h.deleted_at'))->count()
             : 0;
 
             $gpsTagged = Schema::hasTable('geotagged_locations') && Schema::hasTable('households')
                 ? DB::table('geotagged_locations as gl')
                     ->join('households as h', 'h.household_id', '=', 'gl.household_id')
+                    ->when($hasAddresses && $barangayId !== null, fn ($query) => $query->join('addresses as a', 'a.address_id', '=', 'h.address_id')->where('a.barangay_id', $barangayId))
                     ->when($this->hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('h.deleted_at'))
                     ->whereNotNull('gl.latitude')
                     ->whereNotNull('gl.longitude')
@@ -232,6 +237,10 @@ class MappingQuery
 
         if (Schema::hasTable('geotagged_locations') && $this->hasColumn('geotagged_locations', 'accuracy_m')) {
             $averageAccuracy = GeotaggedLocation::query()
+                ->when($hasAddresses && $barangayId !== null, fn ($query) => $query
+                    ->join('households as h', 'h.household_id', '=', 'geotagged_locations.household_id')
+                    ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
+                    ->where('a.barangay_id', $barangayId))
                 ->whereNotNull('accuracy_m')
                 ->avg('accuracy_m');
         }
@@ -240,7 +249,7 @@ class MappingQuery
             'gps_tagged_households' => (int) $gpsTagged,
             'no_verified_geotag' => max((int) $totalHouseholds - (int) $gpsTagged, 0),
             'average_accuracy_m' => $averageAccuracy ? round((float) $averageAccuracy, 1) : null,
-            'evacuation_sites' => $this->countActiveEvacuationSites($eventId, $hasActiveEvent),
+            'evacuation_sites' => $siteCount ?? $this->countActiveEvacuationSites($eventId, $hasActiveEvent),
         ];
     }
 
@@ -268,9 +277,15 @@ class MappingQuery
         return $query->count();
     }
 
-    public function getPuroks(): array
+    public function getPuroks(int|string|null $barangayId = null): array
     {
-        return app(HouseholdPurokQuery::class)->names();
+        if ($barangayId !== null && Schema::hasTable('puroks') && Schema::hasTable('sitios')) {
+            $names = DB::table('puroks as p')->join('sitios as s', 's.sitio_id', '=', 'p.sitio_id')
+                ->where('s.barangay_id', $barangayId)->whereNotNull('p.purok_name')
+                ->distinct()->orderBy('p.purok_name')->pluck('p.purok_name')->all();
+            if ($names !== []) return $names;
+        }
+        return app(HouseholdPurokQuery::class)->names($barangayId);
     }
 
     public function householdSelectColumns(): array

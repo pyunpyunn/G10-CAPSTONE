@@ -365,6 +365,9 @@
   margin-top: 8px;
 }
 
+.boundary-swatch { display: inline-block; flex-shrink: 0; width: 16px; height: 11px; border: 2px solid #173b5f; background: #b9d8ed33; }
+.boundary-source { display: block; max-width: 240px; margin-top: 8px; color: var(--color-text-3); line-height: 1.4; }
+
 .status-swatch {
   display: inline-flex;
   width: 12px;

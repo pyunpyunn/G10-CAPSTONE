@@ -32,7 +32,7 @@ class RescueDispatchPresenterTest extends TestCase
         $presenter = app(RescueDispatchPresenter::class);
         $this->assertSame([], $presenter->dispatch(null));
         $this->assertSame('on_scene', $presenter->status('onscene')['key']);
-        $this->assertSame('Stand-by', $presenter->status(null)['label']);
+        $this->assertSame('Available', $presenter->status(null)['label']);
     }
 }
 

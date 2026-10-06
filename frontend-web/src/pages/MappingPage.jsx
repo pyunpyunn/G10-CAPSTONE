@@ -45,7 +45,7 @@ export default function MappingPage() {
   ], [barangay?.center?.latitude, barangay?.center?.longitude])
   const hasMapCenter = mapCenter.every((coordinate) => coordinate !== null && coordinate !== undefined
     && coordinate !== '' && Number.isFinite(Number(coordinate)))
-  const mapBounds = useMemo(() => Array.isArray(barangay?.bounds) ? barangay.bounds : defaultWorkspace.barangay.bounds, [barangay?.bounds])
+  const mapBounds = Array.isArray(barangay?.bounds) ? barangay.bounds : defaultWorkspace.barangay.bounds
   const households = useMemo(() => (
     hasActiveEvent ? workspace.households : []
   ), [hasActiveEvent, workspace.households])
@@ -111,6 +111,13 @@ export default function MappingPage() {
 
     return () => window.removeEventListener('keydown', closeFullscreen)
   }, [])
+
+  useEffect(() => {
+    if (!isMapFullscreen) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [isMapFullscreen])
 
   function changeLayer(layerName) {
     setLayers((current) => ({

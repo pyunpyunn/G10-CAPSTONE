@@ -133,7 +133,7 @@ class DashboardQuery
         $dispatched = $this->presenter->sumStatusKeys($statusCounts, ['dispatched', 'assigned', 'accepted', 'en_route']);
         $onScene = $this->presenter->sumStatusKeys($statusCounts, ['on_scene', 'on-scene', 'arrived']);
         $standby = Schema::hasTable('rescue_teams')
-            ? RescueTeam::query()->where('duty_status', 'standby')->count()
+            ? RescueTeam::query()->where('duty_status', 'available')->count()
             : 0;
 
         $teams = ResponderAssignment::query()

@@ -1,6 +1,9 @@
 <?php
 
 use App\Services\Shared\WeatherSnapshotService;
+use App\Services\Shared\StatusReminderScheduler;
+use App\Queries\RescueCriteriaHistoryQuery;
+use App\Queries\RescueDispatchQuery;
 use App\Support\QueryProfileRanking;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -29,6 +32,20 @@ Artisan::command('weather:refresh', function () {
 
     return 0;
 })->purpose('Fetch Open-Meteo weather data and save it to weather_logs');
+
+Artisan::command('status-reminders:schedule', function (StatusReminderScheduler $scheduler) {
+    $this->info('Scheduled '.$scheduler->scheduleDue().' member status check-ins.');
+})->purpose('Queue check-ins for unreported members of the active disaster event');
+
+Artisan::command('rescue-criteria:capture {--rebase-contact : Recalculate existing contact baselines after a definition change}', function (RescueDispatchQuery $dispatch, RescueCriteriaHistoryQuery $criteria) {
+    $event = $dispatch->activeEvent();
+    if (! $event) {
+        $this->info('No active event to measure.');
+        return;
+    }
+    $count = $criteria->refresh((string) $event->event_id, $event->started_at, null, (bool) $this->option('rebase-contact'));
+    $this->info('Updated '.$count.' three-hour rescue criteria buckets for '.$event->event_id.'.');
+})->purpose('Store a measured rescue criteria point for the active event');
 
 Artisan::command('profiles:rank {--path= : Laravel log path}', function (QueryProfileRanking $ranking) {
     $path = $this->option('path') ?: storage_path('logs/laravel.log');
@@ -122,6 +139,14 @@ Artisan::command('households:provision-logins {--password=marshmallows : Tempora
 
 Schedule::command('weather:refresh')
     ->everyThreeHours()
+    ->withoutOverlapping();
+
+Schedule::command('status-reminders:schedule')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+Schedule::command('rescue-criteria:capture')
+    ->everyFifteenMinutes()
     ->withoutOverlapping();
 
 Schedule::command('queue:work trackingaid_outbox --queue=trackingaid --stop-when-empty --max-time=50')

@@ -69,7 +69,7 @@ class MappingPresenter
             'responder_name' => $row->full_name ?: 'Responder',
             'assignment_id' => $row->assignment_id,
             'assigned_area' => $row->assigned_area ?: 'No active area',
-            'status' => $row->status ?: $row->duty_status ?? 'standby',
+            'status' => $row->status ?: $row->duty_status ?? 'available',
             'latitude' => (float) $row->latitude,
             'longitude' => (float) $row->longitude,
             'battery_level' => $row->battery_level,

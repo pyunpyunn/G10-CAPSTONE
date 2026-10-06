@@ -72,7 +72,12 @@ class RescuerAssignmentWorkflow
         }
 
         DB::transaction(function () use ($assignmentId, $validated, $responder, $status, $now, $updates, $request): void {
-            DB::table('responder_assignments')->where('assignment_id', $assignmentId)->lockForUpdate()->first();
+            $current = DB::table('responder_assignments')->where('assignment_id', $assignmentId)->lockForUpdate()->first();
+            if (! $current || in_array($current->status, ['cancelled', 'completed'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'status' => ['This assignment is already closed. Refresh your dispatch list before updating it.'],
+                ]);
+            }
             DB::table('responder_assignments')->where('assignment_id', $assignmentId)->update($updates);
             if ($this->hasPoint($validated)) {
                 $this->saveResponderLocation($responder, $validated, $now);
@@ -80,7 +85,13 @@ class RescuerAssignmentWorkflow
                 RefreshResponderRoadRoute::dispatch($assignmentId, $validated)
                     ->onConnection('operations_outbox')->onQueue('operations');
             }
-            $this->updateResponderDuty($responder?->responder_id, $responder?->team_id, $status);
+            $selected = $this->decodeJson($current->route_notes ?? null)['selected_responder_ids'] ?? [];
+            $ids = in_array($status, ['completed', 'cancelled'], true)
+                ? array_values(array_unique(array_map('intval', $selected ?: [$responder?->responder_id])))
+                : [$responder?->responder_id];
+            foreach ($ids as $selectedId) {
+                $this->updateResponderDuty($selectedId, $current->team_id ?? $responder?->team_id, $status);
+            }
             $this->support->writeAuditLog($request, 'mobile_update_assignment', 'responder_assignments', (string) $assignmentId, $updates);
         }, 3);
 
@@ -198,10 +209,14 @@ class RescuerAssignmentWorkflow
             ]));
 
         if ($teamId && Schema::hasTable('rescue_teams')) {
+            $hasAvailable = DB::table('responders')->where('team_id', $teamId)
+                ->where('duty_status', 'available')->where('is_deployed', false)->exists();
+            $hasDeployed = DB::table('responders')->where('team_id', $teamId)
+                ->where('is_deployed', true)->exists();
             DB::table('rescue_teams')
                 ->where('team_id', $teamId)
                 ->update($this->support->filterColumns('rescue_teams', [
-                    'duty_status' => $dutyStatus,
+                    'duty_status' => $hasAvailable ? 'available' : ($hasDeployed ? 'deployed' : 'available'),
                     'updated_at' => now(),
                 ]));
         }

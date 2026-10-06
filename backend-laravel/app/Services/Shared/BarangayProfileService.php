@@ -7,6 +7,7 @@ use App\Support\RequestSchema as Schema;
 
 class BarangayProfileService
 {
+    public function __construct(private BarangayBoundaryService $boundaries) {}
     private ?array $sharedGeometry = null;
     private bool $geometryLoaded = false;
 
@@ -47,14 +48,19 @@ class BarangayProfileService
     public function mapFocus(): array
     {
         $profile = $this->current();
+        $boundary = $this->boundaries->forProfile($profile);
 
         return [
+            'barangay_id' => $profile['barangay_id'],
             'name' => $profile['name'],
             'center' => $profile['center'],
-            'bounds' => $profile['bounds'],
+            'bounds' => $boundary['bounds'] ?? null,
+            'boundary' => $boundary['geometry'] ?? null,
+            'boundary_source' => $boundary['source'] ?? null,
             'zoom' => $profile['map_zoom'],
             'tile_provider' => 'OpenStreetMap Standard',
-            'tile_url' => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'tile_url' => config('map_layers.street.tile_url'),
+            'basemaps' => config('map_layers'),
         ];
     }
 

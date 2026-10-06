@@ -68,7 +68,7 @@ class RescuerAccountPresenter
 
         return match ($status) {
             'on_duty' => ['key' => 'on_duty', 'label' => 'On duty', 'tone' => 'green'],
-            'standby' => ['key' => 'standby', 'label' => 'Stand-by', 'tone' => 'green'],
+            'available', 'standby' => ['key' => 'available', 'label' => 'Available', 'tone' => 'green'],
             'reserve' => ['key' => 'reserve', 'label' => 'Reserve', 'tone' => 'blue'],
             'dispatched' => ['key' => 'dispatched', 'label' => 'Dispatched', 'tone' => 'purple'],
             'on_scene' => ['key' => 'on_scene', 'label' => 'On-scene', 'tone' => 'green'],
@@ -83,7 +83,7 @@ class RescuerAccountPresenter
             ['key' => 'all', 'label' => 'All'],
             ['key' => 'active', 'label' => 'Active accounts'],
             ['key' => 'on_duty', 'label' => 'On duty'],
-            ['key' => 'standby', 'label' => 'Stand-by'],
+            ['key' => 'available', 'label' => 'Available'],
             ['key' => 'reserve', 'label' => 'Reserve'],
             ['key' => 'dispatched', 'label' => 'Dispatched'],
             ['key' => 'on_scene', 'label' => 'On-scene'],

@@ -135,6 +135,14 @@ Route::prefix('v1')->group(function () {
             Route::delete('/archive/saved-groups/{groupId}', [ArchiveController::class, 'deleteSavedGroup']);
             Route::post('/archive/delete-selected', [ArchiveController::class, 'deleteSelected']);
             Route::get('/dispatches', [RescueDispatchController::class, 'index']);
+            Route::get('/dispatches/welfare-checks', [RescueDispatchController::class, 'welfareChecks']);
+            Route::get('/dispatches/member-check-queue', [RescueDispatchController::class, 'memberCheckQueue']);
+            Route::get('/dispatches/priorities', [RescueDispatchController::class, 'priorities']);
+            Route::get('/dispatches/purok-priorities', [RescueDispatchController::class, 'purokPriorities']);
+            Route::get('/dispatches/sitio-priorities', [RescueDispatchController::class, 'sitioPriorities']);
+            Route::get('/dispatches/criteria-timeline', [RescueDispatchController::class, 'criteriaTimeline']);
+            Route::get('/dispatches/priority-settings', [RescueDispatchController::class, 'prioritySettings']);
+            Route::patch('/dispatches/priority-settings', [RescueDispatchController::class, 'updatePrioritySettings']);
             Route::post('/dispatches', [RescueDispatchController::class, 'store']);
             Route::get('/dispatches/{assignmentId}', [RescueDispatchController::class, 'show']);
             Route::post('/dispatches/{assignmentId}/complete', [RescueDispatchController::class, 'complete']);

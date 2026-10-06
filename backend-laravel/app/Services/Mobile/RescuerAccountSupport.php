@@ -133,7 +133,7 @@ class RescuerAccountSupport
             'team_code' => $teamCode,
             'team_name' => $teamName,
             'team_type' => $validated['team_type'] ?? $catalog['team_type'] ?? $teamName,
-            'duty_status' => 'standby',
+            'duty_status' => 'available',
             'created_at' => $now,
             'updated_at' => $now,
         ]);

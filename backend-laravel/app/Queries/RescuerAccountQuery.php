@@ -71,7 +71,7 @@ class RescuerAccountQuery
             'puroks' => $this->purokAddressOptions(),
             'team_types' => $this->teamTypeOptions(),
             'duty_statuses' => [
-                ['key' => 'standby', 'label' => 'Stand-by'],
+                ['key' => 'available', 'label' => 'Available'],
                 ['key' => 'on_duty', 'label' => 'On duty'],
                 ['key' => 'off_duty', 'label' => 'Off duty'],
                 ['key' => 'unavailable', 'label' => 'Unavailable'],
@@ -243,7 +243,7 @@ class RescuerAccountQuery
             ->leftJoin('users as u', 'u.user_id', '=', 'r.user_id')
             ->whereNull('r.deleted_at')
             ->selectRaw("COUNT(*) as registered,
-                SUM(CASE WHEN r.duty_status IN ('on_duty','standby','dispatched','on_scene') AND u.is_active = 1 THEN 1 ELSE 0 END) as on_duty,
+                SUM(CASE WHEN r.duty_status IN ('on_duty','available','dispatched','on_scene') AND u.is_active = 1 THEN 1 ELSE 0 END) as on_duty,
                 SUM(CASE WHEN r.is_deployed = 1 OR r.duty_status IN ('dispatched','on_scene') THEN 1 ELSE 0 END) as deployed,
                 SUM(CASE WHEN LOWER(COALESCE(r.training_notes, '')) LIKE '%due%'
                     OR LOWER(COALESCE(r.training_notes, '')) LIKE '%expired%'

@@ -156,6 +156,19 @@ class OneSignalNotificationService
         $this->applyUserFilter($query, $options['user_ids'] ?? []);
         $this->applyResponderFilter($query, $options['responder_ids'] ?? []);
 
+        if (! empty($options['household_ids'])) {
+            if (! Schema::hasColumn('device_tokens', 'household_id')) return [];
+            $query->whereIn('dt.household_id', $options['household_ids']);
+        }
+        if (! empty($options['member_ids'])) {
+            if (! Schema::hasColumn('device_tokens', 'member_id')) return [];
+            $query->whereIn('dt.member_id', $options['member_ids']);
+        }
+        if (! empty($options['exclude_member_ids']) && Schema::hasColumn('device_tokens', 'member_id')) {
+            $query->where(fn ($inner) => $inner->whereNull('dt.member_id')
+                ->orWhereNotIn('dt.member_id', $options['exclude_member_ids']));
+        }
+
         if (! $this->applyPurokFilter($query, $options['household_puroks'] ?? [])) {
             return [];
         }

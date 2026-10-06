@@ -41,7 +41,7 @@ class DashboardPresenter
         return [
             $this->bar('Dispatched', $dispatched, 'dispatched', $max),
             $this->bar('On-scene', $onScene, 'on-scene', $max),
-            $this->bar('Stand-by', $standby, 'standby', $max),
+            $this->bar('Available', $standby, 'available', $max),
         ];
     }
 

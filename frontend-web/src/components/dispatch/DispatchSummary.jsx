@@ -1,13 +1,13 @@
 export default function DispatchSummary({ summary }) {
   const totalTeams = Number(summary.total_teams) || 0
   const metrics = [
-    { label: 'Stand-by', value: String(summary.standby || 0), tone: 'neutral' },
+    { label: 'Available', value: String(summary.available || 0), tone: 'neutral' },
     { label: 'Dispatched', value: String(summary.dispatched || 0), tone: 'purple' },
     { label: 'On-scene', value: String(summary.on_scene || 0), tone: 'safe' },
     { label: 'Response', value: `${summary.response_rate || 0}%`, tone: 'evacuated' },
   ]
   const progress = [
-    { label: 'Stand-by', value: Number(summary.standby) || 0, className: 'standby' },
+    { label: 'Available', value: Number(summary.available) || 0, className: 'standby' },
     { label: 'Dispatched', value: Number(summary.dispatched) || 0, className: 'dispatched' },
     { label: 'On-scene', value: Number(summary.on_scene) || 0, className: 'on-scene' },
     { label: 'Completed', value: Number(summary.completed) || 0, className: 'completed' },

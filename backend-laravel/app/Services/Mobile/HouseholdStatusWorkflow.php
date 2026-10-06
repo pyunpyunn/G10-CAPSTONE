@@ -2,11 +2,13 @@
 
 namespace App\Services\Mobile;
 
+use App\Actions\UpdateHouseholdStatus;
 use App\Models\AuditLog;
 use App\Models\DeviceToken;
 use App\Models\DeviceTrackingLog;
 use App\Models\Household;
 use App\Models\HouseholdDisaster;
+use App\Models\HouseholdStatus;
 use App\Models\HouseholdStatusLog;
 use App\Queries\HouseholdStatusQuery;
 use Carbon\Carbon;
@@ -158,44 +160,19 @@ class HouseholdStatusWorkflow
 
     private function saveLatestHouseholdDisaster(string $eventId, string $householdId, array $validated, ?string $userId, string $source, Carbon $now, ?int $deviceId): void
     {
-        $existing = HouseholdDisaster::query()
-            ->where('disaster_id', $eventId)
-            ->where('household_id', $householdId)
-            ->lockForUpdate()
-            ->first();
-
-        $data = [
-            'current_status_id' => $validated['status_id'],
-            'last_status_source' => $source,
-            'last_status_notes' => $validated['notes'] ?? null,
-            'last_reported_by_user_id' => $userId,
-            'last_device_token_id' => $deviceId,
-            'last_latitude' => $validated['latitude'] ?? null,
-            'last_longitude' => $validated['longitude'] ?? null,
-            'last_battery_level' => $validated['battery_level'] ?? null,
-            'last_reported_at' => $now,
-            'needs_dispatch' => (bool) ($validated['needs_dispatch'] ?? false),
-            'priority_level' => (bool) ($validated['needs_dispatch'] ?? false) ? 'urgent' : null,
-            'updated_at' => $now,
-        ];
-
-        if ($existing) {
-            HouseholdDisaster::query()
-                ->where('household_disaster_id', $existing->household_disaster_id)
-                ->update($data);
-
-            return;
-        }
-
-        $nextId = app(\App\Services\Shared\OperationalSequence::class)->nextNumericId('household_disasters', 'household_disaster_id');
-
-        HouseholdDisaster::query()->create(array_merge($data, [
-            'household_disaster_id' => $nextId,
-            'household_id' => $householdId,
-            'disaster_id' => $eventId,
-            'initial_status_id' => $validated['status_id'],
-            'created_at' => $now,
-        ]));
+        $statusKey = HouseholdStatus::query()->where('status_id', $validated['status_id'])->value('status_key');
+        app(UpdateHouseholdStatus::class)->apply(
+            $eventId,
+            $householdId,
+            (int) $validated['status_id'],
+            (string) $statusKey,
+            $source,
+            $validated['notes'] ?? null,
+            $userId,
+            $deviceId,
+            $validated,
+            array_key_exists('needs_dispatch', $validated) ? (bool) $validated['needs_dispatch'] : null,
+        );
     }
 
     private function saveLatestDeviceData(string $householdId, array $validated, Carbon $now, ?int $deviceId): void

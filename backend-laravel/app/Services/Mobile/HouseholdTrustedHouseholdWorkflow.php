@@ -2,6 +2,7 @@
 
 namespace App\Services\Mobile;
 
+use App\Models\HouseholdTrustedPin;
 use App\Presenters\HouseholdMobilePresenter;
 use App\Queries\HouseholdMobileReadQuery;
 use Illuminate\Http\JsonResponse;
@@ -50,9 +51,7 @@ class HouseholdTrustedHouseholdWorkflow
             return response()->json(['message' => 'This account is not linked to a household record.'], 403);
         }
 
-        $existing = DB::table('household_trusted_pins')
-            ->where('household_id', $householdId)
-            ->first(['pin_hash']);
+        $existing = HouseholdTrustedPin::query()->find($householdId);
         $validated = $request->validate([
             'pin' => ['required', 'digits:4', 'confirmed'],
             'current_pin' => [$existing ? 'required' : 'nullable', 'digits:4'],
@@ -66,26 +65,19 @@ class HouseholdTrustedHouseholdWorkflow
             return response()->json(['message' => 'New household PIN must be different from the current PIN.'], 422);
         }
 
-        $now = now();
         $pinData = [
             'pin_hash' => Hash::make($validated['pin']),
             'updated_by_user_id' => $user?->user_id,
-            'updated_at' => $now,
         ];
 
-        DB::transaction(function () use ($existing, $householdId, $pinData, $now): void {
+        DB::transaction(function () use ($existing, $householdId, $pinData): void {
             if ($existing) {
-                DB::table('household_trusted_pins')
-                    ->where('household_id', $householdId)
-                    ->update($pinData);
+                $existing->update($pinData);
 
                 return;
             }
 
-            DB::table('household_trusted_pins')->insert(array_merge($pinData, [
-                'household_id' => $householdId,
-                'created_at' => $now,
-            ]));
+            HouseholdTrustedPin::query()->create(array_merge($pinData, ['household_id' => $householdId]));
         });
 
         return response()->json([
@@ -107,9 +99,7 @@ class HouseholdTrustedHouseholdWorkflow
         }
 
         $validated = $request->validate(['pin' => ['required', 'digits:4']]);
-        $storedPin = DB::table('household_trusted_pins')
-            ->where('household_id', $householdId)
-            ->first(['pin_hash']);
+        $storedPin = HouseholdTrustedPin::query()->find($householdId);
 
         if (! $storedPin) {
             return response()->json(['message' => 'Set a household PIN before opening trusted households.'], 409);
@@ -174,8 +164,8 @@ class HouseholdTrustedHouseholdWorkflow
         $validated = $request->validate([
             'status_key' => ['required', Rule::in(['safe', 'evacuated', 'unsafe', 'needs_help'])],
             'device_uuid' => ['nullable', 'string', 'max:150'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'latitude' => [Rule::requiredIf($request->input('status_key') === 'unsafe'), 'numeric', 'between:-90,90'],
+            'longitude' => [Rule::requiredIf($request->input('status_key') === 'unsafe'), 'numeric', 'between:-180,180'],
             'location_label' => ['nullable', 'string', 'max:255'],
             'location_accuracy_m' => ['nullable', 'numeric', 'min:0'],
             'battery_level' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -214,7 +204,7 @@ class HouseholdTrustedHouseholdWorkflow
                 'disaster_id' => $activeEvent['event_id'],
                 'household_id' => $targetHouseholdId,
                 'status_id' => $status['status_id'],
-                'source' => 'household_member_mobile',
+                'source' => 'trusted_household',
                 'submitted_by_user_id' => $user?->user_id,
                 'device_token_id' => $deviceId,
                 'latitude' => $validated['latitude'] ?? null,

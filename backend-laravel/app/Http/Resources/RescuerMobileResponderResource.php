@@ -20,7 +20,7 @@ class RescuerMobileResponderResource extends JsonResource
             'team_name' => $this->team_name ?: 'Unassigned',
             'team_code' => $this->team_code,
             'team_type' => $this->team_type,
-            'duty_status' => $this->duty_status ?: 'standby',
+            'duty_status' => $this->duty_status ?: 'available',
             'is_deployed' => (bool) ($this->is_deployed ?? false),
             'skills' => $this->skills,
             'blood_type' => $this->blood_type ?: 'Unknown',

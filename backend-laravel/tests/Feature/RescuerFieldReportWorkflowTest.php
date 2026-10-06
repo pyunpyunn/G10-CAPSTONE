@@ -40,6 +40,13 @@ class RescuerFieldReportWorkflowTest extends TestCase
             $table->timestamp('submitted_at')->nullable();
             $table->timestamps();
         });
+        Schema::create('household_disasters', function (Blueprint $table): void {
+            $table->increments('household_disaster_id');
+            $table->string('household_id');
+            $table->string('disaster_id');
+            $table->integer('initial_status_id');
+            $table->integer('current_status_id')->nullable();
+        });
         DB::table('disaster_events')->insert([
             'event_id' => 'EVT-1', 'name' => 'Flood response', 'started_at' => now(), 'ended_at' => null,
         ]);
@@ -102,12 +109,7 @@ class RescuerFieldReportWorkflowTest extends TestCase
 
     public function test_failure_while_saving_latest_household_status_rolls_back_the_report_log(): void
     {
-        Schema::create('household_disasters', function (Blueprint $table): void {
-            $table->increments('household_disaster_id');
-            $table->string('household_id');
-            $table->string('disaster_id');
-            $table->integer('initial_status_id');
-            $table->integer('current_status_id')->nullable();
+        Schema::table('household_disasters', function (Blueprint $table): void {
             $table->string('required_guard');
         });
         $request = Request::create('/api/v1/rescuer/field-reports', 'POST', [
