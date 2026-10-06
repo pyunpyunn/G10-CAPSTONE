@@ -10,6 +10,7 @@ export default function WeatherMainColumn({
   riskTone,
   activeEvent,
   locationName,
+  updatedAt,
 }) {
   return (
     <>
@@ -17,11 +18,13 @@ export default function WeatherMainColumn({
         latest={latest}
         activeConditionKey={activeConditionKey}
         riskTone={riskTone}
+        locationName={locationName}
+        updatedAt={updatedAt}
       />
 
       <div className="weather-main-column">
         <ForecastOutlook latest={latest} locationName={locationName} />
-        <AdvisoryUpdates latest={latest} hasSnapshot={hasSnapshot} riskTone={riskTone} activeEvent={activeEvent} />
+        <AdvisoryUpdates hasSnapshot={hasSnapshot} activeEvent={activeEvent} />
         <SourceLinks sourceLinks={sourceLinks} />
       </div>
     </>
@@ -53,7 +56,7 @@ function ForecastOutlook({ latest, locationName }) {
   )
 }
 
-function AdvisoryUpdates({ latest, hasSnapshot, riskTone, activeEvent }) {
+function AdvisoryUpdates({ hasSnapshot, activeEvent }) {
   return (
     <section className="wx-panel">
       <div className="wx-panel-head"><span className="wx-panel-title">Latest advisory updates</span></div>

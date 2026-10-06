@@ -79,8 +79,6 @@ export default function WeatherPage() {
   return (
     <section className="page weather-page active">
       <PageHeader
-        title="Weather Updates"
-        subtitle={`${locationName} · Updated ${updatedAt}`}
         actions={(
           <button className="btn btn-primary btn-sm wx-refresh-button" type="button" disabled={isRefreshing} onClick={handleRefresh}>
             <RefreshCcw size={14} /> {isRefreshing ? 'Refreshing' : 'Refresh'}
@@ -115,6 +113,7 @@ export default function WeatherPage() {
             riskTone={riskTone}
             activeEvent={workspace.active_event}
             locationName={locationName}
+            updatedAt={updatedAt}
           />
           <WeatherSidebar
             workspace={workspace}

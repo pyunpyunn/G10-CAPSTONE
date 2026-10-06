@@ -58,6 +58,20 @@
   gap: 6px;
 }
 
+.app-page-controls-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+.app-page-controls-filters {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .page-loading-card {
   position: fixed;
   top: calc(var(--topbar-offset, var(--header-height)) + 24px);

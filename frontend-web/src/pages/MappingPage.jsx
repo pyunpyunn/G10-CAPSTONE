@@ -5,8 +5,6 @@ import MappingMap from '../components/mapping/MappingMap'
 import MappingSidebar from '../components/mapping/MappingSidebar'
 import LoadingState from '../components/ui/LoadingState'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
-import DataFilterBar from '../components/ui/DataFilterBar'
-import PageHeader from '../components/ui/PageHeader'
 import {
   apiErrorMessage,
   defaultWorkspace,
@@ -21,9 +19,6 @@ export default function MappingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [error, setError] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [status, setStatus] = useState('all')
-  const [search, setSearch] = useState('')
   const [layers, setLayers] = useState({
     households: true,
     evacuationSites: true,
@@ -38,7 +33,6 @@ export default function MappingPage() {
 
   const hasActiveEvent = Boolean(workspace.active_event)
   const barangay = workspace?.barangay || defaultWorkspace.barangay
-  const filters = workspace?.filters || defaultWorkspace.filters
   const mapCenter = useMemo(() => [
     barangay?.center?.latitude,
     barangay?.center?.longitude,
@@ -59,9 +53,7 @@ export default function MappingPage() {
     hasActiveEvent ? (Array.isArray(workspace.dispatch_routes) ? workspace.dispatch_routes.filter(isActiveRouteStatus) : []) : []
   ), [hasActiveEvent, workspace.dispatch_routes])
   const visibleRoutes = selectedRoute ? [selectedRoute] : dispatchRoutes
-  const visibleHouseholds = useMemo(() => households.filter((household) => (
-    String(household.label || '').toLowerCase().includes(search.trim().toLowerCase())
-  )), [households, search])
+  const visibleHouseholds = households
 
   const closestRescueTeam = useMemo(() => rescueTeams[0] || null, [rescueTeams])
 
@@ -74,7 +66,7 @@ export default function MappingPage() {
       setRouteError('')
 
       try {
-        const data = await getMappingOverview({ purok, status })
+        const data = await getMappingOverview()
 
         if (!ignore) {
           setWorkspace(normalizeWorkspaceData(data || {}))
@@ -98,7 +90,7 @@ export default function MappingPage() {
     return () => {
       ignore = true
     }
-  }, [purok, status])
+  }, [])
 
   useEffect(() => {
     function closeFullscreen(event) {
@@ -217,30 +209,6 @@ export default function MappingPage() {
 
   return (
     <section className="page mapping-page active mapmate-page">
-      <PageHeader
-        title="Mapping"
-        subtitle={barangay?.name || 'Shared database map'}
-        filters={hasLoaded && (
-          <DataFilterBar
-            className="page-heading-filter"
-            search={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Search household"
-            filters={[
-              {
-                id: 'purok', label: 'Area', value: purok, onChange: setPurok,
-                options: [{ value: 'all', label: 'All puroks' }, ...(filters?.puroks || []).map((item) => ({ value: item, label: item }))],
-              },
-              {
-                id: 'status', label: 'Status', value: status, onChange: setStatus,
-                options: (filters?.statuses || []).map((item) => ({ value: item.key, label: item.label })),
-              },
-            ]}
-            onReset={() => { setSearch(''); setPurok('all'); setStatus('all') }}
-            trailing={<span className="data-filter-result-count">{visibleHouseholds.length} results</span>}
-          />
-        )}
-      />
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 

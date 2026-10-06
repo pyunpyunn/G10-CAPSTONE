@@ -64,28 +64,26 @@ export default function DashboardPage() {
     navigate(path)
   }
 
+  const disasterAction = hasActiveEvent ? (
+    <button className="btn btn-warning btn-sm" type="button" onClick={() => openModule(`/broadcast?event_id=${encodeURIComponent(dashboard.active_event.event_id)}`)}>
+      <Pencil size={14} />
+      UPDATE DISASTER
+    </button>
+  ) : (
+    <button className="btn btn-danger btn-sm dashboard-declare-button" type="button" onClick={() => openModule('/broadcast')}>
+      <TriangleAlert size={14} />
+      Declare New Disaster
+    </button>
+  )
+
   return (
     <section className="page active">
       <PageHeader
-        title="Dashboard"
         actions={
-          <>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={loadDashboard}>
-              <RefreshCcw size={14} />
-              Refresh
-            </button>
-            {hasActiveEvent ? (
-              <button className="btn btn-warning btn-sm" type="button" onClick={() => openModule(`/broadcast?event_id=${encodeURIComponent(dashboard.active_event.event_id)}`)}>
-                <Pencil size={14} />
-                UPDATE DISASTER
-              </button>
-            ) : (
-              <button className="btn btn-danger btn-sm dashboard-declare-button" type="button" onClick={() => openModule('/broadcast')}>
-                <TriangleAlert size={14} />
-                Declare New Disaster
-              </button>
-            )}
-          </>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={loadDashboard}>
+            <RefreshCcw size={14} />
+            Refresh
+          </button>
         }
       />
 
@@ -94,6 +92,7 @@ export default function DashboardPage() {
 
       {!isLoading && !error && dashboard && (
         <div className="dashboard-layout">
+          <div className="dashboard-layout-mobile-actions">{disasterAction}</div>
           <DashboardMainContent
             dashboard={dashboard}
             stats={stats}
@@ -105,6 +104,7 @@ export default function DashboardPage() {
             dashboard={dashboard}
             hasActiveEvent={hasActiveEvent}
             onOpenModule={openModule}
+            disasterAction={disasterAction}
           />
         </div>
       )}
