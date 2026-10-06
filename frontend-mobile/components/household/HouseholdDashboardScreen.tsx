@@ -74,7 +74,7 @@ export function HouseholdDashboardScreen({
             title="Household status"
             action={
               <Pressable style={styles.historyButton} onPress={onToggleHistory}>
-                <Ionicons name="time-outline" size={18} color={palette.navActive} />
+                <Ionicons name="time-outline" size={16} color={palette.navActive} />
               </Pressable>
             }
           />
@@ -270,7 +270,11 @@ export function HouseholdTrustedScreen({
               accessibilityRole="button"
               accessibilityLabel="Change household PIN"
             >
-              <Ionicons name="lock-closed" size={15} color={palette.navActive} />
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color={palette.navActive}
+              />
             </Pressable>
           }
         />
@@ -681,8 +685,8 @@ const styles = StyleSheet.create({
     backgroundColor: palette.card,
   },
   historyButton: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -943,15 +947,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   trustedPinButton: {
-    width: 26,
-    height: 26,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: palette.navActive,
-    borderRadius: 13,
-    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: radius.md,
   },
+
   trustedAddButton: {
     minHeight: 56,
     flexDirection: 'row',
