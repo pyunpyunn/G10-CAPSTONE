@@ -78,6 +78,11 @@ class RescuerAccountService
         return $this->accountWorkflow->update($request, $responderId);
     }
 
+    public function delete(Request $request, int $responderId): JsonResponse
+    {
+        return $this->accountWorkflow->delete($request, $responderId);
+    }
+
     public function deactivate(Request $request, int $responderId): JsonResponse
     {
         return $this->accountWorkflow->deactivate($request, $responderId);

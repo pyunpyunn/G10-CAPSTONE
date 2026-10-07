@@ -32,7 +32,8 @@ class RescueDispatchQuery
     {
         $query = ResponderAssignment::query()->from('responder_assignments as ra')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')->where('ra.disaster_id', $eventId)->select(['ra.assignment_id', 'ra.assignment_code', 'ra.responder_id', 'ra.responder_count', 'ra.dispatch_type', 'ra.team_id', 'ra.disaster_id', 'ra.household_id', 'ra.assigned_area', 'ra.route_notes', 'ra.priority_level', 'ra.dispatch_notes', 'ra.status', 'ra.assigned_at', 'ra.accepted_at', 'ra.en_route_at', 'ra.arrived_at', 'ra.completed_at', 'ra.outcome_notes', 'ra.updated_at', 'rt.team_name', 'rt.team_code', 'rt.team_type', 'r.full_name as responder_name', 'r.contact_number as responder_contact']);
         $status = trim((string) $request->query('status', 'all')); $search = trim((string) $request->query('search', ''));
-        if ($status !== '' && $status !== 'all') $query->where('ra.status', $this->presenter->statusKey($status));
+        if ($status === 'active') $query->whereNotIn('ra.status', ['completed', 'cancelled']);
+        elseif ($status !== '' && $status !== 'all') $query->where('ra.status', $this->presenter->statusKey($status));
         if ($search !== '') $query->where(function ($q) use ($search): void { $q->where('ra.assignment_code', 'like', "%{$search}%")->orWhere('ra.assigned_area', 'like', "%{$search}%")->orWhere('rt.team_name', 'like', "%{$search}%")->orWhere('r.full_name', 'like', "%{$search}%"); });
         return $query->orderByRaw('CASE WHEN ra.status IN ("on_scene", "onscene", "dispatched", "en_route") THEN 0 ELSE 1 END')->orderByDesc('ra.assigned_at')->paginate(\App\Http\Requests\ListRequest::clampPerPage($request->query('per_page')));
     }

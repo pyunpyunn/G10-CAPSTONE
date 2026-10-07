@@ -173,6 +173,12 @@ export default function MappingMap({
           </Marker>
         ))}
 
+        {layers.rescueOffices && (workspace.rescue_offices || []).map((office) => (
+          <Marker key={office.id} icon={teamIcon('HQ')} position={[office.latitude, office.longitude]}>
+            <Popup><MapPopupTitle title={office.name} sub={office.address || 'Rescue office'} /></Popup>
+          </Marker>
+        ))}
+
         {hasActiveEvent && layers.rescueTeams && rescueTeams.map((team) => (
           <Marker
             icon={teamIcon(team.team_code || 'T')}
@@ -254,6 +260,8 @@ export default function MappingMap({
           <div className="mapmate-panel-body">
             <LayerToggle label="Household GPS" active={hasActiveEvent && layers.households} disabled={!hasActiveEvent} onClick={() => onChangeLayer('households')} />
             <LayerToggle label="Evacuation pins" active={hasActiveEvent && layers.evacuationSites} disabled={!hasActiveEvent} onClick={() => onChangeLayer('evacuationSites')} />
+            <LayerToggle label="Rescue Office" active={layers.rescueOffices} onClick={() => onChangeLayer('rescueOffices')} />
+            {!(workspace.rescue_offices || []).length && <small>No rescue office coordinates saved.</small>}
             <LayerToggle label="Rescue teams" active={hasActiveEvent && layers.rescueTeams} disabled={!hasActiveEvent} onClick={() => onChangeLayer('rescueTeams')} />
             <LayerToggle label="Dispatch routes" active={hasActiveEvent && layers.routes} disabled={!hasActiveEvent} onClick={() => onChangeLayer('routes')} />
           </div>

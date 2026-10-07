@@ -1,10 +1,11 @@
 export const ARCHIVE_TABS = [
-  { key: 'disaster-events', label: 'Disaster Event' },
   { key: 'household-status-logs', label: 'Household Status Logs' },
+  { key: 'inquiry-logs', label: 'Inquiry Logs' },
+  { key: 'disaster-events', label: 'Disaster Event Logs' },
   { key: 'dispatch-logs', label: 'Rescue Dispatch Logs' },
   { key: 'radio-communication-logs', label: 'Radio Logs' },
   { key: 'resource-requests', label: 'Resources & Requests' },
-  { key: 'situation-reports', label: 'Situation Reporting' },
+  { key: 'situation-reports', label: 'SitRep Logs' },
 ]
 
 export const ARCHIVE_TABLE_COPY = {

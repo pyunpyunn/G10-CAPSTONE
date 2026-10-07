@@ -57,6 +57,11 @@ class RescuerAccountController extends Controller
         return $this->service->update($request, $responderId);
     }
 
+    public function destroy(Request $request, int $responderId): JsonResponse
+    {
+        return $this->service->delete($request, $responderId);
+    }
+
     public function deactivate(Request $request, int $responderId): JsonResponse
     {
         return $this->service->deactivate($request, $responderId);

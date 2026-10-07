@@ -8,6 +8,7 @@ import {
   getArchiveRecords,
   getSavedArchiveGroups,
 } from '../api/archiveApi'
+import InquiryLogsView from './InquiryLogsView'
 import ArchiveDownloadMenu from '../components/archive/ArchiveDownloadMenu'
 import ArchiveFilters from '../components/archive/ArchiveFilters'
 import ArchiveRecordModal from '../components/archive/ArchiveRecordModal'
@@ -56,6 +57,7 @@ export default function ArchivePage() {
     let ignore = false
 
     async function loadRecords() {
+      if (activeCategory === 'inquiry-logs') return
       setIsLoading(true)
       setError('')
 
@@ -361,6 +363,13 @@ export default function ArchivePage() {
   const hasBlockingError = error && !payload
   const filters = payload?.filters || {}
   const counts = { [activeCategory]: pagination.total || 0 }
+
+  if (activeCategory === 'inquiry-logs') {
+    return <section className="page active archive-page"><div className="archive-workspace-body">
+      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} />
+      <InquiryLogsView />
+    </div></section>
+  }
 
   return (
     <section className="page active archive-page">

@@ -24,6 +24,7 @@ export default function NewDispatchPage() {
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
+  const returnTo = location.state?.returnTo === '/rescue-management' ? '/rescue-management' : '/dispatch'
   const editingDispatch = location.state?.dispatch || null
 
   useEffect(() => {
@@ -178,7 +179,7 @@ export default function NewDispatchPage() {
       } else {
         await createDispatch(requestBody)
       }
-      navigate('/dispatch', { replace: true })
+      navigate(returnTo, { replace: true })
     } catch (saveError) {
       setFormError(getSaveMessage(saveError))
     } finally {
@@ -195,7 +196,7 @@ export default function NewDispatchPage() {
       <PageHeader
         title={editingDispatch ? 'Update dispatch' : 'New dispatch'}
         actions={(
-          <button className="new-dispatch-back" type="button" onClick={() => navigate('/dispatch')}>
+          <button className="new-dispatch-back" type="button" onClick={() => navigate(returnTo)}>
             <ArrowLeft size={15} /> Back to dispatch
           </button>
         )}
@@ -227,7 +228,7 @@ export default function NewDispatchPage() {
           showOutcomeUpdate={Boolean(editingDispatch)}
         />
         <div className="new-dispatch-actions">
-          <button className="btn btn-secondary" type="button" disabled={isSaving} onClick={() => navigate('/dispatch')}>Cancel</button>
+          <button className="btn btn-secondary" type="button" disabled={isSaving} onClick={() => navigate(returnTo)}>Cancel</button>
           <button className="btn btn-primary" type="submit" form="dispatchForm" disabled={isSaving || !hasActiveEvent}>
             {isSaving ? 'Saving...' : editingDispatch ? 'Save update' : 'Dispatch responders'}
           </button>

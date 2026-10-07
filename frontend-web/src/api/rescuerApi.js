@@ -44,3 +44,8 @@ export async function deleteRescueTeam(teamId) {
   const response = await api.delete(`/rescuers/team-config/${teamId}`)
   return response.data.data
 }
+
+export async function deleteRescuer(responderId) {
+  const response = await api.delete(`/rescuers/${responderId}`)
+  return response.data.data
+}

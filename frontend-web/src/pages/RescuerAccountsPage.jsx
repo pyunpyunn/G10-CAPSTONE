@@ -6,6 +6,7 @@ import {
   createRescuer,
   deleteRescueTeam,
   deactivateRescuer,
+  deleteRescuer,
   getRescueTeamConfig,
   getRescuer,
   getRescuers,
@@ -241,6 +242,17 @@ export default function RescuerAccountsPage() {
     }
   }
 
+  async function handleDelete(rescuer) {
+    if (!window.confirm(`Delete ${rescuer.full_name} from the roster? This disables login and retains dispatch history.`)) return
+    setError('')
+    try {
+      await deleteRescuer(rescuer.responder_id)
+      await loadRescuers()
+    } catch (deleteError) {
+      setError(rescuerErrorMessage(deleteError, 'Unable to delete rescuer account.'))
+    }
+  }
+
   async function saveTeamConfig(body) {
     setTeamConfigSaving(true)
     setTeamConfigError('')
@@ -285,7 +297,7 @@ export default function RescuerAccountsPage() {
   return (
     <main className="ops-page rescuer-page">
       <PageHeader
-        title={workflow ? (workflowType === 'teams' ? 'Configure rescue teams' : modalMode === 'view' ? 'View rescuer account' : modalMode === 'edit' ? 'Update rescuer account' : 'New rescuer account') : 'Rescuer Accounts'}
+        title={workflow ? (workflowType === 'teams' ? 'Team Management' : modalMode === 'view' ? 'View rescuer account' : modalMode === 'edit' ? 'Update rescuer account' : 'New rescuer account') : 'Rescuer Accounts'}
         subtitle={payload?.area_label || 'Shared database records'}
         actions={workflow ? (
           <button className="button secondary" type="button" onClick={() => navigate('/rescuers')}><ArrowLeft size={15} />Back to roster</button>
@@ -297,6 +309,7 @@ export default function RescuerAccountsPage() {
         )}
       />
 
+      {workflow && workflowType === 'teams' && <section className="ra-side-panel"><div className="ra-side-head"><span className="ra-title">Team Status Cards</span></div><RescuerTeamGrid teams={teamConfig?.teams || teams} showStatus /></section>}
       {workflow && workflowType === 'teams' && <RescueTeamConfigModal embedded isOpen workspace={teamConfig} isLoading={teamConfigLoading} isSaving={teamConfigSaving} error={teamConfigError} onRetry={loadTeamConfig} onClose={() => navigate('/rescuers')} onSave={saveTeamConfig} onDelete={removeTeamConfig} />}
       {workflow && workflowType !== 'teams' && <RescuerAccountModal embedded mode={modalMode} isOpen form={form} setForm={setForm} formError={formError} isSaving={isSaving} teamOptions={teamOptions} accountIdOptions={accountIdOptions} fallbackAccountId={payload?.next_account_id || ''} roles={filters.roles || []} bloodTypes={filters.blood_types || []} onClose={() => navigate('/rescuers')} onReset={resetForm} onSubmit={submitForm} />}
 
@@ -306,7 +319,7 @@ export default function RescuerAccountsPage() {
           {!isInitialLoading && !hasBlockingError && payload && (
             <div className="ra-workspace">
               <div className="ra-main-panel">
-                <div className="ra-panel roster-filter-panel"><RefreshOverlay active={isRefreshing}><RescuerRosterTable rescuers={rescuers} pagination={pagination} onPageChange={setPage} onView={openViewModal} onEdit={openEditModal} onDeactivate={handleDeactivate} /></RefreshOverlay></div>
+                <div className="ra-panel roster-filter-panel"><RefreshOverlay active={isRefreshing}><RescuerRosterTable rescuers={rescuers} pagination={pagination} onPageChange={setPage} onView={openViewModal} onEdit={openEditModal} onDeactivate={handleDeactivate} onDelete={handleDelete} /></RefreshOverlay></div>
               </div>
               <aside className="ra-side-panel"><div className="ra-side-head"><span className="ra-title">Team cards</span></div><RescuerTeamGrid teams={teams} /></aside>
             </div>

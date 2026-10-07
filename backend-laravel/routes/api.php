@@ -108,7 +108,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/rescuers', [RescuerAccountController::class, 'store']);
             Route::get('/rescuers/{responderId}', [RescuerAccountController::class, 'show']);
             Route::patch('/rescuers/{responderId}', [RescuerAccountController::class, 'update']);
+            Route::delete('/rescuers/{responderId}', [RescuerAccountController::class, 'destroy']);
             Route::post('/rescuers/{responderId}/deactivate', [RescuerAccountController::class, 'deactivate']);
+            Route::get('/resource-request-types', [ResourceRequestController::class, 'types']);
             Route::get('/resource-requests', [ResourceRequestController::class, 'index']);
             Route::post('/resource-requests', [ResourceRequestController::class, 'store']);
             Route::get('/resource-requests/{requestId}', [ResourceRequestController::class, 'show']);
@@ -122,6 +124,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/situation-reports/{sitRepId}', [SituationReportController::class, 'show']);
             Route::get('/situation-reports/{sitRepId}/pdf', [SituationReportController::class, 'pdf']);
             Route::get('/disaster-events/{eventId}/situation-summary', [SituationReportController::class, 'eventSummary']);
+            Route::get('/archive/inquiry-logs', [ArchiveController::class, 'inquiryLogs']);
             Route::get('/archive/disaster-events', [ArchiveController::class, 'disasterEvents']);
             Route::get('/archive/household-status-logs', [ArchiveController::class, 'householdStatusLogs']);
             Route::get('/archive/dispatch-logs', [ArchiveController::class, 'dispatchLogs']);

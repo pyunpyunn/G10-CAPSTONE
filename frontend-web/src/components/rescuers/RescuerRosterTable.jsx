@@ -3,7 +3,7 @@ import ActionMenu from '../ui/ActionMenu'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 
-export default function RescuerRosterTable({ rescuers, pagination, onPageChange, onView, onEdit, onDeactivate }) {
+export default function RescuerRosterTable({ rescuers, pagination, onPageChange, onView, onEdit, onDeactivate, onDelete }) {
   const from = pagination?.from || 0
   const to = pagination?.to || 0
   const total = pagination?.total || 0
@@ -56,6 +56,7 @@ export default function RescuerRosterTable({ rescuers, pagination, onPageChange,
                           { label: 'View', onClick: () => onView(rescuer) },
                           { label: 'Edit', onClick: () => onEdit(rescuer) },
                           { label: 'Deactivate', onClick: () => onDeactivate(rescuer) },
+                          ...(onDelete ? [{ label: 'Delete user', onClick: () => onDelete(rescuer) }] : []),
                         ]}
                       />
                     </div>

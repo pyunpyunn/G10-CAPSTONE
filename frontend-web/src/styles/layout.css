@@ -169,33 +169,37 @@
   min-width: 0;
   height: 58px;
   margin: 0 12px 8px;
+  padding: 4px 6px;
   overflow: hidden;
-  color: #f5f7fb;
-  font-family: "Archivo Black", "Arial Black", sans-serif;
+  color: #ffffff;
+  background: var(--nav);
+  border-radius: 2px;
   line-height: 1;
   letter-spacing: 0;
   white-space: nowrap;
   transition: margin 220ms cubic-bezier(0.19, 1, 0.22, 1);
 }
 
-.left-sidebar-brand-text {
-  display: inline-block;
-  font-size: 22px;
-  font-weight: 900;
-  text-transform: lowercase;
+.left-sidebar-wordmark {
+  display: block;
+  width: 100%;
+  max-width: 238px;
+  max-height: 50px;
+  height: auto;
+  aspect-ratio: 1756 / 368;
+  flex: 0 1 238px;
 }
 
-.left-sidebar-brand-pin {
-  width: 28px;
-  height: 34px;
-  margin: 0 1px -5px 2px;
+.left-sidebar-wordmark .text-logo-pin {
+  fill: #c72e32;
+}
+
+.left-sidebar-pin-mark {
+  display: none;
+  width: 30px;
+  height: 43px;
   flex: 0 0 auto;
-  color: #f5f7fb;
-  filter: drop-shadow(0 2px 3px rgba(10, 16, 27, 0.32));
-}
-
-.left-sidebar-brand-pin path:last-child {
-  stroke: var(--nav);
+  color: #c72e32;
 }
 
 .app-shell.left-hidden .left-sidebar-brand {
@@ -203,14 +207,12 @@
   margin-left: 8px;
 }
 
-.app-shell.left-hidden:not(.left-peeking):not(.left-pinned) .left-sidebar-brand-text {
+.app-shell.left-hidden:not(.left-peeking):not(.left-pinned) .left-sidebar-wordmark {
   display: none;
 }
 
-.app-shell.left-hidden:not(.left-peeking):not(.left-pinned) .left-sidebar-brand-pin {
-  width: 26px;
-  height: 32px;
-  margin: 0;
+.app-shell.left-hidden:not(.left-peeking):not(.left-pinned) .left-sidebar-pin-mark {
+  display: block;
 }
 
 .header-actions {

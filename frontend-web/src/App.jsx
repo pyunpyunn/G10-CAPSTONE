@@ -46,6 +46,11 @@ const pageComponents = {
   '/mapping': lazy(() => import('./pages/MappingPage')),
   '/households': lazy(() => import('./pages/HouseholdStatusPage')),
   '/households/_household-list': lazy(() => import('./pages/HouseholdPurokListPage')),
+  '/rescue-management': lazy(() => import('./pages/RescueManagementPage')),
+  '/field-reports': lazy(() => import('./pages/FieldReportsPage')),
+  '/dispatch/communication': lazy(() => import('./pages/FieldCommunicationPage')),
+  '/request-types': lazy(() => import('./pages/RequestTypesPage')),
+  '/external-requests': lazy(() => import('./pages/RequestWorkflowPage')),
   '/dispatch': lazy(() => import('./pages/RescueDispatchPage')),
   '/dispatch/new': lazy(() => import('./pages/NewDispatchPage')),
   '/rescuers': lazy(() => import('./pages/RescuerAccountsPage')),
@@ -53,7 +58,7 @@ const pageComponents = {
   '/rescuers/teams': lazy(() => import('./pages/RescuerAccountsPage')),
   '/rescuers/view': lazy(() => import('./pages/RescuerAccountsPage')),
   '/rescuers/edit': lazy(() => import('./pages/RescuerAccountsPage')),
-  '/resources-requests': lazy(() => import('./pages/ResourcesRequestsPage')),
+  '/resources-requests': lazy(() => import('./pages/RequestWorkflowPage')),
   '/resources-requests/new': lazy(() => import('./pages/ResourceRequestEditorPage')),
   '/resources-requests/edit': lazy(() => import('./pages/ResourceRequestEditorPage')),
   '/situation': lazy(() => import('./pages/SituationReportPage')),
@@ -104,13 +109,13 @@ const modulePages = [
   },
   {
     path: '/dispatch',
-    title: 'Rescue Dispatch',
+    title: 'Dispatch Dashboard',
     kicker: 'Operations',
     summary: 'Assign teams, monitor progress, and record field outcomes from rescuer updates.',
   },
   {
     path: '/resources-requests',
-    title: 'Resources & Requests',
+    title: 'Request Monitoring',
     kicker: 'Validation queue',
     summary: 'Validate EvaTrack/manual requests before forwarding verified records to TrackingAid/HQ.',
   },
@@ -119,6 +124,31 @@ const modulePages = [
     title: 'Rescuer Accounts',
     kicker: 'Verified accounts',
     summary: 'Create and manage HQ-created rescuer accounts, teams, duty status, and contact details.',
+  },
+  {
+    path: '/rescuers/teams',
+    title: 'Team Management',
+    summary: 'Configure rescue teams and their members.',
+  },
+  {
+    path: '/rescue-management',
+    title: 'Rescue Management',
+    summary: 'Review and manage saved operational records.',
+  },
+  {
+    path: '/field-reports',
+    title: 'Field Reports',
+    summary: 'Review and manage saved operational records.',
+  },
+  {
+    path: '/request-types',
+    title: 'Request Types',
+    summary: 'Review and manage saved operational records.',
+  },
+  {
+    path: '/external-requests',
+    title: 'External Requests',
+    summary: 'Review and manage saved operational records.',
   },
   {
     path: '/situation',
@@ -230,9 +260,9 @@ function AuthRoutes() {
         }
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dispatch/communication" element={<LazyPage page={{ path: '/dispatch/communication' }} />} />
         <Route path="dispatch/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
         <Route path="rescuers/new" element={<LazyPage page={{ path: '/rescuers/new' }} />} />
-        <Route path="rescuers/teams" element={<LazyPage page={{ path: '/rescuers/teams' }} />} />
         <Route path="rescuers/view" element={<LazyPage page={{ path: '/rescuers/view' }} />} />
         <Route path="rescuers/edit" element={<LazyPage page={{ path: '/rescuers/edit' }} />} />
         <Route path="resources-requests/new" element={<LazyPage page={{ path: '/resources-requests/new' }} />} />

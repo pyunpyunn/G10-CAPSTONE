@@ -15,6 +15,7 @@ import LoadingState from '../components/ui/LoadingState'
 import {
   buildGeneratePayload,
   downloadSituationExcel,
+  downloadSituationCsv,
   downloadSituationPdf,
   emptyGenerateForm,
   situationErrorMessage,
@@ -215,6 +216,7 @@ export default function SituationReportPage() {
                 onArchive={handleArchiveCurrent}
                 onViewArchive={() => navigate('/archive')}
                 onExportExcel={handleExcelExport}
+                onExportCsv={() => downloadSituationCsv(summary, generateForm.included_sections, generateForm.actions_text)}
                 onExportPdf={handlePdfPreview}
               />
             )}

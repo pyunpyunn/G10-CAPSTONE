@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import ResQperationLogo from './ResQperationLogo'
 import {
   Archive,
   ChevronDown,
@@ -18,6 +19,14 @@ import {
   ShieldUser,
 } from 'lucide-react'
 
+const navGroups = [
+  { title: 'General Monitoring', paths: ['/households', '/mapping', '/weather'] },
+  { title: 'Response Operations', paths: ['/dispatch', '/rescue-management', '/field-reports'] },
+  { title: 'Team Management', paths: ['/rescuers', '/rescuers/teams'] },
+  { title: 'Resources & Requests', paths: ['/request-types', '/external-requests', '/resources-requests'] },
+  { title: 'Reports Management', paths: ['/situation', '/archive'] },
+]
+
 const icons = {
   '/dashboard': LayoutDashboard,
   '/super-admin': Inbox,
@@ -26,6 +35,11 @@ const icons = {
   '/mapping': Map,
   '/households': House,
   '/dispatch': Route,
+  '/rescue-management': Route,
+  '/field-reports': FileCheck2,
+  '/rescuers/teams': ShieldUser,
+  '/request-types': PackageCheck,
+  '/external-requests': Inbox,
   '/rescuers': ShieldUser,
   '/resources-requests': PackageCheck,
   '/situation': FileCheck2,
@@ -69,17 +83,7 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
       }}
     >
       <div className="left-sidebar-brand" role="img" aria-label="ResQperation">
-        <span className="left-sidebar-brand-text">res</span>
-        <svg className="left-sidebar-brand-pin" viewBox="0 0 32 39" focusable="false" aria-hidden="true">
-          <path
-            fill="currentColor"
-            fillRule="evenodd"
-            d="M16 1C7.72 1 1 7.72 1 16c0 10.38 15 22 15 22s15-11.62 15-22C31 7.72 24.28 1 16 1Zm0 8.25a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5Z"
-            clipRule="evenodd"
-          />
-          <path d="M19 22.4 27.5 30" fill="none" stroke="var(--nav)" strokeWidth="4.5" strokeLinecap="round" />
-        </svg>
-        <span className="left-sidebar-brand-text">peration</span>
+        <ResQperationLogo />
       </div>
 
       <div className="left-sidebar-actions" aria-label="Navigation controls">
@@ -96,9 +100,23 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
       </div>
 
       <nav className="left-nav">
-        <NavGroup title="Main Views" pages={pages.filter((page) => !page.navHidden).slice(0, 3)} isOpen={openGroups.has('Main Views')} onToggle={toggleGroup} />
-        <NavGroup title="Response Operations" pages={pages.filter((page) => !page.navHidden).slice(3, 6)} isOpen={openGroups.has('Response Operations')} onToggle={toggleGroup} />
-        <NavGroup title="Management & Reports" pages={pages.filter((page) => !page.navHidden).slice(6)} isOpen={openGroups.has('Management & Reports')} onToggle={toggleGroup} />
+        <NavLink
+          to="/dashboard"
+          end
+          className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+        >
+          <LayoutDashboard size={17} />
+          <span>Dashboard</span>
+        </NavLink>
+        {navGroups.map((group) => (
+          <NavGroup
+            key={group.title}
+            title={group.title}
+            pages={group.paths.map((path) => pages.find((page) => page.path === path && !page.navHidden)).filter(Boolean)}
+            isOpen={openGroups.has(group.title)}
+            onToggle={toggleGroup}
+          />
+        ))}
       </nav>
 
       <div className="left-sidebar-logout">
@@ -131,6 +149,7 @@ function NavGroup({ title, pages, isOpen, onToggle }) {
             <NavLink
               key={page.path}
               to={page.path}
+              end
               className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
             >
               <Icon size={17} />
@@ -144,13 +163,10 @@ function NavGroup({ title, pages, isOpen, onToggle }) {
 }
 
 function getActiveGroup(pathname, pages) {
-  if (pages.slice(0, 3).some((page) => pathname === page.path || pathname.startsWith(`${page.path}/`))) {
-    return 'Main Views'
-  }
+  const activePage = pages
+    .filter((page) => !page.navHidden)
+    .sort((a, b) => b.path.length - a.path.length)
+    .find((page) => pathname === page.path || pathname.startsWith(`${page.path}/`))
 
-  if (pages.slice(3, 6).some((page) => pathname === page.path || pathname.startsWith(`${page.path}/`))) {
-    return 'Response Operations'
-  }
-
-  return 'Management & Reports'
+  return navGroups.find((group) => group.paths.includes(activePage?.path))?.title
 }

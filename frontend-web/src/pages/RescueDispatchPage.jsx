@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Route } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { getDispatchDashboard, getWelfareChecks, getRescuePriorities, getMemberCheckQueue } from '../api/dispatchApi'
+import { FieldCommunicationPanel } from './FieldCommunicationPage'
 import DispatchSidePanel from '../components/dispatch/DispatchSidePanel'
 import DispatchSummary from '../components/dispatch/DispatchSummary'
 import DispatchStatusBadge from '../components/dispatch/DispatchStatusBadge'
@@ -116,7 +117,7 @@ export default function RescueDispatchPage() {
   return (
     <main className="ops-page dispatch-page">
       <PageHeader
-        title="Rescue Dispatch"
+        title="Dispatch Dashboard"
         subtitle={payload?.area_label || 'Shared database records'}
         actions={(
           <Link className={`button review ${!hasActiveEvent ? 'disabled' : ''}`} to={hasActiveEvent ? '/dispatch/new' : '/dispatch'} aria-disabled={!hasActiveEvent} onClick={(event) => !hasActiveEvent && event.preventDefault()}>
@@ -141,7 +142,7 @@ export default function RescueDispatchPage() {
             <section className="dispatch-main-panel" aria-label="Dispatch operations overview">
               <div className="dp-side-card dispatch-assignments-card">
                 <div className="dp-side-head">
-                  <span className="dp-side-title">Active dispatch assignments</span>
+                  <span className="dp-side-title">Dispatch Progress</span>
                 </div>
                 <div className="dp-side-body dp-table-body">
                   {dispatches.length === 0 ? (
@@ -200,6 +201,8 @@ export default function RescueDispatchPage() {
               />
             </aside>
           </div>
+
+          <FieldCommunicationPanel compact />
 
           <section className="dp-side-card" aria-label="Welfare Check List">
             <div className="dp-side-head"><span className="dp-side-title">Welfare Check List</span></div>

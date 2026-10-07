@@ -23,6 +23,7 @@ export default function MappingPage() {
     households: true,
     evacuationSites: true,
     rescueTeams: true,
+    rescueOffices: true,
     routes: true,
   })
   const [selectedRoute, setSelectedRoute] = useState(null)

@@ -51,6 +51,24 @@ export function downloadSituationExcel(summary, includedSections = [], actionsTe
   )
 }
 
+export function downloadSituationCsv(summary, includedSections = [], actionsText = '') {
+  if (!summary) return
+  const cell = (value) => {
+    let text = String(value ?? '')
+    if (/^[=+@-]/.test(text)) text = "'" + text
+    return '"' + text.replaceAll('"', '""') + '"'
+  }
+  const rows = [['Section', 'Field', 'Value'], ...situationExcelSections(summary, includedSections, actionsText)
+    .flatMap((section) => section.rows.map((row) => [section.title, ...row]))]
+  const blob = new Blob(['\uFEFF' + rows.map((row) => row.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${summary.report?.report_number || 'sitrep-draft'}.csv`
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 export async function downloadSituationPdf(summary, includedSections = [], actionsText = '') {
   if (!summary) {
     return
