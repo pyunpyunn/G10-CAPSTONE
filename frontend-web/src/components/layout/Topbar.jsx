@@ -442,18 +442,38 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
 
 function getPageTitle(pathname, state) {
   const normalizedPath = pathname.replace(/\/$/, '') || '/dashboard'
+  const navigationTitles = {
+    '/dispatch': 'Dispatch Dashboard',
+    '/dispatch/communication': 'Field Communication',
+    '/rescue-management': 'Rescue Management',
+    '/field-reports': 'Field Reports',
+    '/rescuers/teams': 'Team Management',
+    '/request-types': 'Request Types',
+    '/external-requests': 'External Requests',
+    '/resources-requests': 'Request Monitoring',
+  }
+
+  if (navigationTitles[normalizedPath]) return navigationTitles[normalizedPath]
+
   const page = searchablePages.find((item) => item.href === normalizedPath)
 
   if (page) return page.title
   if (normalizedPath === '/households/_household-list') return 'Household List'
-  if (normalizedPath.startsWith('/households/')) return 'Household Review'
-  if (normalizedPath === '/dispatch/new') return state?.dispatch ? 'Update Dispatch' : 'New Dispatch'
-  if (normalizedPath === '/rescuers/new') return 'New Rescuer'
-  if (normalizedPath === '/rescuers/teams') return 'Rescue Teams'
-  if (normalizedPath === '/rescuers/view') return 'Responder Profile'
-  if (normalizedPath === '/rescuers/edit') return 'Edit Responder'
+  if (normalizedPath.startsWith('/households/')) return 'Household Account View'
+  if (normalizedPath === '/dispatch/new') return state?.dispatch ? 'Update Dispatch Assignment' : 'Create New Dispatch Assignment'
+  if (normalizedPath === '/rescuers/new') return 'Add New User'
+  if (normalizedPath === '/rescuers/view') return 'View User Details'
+  if (normalizedPath === '/rescuers/edit') return 'Edit User Details'
   if (normalizedPath === '/resources-requests/new') return 'New Resource Request'
-  if (normalizedPath.startsWith('/resources-requests/')) return 'Edit Resource Request'
+  if (normalizedPath.startsWith('/resources-requests/')) {
+    const mode = normalizedPath.split('/').pop()
+    return {
+      view: 'View Request',
+      edit: 'Edit Request',
+      validate: 'Approve Request',
+      return: 'Return Request',
+    }[mode] || 'Request Details'
+  }
 
   return 'Dashboard'
 }
