@@ -121,9 +121,9 @@ const modulePages = [
   },
   {
     path: '/rescuers',
-    title: 'Rescuer Accounts',
+    title: 'Account Management',
     kicker: 'Verified accounts',
-    summary: 'Create and manage HQ-created rescuer accounts, teams, duty status, and contact details.',
+    summary: 'Create and manage rescuer, Command Center Personnel, and Barangay Captain accounts.',
   },
   {
     path: '/rescuers/teams',

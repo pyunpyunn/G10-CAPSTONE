@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Shared\RealtimeOutbox;
 use App\Support\RequestQueryProfile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
@@ -21,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Includes query-builder writes from mobile, SMS and web workflows.
+        DB::listen(fn ($query) => app(RealtimeOutbox::class)->capture($query));
         if (config('app.query_profile_enabled') && $this->app->environment('local')) {
             DB::listen(function ($query): void {
                 if (! $this->app->bound('request')) {
@@ -35,5 +38,3 @@ class AppServiceProvider extends ServiceProvider
         }
     }
 }
-
-

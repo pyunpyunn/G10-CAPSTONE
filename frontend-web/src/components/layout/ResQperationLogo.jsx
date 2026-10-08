@@ -23,7 +23,7 @@ export default function ResQperationLogo() {
           d="M550 2C477 2 417 61 417 134C417 190 444 222 487 256C521 283 566 312 596 365C625 313 654 245 674 179C687 136 682 91 660 56C635 19 597 2 550 2Z M550 59C508 59 475 93 475 136C475 180 508 215 550 215C559 215 568 213 575 209L554 187L587 154L611 177C619 165 623 151 623 136C623 93 591 59 550 59Z"
         />
       </svg>
-      <svg className="left-sidebar-pin-mark" viewBox="417 0 257 368" focusable="false" aria-hidden="true">
+      <svg className="left-sidebar-pin-mark" viewBox="415 0 274 368" focusable="false" aria-hidden="true">
         <path
           fill="currentColor"
           fillRule="evenodd"

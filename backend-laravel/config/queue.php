@@ -30,6 +30,15 @@ return [
     */
 
     'connections' => [
+        'realtime_database' => [
+            'driver' => 'database',
+            'connection' => env('REALTIME_DB_CONNECTION', env('DB_CONNECTION', 'resq_local')),
+            'table' => 'jobs', 'queue' => 'realtime', 'retry_after' => 90, 'after_commit' => true,
+        ],
+        'realtime_redis' => [
+            'driver' => 'redis', 'connection' => 'default', 'queue' => 'realtime',
+            'retry_after' => 90, 'block_for' => 1, 'after_commit' => true,
+        ],
         'reports' => [
             'driver' => 'database', 'connection' => env('DB_CONNECTION', 'resq_local'),
             'table' => 'jobs', 'queue' => 'reports', 'retry_after' => 660, 'after_commit' => false,
@@ -108,10 +117,10 @@ return [
         'failover' => [
             'driver' => 'failover',
             'connections' => [
-        'reports' => [
-            'driver' => 'database', 'connection' => env('DB_CONNECTION', 'resq_local'),
-            'table' => 'jobs', 'queue' => 'reports', 'retry_after' => 660, 'after_commit' => false,
-        ],
+                'reports' => [
+                    'driver' => 'database', 'connection' => env('DB_CONNECTION', 'resq_local'),
+                    'table' => 'jobs', 'queue' => 'reports', 'retry_after' => 660, 'after_commit' => false,
+                ],
                 'database',
                 'deferred',
             ],

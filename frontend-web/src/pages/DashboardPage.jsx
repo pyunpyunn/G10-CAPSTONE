@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Pencil, RefreshCcw, TriangleAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getDashboard } from '../api/dashboardApi'
@@ -7,59 +7,18 @@ import DashboardOverview from '../components/dashboard/DashboardOverview'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import { getStats } from '../utils/dashboardHelpers'
+import { useModuleData } from '../utils/useModuleData'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const [dashboard, setDashboard] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { data: dashboard, error, loading: isLoading, refresh } = useModuleData(getDashboard)
   const [refreshVersion, setRefreshVersion] = useState(0)
-
-  useEffect(() => {
-    let ignore = false
-
-    async function loadInitialDashboard() {
-      try {
-        const data = await getDashboard()
-
-        if (!ignore) {
-          setDashboard(data)
-        }
-      } catch {
-        if (!ignore) {
-          setError('Dashboard data cannot be loaded right now. Please check the backend or database connection.')
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadInitialDashboard()
-
-    return () => {
-      ignore = true
-    }
-  }, [])
-
   const stats = useMemo(() => getStats(dashboard), [dashboard])
   const hasActiveEvent = Boolean(dashboard?.active_event)
-  async function loadDashboard() {
-    setIsLoading(true)
-    setError('')
-
-    try {
-      const data = await getDashboard()
-      setDashboard(data)
-      setRefreshVersion((version) => version + 1)
-    } catch {
-      setError('Dashboard data cannot be loaded right now. Please check the backend or database connection.')
-    } finally {
-      setIsLoading(false)
-    }
+  function loadDashboard() {
+    refresh()
+    setRefreshVersion((version) => version + 1)
   }
-
   function openModule(path) {
     navigate(path)
   }

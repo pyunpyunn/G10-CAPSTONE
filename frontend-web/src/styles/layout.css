@@ -183,11 +183,11 @@
 .left-sidebar-wordmark {
   display: block;
   width: 100%;
-  max-width: 238px;
-  max-height: 50px;
+  max-width: 220px;
+  max-height: 46px;
   height: auto;
   aspect-ratio: 1756 / 368;
-  flex: 0 1 238px;
+  flex: 0 1 220px;
 }
 
 .left-sidebar-wordmark .text-logo-pin {
@@ -196,8 +196,8 @@
 
 .left-sidebar-pin-mark {
   display: none;
-  width: 30px;
-  height: 43px;
+  width: 27px;
+  height: 39px;
   flex: 0 0 auto;
   color: #c72e32;
 }

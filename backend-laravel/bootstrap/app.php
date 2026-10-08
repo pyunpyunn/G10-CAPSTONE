@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withBroadcasting(__DIR__.'/../routes/channels.php', [
+        'prefix' => 'api/v1',
+        'middleware' => ['api', 'auth:sanctum'],
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(fn (Request $request) => null);
 
@@ -28,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            'realtime.atomic' => \App\Http\Middleware\AtomicRealtimeWrite::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

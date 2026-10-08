@@ -66,6 +66,7 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
             $table->boolean('is_pwd')->default(false);
             $table->boolean('is_senior')->default(false);
             $table->boolean('is_pregnant')->default(false);
+            $table->date('birth_date')->nullable();
             $table->timestamp('created_at')->default('2020-01-01 00:00:00');
             $table->timestamp('deleted_at')->nullable();
         });
@@ -121,11 +122,12 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
             $table->string('event_id');
             $table->timestamp('observed_at');
             $table->integer('definition_version');
-            $table->decimal('impact', 5, 1);
-            $table->decimal('special_needs', 5, 1);
-            $table->decimal('unreported', 5, 1);
-            $table->decimal('no_contact', 5, 1);
+            $table->decimal('impact', 5, 1)->nullable();
+            $table->decimal('special_needs', 5, 1)->nullable();
+            $table->decimal('unreported', 5, 1)->nullable();
+            $table->decimal('no_contact', 5, 1)->nullable();
             $table->integer('purok_count');
+            $table->unique(['event_id', 'observed_at']);
         });
         Schema::create('rescue_criteria_line_snapshots', function (Blueprint $table): void {
             $table->id();
@@ -244,7 +246,9 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
         $this->assertSame(100.0, $ranking[0]['factors']['special_needs']);
         $this->assertSame(70.0, $ranking[0]['priority_score']);
         $this->assertSame(70.0, round(array_sum($ranking[0]['contributions']), 1));
-        $this->assertCount(1, $query->timeline('EVT-1', $startedAt));
+        $points = $query->timeline('EVT-1', $startedAt);
+        $this->assertCount(6, $points);
+        $this->assertSame(0, $points[0]['hours_since_alert']);
     }
 
     public function test_purok_score_uses_member_weighted_unreported_rate_and_excludes_confirmed_safe_vulnerable_members(): void
@@ -275,14 +279,14 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
 
         $this->assertSame(2, $ranking[0]['households']);
         $this->assertSame(25.0, $ranking[0]['factors']['unreported']);
-        $this->assertSame(43.8, $ranking[0]['priority_score']);
+        $this->assertSame(51.3, $ranking[0]['priority_score']);
 
         DB::table('member_disaster_statuses')->insert(['member_id' => 'M-1', 'disaster_id' => 'EVT-1', 'status_id' => 2]);
         $ranking = $query->puroks('EVT-1');
         $this->assertSame(0.0, $ranking[0]['factors']['special_needs']);
         $this->assertSame(0.0, $ranking[0]['factors']['unreported']);
-        $this->assertSame(50.0, $ranking[0]['factors']['no_contact']);
-        $this->assertSame(7.5, $ranking[0]['priority_score']);
+        $this->assertSame(100.0, $ranking[0]['factors']['no_contact']);
+        $this->assertSame(15.0, $ranking[0]['priority_score']);
     }
 
     public function test_timeline_changes_at_recorded_report_times_and_extends_to_current_time(): void
@@ -326,5 +330,171 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
         DB::table('households')->where('household_id', 'HH-1')->update(['contact_number' => '09170000001']);
         $history->refresh('EVT-1', $startedAt);
         $this->assertSame(100.0, $history->forEvent('EVT-1', $startedAt)[0]['no_contact']);
+    }
+
+    public function test_live_no_contact_share_uses_households_without_any_registered_contact_channel(): void
+    {
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
+
+        $query = app(RescueCriteriaQuery::class);
+        $startedAt = now()->subHour();
+        $this->assertSame(100.0, $query->current('EVT-1', $startedAt)['no_contact']);
+
+        DB::table('device_tokens')->insert(['household_id' => 'HH-1', 'is_active' => 1]);
+
+        $this->assertNull($query->current('EVT-1', $startedAt)['no_contact']);
+
+        DB::table('device_tokens')->where('household_id', 'HH-1')->update(['is_active' => 0]);
+        $this->assertSame(100.0, $query->current('EVT-1', $startedAt)['no_contact']);
+        DB::table('households')->where('household_id', 'HH-2')->update(['contact_number' => null]);
+        DB::table('trusted_households')->insert([
+            'requesting_household_id' => 'HH-2', 'trusted_household_id' => 'HH-1', 'validation_status' => 'validated',
+        ]);
+        DB::table('device_tokens')->insert(['household_id' => 'HH-2', 'is_active' => 1]);
+        $this->assertNull($query->current('EVT-1', $startedAt)['no_contact']);
+    }
+
+    public function test_event_keeps_its_weight_version_after_new_settings_are_created(): void
+    {
+        Schema::create('disaster_events', function (Blueprint $table): void {
+            $table->string('event_id')->primary();
+            $table->timestamp('started_at')->nullable();
+            $table->unsignedBigInteger('rescue_priority_version')->nullable();
+        });
+        Schema::table('rescue_criteria_line_snapshots', function (Blueprint $table): void {
+            $table->unsignedBigInteger('rescue_priority_version')->nullable();
+        });
+        $startedAt = now()->subHour();
+        DB::table('disaster_events')->insert([
+            'event_id' => 'EVT-1', 'started_at' => $startedAt, 'rescue_priority_version' => 1,
+        ]);
+        DB::table('household_members')->insert([
+            'member_id' => 'M-6', 'household_id' => 'HH-1', 'birth_date' => '2015-01-01',
+        ]);
+        DB::table('rescue_priority_settings')->insert([
+            'impact_weight' => 20, 'vulnerability_weight' => 35,
+            'unreported_weight' => 30, 'no_contact_weight' => 15,
+        ]);
+
+        $this->assertSame(1, (int) app(RescuePriorityQuery::class)->settingsForEvent('EVT-1')->version);
+
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
+        $this->assertSame(2, app(RescueCriteriaQuery::class)->puroks('EVT-1')[0]['total_vulnerable_members']);
+        app(RescueCriteriaHistoryQuery::class)->refresh('EVT-1', $startedAt);
+
+        $this->assertSame(1, (int) DB::table('rescue_criteria_line_snapshots')->value('rescue_priority_version'));
+        $this->assertSame(2, (int) DB::table('rescue_criteria_line_snapshots')->value('vulnerable_total'));
+    }
+
+    public function test_live_timeline_saves_only_changed_measurements(): void
+    {
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
+
+        $startedAt = now()->subHours(3);
+        $query = app(RescueCriteriaQuery::class);
+        $query->timeline('EVT-1', $startedAt);
+        $this->assertSame(2, DB::table('rescue_criteria_snapshots')->where('event_id', 'EVT-1')->count());
+
+        DB::table('household_disasters')->insert([
+            'household_disaster_id' => 2, 'household_id' => 'HH-1', 'disaster_id' => 'EVT-1',
+            'current_status_id' => 1, 'needs_dispatch' => 0,
+        ]);
+        $this->assertSame(100.0, $query->current('EVT-1', $startedAt)['impact']);
+        $query->timeline('EVT-1', $startedAt);
+        $this->assertSame(2, DB::table('rescue_criteria_snapshots')->where('event_id', 'EVT-1')->count());
+        $this->assertSame(100.0, (float) DB::table('rescue_criteria_snapshots')->where('event_id', 'EVT-1')->orderByDesc('observed_at')->value('impact'));
+
+        $query->timeline('EVT-1', $startedAt);
+        $this->assertSame(2, DB::table('rescue_criteria_snapshots')->where('event_id', 'EVT-1')->count());
+    }
+
+    public function test_empty_registered_population_keeps_null_measurements_and_valid_history(): void
+    {
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 99]; }
+        });
+        $points = app(RescueCriteriaQuery::class)->timeline('EVT-1', now()->subHour());
+        foreach (['impact', 'special_needs', 'unreported', 'no_contact'] as $criterion) {
+            $this->assertNull(end($points)[$criterion]);
+        }
+        $this->assertDatabaseHas('rescue_criteria_snapshots', ['event_id' => 'EVT-1', 'impact' => null]);
+    }
+
+    public function test_criteria_feed_without_an_event_returns_empty_points_and_default_weight_labels(): void
+    {
+        $dispatch = \Mockery::mock(\App\Queries\RescueDispatchQuery::class);
+        $dispatch->shouldReceive('activeEvent')->once()->andReturn(null);
+        $response = app(\App\Http\Controllers\Api\RescueDispatchController::class)->criteriaTimeline(
+            app(RescueCriteriaQuery::class), $dispatch, app(RescuePriorityQuery::class),
+        );
+        $this->assertSame([], $response->getData(true)['data']);
+        $this->assertNull($response->getData(true)['meta']['event_id']);
+        $this->assertSame(30, $response->getData(true)['meta']['settings']['impact_weight']);
+        $this->assertSame('max-age=0, no-store, private', $response->headers->get('Cache-Control'));
+    }
+
+    public function test_band_settings_and_empty_measurement_migration_preserve_existing_values(): void
+    {
+        $migration = require database_path('migrations/2026_10_09_000003_version_rescue_bands_and_allow_empty_measurements.php');
+        $migration->up();
+        $migration->up();
+        $settings = app(RescuePriorityQuery::class)->settingsForEvent('EVT-1');
+        $this->assertSame(30, $settings->impact_weight);
+        $this->assertSame(40.0, $settings->high_percent);
+        $settings->high_percent = 60;
+        $settings->medium_percent = 30;
+        $presenter = app(\App\Presenters\RescueCriteriaPresenter::class);
+        $this->assertSame('medium', $presenter->priorityBand(50, 2, $settings)['key']);
+        $this->assertSame('low', $presenter->priorityBand(25, 2, $settings)['key']);
+
+        Schema::table('rescue_priority_settings', function (Blueprint $table): void {
+            $table->string('updated_by_user_id')->nullable();
+            $table->string('change_reason')->nullable();
+            $table->timestamps();
+        });
+        config(['rescue_priority.high_percent' => 90]);
+        $next = app(\App\Actions\UpdateRescuePrioritySettings::class)->apply([
+            'impact_weight' => 40, 'vulnerability_weight' => 20,
+            'unreported_weight' => 25, 'no_contact_weight' => 15,
+        ], 'admin-1', 'Use these weights for the next event.');
+        $this->assertSame(2, $next->version);
+        $this->assertSame(40.0, $next->high_percent);
+        $this->assertSame('admin-1', $next->updated_by_user_id);
+        $this->assertSame('Use these weights for the next event.', $next->change_reason);
+        $this->assertNotNull($next->created_at);
+    }
+
+    public function test_live_partial_shares_and_updated_registered_vulnerability_are_not_truncated(): void
+    {
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
+        DB::table('households')->where('household_id', 'HH-2')->update(['address_id' => 1, 'contact_number' => null]);
+        DB::table('household_members')->where('member_id', 'M-2')->update(['is_pregnant' => 1]);
+        DB::table('member_statuses')->insert(['status_id' => 2, 'status_key' => 'safe']);
+        DB::table('member_disaster_statuses')->insert(['member_id' => 'M-2', 'disaster_id' => 'EVT-1', 'status_id' => 2]);
+        DB::table('household_disasters')->where('household_id', 'HH-2')->update(['last_reported_at' => now()]);
+        $query = app(RescueCriteriaQuery::class);
+        $point = $query->current('EVT-1', now()->subHour());
+        $this->assertSame(50.0, $point['impact']);
+        $this->assertSame(50.0, $point['special_needs']);
+        $this->assertSame(50.0, $point['unreported']);
+        $this->assertSame(50.0, $point['no_contact']);
+
+        DB::table('household_members')->where('member_id', 'M-1')->update(['is_pwd' => 0]);
+        $this->assertSame(0.0, $query->current('EVT-1', now()->subHour())['special_needs']);
+        DB::table('household_members')->where('member_id', 'M-1')->update(['is_pregnant' => 1]);
+        $this->assertSame(50.0, $query->current('EVT-1', now()->subHour())['special_needs']);
     }
 }

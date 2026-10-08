@@ -2,15 +2,65 @@
 
 namespace Tests\Feature;
 
+use App\Events\NotificationFeedChanged;
 use App\Models\Notification;
 use App\Models\User;
+use App\Models\WeatherLog;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class NotificationApiTest extends TestCase
 {
+    public function test_mobile_member_status_and_inquiry_writes_broadcast_view_updates(): void
+    {
+        Event::fake([NotificationFeedChanged::class]);
+        foreach (['member_disaster_statuses', 'landing_inquiries', 'responder_location_logs'] as $tableName) {
+            Schema::create($tableName, function (Blueprint $table) {
+                $table->id();
+                $table->string('status');
+            });
+            \DB::transaction(fn () => \DB::table($tableName)->insert(['status' => 'updated']));
+        }
+        Event::assertDispatchedTimes(NotificationFeedChanged::class, 3);
+    }
+
+    public function test_private_channels_require_auth_and_reject_another_users_channel(): void
+    {
+        config(['broadcasting.default' => 'reverb', 'broadcasting.connections.reverb.key' => 'test-key',
+            'broadcasting.connections.reverb.secret' => 'test-secret', 'broadcasting.connections.reverb.app_id' => 'test-app']);
+        // Register callbacks on this test driver, rather than the null driver used at boot.
+        require base_path('routes/channels.php');
+        $payload = ['socket_id' => '123.456', 'channel_name' => 'private-notifications.admin'];
+        $this->postJson('/api/v1/broadcasting/auth', $payload)->assertUnauthorized();
+        $user = User::query()->where('user_id', 'USR-ADMIN-001')->firstOrFail();
+        $this->actingAs($user, 'sanctum')->postJson('/api/v1/broadcasting/auth', $payload)->assertOk()->assertJsonStructure(['auth']);
+        $this->postJson('/api/v1/broadcasting/auth', array_replace($payload, ['channel_name' => 'private-users.someone-else']))->assertForbidden();
+        $this->postJson('/api/v1/broadcasting/auth', array_replace($payload, ['channel_name' => 'private-users.USR-ADMIN-001']))->assertOk();
+        $this->postJson('/api/v1/broadcasting/auth', array_replace($payload, ['channel_name' => 'private-operations.households']))->assertOk();
+        $this->postJson('/api/v1/broadcasting/auth', array_replace($payload, ['channel_name' => 'private-operations.accounts']))->assertForbidden();
+        $this->postJson('/api/v1/broadcasting/auth', array_replace($payload, ['channel_name' => 'private-operations.invalid-topic']))->assertForbidden();
+        $user->role_id = 6;
+        $user->unsetRelation('role');
+        $this->postJson('/api/v1/broadcasting/auth', $payload)->assertForbidden();
+    }
+
+    public function test_query_builder_changes_broadcast_only_after_commit_and_never_after_rollback(): void
+    {
+        Event::fake([NotificationFeedChanged::class]);
+        \DB::beginTransaction();
+        \DB::table('notifications')->where('notif_id', 1)->update(['message' => 'Committed alert']);
+        Event::assertNotDispatched(NotificationFeedChanged::class);
+        \DB::commit();
+        Event::assertDispatchedTimes(NotificationFeedChanged::class, 1);
+        \DB::beginTransaction();
+        \DB::table('notifications')->where('notif_id', 1)->update(['message' => 'Rolled back alert']);
+        \DB::rollBack();
+        Event::assertDispatchedTimes(NotificationFeedChanged::class, 1);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -133,6 +183,67 @@ class NotificationApiTest extends TestCase
                 'notifications' => ['data', 'current_page', 'per_page', 'total', 'page_count'],
                 'preview', 'status_filter', 'scope_note']]);
     }
+
+    public function test_repeated_feed_requests_include_new_weather_and_preserve_user_actions(): void
+    {
+        Schema::create('weather_logs', function (Blueprint $table) {
+            $table->increments('weather_log_id');
+            $table->string('disaster_id')->nullable();
+            $table->string('source_name')->nullable();
+            $table->string('source_url')->nullable();
+            $table->string('condition_name')->nullable();
+            foreach (['temperature', 'rainfall_mm', 'wind_speed', 'humidity'] as $column) {
+                $table->float($column)->nullable();
+            }
+            $table->string('wind_direction')->nullable();
+            $table->string('advisory_title')->nullable();
+            $table->text('advisory_text')->nullable();
+            $table->text('raw_payload')->nullable();
+            $table->timestamp('observed_at')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('audit_logs', function (Blueprint $table) {
+            $table->increments('audit_log_id');
+            foreach (['user_id', 'role_key', 'module', 'action', 'reference_table', 'reference_id', 'ip_address', 'user_agent'] as $column) {
+                $table->string($column)->nullable();
+            }
+            $table->text('old_values')->nullable();
+            $table->text('new_values')->nullable();
+            $table->timestamp('created_at')->useCurrent();
+        });
+        $user = User::query()->where('user_id', 'USR-ADMIN-001')->firstOrFail();
+        $this->actingAs($user, 'sanctum');
+
+        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.unread', 1)
+            ->assertHeader('Cache-Control', 'max-age=0, no-store, private');
+        $this->postJson('/api/v1/notifications/mark-read', ['notification_ids' => ['notif-1']])->assertOk();
+        $weather = WeatherLog::query()->create([
+            'source_name' => 'External weather source', 'condition_name' => 'Clear',
+            'observed_at' => now()->subHours(3),
+        ]);
+        $weatherId = 'weather-'.$weather->weather_log_id;
+        $this->getJson('/api/v1/notifications')->assertOk()
+            ->assertJsonPath('data.summary.unread', 1)
+            ->assertJsonFragment(['id' => $weatherId, 'read' => false]);
+        $this->postJson('/api/v1/notifications/delete-selected', ['notification_ids' => [$weatherId]])->assertOk();
+        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.unread', 0);
+        $this->assertDatabaseHas('weather_logs', ['weather_log_id' => $weather->weather_log_id]);
+
+        $next = WeatherLog::query()->create(['source_name' => 'External weather source', 'condition_name' => 'Clear']);
+        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.unread', 1)
+            ->assertJsonFragment(['id' => 'weather-'.$next->weather_log_id, 'read' => false]);
+        $this->postJson('/api/v1/notifications/clear-all')->assertOk();
+        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.total', 0);
+        $this->assertDatabaseCount('weather_logs', 2);
+        $this->assertDatabaseCount('notifications', 1);
+
+        $otherUser = $user->replicate();
+        $otherUser->user_id = 'USR-ADMIN-002';
+        $otherUser->username = 'admin002';
+        $otherUser->email = 'other-admin@example.com';
+        $otherUser->save();
+        $this->actingAs($otherUser, 'sanctum');
+        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.total', 3)
+            ->assertJsonPath('data.summary.unread', 3);
+    }
 }
-
-

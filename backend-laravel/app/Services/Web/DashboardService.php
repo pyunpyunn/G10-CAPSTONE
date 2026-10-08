@@ -5,6 +5,7 @@ namespace App\Services\Web;
 use App\Data\DashboardSnapshot;
 use App\Queries\DashboardQuery;
 use App\Services\Shared\BarangayProfileService;
+use App\Services\Shared\RealtimeReadCache;
 use Illuminate\Http\Request;
 
 class DashboardService
@@ -18,13 +19,15 @@ class DashboardService
     public function index(): DashboardSnapshot
     {
         $this->closureWorkflow->releaseEndedEventReferences();
-        return $this->snapshot(true);
+
+        return app(RealtimeReadCache::class)->remember('dashboard-full', fn () => $this->snapshot(true));
     }
 
     public function summary(): DashboardSnapshot
     {
         $this->closureWorkflow->releaseEndedEventReferences();
-        return $this->snapshot(false);
+
+        return app(RealtimeReadCache::class)->remember('dashboard-summary', fn () => $this->snapshot(false));
     }
 
     public function dispatch(): array
@@ -50,8 +53,11 @@ class DashboardService
     public function closeActiveEvent(Request $request): ?array
     {
         $closedEvent = $this->closureWorkflow->close($request);
-        if (! $closedEvent) return null;
+        if (! $closedEvent) {
+            return null;
+        }
         $this->closureWorkflow->releaseEndedEventReferences();
+
         return ['closed_event' => $closedEvent, 'dashboard' => $this->snapshot(true)];
     }
 
@@ -63,7 +69,9 @@ class DashboardService
         $latest = $event ? $this->query->latestBroadcast((string) $eventId) : null;
         $profile = $this->barangayProfile->current();
 
-        if (! $full) return new DashboardSnapshot($event, $latest, $profile, $households);
+        if (! $full) {
+            return new DashboardSnapshot($event, $latest, $profile, $households);
+        }
 
         return new DashboardSnapshot($event, $latest, $profile, $households,
             $this->query->getDispatchSummary($eventId),

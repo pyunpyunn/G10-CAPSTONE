@@ -26,6 +26,7 @@ class RescueCriteriaHistoryQuery
                 'special_needs' => $this->percent($row->special_open, $row->vulnerable_total),
                 'unreported' => $this->percent($row->unreported_open, $row->member_total),
                 'no_contact' => $this->percent($row->no_contact_open, $row->no_contact_total),
+                'rescue_priority_version' => $row->rescue_priority_version ?? null,
             ])->all();
     }
 
@@ -33,12 +34,15 @@ class RescueCriteriaHistoryQuery
     public function refresh(string $eventId, Carbon $startedAt, ?Carbon $endedAt = null, bool $rebaseContact = false): int
     {
         $until = $endedAt && $endedAt->lt(now()) ? $endedAt : now();
+        $weightVersion = Schema::hasColumn('disaster_events', 'rescue_priority_version')
+            ? DB::table('disaster_events')->where('event_id', $eventId)->value('rescue_priority_version')
+            : null;
         $barangayId = $this->barangay->current()['barangay_id'] ?? null;
         $households = DB::table('households as h')->join('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->when($barangayId !== null, fn ($q) => $q->where('a.barangay_id', $barangayId))
             ->where('h.created_at', '<=', $startedAt)
             ->where(fn ($q) => $q->whereNull('h.deleted_at')->orWhere('h.deleted_at', '>', $startedAt))
-            ->get(['h.household_id', 'h.contact_number']);
+            ->get(['h.household_id', 'h.contact_number', 'a.purok_sitio']);
         $ids = $households->pluck('household_id')->all();
         $trusted = $ids === [] ? [] : DB::table('trusted_households as t')
             ->join('households as h', 'h.household_id', '=', 't.trusted_household_id')
@@ -72,11 +76,15 @@ class RescueCriteriaHistoryQuery
                 'no_contact' => (bool) $baselineContact->get($household->household_id, false),
             ];
         }
+        $minorPredicate = Schema::hasColumn('household_members', 'birth_date')
+            ? ' OR (m.birth_date IS NOT NULL AND m.birth_date > ?)'
+            : '';
+        $minorBindings = $minorPredicate === '' ? [] : [$startedAt->copy()->subYears(18)->toDateString()];
         $members = $ids === [] ? collect() : DB::table('household_members as m')
             ->whereIn('m.household_id', $ids)->where('m.created_at', '<=', $startedAt)
             ->where(fn ($q) => $q->whereNull('m.deleted_at')->orWhere('m.deleted_at', '>', $startedAt))
             ->select('m.member_id')
-            ->selectRaw('CASE WHEN m.is_pwd = 1 OR m.is_senior = 1 OR m.is_pregnant = 1 OR EXISTS (SELECT 1 FROM member_vulnerable_groups g WHERE g.member_id = m.member_id) THEN 1 ELSE 0 END as vulnerable')->get();
+            ->selectRaw("CASE WHEN m.is_pwd = 1 OR m.is_senior = 1 OR m.is_pregnant = 1 OR EXISTS (SELECT 1 FROM member_vulnerable_groups g WHERE g.member_id = m.member_id){$minorPredicate} THEN 1 ELSE 0 END as vulnerable", $minorBindings)->get();
         $memberStates = $members->mapWithKeys(fn ($m) => [$m->member_id => ['status' => null, 'vulnerable' => (bool) $m->vulnerable]])->all();
         $reports = [];
         if ($ids !== []) {
@@ -126,12 +134,50 @@ class RescueCriteriaHistoryQuery
                 }
             }
             $values = $this->counts($householdStates, $memberStates);
-            $snapshots[] = array_merge(['event_id' => $eventId, 'bucket_hour' => $hour, 'observed_at' => $at,
+            $snapshot = array_merge(['event_id' => $eventId, 'bucket_hour' => $hour, 'observed_at' => $at,
                 'created_at' => now(), 'updated_at' => now()], $values);
+            if (Schema::hasColumn('rescue_criteria_line_snapshots', 'rescue_priority_version')) {
+                $snapshot['rescue_priority_version'] = $weightVersion;
+            }
+            $snapshots[] = $snapshot;
         }
-        foreach (array_chunk($snapshots, 500) as $chunk) {
-            DB::table('rescue_criteria_line_snapshots')->upsert($chunk, ['event_id', 'bucket_hour'],
-                array_merge(array_keys($this->counts([], [])), ['observed_at', 'updated_at']));
+        if (Schema::hasTable('rescue_criteria_line_snapshots')) {
+            foreach (array_chunk($snapshots, 500) as $chunk) {
+                $updates = array_merge(array_keys($this->counts([], [])), ['observed_at', 'updated_at']);
+                if (Schema::hasColumn('rescue_criteria_line_snapshots', 'rescue_priority_version')) {
+                    $updates[] = 'rescue_priority_version';
+                }
+                DB::table('rescue_criteria_line_snapshots')->upsert($chunk, ['event_id', 'bucket_hour'], $updates);
+            }
+        }
+
+        if (Schema::hasTable('rescue_criteria_snapshots')) {
+            $purokCount = $households->pluck('purok_sitio')->filter()->unique()->count();
+            $criteriaSnapshots = array_map(function (array $snapshot) use ($purokCount, $weightVersion): array {
+                $values = $snapshot;
+                $criteriaSnapshot = [
+                    'event_id' => $values['event_id'],
+                    'observed_at' => $values['observed_at'],
+                    'definition_version' => 4,
+                    'impact' => $this->percent($values['impact_open'], $values['household_total']),
+                    'special_needs' => $this->percent($values['special_open'], $values['vulnerable_total']),
+                    'unreported' => $this->percent($values['unreported_open'], $values['member_total']),
+                    'no_contact' => $this->percent($values['no_contact_open'], $values['no_contact_total']),
+                    'purok_count' => $purokCount,
+                ];
+                if (Schema::hasColumn('rescue_criteria_snapshots', 'rescue_priority_version')) {
+                    $criteriaSnapshot['rescue_priority_version'] = $weightVersion;
+                }
+                return $criteriaSnapshot;
+            }, $snapshots);
+
+            foreach (array_chunk($criteriaSnapshots, 500) as $chunk) {
+                $updates = ['definition_version', 'impact', 'special_needs', 'unreported', 'no_contact', 'purok_count'];
+                if (Schema::hasColumn('rescue_criteria_snapshots', 'rescue_priority_version')) {
+                    $updates[] = 'rescue_priority_version';
+                }
+                DB::table('rescue_criteria_snapshots')->upsert($chunk, ['event_id', 'observed_at'], $updates);
+            }
         }
         return count($snapshots);
     }

@@ -35,6 +35,16 @@ export async function getRescueCriteriaTimeline() {
   return response.data.data
 }
 
+export async function getRescueCriteriaFeed(options = {}) {
+  const response = await api.get('/dispatches/criteria-timeline', options)
+  return response.data
+}
+
+export async function getRescuePrioritySettings() {
+  const response = await api.get('/dispatches/priority-settings')
+  return response.data.data
+}
+
 export async function getMemberCheckQueue(params = {}) {
   const response = await api.get('/dispatches/member-check-queue', { params })
   return response.data

@@ -5,6 +5,8 @@ namespace App\Queries;
 use App\Models\Household;
 use App\Models\HouseholdMember;
 use App\Models\RescuePrioritySetting;
+use App\Support\RequestSchema as Schema;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class RescuePriorityQuery
@@ -25,7 +27,15 @@ class RescuePriorityQuery
 
     public function scored(string $eventId, int|string|null $barangayId = null): array
     {
-        $settings = RescuePrioritySetting::query()->orderByDesc('version')->firstOrFail();
+        $settings = $this->settingsForEvent($eventId);
+        $minorPredicate = '';
+        if (Schema::hasColumn('household_members', 'birth_date') && Schema::hasColumn('disaster_events', 'started_at')) {
+            $eventStartedAt = DB::table('disaster_events')->where('event_id', $eventId)->value('started_at');
+            if ($eventStartedAt) {
+                $minorCutoff = Carbon::parse($eventStartedAt)->subYears(18)->toDateString();
+                $minorPredicate = " OR (area_member.birth_date IS NOT NULL AND area_member.birth_date > '{$minorCutoff}')";
+            }
+        }
 
         $areaImpact = Household::query()->from('households as area_household')
             ->join('addresses as area_address', 'area_address.address_id', '=', 'area_household.address_id')
@@ -37,7 +47,7 @@ class RescuePriorityQuery
             ->when($barangayId !== null, fn ($query) => $query->where('area_address.barangay_id', $barangayId))
             ->groupBy('area_address.purok_sitio')
             ->selectRaw('area_address.purok_sitio as area_name, COUNT(DISTINCT area_household.household_id) as total_households')
-            ->selectRaw("COUNT(DISTINCT CASE WHEN area_disaster.needs_dispatch = 1 OR area_status.status_key IN ('unsafe', 'needs_help') THEN area_household.household_id END) as impacted_households");
+            ->selectRaw("COUNT(DISTINCT CASE WHEN area_status.status_key IN ('unsafe', 'needs_help', 'needs_assistance') THEN area_household.household_id END) as impacted_households");
 
         $areaVulnerability = HouseholdMember::query()->withoutGlobalScopes()->from('household_members as area_member')
             ->join('households as member_household', 'member_household.household_id', '=', 'area_member.household_id')
@@ -51,8 +61,8 @@ class RescuePriorityQuery
             ->when($barangayId !== null, fn ($query) => $query->where('member_address.barangay_id', $barangayId))
             ->groupBy('member_address.purok_sitio')
             ->selectRaw('member_address.purok_sitio as area_name, COUNT(DISTINCT area_member.member_id) as total_members')
-            ->selectRaw('COUNT(DISTINCT CASE WHEN area_member.is_pwd = 1 OR area_member.is_senior = 1 OR area_member.is_pregnant = 1 OR member_group.member_id IS NOT NULL THEN area_member.member_id END) as total_vulnerable_members')
-            ->selectRaw("COUNT(DISTINCT CASE WHEN (area_member.is_pwd = 1 OR area_member.is_senior = 1 OR area_member.is_pregnant = 1 OR member_group.member_id IS NOT NULL)
+            ->selectRaw("COUNT(DISTINCT CASE WHEN area_member.is_pwd = 1 OR area_member.is_senior = 1 OR area_member.is_pregnant = 1 OR member_group.member_id IS NOT NULL{$minorPredicate} THEN area_member.member_id END) as total_vulnerable_members")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN (area_member.is_pwd = 1 OR area_member.is_senior = 1 OR area_member.is_pregnant = 1 OR member_group.member_id IS NOT NULL{$minorPredicate})
                 AND (vulnerable_status.status_key IS NULL OR vulnerable_status.status_key NOT IN ('safe', 'safe_at_home', 'evacuated'))
                 THEN area_member.member_id END) as vulnerable_members");
 
@@ -60,19 +70,14 @@ class RescuePriorityQuery
             ->leftJoin('member_disaster_statuses as member_report', fn ($join) => $join
                 ->on('member_report.member_id', '=', 'report_member.member_id')
                 ->where('member_report.disaster_id', $eventId))
+            ->leftJoin('member_statuses as report_status', 'report_status.status_id', '=', 'member_report.status_id')
             ->whereNull('report_member.deleted_at')->groupBy('report_member.household_id')
             ->selectRaw('report_member.household_id, COUNT(DISTINCT report_member.member_id) as total_members')
-            ->selectRaw('COUNT(DISTINCT CASE WHEN member_report.member_id IS NULL THEN report_member.member_id END) as unreported_members');
+            ->selectRaw("COUNT(DISTINCT CASE WHEN report_status.status_key IS NULL OR report_status.status_key IN ('unknown', 'unchecked', 'unreported') THEN report_member.member_id END) as unreported_members");
 
-        $missingContact = "CASE WHEN (h.contact_number IS NULL OR TRIM(h.contact_number) = '')
-            AND NOT EXISTS (
-                SELECT 1 FROM trusted_households trust JOIN households trusted
-                ON ((trust.requesting_household_id = h.household_id AND trusted.household_id = trust.trusted_household_id)
-                    OR (trust.trusted_household_id = h.household_id AND trusted.household_id = trust.requesting_household_id))
-                WHERE trust.validation_status IN ('validated', 'approved')
-                AND trusted.contact_number IS NOT NULL AND TRIM(trusted.contact_number) <> ''
-            ) THEN 1 ELSE 0 END";
-        $noContact = "CASE WHEN (hs.status_key IS NULL OR hs.status_key NOT IN ('safe', 'safe_at_home', 'evacuated', 'returned', 'relocated'))
+        $missingContact = $this->contactMissingExpression();
+        $noContact = "CASE WHEN hd.last_reported_at IS NULL
+            AND (hs.status_key IS NULL OR hs.status_key NOT IN ('safe', 'safe_at_home', 'evacuated', 'returned', 'relocated'))
             AND ({$missingContact}) = 1 THEN 1 ELSE 0 END";
 
         $base = Household::query()->from('households as h')
@@ -96,9 +101,9 @@ class RescuePriorityQuery
 
         $query = DB::query()->fromSub($base, 'priority_base')
             ->select('priority_base.*')
-            ->selectRaw('( ? * impacted_households / CASE WHEN area_households < 1 THEN 1 ELSE area_households END
-                + ? * vulnerable_members / CASE WHEN total_vulnerable_members < 1 THEN 1 ELSE total_vulnerable_members END
-                + ? * unreported_members / CASE WHEN household_members < 1 THEN 1 ELSE household_members END
+            ->selectRaw('( ? * 1.0 * impacted_households / CASE WHEN area_households < 1 THEN 1 ELSE area_households END
+                + ? * 1.0 * vulnerable_members / CASE WHEN total_vulnerable_members < 1 THEN 1 ELSE total_vulnerable_members END
+                + ? * 1.0 * unreported_members / CASE WHEN household_members < 1 THEN 1 ELSE household_members END
                 + ? * no_contact_channel) as priority_score', [
                 $settings->impact_weight,
                 $settings->vulnerability_weight,
@@ -107,5 +112,33 @@ class RescuePriorityQuery
             ]);
 
         return [$query, $settings];
+    }
+
+    public function settingsForEvent(string $eventId): RescuePrioritySetting
+    {
+        $version = Schema::hasColumn('disaster_events', 'rescue_priority_version')
+            ? DB::table('disaster_events')->where('event_id', $eventId)->value('rescue_priority_version')
+            : null;
+
+        return ($version ? RescuePrioritySetting::query()->find($version) : null)
+            ?? RescuePrioritySetting::query()->orderByDesc('version')->firstOrFail();
+    }
+
+    public function contactMissingExpression(): string
+    {
+        $hasDevices = Schema::hasTable('device_tokens') && Schema::hasColumn('device_tokens', 'household_id');
+        $active = $hasDevices && Schema::hasColumn('device_tokens', 'is_active') ? ' AND dt.is_active = 1' : '';
+        $ownDevice = $hasDevices ? "EXISTS (SELECT 1 FROM device_tokens dt WHERE dt.household_id = h.household_id{$active})" : '0 = 1';
+        $trustedDevice = $hasDevices ? "EXISTS (SELECT 1 FROM device_tokens dt WHERE dt.household_id = trusted.household_id{$active})" : '0 = 1';
+
+        return "CASE WHEN (h.contact_number IS NULL OR TRIM(h.contact_number) = '')
+            AND NOT ({$ownDevice})
+            AND NOT EXISTS (
+                SELECT 1 FROM trusted_households trust JOIN households trusted
+                ON ((trust.requesting_household_id = h.household_id AND trusted.household_id = trust.trusted_household_id)
+                    OR (trust.trusted_household_id = h.household_id AND trusted.household_id = trust.requesting_household_id))
+                WHERE trust.validation_status IN ('validated', 'approved') AND trusted.deleted_at IS NULL
+                AND ((trusted.contact_number IS NOT NULL AND TRIM(trusted.contact_number) <> '') OR {$trustedDevice})
+            ) THEN 1 ELSE 0 END";
     }
 }

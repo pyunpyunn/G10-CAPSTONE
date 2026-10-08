@@ -14,6 +14,7 @@ import {
   updateRescuer,
 } from '../api/rescuerApi'
 import RescuerAccountModal from '../components/rescuers/RescuerAccountModal'
+import HeadquartersAccountsPanel from '../components/rescuers/HeadquartersAccountsPanel'
 import RescuerRosterTable from '../components/rescuers/RescuerRosterTable'
 import RescuerTeamGrid from '../components/rescuers/RescuerTeamGrid'
 import RescueTeamConfigModal from '../components/rescuers/RescueTeamConfigModal'
@@ -55,6 +56,7 @@ function RescuerAccountsWorkspace() {
   const [teamConfigLoading, setTeamConfigLoading] = useState(false)
   const [teamConfigSaving, setTeamConfigSaving] = useState(false)
   const [teamConfigError, setTeamConfigError] = useState('')
+  const [activeAccountTab, setActiveAccountTab] = useState('responders')
 
   useEffect(() => {
     if (workflowType !== 'view' && workflowType !== 'edit') return
@@ -285,16 +287,16 @@ function RescuerAccountsWorkspace() {
   return (
     <main className="ops-page rescuer-page">
       <PageHeader
-        title={workflow ? (workflowType === 'teams' ? 'Team Management' : workflowType === 'view' ? 'Rescuer profile' : workflowType === 'edit' ? 'Update profile' : 'New rescuer account') : 'Rescuer Accounts'}
+        title={workflow ? (workflowType === 'teams' ? 'Team Management' : workflowType === 'view' ? 'Rescuer profile' : workflowType === 'edit' ? 'Update profile' : 'New rescuer account') : 'Account Management'}
         subtitle={payload?.area_label || 'Shared database records'}
         actions={workflow ? (
           <button className="button secondary" type="button" onClick={() => navigate('/rescuers')}><ArrowLeft size={15} />Back to roster</button>
-        ) : (
+        ) : activeAccountTab === 'responders' ? (
           <>
             <button className="button secondary" type="button" onClick={openTeamConfig}><Settings2 size={15} />Manage teams</button>
             <button className="button review" type="button" onClick={openCreateModal}><UserPlus size={15} />Create account</button>
           </>
-        )}
+        ) : null}
       />
 
       {error && <div className="form-error" role="alert">{error}</div>}
@@ -305,6 +307,12 @@ function RescuerAccountsWorkspace() {
 
       {workflow && workflowType !== 'teams' && (isInitialLoading || detailLoading) && <LoadingState label="Loading rescuer profile..." />}
       {!workflow && <>
+          <div className="account-management-tabs" role="tablist" aria-label="Account categories">
+            <button type="button" role="tab" aria-selected={activeAccountTab === 'responders'} className={activeAccountTab === 'responders' ? 'active' : ''} onClick={() => setActiveAccountTab('responders')}>Rescuers & teams</button>
+            <button type="button" role="tab" aria-selected={activeAccountTab === 'headquarters'} className={activeAccountTab === 'headquarters' ? 'active' : ''} onClick={() => setActiveAccountTab('headquarters')}>Headquarters accounts</button>
+          </div>
+          {activeAccountTab === 'headquarters' && <HeadquartersAccountsPanel />}
+          {activeAccountTab === 'responders' && <>
           {isInitialLoading && <LoadingState />}
           {!isInitialLoading && !hasBlockingError && payload && (
             <div className="ra-workspace">
@@ -314,6 +322,7 @@ function RescuerAccountsWorkspace() {
               <aside className="ra-side-panel"><div className="ra-side-head"><span className="ra-title">Team cards</span></div><RescuerTeamGrid teams={teams} showStatus /><button className="button secondary" type="button" onClick={openTeamConfig}>View all teams</button></aside>
             </div>
           )}
+          </>}
         </>}
 
     </main>

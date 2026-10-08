@@ -5,6 +5,7 @@ namespace App\Services\Web;
 use App\Jobs\DeliverDisasterBroadcast;
 use App\Models\DisasterBroadcast;
 use App\Models\DisasterEvent;
+use App\Models\RescuePrioritySetting;
 use App\Queries\DisasterBroadcastQuery;
 use App\Presenters\DisasterBroadcastPresenter;
 use Illuminate\Http\JsonResponse;
@@ -31,7 +32,7 @@ class DisasterBroadcastWorkflow
             $now = now();
             $eventId = 'EVT-'.$now->format('Ymd').'-'.Str::upper(Str::random(5));
 
-            DisasterEvent::query()->create([
+            $event = [
                 'event_id' => $eventId,
                 'name' => $validated['name'],
                 'type_id' => $validated['type_id'],
@@ -41,7 +42,11 @@ class DisasterBroadcastWorkflow
                 'created_at' => $now,
                 'updated_at' => $now,
                 'deleted_at' => null,
-            ]);
+            ];
+            if (Schema::hasColumn('disaster_events', 'rescue_priority_version')) {
+                $event['rescue_priority_version'] = RescuePrioritySetting::query()->orderByDesc('version')->value('version');
+            }
+            DisasterEvent::query()->create($event);
 
             return $eventId;
         });

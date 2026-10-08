@@ -283,6 +283,71 @@
   gap: 12px;
 }
 
+.account-management-tabs {
+  display: flex;
+  gap: 18px;
+  margin: 0 0 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.account-management-tabs button {
+  min-height: 42px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-3);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.account-management-tabs button.active {
+  border-bottom-color: var(--color-nav-active);
+  color: var(--color-text-1);
+}
+
+.hq-account-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.hq-account-heading,
+.hq-account-form-footer,
+.hq-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hq-account-heading h3 { margin: 0 0 6px; }
+.hq-account-heading .ra-section-description { margin: 0; }
+.hq-account-type-switch { display: flex; gap: 6px; margin: 18px 0; }
+.hq-account-type-switch button { min-height: 36px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 6px; background: #fff; color: var(--color-text-2); font: inherit; font-size: 12px; cursor: pointer; }
+.hq-account-type-switch button.active { border-color: var(--color-nav-active); background: color-mix(in srgb, var(--color-nav-active) 10%, white); color: var(--color-text-1); }
+.hq-account-form .ra-form-grid label { display: grid; gap: 8px; min-width: 0; }
+.hq-account-form .ra-form-grid input { width: 100%; min-width: 0; min-height: 42px; border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; font: inherit; }
+.hq-account-form-footer { flex-wrap: wrap; margin-top: 18px; color: var(--color-text-3); font-size: 12px; }
+.hq-account-list { display: grid; margin-top: 16px; }
+.hq-account-row { min-width: 0; padding: 12px 0; border-top: 1px solid var(--color-border); }
+.hq-account-person { display: grid; min-width: 0; gap: 3px; }
+.hq-account-person strong { overflow-wrap: anywhere; font-size: 13px; }
+.hq-account-person span, .hq-account-row code { color: var(--color-text-3); font-size: 11px; }
+.hq-account-row code { white-space: nowrap; }
+.hq-account-status { flex: 0 0 auto; color: var(--color-text-3); font-size: 11px; }
+.hq-account-status.is-active { color: var(--green); }
+.hq-account-empty { color: var(--color-text-3); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .hq-account-workspace { grid-template-columns: minmax(0, 1fr); }
+  .hq-account-row { flex-wrap: wrap; }
+  .hq-account-type-switch { flex-wrap: wrap; }
+}
+
 .ra-main-panel,
 .ra-side-panel {
   min-width: 0;

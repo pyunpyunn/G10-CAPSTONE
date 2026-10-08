@@ -1,5 +1,5 @@
 import { Inbox } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { getInquiries, updateInquiryStatus } from '../api/inquiryApi'
 import Badge from '../components/ui/Badge'
 import EmptyState from '../components/ui/EmptyState'
@@ -8,58 +8,16 @@ import PageHeader from '../components/ui/PageHeader'
 import PaginationBar from '../components/ui/PaginationBar'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
 import DataFilterBar from '../components/ui/DataFilterBar'
+import { useModuleData } from '../utils/useModuleData'
 
 export default function SuperAdminPage() {
-  const [payload, setPayload] = useState(null)
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [actionError, setError] = useState('')
   const [message, setMessage] = useState('')
-
-  useEffect(() => {
-    let ignore = false
-
-    async function load() {
-      setIsLoading(true)
-      setError('')
-
-      try {
-        const data = await getInquiries({ status, page, per_page: 10 })
-        if (!ignore) {
-          setPayload(data)
-        }
-      } catch {
-        if (!ignore) {
-          setError('Inquiries cannot be loaded right now. Please check the backend or database connection.')
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    load()
-
-    return () => {
-      ignore = true
-    }
-  }, [status, page])
-
-  async function refresh() {
-    setIsLoading(true)
-    setError('')
-
-    try {
-      setPayload(await getInquiries({ status, page, per_page: 10 }))
-    } catch {
-      setError('Inquiries cannot be loaded right now. Please check the backend or database connection.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
+  const loader = useCallback(() => getInquiries({ status, page, per_page: 10 }), [status, page])
+  const { data: payload, error: loadError, loading: isLoading, refresh } = useModuleData(loader, ['inquiries', 'accounts'])
+  const error = actionError || loadError
   async function changeStatus(inquiry, nextStatus) {
     setMessage('')
     setError('')

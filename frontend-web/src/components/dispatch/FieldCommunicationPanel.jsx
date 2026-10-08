@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { getFieldCommunications } from '../../api/dispatchApi'
 import ModuleDataView from '../ui/ModuleDataView'
 import { useModuleData } from '../../utils/useModuleData'
+import { useRealtimeVersion } from '../../utils/useRealtimeVersion'
 import PaginationBar from '../ui/PaginationBar'
 import DataFilterBar from '../ui/DataFilterBar'
 import LoadingState from '../ui/LoadingState'
@@ -20,10 +21,6 @@ function CommunicationTable({ compact = false }) {
   const loader = useCallback(() => getFieldCommunications({ page, per_page: compact ? 5 : 20, search, channel,
     ...(team !== 'all' ? { team_id: team } : {}) }), [page, compact, search, channel, team])
   const { data, error, loading, refresh } = useModuleData(loader)
-  useEffect(() => {
-    const interval = window.setInterval(refresh, 5000)
-    return () => window.clearInterval(interval)
-  }, [refresh])
   const change = (setter) => (value) => { setter(value); setPage(1) }
   return <section className="response-communication" aria-label="Field Communication Panel">
     {!compact && <DataFilterBar search={search} onSearchChange={change(setSearch)} searchPlaceholder="Search teams or messages..."
@@ -48,6 +45,7 @@ function TeamRecordingsPanel() {
   const [playbackError, setPlaybackError] = useState('')
   const audioRef = useRef(null)
   const requestKey = `${team}:${page}`
+  const realtimeVersion = useRealtimeVersion()
   const current = result?.key === requestKey
   const data = current ? result.data : null
   const error = current ? result.error : ''
@@ -69,10 +67,9 @@ function TeamRecordingsPanel() {
       } finally { pending = false }
     }
     update()
-    const interval = window.setInterval(update, 5000)
     document.addEventListener('visibilitychange', update)
-    return () => { disposed = true; window.clearInterval(interval); document.removeEventListener('visibilitychange', update) }
-  }, [team, page, requestKey])
+    return () => { disposed = true; document.removeEventListener('visibilitychange', update) }
+  }, [team, page, requestKey, realtimeVersion])
 
   useEffect(() => () => { audioRef.current?.pause() }, [])
 

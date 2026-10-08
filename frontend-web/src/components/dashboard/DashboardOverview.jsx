@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useModuleData } from '../../utils/useModuleData'
 import {
   CircleMarker,
   GeoJSON,
@@ -36,27 +37,8 @@ export default function DashboardOverview({
   onOpenModule,
   disasterAction,
 }) {
-  const [latestSavedWeather, setLatestSavedWeather] = useState(null)
-
-  useEffect(() => {
-    let ignore = false
-
-    getWeatherWorkspace()
-      .then((workspace) => {
-        if (!ignore) {
-          setLatestSavedWeather(workspace.latest_snapshot || null)
-        }
-      })
-      .catch(() => {
-        if (!ignore) {
-          setLatestSavedWeather(null)
-        }
-      })
-
-    return () => {
-      ignore = true
-    }
-  }, [])
+  const { data: weatherWorkspace } = useModuleData(getWeatherWorkspace, ['weather', 'disasters'])
+  const latestSavedWeather = weatherWorkspace?.latest_snapshot || null
 
   return (
     <aside className="dashboard-overview" aria-label="Dashboard side information">
@@ -112,39 +94,8 @@ function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
 }
 
 function DashboardMapCard({ hasActiveEvent, reportedHouseholds, onOpenMap }) {
-  const [workspace, setWorkspace] = useState(defaultWorkspace)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    let ignore = false
-
-    async function loadMap() {
-      setIsLoading(true)
-
-      try {
-        const data = await getMappingOverview()
-
-        if (!ignore) {
-          setWorkspace({ ...defaultWorkspace, ...data })
-        }
-      } catch {
-        if (!ignore) {
-          setWorkspace(defaultWorkspace)
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadMap()
-
-    return () => {
-      ignore = true
-    }
-  }, [hasActiveEvent])
-
+  const { data, loading: isLoading } = useModuleData(getMappingOverview, ['mapping', 'households', 'dispatch', 'disasters'])
+  const workspace = useMemo(() => data ? { ...defaultWorkspace, ...data } : defaultWorkspace, [data])
   const mapCenter = useMemo(() => [
     workspace.barangay.center.latitude,
     workspace.barangay.center.longitude,

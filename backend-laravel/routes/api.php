@@ -38,12 +38,12 @@ Route::prefix('v1')->group(function () {
     Route::get('/health/ready', [HealthController::class, 'ready'])->name('api.health.ready');
 
     Route::post('/inquiries', [InquiryController::class, 'store'])
-        ->middleware('throttle:10,1');
+        ->middleware(['throttle:10,1', 'realtime.atomic']);
 
     Route::post('/external/resource-requests', [ResourceRequestController::class, 'externalStore'])
-        ->middleware('throttle:60,1');
+        ->middleware(['throttle:60,1', 'realtime.atomic']);
     Route::post('/sms/inbound', [SmsInboundController::class, 'handle'])
-        ->middleware('throttle:60,1');
+        ->middleware(['throttle:60,1', 'realtime.atomic']);
 
     Route::post('/auth/login', [AuthController::class, 'login'])
         ->middleware('throttle:5,1');
@@ -52,7 +52,8 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/password-recovery/reset', [AuthController::class, 'resetPassword'])
         ->middleware('throttle:5,1');
 
-    Route::middleware(['auth:sanctum', 'throttle:300,1'])->group(function () {
+    Route::middleware(['auth:sanctum', 'throttle:300,1', 'realtime.atomic'])->group(function () {
+        Route::get('/realtime/health', \App\Http\Controllers\Api\RealtimeHealthController::class)->middleware('role:super_admin');
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/security-questions', [AuthController::class, 'recoveryQuestions']);
@@ -104,6 +105,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/field-reports', [RescuerMobileController::class, 'fieldReportsAdmin']);
             Route::get('/rescue-teams', [RescueDispatchController::class, 'teams']);
             Route::get('/rescuers', [RescuerAccountController::class, 'index']);
+            Route::get('/headquarters-accounts', [RescuerAccountController::class, 'headquartersAccounts']);
+            Route::post('/headquarters-accounts', [RescuerAccountController::class, 'storeHeadquartersAccount']);
             Route::get('/rescuers/team-config', [RescuerAccountController::class, 'teamConfig']);
             Route::post('/rescuers/team-config', [RescuerAccountController::class, 'storeTeam']);
             Route::patch('/rescuers/team-config/{teamId}', [RescuerAccountController::class, 'updateTeam']);
