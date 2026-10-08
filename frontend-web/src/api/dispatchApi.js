@@ -54,3 +54,18 @@ export async function completeDispatch(assignmentId, payload) {
   const response = await api.post(`/dispatches/${assignmentId}/complete`, payload)
   return response.data.data
 }
+
+export async function getDispatch(assignmentId) {
+  const response = await api.get(`/dispatches/${assignmentId}`)
+  return response.data.data
+}
+
+export async function getFieldCommunications(params = {}) {
+  const response = await api.get('/dispatches/communications', { params })
+  return response.data.data
+}
+
+export async function getFieldReports(params = {}) {
+  const response = await api.get('/field-reports', { params })
+  return response.data.data
+}

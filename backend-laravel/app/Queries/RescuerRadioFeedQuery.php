@@ -129,7 +129,7 @@ class RescuerRadioFeedQuery
         );
     }
 
-    private function activeRadioTransmission(object $responder, $logs = null): ?array
+    public function activeRadioTransmission(object $responder, $logs = null): ?array
     {
         $radioLogs = $logs
             ? collect($logs)

@@ -15,7 +15,17 @@ class RescuerFieldReportQuery
     public function fieldReports(?int $responderId, ?string $userId, array $filters = []): Collection
     {
         if (! Schema::hasTable('household_status_logs')) return collect();
+        return $this->reportQuery($responderId, $userId, $filters)->limit(50)->get()->values();
+    }
 
+    public function paginateAdmin(array $filters, int $perPage): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        abort_unless(Schema::hasTable('household_status_logs'), 503, 'Field report records are currently unavailable.');
+        return $this->reportQuery(null, null, $filters)->paginate($perPage);
+    }
+
+    private function reportQuery(?int $responderId, ?string $userId, array $filters): \Illuminate\Database\Query\Builder
+    {
         $status = strtolower(trim((string) ($filters['status'] ?? 'all')));
         $statusId = trim((string) ($filters['status_id'] ?? ''));
         $eventId = trim((string) ($filters['event_id'] ?? ''));
@@ -48,12 +58,25 @@ class RescuerFieldReportQuery
         }
         if ($responderId && Schema::hasColumn('household_status_logs', 'responder_id')) $query->where('hsl.responder_id', $responderId);
         elseif ($userId && Schema::hasColumn('household_status_logs', 'submitted_by_user_id')) $query->where('hsl.submitted_by_user_id', $userId);
-        if ($eventId !== '' && Schema::hasColumn('household_status_logs', 'disaster_id')) $query->where('hsl.disaster_id', $eventId);
+        if ($eventId !== '' && $eventId !== 'all' && Schema::hasColumn('household_status_logs', 'disaster_id')) $query->where('hsl.disaster_id', $eventId);
         if ($statusId !== '' && Schema::hasColumn('household_status_logs', 'status_id')) $query->where('hsl.status_id', $statusId);
         elseif ($status !== '' && $status !== 'all' && Schema::hasTable('household_statuses')) $query->where('hs.status_key', $status);
 
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $searchColumns = [];
+            foreach (['household_id', 'notes'] as $column) {
+                if (Schema::hasColumn('household_status_logs', $column)) $searchColumns[] = 'hsl.'.$column;
+            }
+            foreach (['household_code', 'household_head_name', 'head_name', 'household_name'] as $column) {
+                if (Schema::hasColumn('households', $column)) $searchColumns[] = 'h.'.$column;
+            }
+            if ($searchColumns) $query->where(function ($inner) use ($searchColumns, $search) {
+                foreach ($searchColumns as $column) $inner->orWhere($column, 'like', "%{$search}%");
+            });
+        }
         $orderColumn = Schema::hasColumn('household_status_logs', 'submitted_at') ? 'hsl.submitted_at' : 'hsl.status_log_id';
-        return $query->orderByDesc($orderColumn)->limit(50)->get($columns)->values();
+        return $query->select($columns)->orderByDesc($orderColumn)->orderByDesc('hsl.status_log_id');
     }
 
     public function summary(?string $eventId = null): array
@@ -64,7 +87,7 @@ class RescuerFieldReportQuery
         foreach ($options as $option) {
             $query = DB::table('household_status_logs as hsl');
             if (Schema::hasColumn('household_status_logs', 'source')) $query->where('hsl.source', 'responder_field_report');
-            if ($eventId !== '' && Schema::hasColumn('household_status_logs', 'disaster_id')) $query->where('hsl.disaster_id', $eventId);
+            if ($eventId && $eventId !== 'all' && Schema::hasColumn('household_status_logs', 'disaster_id')) $query->where('hsl.disaster_id', $eventId);
             if (! empty($option['status_id']) && Schema::hasColumn('household_status_logs', 'status_id')) $query->where('hsl.status_id', $option['status_id']);
             $counts[$option['key']] = (int) $query->count();
         }

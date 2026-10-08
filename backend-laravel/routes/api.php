@@ -138,6 +138,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/archive/saved-groups/{groupId}', [ArchiveController::class, 'deleteSavedGroup']);
             Route::post('/archive/delete-selected', [ArchiveController::class, 'deleteSelected']);
             Route::get('/dispatches', [RescueDispatchController::class, 'index']);
+            Route::get('/dispatches/communications', [RescueDispatchController::class, 'communications']);
             Route::get('/dispatches/welfare-checks', [RescueDispatchController::class, 'welfareChecks']);
             Route::get('/dispatches/member-check-queue', [RescueDispatchController::class, 'memberCheckQueue']);
             Route::get('/dispatches/priorities', [RescueDispatchController::class, 'priorities']);

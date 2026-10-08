@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 export function useModuleData(loader) {
   const [version, setVersion] = useState(0)
@@ -13,6 +13,7 @@ export function useModuleData(loader) {
     return () => { cancelled = true }
   }, [loader, version])
   const current = result?.loader === loader && result?.version === version
+  const refresh = useCallback(() => setVersion((value) => value + 1), [])
   return { data: current ? result.data : null, error: current ? result.error : '', loading: !current,
-    refresh: () => setVersion((value) => value + 1) }
+    refresh }
 }

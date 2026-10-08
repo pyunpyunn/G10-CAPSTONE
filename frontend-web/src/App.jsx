@@ -261,6 +261,8 @@ function AuthRoutes() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dispatch/communication" element={<LazyPage page={{ path: '/dispatch/communication' }} />} />
+        <Route path="rescue-management/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
+        <Route path="rescue-management/:assignmentId/edit" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
         <Route path="dispatch/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
         <Route path="rescuers/new" element={<LazyPage page={{ path: '/rescuers/new' }} />} />
         <Route path="rescuers/view" element={<LazyPage page={{ path: '/rescuers/view' }} />} />

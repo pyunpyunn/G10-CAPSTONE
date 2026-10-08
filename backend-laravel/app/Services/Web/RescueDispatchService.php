@@ -46,6 +46,21 @@ class RescueDispatchService
         ]);
     }
 
+    public function communications(Request $request): array
+    {
+        $request->validate([
+            'channel' => ['nullable', \Illuminate\Validation\Rule::in(['all', 'command', 'team', 'event'])],
+            'team_id' => ['nullable', 'integer', 'min:1'],
+            'search' => ['nullable', 'string', 'max:255'],
+        ]);
+        $event = $this->query->activeEvent();
+        return [
+            'active_event' => $event ? $this->presenter->activeEvent($event) : null,
+            'logs' => app(\App\Queries\FieldCommunicationQuery::class)->paginate($request, $event?->event_id),
+            'teams' => $this->query->teamCards($event?->event_id)->filter(fn ($team) => $team['team_id'])->values(),
+        ];
+    }
+
     public function index(Request $request): JsonResponse
     {
         $activeEvent = $this->query->activeEvent();
@@ -59,6 +74,7 @@ class RescueDispatchService
                     'area_label' => $this->coverage->label(),
                     'active_event' => null,
                     'summary' => $this->query->summary(null, $teamCards),
+                    'team_coverage' => $this->query->teamCoverage(null),
                     'teams' => $teamCards,
                     'responders' => $this->query->responders(null),
                     'risk_areas' => collect(),
@@ -86,6 +102,7 @@ class RescueDispatchService
                 'area_label' => $this->coverage->label(),
                 'active_event' => $activeEvent ? $this->presenter->activeEvent($activeEvent) : null,
                 'summary' => $this->query->summary($eventId, $teamCards),
+                'team_coverage' => $this->query->teamCoverage($eventId),
                 'teams' => $teamCards,
                 'responders' => $this->query->responders($eventId),
                 'risk_areas' => $this->query->riskAreas($eventId),

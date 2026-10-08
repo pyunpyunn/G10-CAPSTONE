@@ -513,6 +513,10 @@
   margin-block: 0;
 }
 
+.left-nav > .nav-group + .nav-group {
+  margin-top: 2px;
+}
+
 .nav-group.is-open .nav-group-items {
   max-height: 220px;
   opacity: 1;

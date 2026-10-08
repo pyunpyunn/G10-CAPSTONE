@@ -446,12 +446,15 @@ function getPageTitle(pathname, state) {
     '/dispatch': 'Dispatch Dashboard',
     '/dispatch/communication': 'Field Communication',
     '/rescue-management': 'Rescue Management',
+    '/rescue-management/new': 'Create New Dispatch Assignment',
     '/field-reports': 'Field Reports',
     '/rescuers/teams': 'Team Management',
     '/request-types': 'Request Types',
     '/external-requests': 'External Requests',
     '/resources-requests': 'Request Monitoring',
   }
+
+  if (/^\/rescue-management\/[^/]+\/edit$/.test(normalizedPath)) return 'Update Dispatch Assignment'
 
   if (navigationTitles[normalizedPath]) return navigationTitles[normalizedPath]
 

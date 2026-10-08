@@ -35,6 +35,11 @@ class RescueDispatchController extends Controller
         return $this->service->teams();
     }
 
+    public function communications(ListRequest $request): JsonResponse
+    {
+        return (new \App\Http\Resources\FieldCommunicationWorkspaceResource($this->service->communications($request)))->response();
+    }
+
     public function index(ListRequest $request): JsonResponse
     {
         return $this->service->index($request);

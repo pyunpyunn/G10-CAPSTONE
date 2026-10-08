@@ -32,10 +32,10 @@ class RescueDispatchQuery
     {
         $query = ResponderAssignment::query()->from('responder_assignments as ra')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')->where('ra.disaster_id', $eventId)->select(['ra.assignment_id', 'ra.assignment_code', 'ra.responder_id', 'ra.responder_count', 'ra.dispatch_type', 'ra.team_id', 'ra.disaster_id', 'ra.household_id', 'ra.assigned_area', 'ra.route_notes', 'ra.priority_level', 'ra.dispatch_notes', 'ra.status', 'ra.assigned_at', 'ra.accepted_at', 'ra.en_route_at', 'ra.arrived_at', 'ra.completed_at', 'ra.outcome_notes', 'ra.updated_at', 'rt.team_name', 'rt.team_code', 'rt.team_type', 'r.full_name as responder_name', 'r.contact_number as responder_contact']);
         $status = trim((string) $request->query('status', 'all')); $search = trim((string) $request->query('search', ''));
-        if ($status === 'active') $query->whereNotIn('ra.status', ['completed', 'cancelled']);
+        if ($status === 'active') $query->whereIn('ra.status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning']);
         elseif ($status !== '' && $status !== 'all') $query->where('ra.status', $this->presenter->statusKey($status));
         if ($search !== '') $query->where(function ($q) use ($search): void { $q->where('ra.assignment_code', 'like', "%{$search}%")->orWhere('ra.assigned_area', 'like', "%{$search}%")->orWhere('rt.team_name', 'like', "%{$search}%")->orWhere('r.full_name', 'like', "%{$search}%"); });
-        return $query->orderByRaw('CASE WHEN ra.status IN ("on_scene", "onscene", "dispatched", "en_route") THEN 0 ELSE 1 END')->orderByDesc('ra.assigned_at')->paginate(\App\Http\Requests\ListRequest::clampPerPage($request->query('per_page')));
+        return $query->orderByRaw('CASE WHEN ra.status IN ("on_scene", "onscene", "dispatched", "en_route") THEN 0 ELSE 1 END')->orderByDesc('ra.assigned_at')->orderByDesc('ra.assignment_id')->paginate(\App\Http\Requests\ListRequest::clampPerPage($request->query('per_page')));
     }
 
     public function route(int $assignmentId): ?array
@@ -82,9 +82,55 @@ class RescueDispatchQuery
 
     public function summary(?string $eventId, $teamCards = null): array
     {
-        $teamCards ??= $this->teamCards($eventId); $counts = $eventId ? ResponderAssignment::query()->where('disaster_id', $eventId)->select('status', DB::raw('COUNT(*) as total'))->groupBy('status')->pluck('total', 'status') : collect();
-        $dispatched = collect(['dispatched', 'en_route', 'accepted'])->sum(fn ($key) => (int) ($counts[$key] ?? 0)); $onScene = (int) ($counts['on_scene'] ?? 0) + (int) ($counts['onscene'] ?? 0); $completed = (int) ($counts['completed'] ?? 0); $available = collect($teamCards)->filter(fn ($team) => ($team['available_responder_count'] ?? 0) > 0)->count(); $active = $dispatched + $onScene;
-        return ['total_teams' => count($teamCards), 'dispatched' => $dispatched, 'on_scene' => $onScene, 'available' => $available, 'completed' => $completed, 'response_rate' => count($teamCards) ? round(($active / count($teamCards)) * 100) : 0, 'active_units' => $active];
+        $teamCards ??= $this->teamCards($eventId);
+        $counts = $eventId ? ResponderAssignment::query()->where('disaster_id', $eventId)
+            ->select('status', DB::raw('COUNT(*) as total'))->groupBy('status')->pluck('total', 'status') : collect();
+        $dispatched = collect(['dispatched', 'en_route', 'accepted'])->sum(fn ($key) => (int) ($counts[$key] ?? 0));
+        $onScene = (int) ($counts['on_scene'] ?? 0) + (int) ($counts['onscene'] ?? 0);
+        $returning = (int) ($counts['returning'] ?? 0);
+        $completed = (int) ($counts['completed'] ?? 0);
+        $realTeams = collect($teamCards)->filter(fn ($team) => ! empty($team['team_id']));
+        $available = $realTeams->filter(fn ($team) => ($team['available_responder_count'] ?? 0) > 0)->count();
+        $activeTeams = $eventId ? ResponderAssignment::query()->where('disaster_id', $eventId)
+            ->whereIn('status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'])
+            ->whereIn('team_id', $realTeams->pluck('team_id'))->distinct()->count('team_id') : 0;
+        return ['total_teams' => $realTeams->count(), 'dispatched' => $dispatched, 'on_scene' => $onScene,
+            'available' => $available, 'completed' => $completed,
+            'response_rate' => $realTeams->count() ? (int) round($activeTeams / $realTeams->count() * 100) : 0,
+            'active_units' => $dispatched + $onScene + $returning,
+            'dispatch_progress' => ['total' => (int) $counts->sum(), 'dispatched' => $dispatched,
+                'on_scene' => $onScene, 'returning' => $returning, 'completed' => $completed,
+                'cancelled' => (int) ($counts['cancelled'] ?? 0)]];
+    }
+
+    public function teamCoverage(?string $eventId): array
+    {
+        $teams = RescueTeam::query()->orderBy('team_name')->get(['team_id', 'team_code', 'team_name']);
+        $totals = [];
+        if ($eventId) {
+            $assignments = ResponderAssignment::query()->where('disaster_id', $eventId)
+                ->where('status', '<>', 'cancelled')->whereNotNull('team_id')
+                ->select(['assignment_id', 'team_id', 'household_id', 'route_notes', 'outcome_notes'])->lazyById(200, 'assignment_id');
+            foreach ($assignments as $assignment) {
+                $route = $this->presenter->decodeJson($assignment->route_notes);
+                $outcomes = $this->presenter->decodeJson($assignment->outcome_notes);
+                $assigned = max(0, (int) ($route['households_to_cover'] ?? ($assignment->household_id ? 1 : 0)));
+                $reported = 0;
+                foreach (['safe_count', 'evacuated_count', 'unsafe_count', 'injured_count', 'missing_count'] as $key) {
+                    $reported += max(0, (int) ($outcomes[$key] ?? 0));
+                }
+                $id = $assignment->team_id;
+                $totals[$id]['assigned'] = ($totals[$id]['assigned'] ?? 0) + $assigned;
+                $totals[$id]['reported'] = ($totals[$id]['reported'] ?? 0) + min($assigned, $reported);
+            }
+        }
+        return $teams->map(function ($team) use ($totals) {
+            $assigned = $totals[$team->team_id]['assigned'] ?? 0;
+            $reported = $totals[$team->team_id]['reported'] ?? 0;
+            return ['team_id' => $team->team_id, 'team_code' => $team->team_code, 'team_name' => $team->team_name,
+                'assigned_households' => $assigned, 'reported_households' => $reported,
+                'coverage_percent' => $assigned ? (int) round($reported / $assigned * 100) : 0];
+        })->all();
     }
 
     public function teamCards(?string $eventId)

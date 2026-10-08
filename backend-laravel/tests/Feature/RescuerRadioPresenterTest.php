@@ -29,6 +29,26 @@ class RescuerRadioPresenterTest extends TestCase
         $this->assertSame('Sep 12, 10:30 AM', $log['timestamp']);
     }
 
+    public function test_radio_audio_url_uses_a_same_origin_storage_path(): void
+    {
+        $presenter = app(RescuerRadioPresenter::class);
+        $log = $presenter->log((object) [
+            'communication_id' => 45,
+            'responder_id' => 7,
+            'team_id' => 2,
+            'team_name' => 'Team A',
+            'disaster_id' => 'EVT-4',
+            'timestamp' => '2026-10-08 10:30:00',
+            'message' => json_encode([
+                'type' => 'ptt_audio',
+                'channel' => 'team',
+                'audio_path' => 'radio-ptt/2026/10/08/clip.m4a',
+            ]),
+        ]);
+
+        $this->assertSame('/storage/radio-ptt/2026/10/08/clip.m4a', $log['audio_url']);
+    }
+
     public function test_radio_transmission_summary_ignores_ended_transmissions(): void
     {
         $presenter = app(RescuerRadioPresenter::class);
