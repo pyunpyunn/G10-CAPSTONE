@@ -1,4 +1,5 @@
 import { api } from './client';
+import { cachedMobileRead } from '@/utils/mobileReadCache';
 
 export type RescuerOverview = {
   profile: {
@@ -20,9 +21,11 @@ export type RescuerOverview = {
   category_options: any[];
 };
 
-export async function getRescuerOverview() {
-  const response = await api.get<{ data: RescuerOverview }>('/rescuer/overview');
-  return response.data.data;
+export async function getRescuerOverview(refresh = false) {
+  return cachedMobileRead('rescuer/overview', async () => {
+    const response = await api.get<{ data: RescuerOverview }>('/rescuer/overview');
+    return response.data.data;
+  }, refresh);
 }
 
 export async function getRescuerProfile() {

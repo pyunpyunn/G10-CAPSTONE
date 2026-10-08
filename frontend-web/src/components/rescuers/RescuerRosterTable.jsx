@@ -33,20 +33,20 @@ export default function RescuerRosterTable({ rescuers, pagination, onPageChange,
             <tbody>
               {rescuers.map((rescuer) => (
                 <tr key={rescuer.responder_id}>
-                  <td>
-                    <div className="ra-person">{rescuer.full_name}</div>
+                  <td data-label="Responder">
+                    <button type="button" className="ra-profile-link" onClick={() => onView(rescuer)}>{rescuer.full_name}</button>
                     <div className="ra-meta">{rescuer.responder_code || rescuer.account_id} - {rescuer.address || 'No address recorded'}</div>
                   </td>
-                  <td>
+                  <td data-label="Team / role">
                     <strong>{rescuer.team_name}</strong>
                     <div className="ra-meta">{rescuer.title}</div>
                   </td>
-                  <td>
+                  <td data-label="Contact / ICE">
                     <span className="ra-mono">{rescuer.contact_number || '-'}</span>
                     <div className="ra-meta">ICE: {rescuer.emergency_contact_name || 'Not recorded'}</div>
                   </td>
-                  <td><Badge tone={rescuer.duty_status.tone}>{rescuer.duty_status.label}</Badge></td>
-                  <td>
+                  <td data-label="Duty status"><Badge tone={rescuer.duty_status?.tone}>{rescuer.duty_status?.label || 'Unknown'}</Badge></td>
+                  <td data-label="Actions">
                     <div className="ra-actions">
                       <ActionMenu
                         label={`Responder actions for ${rescuer.full_name}`}

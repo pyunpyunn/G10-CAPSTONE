@@ -1,4 +1,5 @@
 import { api } from './client';
+import { cachedMobileRead } from '@/utils/mobileReadCache';
 
 export type HouseholdOverview = {
   profile: {
@@ -27,9 +28,11 @@ export type HouseholdOverview = {
   qr: any;
 };
 
-export async function getHouseholdOverview() {
-  const response = await api.get<{ data: HouseholdOverview }>('/household/overview');
-  return response.data.data;
+export async function getHouseholdOverview(refresh = false) {
+  return cachedMobileRead('household/overview', async () => {
+    const response = await api.get<{ data: HouseholdOverview }>('/household/overview');
+    return response.data.data;
+  }, refresh);
 }
 
 export async function completeHouseholdSetup(payload: any) {

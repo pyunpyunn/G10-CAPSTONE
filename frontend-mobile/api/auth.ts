@@ -1,4 +1,5 @@
 import { api, clearToken, saveToken } from './client';
+import { logoutPushIdentity } from '@/utils/pushNotifications';
 
 type Role = {
   role_key: string;
@@ -33,6 +34,10 @@ export async function logoutMobile() {
   try {
     await api.post('/auth/logout');
   } finally {
-    await clearToken();
+    try {
+      await logoutPushIdentity();
+    } finally {
+      await clearToken();
+    }
   }
 }

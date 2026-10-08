@@ -41,11 +41,19 @@ class ArchiveQuery
             'situation-reports' => 'sr.sit_rep_id',
             default => 'de.event_id',
         };
+        if ($request->filled('ids')) $query->whereIn($column, $request->query('ids'));
+        $dateColumn = match ($category) {
+            'household-status-logs' => 'hsl.submitted_at', 'dispatch-logs' => 'ra.assigned_at',
+            'radio-communication-logs' => 'rcl.timestamp', 'resource-requests' => 'rr.created_at',
+            'situation-reports' => 'sr.generated_at', default => 'de.started_at',
+        };
+        if ($request->filled('start_date')) $query->whereDate($dateColumn, '>=', $request->query('start_date'));
+        if ($request->filled('end_date')) $query->whereDate($dateColumn, '<=', $request->query('end_date'));
         $alias = substr($column, strpos($column, '.') + 1);
         $total = (clone $query)->count();
 
-        // A hard limit bounds the download; lazyById reads at most two 500-row pages.
-        $source = $query->lazyByIdDesc(500, $column, $alias)->take(1000);
+        // Read matching records in bounded chunks without truncating the export.
+        $source = $query->lazyByIdDesc(500, $column, $alias);
         $rows = $category === 'disaster-events'
             ? $source->chunk(500)->flatMap(fn ($chunk) => $this->eventPresenter->presentBatch($chunk))
             : $source->map(function (object $row) use ($category): array {
@@ -101,7 +109,7 @@ class ArchiveQuery
     private function disasterEventRows(Request $request, int $perPage, bool $asQuery = false): mixed
     {
         $query = DB::table('disaster_events as de')->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')->leftJoin('severity_levels as sl', 'sl.severity_id', '=', 'de.severity_level_id')->whereNull('de.deleted_at')->select(['de.event_id', 'de.name', 'de.started_at', 'de.ended_at', 'dt.type_name', 'sl.severity_key', 'sl.severity_label']);
-        $this->applySearch($query, $request, ['de.event_id', 'de.name', 'dt.type_name', 'sl.severity_label']); $this->applyEventFilter($query, $request, 'de.event_id'); $this->applyDisasterStatusFilter($query, $request); $this->applyDisasterPurokFilter($query, $request); $this->excludeSavedGroupRecords($query, 'disaster-events', 'de.event_id');
+        $this->applySearch($query, $request, ['de.event_id', 'de.name', 'dt.type_name', 'sl.severity_label']); $this->applyEventFilter($query, $request, 'de.event_id'); $this->applyDisasterStatusFilter($query, $request); $this->applyDisasterPurokFilter($query, $request); if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'disaster-events', 'de.event_id');
         if ($asQuery) return $query;
         $paginator = $query->orderByDesc('de.started_at')->paginate($this->perPage($request, $perPage));
         return [$paginator, collect($paginator->items())->map(fn (object $row): array => $this->eventPresenter->present($row))->values()->all()];
@@ -110,7 +118,7 @@ class ArchiveQuery
     private function householdStatusRows(Request $request, int $perPage, bool $asQuery = false): mixed
     {
         $query = DB::table('household_status_logs as hsl')->leftJoin('disaster_events as de', 'de.event_id', '=', 'hsl.disaster_id')->leftJoin('households as h', 'h.household_id', '=', 'hsl.household_id')->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')->leftJoin('responders as r', 'r.responder_id', '=', 'hsl.responder_id')->select(['hsl.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'h.household_code', 'h.household_name', 'a.purok_sitio', 'hs.status_key', 'hs.status_label', 'r.full_name as responder_name']);
-        $this->applySearch($query, $request, ['hsl.status_log_id', 'de.name', 'h.household_code', 'h.household_name', 'hsl.location_label', 'hsl.notes', 'hsl.source', 'hs.status_label']); $this->applyEventFilter($query, $request, 'hsl.disaster_id'); $this->applyPurokFilter($query, $request, 'a.purok_sitio'); $this->applyHouseholdStatusFilter($query, $request); $this->excludeSavedGroupRecords($query, 'household-status-logs', 'hsl.status_log_id');
+        $this->applySearch($query, $request, ['hsl.status_log_id', 'de.name', 'h.household_code', 'h.household_name', 'hsl.location_label', 'hsl.notes', 'hsl.source', 'hs.status_label']); $this->applyEventFilter($query, $request, 'hsl.disaster_id'); $this->applyPurokFilter($query, $request, 'a.purok_sitio'); $this->applyHouseholdStatusFilter($query, $request); if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'household-status-logs', 'hsl.status_log_id');
         if ($asQuery) return $query;
         $paginator = $query->orderByDesc('hsl.submitted_at')->orderByDesc('hsl.status_log_id')->paginate($this->perPage($request, $perPage));
         return [$paginator, collect($paginator->items())->map(fn (object $row): array => $this->presenter->formatHouseholdStatus($row))->values()->all()];
@@ -119,7 +127,7 @@ class ArchiveQuery
     private function dispatchRows(Request $request, int $perPage, bool $asQuery = false): mixed
     {
         $query = DB::table('responder_assignments as ra')->leftJoin('disaster_events as de', 'de.event_id', '=', 'ra.disaster_id')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')->select(['ra.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'rt.team_name', 'rt.team_code', 'r.full_name as responder_name']);
-        $this->applySearch($query, $request, ['ra.assignment_code', 'de.name', 'rt.team_name', 'rt.team_code', 'r.full_name', 'ra.assigned_area', 'ra.status', 'ra.dispatch_notes', 'ra.outcome_notes']); $this->applyEventFilter($query, $request, 'ra.disaster_id'); $this->applyPurokFilter($query, $request, 'ra.assigned_area'); $this->applyDispatchStatusFilter($query, $request); $this->excludeSavedGroupRecords($query, 'dispatch-logs', 'ra.assignment_id');
+        $this->applySearch($query, $request, ['ra.assignment_code', 'de.name', 'rt.team_name', 'rt.team_code', 'r.full_name', 'ra.assigned_area', 'ra.status', 'ra.dispatch_notes', 'ra.outcome_notes']); $this->applyEventFilter($query, $request, 'ra.disaster_id'); $this->applyPurokFilter($query, $request, 'ra.assigned_area'); $this->applyDispatchStatusFilter($query, $request); if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'dispatch-logs', 'ra.assignment_id');
         if ($asQuery) return $query;
         $paginator = $query->orderByDesc('ra.assigned_at')->orderByDesc('ra.assignment_id')->paginate($this->perPage($request, $perPage));
         return [$paginator, collect($paginator->items())->map(fn (object $row): array => $this->presenter->formatDispatch($row))->values()->all()];
@@ -128,7 +136,7 @@ class ArchiveQuery
     private function resourceRequestRows(Request $request, int $perPage, bool $asQuery = false): mixed
     {
         $query = ResourceRequest::query()->from('resource_requests as rr')->leftJoin('disaster_events as de', 'de.event_id', '=', 'rr.source_reference')->leftJoin('evacuation_centers as ec', 'ec.evacuation_center_id', '=', 'rr.evacuation_center_id')->leftJoin('urgency_levels as ul', 'ul.urgency_id', '=', 'rr.urgency_id')->select(['rr.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'ec.name as evacuation_center_name', 'ec.osm_address as evacuation_center_address', 'ec.current_event_id as evacuation_event_id', 'ul.urgency_key', 'ul.urgency_label']);
-        $this->applySearch($query, $request, ['rr.request_id', 'rr.request_source', 'rr.source_reference', 'rr.requested_by', 'rr.resource_type', 'rr.item_name', 'rr.description', 'rr.validation_status', 'rr.tracking_reference', 'ec.name', 'ec.osm_address']); $this->applyEventFilter($query, $request, 'rr.source_reference'); $this->applyResourcePurokFilter($query, $request); $this->applyResourceStatusFilter($query, $request); $this->excludeSavedGroupRecords($query, 'resource-requests', 'rr.request_id');
+        $this->applySearch($query, $request, ['rr.request_id', 'rr.request_source', 'rr.source_reference', 'rr.requested_by', 'rr.resource_type', 'rr.item_name', 'rr.description', 'rr.validation_status', 'rr.tracking_reference', 'ec.name', 'ec.osm_address']); $this->applyEventFilter($query, $request, 'rr.source_reference'); $this->applyResourcePurokFilter($query, $request); $this->applyResourceStatusFilter($query, $request); if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'resource-requests', 'rr.request_id');
         if ($asQuery) return $query;
         $paginator = $query->orderByDesc('rr.created_at')->paginate($this->perPage($request, $perPage));
         return [$paginator, collect($paginator->items())->map(fn (object $row): array => $this->presenter->formatResourceRequest($row))->values()->all()];
@@ -137,7 +145,7 @@ class ArchiveQuery
     private function radioCommunicationRows(Request $request, int $perPage, bool $asQuery = false): mixed
     {
         $query = DB::table('responder_communication_logs as rcl')->leftJoin('disaster_events as de', 'de.event_id', '=', 'rcl.disaster_id')->leftJoin('responders as r', 'r.responder_id', '=', 'rcl.responder_id')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'rcl.team_id')->select(['rcl.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'r.full_name as responder_name', 'r.responder_code', 'rt.team_code', 'rt.team_type']);
-        $this->applySearch($query, $request, ['rcl.communication_id', 'rcl.team_name', 'rcl.message', 'de.name', 'r.full_name', 'r.responder_code', 'rt.team_code']); $this->applyEventFilter($query, $request, 'rcl.disaster_id'); $this->applyRadioStatusFilter($query, $request); $this->excludeSavedGroupRecords($query, 'radio-communication-logs', 'rcl.communication_id');
+        $this->applySearch($query, $request, ['rcl.communication_id', 'rcl.team_name', 'rcl.message', 'de.name', 'r.full_name', 'r.responder_code', 'rt.team_code']); $this->applyEventFilter($query, $request, 'rcl.disaster_id'); $this->applyRadioStatusFilter($query, $request); if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'radio-communication-logs', 'rcl.communication_id');
         if ($asQuery) return $query;
         $paginator = $query->orderByDesc('rcl.timestamp')->orderByDesc('rcl.communication_id')->paginate($this->perPage($request, $perPage));
         return [$paginator, collect($paginator->items())->map(fn (object $row): array => $this->presenter->formatRadioCommunication($row))->values()->all()];
@@ -146,7 +154,7 @@ class ArchiveQuery
     private function situationReportRows(Request $request, int $perPage, bool $asQuery = false): mixed
     {
         $query = DB::table('situation_reports as sr')->leftJoin('disaster_events as de', 'de.event_id', '=', 'sr.disaster_id')->leftJoin('disaster_types as dt', 'dt.type_id', '=', 'de.type_id')->select(['sr.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'dt.type_name']);
-        $this->applySearch($query, $request, ['sr.sit_rep_id', 'sr.report_number', 'sr.summary', 'sr.report_status', 'sr.escalated_to', 'de.name', 'dt.type_name']); $this->applyEventFilter($query, $request, 'sr.disaster_id'); $this->applySituationPurokFilter($query, $request); $this->applySituationStatusFilter($query, $request); $this->excludeSavedGroupRecords($query, 'situation-reports', 'sr.sit_rep_id');
+        $this->applySearch($query, $request, ['sr.sit_rep_id', 'sr.report_number', 'sr.summary', 'sr.report_status', 'sr.escalated_to', 'de.name', 'dt.type_name']); $this->applyEventFilter($query, $request, 'sr.disaster_id'); $this->applySituationPurokFilter($query, $request); $this->applySituationStatusFilter($query, $request); if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'situation-reports', 'sr.sit_rep_id');
         if ($asQuery) return $query;
         $paginator = $query->orderByDesc('sr.generated_at')->orderByDesc('sr.sit_rep_id')->paginate($this->perPage($request, $perPage));
         return [$paginator, collect($paginator->items())->map(fn (object $row): array => $this->presenter->formatSituationReport($row))->values()->all()];

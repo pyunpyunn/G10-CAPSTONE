@@ -14,7 +14,7 @@ use Tests\TestCase;
 
 class ArchiveExportQueryTest extends TestCase
 {
-    public function test_export_reads_five_hundred_at_a_time_and_stops_after_one_thousand(): void
+    public function test_export_reads_all_matching_records_in_five_hundred_row_chunks(): void
     {
         Schema::create('disaster_events', function (Blueprint $table): void {
             $table->string('event_id')->primary();
@@ -44,7 +44,7 @@ class ArchiveExportQueryTest extends TestCase
         }
 
         $presenter = Mockery::mock(ArchiveEventPresenter::class);
-        $presenter->shouldReceive('presentBatch')->times(2)->andReturnUsing(
+        $presenter->shouldReceive('presentBatch')->times(3)->andReturnUsing(
             static fn ($batch): array => $batch->map(static fn (object $row): array => ['export' => ['reference' => $row->event_id]])->all()
         );
         $queries = [];
@@ -57,8 +57,8 @@ class ArchiveExportQueryTest extends TestCase
 
         $results = $rows->all();
         $this->assertSame(1200, $total);
-        $this->assertCount(1000, $results);
-        $this->assertCount(3, $queries); // one count and two 500-row reads
+        $this->assertCount(1200, $results);
+        $this->assertCount(4, $queries); // one count and three bounded reads
         $this->assertSame('EVT-1200', $results[0]['export']['reference']);
     }
 }

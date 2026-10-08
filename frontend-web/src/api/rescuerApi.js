@@ -12,12 +12,12 @@ export async function getRescuer(responderId) {
 
 export async function createRescuer(payload) {
   const response = await api.post('/rescuers', payload)
-  return response.data.data
+  return { ...response.data.data, message: response.data.message }
 }
 
 export async function updateRescuer(responderId, payload) {
   const response = await api.patch(`/rescuers/${responderId}`, payload)
-  return response.data.data
+  return { ...response.data.data, message: response.data.message }
 }
 
 export async function deactivateRescuer(responderId) {

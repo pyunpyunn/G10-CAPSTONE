@@ -19,7 +19,15 @@ const defaultRegion = {
 };
 
 export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) {
-  const centers = useMemo(() => evacuationCenters || [], [evacuationCenters]);
+  const centers = useMemo(() => (evacuationCenters || []).filter((center) => {
+    const status = String(center.status || 'active').trim().toLowerCase();
+    return center.route_available !== false
+      && center.vacancy != null && Number(center.vacancy) > 0
+      && ['active', 'open', 'available'].includes(status)
+      && center.latitude != null && center.longitude != null
+      && Number.isFinite(Number(center.latitude)) && Math.abs(Number(center.latitude)) <= 90
+      && Number.isFinite(Number(center.longitude)) && Math.abs(Number(center.longitude)) <= 180;
+  }), [evacuationCenters]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [originMode, setOriginMode] = useState<'geotag' | 'live'>('geotag');
   const [livePoint, setLivePoint] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -28,12 +36,12 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
   const [routeError, setRouteError] = useState('');
 
   useEffect(() => {
-    if (!selectedId && centers.length) {
-      setSelectedId(String(centers[0].evacuation_center_id));
+    if (!centers.some((center) => String(center.evacuation_center_id) === selectedId)) {
+      setSelectedId(centers.length ? String(centers[0].evacuation_center_id) : '');
     }
   }, [centers, selectedId]);
 
-  const householdPoint = geotag && Number.isFinite(Number(geotag.latitude)) && Number.isFinite(Number(geotag.longitude))
+  const householdPoint = geotag && geotag.latitude != null && geotag.longitude != null && Number.isFinite(Number(geotag.latitude)) && Number.isFinite(Number(geotag.longitude))
     ? {
         latitude: Number(geotag.latitude),
         longitude: Number(geotag.longitude),
@@ -59,25 +67,29 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
 
     async function loadRoute() {
+      setRoadRoute(null);
       if (originLatitude === undefined || originLongitude === undefined || centerLatitude === undefined || centerLongitude === undefined) {
         setRoadRoute(null);
         setRouteError('');
+        setRouteLoading(false);
         return;
       }
 
       setRouteLoading(true);
       setRouteError('');
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
       try {
         const start = `${originLongitude},${originLatitude}`;
         const end = `${centerLongitude},${centerLatitude}`;
-        const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${start};${end}?overview=full&geometries=geojson`);
+        const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${start};${end}?overview=full&geometries=geojson`, { signal: controller.signal });
         const data = await response.json();
         const route = data.routes?.[0];
 
-        if (!response.ok || !route) {
+        if (!response.ok || data.code !== 'Ok' || !route || !Array.isArray(route.geometry?.coordinates) || route.geometry.coordinates.length < 2) {
           throw new Error('No road route is available for these locations.');
         }
 
@@ -94,12 +106,13 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
           setRouteError('Could not load a road route. Check your connection and try again.');
         }
       } finally {
+        clearTimeout(timeout);
         if (!cancelled) setRouteLoading(false);
       }
     }
 
     loadRoute();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [originLatitude, originLongitude, centerLatitude, centerLongitude]);
 
   async function useLiveGps() {
@@ -137,7 +150,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
       <View style={styles.card}>
         <HouseholdSection
           title="Evacuation route"
-          action={<HouseholdBadge label={selectedCenter ? 'Route ready' : 'No center'} tone={selectedCenter ? 'info' : 'neutral'} />}
+          action={<HouseholdBadge label={roadRoute ? 'Route ready' : routeLoading ? 'Finding route' : selectedCenter ? 'Select origin' : 'No vacant center'} tone={roadRoute ? 'info' : 'neutral'} />}
         />
 
         <View style={styles.originSwitch} accessibilityRole="radiogroup">
@@ -184,14 +197,14 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
             </View>
           </View>
         ) : (
-          <HouseholdEmpty icon="business-outline" title="No evacuation centers encoded" />
+          <HouseholdEmpty icon="business-outline" title="No vacant evacuation centers available" />
         )}
       </View>
 
       <View style={styles.card}>
-        <HouseholdSection title="Evacuation centers" />
+        <HouseholdSection title="Vacant evacuation centers" />
         {centers.length === 0 ? (
-          <HouseholdEmpty icon="business-outline" title="No evacuation centers encoded" />
+          <HouseholdEmpty icon="business-outline" title="No vacant evacuation centers available" />
         ) : (
           centers.map((center) => {
             const isSelected = String(center.evacuation_center_id) === selectedId;

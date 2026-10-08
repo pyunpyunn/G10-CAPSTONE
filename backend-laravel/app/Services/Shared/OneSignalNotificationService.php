@@ -5,17 +5,30 @@ namespace App\Services\Shared;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use App\Support\RequestSchema as Schema;
 
 class OneSignalNotificationService
 {
+    public function prepareDelivery(array $options): array
+    {
+        $ids = $this->mobilePlayerIds($options);
+        sort($ids);
+
+        return [
+            'recipient_ids' => $ids,
+            'keys' => array_map(fn () => (string) Str::uuid(), array_chunk($ids, 2000)),
+        ];
+    }
+
     public function sendToMobileDevices(string $title, string $message, array $options = []): array
     {
         if (! $this->isConfigured()) {
             return $this->result('not_configured', 0, 'OneSignal credentials are not configured.');
         }
 
-        $playerIds = $this->mobilePlayerIds($options);
+        $plan = $options['delivery_plan'] ?? $this->prepareDelivery($options);
+        $playerIds = $plan['recipient_ids'];
 
         if (count($playerIds) > $this->recipientLimit()) {
             return $this->result('limit_exceeded', count($playerIds), 'Mobile recipient limit exceeded; narrow the broadcast audience.');
@@ -29,11 +42,12 @@ class OneSignalNotificationService
         $providerIds = [];
         $errors = [];
 
-        foreach (array_chunk($playerIds, 2000) as $chunk) {
-            $response = $this->sendChunk($chunk, $title, $message, $options['data'] ?? []);
+        foreach (array_chunk($playerIds, 2000) as $index => $chunk) {
+            $response = $this->sendChunk($chunk, $title, $message, $options['data'] ?? [], $plan['keys'][$index]);
 
             if ($response['ok']) {
-                $sent += count($chunk);
+                $sent += $response['accepted_count'];
+                if ($response['error']) $errors[] = $response['error'];
 
                 if ($response['provider_id']) {
                     $providerIds[] = $response['provider_id'];
@@ -84,7 +98,7 @@ class OneSignalNotificationService
         ]);
     }
 
-    private function sendChunk(array $playerIds, string $title, string $message, array $data): array
+    private function sendChunk(array $playerIds, string $title, string $message, array $data, string $idempotencyKey): array
     {
         try {
             $response = Http::withHeaders([
@@ -93,9 +107,13 @@ class OneSignalNotificationService
                 'Content-Type' => 'application/json',
             ])
                 ->timeout(10)
-                ->retry(2, 500)
+                ->connectTimeout(5)
+                ->retry(2, 500, fn ($exception) => $exception instanceof \Illuminate\Http\Client\ConnectionException
+                    || ($exception instanceof \Illuminate\Http\Client\RequestException
+                        && $exception->response->serverError()), throw: false)
                 ->post(rtrim($this->baseUrl(), '/').'/notifications', [
                     'app_id' => $this->appId(),
+                    'idempotency_key' => $idempotencyKey,
                     'target_channel' => 'push',
                     'include_subscription_ids' => array_values($playerIds),
                     'headings' => ['en' => $title],
@@ -103,11 +121,14 @@ class OneSignalNotificationService
                     'data' => $data,
                 ]);
 
-            if ($response->successful()) {
+            if ($response->successful() && is_string($response->json('id')) && $response->json('id') !== '') {
+                $errors = $response->json('errors', []);
+                $invalid = is_array($errors) ? ($errors['invalid_player_ids'] ?? $errors['invalid_subscription_ids'] ?? []) : [];
                 return [
                     'ok' => true,
+                    'accepted_count' => max(0, count($playerIds) - count($invalid)),
                     'provider_id' => $response->json('id'),
-                    'error' => null,
+                    'error' => empty($errors) ? null : substr(json_encode($errors), 0, 300),
                 ];
             }
 
@@ -190,7 +211,11 @@ class OneSignalNotificationService
 
     private function applyRoleFilter($query, array $roles): void
     {
-        if (empty($roles) || ! Schema::hasColumn('device_tokens', 'app_role')) {
+        if (empty($roles)) {
+            return;
+        }
+        if (! Schema::hasColumn('device_tokens', 'app_role')) {
+            $query->whereRaw('1 = 0');
             return;
         }
 
@@ -216,7 +241,11 @@ class OneSignalNotificationService
             ->values()
             ->all();
 
-        if (empty($userIds) || ! Schema::hasColumn('device_tokens', 'user_id')) {
+        if (empty($userIds)) {
+            return;
+        }
+        if (! Schema::hasColumn('device_tokens', 'user_id')) {
+            $query->whereRaw('1 = 0');
             return;
         }
 
@@ -246,7 +275,9 @@ class OneSignalNotificationService
             $query
                 ->join('responders as r_filter', 'r_filter.user_id', '=', 'dt.user_id')
                 ->whereIn('r_filter.responder_id', $responderIds);
+            return;
         }
+        $query->whereRaw('1 = 0');
     }
 
     private function applyPurokFilter($query, array $purokNames): bool

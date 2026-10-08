@@ -135,7 +135,7 @@ export function archiveRecordTitle(record = {}) {
 export function archiveErrorMessage(error, fallback = 'Archive records cannot be loaded right now.') {
   const message = error?.response?.data?.message
 
-  return message || fallback
+  return message || error?.message || fallback
 }
 
 export function archiveFileName(category, type = 'csv') {

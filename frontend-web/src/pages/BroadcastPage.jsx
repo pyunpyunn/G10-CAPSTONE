@@ -74,6 +74,26 @@ export default function BroadcastPage() {
   const severityLevels = workspace?.severity_levels || []
   const puroks = workspace?.puroks || []
   const statusOptions = workspace?.status_options || []
+  const deliveryEventId = activeEvent?.event_id
+
+  // Delivery runs on the server; keep its status visible without a page reload.
+  useEffect(() => {
+    if (!deliveryEventId) return
+    let cancelled = false
+    let timer
+    async function refreshDeliveryStatus() {
+      try {
+        const data = await getBroadcastWorkspace(deliveryEventId)
+        if (!cancelled) setWorkspace(data)
+      } catch {
+        // A status read failure does not undo a saved broadcast.
+      } finally {
+        if (!cancelled) timer = setTimeout(refreshDeliveryStatus, 5000)
+      }
+    }
+    timer = setTimeout(refreshDeliveryStatus, 2000)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [deliveryEventId])
   function initForm(wsData) {
     const currentWorkspace = wsData || workspace
     const nextForm = defaultForm(currentWorkspace)
@@ -217,7 +237,7 @@ export default function BroadcastPage() {
 
       setWorkspace(broadcastResult)
       initForm(broadcastResult)
-      setFormNotice(activeEvent ? 'Disaster updated and broadcast posted.' : 'Disaster declared and broadcast posted.')
+      setFormNotice('Broadcast posted. Mobile notification delivery starts automatically; you can leave this page.')
     } catch (saveError) {
       setFormError(apiErrorMessage(saveError, 'Unable to save this broadcast. Please check the entries and try again.'))
     } finally {
