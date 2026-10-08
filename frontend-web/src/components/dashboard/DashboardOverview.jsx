@@ -9,14 +9,13 @@ import {
 } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
+  ArrowUpRight,
   CloudSun,
   Map,
   PackageCheck,
   Thermometer,
   Wind,
 } from 'lucide-react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import { getMappingOverview } from '../../api/mappingApi'
 import { getWeatherWorkspace } from '../../api/weatherApi'
 import {
@@ -31,7 +30,8 @@ import EmptyState from '../ui/EmptyState'
 import LoadingState from '../ui/LoadingState'
 
 export default function DashboardOverview({
-  dashboard,
+  weatherState,
+  requestsState,
   hasActiveEvent,
   onOpenModule,
   disasterAction,
@@ -60,19 +60,17 @@ export default function DashboardOverview({
 
   return (
     <aside className="dashboard-overview" aria-label="Dashboard side information">
-      <div className="dashboard-layout-actions">{disasterAction}</div>
-      <WeatherCard weather={latestSavedWeather || dashboard.weather} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
-      <DashboardMapCard
-        hasActiveEvent={hasActiveEvent}
-        reportedHouseholds={dashboard.households.reported}
-        onOpenMap={() => onOpenModule('/mapping')}
-      />
-      <RequestCard requests={dashboard.requests} onOpenRequests={() => onOpenModule('/resources-requests')} />
+      {disasterAction && <div className="dashboard-layout-actions">{disasterAction}</div>}
+      <WeatherCard weatherState={weatherState} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
+      <DashboardMapCard hasActiveEvent={hasActiveEvent} onOpenMap={() => onOpenModule('/mapping')} />
+      <RequestCard requestsState={requestsState} onOpenRequests={() => onOpenModule('/resources-requests')} />
     </aside>
   )
 }
 
-function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
+function WeatherCard({ weatherState, hasActiveEvent, onOpenWeather }) {
+  const weather = weatherState?.data
+  const isLoading = weatherState?.isLoading
   const hasWeather = Boolean(weather)
 
   return (
@@ -80,11 +78,13 @@ function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
       <div className="panel-head">
         <span className="panel-title"><CloudSun size={15} />Weather update</span>
         <button className="panel-link" type="button" onClick={onOpenWeather}>
-          Full view <FontAwesomeIcon icon={faArrowRight} />
+          Full view <ArrowUpRight size={14} />
         </button>
       </div>
 
-      {hasWeather ? (
+      {isLoading ? (
+        <LoadingState inline />
+      ) : hasWeather ? (
         <div className="dashboard-weather-compact">
           <div className="dashboard-weather-icon">
             <CloudSun size={30} />
@@ -158,7 +158,7 @@ function DashboardMapCard({ hasActiveEvent, reportedHouseholds, onOpenMap }) {
       <div className="panel-head">
         <span className="panel-title"><Map size={15} />Household map</span>
         <button className="panel-link" type="button" onClick={onOpenMap}>
-          Full view <FontAwesomeIcon icon={faArrowRight} />
+          Full view <ArrowUpRight size={14} />
         </button>
       </div>
 
@@ -238,37 +238,52 @@ function FitBarangay({ center, bounds, zoom }) {
   return null
 }
 
-function RequestCard({ requests, onOpenRequests }) {
+function RequestCard({ requestsState, onOpenRequests }) {
+  const requests = requestsState?.data || {
+    needs_validation: 0,
+    validated: 0,
+    released: 0,
+    latest: [],
+  }
+  const isLoading = requestsState?.isLoading
+
   return (
     <section className="overview-card">
       <div className="panel-head">
         <span className="panel-title"><PackageCheck size={15} />Requests</span>
         <button className="panel-link" type="button" onClick={onOpenRequests}>
-          Full view <FontAwesomeIcon icon={faArrowRight} />
+          Full view <ArrowUpRight size={14} />
         </button>
       </div>
-      <div className="dashboard-side-metrics">
-        <div><strong>{requests.needs_validation}</strong><span>Needs validation</span></div>
-        <div><strong>{requests.validated}</strong><span>Validated</span></div>
-        <div><strong>{requests.released}</strong><span>Released</span></div>
-      </div>
-      {requests.latest.length > 0 ? (
-        <div className="overview-request-table">
-          <table>
-            <thead><tr><th>Request from</th><th>Request</th><th>Status</th></tr></thead>
-            <tbody>
-              {requests.latest.map((request) => (
-                <tr key={request.request_id}>
-                  <td>{request.requested_by}</td>
-                  <td>{request.item_name}</td>
-                  <td><Badge tone={statusTone(request.status_key)}>{request.validation_status}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+      {isLoading ? (
+        <LoadingState inline />
       ) : (
-        <EmptyState title="No requests yet" message="Requests will appear after records are received for validation." />
+        <>
+          <div className="dashboard-side-metrics">
+            <div><strong>{requests.needs_validation}</strong><span>Needs validation</span></div>
+            <div><strong>{requests.validated}</strong><span>Validated</span></div>
+            <div><strong>{requests.released}</strong><span>Released</span></div>
+          </div>
+          {requests.latest.length > 0 ? (
+            <div className="overview-request-table">
+              <table>
+                <thead><tr><th>Request from</th><th>Request</th><th>Status</th></tr></thead>
+                <tbody>
+                  {requests.latest.map((request) => (
+                    <tr key={request.request_id}>
+                      <td>{request.requested_by}</td>
+                      <td>{request.item_name}</td>
+                      <td><Badge tone={statusTone(request.status_key)}>{request.validation_status}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="No requests yet" message="Requests will appear after records are received for validation." />
+          )}
+        </>
       )}
     </section>
   )

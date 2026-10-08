@@ -23,6 +23,9 @@ export function defaultForm(workspace = {}) {
     scope_type: 'barangay_wide',
     broadcast_title: '',
     message: '',
+    attach_route: false,
+    attached_evacuation_center_id: '',
+    attached_affected_area_ids: [],
   }
 }
 
@@ -81,4 +84,16 @@ function preferredSeverityId(severityLevels) {
   return severityLevels.find((severity) => severity.severity_key === 'high')?.severity_id
     || severityLevels[0]?.severity_id
     || ''
+}
+
+export function getRecipientNote(typeName, scopeType, directPuroks = []) {
+  if (scopeType === 'selected_puroks') {
+    if (directPuroks.length === 0) {
+      return 'No direct purok selected yet.'
+    }
+    const names = directPuroks.map((p) => p.name).join(', ')
+    return `Selected puroks (${names}) will receive this advisory.`
+  }
+
+  return `All mobile households in Barangay Mambaling will receive this ${typeName || 'disaster'} advisory.`
 }

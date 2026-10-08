@@ -108,7 +108,7 @@ export function resourceRequestErrorMessage(error, fallback = 'Unable to save th
     return Array.isArray(firstError) ? firstError[0] : 'Please check the request form.'
   }
 
-  return data?.message || fallback
+  return data?.message || error?.message || fallback
 }
 
 export function displayText(value, fallback = '-') {

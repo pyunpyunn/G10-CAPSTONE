@@ -1,25 +1,113 @@
-import { Clock, Radio, Siren } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertOctagon, Clock, Edit3, MoreVertical, PlusCircle, Radio, Siren } from 'lucide-react'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 import { eventTone } from '../../utils/broadcastHelpers'
 
-export default function BroadcastSidePanel({ activeEvent, broadcasts }) {
+export default function BroadcastSidePanel({
+  activeEvent,
+  broadcasts,
+  onCloseActiveEvent,
+  onUpdateActiveEvent,
+  onDeclareActiveEvent,
+}) {
   return (
     <aside className="broadcast-side-panel">
-      <CurrentAlertCard activeEvent={activeEvent} latestBroadcast={broadcasts[0]} />
+      <CurrentAlertCard
+        activeEvent={activeEvent}
+        latestBroadcast={broadcasts[0]}
+        onCloseActiveEvent={onCloseActiveEvent}
+        onUpdateActiveEvent={onUpdateActiveEvent}
+        onDeclareActiveEvent={onDeclareActiveEvent}
+      />
       <BroadcastLog broadcasts={broadcasts} />
     </aside>
   )
 }
 
-function CurrentAlertCard({ activeEvent, latestBroadcast }) {
+function CurrentAlertCard({
+  activeEvent,
+  latestBroadcast,
+  onCloseActiveEvent,
+  onUpdateActiveEvent,
+  onDeclareActiveEvent,
+}) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   return (
     <section className="broadcast-card">
       <div className="broadcast-card-head">
         <span><Siren size={15} /> Current disaster alert update</span>
-        <Badge tone={activeEvent ? eventTone(activeEvent.severity_key) : 'gray'}>
-          {activeEvent ? 'Active' : 'Standby'}
-        </Badge>
+        <div className="bc-card-head-actions" ref={menuRef}>
+          <Badge tone={activeEvent ? eventTone(activeEvent.severity_key) : 'gray'}>
+            {activeEvent ? 'Active' : 'Standby'}
+          </Badge>
+
+          <button
+            className="bc-card-menu-btn"
+            type="button"
+            aria-label="Disaster event options"
+            aria-expanded={isMenuOpen}
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+          >
+            <MoreVertical size={16} />
+          </button>
+
+          {isMenuOpen && (
+            <div className="bc-card-dropdown">
+              {activeEvent ? (
+                <>
+                  <button
+                    className="bc-dropdown-item danger"
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      onCloseActiveEvent?.()
+                    }}
+                  >
+                    <AlertOctagon size={14} />
+                    <span>CLOSE ACTIVE EVENT</span>
+                  </button>
+                  <button
+                    className="bc-dropdown-item"
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      onUpdateActiveEvent?.()
+                    }}
+                  >
+                    <Edit3 size={14} />
+                    <span>UPDATE ACTIVE EVENT</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="bc-dropdown-item primary"
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false)
+                    onDeclareActiveEvent?.()
+                  }}
+                >
+                  <PlusCircle size={14} />
+                  <span>DECLARE ACTIVE EVENT</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       {activeEvent ? (
         <div className="bc-current-details">
@@ -94,6 +182,21 @@ function BroadcastLog({ broadcasts }) {
                   <span><strong>Target:</strong> {broadcast.scope_label || broadcast.target_area || 'Target unavailable'}</span>
                   <span><strong>Recipients:</strong> {broadcast.recipient_count || 0}</span>
                 </div>
+
+                {(broadcast.attached_evacuation_center || broadcast.evacuation_route) && (
+                  <div className="bc-log-route-info" style={{ marginTop: '0.4rem', fontSize: '0.775rem', color: '#10b981', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                    {broadcast.attached_evacuation_center && (
+                      <span style={{ background: 'rgba(16,185,129,0.12)', padding: '0.15rem 0.4rem', borderRadius: '0.25rem' }}>
+                        📍 Evac Center: <strong>{broadcast.attached_evacuation_center.name}</strong> (Active)
+                      </span>
+                    )}
+                    {broadcast.evacuation_route && (
+                      <span style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', padding: '0.15rem 0.4rem', borderRadius: '0.25rem' }}>
+                        🗺️ Route: {broadcast.evacuation_route.distance_km}km ({broadcast.evacuation_route.estimated_minutes} mins)
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </article>
           ))}

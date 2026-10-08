@@ -1,10 +1,9 @@
-import { X } from 'lucide-react'
+import { ArrowUpRight, Radio, Settings, TriangleAlert, X } from 'lucide-react'
 import { useState } from 'react'
 import RescueCriteriaChart from './RescueCriteriaChart'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
+import LoadingState from '../ui/LoadingState'
 import Panel from '../ui/Panel'
 import StatCard from '../ui/StatCard'
 import {
@@ -15,7 +14,9 @@ import {
 } from '../../utils/dashboardHelpers'
 
 export default function DashboardMainContent({
-  dashboard,
+  summaryState,
+  dispatchState,
+  activityState,
   stats,
   hasActiveEvent,
   onOpenModule,
@@ -23,28 +24,44 @@ export default function DashboardMainContent({
 }) {
   const [isStandbyStripVisible, setIsStandbyStripVisible] = useState(true)
 
+  const households = summaryState?.data?.households || {
+    total: 0,
+    reported: 0,
+    reporting_percent: 0,
+    unchecked: 0,
+    safe_total: 0,
+    safe_only: 0,
+    evacuated: 0,
+    unsafe: 0,
+    bars: [],
+  }
+
+  const dispatchData = dispatchState?.data || {
+    counts: [],
+    teams: [],
+  }
+
+  const activities = activityState?.data || []
+
   return (
     <div className="dashboard-main">
-      {hasActiveEvent && (
-        <ActiveEventBanner
-          activeEvent={dashboard.active_event}
-          onOpenBroadcast={(eventId) => onOpenModule(`/broadcast?event_id=${encodeURIComponent(eventId)}`)}
-        />
-      )}
-
-      {!hasActiveEvent && isStandbyStripVisible && (
+      {summaryState?.isLoading ? (
         <div className="standby-strip">
-          <strong>NO ACTIVE DISASTER</strong>
-          <button
-            className="standby-strip-close"
-            type="button"
-            aria-label="Dismiss no active disaster message"
-            title="Dismiss"
-            onClick={() => setIsStandbyStripVisible(false)}
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
+          <LoadingState inline />
         </div>
+      ) : (
+        <>
+          {hasActiveEvent && (
+            <ActiveEventBanner activeEvent={summaryState?.data?.active_event} onOpenBroadcast={() => onOpenModule('/broadcast')} />
+          )}
+
+          {!hasActiveEvent && (
+            <div className="standby-strip">
+              <strong>Standby mode</strong>
+              <span>Household reporting, dispatch charts, weather snapshots, and activity logs will appear after an active disaster event is declared.</span>
+            </div>
+          )}
+        </>
       )}
 
       <div className="stat-row">
@@ -53,35 +70,46 @@ export default function DashboardMainContent({
         ))}
       </div>
 
-      <ReportingProgress households={dashboard.households} hasActiveEvent={hasActiveEvent} />
+      <ReportingProgress households={households} hasActiveEvent={hasActiveEvent} isLoading={summaryState?.isLoading} />
 
       <Panel title="Operational charts">
         <div className="dashboard-dispatch-graphs">
           <ChartCard
             title="Household status"
-            bars={dashboard.households.bars}
+            bars={households.bars}
+            isLoading={summaryState?.isLoading}
             emptyTitle="No household reports yet"
             emptyMessage="Reports will come from household mobile users or authenticated responder field reports."
             onManage={() => onOpenModule('/households')}
           />
           <ChartCard
             title="Dispatch status - team count"
-            bars={dashboard.dispatch.counts}
-            alwaysShowChart
+            bars={dispatchData.counts}
             onManage={() => onOpenModule('/dispatch')}
           />
         </div>
       </Panel>
 
+      <Panel
+        title="Team dispatch overview"
+        action={
+          <button className="panel-link" type="button" onClick={() => onOpenModule('/dispatch')}>
+            Full dispatch <ArrowUpRight size={14} />
+          </button>
+        }
+      >
+        <TeamDispatchTable teams={dispatchData.teams} isLoading={dispatchState?.isLoading} />
+      </Panel>
+
       <RescueCriteriaChart
-        eventId={dashboard.active_event?.event_id}
+        eventId={summaryState?.data?.active_event?.event_id}
         refreshVersion={refreshVersion}
       />
 
       <div className="sep">
         Recent activity log <span>showing latest event reports only</span>
       </div>
-      <ActivityLog activities={dashboard.recent_activity} onViewAll={() => onOpenModule('/archive')} />
+      <ActivityLog activities={activities} isLoading={activityState?.isLoading} onViewAll={() => onOpenModule('/archive')} />
     </div>
   )
 }
@@ -102,7 +130,7 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
         </div>
         <div className="event-meta-col">
           <span className="standby-hint">
-            Click to declare event <FontAwesomeIcon icon={faArrowRight} />
+            Click to declare event <ArrowUpRight size={14} />
           </span>
         </div>
       </div>
@@ -178,7 +206,7 @@ function ReportingProgress({ households, hasActiveEvent }) {
   )
 }
 
-function ChartCard({ title, bars = [], emptyTitle, emptyMessage, alwaysShowChart = false, onManage }) {
+function ChartCard({ title, bars = [], isLoading, emptyTitle, emptyMessage, alwaysShowChart = false, onManage }) {
   const hasValues = bars.some((bar) => Number(bar.value) > 0)
   const axis = makeAxis(bars)
 
@@ -187,10 +215,12 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, alwaysShowChart
       <div className="dispatch-chart-head">
         <div className="dispatch-chart-title">{title}</div>
         <button className="chart-manage-button" type="button" aria-label={`Open ${title}`} onClick={onManage}>
-          <FontAwesomeIcon icon={faArrowRight} />
+          <ArrowUpRight size={14} />
         </button>
       </div>
-      {hasValues || alwaysShowChart ? (
+      {isLoading ? (
+        <LoadingState inline />
+      ) : (hasValues || alwaysShowChart) ? (
         <div className="team-count-chart" role="img" aria-label={title}>
           <div className="chart-y-axis" aria-hidden="true">
             {axis.map((item) => <span key={item}>{item}</span>)}
@@ -212,7 +242,51 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, alwaysShowChart
   )
 }
 
-function ActivityLog({ activities = [], onViewAll }) {
+function TeamDispatchTable({ teams = [], isLoading }) {
+  if (isLoading) {
+    return <LoadingState inline />
+  }
+
+  if (teams.length === 0) {
+    return <EmptyState title="No team assignments yet" message="Dispatch rows will appear after HQ assigns a team to an active event." />
+  }
+
+  return (
+    <div className="tbl-wrap compact-table">
+      <table className="dispatch-overview-table">
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Assigned area</th>
+            <th>Assigned at</th>
+          </tr>
+        </thead>
+        <tbody>
+          {teams.map((team) => (
+            <tr key={`${team.team_name}-${team.assigned_time}`}>
+              <td><span className="team-dot" />{team.team_name}</td>
+              <td>{team.team_type}</td>
+              <td><Badge tone={statusTone(team.status_key)}>{team.status}</Badge></td>
+              <td>{team.assigned_area}</td>
+              <td>{team.assigned_time || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ActivityLog({ activities = [], isLoading, onViewAll }) {
+  if (isLoading) {
+    return (
+      <div className="tbl-wrap">
+        <LoadingState inline />
+      </div>
+    )
+  }
   if (activities.length === 0) {
     return (
       <div className="tbl-wrap">
