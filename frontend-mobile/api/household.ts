@@ -91,3 +91,8 @@ export async function deleteTrustedHousehold(connectionId: string) {
   const response = await api.delete(`/household/trusted-households/${connectionId}`);
   return response.data;
 }
+
+export async function respondToTrustedHousehold(connectionId: string, decision: 'accept' | 'reject') {
+  const response = await api.patch(`/household/trusted-households/${connectionId}`, { decision });
+  return response.data;
+}

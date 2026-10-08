@@ -26,6 +26,7 @@ import {
   saveTrustedHouseholdMemberStatus,
   saveHouseholdStatus,
   saveTrustedPin,
+  respondToTrustedHousehold,
   updateHouseholdDeviceLocation,
   updateHouseholdMember,
   verifyTrustedPin,
@@ -35,6 +36,7 @@ import { HouseholdDashboardScreen, HouseholdTrustedScreen } from '@/components/h
 import { HouseholdHeader } from '@/components/household/HouseholdHeader';
 import {
   AddTrustedHouseholdModal,
+  HouseholdNotificationsModal,
   HouseholdQrModal,
   TrustedPinModal,
 } from '@/components/household/HouseholdModals';
@@ -82,6 +84,8 @@ export default function HouseholdHomeScreen() {
   const [showAddTrusted, setShowAddTrusted] = useState(false);
   const [trustedLookup, setTrustedLookup] = useState<any>(null);
   const [trustedLoading, setTrustedLoading] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationBusyId, setNotificationBusyId] = useState('');
 
   const loadLocalKeys = useCallback(async () => {
     const existingDeviceUuid = await getStoredItem(deviceUuidKey);
@@ -408,18 +412,60 @@ export default function HouseholdHomeScreen() {
         await verifyTrustedPin(pin);
       }
 
-      setShowPin(false);
-
       if (pinAction === 'open' && selectedTrusted) {
+        setShowPin(false);
         setViewingTrusted(selectedTrusted);
       } else if (pinAction === 'change') {
+        setShowPin(false);
         Alert.alert('Household PIN', 'Your household PIN was changed.');
       }
     } catch (error: any) {
       setPinError(errorMessage(error));
     } finally {
+      setNotificationBusyId('');
       setPinSaving(false);
     }
+  }
+
+  async function handleAcceptTrustedRequest(request: any) {
+    const connectionId = String(request.connection_id);
+    setNotificationBusyId(connectionId);
+    try {
+      await respondToTrustedHousehold(connectionId, 'accept');
+      setShowNotifications(false);
+      await loadOverview(true);
+      Alert.alert('Trusted household accepted', 'The household request was accepted and added to Trusted Household.');
+    } catch (error: any) {
+      Alert.alert('Unable to accept request', errorMessage(error));
+    } finally {
+      setNotificationBusyId('');
+    }
+  }
+
+  function handleRejectTrustedRequest(request: any) {
+    const connectionId = String(request.connection_id);
+    Alert.alert(
+      'Reject trusted household request?',
+      `${request.family_name || 'This household'} (${request.requesting_household_id}) will not be added to your trusted households.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            setNotificationBusyId(connectionId);
+            try {
+              await respondToTrustedHousehold(connectionId, 'reject');
+              await loadOverview(true);
+            } catch (error: any) {
+              Alert.alert('Unable to reject request', errorMessage(error));
+            } finally {
+              setNotificationBusyId('');
+            }
+          },
+        },
+      ]
+    );
   }
 
   async function handleLookupTrusted(householdId: string) {
@@ -578,7 +624,11 @@ export default function HouseholdHomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <HouseholdHeader isDisasterMode={Boolean(overview.active_event)} />
+      <HouseholdHeader
+        isDisasterMode={Boolean(overview.active_event)}
+        notificationCount={overview.trusted?.incoming_requests?.length || 0}
+        onOpenNotifications={() => setShowNotifications(true)}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -627,6 +677,14 @@ export default function HouseholdHomeScreen() {
       ) : null}
 
       <HouseholdQrModal visible={showQr} qr={overview.qr} onClose={() => setShowQr(false)} />
+      <HouseholdNotificationsModal
+        visible={showNotifications}
+        requests={overview.trusted?.incoming_requests || []}
+        busyId={notificationBusyId}
+        onClose={() => setShowNotifications(false)}
+        onAccept={handleAcceptTrustedRequest}
+        onReject={handleRejectTrustedRequest}
+      />
       <TrustedPinModal
         visible={showPin}
         mode={pinAction === 'change' ? 'change' : trustedPinConfigured ? 'verify' : 'set'}

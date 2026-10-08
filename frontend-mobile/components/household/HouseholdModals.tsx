@@ -28,6 +28,80 @@ export function HouseholdQrModal({ visible, qr, onClose }: QrModalProps) {
   );
 }
 
+export function HouseholdNotificationsModal({ visible, requests, busyId, onClose, onAccept, onReject }: {
+  visible: boolean;
+  requests: any[];
+  busyId: string;
+  onClose: () => void;
+  onAccept: (request: any) => void;
+  onReject: (request: any) => void;
+}) {
+  const [expandedId, setExpandedId] = useState('');
+
+  useEffect(() => {
+    if (!visible) setExpandedId('');
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.backdrop}>
+        <View style={[styles.modalCard, styles.tallModal]}>
+          <ModalHeader title="Notifications" onClose={onClose} />
+          <Text style={styles.note}>Trusted household requests and updates for your household.</Text>
+          <ScrollView contentContainerStyle={styles.notificationList}>
+            {requests.length ? requests.map((request) => {
+              const id = String(request.connection_id);
+              const expanded = expandedId === id;
+              const householdName = request.family_name || request.household_name || 'Household';
+              return (
+                <View key={id} style={styles.notificationCard}>
+                  <Pressable
+                    style={styles.notificationRow}
+                    onPress={() => setExpandedId(expanded ? '' : id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${householdName}, household ID ${request.requesting_household_id}`}
+                  >
+                    <View style={styles.notificationIcon}><Ionicons name="people-outline" size={19} color={palette.navActive} /></View>
+                    <View style={styles.notificationCopy}>
+                      <Text style={styles.notificationTitle}>Trusted household request</Text>
+                      <Text style={styles.notificationMeta}>{householdName} · {request.requesting_household_id}</Text>
+                    </View>
+                    <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={palette.textSoft} />
+                  </Pressable>
+                  {expanded ? (
+                    <View style={styles.notificationDetails}>
+                      <Text style={styles.notificationDetailText}>Request details: {request.reason || 'Trusted household connection request'}</Text>
+                      <Text style={styles.notificationDate}>{request.created_label || ''}</Text>
+                      <View style={styles.notificationActions}>
+                        <Pressable
+                          style={[styles.notificationAction, styles.rejectAction]}
+                          onPress={() => onReject(request)}
+                          disabled={busyId === id}
+                        >
+                          <Text style={[styles.notificationActionText, styles.rejectText]}>{busyId === id ? 'Please wait...' : 'Reject'}</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.notificationAction, styles.acceptAction]}
+                          onPress={() => onAccept(request)}
+                          disabled={busyId === id}
+                        >
+                          <Text style={[styles.notificationActionText, styles.acceptText]}>{busyId === id ? 'Please wait...' : 'Accept'}</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            }) : (
+              <HouseholdEmpty icon="notifications-outline" title="You're all caught up" body="New trusted household requests will appear here." />
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 type PinModalProps = {
   visible: boolean;
   mode: 'set' | 'verify' | 'change';
@@ -44,7 +118,7 @@ export function TrustedPinModal({ visible, mode, saving, error, onClose, onConfi
   const [showCurrentPin, setShowCurrentPin] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
-  const needsConfirmation = mode !== 'verify';
+  const needsConfirmation = mode === 'set' || mode === 'change';
   const needsCurrentPin = mode === 'change';
 
   const title = mode === 'change'
@@ -187,12 +261,14 @@ export function AddTrustedHouseholdModal({
 }: AddTrustedModalProps) {
   const [householdId, setHouseholdId] = useState('');
   const [reason, setReason] = useState('');
+  const [targetPin, setTargetPin] = useState('');
   const [relationships, setRelationships] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!visible) {
       setHouseholdId('');
       setReason('');
+      setTargetPin('');
       setRelationships({});
     }
   }, [visible]);
@@ -201,6 +277,7 @@ export function AddTrustedHouseholdModal({
     onSubmit({
       trusted_household_id: lookupResult?.household_id || householdId,
       reason,
+      pin: targetPin,
       member_relationships: (lookupResult?.members || []).map((member: any) => ({
         member_id: member.member_id,
         name: member.name,
@@ -230,7 +307,7 @@ export function AddTrustedHouseholdModal({
                 placeholderTextColor="#7d8da0"
                 autoCapitalize="characters"
               />
-              <Pressable style={styles.lookupButton} onPress={() => onLookup(householdId.trim())}>
+              <Pressable style={styles.lookupButton} onPress={() => { setTargetPin(''); onLookup(householdId.trim()); }}>
                 <Ionicons name="search-outline" size={19} color="#fff" />
               </Pressable>
             </View>
@@ -255,6 +332,24 @@ export function AddTrustedHouseholdModal({
               textAlignVertical="top"
             />
 
+            {lookupResult ? (
+              <View style={styles.targetPinGroup}>
+                <Text style={styles.lookupLabel}>Household PIN</Text>
+                <Text style={styles.memberMeta}>Enter the PIN set by {lookupResult.family_name || 'this household'}. They are added to your Trusted Household only after the PIN matches.</Text>
+                <TextInput
+                  style={styles.input}
+                  value={targetPin}
+                  onChangeText={(value) => setTargetPin(value.replace(/[^0-9]/g, '').slice(0, 4))}
+                  placeholder="Their 4-digit PIN"
+                  placeholderTextColor="#7d8da0"
+                  keyboardType="number-pad"
+                  secureTextEntry
+                  maxLength={4}
+                  accessibilityLabel="Target household 4-digit PIN"
+                />
+              </View>
+            ) : null}
+
             {lookupResult?.members?.length ? (
               <View style={styles.relationshipStack}>
                 <HouseholdSection title="Member relationships" />
@@ -277,9 +372,9 @@ export function AddTrustedHouseholdModal({
             ) : null}
           </ScrollView>
           <HouseholdButton
-            label={loading ? 'Saving...' : 'Send request'}
-            icon="send-outline"
-            disabled={loading || !lookupResult || !reason.trim()}
+            label={loading ? 'Verifying PIN...' : 'Add to Trusted Household'}
+            icon="people-outline"
+            disabled={loading || !lookupResult || !reason.trim() || targetPin.length !== 4}
             onPress={submit}
           />
         </View>
@@ -330,6 +425,52 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingBottom: spacing.sm,
   },
+  notificationList: {
+    gap: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  notificationCard: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    backgroundColor: palette.card,
+    overflow: 'hidden',
+  },
+  notificationRow: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  notificationIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${palette.navActive}15`,
+  },
+  notificationCopy: { flex: 1, gap: 3 },
+  notificationTitle: { color: palette.text, fontSize: 13, fontWeight: '800' },
+  notificationMeta: { color: palette.textSoft, fontSize: 11, fontWeight: '600' },
+  notificationDetails: {
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  notificationDetailText: { color: palette.text, fontSize: 13, lineHeight: 19 },
+  notificationDate: { color: palette.textSoft, fontSize: 11 },
+  notificationActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.xs },
+  notificationAction: { minWidth: 88, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, paddingHorizontal: spacing.md },
+  rejectAction: { backgroundColor: '#fff', borderWidth: 1, borderColor: palette.border },
+  acceptAction: { backgroundColor: palette.navActive },
+  notificationActionText: { fontSize: 12, fontWeight: '800' },
+  rejectText: { color: palette.text },
+  acceptText: { color: '#fff' },
+  targetPinGroup: { gap: spacing.xs },
   stepRow: {
     flexDirection: 'row',
     gap: spacing.sm,

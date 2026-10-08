@@ -760,6 +760,7 @@ class HouseholdMobileService
             'trusted_household_id' => ['required', 'string', 'max:255'],
             'reason' => ['required', 'string', 'max:500'],
             'member_relationships' => ['nullable', 'array'],
+            'pin' => ['required', 'digits:4'],
         ], [
             'trusted_household_id.required' => 'Enter the household ID you want to connect with.',
             'reason.required' => 'Give a short reason for this trusted household request.',
@@ -775,6 +776,22 @@ class HouseholdMobileService
             return response()->json([
                 'message' => 'Household account was not found. Enter the household ID like HH-2024035503 or the account ID like 2024035503.',
             ], 404);
+        }
+
+        if (! Schema::hasTable('household_trusted_pins')) {
+            return $this->missingTableResponse('household_trusted_pins');
+        }
+
+        $trustedHouseholdPin = DB::table('household_trusted_pins')
+            ->where('household_id', $trustedHouseholdId)
+            ->first(['pin_hash']);
+
+        if (! $trustedHouseholdPin) {
+            return response()->json(['message' => 'This household has not set a trusted PIN yet. Ask them to set one before adding them.'], 409);
+        }
+
+        if (! Hash::check($validated['pin'], $trustedHouseholdPin->pin_hash)) {
+            return response()->json(['message' => 'The selected household PIN did not match.'], 422);
         }
 
         $existing = DB::table('trusted_households')
@@ -807,6 +824,8 @@ class HouseholdMobileService
             'created_at' => $now,
             'updated_at' => $now,
         ]));
+
+        unset($validated['pin']);
 
         $this->writeAuditLog($request, 'mobile_trusted_household_added', 'trusted_households', $connectionId, array_merge($validated, [
             'resolved_trusted_household_id' => $trustedHouseholdId,
