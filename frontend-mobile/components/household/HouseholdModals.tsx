@@ -28,9 +28,10 @@ export function HouseholdQrModal({ visible, qr, onClose }: QrModalProps) {
   );
 }
 
-export function HouseholdNotificationsModal({ visible, requests, busyId, onClose, onAccept, onReject }: {
+export function HouseholdNotificationsModal({ visible, requests, notices = [], busyId, onClose, onAccept, onReject }: {
   visible: boolean;
   requests: any[];
+  notices?: any[];
   busyId: string;
   onClose: () => void;
   onAccept: (request: any) => void;
@@ -49,6 +50,16 @@ export function HouseholdNotificationsModal({ visible, requests, busyId, onClose
           <ModalHeader title="Notifications" onClose={onClose} />
           <Text style={styles.note}>Trusted household requests and updates for your household.</Text>
           <ScrollView contentContainerStyle={styles.notificationList}>
+            {notices.map((notice) => (
+              <View key={`notice-${notice.notification_id}`} style={styles.infoNotificationCard}>
+                <View style={styles.notificationIcon}><Ionicons name="information-circle-outline" size={19} color={palette.navActive} /></View>
+                <View style={styles.notificationCopy}>
+                  <Text style={styles.notificationTitle}>{notice.title}</Text>
+                  <Text style={styles.notificationDetailText}>{notice.message}</Text>
+                  <Text style={styles.notificationDate}>{notice.created_label || ''}</Text>
+                </View>
+              </View>
+            ))}
             {requests.length ? requests.map((request) => {
               const id = String(request.connection_id);
               const expanded = expandedId === id;
@@ -59,12 +70,12 @@ export function HouseholdNotificationsModal({ visible, requests, busyId, onClose
                     style={styles.notificationRow}
                     onPress={() => setExpandedId(expanded ? '' : id)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${householdName}, household ID ${request.requesting_household_id}`}
+                    accessibilityLabel={`${request.household_username || householdName}, household ID ${request.requesting_household_id}`}
                   >
                     <View style={styles.notificationIcon}><Ionicons name="people-outline" size={19} color={palette.navActive} /></View>
                     <View style={styles.notificationCopy}>
                       <Text style={styles.notificationTitle}>Trusted household request</Text>
-                      <Text style={styles.notificationMeta}>{householdName} · {request.requesting_household_id}</Text>
+                      <Text style={styles.notificationMeta}>{request.household_username || householdName} · {request.requesting_household_id}</Text>
                     </View>
                     <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={palette.textSoft} />
                   </Pressable>
@@ -92,9 +103,9 @@ export function HouseholdNotificationsModal({ visible, requests, busyId, onClose
                   ) : null}
                 </View>
               );
-            }) : (
+            }) : notices.length === 0 ? (
               <HouseholdEmpty icon="notifications-outline" title="You're all caught up" body="New trusted household requests will appear here." />
-            )}
+            ) : null}
           </ScrollView>
         </View>
       </View>
@@ -335,7 +346,7 @@ export function AddTrustedHouseholdModal({
             {lookupResult ? (
               <View style={styles.targetPinGroup}>
                 <Text style={styles.lookupLabel}>Household PIN</Text>
-                <Text style={styles.memberMeta}>Enter the PIN set by {lookupResult.family_name || 'this household'}. They are added to your Trusted Household only after the PIN matches.</Text>
+                <Text style={styles.memberMeta}>Enter the PIN set by {lookupResult.family_name || 'this household'}. A correct PIN sends a request; the household must confirm before it is connected.</Text>
                 <TextInput
                   style={styles.input}
                   value={targetPin}
@@ -372,8 +383,8 @@ export function AddTrustedHouseholdModal({
             ) : null}
           </ScrollView>
           <HouseholdButton
-            label={loading ? 'Verifying PIN...' : 'Add to Trusted Household'}
-            icon="people-outline"
+            label={loading ? 'Verifying PIN...' : 'Send request'}
+            icon="send-outline"
             disabled={loading || !lookupResult || !reason.trim() || targetPin.length !== 4}
             onPress={submit}
           />
@@ -435,6 +446,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: palette.card,
     overflow: 'hidden',
+  },
+  infoNotificationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: `${palette.navActive}44`,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: `${palette.navActive}0b`,
   },
   notificationRow: {
     minHeight: 68,

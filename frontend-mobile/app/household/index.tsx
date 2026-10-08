@@ -112,7 +112,10 @@ export default function HouseholdHomeScreen() {
       setTrustedPinConfigured(Boolean(data.trusted?.pin_configured));
       setViewingTrusted((current: any) =>
         current
-          ? data.trusted?.households?.find((household: any) => household.connection_id === current.connection_id) || null
+          ? data.trusted?.households?.find((household: any) =>
+              household.connection_id === current.connection_id
+              && ['active', 'validated'].includes(household.validation_status)
+            ) || null
           : null
       );
       const savedStatus = data.current_status?.status_key || data.status_options?.[0]?.key || 'safe';
@@ -379,6 +382,11 @@ export default function HouseholdHomeScreen() {
   }
 
   function openTrusted(household: any) {
+    if (!['active', 'validated'].includes(household.validation_status)) {
+      Alert.alert('Pending confirmation', 'This household must accept your request before you can view its members or statuses.');
+      return;
+    }
+
     setSelectedTrusted(household);
     setPinAction('open');
     setPinError('');
@@ -509,16 +517,19 @@ export default function HouseholdHomeScreen() {
 
   function handleDeleteTrusted(household: any) {
     const householdName = household.household_name || household.family_name || 'this trusted household';
+    const isPending = household.validation_status === 'pending';
 
     Alert.alert(
-      'Trusted household options',
-      householdName,
+      isPending ? 'Cancel pending request?' : 'Trusted household options',
+      isPending
+        ? `Cancel your pending request to ${householdName}?`
+        : householdName,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: isPending ? 'Cancel request' : 'Delete',
           style: 'destructive',
-          onPress: () => confirmDeleteTrusted(household),
+          onPress: () => isPending ? void deleteTrusted(household) : confirmDeleteTrusted(household),
         },
       ]
     );
@@ -548,7 +559,10 @@ export default function HouseholdHomeScreen() {
       const response = await deleteTrustedHousehold(household.connection_id);
       setViewingTrusted(null);
       await loadOverview(true);
-      Alert.alert('Trusted household removed', response.message || 'The trusted household was removed successfully.');
+      Alert.alert(
+        household.validation_status === 'pending' ? 'Request cancelled' : 'Trusted household removed',
+        response.message || (household.validation_status === 'pending' ? 'Your trusted household request was cancelled.' : 'The trusted household was removed successfully.')
+      );
     } catch (error: any) {
       Alert.alert('Unable to delete trusted household', errorMessage(error));
     }
@@ -626,8 +640,11 @@ export default function HouseholdHomeScreen() {
     <SafeAreaView style={styles.safe}>
       <HouseholdHeader
         isDisasterMode={Boolean(overview.active_event)}
-        notificationCount={overview.trusted?.incoming_requests?.length || 0}
-        onOpenNotifications={() => setShowNotifications(true)}
+        notificationCount={(overview.trusted?.incoming_requests?.length || 0) + (overview.trusted?.notifications?.length || 0)}
+        onOpenNotifications={() => {
+          setShowNotifications(true);
+          void loadOverview(true);
+        }}
       />
 
       <ScrollView
@@ -680,6 +697,7 @@ export default function HouseholdHomeScreen() {
       <HouseholdNotificationsModal
         visible={showNotifications}
         requests={overview.trusted?.incoming_requests || []}
+        notices={overview.trusted?.notifications || []}
         busyId={notificationBusyId}
         onClose={() => setShowNotifications(false)}
         onAccept={handleAcceptTrustedRequest}

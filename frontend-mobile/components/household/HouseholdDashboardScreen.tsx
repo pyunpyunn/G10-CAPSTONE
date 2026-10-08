@@ -344,15 +344,18 @@ function TrustedHouseholdList({
 
   return (
     <>
-      {trusted.map((householdItem: any) => (
-        <Pressable
-          key={householdItem.connection_id}
-          style={({ pressed }) => [styles.trustedRow, pressed && styles.trustedRowPressed]}
-          onPress={() => onOpenTrusted(householdItem)}
-          onLongPress={() => onDeleteTrusted(householdItem)}
-          delayLongPress={500}
-          accessibilityHint="Long press to remove this trusted household"
-        >
+      {trusted.map((householdItem: any) => {
+        const isAccepted = ['active', 'validated'].includes(householdItem.validation_status);
+
+        return (
+          <Pressable
+            key={householdItem.connection_id}
+            style={({ pressed }) => [styles.trustedRow, pressed && isAccepted && styles.trustedRowPressed]}
+            onPress={isAccepted ? () => onOpenTrusted(householdItem) : undefined}
+            onLongPress={() => onDeleteTrusted(householdItem)}
+            delayLongPress={500}
+            accessibilityHint={isAccepted ? 'Long press to remove this trusted household' : 'Long press to cancel this pending request'}
+          >
           <View style={styles.trustedIcon}>
             <Ionicons
               name="home-outline"
@@ -368,13 +371,18 @@ function TrustedHouseholdList({
           </View>
           <View style={styles.trustedStatusSlot}>
             <HouseholdBadge
-              label={householdItem.current_status?.status_label || 'Unchecked'}
-              tone={householdItem.current_status?.status_key || 'neutral'}
+              label={householdItem.validation_status === 'pending'
+                ? 'Pending'
+                : householdItem.current_status?.status_label || 'Unchecked'}
+              tone={householdItem.validation_status === 'pending'
+                ? 'pending'
+                : householdItem.current_status?.status_key || 'neutral'}
             />
-            <MemberStatusDots members={householdItem.members || []} />
+            {householdItem.validation_status === 'pending' ? null : <MemberStatusDots members={householdItem.members || []} />}
           </View>
-        </Pressable>
-      ))}
+          </Pressable>
+        );
+      })}
       {addButton}
     </>
   );

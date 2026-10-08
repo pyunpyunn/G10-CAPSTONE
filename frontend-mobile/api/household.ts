@@ -23,6 +23,7 @@ export type HouseholdOverview = {
     pin_configured: boolean;
     households: any[];
     incoming_requests: any[];
+    notifications?: any[];
   };
   qr: any;
 };
