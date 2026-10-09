@@ -9,7 +9,6 @@ use App\Models\Notification;
 use App\Models\ResourceRequest;
 use App\Models\ResponderAssignment;
 use App\Models\WeatherLog;
-use App\Services\Shared\RealtimeReadCache;
 use App\Support\RequestSchema as Schema;
 use Illuminate\Http\Request;
 use Illuminate\Support\LazyCollection;
@@ -18,7 +17,8 @@ class NotificationQuery
 {
     public function feedSources(): array
     {
-        return app(RealtimeReadCache::class)->remember('notification-sources', fn () => $this->uncachedFeedSources());
+        // Eloquent collections and their models must stay outside the shared serialized cache.
+        return $this->uncachedFeedSources();
     }
 
     private function uncachedFeedSources(): array

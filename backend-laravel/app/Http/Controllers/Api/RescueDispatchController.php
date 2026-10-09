@@ -87,9 +87,13 @@ class RescueDispatchController extends Controller
     {
         $event = $dispatch->activeEvent();
         return response()->json([
-            'data' => $event ? $query->timeline((string) $event->event_id, $event->started_at) : [],
+            'data' => $event ? $query->sitioTimeline((string) $event->event_id, $event->started_at) : [],
             'meta' => [
                 'event_id' => $event?->event_id,
+                'started_at' => $event?->started_at?->toIso8601String(),
+                'ended_at' => $event?->ended_at?->toIso8601String(),
+                'server_time' => now()->toIso8601String(),
+                'weights' => RescueCriteriaQuery::SITIO_WEIGHTS,
                 'settings' => $event ? $priorities->settingsForEvent((string) $event->event_id)
                     : RescuePrioritySetting::query()->orderByDesc('version')->first(),
             ],

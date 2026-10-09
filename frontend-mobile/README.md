@@ -9,29 +9,30 @@ The mobile app does not connect directly to MySQL. It connects to Laravel throug
 `frontend-mobile/.env`
 
 ```env
-EXPO_PUBLIC_API_BASE_URL=http://192.168.112.109:8000/api/v1
+EXPO_PUBLIC_API_BASE_URL=http://172.20.10.5:8000/api/v1
 ```
 
-This IP is the laptop Wi-Fi IP. If the laptop IP changes, update this value.
+This must be the laptop's current Wi-Fi IPv4 address. Check it with `ipconfig` and use the IPv4 address under the Wi-Fi adapter. If it changes, update `.env` and restart Expo so the app bundles the new API URL. Do not use `localhost`, `127.0.0.1`, a WSL address, or a VPN address for a phone.
 
-## Required Backend Command For Phone Testing
+## Start Both Servers For Phone Login
 
-Run Laravel with `0.0.0.0`, not only `127.0.0.1`.
+Expo Go and Laravel must both be running. Start Laravel in one PowerShell terminal, from the backend folder:
 
-```bash
-cd backend-laravel
+```powershell
+cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-Reason: Expo Go on a phone must reach the backend through the laptop network IP.
+Keep that terminal open. Binding to `0.0.0.0` lets the phone reach Laravel through the laptop's Wi-Fi IP.
 
-## Start Mobile App
+In a second PowerShell terminal, start Expo:
 
-```bash
-cd frontend-mobile
-npm install
+```powershell
+cd C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile
 npm start
 ```
+
+Keep both terminals open, connect the phone and laptop to the same Wi-Fi, then scan the Expo Go QR code. Verify the API from the phone's browser at `http://<laptop-wi-fi-ip>:8000/api/v1/health/ready`; it should return `{"status":"ready"}`. If it does not load, check the Wi-Fi IP in `.env` and allow PHP/Laravel through Windows Firewall on the private network.
 
 Open the QR code in Expo Go.
 

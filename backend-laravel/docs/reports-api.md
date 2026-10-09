@@ -1,4 +1,4 @@
-# Archive and Situation reports
+ Archive and Situation reports
 
 The implementation adapts `EXTERNAL_REPORTS_API.md` to ResQperation's existing
 Archive and Situation schemas. It uses the document's API-key authentication,

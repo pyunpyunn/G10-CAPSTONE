@@ -20,14 +20,14 @@ class DashboardService
     {
         $this->closureWorkflow->releaseEndedEventReferences();
 
-        return app(RealtimeReadCache::class)->remember('dashboard-full', fn () => $this->snapshot(true));
+        return $this->cachedSnapshot(true);
     }
 
     public function summary(): DashboardSnapshot
     {
         $this->closureWorkflow->releaseEndedEventReferences();
 
-        return app(RealtimeReadCache::class)->remember('dashboard-summary', fn () => $this->snapshot(false));
+        return $this->cachedSnapshot(false);
     }
 
     public function dispatch(): array
@@ -79,5 +79,14 @@ class DashboardService
             $this->query->getRequestSummary(),
             $this->query->getMapSummary($eventId, $households),
             $this->query->getRecentActivity($eventId));
+    }
+
+    private function cachedSnapshot(bool $full): DashboardSnapshot
+    {
+        // A new key bypasses legacy object entries; cache stores may prohibit class deserialization.
+        $name = $full ? 'dashboard-full:v2' : 'dashboard-summary:v2';
+        $data = app(RealtimeReadCache::class)->remember($name, fn () => $this->snapshot($full)->toCacheArray());
+
+        return DashboardSnapshot::fromCacheArray($data);
     }
 }

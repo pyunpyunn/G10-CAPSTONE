@@ -11,7 +11,6 @@ import {
   eventTone,
   makeAxis,
   percent,
-  statusTone,
 } from '../../utils/dashboardHelpers'
 
 export default function DashboardMainContent({
@@ -19,7 +18,6 @@ export default function DashboardMainContent({
   stats,
   hasActiveEvent,
   onOpenModule,
-  refreshVersion,
 }) {
   const [isStandbyStripVisible, setIsStandbyStripVisible] = useState(true)
 
@@ -73,15 +71,7 @@ export default function DashboardMainContent({
         </div>
       </Panel>
 
-      <RescueCriteriaChart
-        eventId={dashboard.active_event?.event_id}
-        refreshVersion={refreshVersion}
-      />
-
-      <div className="sep">
-        Recent activity log <span>showing latest event reports only</span>
-      </div>
-      <ActivityLog activities={dashboard.recent_activity} onViewAll={() => onOpenModule('/archive')} />
+      <RescueCriteriaChart eventId={dashboard.active_event?.event_id} />
     </div>
   )
 }
@@ -212,34 +202,3 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, alwaysShowChart
   )
 }
 
-function ActivityLog({ activities = [], onViewAll }) {
-  if (activities.length === 0) {
-    return (
-      <div className="tbl-wrap">
-        <EmptyState title="No recent event activity" message="Household reports and responder field reports will appear here after an active event receives updates." />
-      </div>
-    )
-  }
-
-  return (
-    <div className="tbl-wrap">
-      <div className="log-list">
-        {activities.map((activity) => (
-          <div className="log-item" key={`${activity.time}-${activity.household_name}-${activity.status}`}>
-            <span className="log-time">{activity.time || '-'}</span>
-            <span className={`log-dot log-${statusTone(activity.status_key)}`} />
-            <div className="log-msg">
-              {activity.household_name} - <Badge tone={statusTone(activity.status_key)}>{activity.status}</Badge>
-              {activity.location_label ? <span className="log-extra"> {activity.location_label}</span> : null}
-              {activity.battery_level !== null ? <span className="log-extra"> Battery {activity.battery_level}%</span> : null}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="table-footer">
-        <span>Only the latest records load first to keep 1,000+ household operations fast.</span>
-        <button className="btn btn-secondary btn-sm" type="button" onClick={onViewAll}>View all logs</button>
-      </div>
-    </div>
-  )
-}

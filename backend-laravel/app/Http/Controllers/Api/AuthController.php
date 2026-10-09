@@ -43,6 +43,11 @@ class AuthController extends Controller
         return $this->service->saveRecoveryQuestions($request);
     }
 
+    public function verifyPasswordChange(Request $request): JsonResponse
+    {
+        return $this->service->verifyPasswordChange($request);
+    }
+
     public function resetPassword(Request $request): JsonResponse
     {
         return $this->service->resetPassword($request);

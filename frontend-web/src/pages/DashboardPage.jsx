@@ -1,24 +1,18 @@
-import { useMemo, useState } from 'react'
-import { Pencil, RefreshCcw, TriangleAlert } from 'lucide-react'
+import { useMemo } from 'react'
+import { Pencil, TriangleAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getDashboard } from '../api/dashboardApi'
 import DashboardMainContent from '../components/dashboard/DashboardMainContent'
 import DashboardOverview from '../components/dashboard/DashboardOverview'
 import LoadingState from '../components/ui/LoadingState'
-import PageHeader from '../components/ui/PageHeader'
 import { getStats } from '../utils/dashboardHelpers'
 import { useModuleData } from '../utils/useModuleData'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const { data: dashboard, error, loading: isLoading, refresh } = useModuleData(getDashboard)
-  const [refreshVersion, setRefreshVersion] = useState(0)
+  const { data: dashboard, error, loading: isLoading } = useModuleData(getDashboard)
   const stats = useMemo(() => getStats(dashboard), [dashboard])
   const hasActiveEvent = Boolean(dashboard?.active_event)
-  function loadDashboard() {
-    refresh()
-    setRefreshVersion((version) => version + 1)
-  }
   function openModule(path) {
     navigate(path)
   }
@@ -37,15 +31,6 @@ export default function DashboardPage() {
 
   return (
     <section className="page active">
-      <PageHeader
-        actions={
-          <button className="btn btn-secondary btn-sm" type="button" onClick={loadDashboard}>
-            <RefreshCcw size={14} />
-            Refresh
-          </button>
-        }
-      />
-
       {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
@@ -57,7 +42,6 @@ export default function DashboardPage() {
             stats={stats}
             hasActiveEvent={hasActiveEvent}
             onOpenModule={openModule}
-            refreshVersion={refreshVersion}
           />
           <DashboardOverview
             dashboard={dashboard}

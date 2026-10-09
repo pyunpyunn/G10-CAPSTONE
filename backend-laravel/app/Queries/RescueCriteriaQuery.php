@@ -10,6 +10,13 @@ use App\Presenters\RescueCriteriaPresenter;
 
 class RescueCriteriaQuery
 {
+    public const SITIO_WEIGHTS = ['unsafe_reports' => 30, 'special_needs' => 30, 'no_contact' => 15, 'unreported_members' => 25];
+
+    public function sitioTimeline(string $eventId, Carbon $startedAt): array
+    {
+        return $this->historyQuery->sitioSeries($eventId, $startedAt);
+    }
+
     public function __construct(
         private RescuePriorityQuery $priorities,
         private BarangayProfileService $barangay,
@@ -81,6 +88,7 @@ class RescueCriteriaQuery
 
     public function current(string $eventId, Carbon $startedAt): array
     {
+        $observedAt = now()->startOfSecond();
         $puroks = $this->puroks($eventId);
         $percent = function (string $numerator, string $denominator) use ($puroks): ?float {
             $total = array_sum(array_column($puroks, $denominator));
@@ -88,8 +96,8 @@ class RescueCriteriaQuery
         };
 
         return [
-            'observed_at' => now()->toIso8601String(),
-            'hours_since_alert' => max(0, round($startedAt->diffInMinutes(now()) / 60, 1)),
+            'observed_at' => $observedAt->toIso8601String(),
+            'hours_since_alert' => max(0, round($startedAt->diffInSeconds($observedAt, false) / 3600, 6)),
             'impact' => $percent('impacted_households', 'households'),
             'special_needs' => $percent('unresolved_vulnerable_members', 'total_vulnerable_members'),
             'unreported' => $percent('unreported_members', 'total_members'),
@@ -103,19 +111,21 @@ class RescueCriteriaQuery
         $current = $this->current($eventId, $startedAt);
         $settingsVersion = (int) $this->priorities->settingsForEvent($eventId)->version;
         $current['rescue_priority_version'] = $settingsVersion;
-        $elapsedHours = max(0, (int) $startedAt->diffInHours(now()));
-        $expectedSnapshots = intdiv($elapsedHours, 3) + 1;
-        $storedSnapshots = DB::table('rescue_criteria_snapshots')
-            ->where('event_id', $eventId)->where('definition_version', 4)->count();
-        if ($storedSnapshots < $expectedSnapshots) {
+        $elapsedHours = max(0, (int) $startedAt->diffInHours(now(), false));
+        $latestBucket = $startedAt->copy()->addHours(intdiv($elapsedHours, 3) * 3);
+        $hasLatestBucket = DB::table('rescue_criteria_snapshots')
+            ->where('event_id', $eventId)->where('definition_version', 6)
+            ->where('observed_at', $latestBucket->toDateTimeString())->exists();
+        if (! $hasLatestBucket) {
             $this->historyQuery->refresh($eventId, $startedAt);
         }
 
-        $history = DB::table('rescue_criteria_snapshots')->where('event_id', $eventId)->where('definition_version', 4)
-            ->orderByDesc('observed_at')->limit(250)->get()->reverse()->values()
+        $history = DB::table('rescue_criteria_snapshots')->where('event_id', $eventId)->where('definition_version', 6)
+            ->whereBetween('observed_at', [$startedAt, Carbon::parse($current['observed_at'])])
+            ->orderBy('observed_at')->get()
             ->map(fn (object $row): array => [
                 'observed_at' => Carbon::parse($row->observed_at)->toIso8601String(),
-                'hours_since_alert' => max(0, round($startedAt->diffInMinutes(Carbon::parse($row->observed_at)) / 60, 1)),
+                'hours_since_alert' => max(0, round($startedAt->diffInSeconds(Carbon::parse($row->observed_at), false) / 3600, 6)),
                 'impact' => $row->impact === null ? null : (float) $row->impact,
                 'special_needs' => $row->special_needs === null ? null : (float) $row->special_needs,
                 'unreported' => $row->unreported === null ? null : (float) $row->unreported,
@@ -140,7 +150,7 @@ class RescueCriteriaQuery
         $snapshot = [
             'event_id' => $eventId,
             'observed_at' => Carbon::parse($point['observed_at'])->toDateTimeString(),
-            'definition_version' => 4,
+            'definition_version' => 6,
             'impact' => $point['impact'],
             'special_needs' => $point['special_needs'],
             'unreported' => $point['unreported'],

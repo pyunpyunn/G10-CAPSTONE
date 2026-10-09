@@ -4,6 +4,7 @@ namespace App\Services\Web;
 
 use App\Presenters\NotificationPresenter;
 use App\Queries\NotificationQuery;
+use App\Services\Shared\RealtimeReadCache;
 use Illuminate\Http\Request;
 
 class NotificationService
@@ -46,8 +47,10 @@ class NotificationService
 
     private function items(Request $request)
     {
-        $raw=$this->query->feedSources();
-        $items=$this->presenter->feed($raw);
+        // Cache only presented arrays; apply each user's read/hidden state after the shared read.
+        $rows = app(RealtimeReadCache::class)->remember('notification-feed:v2',
+            fn () => $this->presenter->feed($this->query->feedSources())->all());
+        $items = collect($rows);
         return $this->savedView->apply($items,$this->savedView->state($this->query->savedViewRows($request), $items->pluck('id')->all()));
     }
 }

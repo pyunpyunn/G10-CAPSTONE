@@ -41,3 +41,13 @@ export async function logoutMobile() {
     }
   }
 }
+
+export async function changePasswordWithOldPassword(payload: { login: string; current_password: string; password: string; password_confirmation: string }) {
+  return (await api.post('/auth/password-recovery/reset', payload)).data;
+}
+
+export async function verifyPasswordChange(login: string, currentPassword?: string) {
+  const payload: { login: string; current_password?: string } = { login: login.trim() };
+  if (currentPassword !== undefined) payload.current_password = currentPassword;
+  return (await api.post('/auth/password-recovery/verify', payload)).data;
+}

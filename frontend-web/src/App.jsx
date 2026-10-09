@@ -11,7 +11,7 @@ import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import HouseholdReviewPage from './pages/HouseholdReviewPage'
-import { getCurrentUser, loginUser, logoutUser } from './api/authApi'
+import { getCurrentUser, loginUser, logoutUser, saveRememberedPassword } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
 import './App.css'
 import './styles/foundation.css'
@@ -212,15 +212,15 @@ function AuthRoutes() {
 
       if (!isWebUser(nextUser)) {
         clearToken()
-        setLoginError('Household and rescuer accounts should use the mobile app.')
-        return
+        throw new Error('Household and rescuer accounts should use the mobile app.')
       }
 
+      await saveRememberedPassword(form.login, form.password, form.rememberPassword)
       saveToken(data.token)
       setUser(nextUser)
       navigate('/dashboard', { replace: true })
     } catch (error) {
-      setLoginError(getLoginMessage(error))
+      throw new Error(error.message === 'Household and rescuer accounts should use the mobile app.' ? error.message : getLoginMessage(error), { cause: error })
     }
   }
 

@@ -67,7 +67,7 @@ class ProfileWorkflow
     {
         $validated = $request->validate([
             'current_password' => ['required', 'string'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'min:8', 'max:128', 'confirmed'],
         ], [
             'current_password.required' => 'Current password is required.',
             'password.required' => 'New password is required.',
@@ -83,6 +83,10 @@ class ProfileWorkflow
             ], 422);
         }
 
+        if (Hash::check($validated['password'], $user->password)) {
+            return response()->json(['message' => 'Choose a different new password.'], 422);
+        }
+
         DB::transaction(function () use ($request, $user, $validated): void {
             User::query()->where($user->getKeyName(), $user->getKey())->update([
                 'password' => Hash::make($validated['password']),
@@ -90,6 +94,9 @@ class ProfileWorkflow
                 'must_change_password' => 0,
                 'updated_at' => now(),
             ]);
+            if (Schema::hasTable('personal_access_tokens')) {
+                $user->tokens()->where('id', '!=', $user->currentAccessToken()?->id)->delete();
+            }
             $this->writeAuditLog($request, 'change_password', null, [
                 'user_id' => $user->user_id,
                 'changed_at' => now()->toDateTimeString(),

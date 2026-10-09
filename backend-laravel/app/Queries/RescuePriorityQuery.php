@@ -126,19 +126,14 @@ class RescuePriorityQuery
 
     public function contactMissingExpression(): string
     {
-        $hasDevices = Schema::hasTable('device_tokens') && Schema::hasColumn('device_tokens', 'household_id');
-        $active = $hasDevices && Schema::hasColumn('device_tokens', 'is_active') ? ' AND dt.is_active = 1' : '';
-        $ownDevice = $hasDevices ? "EXISTS (SELECT 1 FROM device_tokens dt WHERE dt.household_id = h.household_id{$active})" : '0 = 1';
-        $trustedDevice = $hasDevices ? "EXISTS (SELECT 1 FROM device_tokens dt WHERE dt.household_id = trusted.household_id{$active})" : '0 = 1';
-
-        return "CASE WHEN (h.contact_number IS NULL OR TRIM(h.contact_number) = '')
-            AND NOT ({$ownDevice})
+        return "CASE WHEN NOT EXISTS (
+                SELECT 1 FROM geotagged_locations location WHERE location.household_id = h.household_id
+            )
             AND NOT EXISTS (
                 SELECT 1 FROM trusted_households trust JOIN households trusted
                 ON ((trust.requesting_household_id = h.household_id AND trusted.household_id = trust.trusted_household_id)
                     OR (trust.trusted_household_id = h.household_id AND trusted.household_id = trust.requesting_household_id))
                 WHERE trust.validation_status IN ('validated', 'approved') AND trusted.deleted_at IS NULL
-                AND ((trusted.contact_number IS NOT NULL AND TRIM(trusted.contact_number) <> '') OR {$trustedDevice})
             ) THEN 1 ELSE 0 END";
     }
 }

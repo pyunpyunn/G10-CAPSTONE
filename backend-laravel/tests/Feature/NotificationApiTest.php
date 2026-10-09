@@ -14,6 +14,40 @@ use Tests\TestCase;
 
 class NotificationApiTest extends TestCase
 {
+    public function test_feed_and_preview_survive_cache_hits_with_class_deserialization_disabled(): void
+    {
+        Schema::create('audit_logs', function (Blueprint $table): void {
+            $table->increments('audit_log_id');
+            foreach (['user_id', 'role_key', 'module', 'action', 'reference_table', 'reference_id', 'ip_address', 'user_agent'] as $column) {
+                $table->string($column)->nullable();
+            }
+            $table->text('old_values')->nullable();
+            $table->text('new_values')->nullable();
+            $table->timestamp('created_at')->useCurrent();
+        });
+        config([
+            'realtime.read_cache' => true,
+            'realtime.cache_store' => 'notification-test',
+            'cache.serializable_classes' => false,
+            'cache.stores.notification-test' => ['driver' => 'array', 'serialize' => true],
+        ]);
+        $cache = \Illuminate\Support\Facades\Cache::store('notification-test');
+        $revision = 'realtime:'.config('app.env').':'.config('realtime.connection').':revision';
+        $cache->put($revision.':initial:notification-sources', ['outgoing' => Notification::all()], 60);
+        $this->assertInstanceOf(\__PHP_Incomplete_Class::class, $cache->get($revision.':initial:notification-sources')['outgoing']);
+
+        $user = User::query()->where('user_id', 'USR-ADMIN-001')->firstOrFail();
+        $this->actingAs($user, 'sanctum');
+        $first = $this->getJson('/api/v1/notifications')->assertOk();
+        $second = $this->getJson('/api/v1/notifications')->assertOk();
+        $this->assertSame($first->json('data'), $second->json('data'));
+        $this->assertNotEmpty($second->json('data.preview'));
+        $this->assertIsArray($cache->get($revision.':initial:notification-feed:v2'));
+
+        $this->postJson('/api/v1/notifications/mark-read', ['notification_ids' => ['notif-1']])->assertOk();
+        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.unread', 0);
+    }
+
     public function test_mobile_member_status_and_inquiry_writes_broadcast_view_updates(): void
     {
         Event::fake([NotificationFeedChanged::class]);

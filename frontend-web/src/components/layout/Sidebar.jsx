@@ -20,11 +20,11 @@ import {
 } from 'lucide-react'
 
 const navGroups = [
-  { title: 'General Monitoring', paths: ['/households', '/mapping', '/weather'] },
+  { title: 'Geospatial & Analytics', paths: ['/households', '/mapping', '/weather'] },
   { title: 'Response Operations', paths: ['/dispatch', '/rescue-management', '/field-reports'] },
-  { title: 'Team Management', paths: ['/rescuers', '/rescuers/teams'] },
+  { title: 'Personnel Access Control', paths: ['/rescuers', '/rescuers/teams'] },
   { title: 'Resources & Requests', paths: ['/request-types', '/external-requests', '/resources-requests'] },
-  { title: 'Reports Management', paths: ['/situation', '/archive'] },
+  { title: 'Reports Documentation', paths: ['/situation', '/archive'] },
 ]
 
 const icons = {
