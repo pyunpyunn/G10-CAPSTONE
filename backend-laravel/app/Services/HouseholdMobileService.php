@@ -14,6 +14,13 @@ use Illuminate\Validation\ValidationException;
 
 class HouseholdMobileService
 {
+    private const TRUSTED_HOUSEHOLD_RELATIONSHIPS = [
+        'relative' => 'Relative',
+        'extended_family_household' => 'Extended Family Household',
+        'family_friend_household' => 'Family Friend Household',
+        'close_friend_household' => "Close Friend's Household",
+    ];
+
     public function __construct(private OneSignalNotificationService $oneSignal) {}
 
     public function overview(Request $request): JsonResponse
@@ -721,7 +728,7 @@ class HouseholdMobileService
 
         if (! $household) {
             return response()->json([
-                'message' => 'Household account was not found. Enter the household ID like HH-2024035503 or the account ID like 2024035503.',
+                'message' => 'Household account was not found. Enter the household ID or the household account username.',
             ], 404);
         }
 
@@ -732,6 +739,7 @@ class HouseholdMobileService
                 'household_id' => $household->household_id,
                 'family_name' => $this->familyName($household->household_name ?? $household->household_code ?? $household->household_id),
                 'household_code' => $household->household_code ?? null,
+                'household_username' => $this->householdUsername($trustedHouseholdId),
                 'members' => $this->members($trustedHouseholdId, $devices, null, $this->activeEvent()['event_id'] ?? null)
                     ->map(fn (array $member): array => [
                         'member_id' => $member['member_id'],
@@ -759,13 +767,21 @@ class HouseholdMobileService
 
         $validated = $request->validate([
             'trusted_household_id' => ['required', 'string', 'max:255'],
-            'reason' => ['required', 'string', 'max:500'],
-            'member_relationships' => ['nullable', 'array'],
+            'household_identifier' => ['nullable', 'string', 'max:255'],
+            'relationshipID' => ['required', 'string', Rule::in(array_keys(self::TRUSTED_HOUSEHOLD_RELATIONSHIPS))],
+            'relationshipLabel' => ['required', 'string', 'max:100'],
             'pin' => ['required', 'digits:4'],
         ], [
             'trusted_household_id.required' => 'Enter the household ID you want to connect with.',
-            'reason.required' => 'Give a short reason for this trusted household request.',
+            'relationshipID.required' => 'Select your relationship to this household.',
+            'relationshipLabel.required' => 'Select your relationship to this household.',
         ]);
+
+        $relationshipLabel = self::TRUSTED_HOUSEHOLD_RELATIONSHIPS[$validated['relationshipID']];
+
+        if ($validated['relationshipLabel'] !== $relationshipLabel) {
+            return response()->json(['message' => 'Select one of the available household relationship options.'], 422);
+        }
 
         $trustedHouseholdId = $this->resolveTrustedHouseholdId($validated['trusted_household_id']);
 
@@ -775,7 +791,7 @@ class HouseholdMobileService
 
         if (! $trustedHouseholdId || ! $this->householdRecord($trustedHouseholdId)) {
             return response()->json([
-                'message' => 'Household account was not found. Enter the household ID like HH-2024035503 or the account ID like 2024035503.',
+                'message' => 'Household account was not found. Enter the household ID or the household account username.',
             ], 404);
         }
 
@@ -820,9 +836,12 @@ class HouseholdMobileService
             'connection_id' => $connectionId,
             'requesting_household_id' => $householdId,
             'trusted_household_id' => $trustedHouseholdId,
-            'reason' => $validated['reason'],
+            // Keep the legacy reason value meaningful for existing request displays.
+            'reason' => $relationshipLabel,
+            'relationship_id' => $validated['relationshipID'],
+            'relationship_label' => $relationshipLabel,
             'validation_status' => 'pending',
-            'member_relationships' => json_encode($validated['member_relationships'] ?? [], JSON_UNESCAPED_SLASHES),
+            'member_relationships' => json_encode([], JSON_UNESCAPED_SLASHES),
             'created_by_user_id' => $user?->user_id,
             'created_at' => $now,
             'updated_at' => $now,
@@ -1133,6 +1152,18 @@ class HouseholdMobileService
         }
 
         return $query->value('household_id');
+    }
+
+    private function householdUsername(string $householdId): ?string
+    {
+        if (! Schema::hasTable('users') || ! Schema::hasColumn('users', 'household_id')) {
+            return null;
+        }
+
+        return DB::table('users')
+            ->where('household_id', $householdId)
+            ->orderBy('username')
+            ->value('username');
     }
 
     private function householdRecord(string $householdId): ?object
@@ -1799,6 +1830,8 @@ class HouseholdMobileService
                 'th.requesting_household_id',
                 'th.trusted_household_id',
                 'th.reason',
+                $this->optionalColumnSelect('trusted_households', 'relationship_id', 'relationship_id', 'th'),
+                $this->optionalColumnSelect('trusted_households', 'relationship_label', 'relationship_label', 'th'),
                 'th.validation_status',
                 'th.member_relationships',
                 'th.created_at',
@@ -1824,6 +1857,8 @@ class HouseholdMobileService
                     'household_name' => $trustedHouseholdName,
                     'family_name' => $this->familyName($trustedHouseholdName),
                     'reason' => $row->reason,
+                    'relationship_id' => $row->relationship_id,
+                    'relationship_label' => $row->relationship_label ?? $row->reason,
                     'validation_status' => $row->validation_status,
                     'member_relationships' => $this->decodeJson($row->member_relationships),
                     'current_status' => $canAccess ? $this->currentStatus($trustedHouseholdId, $activeEvent['event_id'] ?? null) : null,
@@ -1852,6 +1887,8 @@ class HouseholdMobileService
                 'th.connection_id',
                 'th.requesting_household_id',
                 'th.reason',
+                $this->optionalColumnSelect('trusted_households', 'relationship_id', 'relationship_id', 'th'),
+                $this->optionalColumnSelect('trusted_households', 'relationship_label', 'relationship_label', 'th'),
                 'th.member_relationships',
                 'th.created_at',
                 'h.household_name',
@@ -1864,6 +1901,8 @@ class HouseholdMobileService
                 'family_name' => $this->familyName($row->household_name ?? $row->household_code ?? $row->requesting_household_id),
                 'household_username' => $row->household_username ?? $this->familyName($row->household_name ?? $row->household_code ?? $row->requesting_household_id),
                 'reason' => $row->reason,
+                'relationship_id' => $row->relationship_id,
+                'relationship_label' => $row->relationship_label ?? $row->reason,
                 'member_relationships' => $this->decodeJson($row->member_relationships),
                 'created_at' => $row->created_at,
                 'created_label' => $this->dateLabel($row->created_at),

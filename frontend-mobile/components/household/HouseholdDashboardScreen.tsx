@@ -366,7 +366,7 @@ function TrustedHouseholdList({
           <View style={styles.trustedText}>
             <Text style={styles.rowTitle}>{trustedHouseholdName(householdItem)}</Text>
             <Text style={[styles.rowMeta, styles.trustedMeta]}>
-              {householdItem.household_id} · {householdItem.reason || 'Trusted household request'}
+              {householdItem.household_id} · {householdItem.relationship_label || householdItem.reason || 'Trusted household request'}
             </Text>
           </View>
           <View style={styles.trustedStatusSlot}>

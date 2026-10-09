@@ -478,7 +478,7 @@ export default function HouseholdHomeScreen() {
 
   async function handleLookupTrusted(householdId: string) {
     if (!householdId) {
-      Alert.alert('Missing household ID', 'Enter the household ID first.');
+      Alert.alert('Missing household details', 'Enter the household ID or username first.');
       return;
     }
 
@@ -495,8 +495,8 @@ export default function HouseholdHomeScreen() {
   }
 
   async function handleCreateTrusted(payload: any) {
-    if (!payload.trusted_household_id || !payload.reason) {
-      Alert.alert('Missing details', 'Enter the household ID and reason.');
+    if (!payload.trusted_household_id || !payload.relationshipID || !payload.relationshipLabel || !payload.pin) {
+      Alert.alert('Missing details', 'Complete the household, relationship, and PIN steps first.');
       return;
     }
 

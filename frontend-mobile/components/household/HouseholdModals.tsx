@@ -81,7 +81,7 @@ export function HouseholdNotificationsModal({ visible, requests, notices = [], b
                   </Pressable>
                   {expanded ? (
                     <View style={styles.notificationDetails}>
-                      <Text style={styles.notificationDetailText}>Request details: {request.reason || 'Trusted household connection request'}</Text>
+                      <Text style={styles.notificationDetailText}>Relationship: {request.relationship_label || request.reason || 'Trusted household connection request'}</Text>
                       <Text style={styles.notificationDate}>{request.created_label || ''}</Text>
                       <View style={styles.notificationActions}>
                         <Pressable
@@ -258,9 +258,16 @@ type AddTrustedModalProps = {
   loading: boolean;
   lookupResult: any;
   onClose: () => void;
-  onLookup: (householdId: string) => void;
+  onLookup: (identifier: string) => void;
   onSubmit: (payload: any) => void;
 };
+
+const trustedRelationshipOptions = [
+  { relationshipID: 'relative', relationshipLabel: 'Relative', icon: 'people-outline' },
+  { relationshipID: 'extended_family_household', relationshipLabel: 'Extended Family Household', icon: 'home-outline' },
+  { relationshipID: 'family_friend_household', relationshipLabel: 'Family Friend Household', icon: 'heart-outline' },
+  { relationshipID: 'close_friend_household', relationshipLabel: "Close Friend's Household", icon: 'person-add-outline' },
+] as const;
 
 export function AddTrustedHouseholdModal({
   visible,
@@ -270,30 +277,39 @@ export function AddTrustedHouseholdModal({
   onLookup,
   onSubmit,
 }: AddTrustedModalProps) {
-  const [householdId, setHouseholdId] = useState('');
-  const [reason, setReason] = useState('');
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [householdIdentifier, setHouseholdIdentifier] = useState('');
+  const [relationship, setRelationship] = useState<(typeof trustedRelationshipOptions)[number] | null>(null);
   const [targetPin, setTargetPin] = useState('');
-  const [relationships, setRelationships] = useState<Record<string, string>>({});
+  const [isTargetPinVisible, setIsTargetPinVisible] = useState(false);
 
   useEffect(() => {
     if (!visible) {
-      setHouseholdId('');
-      setReason('');
+      setStep(1);
+      setHouseholdIdentifier('');
+      setRelationship(null);
       setTargetPin('');
-      setRelationships({});
+      setIsTargetPinVisible(false);
     }
   }, [visible]);
 
+  useEffect(() => {
+    if (visible && lookupResult) {
+      setStep(2);
+    }
+  }, [lookupResult, visible]);
+
   function submit() {
+    if (!relationship) {
+      return;
+    }
+
     onSubmit({
-      trusted_household_id: lookupResult?.household_id || householdId,
-      reason,
+      trusted_household_id: lookupResult?.household_id || householdIdentifier,
+      household_identifier: householdIdentifier,
+      relationshipID: relationship.relationshipID,
+      relationshipLabel: relationship.relationshipLabel,
       pin: targetPin,
-      member_relationships: (lookupResult?.members || []).map((member: any) => ({
-        member_id: member.member_id,
-        name: member.name,
-        relationship_to_family: relationships[member.member_id] || '',
-      })),
     });
   }
 
@@ -304,90 +320,115 @@ export function AddTrustedHouseholdModal({
           <ModalHeader title="Add trusted household" onClose={onClose} />
           <ScrollView contentContainerStyle={styles.modalScroll}>
             <View style={styles.stepRow}>
-              <StepPill label="Find" active />
-              <StepPill label="Reason" active={Boolean(lookupResult)} />
-              <StepPill label="Members" active={Boolean(lookupResult?.members?.length)} />
+              <StepPill label="1. Identify" active={step === 1} complete={step > 1} />
+              <StepPill label="2. Relationship" active={step === 2} complete={step > 2} />
+              <StepPill label="3. Verify PIN" active={step === 3} />
             </View>
 
-            <View style={styles.lookupRow}>
-              <TextInput
-                style={[styles.input, styles.lookupInput]}
-                value={householdId}
-                onChangeText={setHouseholdId}
-                placeholder="HH-2024035503 or 2024035503"
-                placeholderTextColor="#7d8da0"
-                autoCapitalize="characters"
-              />
-              <Pressable style={styles.lookupButton} onPress={() => { setTargetPin(''); onLookup(householdId.trim()); }}>
-                <Ionicons name="search-outline" size={19} color="#fff" />
-              </Pressable>
-            </View>
-
-            {lookupResult ? (
-              <View style={styles.lookupCard}>
-                <Text style={styles.lookupLabel}>Connect with</Text>
-                <Text style={styles.lookupTitle}>{lookupResult.family_name} household</Text>
-                <Text style={styles.lookupMeta}>{lookupResult.household_id}</Text>
-              </View>
-            ) : (
-              <HouseholdEmpty icon="home-outline" title="No household selected" />
-            )}
-
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={reason}
-              onChangeText={setReason}
-              placeholder="Reason for trusted access"
-              placeholderTextColor="#7d8da0"
-              multiline
-              textAlignVertical="top"
-            />
-
-            {lookupResult ? (
-              <View style={styles.targetPinGroup}>
-                <Text style={styles.lookupLabel}>Household PIN</Text>
-                <Text style={styles.memberMeta}>Enter the PIN set by {lookupResult.family_name || 'this household'}. A correct PIN sends a request; the household must confirm before it is connected.</Text>
+            {step === 1 ? (
+              <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>Find a household</Text>
+                <Text style={styles.note}>Enter the trusted household ID or the household account username.</Text>
                 <TextInput
                   style={styles.input}
-                  value={targetPin}
-                  onChangeText={(value) => setTargetPin(value.replace(/[^0-9]/g, '').slice(0, 4))}
-                  placeholder="Their 4-digit PIN"
+                  value={householdIdentifier}
+                  onChangeText={setHouseholdIdentifier}
+                  placeholder="Household ID or username"
                   placeholderTextColor="#7d8da0"
-                  keyboardType="number-pad"
-                  secureTextEntry
-                  maxLength={4}
-                  accessibilityLabel="Target household 4-digit PIN"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                  onSubmitEditing={() => onLookup(householdIdentifier.trim())}
+                  accessibilityLabel="Trusted household ID or username"
+                />
+                <HouseholdButton
+                  label={loading ? 'Looking up household...' : 'Continue'}
+                  icon="arrow-forward-outline"
+                  disabled={loading || !householdIdentifier.trim()}
+                  onPress={() => onLookup(householdIdentifier.trim())}
                 />
               </View>
             ) : null}
 
-            {lookupResult?.members?.length ? (
-              <View style={styles.relationshipStack}>
-                <HouseholdSection title="Member relationships" />
-                {lookupResult.members.map((member: any) => (
-                  <View key={member.member_id} style={styles.relationshipRow}>
-                    <Text style={styles.memberName}>{member.name}</Text>
-                    {member.household_relationship ? (
-                      <Text style={styles.memberMeta}>{member.household_relationship}</Text>
-                    ) : null}
-                    <TextInput
-                      style={[styles.input, styles.relationshipInput]}
-                      value={relationships[member.member_id] || ''}
-                      onChangeText={(value) => setRelationships((current) => ({ ...current, [member.member_id]: value }))}
-                      placeholder="Relationship"
-                      placeholderTextColor="#7d8da0"
-                    />
-                  </View>
-                ))}
+            {step === 2 && lookupResult ? (
+              <View style={styles.stepContent}>
+                <View style={styles.lookupCard}>
+                  <Text style={styles.lookupLabel}>Adding</Text>
+                  <Text style={styles.lookupTitle}>{lookupResult.family_name} household</Text>
+                  <Text style={styles.lookupMeta}>{lookupResult.household_id}</Text>
+                </View>
+                <Text style={styles.stepTitle}>Select your relationship</Text>
+                <Text style={styles.note}>Choose the relationship that best describes this household.</Text>
+                <View style={styles.relationshipChoices}>
+                  {trustedRelationshipOptions.map((option) => (
+                    <Pressable
+                      key={option.relationshipID}
+                      style={({ pressed }) => [styles.relationshipChoice, pressed && styles.relationshipChoicePressed]}
+                      onPress={() => {
+                        setRelationship(option);
+                        setStep(3);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={option.relationshipLabel}
+                    >
+                      <View style={styles.relationshipChoiceIcon}>
+                        <Ionicons name={option.icon} size={20} color={palette.navActive} />
+                      </View>
+                      <Text style={styles.relationshipChoiceText}>{option.relationshipLabel}</Text>
+                      <Ionicons name="chevron-forward-outline" size={18} color={palette.textSoft} />
+                    </Pressable>
+                  ))}
+                </View>
+                <Pressable style={styles.backLink} onPress={() => setStep(1)} accessibilityRole="button">
+                  <Text style={styles.backLinkText}>Use a different household</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {step === 3 && lookupResult && relationship ? (
+              <View style={styles.stepContent}>
+                <View style={styles.lookupCard}>
+                  <Text style={styles.lookupLabel}>Relationship</Text>
+                  <Text style={styles.lookupTitle}>{relationship.relationshipLabel}</Text>
+                  <Text style={styles.lookupMeta}>{lookupResult.family_name} household · {lookupResult.household_id}</Text>
+                </View>
+                <Text style={styles.stepTitle}>Verify household PIN</Text>
+                <Text style={styles.note}>Enter the PIN set by {lookupResult.family_name || 'this household'}. A correct PIN sends the request for their confirmation.</Text>
+                <View style={styles.pinInputWrap}>
+                <TextInput
+                  style={styles.pinInput}
+                  value={targetPin}
+                  onChangeText={(value) => setTargetPin(value.replace(/[^0-9]/g, '').slice(0, 4))}
+                  placeholder="4-digit household PIN"
+                  placeholderTextColor="#7d8da0"
+                  keyboardType="number-pad"
+                  secureTextEntry={!isTargetPinVisible}
+                  maxLength={4}
+                  accessibilityLabel="Target household 4-digit PIN"
+                />
+                  <Pressable
+                    style={styles.pinVisibilityButton}
+                    onPress={() => setIsTargetPinVisible((current) => !current)}
+                    accessibilityRole="button"
+                    accessibilityLabel={isTargetPinVisible ? 'Hide household PIN' : 'Show household PIN'}
+                  >
+                    <Ionicons name={isTargetPinVisible ? 'eye-off-outline' : 'eye-outline'} size={20} color={palette.textSoft} />
+                  </Pressable>
+                </View>
+                <Pressable style={styles.backLink} onPress={() => setStep(2)} accessibilityRole="button">
+                  <Text style={styles.backLinkText}>Change relationship</Text>
+                </Pressable>
               </View>
             ) : null}
           </ScrollView>
-          <HouseholdButton
-            label={loading ? 'Verifying PIN...' : 'Send request'}
-            icon="send-outline"
-            disabled={loading || !lookupResult || !reason.trim() || targetPin.length !== 4}
-            onPress={submit}
-          />
+          {step === 3 ? (
+            <HouseholdButton
+              label={loading ? 'Verifying PIN...' : 'Send request'}
+              icon="send-outline"
+              disabled={loading || !lookupResult || !relationship || targetPin.length !== 4}
+              onPress={submit}
+            />
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -405,10 +446,10 @@ function ModalHeader({ title, onClose }: { title: string; onClose: () => void })
   );
 }
 
-function StepPill({ label, active }: { label: string; active: boolean }) {
+function StepPill({ label, active, complete = false }: { label: string; active: boolean; complete?: boolean }) {
   return (
-    <View style={[styles.stepPill, active && styles.stepPillActive]}>
-      <Text style={[styles.stepText, active && styles.stepTextActive]}>{label}</Text>
+    <View style={[styles.stepPill, (active || complete) && styles.stepPillActive]}>
+      <Text style={[styles.stepText, (active || complete) && styles.stepTextActive]}>{label}</Text>
     </View>
   );
 }
@@ -492,6 +533,14 @@ const styles = StyleSheet.create({
   rejectText: { color: palette.text },
   acceptText: { color: '#fff' },
   targetPinGroup: { gap: spacing.xs },
+  stepContent: {
+    gap: spacing.md,
+  },
+  stepTitle: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
   stepRow: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -639,6 +688,48 @@ const styles = StyleSheet.create({
   },
   lookupMeta: {
     color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  relationshipChoices: {
+    gap: spacing.sm,
+  },
+  relationshipChoice: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: '#fff',
+  },
+  relationshipChoicePressed: {
+    borderColor: palette.navActive,
+    backgroundColor: `${palette.navActive}0b`,
+  },
+  relationshipChoiceIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: `${palette.navActive}14`,
+  },
+  relationshipChoiceText: {
+    flex: 1,
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  backLink: {
+    alignSelf: 'flex-start',
+    minHeight: 34,
+    justifyContent: 'center',
+  },
+  backLinkText: {
+    color: palette.navActive,
     fontSize: 12,
     fontWeight: '800',
   },
