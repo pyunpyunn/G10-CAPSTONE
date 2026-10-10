@@ -86,9 +86,10 @@ export default function ResourceRequestEditorPage() {
   }, [requestId, mode])
 
   const options = payload?.options || {}
+  const returnTo = location.state?.returnTo === '/external-requests' ? '/external-requests' : '/resources-requests'
 
   function closePage() {
-    navigate('/resources-requests')
+    navigate(returnTo)
   }
 
   function openReturnPage() {

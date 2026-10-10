@@ -453,3 +453,19 @@
   text-align: center;
   font-weight: 500;
 }
+.notification-open-button {
+  display: block;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-open-button:hover,
+.notification-open-button:focus-visible {
+  text-decoration: underline;
+}

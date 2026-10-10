@@ -136,56 +136,68 @@ class AuthService
         return response()->json(['message' => 'Recovery questions saved successfully.']);
     }
 
+    public function verifyPasswordChange(Request $request): JsonResponse
+    {
+        $values = $request->validate([
+            'login' => ['required', 'string', 'max:255'],
+            'current_password' => ['sometimes', 'required', 'string', 'max:255'],
+        ]);
+        if ($response = $this->databaseUnavailableResponse()) return $response;
+        $user = $this->accounts->userFromLogin(trim($values['login']));
+        if (! $user) {
+            throw ValidationException::withMessages(['login' => ['Account ID does not exist. Check the ID issued by your administrator.']]);
+        }
+        if ($user->is_active !== null && ! $user->is_active) {
+            return response()->json(['message' => 'This account is inactive. Contact HQ/Admin.'], 403);
+        }
+        if (array_key_exists('current_password', $values) &&
+            (! $user->password || ! Hash::check($values['current_password'], $user->password))) {
+            throw ValidationException::withMessages(['current_password' => ['Old password is incorrect.']]);
+        }
+        return response()->json(['message' => array_key_exists('current_password', $values) ? 'Old password verified.' : 'Account ID verified.']);
+    }
+
     public function resetPassword(Request $request): JsonResponse
     {
-        if (! $this->hasRecoveryColumns()) {
-            return response()->json(['message' => 'Account recovery is not configured yet. Run the latest database migration.'], 503);
-        }
-
-        $validated = $request->validate([
+        $values = $request->validate([
             'login' => ['required', 'string', 'max:255'],
-            'method' => ['required', 'in:previous_password,security_questions'],
-            'previous_password' => ['nullable', 'string'],
-            'question_1' => ['nullable', 'string', 'in:'.implode(',', array_keys(self::RECOVERY_QUESTIONS))],
-            'answer_1' => ['nullable', 'string'],
-            'question_2' => ['nullable', 'string', 'in:'.implode(',', array_keys(self::RECOVERY_QUESTIONS))],
-            'answer_2' => ['nullable', 'string'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'current_password' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', 'min:8', 'max:128', 'confirmed'],
         ]);
-        $user = $this->accounts->userFromLogin($validated['login']);
-
+        $user = $this->accounts->userFromLogin(trim($values['login']));
         if (! $user) {
-            return response()->json(['message' => 'The account ID could not be found.'], 422);
+            throw ValidationException::withMessages(['login' => ['Account ID does not exist. Check the ID issued by your administrator.']]);
         }
-
-        $configured = filled($user->security_question_1) && filled($user->security_question_2);
-        $previousPasswordValid = filled($validated['previous_password'] ?? null) && Hash::check($validated['previous_password'], $user->password);
-
-        if ($validated['method'] === 'previous_password') {
-            if (! $previousPasswordValid) {
-                return response()->json(['message' => 'The previous password is incorrect.'], 422);
-            }
-
-            if (! $configured) {
-                if (($validated['question_1'] ?? null) === ($validated['question_2'] ?? null) || ! filled($validated['question_1'] ?? null) || ! filled($validated['question_2'] ?? null) || ! filled($validated['answer_1'] ?? null) || ! filled($validated['answer_2'] ?? null)) {
-                    return response()->json(['message' => 'Choose two different recovery questions and answer both before continuing.'], 422);
-                }
-
-                $this->storeRecoveryQuestions($user, $validated);
-            }
-        } elseif (! $configured) {
-            return response()->json(['message' => 'Set up your two recovery questions by verifying your previous password first.'], 422);
-        } elseif (! Hash::check($this->normalizeAnswer($validated['answer_1'] ?? ''), $user->security_answer_1) || ! Hash::check($this->normalizeAnswer($validated['answer_2'] ?? ''), $user->security_answer_2)) {
-            return response()->json(['message' => 'The recovery answers are incorrect.'], 422);
+        if (! $user->password || ! Hash::check($values['current_password'], $user->password)) {
+            throw ValidationException::withMessages(['current_password' => ['Old password is incorrect.']]);
         }
+        if ($user->is_active !== null && ! $user->is_active) {
+            return response()->json(['message' => 'This account is inactive. Contact HQ/Admin.'], 403);
+        }
+        if (Hash::check($values['password'], $user->password)) {
+            throw ValidationException::withMessages(['password' => ['Choose a different new password.']]);
+        }
+        DB::transaction(function () use ($user, $values): void {
+            $updates = ['password' => Hash::make($values['password']), 'updated_at' => now()];
+            if (Schema::hasColumn('users', 'password_changed_at')) $updates['password_changed_at'] = now();
+            if (Schema::hasColumn('users', 'must_change_password')) $updates['must_change_password'] = 0;
+            User::query()->whereKey($user->getKey())->update($updates);
+            if (Schema::hasTable('personal_access_tokens')) $user->tokens()->delete();
+        });
+        return response()->json(['message' => 'Password changed successfully. Sign in with your new password.']);
+    }
 
-        User::query()->whereKey($user->user_id)->update([
-            'password' => Hash::make($validated['password']),
-            'password_changed_at' => now(),
-            'must_change_password' => 0,
-            'updated_at' => now(),
-        ]);
-        return response()->json(['message' => 'Password reset successfully. You can now sign in.']);
+    private function hasRecoveryColumns(): bool
+    {
+        foreach (['security_question_1', 'security_question_2', 'security_answer_1', 'security_answer_2'] as $column) {
+            if (! Schema::hasColumn('users', $column)) return false;
+        }
+        return true;
+    }
+
+    private function normalizeAnswer(string $answer): string
+    {
+        return mb_strtolower(preg_replace('/\s+/u', ' ', trim($answer)));
     }
 
     private function storeRecoveryQuestions(User $user, array $values): void

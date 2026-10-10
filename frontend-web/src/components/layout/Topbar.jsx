@@ -2,7 +2,8 @@ import { Bell, CheckCircle2, Eye, Filter, Inbox, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { searchGlobalRecords } from '../../api/globalSearchApi'
-import { getNotifications, markNotificationsRead } from '../../api/notificationApi'
+import { markNotificationsRead, subscribeNotifications } from '../../api/notificationApi'
+import { notificationErrorMessage } from '../../utils/notificationHelpers'
 
 const searchTypes = [
   { id: 'pages', label: 'Pages' },
@@ -23,7 +24,7 @@ const searchablePages = [
   { title: 'Mapping', href: '/mapping', keywords: 'map routes evacuation centers' },
   { title: 'Household Status', href: '/households', keywords: 'residents family safety' },
   { title: 'Rescue Dispatch', href: '/dispatch', keywords: 'teams rescue assignments' },
-  { title: 'Rescuer Accounts', href: '/rescuers', keywords: 'responders personnel' },
+  { title: 'Account Management', href: '/rescuers', keywords: 'responders personnel hcc command center captain' },
   { title: 'Resources & Requests', href: '/resources-requests', keywords: 'supplies inventory requests' },
   { title: 'Situation Reporting', href: '/situation', keywords: 'sitrep reports' },
   { title: 'Archive', href: '/archive', keywords: 'history records logs' },
@@ -37,6 +38,8 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [notificationError, setNotificationError] = useState('')
+  const [notificationSaving, setNotificationSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [recordSearch, setRecordSearch] = useState({ key: '', status: 'idle', results: [], error: '' })
   const [selectedTypes, setSelectedTypes] = useState(() => searchTypes.map((type) => type.id))
@@ -126,44 +129,12 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   }, [isFilterOpen, isSearchOpen])
 
   useEffect(() => {
-    let ignore = false
-
-    async function loadPreview() {
-      try {
-        const data = await getNotifications({ status: 'all', page: 1 })
-
-        if (!ignore) {
-          setNotifications(data.preview || [])
-          setUnreadCount(data.summary?.unread || 0)
-        }
-      } catch {
-        if (!ignore) {
-          setNotifications([])
-          setUnreadCount(0)
-        }
-      }
-    }
-
-    async function refreshPreview() {
-      try {
-        const data = await getNotifications({ status: 'all', page: 1 })
-
-        setNotifications(data.preview || [])
-        setUnreadCount(data.summary?.unread || 0)
-      } catch {
-        setNotifications([])
-        setUnreadCount(0)
-      }
-    }
-
-    loadPreview()
-    window.addEventListener('notifications:changed', refreshPreview)
-
-    return () => {
-      ignore = true
-      window.removeEventListener('notifications:changed', refreshPreview)
-    }
-  }, [])
+    return subscribeNotifications({ status: 'all', page: 1 }, (data) => {
+      setNotifications(data.preview || [])
+      setUnreadCount(data.summary?.unread || 0)
+      setNotificationError('')
+    }, (error) => setNotificationError(notificationErrorMessage(error)))
+  }, [user?.user_id])
 
   useEffect(() => {
     if (!isOpen) {
@@ -196,12 +167,14 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   }, [isOpen])
 
   async function markAllRead() {
+    setNotificationSaving(true)
     try {
       await markNotificationsRead([])
-      window.dispatchEvent(new Event('notifications:changed'))
+      setNotificationError('')
+    } catch (error) {
+      setNotificationError(notificationErrorMessage(error, 'Unable to mark notifications as read.'))
     } finally {
-      setNotifications((currentItems) => currentItems.map((item) => ({ ...item, read: true })))
-      setUnreadCount(0)
+      setNotificationSaving(false)
     }
   }
 
@@ -230,7 +203,8 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   async function openNotification(item) {
     try {
       await markNotificationsRead([item.id])
-      window.dispatchEvent(new Event('notifications:changed'))
+    } catch (error) {
+      setNotificationError(notificationErrorMessage(error, 'Unable to mark this notification as read.'))
     } finally {
       setIsOpen(false)
       navigate(item.action_url || '/notifications')
@@ -370,7 +344,10 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
           aria-label={`${unreadLabel} unread notifications`}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => {
+            setIsOpen(!isOpen)
+            if (!isOpen) window.dispatchEvent(new Event('notifications:changed'))
+          }}
         >
           <Bell size={17} />
           {unreadCount > 0 && <span className="notification-badge" aria-hidden="true">{unreadLabel}</span>}
@@ -400,6 +377,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
             </div>
             <span className="notification-count-pill">{unreadCount} unread</span>
           </div>
+          {notificationError && <div className="notification-page-message" role="status">{notificationError}</div>}
           <div className="notification-popover-list">
             {notifications.length === 0 ? (
               <div className="notification-empty">
@@ -425,7 +403,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
             )}
           </div>
           <div className="notification-popover-actions">
-            <button className="btn btn-secondary btn-sm" type="button" onClick={markAllRead}>
+            <button className="btn btn-secondary btn-sm" type="button" onClick={markAllRead} disabled={notificationSaving}>
               <CheckCircle2 size={14} />
               Mark as read
             </button>
@@ -442,18 +420,41 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
 
 function getPageTitle(pathname, state) {
   const normalizedPath = pathname.replace(/\/$/, '') || '/dashboard'
+  const navigationTitles = {
+    '/dispatch': 'Dispatch Dashboard',
+    '/dispatch/communication': 'Field Communication',
+    '/rescue-management': 'Rescue Management',
+    '/rescue-management/new': 'Create New Dispatch Assignment',
+    '/field-reports': 'Field Reports',
+    '/rescuers/teams': 'Team Management',
+    '/request-types': 'Request Types',
+    '/external-requests': 'External Requests',
+    '/resources-requests': 'Request Monitoring',
+  }
+
+  if (/^\/rescue-management\/[^/]+\/edit$/.test(normalizedPath)) return 'Update Dispatch Assignment'
+
+  if (navigationTitles[normalizedPath]) return navigationTitles[normalizedPath]
+
   const page = searchablePages.find((item) => item.href === normalizedPath)
 
   if (page) return page.title
   if (normalizedPath === '/households/_household-list') return 'Household List'
-  if (normalizedPath.startsWith('/households/')) return 'Household Review'
-  if (normalizedPath === '/dispatch/new') return state?.dispatch ? 'Update Dispatch' : 'New Dispatch'
-  if (normalizedPath === '/rescuers/new') return 'New Rescuer'
-  if (normalizedPath === '/rescuers/teams') return 'Rescue Teams'
-  if (normalizedPath === '/rescuers/view') return 'Responder Profile'
-  if (normalizedPath === '/rescuers/edit') return 'Edit Responder'
+  if (normalizedPath.startsWith('/households/')) return 'Household Account View'
+  if (normalizedPath === '/dispatch/new') return state?.dispatch ? 'Update Dispatch Assignment' : 'Create New Dispatch Assignment'
+  if (normalizedPath === '/rescuers/new') return 'Add New User'
+  if (normalizedPath === '/rescuers/view') return 'View User Details'
+  if (normalizedPath === '/rescuers/edit') return 'Edit User Details'
   if (normalizedPath === '/resources-requests/new') return 'New Resource Request'
-  if (normalizedPath.startsWith('/resources-requests/')) return 'Edit Resource Request'
+  if (normalizedPath.startsWith('/resources-requests/')) {
+    const mode = normalizedPath.split('/').pop()
+    return {
+      view: 'View Request',
+      edit: 'Edit Request',
+      validate: 'Approve Request',
+      return: 'Return Request',
+    }[mode] || 'Request Details'
+  }
 
   return 'Dashboard'
 }

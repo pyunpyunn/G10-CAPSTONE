@@ -19,7 +19,7 @@ class RescuerAccountSupport
     public function validatePayload(Request $request, bool $isUpdate = false): array
     {
         $validated = app(\App\Http\Requests\RescuerAccountPayloadValidator::class)->validate($request, $isUpdate);
-        $validated['account_status'] = $validated['account_status'] ?? 'active';
+        $validated['account_status'] = $validated['account_status'] ?? config('rescuers.account_defaults.account_status');
 
         if (! empty($validated['account_id'])) {
             $validated['account_id'] = strtoupper($validated['account_id']);

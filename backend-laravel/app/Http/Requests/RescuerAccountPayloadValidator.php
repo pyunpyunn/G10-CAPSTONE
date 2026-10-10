@@ -12,10 +12,28 @@ class RescuerAccountPayloadValidator
         if (in_array($request->input('duty_status'), ['standby', 'stand-by'], true)) {
             $request->merge(['duty_status' => 'available']);
         }
-        $rules = [
+
+        $messages = [
+            'account_id.regex' => 'Rescuer Account ID must follow the DB format BDRRM-SAR-001.',
+            'responder_code.regex' => 'Responder code must follow the DB format BDRRM-SAR-001.',
+            'first_name.required' => 'First name is required.',
+            'last_name.required' => 'Last name is required.',
+            'team_name.required' => 'Team is required before creating a rescuer account.',
+            'contact_number.required' => 'Mobile number is required.',
+            'title.required' => 'Responder role is required.',
+            'duty_status.required' => 'Duty status is required.',
+            'password.min' => 'Temporary password must have at least 6 characters.',
+        ];
+
+        $validated = $request->validate($this->rules($isUpdate), $messages);
+        return $validated;
+    }
+    public function rules(bool $isUpdate = false): array
+    {
+        return [
             'account_id' => ['nullable', 'string', 'max:30', 'regex:/^BDRRM-[A-Z0-9]{2,8}-[0-9]{3}$/i'],
             'responder_code' => ['nullable', 'string', 'max:80', 'regex:/^BDRRM-[A-Z0-9]{2,8}-[0-9]{3}$/i'],
-            'account_status' => ['nullable', Rule::in(['active', 'reserve', 'disabled'])],
+            'account_status' => ['nullable', Rule::in(array_keys(config('rescuers.account_statuses')))],
             'first_name' => ['required', 'string', 'max:100'],
             'middle_initial' => ['nullable', 'string', 'max:5'],
             'last_name' => ['required', 'string', 'max:100'],
@@ -34,26 +52,18 @@ class RescuerAccountPayloadValidator
             'team_code' => ['nullable', 'string', 'max:20'],
             'team_type' => ['nullable', 'string', 'max:80'],
             'title' => ['required', 'string', 'max:100'],
-            'duty_status' => ['required', Rule::in(['available', 'on_duty', 'reserve', 'off_duty', 'unavailable', 'dispatched', 'on_scene', 'disabled'])],
+            'duty_status' => ['required', Rule::in(array_keys(config('rescuers.duty_statuses')))],
             'skills' => ['nullable', 'string', 'max:1000'],
             'training_notes' => ['nullable', 'string', 'max:1500'],
             'certification_reference' => ['nullable', 'string', 'max:150'],
             'equipment_notes' => ['nullable', 'string', 'max:1500'],
         ];
 
-        $messages = [
-            'account_id.regex' => 'Rescuer Account ID must follow the DB format BDRRM-SAR-001.',
-            'responder_code.regex' => 'Responder code must follow the DB format BDRRM-SAR-001.',
-            'first_name.required' => 'First name is required.',
-            'last_name.required' => 'Last name is required.',
-            'team_name.required' => 'Team is required before creating a rescuer account.',
-            'contact_number.required' => 'Mobile number is required.',
-            'title.required' => 'Responder role is required.',
-            'duty_status.required' => 'Duty status is required.',
-            'password.min' => 'Temporary password must have at least 6 characters.',
-        ];
-
-        $validated = $request->validate($rules, $messages);
-        return $validated;
     }
+
+    public function formConstraints(bool $isUpdate = false): array
+    {
+        return app(\App\Support\FormInputConstraints::class)->fromRules($this->rules($isUpdate));
+    }
+
 }

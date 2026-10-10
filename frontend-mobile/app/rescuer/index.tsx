@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import {
   Alert,
+  AppState,
   Platform,
   Pressable,
   RefreshControl,
@@ -64,7 +66,7 @@ export default function RescuerHomeScreen() {
     }
 
     try {
-      const data = await getRescuerOverview();
+      const data = await getRescuerOverview(isRefresh);
       setOverview(data);
     } catch (error: any) {
       Alert.alert('Unable to load rescuer data', errorMessage(error));
@@ -73,6 +75,14 @@ export default function RescuerHomeScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  useEffect(() => {
+    const removeBroadcast = onDisasterBroadcast(() => { void loadOverview(true); });
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void loadOverview(true);
+    });
+    return () => { removeBroadcast(); subscription.remove(); };
+  }, [loadOverview]);
 
   useEffect(() => {
     loadOverview();

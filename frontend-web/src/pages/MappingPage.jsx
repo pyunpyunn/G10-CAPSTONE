@@ -5,24 +5,26 @@ import MappingMap from '../components/mapping/MappingMap'
 import MappingSidebar from '../components/mapping/MappingSidebar'
 import LoadingState from '../components/ui/LoadingState'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
+import { useModuleData } from '../utils/useModuleData'
 import {
-  apiErrorMessage,
   defaultWorkspace,
   isActiveRouteStatus,
   isHouseholdRouteAllowed,
   normalizeWorkspaceData,
 } from '../utils/mappingHelpers'
 
+const loadMappingWorkspace = async () => normalizeWorkspaceData(await getMappingOverview() || {})
+
 export default function MappingPage() {
   const navigate = useNavigate()
-  const [workspace, setWorkspace] = useState(defaultWorkspace)
-  const [isLoading, setIsLoading] = useState(true)
-  const [hasLoaded, setHasLoaded] = useState(false)
-  const [error, setError] = useState('')
+  const { data, error, loading: isLoading } = useModuleData(loadMappingWorkspace, ['mapping', 'households', 'dispatch', 'disasters'])
+  const workspace = data || defaultWorkspace
+  const hasLoaded = Boolean(data)
   const [layers, setLayers] = useState({
     households: true,
     evacuationSites: true,
     rescueTeams: true,
+    rescueOffices: true,
     routes: true,
   })
   const [selectedRoute, setSelectedRoute] = useState(null)
@@ -56,41 +58,6 @@ export default function MappingPage() {
   const visibleHouseholds = households
 
   const closestRescueTeam = useMemo(() => rescueTeams[0] || null, [rescueTeams])
-
-  useEffect(() => {
-    let ignore = false
-
-    async function loadPage() {
-      setIsLoading(true)
-      setError('')
-      setRouteError('')
-
-      try {
-        const data = await getMappingOverview()
-
-        if (!ignore) {
-          setWorkspace(normalizeWorkspaceData(data || {}))
-          setHasLoaded(true)
-        }
-      } catch (loadError) {
-        if (!ignore) {
-          setWorkspace(defaultWorkspace)
-          setError(apiErrorMessage(loadError))
-          setHasLoaded(false)
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadPage()
-
-    return () => {
-      ignore = true
-    }
-  }, [])
 
   useEffect(() => {
     function closeFullscreen(event) {

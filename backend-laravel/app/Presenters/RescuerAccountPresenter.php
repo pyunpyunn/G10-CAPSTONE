@@ -22,6 +22,8 @@ class RescuerAccountPresenter
             'display_username' => $row->user_username,
             'responder_code' => $row->responder_code,
             'account_status' => $accountStatus,
+            'account_status_display' => $this->formatAccountStatus($accountStatus),
+            'assigned_team_name' => $row->team_id ? $row->team_name : null,
             'full_name' => $row->full_name ?: 'Unnamed rescuer',
             'first_name' => $nameParts['first_name'],
             'middle_initial' => $nameParts['middle_initial'],
@@ -63,18 +65,46 @@ class RescuerAccountPresenter
     public function formatStatus(?string $status, bool $isActive = true): array
     {
         if (! $isActive || $status === 'disabled') {
-            return ['key' => 'disabled', 'label' => 'Disabled', 'tone' => 'gray'];
+            return ['key' => 'disabled', ...config('rescuers.duty_statuses.disabled')];
         }
 
-        return match ($status) {
-            'on_duty' => ['key' => 'on_duty', 'label' => 'On duty', 'tone' => 'green'],
-            'available', 'standby' => ['key' => 'available', 'label' => 'Available', 'tone' => 'green'],
-            'reserve' => ['key' => 'reserve', 'label' => 'Reserve', 'tone' => 'blue'],
-            'dispatched' => ['key' => 'dispatched', 'label' => 'Dispatched', 'tone' => 'purple'],
-            'on_scene' => ['key' => 'on_scene', 'label' => 'On-scene', 'tone' => 'green'],
-            'unavailable' => ['key' => 'unavailable', 'label' => 'Unavailable', 'tone' => 'amber'],
-            default => ['key' => 'off_duty', 'label' => 'Off duty', 'tone' => 'gray'],
-        };
+        $key = $status === 'standby' ? 'available' : $status;
+        $statuses = config('rescuers.duty_statuses');
+        $key = isset($statuses[$key]) ? $key : 'off_duty';
+        return ['key' => $key, ...$statuses[$key]];
+    }
+
+    public function formatAccountStatus(string $status): array
+    {
+        return ['key' => $status, ...config('rescuers.account_statuses.'.$status)];
+    }
+
+    public function accountFormOptions(): array
+    {
+        return [
+            'duty_statuses' => $this->statusOptions(array_keys(config('rescuers.duty_statuses'))),
+            'account_statuses' => collect(config('rescuers.account_statuses'))->map(fn (array $status, string $key): array => ['key' => $key, ...$status])->values()->all(),
+            'roles' => $this->responderRoles(),
+            'blood_types' => $this->bloodTypes(),
+            'defaults' => config('rescuers.account_defaults'),
+        ];
+    }
+
+    public function statusOptions(array $keys): array
+    {
+        return array_map(fn (string $key): array => $this->formatStatus($key), $keys);
+    }
+
+    public function membershipPresentation(object $responder): array
+    {
+        $busy = (bool) $responder->is_deployed || in_array($responder->duty_status, ['dispatched', 'on_scene'], true);
+        return [
+            'is_busy' => $busy,
+            'can_change_membership' => ! $busy,
+            'membership_status' => $busy
+                ? ['label' => 'Busy', 'tone' => 'amber']
+                : ['label' => 'Available', 'tone' => 'green'],
+        ];
     }
 
     public function dutyStatuses(): array

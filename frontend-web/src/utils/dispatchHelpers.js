@@ -5,6 +5,7 @@ export const dispatchStatuses = [
   { value: 'on_scene', label: 'On-scene (working)' },
   { value: 'returning', label: 'Returning to base' },
   { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 export const priorityOptions = [

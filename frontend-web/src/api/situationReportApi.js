@@ -1,3 +1,4 @@
+import { downloadBackendReport } from './reportApi'
 import api from './client'
 
 export async function getSituationWorkspace() {
@@ -23,4 +24,8 @@ export async function getSituationReport(sitRepId) {
 export async function requestSituationPdf(sitRepId) {
   const response = await api.get(`/situation-reports/${sitRepId}/pdf`)
   return response.data
+}
+
+export async function exportSituationReport(payload) {
+  return downloadBackendReport({ ...payload, report_type: 'situation' })
 }

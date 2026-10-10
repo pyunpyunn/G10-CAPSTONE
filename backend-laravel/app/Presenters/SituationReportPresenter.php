@@ -20,8 +20,8 @@ class SituationReportPresenter
                 'report_number' => $meta['report_number'] ?? 'SITREP-DRAFT-'.now()->format('Ymd'),
                 'period_start' => $this->formatDateTime($meta['period_start'] ?? $event->started_at),
                 'period_end' => $this->formatDateTime($meta['period_end'] ?? now()->toDateTimeString()),
-                'prepared_by' => $meta['prepared_by'] ?? 'HQ/Admin Desk',
-                'reviewed_by' => $meta['reviewed_by'] ?? 'Incident Commander',
+                'prepared_by' => $meta['prepared_by'] ?? null,
+                'reviewed_by' => $meta['reviewed_by'] ?? null,
                 'generated_at' => $this->formatDateTime($meta['generated_at'] ?? now()->toDateTimeString()),
                 'next_report' => $event->ended_at ? 'Final report filed' : $this->formatDateTime(now()->addHours(2)->toDateTimeString()),
             ],
@@ -38,7 +38,7 @@ class SituationReportPresenter
             ],
             'weather' => $weather, 'household' => $household, 'casualties' => $casualties,
             'evacuation' => $evacuation, 'dispatch' => $dispatch,
-            'damage' => ['partial' => 'For validation', 'total' => 'For validation', 'cost' => 'For validation'],
+            'damage' => ['partial' => null, 'total' => null, 'cost' => null],
             'resources' => $resources, 'actions_text' => $meta['actions_text'] ?? '',
             'included_sections' => $meta['included_sections'] ?? [],
         ];
@@ -156,7 +156,7 @@ class SituationReportPresenter
     {
         $safe = $evacuated = $unsafe = $injured = $missing = 0;
         foreach ($dispatch['raw_outcomes'] as $outcomes) { $safe += (int) ($outcomes['safe_count'] ?? 0); $evacuated += (int) ($outcomes['evacuated_count'] ?? 0); $unsafe += (int) ($outcomes['unsafe_count'] ?? 0); $injured += (int) ($outcomes['injured_count'] ?? 0); $missing += (int) ($outcomes['missing_count'] ?? 0); }
-        return ['deaths' => 0, 'missing' => $missing, 'injured' => $injured, 'rescued' => $safe + $evacuated, 'unsafe' => $unsafe];
+        return ['deaths' => null, 'missing' => $missing, 'injured' => $injured, 'rescued' => $safe + $evacuated, 'unsafe' => $unsafe];
     }
 
     private function resourceSummary($requests): array

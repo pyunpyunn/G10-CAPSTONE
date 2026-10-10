@@ -15,6 +15,7 @@ class RescuerMobileAdminFieldReportsResource extends JsonResource
                 : null,
             'status_options' => $this->resource['status_options'],
             'summary' => $this->resource['summary'],
+            'reports_meta' => $this->resource['reports_meta'] ?? null,
             'reports' => RescuerMobileFieldReportResource::collection($this->resource['reports']),
         ];
     }

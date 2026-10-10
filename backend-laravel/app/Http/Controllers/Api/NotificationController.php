@@ -20,7 +20,8 @@ class NotificationController extends Controller
 
     public function index(ListRequest $request): JsonResponse
     {
-        return (new NotificationFeedResource($this->service->index($request)))->response();
+        return (new NotificationFeedResource($this->service->index($request)))->response()
+            ->header('Cache-Control', 'private, no-store, max-age=0');
     }
 
     public function markRead(Request $request): JsonResponse

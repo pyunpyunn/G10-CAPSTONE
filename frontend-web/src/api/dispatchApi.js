@@ -35,6 +35,16 @@ export async function getRescueCriteriaTimeline() {
   return response.data.data
 }
 
+export async function getRescueCriteriaFeed(options = {}) {
+  const response = await api.get('/dispatches/criteria-timeline', options)
+  return response.data
+}
+
+export async function getRescuePrioritySettings() {
+  const response = await api.get('/dispatches/priority-settings')
+  return response.data.data
+}
+
 export async function getMemberCheckQueue(params = {}) {
   const response = await api.get('/dispatches/member-check-queue', { params })
   return response.data
@@ -52,5 +62,20 @@ export async function updateDispatch(assignmentId, payload) {
 
 export async function completeDispatch(assignmentId, payload) {
   const response = await api.post(`/dispatches/${assignmentId}/complete`, payload)
+  return response.data.data
+}
+
+export async function getDispatch(assignmentId) {
+  const response = await api.get(`/dispatches/${assignmentId}`)
+  return response.data.data
+}
+
+export async function getFieldCommunications(params = {}) {
+  const response = await api.get('/dispatches/communications', { params })
+  return response.data.data
+}
+
+export async function getFieldReports(params = {}) {
+  const response = await api.get('/field-reports', { params })
   return response.data.data
 }

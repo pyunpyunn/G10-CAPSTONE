@@ -4,7 +4,6 @@ import { getWeatherWorkspace, refreshWeather } from '../api/weatherApi'
 import WeatherMainColumn from '../components/weather/WeatherMainColumn'
 import WeatherSidebar from '../components/weather/WeatherSidebar'
 import LoadingState from '../components/ui/LoadingState'
-import PageHeader from '../components/ui/PageHeader'
 import {
   apiErrorMessage,
   riskToneFor,
@@ -76,14 +75,6 @@ export default function WeatherPage() {
 
   return (
     <section className="page weather-page active">
-      <PageHeader
-        actions={(
-          <button className="btn btn-primary btn-sm wx-refresh-button" type="button" disabled={isRefreshing} onClick={handleRefresh}>
-            <RefreshCcw size={14} /> {isRefreshing ? 'Refreshing' : 'Refresh'}
-          </button>
-        )}
-      />
-
       {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
       
@@ -119,6 +110,18 @@ export default function WeatherPage() {
           />
         </div>
       )}
+
+      <button
+        className={`wx-refresh-button${isRefreshing ? ' is-refreshing' : ''}`}
+        type="button"
+        aria-label="Refresh weather data"
+        aria-busy={isRefreshing}
+        title="Refresh weather data"
+        disabled={isRefreshing}
+        onClick={handleRefresh}
+      >
+        <RefreshCcw size={20} aria-hidden="true" />
+      </button>
     </section>
   )
 }

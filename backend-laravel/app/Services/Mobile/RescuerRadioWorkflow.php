@@ -17,6 +17,10 @@ class RescuerRadioWorkflow
     public function __construct(private \App\Services\Mobile\RescuerMobileSupport $support, private RescuerRadioPresenter $radioPresenter, private RescuerRadioFeedQuery $feedQuery) {}
 
 
+    public function radioFeed(Request $request): JsonResponse|array
+    {
+        return $this->feedQuery->radioFeed($request);
+    }
 
     public function startRadioTransmission(Request $request): JsonResponse
     {

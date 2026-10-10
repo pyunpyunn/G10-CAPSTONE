@@ -5,38 +5,20 @@ namespace App\Services\Mobile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class RescuerTeamWorkflow
 {
+    public function __construct(private RescuerAccountSupport $support) {}
+
     public function validateTeamPayload(Request $request, ?int $teamId = null): array
     {
         if (in_array($request->input('duty_status'), ['standby', 'stand-by'], true)) {
             $request->merge(['duty_status' => 'available']);
         }
-        $validated = $request->validate([
-            'team_code' => ['required', 'string', 'max:8', 'regex:/^[A-Z0-9]+$/i'],
-            'team_name' => ['required', 'string', 'max:100'],
-            'team_type' => ['required', 'string', 'max:80'],
-            'duty_status' => ['required', Rule::in(['available', 'on_duty', 'off_duty', 'unavailable'])],
-            'assigned_purok_id' => ['nullable', 'integer', 'exists:addresses,address_id'],
-            'leader_responder_id' => ['nullable', 'integer', 'exists:responders,responder_id'],
-            'member_ids' => ['nullable', 'array'],
-            'member_ids.*' => ['integer', 'exists:responders,responder_id'],
-        ], [
-            'team_code.required' => 'Team code is required.',
-            'team_code.regex' => 'Team code must use letters and numbers only.',
-            'team_name.required' => 'Team name is required.',
-            'team_type.required' => 'Team type is required.',
-            'duty_status.required' => 'Team duty status is required.',
-            'duty_status.in' => 'Select a valid team duty status.',
-            'leader_responder_id.exists' => 'Selected team leader does not exist.',
-            'member_ids.*.exists' => 'One selected member does not exist.',
-        ]);
+        $validated = app(\App\Http\Requests\RescueTeamPayloadValidator::class)->validate($request);
 
-        $validated['team_code'] = $this->normalizeTeamCode($validated['team_code']);
+        $validated['team_code'] = $this->support->normalizeTeamCode($validated['team_code']);
         $validated['team_name'] = trim($validated['team_name']);
         $validated['team_type'] = trim($validated['team_type']);
 
@@ -56,7 +38,7 @@ class RescuerTeamWorkflow
         $query = DB::table('rescue_teams')
             ->where(function ($inner) use ($teamName, $teamCode): void {
                 $inner->whereRaw('LOWER(team_name) = ?', [strtolower(trim($teamName))])
-                    ->orWhereRaw('LOWER(team_code) = ?', [strtolower($this->normalizeTeamCode($teamCode))]);
+                    ->orWhereRaw('LOWER(team_code) = ?', [strtolower($this->support->normalizeTeamCode($teamCode))]);
             });
 
         if ($teamId) {

@@ -17,6 +17,35 @@ class ResourceRequestController extends Controller
         $this->service = $service;
     }
 
+    public function types(ListRequest $request): JsonResponse
+    {
+        $query = app(\App\Queries\ResourceRequestQuery::class);
+        $connection = (string) config('services.trackingaid.connection', 'trackingaid');
+        $inventory = ['data' => [], 'total' => 0];
+        $inventoryError = null;
+        try {
+            if (! \App\Support\RequestSchema::connection($connection)->hasTable('inventory')) {
+                throw new \RuntimeException('Inventory unavailable');
+            }
+            $inventory = \Illuminate\Support\Facades\DB::connection($connection)->table('inventory')
+                ->whereNull('deleted_at')->orderBy('name')->paginate($request->integer('per_page', 20));
+            $inventory->through(fn ($item) => [
+                'label' => $item->name, 'type' => $item->type, 'sku' => $item->sku,
+                'quantity' => max(0, (int) $item->quantity),
+                'status' => $item->expiration && strtotime($item->expiration) < strtotime('today')
+                    ? 'Expired' : ((int) $item->quantity > 0 ? 'Available' : 'Out of stock'),
+                'detail' => $item->storage_location,
+            ]);
+        } catch (\Throwable $error) {
+            report($error);
+            $inventoryError = 'Inventory could not be loaded from TrackingAid. Please try again.';
+        }
+        return response()->json(['data' => [
+            'types' => $query->options()['categories'], 'inventory' => $inventory,
+            'inventory_error' => $inventoryError,
+        ]]);
+    }
+
     public function index(ListRequest $request): JsonResponse
     {
         return $this->service->index($request);

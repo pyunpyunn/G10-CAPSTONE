@@ -175,6 +175,28 @@ class RescuerAccountWriteWorkflow
         ]);
     }
 
+    public function delete(Request $request, int $responderId): JsonResponse
+    {
+        return DB::transaction(function () use ($request, $responderId): JsonResponse {
+            $record = DB::table('responders')->where('responder_id', $responderId)->whereNull('deleted_at')->lockForUpdate()->first();
+            if (! $record) return response()->json(['message' => 'Rescuer account was not found.'], 404);
+            $activeAssignment = DB::table('responder_assignments')->where('responder_id', $responderId)
+                ->whereNotIn('status', ['completed', 'cancelled'])->exists();
+            if ($record->is_deployed || $activeAssignment) {
+                return response()->json(['message' => 'Finish the active dispatch for this rescuer before deleting the account.'], 422);
+            }
+            $now = now();
+            DB::table('users')->where('user_id', $record->user_id)->update(['is_active' => 0, 'updated_at' => $now]);
+            DB::table('responders')->where('responder_id', $responderId)->update([
+                'deleted_at' => $now, 'updated_at' => $now, 'is_validated' => 0,
+                'duty_status' => 'disabled', 'team_id' => null,
+            ]);
+            DB::table('rescue_teams')->where('leader_responder_id', $responderId)->update(['leader_responder_id' => null]);
+            $this->audit->writeAuditLog($request, 'delete', $responderId, ['user_id' => $record->user_id], ['deleted_at' => $now->toDateTimeString()]);
+            return response()->json(['message' => 'Rescuer account deleted from the roster. Dispatch history is retained.', 'data' => ['responder_id' => $responderId]]);
+        });
+    }
+
     public function deactivate(Request $request, int $responderId): JsonResponse
     {
         $existing = $this->query->findResponder($responderId);

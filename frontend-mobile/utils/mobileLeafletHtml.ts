@@ -17,14 +17,17 @@ export function mobileLeafletHtml({
   markers,
   routes,
   center,
+  interactive = false,
 }: {
   markers: LeafletPoint[];
   routes: LeafletRoute[];
   center?: { latitude: number; longitude: number };
+  interactive?: boolean;
 }) {
   const data = JSON.stringify({
     markers,
     routes,
+    interactive,
     center: center || { latitude: 10.3157, longitude: 123.8854 },
   }).replace(/</g, '\\u003c');
 
@@ -53,6 +56,13 @@ export function mobileLeafletHtml({
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
     const bounds = L.latLngBounds([]);
+    if (data.interactive) {
+      map.on('click', (event) => {
+        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'mapPress', latitude: event.latlng.lat, longitude: event.latlng.lng
+        }));
+      });
+    }
     data.markers.forEach((point) => {
       const latitude = Number(point.latitude);
       const longitude = Number(point.longitude);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  exportSituationReport,
   createSituationReport,
   getSituationReport,
   getSituationSummary,
@@ -14,13 +15,13 @@ import SitrepPreview from '../components/situation/SitrepPreview'
 import LoadingState from '../components/ui/LoadingState'
 import {
   buildGeneratePayload,
-  downloadSituationExcel,
-  downloadSituationPdf,
   emptyGenerateForm,
   situationErrorMessage,
 } from '../utils/situationReportHelpers'
 
 export default function SituationReportPage() {
+  const [isExporting, setIsExporting] = useState(false)
+  const [savedReportId, setSavedReportId] = useState(null)
   const [workspace, setWorkspace] = useState(null)
   const [selectedEventId, setSelectedEventId] = useState('')
   const [summary, setSummary] = useState(null)
@@ -79,6 +80,7 @@ export default function SituationReportPage() {
   }
 
   async function handleSelectEvent(eventId) {
+    setSavedReportId(null)
     setSelectedEventId(eventId)
     setSummary(null)
     setMessage('')
@@ -119,6 +121,7 @@ export default function SituationReportPage() {
 
     try {
       const data = await createSituationReport(buildGeneratePayload(selectedEventId, generateForm))
+      setSavedReportId(data.report.sit_rep_id)
       setSummary(data.report.summary)
       setIsGenerateOpen(false)
       await reloadWorkspace(`${data.report.report_number} generated and locked.`)
@@ -136,6 +139,7 @@ export default function SituationReportPage() {
     try {
       const data = await getSituationReport(report.sit_rep_id)
       setSelectedEventId(data.report.event_id || '')
+      setSavedReportId(data.report.sit_rep_id)
       setSummary(data.report.summary)
       setGenerateForm(emptyGenerateForm(data.report.summary))
       setMessage(`${data.report.report_number} loaded from saved snapshots.`)
@@ -153,24 +157,18 @@ export default function SituationReportPage() {
     setMessage('The current SitRep snapshot is available for Archive after it is generated and locked.')
   }
 
-  async function handlePdfPreview() {
-    if (!summary) {
-      setMessage('Select a disaster event first.')
-      return
+  async function handleExport(format) {
+    if (!summary || isExporting) return
+    setIsExporting(true)
+    setMessage('Generating report. Large exports may take a moment.')
+    try {
+      await exportSituationReport({ format, event_id: selectedEventId, sit_rep_id: savedReportId, included_sections: generateForm.included_sections, actions_text: generateForm.actions_text })
+      setMessage('SitRep export generated.')
+    } catch (exportError) {
+      setMessage(situationErrorMessage(exportError, 'SitRep export cannot be generated.'))
+    } finally {
+      setIsExporting(false)
     }
-
-    await downloadSituationPdf(summary, generateForm.included_sections, generateForm.actions_text)
-    setMessage('SitRep PDF downloaded.')
-  }
-
-  function handleExcelExport() {
-    if (!summary) {
-      setMessage('Select a disaster event first.')
-      return
-    }
-
-    downloadSituationExcel(summary, generateForm.included_sections, generateForm.actions_text)
-    setMessage('SitRep Excel downloaded.')
   }
 
   const events = workspace?.events || []
@@ -210,12 +208,13 @@ export default function SituationReportPage() {
             onSelect={handleSelectEvent}
             actions={(
               <SituationActionMenu
-                hasSummary={Boolean(summary)}
+                hasSummary={Boolean(summary) && !isExporting}
                 onGenerate={openGenerateModal}
                 onArchive={handleArchiveCurrent}
                 onViewArchive={() => navigate('/archive')}
-                onExportExcel={handleExcelExport}
-                onExportPdf={handlePdfPreview}
+                onExportExcel={() => handleExport('excel')}
+                onExportCsv={() => handleExport('csv')}
+                onExportPdf={() => handleExport('pdf')}
               />
             )}
           />

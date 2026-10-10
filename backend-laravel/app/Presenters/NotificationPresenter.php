@@ -64,7 +64,7 @@ class NotificationPresenter
     {
         return $this->notice('notif-'.$row->notif_id, 'Broadcast', $this->priorityFromUrgency($row->urgency_level_id),
             $this->notificationTitle($row), $row->message ?: 'Notification message saved in shared DB.', $row->created_at,
-            in_array($row->status, ['sent','cancelled','completed'], true));
+            false);
     }
 
     private function household(HouseholdStatusLog $row): array
@@ -73,25 +73,23 @@ class NotificationPresenter
         $name = $row->household?->household_name ?: 'Household';
         $status = $row->status?->status_label ?: 'Unsafe';
         return $this->notice('household-'.$row->status_log_id, 'Household status', 'Critical', $status.' household report from '.$purok,
-            $name.' reported '.$status.'. '.($row->notes ?: $row->location_label ?: 'HQ review is required.'), $row->submitted_at, (bool) $row->reviewed_at);
+            $name.' reported '.$status.'. '.($row->notes ?: $row->location_label ?: 'HQ review is required.'), $row->submitted_at, false);
     }
 
     private function dispatch(ResponderAssignment $row): array
     {
         $team = $row->team?->team_name ?: $row->responder?->full_name ?: 'Responder team';
         $priority = in_array($row->priority_level, ['high','critical','urgent'], true) ? 'High' : 'Medium';
-        $read = in_array($row->status, ['completed','cancelled'], true) || (bool) $row->completed_at;
         return $this->notice('dispatch-'.$row->assignment_id, 'Dispatch route', $priority, $team.' route updated',
-            $this->label($row->status ?: 'assigned').' to '.($row->assigned_area ?: 'assigned area').'.', $row->assigned_at, $read);
+            $this->label($row->status ?: 'assigned').' to '.($row->assigned_area ?: 'assigned area').'.', $row->assigned_at, false);
     }
 
     private function request(ResourceRequest $row): array
     {
         $priority = $row->validation_status === 'needs_validation' ? 'Medium' : 'Normal';
         $item = $row->item_name ?: $row->resource_type ?: 'Request';
-        $read = ! in_array($row->validation_status, ['needs_validation','returned'], true);
         return $this->notice('request-'.$row->request_id, 'Resources', $priority, $item.' request '.$this->label($row->validation_status ?: 'needs_validation'),
-            ($row->requested_by ?: 'Requester').' requested '.trim(($row->quantity ?? '').' '.($row->unit ?? '')).'.', $row->created_at, $read);
+            ($row->requested_by ?: 'Requester').' requested '.trim(($row->quantity ?? '').' '.($row->unit ?? '')).'.', $row->created_at, false);
     }
 
     private function weather(WeatherLog $row): array
@@ -101,7 +99,7 @@ class NotificationPresenter
         return $this->notice('weather-'.$row->weather_log_id, 'Weather', $critical ? 'High' : 'Normal',
             $row->advisory_title ?: ($row->condition_name ?: 'Weather snapshot saved'),
             $row->advisory_text ?: 'Weather data was saved from '.$row->source_name.'. Confirm official warnings through PAGASA before broadcasting.',
-            $row->observed_at ?: $row->created_at, ! $critical);
+            $row->created_at ?: $row->observed_at, false);
     }
 
     private function broadcast($row): array
@@ -109,13 +107,13 @@ class NotificationPresenter
         $severity = $row->severity?->severity_key;
         $priority = in_array($severity, ['high','critical','severe'], true) ? 'Critical' : 'High';
         return $this->notice('broadcast-'.$row->broadcast_id, 'Broadcast', $priority, $row->broadcast_title ?: 'Disaster broadcast saved',
-            ($row->message ?: 'Broadcast message saved.').' Scope: '.$this->label($row->scope_type ?: 'barangay'), $row->sent_at, true);
+            ($row->message ?: 'Broadcast message saved.').' Scope: '.$this->label($row->scope_type ?: 'barangay'), $row->sent_at, false);
     }
 
     private function audit($row): array
     {
         return $this->notice('audit-'.$row->audit_log_id, 'System activity', 'Normal', $this->label($row->module).' '.$this->label($row->action),
-            'Action recorded for '.$row->reference_table.' #'.$row->reference_id.'.', $row->created_at, true);
+            'Action recorded for '.$row->reference_table.' #'.$row->reference_id.'.', $row->created_at, false);
     }
 
     private function notice(string $id,string $type,string $priority,string $title,string $body,mixed $time,bool $read): array
@@ -128,7 +126,7 @@ class NotificationPresenter
 
     private function actionUrlForType(string $type): string
     {
-        return match ($type) {'Broadcast'=>'/broadcast','Household status'=>'/households','Dispatch route'=>'/dispatch','Resources'=>'/resources','Weather'=>'/weather',default=>'/notifications'};
+        return match ($type) {'Broadcast'=>'/broadcast','Household status'=>'/households','Dispatch route'=>'/dispatch','Resources'=>'/resources-requests','Weather'=>'/weather',default=>'/notifications'};
     }
     private function priorityFromUrgency(mixed $id): string { return (int)$id >= 4 ? 'Critical' : ((int)$id >= 3 ? 'High' : ((int)$id >= 2 ? 'Medium' : 'Normal')); }
     private function priorityTone(string $priority): string { return match($priority) {'Critical'=>'red','High'=>'amber','Medium'=>'blue',default=>'gray'}; }

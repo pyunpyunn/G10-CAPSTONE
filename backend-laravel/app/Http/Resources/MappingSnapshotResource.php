@@ -23,6 +23,13 @@ class MappingSnapshotResource extends JsonResource
             $data['evacuation_sites'] = $snapshot->evacuationSites;
             $data['rescue_teams'] = $snapshot->rescueTeams;
             $data['dispatch_routes'] = $snapshot->dispatchRoutes;
+            $office = config('rescue_office');
+            $latitude = $office['latitude'] ?? null;
+            $longitude = $office['longitude'] ?? null;
+            $data['rescue_offices'] = is_numeric($latitude) && is_numeric($longitude)
+                && abs((float) $latitude) <= 90 && abs((float) $longitude) <= 180
+                ? [['id' => 'rescue-office', 'name' => $office['name'], 'address' => $office['address'],
+                    'latitude' => (float) $latitude, 'longitude' => (float) $longitude]] : [];
         }
         $data['map_rules'] = $presenter->mapRules();
         return $data;

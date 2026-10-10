@@ -14,6 +14,7 @@ import DashboardMainContent from '../components/dashboard/DashboardMainContent'
 import DashboardOverview from '../components/dashboard/DashboardOverview'
 import PageHeader from '../components/ui/PageHeader'
 import { getStats } from '../utils/dashboardHelpers'
+import { useModuleData } from '../utils/useModuleData'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -93,7 +94,6 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => getStats(summaryState.data), [summaryState.data])
   const hasActiveEvent = Boolean(summaryState.data?.active_event)
-
   function openModule(path) {
     navigate(path)
   }

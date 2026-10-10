@@ -2,21 +2,30 @@
 
 namespace App\Queries;
 
-use App\Models\RescuePrioritySetting;
 use App\Models\Sitio;
 use App\Presenters\RescueCriteriaPresenter;
 use App\Services\Shared\BarangayProfileService;
+use App\Support\RequestSchema as Schema;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class SitioPriorityQuery
 {
-    public function __construct(private BarangayProfileService $barangay, private RescueCriteriaPresenter $presenter) {}
+    public function __construct(private BarangayProfileService $barangay, private RescueCriteriaPresenter $presenter, private RescuePriorityQuery $priorities) {}
 
     public function ranked(string $eventId): array
     {
         $barangayId = $this->barangay->current()['barangay_id'] ?? null;
         if ($barangayId === null) return [];
-        $settings = RescuePrioritySetting::query()->orderByDesc('version')->firstOrFail();
+        $settings = $this->priorities->settingsForEvent($eventId);
+        $minorPredicate = '';
+        if (Schema::hasColumn('household_members', 'birth_date') && Schema::hasColumn('disaster_events', 'started_at')) {
+            $eventStartedAt = DB::table('disaster_events')->where('event_id', $eventId)->value('started_at');
+            if ($eventStartedAt) {
+                $minorCutoff = Carbon::parse($eventStartedAt)->subYears(18)->toDateString();
+                $minorPredicate = " OR (m.birth_date IS NOT NULL AND m.birth_date > '{$minorCutoff}')";
+            }
+        }
         $sitios = Sitio::query()->where('barangay_id', $barangayId)->orderBy('sitio_name')->get(['sitio_id', 'sitio_name']);
         $compositeName = DB::connection()->getDriverName() === 'sqlite'
             ? "(p.purok_name || ', ' || s.sitio_name)"
@@ -36,6 +45,7 @@ class SitioPriorityQuery
             ->get(['p.purok_id', 'p.sitio_id', 'p.purok_name', DB::raw('COUNT(DISTINCT h.household_id) as household_count')])
             ->groupBy('sitio_id');
         $area = 'COALESCE(a.sitio_id, p.sitio_id)';
+        $missingContact = $this->priorities->contactMissingExpression();
         $households = DB::table('households as h')
             ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->leftJoin('puroks as p', 'p.purok_id', '=', 'a.purok_id')
@@ -46,13 +56,10 @@ class SitioPriorityQuery
             ->selectRaw($area.' as sitio_id, COUNT(DISTINCT h.household_id) as households')
             ->selectRaw("COUNT(DISTINCT CASE WHEN hs.status_key IN ('unsafe','needs_help','needs_assistance') THEN h.household_id END) as impacted_households")
             ->selectRaw("COUNT(DISTINCT CASE WHEN hd.needs_dispatch = 1 THEN h.household_id END) as urgent_households")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN (h.contact_number IS NULL OR TRIM(h.contact_number) = '')
-                AND NOT EXISTS (SELECT 1 FROM trusted_households t JOIN households trusted
-                    ON ((t.requesting_household_id = h.household_id AND trusted.household_id = t.trusted_household_id)
-                    OR (t.trusted_household_id = h.household_id AND trusted.household_id = t.requesting_household_id))
-                    WHERE t.validation_status IN ('validated','approved') AND trusted.contact_number IS NOT NULL
-                    AND TRIM(trusted.contact_number) <> '')
-                AND hd.last_reported_at IS NULL THEN h.household_id END) as no_contact_households")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN ({$missingContact}) = 1 THEN h.household_id END) as no_contact_total")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN ({$missingContact}) = 1 AND hd.last_reported_at IS NULL
+                AND (hs.status_key IS NULL OR hs.status_key NOT IN ('safe','safe_at_home','evacuated','returned','relocated'))
+                THEN h.household_id END) as no_contact_households")
             ->get()->keyBy('sitio_id');
         $members = DB::table('household_members as m')
             ->join('households as h', 'h.household_id', '=', 'm.household_id')
@@ -63,11 +70,11 @@ class SitioPriorityQuery
             ->where('a.barangay_id', $barangayId)->whereNull('h.deleted_at')->whereNull('m.deleted_at')
             ->whereNotNull(DB::raw($area))->groupBy(DB::raw($area))
             ->selectRaw($area.' as sitio_id, COUNT(DISTINCT m.member_id) as total_members')
-            ->selectRaw('COUNT(DISTINCT CASE WHEN report.member_id IS NULL THEN m.member_id END) as unreported_members')
-            ->selectRaw('COUNT(DISTINCT CASE WHEN m.is_pwd = 1 OR m.is_senior = 1 OR m.is_pregnant = 1 OR EXISTS
-                (SELECT 1 FROM member_vulnerable_groups g WHERE g.member_id = m.member_id) THEN m.member_id END) as total_vulnerable_members')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN ms.status_key IS NULL OR ms.status_key IN ('unknown','unchecked','unreported') THEN m.member_id END) as unreported_members")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN m.is_pwd = 1 OR m.is_senior = 1 OR m.is_pregnant = 1 OR EXISTS
+                (SELECT 1 FROM member_vulnerable_groups g WHERE g.member_id = m.member_id){$minorPredicate} THEN m.member_id END) as total_vulnerable_members")
             ->selectRaw("COUNT(DISTINCT CASE WHEN (m.is_pwd = 1 OR m.is_senior = 1 OR m.is_pregnant = 1 OR EXISTS
-                (SELECT 1 FROM member_vulnerable_groups g WHERE g.member_id = m.member_id))
+                (SELECT 1 FROM member_vulnerable_groups g WHERE g.member_id = m.member_id){$minorPredicate})
                 AND (ms.status_key IS NULL OR ms.status_key NOT IN ('safe','safe_at_home','evacuated'))
                 THEN m.member_id END) as unresolved_vulnerable_members")
             ->get()->keyBy('sitio_id');
@@ -82,7 +89,7 @@ class SitioPriorityQuery
                 'impact' => $householdTotal ? (int) $h->impacted_households / $householdTotal : 0,
                 'special_needs' => $vulnerableTotal ? (int) $m->unresolved_vulnerable_members / $vulnerableTotal : 0,
                 'unreported' => $memberTotal ? (int) $m->unreported_members / $memberTotal : 0,
-                'no_contact' => $householdTotal ? (int) $h->no_contact_households / $householdTotal : 0,
+                'no_contact' => (int) ($h->no_contact_total ?? 0) > 0 ? (int) $h->no_contact_households / (int) $h->no_contact_total : 0,
             ];
             $weights = ['impact' => $settings->impact_weight, 'special_needs' => $settings->vulnerability_weight,
                 'unreported' => $settings->unreported_weight, 'no_contact' => $settings->no_contact_weight];
@@ -102,9 +109,9 @@ class SitioPriorityQuery
                 'priority_score' => round(array_sum($contributions), 1), 'contributions' => $contributions,
             ];
         })->sort(fn ($a, $b) => ($b['priority_score'] <=> $a['priority_score']) ?: strcmp($a['sitio'], $b['sitio']))
-            ->values()->map(function ($row, $index): array {
+            ->values()->map(function ($row, $index) use ($settings): array {
                 $row['rank'] = $index + 1;
-                $row['band'] = $this->presenter->priorityBand($row['priority_score'], $row['rank']);
+                $row['band'] = $this->presenter->priorityBand($row['priority_score'], $row['rank'], $settings);
                 return $row;
             })->all();
     }

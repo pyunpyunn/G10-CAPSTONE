@@ -70,12 +70,10 @@ class RescuerAccountQuery
             'responders' => $this->teamConfigResponders(),
             'puroks' => $this->purokAddressOptions(),
             'team_types' => $this->teamTypeOptions(),
-            'duty_statuses' => [
-                ['key' => 'available', 'label' => 'Available'],
-                ['key' => 'on_duty', 'label' => 'On duty'],
-                ['key' => 'off_duty', 'label' => 'Off duty'],
-                ['key' => 'unavailable', 'label' => 'Unavailable'],
-            ],
+            'duty_statuses' => $this->presenter->statusOptions(config('rescuers.team_duty_statuses')),
+            'form_defaults' => config('rescuers.team_defaults'),
+            'form_constraints' => app(\App\Http\Requests\RescueTeamPayloadValidator::class)->formConstraints(),
+            'members_per_page' => config('rescuers.members_per_page'),
             'note' => 'Team configuration uses the existing rescue_teams table. Deleting a team never deletes rescuer accounts.',
         ];
     }
@@ -130,9 +128,11 @@ class RescuerAccountQuery
             'leader_responder_id' => $team->leader_responder_id,
             'leader_name' => $team->leader_name,
             'duty_status' => $team->duty_status,
+            'duty_status_display' => $this->presenter->formatStatus($team->duty_status),
             'source' => $source,
             'is_configured' => $source === 'database',
-            'can_delete' => $source === 'database' && $activeDispatchCount === 0,
+            'can_delete' => $source === 'database' && $activeDispatchCount === 0
+                && ! $members->contains(fn (object $member): bool => $this->presenter->membershipPresentation($member)['is_busy']),
             'active_dispatch_count' => $activeDispatchCount,
             'member_count' => $members->count(),
             'deployed_count' => $members->where('is_deployed', 1)->count(),
@@ -172,7 +172,7 @@ class RescuerAccountQuery
                 'team_code' => $responder->team_code,
                 'duty_status' => $responder->duty_status,
                 'is_deployed' => (bool) $responder->is_deployed,
-                'is_busy' => (bool) $responder->is_deployed || in_array($responder->duty_status, ['dispatched', 'on_scene'], true),
+                ...$this->presenter->membershipPresentation($responder),
             ])
             ->values()
             ->all();
@@ -263,17 +263,20 @@ class RescuerAccountQuery
 
     public function teamCards(): array
     {
+        $activeAssignments = DB::table('responder_assignments as ra')
+            ->selectRaw('COUNT(*)')->whereColumn('ra.team_id', 'rt.team_id')
+            ->whereNotIn('ra.status', ['completed', 'cancelled']);
         $teams = DB::table('rescue_teams as rt')
             ->leftJoin('responders as r', function ($join): void {
                 $join->on('r.team_id', '=', 'rt.team_id')->whereNull('r.deleted_at');
             })
             ->groupBy('rt.team_id', 'rt.team_code', 'rt.team_name', 'rt.team_type', 'rt.duty_status')
             ->orderBy('rt.team_name')
-            ->get([
+            ->select([
                 'rt.team_id', 'rt.team_code', 'rt.team_name', 'rt.team_type', 'rt.duty_status',
                 DB::raw('COUNT(r.responder_id) as member_count'),
                 DB::raw('SUM(CASE WHEN r.is_deployed = 1 THEN 1 ELSE 0 END) as deployed_count'),
-            ]);
+            ])->selectSub($activeAssignments, 'active_dispatch_count')->get();
 
         return $teams->map(fn (object $team): array => [
             'team_id' => $team->team_id,
@@ -281,6 +284,8 @@ class RescuerAccountQuery
             'team_name' => $team->team_name,
             'team_type' => $team->team_type,
             'duty_status' => $team->duty_status,
+            'duty_status_display' => $this->presenter->formatStatus($team->duty_status),
+            'active_dispatch_count' => (int) $team->active_dispatch_count,
             'member_count' => (int) $team->member_count,
             'deployed_count' => (int) $team->deployed_count,
         ])->values()->all();

@@ -416,7 +416,7 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  gap: 4px;
+  gap: 2px;
   min-height: 0;
   padding: 4px 6px 13px;
   overflow-x: hidden;
@@ -456,7 +456,7 @@
   align-items: center;
   justify-content: space-between;
   width: calc(100% - 20px);
-  margin: 16px 10px 7px;
+  margin: 0 10px;
   min-height: 30px;
   padding: 0 8px;
   border: 1px solid transparent;
@@ -502,8 +502,12 @@
   transition: max-height 220ms ease, opacity 160ms ease, transform 220ms ease;
 }
 
-.nav-group + .nav-group {
-  margin-top: 5px;
+.nav-group {
+  margin-block: 0;
+}
+
+.left-nav > .nav-group + .nav-group {
+  margin-top: 2px;
 }
 
 .nav-group.is-open .nav-group-items {
@@ -513,7 +517,7 @@
 }
 
 .left-nav .nav-section-title:first-child {
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .app-shell.left-peeking .nav-section-title,

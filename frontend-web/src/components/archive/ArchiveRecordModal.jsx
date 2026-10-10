@@ -42,6 +42,7 @@ export default function ArchiveRecordModal({ record, categoryLabel, onClose, onD
             <Download size={14} />
             PDF
           </button>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={() => onDownload('csv')}>CSV</button>
           <button className="btn btn-secondary btn-sm" type="button" onClick={() => onDownload('excel')}>
             <Download size={14} />
             Excel

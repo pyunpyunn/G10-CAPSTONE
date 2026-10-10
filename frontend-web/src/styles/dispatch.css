@@ -2211,3 +2211,77 @@
     text-transform: none;
   }
 }
+
+/* Response Operations views */
+.response-operations-page { display: grid; gap: 14px; min-width: 0; }
+.response-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.response-communication { display: grid; gap: 10px; min-width: 0; }
+.response-communication audio { width: 210px; max-width: 100%; }
+.response-coverage-team { margin-bottom: 12px; }
+.response-coverage-team small { display: block; color: var(--color-text-2); margin-top: 4px; }
+.response-report-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .response-operations-page .dispatch-workspace-grid { grid-template-columns: minmax(0, 1fr); }
+  .response-operations-page .dispatch-side-panel { position: static; }
+}
+
+.response-assignment-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+
+/* Dispatch dashboard ranking and team recordings. */
+.dispatch-priority-panel { min-width: 0; padding: 12px; }
+.dispatch-priority-panel .sitio-priority-list li { display: block; padding: 0; }
+.dispatch-priority-panel .sitio-priority-choice { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto 60px; gap: 8px; align-items: center; width: 100%; min-height: 42px; padding: 6px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.dispatch-priority-panel .sitio-priority-choice strong { text-align: right; font-variant-numeric: tabular-nums; }
+.dispatch-priority-panel .sitio-priority-choice:hover,
+.dispatch-priority-panel .sitio-priority-choice:focus-visible,
+.dispatch-priority-panel .is-selected .sitio-priority-choice { background: var(--color-bg-secondary); }
+.dispatch-priority-panel .sitio-priority-choice:focus-visible { outline: 2px solid var(--color-nav-active); outline-offset: -2px; }
+.dispatch-priority-panel li:focus-within .sitio-priority-tooltip { display: block; }
+.dispatch-priority-panel .sitio-priority-tooltip { left: auto; right: 8px; }
+.dispatch-recording-team + .dispatch-recording-team { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.dispatch-recording-team h3 { margin: 0 0 8px; font-size: 14px; }
+.dispatch-recording { display: grid; gap: 6px; margin-top: 10px; }
+.dispatch-recording small { color: var(--color-text-3); }
+.dispatch-recording audio { width: 100%; min-width: 0; }
+.response-recordings .pagination-bar { flex-wrap: wrap; padding: 10px; }
+@media (max-width: 480px) {
+  .dispatch-priority-panel .sitio-priority-choice { grid-template-columns: 18px minmax(0, 1fr) auto 48px; gap: 4px; font-size: 11px; }
+  .dispatch-priority-panel .sitio-priority-chip { padding: 3px 6px; font-size: 10px; }
+}
+
+/* Team voice workspace */
+.response-recordings { gap: 0; overflow: hidden; }
+.recordings-subtitle { display: block; margin-top: 5px; font-size: 11px; color: var(--color-text-3); }
+.recordings-live { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-text-2); white-space: nowrap; }
+.recordings-live i { width: 7px; height: 7px; border-radius: 50%; background: #43b581; box-shadow: 0 0 0 3px #43b58118; }
+.recordings-live.is-delayed i { background: #faa61a; }
+.recordings-workspace { display: grid; grid-template-columns: 150px minmax(0, 1fr); min-height: 260px; }
+.recordings-channels { display: flex; flex-direction: column; gap: 5px; padding: 16px 10px; background: var(--color-bg-secondary); border-right: 1px solid var(--color-border); }
+.recordings-channel-heading { margin: 0 8px 8px; font-size: 10px; letter-spacing: 1.2px; color: var(--color-text-3); font-weight: 700; }
+.recordings-channels button { padding: 9px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-2); text-align: left; font: inherit; font-size: 12px; cursor: pointer; overflow-wrap: anywhere; }
+.recordings-channels button:hover, .recordings-channels button.is-active { background: #5865f222; color: var(--color-text-1); }
+.recordings-channels button.is-active { box-shadow: inset 3px 0 #5865f2; }
+.recordings-feed { padding: 16px; min-width: 0; max-height: 480px; overflow-y: auto; }
+.recordings-hint { margin: 0 0 18px; font-size: 12px; color: var(--color-text-3); }
+.dispatch-recording-team h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.dispatch-recording-team h3 > span { color: #8790ef; }
+.dispatch-recording-team h3 > small { margin-left: auto; font-size: 10px; font-weight: 400; color: var(--color-text-3); }
+.recordings-avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.recording-profile { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 14px 8px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--color-text-1); font: inherit; cursor: pointer; text-align: center; min-width: 0; }
+.recording-profile:hover { background: var(--color-bg-secondary); border-color: var(--color-border); }
+.recording-profile:focus-visible, .recordings-channels button:focus-visible { outline: 2px solid #8790ef; outline-offset: 2px; }
+.recording-avatar { position: relative; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, #5865f2, #8257c8); color: #fff; font-size: 15px; font-weight: 700; }
+.recording-play-icon { position: absolute; right: -3px; bottom: -2px; display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; border: 2px solid var(--color-bg-secondary); background: #43b581; color: #fff; font-size: 9px; }
+.recording-profile > strong { font-size: 11px; overflow-wrap: anywhere; }
+.recording-profile > strong span { color: var(--color-text-2); font-weight: 400; }
+.recording-profile > small { font-size: 10px; color: var(--color-text-3); }
+.recording-duration { font-size: 10px; color: var(--color-text-3); }
+.recording-profile.is-playing { border-color: #43b581; background: #43b5810d; }
+.recording-profile.is-playing .recording-avatar { box-shadow: 0 0 0 3px #43b58144; }
+.recording-profile.is-playing .recording-duration { color: #43b581; }
+@media (max-width: 600px) {
+  .recordings-workspace { grid-template-columns: minmax(0, 1fr); }
+  .recordings-channels { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--color-border); }
+  .recordings-channel-heading { width: 100%; margin-bottom: 0; }
+  .recordings-feed { padding: 12px; }
+}
