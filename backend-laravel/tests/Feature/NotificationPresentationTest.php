@@ -20,7 +20,7 @@ class NotificationPresentationTest extends TestCase
         $this->assertSame('Critical',$feed[0]['priority']);
         $this->assertSame('/broadcast',$feed[0]['action_url']);
         $this->assertSame('red',$feed[0]['tone']);
-        $this->assertTrue($feed[0]['read']);
+        $this->assertFalse($feed[0]['read']);
     }
 
     public function test_saved_view_applies_read_and_hide_ids_without_mutating_sources(): void
@@ -37,6 +37,28 @@ class NotificationPresentationTest extends TestCase
         $this->assertSame('a',$visible[0]['id']);
         $this->assertTrue($visible[0]['read']);
         $this->assertFalse($items[0]['read']);
+    }
+
+    public function test_normal_weather_and_processed_external_requests_start_unread(): void
+    {
+        $savedAt = now();
+        $feed = app(NotificationPresenter::class)->feed([
+            'outgoing' => collect(), 'household' => collect(), 'dispatch' => collect(),
+            'requests' => collect([\App\Models\ResourceRequest::unguarded(fn () => new \App\Models\ResourceRequest([
+                'request_id' => 7, 'request_source' => 'external', 'item_name' => 'Water',
+                'validation_status' => 'approved', 'created_at' => $savedAt->copy()->subMinute(),
+            ]))]),
+            'weather' => collect([\App\Models\WeatherLog::unguarded(fn () => new \App\Models\WeatherLog([
+                'weather_log_id' => 8, 'condition_name' => 'Clear', 'source_name' => 'Weather API',
+                'observed_at' => $savedAt->copy()->subHours(3), 'created_at' => $savedAt,
+            ]))]),
+            'broadcasts' => collect(), 'audit' => collect(),
+        ]);
+        $this->assertSame('weather-8', $feed[0]['id']);
+        $this->assertSame($savedAt->timestamp, $feed[0]['sort_time']);
+        $this->assertFalse($feed[0]['read']);
+        $this->assertFalse($feed[1]['read']);
+        $this->assertSame('/resources-requests', $feed[1]['action_url']);
     }
 
     public function test_saved_view_only_retains_ids_in_the_current_feed_while_scanning_history(): void

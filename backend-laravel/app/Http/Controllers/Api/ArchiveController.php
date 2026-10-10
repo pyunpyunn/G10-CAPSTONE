@@ -18,6 +18,21 @@ class ArchiveController extends Controller
         $this->service = $service;
     }
 
+    public function inquiryLogs(ListRequest $request): JsonResponse
+    {
+        if (! \App\Support\RequestSchema::hasTable('landing_inquiries')) {
+            return response()->json(['data' => ['records' => ['data' => [], 'total' => 0]]]);
+        }
+        $search = trim((string) $request->query('search', ''));
+        $rows = \App\Models\LandingInquiry::query()
+            ->select(['inquiry_id', 'name', 'organization', 'email', 'message', 'status', 'created_at'])
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")->orWhere('message', 'like', "%{$search}%");
+            }))
+            ->orderByDesc('created_at')->paginate($request->integer('per_page', 20));
+        return response()->json(['data' => ['records' => $rows]]);
+    }
+
     public function disasterEvents(ListRequest $request): JsonResponse
     {
         return $this->service->disasterEvents($request);

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import {
   Alert,
+  AppState,
   Platform,
   Pressable,
   RefreshControl,
@@ -104,7 +106,7 @@ export default function HouseholdHomeScreen() {
     }
 
     try {
-      const data = await getHouseholdOverview();
+      const data = await getHouseholdOverview(isRefresh);
       setOverview(data);
       setTrustedPinConfigured(Boolean(data.trusted?.pin_configured));
       setViewingTrusted((current: any) =>
@@ -122,6 +124,14 @@ export default function HouseholdHomeScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  useEffect(() => {
+    const removeBroadcast = onDisasterBroadcast(() => { void loadOverview(true); });
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void loadOverview(true);
+    });
+    return () => { removeBroadcast(); subscription.remove(); };
+  }, [loadOverview]);
 
   const refreshDeviceSensors = useCallback(async () => {
     try {

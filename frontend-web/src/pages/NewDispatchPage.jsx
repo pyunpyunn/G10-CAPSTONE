@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { completeDispatch, createDispatch, getDispatchDashboard, updateDispatch } from '../api/dispatchApi'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { completeDispatch, createDispatch, getDispatchDashboard, getDispatch, updateDispatch } from '../api/dispatchApi'
 import DispatchModalForm from '../components/dispatch/DispatchModalForm'
+import { useModuleData } from '../utils/useModuleData'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import {
@@ -15,99 +16,34 @@ import {
 export default function NewDispatchPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [payload, setPayload] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [selectedRiskId, setSelectedRiskId] = useState('')
-  const [assignmentOption, setAssignmentOption] = useState('')
-  const [form, setForm] = useState(defaultForm())
-  const [formError, setFormError] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
-  const editingDispatch = location.state?.dispatch || null
+  const { assignmentId } = useParams()
+  const editingId = assignmentId || location.state?.dispatch?.assignment_id
+  const returnTo = location.pathname.startsWith('/rescue-management') || location.state?.returnTo === '/rescue-management' ? '/rescue-management' : '/dispatch'
+  const loader = useCallback(async () => {
+    const [workspace, detail] = await Promise.all([getDispatchDashboard({ per_page: 1 }), editingId ? getDispatch(editingId) : Promise.resolve(null)])
+    return { workspace, dispatch: detail?.dispatch || null }
+  }, [editingId])
+  const { data, error, loading, refresh } = useModuleData(loader)
+  if (loading) return <main className="ops-page new-dispatch-page"><LoadingState /></main>
+  if (error) return <main className="ops-page new-dispatch-page"><PageHeader title={editingId ? 'Update Dispatch Assignment' : 'Create New Dispatch Assignment'} />
+    <div className="form-error" role="alert">{error}</div><button className="btn btn-secondary" type="button" onClick={refresh}>Retry</button>
+    <button className="btn btn-secondary" type="button" onClick={() => navigate(returnTo)}>Back to Rescue Management</button></main>
+  return <DispatchAssignmentEditor key={`${editingId || 'new'}-${location.key}`} payload={data.workspace} editingDispatch={data.dispatch} returnTo={returnTo} />
+}
 
-  useEffect(() => {
-    let ignore = false
-
-    async function loadPage() {
-      setIsLoading(true)
-      setError('')
-
-      try {
-        const data = await getDispatchDashboard({ status: 'all', per_page: 20 })
-        if (!ignore) {
-          setPayload(data)
-        }
-      } catch {
-        if (!ignore) {
-          setError('New dispatch cannot be loaded right now. Please check the backend or database connection.')
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadPage()
-
-    return () => {
-      ignore = true
-    }
-  }, [])
-
+function DispatchAssignmentEditor({ payload, editingDispatch, returnTo }) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const teams = payload?.teams || []
-  const responders = payload?.responders || []
   const riskAreas = payload?.risk_areas || []
   const hasActiveEvent = Boolean(payload?.active_event)
-
-  useEffect(() => {
-    if (!payload || isInitialized) {
-      return
-    }
-
-    const selectedHousehold = location.state?.selectedHousehold
-    const selectedTeam = location.state?.team
-    const existingDispatch = editingDispatch
-    const selectedAreaName = selectedHousehold?.purok || existingDispatch?.assigned_area
-    const matchingArea = selectedAreaName
-      ? riskAreas.find((area) => {
-          const areaName = String(area.area_name || '').toLowerCase()
-          const targetArea = String(selectedAreaName || '').toLowerCase()
-          return areaName === targetArea || targetArea.includes(areaName) || areaName.includes(targetArea)
-        })
-      : null
-    const firstHousehold = matchingArea?.households?.find((household) => household.household_id === existingDispatch?.household_id)
-      || (matchingArea ? firstDispatchableHousehold(matchingArea) : null)
-    const teamOption = existingDispatch?.team_id
-      ? `team:${existingDispatch.team_id}`
-      : selectedTeam?.team_id && selectedTeam.is_available
-      ? `team:${selectedTeam.team_id}`
-      : firstAssignmentOption(teams)
-
-    setAssignmentOption(teamOption)
-    setSelectedRiskId(matchingArea?.id || '')
-    setForm({
-      ...defaultForm(),
-      target_household: selectedHousehold || firstHousehold,
-      assigned_area: matchingArea?.area_name || selectedHousehold?.purok || existingDispatch?.assigned_area || '',
-      household_id: selectedHousehold?.household_id || selectedHousehold?.id || firstHousehold?.household_id || existingDispatch?.household_id || '',
-      households_to_cover: matchingArea?.to_cover || (selectedHousehold ? 1 : existingDispatch?.households_to_cover || 0),
-      priority_level: selectedHousehold?.priority_level || matchingArea?.priority || existingDispatch?.priority_level || 'high',
-      status: existingDispatch?.status?.key || 'dispatched',
-      selected_responder_ids: existingDispatch?.selected_responder_ids || [],
-      responder_count: existingDispatch?.responder_count || (location.state?.dispatchType === 'welfare_check' ? 2 : 1),
-      dispatch_type: existingDispatch?.dispatch_type || location.state?.dispatchType || 'rescue',
-      dispatch_notes: existingDispatch?.dispatch_notes || '',
-      route_notes: existingDispatch?.route_notes || '',
-      safe_count: existingDispatch?.outcomes?.safe || 0,
-      evacuated_count: existingDispatch?.outcomes?.evacuated || 0,
-      unsafe_count: existingDispatch?.outcomes?.unsafe || 0,
-      pending_count: existingDispatch?.outcomes?.pending || 0,
-      outcome_notes: existingDispatch?.outcomes?.notes || '',
-    })
-    setIsInitialized(true)
-  }, [location.state, payload, riskAreas, teams, isInitialized, editingDispatch])
+  const isClosed = ['completed', 'cancelled'].includes(editingDispatch?.status?.key)
+  const initial = initialAssignment(payload, editingDispatch, location.state)
+  const [selectedRiskId, setSelectedRiskId] = useState(initial.selectedRiskId)
+  const [assignmentOption, setAssignmentOption] = useState(initial.assignmentOption)
+  const [form, setForm] = useState(initial.form)
+  const [formError, setFormError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   function selectRiskArea(area) {
     const firstHousehold = firstDispatchableHousehold(area)
@@ -117,10 +53,14 @@ export default function NewDispatchPage() {
       ...current,
       assigned_area: area.area_name,
       household_id: firstHousehold?.household_id || '',
-      households_to_cover: area.to_cover,
-      safe_count: area.safe_households || 0,
-      unsafe_count: area.unsafe_households || 0,
-      pending_count: area.unchecked_households || 0,
+      target_household: firstHousehold,
+      households_to_cover: firstHousehold ? 1 : 0,
+      safe_count: 0,
+      evacuated_count: 0,
+      injured_count: 0,
+      missing_count: 0,
+      unsafe_count: 0,
+      pending_count: 0,
       priority_level: area.priority,
     }))
   }
@@ -132,7 +72,7 @@ export default function NewDispatchPage() {
       assigned_area: area.area_name,
       household_id: household.household_id,
       target_household: household,
-      households_to_cover: Math.max(1, current.households_to_cover || area.to_cover || 1),
+      households_to_cover: 1,
       priority_level: household.priority_level || area.priority || current.priority_level,
     }))
   }
@@ -141,12 +81,17 @@ export default function NewDispatchPage() {
     event.preventDefault()
     setFormError('')
 
-    if (!hasActiveEvent) {
+    if (isClosed) {
+      setFormError('This assignment is already closed. Return to Rescue Management and refresh the list.')
+      return
+    }
+
+    if (!editingDispatch && !hasActiveEvent) {
       setFormError('Dispatch assignment requires an active disaster event.')
       return
     }
 
-    if (!assignmentOption) {
+    if (!editingDispatch && !assignmentOption) {
       setFormError('Select an available team first.')
       return
     }
@@ -156,7 +101,7 @@ export default function NewDispatchPage() {
       return
     }
 
-    if (!form.household_id) {
+    if (!editingDispatch && !form.household_id) {
       setFormError('Select a household with GPS from the affected area list. This is required for routed dispatch.')
       return
     }
@@ -178,7 +123,7 @@ export default function NewDispatchPage() {
       } else {
         await createDispatch(requestBody)
       }
-      navigate('/dispatch', { replace: true })
+      navigate(returnTo, { replace: true })
     } catch (saveError) {
       setFormError(getSaveMessage(saveError))
     } finally {
@@ -186,30 +131,27 @@ export default function NewDispatchPage() {
     }
   }
 
-  if (isLoading) {
-    return <main className="ops-page new-dispatch-page"><LoadingState /></main>
-  }
-
   return (
     <main className="ops-page new-dispatch-page">
       <PageHeader
-        title={editingDispatch ? 'Update dispatch' : 'New dispatch'}
+        title={editingDispatch ? 'Update Dispatch Assignment' : 'Create New Dispatch Assignment'}
         actions={(
-          <button className="new-dispatch-back" type="button" onClick={() => navigate('/dispatch')}>
+          <button className="new-dispatch-back" type="button" onClick={() => navigate(returnTo)}>
             <ArrowLeft size={15} /> Back to dispatch
           </button>
         )}
       />
 
-      {error && <div className="form-error">{error}</div>}
-      {!hasActiveEvent && (
+      {!editingDispatch && !hasActiveEvent && (
         <div className="standby-strip">
           <strong>No active disaster event</strong>
           <span>New dispatch assignments are disabled until HQ/Admin declares an active event.</span>
         </div>
       )}
 
+      {isClosed && <div className="form-error">This assignment is already completed or cancelled. It cannot be updated.</div>}
       <section className="new-dispatch-shell" aria-label="New dispatch form">
+        <fieldset className="response-assignment-fields" disabled={isClosed || isSaving}>
         <DispatchModalForm
           editingDispatch={editingDispatch}
           form={form}
@@ -218,7 +160,6 @@ export default function NewDispatchPage() {
           assignmentOption={assignmentOption}
           setAssignmentOption={setAssignmentOption}
           teams={teams}
-          responders={responders}
           riskAreas={riskAreas}
           selectedRiskId={selectedRiskId}
           onSelectRiskArea={selectRiskArea}
@@ -226,9 +167,10 @@ export default function NewDispatchPage() {
           onSubmit={submitDispatch}
           showOutcomeUpdate={Boolean(editingDispatch)}
         />
+        </fieldset>
         <div className="new-dispatch-actions">
-          <button className="btn btn-secondary" type="button" disabled={isSaving} onClick={() => navigate('/dispatch')}>Cancel</button>
-          <button className="btn btn-primary" type="submit" form="dispatchForm" disabled={isSaving || !hasActiveEvent}>
+          <button className="btn btn-secondary" type="button" disabled={isSaving} onClick={() => navigate(returnTo)}>Cancel</button>
+          <button className="btn btn-primary" type="submit" form="dispatchForm" disabled={isSaving || isClosed || (!editingDispatch && !hasActiveEvent)}>
             {isSaving ? 'Saving...' : editingDispatch ? 'Save update' : 'Dispatch responders'}
           </button>
         </div>
@@ -241,4 +183,34 @@ function firstDispatchableHousehold(area) {
   return area?.recommended_households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
     || area?.households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
     || null
+}
+
+function initialAssignment(payload, dispatch, state) {
+  const areas = payload?.risk_areas || []
+  const household = state?.selectedHousehold
+  const areaName = household?.purok || dispatch?.assigned_area
+  const area = areas.find((item) => String(item.area_name).toLowerCase() === String(areaName || '').toLowerCase())
+  const target = dispatch
+    ? areas.flatMap((item) => item.households || []).find((item) => String(item.household_id) === String(dispatch.household_id))
+      || { household_id: dispatch.household_id, household_name: dispatch.household_id }
+    : household || firstDispatchableHousehold(area)
+  const option = dispatch?.team_id ? `team:${dispatch.team_id}`
+    : dispatch?.responder_id ? `responder:${dispatch.responder_id}`
+    : state?.team?.team_id && state.team.is_available ? `team:${state.team.team_id}` : firstAssignmentOption((payload?.teams || []).filter((team) => state?.dispatchType !== 'welfare_check' || Number(team.available_responder_count) >= 2))
+  return { selectedRiskId: area?.id || '', assignmentOption: option, form: {
+    ...defaultForm(), target_household: target,
+    household_id: dispatch?.household_id || household?.household_id || household?.id || target?.household_id || '',
+    assigned_area: dispatch?.assigned_area || area?.area_name || household?.purok || '',
+    households_to_cover: dispatch?.households_to_cover ?? (target ? 1 : 0),
+    priority_level: dispatch?.priority_level || household?.priority_level || area?.priority || 'high',
+    status: dispatch?.status?.key || 'dispatched',
+    selected_responder_ids: dispatch?.selected_responder_ids || [],
+    responder_count: dispatch?.responder_count || (state?.dispatchType === 'welfare_check' ? 2 : 1),
+    dispatch_type: dispatch?.dispatch_type || state?.dispatchType || 'rescue',
+    dispatch_notes: dispatch?.dispatch_notes || '', route_notes: dispatch?.route_notes || '',
+    safe_count: dispatch?.outcomes?.safe || 0, evacuated_count: dispatch?.outcomes?.evacuated || 0,
+    unsafe_count: dispatch?.outcomes?.unsafe || 0, injured_count: dispatch?.outcomes?.injured || 0,
+    missing_count: dispatch?.outcomes?.missing || 0, pending_count: dispatch?.outcomes?.pending || 0,
+    outcome_notes: dispatch?.outcomes?.notes || '',
+  } }
 }

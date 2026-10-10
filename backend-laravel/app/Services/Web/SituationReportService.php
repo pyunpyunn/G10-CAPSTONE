@@ -63,18 +63,8 @@ class SituationReportService
 
     public function pdf(int $sitRepId): JsonResponse
     {
-        $report = $this->query->findReport($sitRepId);
-        if (! $report) return response()->json(['message' => 'Situation report was not found.'], 404);
-        return response()->json([
-            'message' => 'PDF export is reserved for the PDF package step. Use the saved report snapshot for now.',
-            'data' => ['report' => $this->presenter->formatSavedReport($report, true)],
-        ], 501);
+        return app(ReportGenerationService::class)->generate(Request::create('/', 'POST', [
+            'report_type' => 'situation', 'sit_rep_id' => $sitRepId, 'format' => 'pdf',
+        ]));
     }
 }
-
-
-
-
-
-
-

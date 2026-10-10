@@ -3,7 +3,6 @@
 namespace App\Presenters;
 
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Carbon;
 
 class RescuerRadioPresenter
@@ -47,7 +46,7 @@ class RescuerRadioPresenter
             'event_name' => (string) ($message['event_name'] ?? 'No active event'),
             'audio_status' => (string) ($message['audio_status'] ?? 'metadata_only'),
             'audio_path' => $message['audio_path'] ?? null,
-            'audio_url' => ! empty($message['audio_path']) ? Storage::disk('public')->url($message['audio_path']) : null,
+            'audio_url' => ! empty($message['audio_path']) ? '/storage/'.ltrim($message['audio_path'], '/') : null,
             'message' => $this->displayMessage($type, $message),
             'timestamp' => $this->mobileDateTime($row->timestamp),
             'raw_timestamp' => $row->timestamp,

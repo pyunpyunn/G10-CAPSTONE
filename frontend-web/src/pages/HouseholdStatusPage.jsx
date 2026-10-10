@@ -1,43 +1,29 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { getHouseholds } from '../api/householdApi'
 import { getSitioPriorities } from '../api/dispatchApi'
 import { HouseholdSummaryMetrics } from '../components/households/HouseholdSummary'
 import { SitioPriorityChart, SitioPriorityList } from '../components/households/SitioPriorityRanking'
 import LoadingState from '../components/ui/LoadingState'
 import { emptySummary } from '../utils/householdStatusHelpers'
+import { useModuleData } from '../utils/useModuleData'
 
 export default function HouseholdStatusPage() {
-  const [payload, setPayload] = useState(null)
-  const [ranking, setRanking] = useState([])
   const [selectedSitioId, setSelectedSitioId] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    setError('')
-    try {
-      const [households, priorities] = await Promise.allSettled([
-        getHouseholds({ page: 1, per_page: 1 }),
-        getSitioPriorities(),
-      ])
-      if (households.status === 'fulfilled') setPayload(households.value)
-      if (priorities.status === 'fulfilled') setRanking(priorities.value || [])
-      if (priorities.status === 'rejected') setError('Sitio priorities cannot be loaded right now. Please check the backend or database connection.')
-      else if (households.status === 'rejected') setError('Household summary is temporarily unavailable.')
-    } catch {
-      setError('Sitio priorities cannot be loaded right now. Please check the backend or database connection.')
-    } finally {
-      setIsLoading(false)
+  const loader = useCallback(async () => {
+    const [households, priorities] = await Promise.allSettled([
+      getHouseholds({ page: 1, per_page: 1 }), getSitioPriorities(),
+    ])
+    return {
+      payload: households.status === 'fulfilled' ? households.value : null,
+      ranking: priorities.status === 'fulfilled' ? priorities.value || [] : [],
+      error: priorities.status === 'rejected' ? 'Sitio priorities cannot be loaded right now. Please check the backend or database connection.'
+        : households.status === 'rejected' ? 'Household summary is temporarily unavailable.' : '',
     }
   }, [])
-
-  useEffect(() => {
-    let active = true
-    Promise.resolve().then(() => { if (active) load() })
-    return () => { active = false }
-  }, [load])
-
+  const { data, error: loadError, loading: isLoading, refresh: load } = useModuleData(loader, ['households', 'disasters'])
+  const payload = data?.payload || null
+  const ranking = data?.ranking || []
+  const error = loadError || data?.error || ''
   return (
     <main className="ops-page household-page">
       {isLoading && !payload && <LoadingState />}

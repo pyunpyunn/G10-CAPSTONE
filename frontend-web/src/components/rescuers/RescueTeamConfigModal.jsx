@@ -1,18 +1,18 @@
-import { ChevronLeft, ChevronRight, Plus, Save, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import Badge from '../ui/Badge'
 import LoadingState from '../ui/LoadingState'
 import Modal from '../ui/Modal'
 
-const blankTeam = {
-  team_id: null,
-  team_code: '',
-  team_name: '',
-  team_type: '',
-  duty_status: 'available',
-  assigned_purok_id: '',
-  leader_responder_id: '',
-  member_ids: [],
+function emptyTeam(defaults = {}) {
+  return {
+    ...defaults,
+    team_code: defaults.team_code ?? '', team_name: defaults.team_name ?? '',
+    team_type: defaults.team_type ?? '', duty_status: defaults.duty_status ?? '',
+    assigned_purok_id: defaults.assigned_purok_id ?? '',
+    leader_responder_id: defaults.leader_responder_id ?? '',
+    member_ids: [...(defaults.member_ids || [])],
+  }
 }
 
 export default function RescueTeamConfigModal({
@@ -27,29 +27,16 @@ export default function RescueTeamConfigModal({
   onDelete,
   embedded = false,
 }) {
-  const membersPerPage = 7
+  const membersPerPage = workspace?.members_per_page || Math.max(1, workspace?.responders?.length || 1)
+  const constraints = workspace?.form_constraints || {}
   const teams = useMemo(() => workspace?.teams || [], [workspace])
   const responders = useMemo(() => workspace?.responders || [], [workspace])
+  const [isEditing, setIsEditing] = useState(!workspace?.teams?.length)
   const [memberPage, setMemberPage] = useState(1)
   const [form, setForm] = useState(() => {
-    const firstTeam = workspace?.teams?.[0]
-    return firstTeam ? teamToForm(firstTeam) : blankTeam
+    const firstTeam = workspace?.teams?.find((team) => Number(team.team_id) === Number(workspace.selected_team_id)) || workspace?.teams?.[0]
+    return firstTeam ? teamToForm(firstTeam) : emptyTeam(workspace?.form_defaults)
   })
-
-  useEffect(() => {
-    if (!workspace) {
-      return
-    }
-
-    setForm((current) => {
-      if (current.team_id || current.team_name) {
-        return current
-      }
-
-      const firstTeam = workspace.teams?.[0]
-      return firstTeam ? teamToForm(firstTeam) : { ...blankTeam, member_ids: [] }
-    })
-  }, [workspace])
 
   const selectedTeam = useMemo(() => (
     teams.find((team) => String(team.team_id || team.team_name) === String(form.team_id || form.team_name))
@@ -57,11 +44,8 @@ export default function RescueTeamConfigModal({
 
   const memberSet = new Set(form.member_ids.map((id) => Number(id)))
   const memberPageCount = Math.max(1, Math.ceil(responders.length / membersPerPage))
-  const visibleResponders = responders.slice((memberPage - 1) * membersPerPage, memberPage * membersPerPage)
-
-  useEffect(() => {
-    setMemberPage((current) => Math.min(current, memberPageCount))
-  }, [memberPageCount])
+  const currentMemberPage = Math.min(memberPage, memberPageCount)
+  const visibleResponders = responders.slice((currentMemberPage - 1) * membersPerPage, currentMemberPage * membersPerPage)
 
   function setField(key, value) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -69,11 +53,13 @@ export default function RescueTeamConfigModal({
 
   function selectTeam(team) {
     setForm(teamToForm(team))
+    setIsEditing(false)
     setMemberPage(1)
   }
 
   function startNewTeam() {
-    setForm({ ...blankTeam, duty_status: 'available' })
+    setForm(emptyTeam(workspace?.form_defaults))
+    setIsEditing(true)
     setMemberPage(1)
   }
 
@@ -110,24 +96,25 @@ export default function RescueTeamConfigModal({
       <div className="rtc-footer-note">This page manages team membership and deployment readiness. It does not create or delete rescuer accounts.</div>
       <div className="rtc-footer-actions">
         {form.team_id && (
-          <button className="btn btn-danger btn-sm" type="button" disabled={isSaving || selectedTeam?.can_delete === false} onClick={deleteTeam}>
+          <button className="btn btn-danger btn-sm" type="button" disabled={isSaving || !selectedTeam?.can_delete} onClick={deleteTeam}>
             <Trash2 size={14} />
             Delete team
           </button>
         )}
-        <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={onClose}>
+        <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={() => { if (isEditing && selectedTeam) { setForm(teamToForm(selectedTeam)); setIsEditing(false) } else onClose() }}>
           Cancel
         </button>
-        <button className="btn btn-primary btn-sm" type="submit" form="teamConfigForm" disabled={isSaving}>
+        {isEditing ? <button className="btn btn-primary btn-sm" type="submit" form="teamConfigForm" disabled={isSaving || isLoading || !workspace}>
           <Save size={14} />
           {isSaving ? 'Saving...' : 'Save team'}
-        </button>
+        </button> : <button className="btn btn-primary btn-sm" type="button" disabled={isLoading || !selectedTeam} onClick={() => setIsEditing(true)}><Pencil size={14} />Update team</button>}
       </div>
     </>
   )
 
   const body = (
     <>
+      {error && isLoading === false && !workspace && <div className="rtc-error" role="alert">{error}<button type="button" className="button secondary" onClick={onRetry}>Retry</button></div>}
       {isLoading ? (
         <LoadingState label="Loading team configuration..." inline />
       ) : (
@@ -140,7 +127,7 @@ export default function RescueTeamConfigModal({
               </div>
               <span>Saved to the database</span>
             </div>
-            <button className="btn btn-secondary btn-sm rtc-new-team" type="button" onClick={startNewTeam}>
+            <button className="btn btn-secondary btn-sm rtc-new-team" type="button" disabled={isSaving} onClick={startNewTeam}>
               <Plus size={14} />
               Add rescue team
             </button>
@@ -148,10 +135,10 @@ export default function RescueTeamConfigModal({
             {teams.map((team) => {
               const isActive = String(team.team_id || team.team_name) === String(form.team_id || form.team_name)
               return (
-                <button className={`rtc-team-option ${isActive ? 'active' : ''}`} type="button" key={team.team_id || team.team_name} onClick={() => selectTeam(team)}>
+                <button className={`rtc-team-option ${isActive ? 'active' : ''}`} type="button" key={team.team_id || team.team_name} disabled={isSaving} aria-pressed={isActive} onClick={() => selectTeam(team)}>
                   <span>
                     <strong>{team.team_name}</strong>
-                    <small>{team.team_code} - {team.member_count || 0} members</small>
+                    <small>{team.team_code} - {team.member_count} members</small>
                   </span>
                   <Badge tone="blue">Saved</Badge>
                 </button>
@@ -174,27 +161,32 @@ export default function RescueTeamConfigModal({
                 <button className="btn btn-secondary btn-sm" type="button" onClick={onRetry} disabled={isLoading || isSaving}>Retry</button>
               </div>
             )}
-            <div className="rtc-grid">
+            {selectedTeam && !isEditing && <div className="rtc-team-summary"><Badge tone={selectedTeam.duty_status_display?.tone}>{selectedTeam.duty_status_display?.label}</Badge><span>{selectedTeam.active_dispatch_count} active assignments</span></div>}
+            <fieldset className={`rtc-fields ${!isEditing ? 'rtc-readonly' : ''}`} disabled={!isEditing || isSaving}>
+            {!isEditing && selectedTeam && <dl className="ra-profile-details rtc-detail-grid">
+              {[
+                ['Team name', selectedTeam.team_name], ['Team code', selectedTeam.team_code],
+                ['Team type', selectedTeam.team_type], ['Duty status', selectedTeam.duty_status_display?.label],
+                ['Assigned purok / sitio', selectedTeam.assigned_purok || 'No fixed purok'], ['Team leader', selectedTeam.leader_name || 'No leader assigned'],
+              ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Not recorded'}</dd></div>)}
+            </dl>}
+            {isEditing && <div className="rtc-grid">
               <label>
                 <span>Team name</span>
-                <input value={form.team_name} onChange={(event) => setField('team_name', event.target.value)} placeholder="Team name" required />
+                <input value={form.team_name} onChange={(event) => setField('team_name', event.target.value)} placeholder="Team name" {...constraints.team_name} />
               </label>
               <label>
                 <span>Team code</span>
-                <input value={form.team_code} onChange={(event) => setField('team_code', event.target.value.toUpperCase())} placeholder="Team code" maxLength={8} required />
+                <input value={form.team_code} onChange={(event) => setField('team_code', event.target.value)} placeholder="Team code" {...constraints.team_code} />
               </label>
               <label>
                 <span>Team type</span>
-                <select value={form.team_type} onChange={(event) => setField('team_type', event.target.value)} required>
-                  <option value="">Select team type</option>
-                  {(workspace?.team_types || []).map((type) => (
-                    <option value={type} key={type}>{type}</option>
-                  ))}
-                </select>
+                <input value={form.team_type} list="rescueTeamTypes" onChange={(event) => setField('team_type', event.target.value)} {...constraints.team_type} />
+                <datalist id="rescueTeamTypes">{(workspace?.team_types || []).map((type) => <option value={type} key={type} />)}</datalist>
               </label>
               <label>
                 <span>Duty status</span>
-                <select value={form.duty_status} onChange={(event) => setField('duty_status', event.target.value)}>
+                <select {...constraints.duty_status} value={form.duty_status} onChange={(event) => setField('duty_status', event.target.value)}>
                   {(workspace?.duty_statuses || []).map((status) => (
                     <option value={status.key} key={status.key}>{status.label}</option>
                   ))}
@@ -220,27 +212,29 @@ export default function RescueTeamConfigModal({
               </label>
             </div>
 
+            }
+            </fieldset>
+            <fieldset className="rtc-fields" disabled={!isEditing || isSaving}>
             <div className="rtc-member-head">
               <div>
                 <span className="rtc-kicker">Members</span>
                 <strong>{form.member_ids.length} selected</strong>
               </div>
-              <span>Busy responders are locked while deployed.</span>
+              <span>{isEditing ? 'Busy responders are locked while deployed.' : 'Assigned rescue personnel'}</span>
             </div>
 
             <div className="rtc-member-list">
-              {responders.length === 0 ? (
-                <div className="rtc-empty">No rescuer accounts created yet.</div>
+              {(isEditing ? responders.length === 0 : form.member_ids.length === 0) ? (
+                <div className="rtc-empty">{isEditing ? 'No rescuer accounts created yet.' : 'No members assigned to this team.'}</div>
               ) : (
-                visibleResponders.map((responder) => {
+                (isEditing ? visibleResponders : responders.filter((responder) => memberSet.has(Number(responder.responder_id)))).map((responder) => {
                   const checked = memberSet.has(Number(responder.responder_id))
-                  const busyInOtherTeam = responder.is_busy && responder.team_id && Number(responder.team_id) !== Number(form.team_id)
-                  const busyInCurrentTeam = responder.is_busy && checked
-                  const disabled = busyInOtherTeam || busyInCurrentTeam
+                  const disabled = !responder.can_change_membership
 
                   return (
                     <label className={`rtc-member ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}`} key={responder.responder_id}>
                       <input
+                        style={!isEditing ? { visibility: 'hidden' } : undefined}
                         type="checkbox"
                         checked={checked}
                         disabled={disabled}
@@ -251,23 +245,24 @@ export default function RescueTeamConfigModal({
                         <strong>{responder.full_name}</strong>
                         <small>{responder.title} - {responder.team_name}</small>
                       </span>
-                      <Badge tone={responder.is_busy ? 'amber' : 'green'}>{responder.is_busy ? 'Busy' : 'Available'}</Badge>
+                      <Badge tone={responder.membership_status?.tone}>{responder.membership_status?.label}</Badge>
                     </label>
                   )
                 })
               )}
             </div>
-            {memberPageCount > 1 && (
+            {isEditing && memberPageCount > 1 && (
               <div className="rtc-member-pagination">
-                <button className="btn btn-secondary btn-sm" type="button" aria-label="Previous members" disabled={memberPage === 1} onClick={() => setMemberPage((current) => current - 1)}>
+                <button className="btn btn-secondary btn-sm" type="button" aria-label="Previous members" disabled={currentMemberPage === 1} onClick={() => setMemberPage((current) => current - 1)}>
                   <ChevronLeft size={14} />
                 </button>
-                <span>Page {memberPage} of {memberPageCount}</span>
-                <button className="btn btn-secondary btn-sm" type="button" aria-label="Next members" disabled={memberPage === memberPageCount} onClick={() => setMemberPage((current) => current + 1)}>
+                <span>Page {currentMemberPage} of {memberPageCount}</span>
+                <button className="btn btn-secondary btn-sm" type="button" aria-label="Next members" disabled={currentMemberPage === memberPageCount} onClick={() => setMemberPage((current) => current + 1)}>
                   <ChevronRight size={14} />
                 </button>
               </div>
             )}
+            </fieldset>
           </form>
         </div>
       )}
@@ -287,7 +282,7 @@ function teamToForm(team) {
     team_code: team.team_code || '',
     team_name: team.team_name || '',
     team_type: team.team_type || '',
-    duty_status: team.duty_status === 'not_created' ? 'available' : team.duty_status || 'available',
+    duty_status: team.duty_status || '',
     assigned_purok_id: team.assigned_purok_id || '',
     leader_responder_id: team.leader_responder_id || '',
     member_ids: team.member_ids || [],

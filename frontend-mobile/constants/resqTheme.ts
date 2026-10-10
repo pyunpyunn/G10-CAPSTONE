@@ -4,6 +4,7 @@ export const palette = {
   navHover: '#2a4f72',
   navText: '#e8eef5',
   navMuted: '#a0b4c8',
+  brandRed: '#c72e32',
   page: '#f2f4f7',
   card: '#ffffff',
   secondary: '#edf1f6',

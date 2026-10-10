@@ -2,6 +2,7 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
+import { invalidateMobileReads } from '@/utils/mobileReadCache';
 
 const tokenKey = 'resqperation_mobile_token';
 
@@ -58,7 +59,10 @@ api.interceptors.request.use(async (config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config.method !== 'get') invalidateMobileReads();
+    return response;
+  },
   (error) => {
     if (error.code === 'ECONNABORTED') {
       error.userMessage = 'The server took too long to respond. Check Wi-Fi, Laravel, and the database connection.';
@@ -71,10 +75,12 @@ api.interceptors.response.use(
 );
 
 export async function saveToken(token: string) {
+  invalidateMobileReads();
   await setStoredItem(tokenKey, token);
 }
 
 export async function clearToken() {
+  invalidateMobileReads();
   await deleteStoredItem(tokenKey);
 }
 

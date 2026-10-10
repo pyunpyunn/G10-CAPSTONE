@@ -6,6 +6,7 @@ export default function SituationActionMenu({
   onArchive,
   onViewArchive,
   onExportExcel,
+  onExportCsv,
   onExportPdf,
 }) {
   return (
@@ -30,6 +31,7 @@ export default function SituationActionMenu({
           <Download size={14} />
           Export PDF
         </button>
+        <button className="btn btn-secondary btn-sm" type="button" disabled={!hasSummary} onClick={onExportCsv}><Download size={14} />Export CSV</button>
         <button className="btn btn-secondary btn-sm" type="button" disabled={!hasSummary} onClick={onExportExcel}>
           <Download size={14} />
           Export Excel

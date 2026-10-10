@@ -267,13 +267,14 @@ class HouseholdMobileReadQuery
         ];
 
         $centers = $query
-            ->limit(20)
             ->get($columns)
             ->map(function (object $center) use ($originLat, $originLng): array {
                 $capacity = $center->capacity !== null ? (int) $center->capacity : null;
                 $occupancy = $center->current_occupancy !== null ? (int) $center->current_occupancy : null;
                 $latitude = (float) $center->latitude;
                 $longitude = (float) $center->longitude;
+                $vacancy = $capacity !== null && $occupancy !== null ? max($capacity - $occupancy, 0) : null;
+                $status = strtolower(trim($center->status ?: 'active'));
                 $distanceKm = ($originLat !== null && $originLng !== null)
                     ? $this->distanceKm($originLat, $originLng, $latitude, $longitude)
                     : null;
@@ -286,7 +287,11 @@ class HouseholdMobileReadQuery
                     'distance_km' => $distanceKm,
                     'capacity' => $capacity,
                     'current_occupancy' => $occupancy,
-                    'vacancy' => $capacity !== null && $occupancy !== null ? max($capacity - $occupancy, 0) : null,
+                    'vacancy' => $vacancy,
+                    'route_available' => $vacancy !== null && $vacancy > 0
+                        && in_array($status, ['active', 'open', 'available'], true)
+                        && is_numeric($center->latitude) && is_numeric($center->longitude)
+                        && abs($latitude) <= 90 && abs($longitude) <= 180,
                     'status' => $center->status ?: 'active',
                     'center_type' => $center->center_type ?: 'Evacuation center',
                     'address' => $center->osm_address,

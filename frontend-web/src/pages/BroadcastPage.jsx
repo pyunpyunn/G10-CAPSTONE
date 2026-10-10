@@ -97,6 +97,26 @@ export default function BroadcastPage() {
     [currentTypeName, form.scope_type, directPuroks],
   )
 
+  const deliveryEventId = activeEvent?.event_id
+
+  // Delivery runs on the server; keep its status visible without a page reload.
+  useEffect(() => {
+    if (!deliveryEventId) return
+    let cancelled = false
+    let timer
+    async function refreshDeliveryStatus() {
+      try {
+        const data = await getBroadcastWorkspace(deliveryEventId)
+        if (!cancelled) setWorkspace(data)
+      } catch {
+        // A status read failure does not undo a saved broadcast.
+      } finally {
+        if (!cancelled) timer = setTimeout(refreshDeliveryStatus, 5000)
+      }
+    }
+    timer = setTimeout(refreshDeliveryStatus, 2000)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [deliveryEventId])
   function initForm(wsData) {
     const currentWorkspace = wsData || workspace
     const nextForm = defaultForm(currentWorkspace)
@@ -241,16 +261,10 @@ export default function BroadcastPage() {
         direct_puroks: directPuroks,
       })
 
-      const updatedWorkspace = {
-        ...workspace,
-        active_event: nextActiveEvent,
-        events: nextEvents,
-        broadcasts: broadcastResult.broadcasts || broadcastResult,
-      }
-
+      const updatedWorkspace = broadcastResult.workspace || broadcastResult
       setWorkspace(updatedWorkspace)
       initForm(updatedWorkspace)
-      setFormNotice(activeEvent ? 'Disaster updated and broadcast posted.' : 'Disaster declared and broadcast posted.')
+      setFormNotice(activeEvent ? 'Disaster updated and broadcast posted. Mobile notification delivery starts automatically.' : 'Disaster declared and broadcast posted. Mobile notification delivery starts automatically.')
     } catch (saveError) {
       setFormError(apiErrorMessage(saveError, 'Unable to save this broadcast. Please check all entries and try again.'))
     } finally {

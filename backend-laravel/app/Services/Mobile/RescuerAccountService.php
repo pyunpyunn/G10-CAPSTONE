@@ -30,6 +30,16 @@ class RescuerAccountService
         $view = $this->query->viewData();
         $teamOptions = $view['team_options'];
         $accountIds = $this->query->accountIdChoices($teamOptions);
+        $formOptions = $this->presenter->accountFormOptions();
+        $defaultTeam = $teamOptions[0] ?? [];
+        $formOptions['defaults'] = [
+            ...$formOptions['defaults'],
+            'account_id' => $accountIds['options'][0]['account_id'] ?? '',
+            'team_id' => $defaultTeam['team_id'] ?? null,
+            'team_name' => $defaultTeam['team_name'] ?? '',
+            'team_code' => $defaultTeam['team_code'] ?? '',
+            'team_type' => $defaultTeam['team_type'] ?? '',
+        ];
 
         return response()->json(['data' => [
             'area_label' => app(\App\Queries\AreaCoverageQuery::class)->label(),
@@ -48,6 +58,13 @@ class RescuerAccountService
             'account_id_options' => $accountIds['options'],
             'next_account_id' => $accountIds['default'],
             'account_id_format' => 'BDRRM-{TEAM_CODE}-###',
+            'form_options' => [
+                ...$formOptions,
+                'constraints' => [
+                    'create' => app(\App\Http\Requests\RescuerAccountPayloadValidator::class)->formConstraints(),
+                    'edit' => app(\App\Http\Requests\RescuerAccountPayloadValidator::class)->formConstraints(true),
+                ],
+            ],
             'filters' => [
                 'puroks' => $view['puroks'],
                 'duty_statuses' => $this->presenter->dutyStatuses(),
@@ -76,6 +93,11 @@ class RescuerAccountService
     public function update(Request $request, int $responderId): JsonResponse
     {
         return $this->accountWorkflow->update($request, $responderId);
+    }
+
+    public function delete(Request $request, int $responderId): JsonResponse
+    {
+        return $this->accountWorkflow->delete($request, $responderId);
     }
 
     public function deactivate(Request $request, int $responderId): JsonResponse

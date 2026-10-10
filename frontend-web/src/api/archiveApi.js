@@ -1,3 +1,4 @@
+import { downloadBackendReport } from './reportApi'
 import api from './client'
 
 const archiveEndpoints = {
@@ -36,17 +37,8 @@ export async function getSituationReportArchives(params = {}) {
   return getArchiveRecords('situation-reports', params)
 }
 
-export async function exportArchive(category, type, params = {}) {
-  const response = await api.get('/archive/export', {
-    params: {
-      ...params,
-      category,
-      type,
-    },
-    responseType: 'blob',
-  })
-
-  return response.data
+export async function exportArchive(category, format, params = {}) {
+  return downloadBackendReport({ ...params, report_type: 'archive', category, format })
 }
 
 export async function deleteArchiveRecords(category, ids = []) {

@@ -11,7 +11,6 @@ use App\Actions\UpdateRescuePrioritySettings;
 use App\Models\RescuePrioritySetting;
 use App\Queries\RescuePriorityQuery;
 use App\Queries\RescueCriteriaQuery;
-use App\Queries\RescueCriteriaHistoryQuery;
 use App\Queries\SitioPriorityQuery;
 use App\Queries\WelfareCheckQuery;
 use App\Queries\UnreportedMemberQuery;
@@ -33,6 +32,11 @@ class RescueDispatchController extends Controller
     public function teams(): JsonResponse
     {
         return $this->service->teams();
+    }
+
+    public function communications(ListRequest $request): JsonResponse
+    {
+        return (new \App\Http\Resources\FieldCommunicationWorkspaceResource($this->service->communications($request)))->response();
     }
 
     public function index(ListRequest $request): JsonResponse
@@ -79,15 +83,31 @@ class RescueDispatchController extends Controller
         return response()->json(['data' => $event ? $query->ranked((string) $event->event_id) : []]);
     }
 
-    public function criteriaTimeline(RescueCriteriaHistoryQuery $query, RescueDispatchQuery $dispatch): JsonResponse
+    public function criteriaTimeline(RescueCriteriaQuery $query, RescueDispatchQuery $dispatch, RescuePriorityQuery $priorities): JsonResponse
     {
         $event = $dispatch->activeEvent();
-        return response()->json(['data' => $event ? $query->forEvent((string) $event->event_id, $event->started_at) : []]);
+        return response()->json([
+            'data' => $event ? $query->sitioTimeline((string) $event->event_id, $event->started_at) : [],
+            'meta' => [
+                'event_id' => $event?->event_id,
+                'started_at' => $event?->started_at?->toIso8601String(),
+                'ended_at' => $event?->ended_at?->toIso8601String(),
+                'server_time' => now()->toIso8601String(),
+                'weights' => RescueCriteriaQuery::SITIO_WEIGHTS,
+                'settings' => $event ? $priorities->settingsForEvent((string) $event->event_id)
+                    : RescuePrioritySetting::query()->orderByDesc('version')->first(),
+            ],
+        ])->header('Cache-Control', 'private, no-store, max-age=0');
     }
 
-    public function prioritySettings(): JsonResponse
+    public function prioritySettings(RescueDispatchQuery $dispatch, RescuePriorityQuery $priorities): JsonResponse
     {
-        return response()->json(['data' => RescuePrioritySetting::query()->orderByDesc('version')->first()]);
+        $event = $dispatch->activeEvent();
+        $settings = $event
+            ? $priorities->settingsForEvent((string) $event->event_id)
+            : RescuePrioritySetting::query()->orderByDesc('version')->first();
+
+        return response()->json(['data' => $settings]);
     }
 
     public function updatePrioritySettings(Request $request, UpdateRescuePrioritySettings $action): JsonResponse
@@ -97,9 +117,13 @@ class RescueDispatchController extends Controller
             'vulnerability_weight' => ['required', 'integer', 'between:0,100'],
             'unreported_weight' => ['required', 'integer', 'between:0,100'],
             'no_contact_weight' => ['required', 'integer', 'between:0,100'],
+            'reason' => ['required', 'string', 'min:5', 'max:255'],
         ]);
 
-        return response()->json(['data' => $action->apply($weights, $request->user()?->user_id)]);
+        $reason = $weights['reason'];
+        unset($weights['reason']);
+
+        return response()->json(['data' => $action->apply($weights, $request->user()?->user_id, $reason)]);
     }
 
     public function store(Request $request): JsonResponse

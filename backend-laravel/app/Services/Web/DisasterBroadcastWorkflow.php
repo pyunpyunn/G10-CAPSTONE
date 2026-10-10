@@ -5,6 +5,7 @@ namespace App\Services\Web;
 use App\Jobs\DeliverDisasterBroadcast;
 use App\Models\DisasterBroadcast;
 use App\Models\DisasterEvent;
+use App\Models\RescuePrioritySetting;
 use App\Queries\DisasterBroadcastQuery;
 use App\Presenters\DisasterBroadcastPresenter;
 use Illuminate\Http\JsonResponse;
@@ -31,7 +32,7 @@ class DisasterBroadcastWorkflow
             $now = now();
             $eventId = 'EVT-'.$now->format('Ymd').'-'.Str::upper(Str::random(5));
 
-            DisasterEvent::query()->create([
+            $event = [
                 'event_id' => $eventId,
                 'name' => $validated['name'],
                 'type_id' => $validated['type_id'],
@@ -41,7 +42,11 @@ class DisasterBroadcastWorkflow
                 'created_at' => $now,
                 'updated_at' => $now,
                 'deleted_at' => null,
-            ]);
+            ];
+            if (Schema::hasColumn('disaster_events', 'rescue_priority_version')) {
+                $event['rescue_priority_version'] = RescuePrioritySetting::query()->orderByDesc('version')->value('version');
+            }
+            DisasterEvent::query()->create($event);
 
             return $eventId;
         });
@@ -115,6 +120,8 @@ class DisasterBroadcastWorkflow
         $metadata = $this->broadcastMetadata($validated);
 
         $broadcastId = DB::transaction(function () use ($request, $validated, $metadata, $event): int {
+            $lockedEvent = DisasterEvent::query()->where('event_id', $event->event_id)->lockForUpdate()->first();
+            abort_if(! $lockedEvent || $lockedEvent->ended_at || $lockedEvent->deleted_at, 409, 'The disaster event is no longer active.');
             $now = now();
             $broadcastId = $this->query->nextId('disaster_broadcasts', 'broadcast_id');
 
@@ -159,6 +166,13 @@ class DisasterBroadcastWorkflow
             }
 
             DisasterBroadcast::query()->create($data);
+            // Persist the audience and UUIDs in the transactional outbox payload.
+            // Queue retries must reuse exactly the same provider request.
+            $metadata['push_plan'] = $this->oneSignal->prepareDelivery([
+                'roles' => $validated['scope_type'] === 'selected_puroks' ? ['household'] : ['household', 'rescuer'],
+                'household_puroks' => $validated['scope_type'] === 'selected_puroks'
+                    ? collect($metadata['puroks'])->pluck('name')->filter()->values()->all() : [],
+            ]);
             DeliverDisasterBroadcast::dispatch($broadcastId, $validated, $metadata, (string) $event->event_id)
                 ->onConnection('operations_outbox')->onQueue('operations');
 
@@ -186,10 +200,10 @@ class DisasterBroadcastWorkflow
 
         $pushFailed = false;
         $smsFailed = false;
-        if (in_array($broadcast->push_status ?? 'pending_mobile_push', ['pending_mobile_push', 'onesignal_failed'], true)) {
+        if (in_array($broadcast->push_status ?? 'pending_mobile_push', ['pending_mobile_push', 'onesignal_failed', 'onesignal_partial'], true)) {
             $push = $this->sendBroadcastPush($broadcastId, $validated, $metadata, $event);
             $this->updateBroadcastPushStatus($broadcastId, $push);
-            $pushFailed = $push['status'] === 'failed';
+            $pushFailed = in_array($push['status'], ['failed', 'partial'], true);
         }
         if (in_array($broadcast->sms_status ?? 'queued', ['queued', 'smsgate_failed'], true)) {
             $sms = $this->sendBroadcastSms($validated, $metadata);
@@ -235,6 +249,7 @@ class DisasterBroadcastWorkflow
             $validated['message'],
             [
                 'roles' => $roles,
+                ...(isset($metadata['push_plan']) ? ['delivery_plan' => $metadata['push_plan']] : []),
                 'household_puroks' => $purokNames,
                 'data' => [
                     'type' => 'disaster_broadcast',
@@ -249,6 +264,14 @@ class DisasterBroadcastWorkflow
 
     public function updateBroadcastPushStatus(int $broadcastId, array $pushResult): void
     {
+        \Illuminate\Support\Facades\Log::info('Disaster broadcast push submission completed', [
+            'broadcast_id' => $broadcastId,
+            'status' => $pushResult['status'],
+            'recipient_count' => $pushResult['recipient_count'],
+            'accepted_count' => $pushResult['sent_count'],
+            'provider_ids' => $pushResult['provider_ids'] ?? [],
+            'errors' => $pushResult['errors'] ?? [],
+        ]);
         if (! Schema::hasTable('disaster_broadcasts') || ! Schema::hasColumn('disaster_broadcasts', 'push_status')) {
             return;
         }

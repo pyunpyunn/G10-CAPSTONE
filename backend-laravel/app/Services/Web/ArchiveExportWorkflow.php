@@ -19,8 +19,12 @@ class ArchiveExportWorkflow
         $category = (string) $request->query('category', 'disaster-events');
         $type = strtolower((string) $request->query('type', 'csv'));
         if (! in_array($category, self::CATEGORIES, true)) return response()->json(['success' => false, 'message' => 'Select a valid archive category before exporting.'], 422);
-        if ($type === 'pdf') return response()->json(['success' => false, 'message' => 'Archive PDF export is reserved for the PDF package step. Use CSV export for now.'], 501);
-        if ($type !== 'csv') return response()->json(['success' => false, 'message' => 'Only CSV export is available in this version.'], 422);
+        if (in_array($type, ['pdf', 'xlsx', 'excel'], true)) {
+            return app(ReportGenerationService::class)->generate(Request::create('/', 'POST', array_merge($request->query(), [
+                'report_type' => 'archive', 'category' => $category, 'format' => $type,
+            ])));
+        }
+        if ($type !== 'csv') return response()->json(['success' => false, 'message' => 'Select PDF, CSV, or Excel.'], 422);
         [$total, $records] = $this->query->exportRows($category, $request);
         $headers = $this->presenter->headers($category);
         $filename = 'resqperation-'.$category.'-archive-'.now()->format('Ymd-His').'.csv';

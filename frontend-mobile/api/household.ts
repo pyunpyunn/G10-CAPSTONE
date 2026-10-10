@@ -1,4 +1,6 @@
 import { api } from './client';
+import { submitReport } from './reportSubmission';
+import { cachedMobileRead } from '@/utils/mobileReadCache';
 
 export type HouseholdOverview = {
   profile: {
@@ -27,9 +29,11 @@ export type HouseholdOverview = {
   qr: any;
 };
 
-export async function getHouseholdOverview() {
-  const response = await api.get<{ data: HouseholdOverview }>('/household/overview');
-  return response.data.data;
+export async function getHouseholdOverview(refresh = false) {
+  return cachedMobileRead('household/overview', async () => {
+    const response = await api.get<{ data: HouseholdOverview }>('/household/overview');
+    return response.data.data;
+  }, refresh);
 }
 
 export async function completeHouseholdSetup(payload: any) {
@@ -48,17 +52,17 @@ export async function updateHouseholdMember(memberId: string, payload: any) {
 }
 
 export async function saveHouseholdMemberStatus(memberId: string, payload: any) {
-  const response = await api.post(`/household/members/${memberId}/status`, payload);
+  const response = await submitReport('post', `/household/members/${memberId}/status`, payload);
   return response.data.data;
 }
 
 export async function saveTrustedHouseholdMemberStatus(connectionId: string, memberId: string, payload: any) {
-  const response = await api.post(`/household/trusted-households/${connectionId}/members/${memberId}/status`, payload);
+  const response = await submitReport('post', `/household/trusted-households/${connectionId}/members/${memberId}/status`, payload);
   return response.data.data;
 }
 
 export async function saveHouseholdStatus(payload: any) {
-  const response = await api.post('/household/status', payload);
+  const response = await submitReport('post', '/household/status', payload);
   return response.data;
 }
 

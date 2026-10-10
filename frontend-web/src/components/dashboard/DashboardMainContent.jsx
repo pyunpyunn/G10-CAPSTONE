@@ -10,7 +10,6 @@ import {
   eventTone,
   makeAxis,
   percent,
-  statusTone,
 } from '../../utils/dashboardHelpers'
 
 export default function DashboardMainContent({
@@ -20,7 +19,6 @@ export default function DashboardMainContent({
   stats,
   hasActiveEvent,
   onOpenModule,
-  refreshVersion,
 }) {
   const [isStandbyStripVisible, setIsStandbyStripVisible] = useState(true)
 

@@ -159,3 +159,15 @@ Schedule::command('queue:work operations_outbox --queue=operations --stop-when-e
 
 
 
+
+Schedule::command('queue:work reports --queue=reports --stop-when-empty --max-time=50 --timeout=600')
+    ->everyMinute()->withoutOverlapping();
+
+Schedule::call(function () {
+    $disk = \Illuminate\Support\Facades\Storage::disk('local');
+    foreach (['reports', 'report-jobs'] as $directory) {
+        foreach ($disk->files($directory) as $file) {
+            if ($disk->lastModified($file) < now()->subDay()->timestamp) $disk->delete($file);
+        }
+    }
+})->hourly()->name('reports:cleanup')->withoutOverlapping();

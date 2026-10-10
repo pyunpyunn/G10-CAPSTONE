@@ -36,10 +36,17 @@ class SelectDispatchRespondersTest extends TestCase
         });
         Schema::create('geotagged_locations', function (Blueprint $table): void {
             $table->integer('geotag_id')->primary();
+            $table->string('location_label')->nullable();
             $table->string('household_id');
             $table->decimal('latitude', 10, 7);
             $table->decimal('longitude', 10, 7);
             $table->timestamp('updated_at')->nullable();
+        });
+        Schema::create('household_statuses', function (Blueprint $table): void {
+            $table->integer('status_id')->primary(); $table->string('status_key');
+        });
+        Schema::create('household_disasters', function (Blueprint $table): void {
+            $table->string('household_id'); $table->string('disaster_id'); $table->integer('current_status_id');
         });
         DB::table('responders')->insert([
             ['responder_id' => 1, 'team_id' => 4, 'full_name' => 'Far', 'duty_status' => 'available', 'is_deployed' => 0, 'last_active_at' => now()->subHours(3)],

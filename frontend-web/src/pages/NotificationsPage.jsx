@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   clearNotifications,
   deleteSelectedNotifications,
-  getNotifications,
+  subscribeNotifications,
   markNotificationsRead,
 } from '../api/notificationApi'
 import NotificationList from '../components/notifications/NotificationList'
@@ -17,6 +18,8 @@ import {
 } from '../utils/notificationHelpers'
 
 export default function NotificationsPage() {
+  const navigate = useNavigate()
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [items, setItems] = useState([])
@@ -30,39 +33,25 @@ export default function NotificationsPage() {
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    let ignore = false
-
-    async function loadPage() {
-      setIsLoading(true)
+    if (isSaving) return undefined
+    return subscribeNotifications(notificationParams(statusFilter, page), (data) => {
+      const nextItems = data.notifications?.data || []
+      setHasLoaded(true)
+      setItems(nextItems)
+      setSummary(data.summary || {})
+      setPagination(data.notifications || {})
+      setScopeNote(data.scope_note || '')
+      setSelectedIds((ids) => ids.filter((id) => nextItems.some((item) => item.id === id)))
       setError('')
-
-      try {
-        const data = await getNotifications(notificationParams(statusFilter, page))
-
-        if (!ignore) {
-          setItems(data.notifications?.data || [])
-          setSummary(data.summary || {})
-          setPagination(data.notifications || {})
-          setScopeNote(data.scope_note || '')
-          setSelectedIds([])
-        }
-      } catch (loadError) {
-        if (!ignore) {
-          setError(notificationErrorMessage(loadError))
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
+      setIsLoading(false)
+      if (data.notifications?.current_page && data.notifications.current_page !== page) {
+        setPage(data.notifications.current_page)
       }
-    }
-
-    loadPage()
-
-    return () => {
-      ignore = true
-    }
-  }, [statusFilter, page])
+    }, (loadError) => {
+      setError(notificationErrorMessage(loadError))
+      setIsLoading(false)
+    })
+  }, [statusFilter, page, isSaving])
 
   function changeFilter(nextFilter) {
     setStatusFilter(nextFilter)
@@ -94,7 +83,6 @@ export default function NotificationsPage() {
         selected: selectedIds.length,
       }))
       setMessage('Notifications marked as read in the current HQ view.')
-      notifyHeader()
     } catch (saveError) {
       setMessage(notificationErrorMessage(saveError, 'Unable to mark notifications as read.'))
     } finally {
@@ -128,7 +116,6 @@ export default function NotificationsPage() {
       }))
       setSelectedIds([])
       setMessage('Selected notification(s) hidden from this HQ view.')
-      notifyHeader()
     } catch (saveError) {
       setMessage(notificationErrorMessage(saveError, 'Unable to delete selected notifications.'))
     } finally {
@@ -156,11 +143,19 @@ export default function NotificationsPage() {
       })
       setSelectedIds([])
       setMessage('Notifications cleared from this HQ view.')
-      notifyHeader()
     } catch (saveError) {
       setMessage(notificationErrorMessage(saveError, 'Unable to clear notifications.'))
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  async function openNotification(item) {
+    try {
+      await markNotificationsRead([item.id])
+      navigate(item.action_url || '/notifications')
+    } catch (saveError) {
+      setMessage(notificationErrorMessage(saveError, 'Unable to mark this notification as read.'))
     }
   }
 
@@ -184,7 +179,7 @@ export default function NotificationsPage() {
       {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
-      {!isLoading && !error && (
+      {!isLoading && (!error || hasLoaded) && (
         <>
           {scopeNote && <div className="notification-scope-note">{scopeNote}</div>}
           <NotificationList
@@ -192,6 +187,7 @@ export default function NotificationsPage() {
             selectedIds={selectedIds}
             pagination={pagination}
             onToggleSelected={toggleSelected}
+            onOpenNotification={openNotification}
             onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
             onNext={() => setPage((currentPage) => currentPage + 1)}
           />
@@ -199,8 +195,4 @@ export default function NotificationsPage() {
       )}
     </section>
   )
-}
-
-function notifyHeader() {
-  window.dispatchEvent(new Event('notifications:changed'))
 }

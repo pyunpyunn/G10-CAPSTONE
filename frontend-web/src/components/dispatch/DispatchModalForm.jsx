@@ -17,7 +17,6 @@ export default function DispatchModalForm({
   assignmentOption,
   setAssignmentOption,
   teams,
-  responders,
   riskAreas,
   selectedRiskId,
   onSelectRiskArea,
@@ -47,6 +46,7 @@ export default function DispatchModalForm({
             </div>
             {!isAreasCollapsed && (
               <div className="dp-modal-section-body dp-affected-areas-body">
+                <fieldset className="response-assignment-fields" disabled={Boolean(editingDispatch)}>
                 <RiskAreaList
                   areas={riskAreas}
                   selectedRiskId={selectedRiskId}
@@ -54,6 +54,7 @@ export default function DispatchModalForm({
                   onSelect={onSelectRiskArea}
                   onSelectHousehold={onSelectRiskHousehold}
                 />
+                </fieldset>
               </div>
             )}
           </section>
@@ -73,7 +74,6 @@ export default function DispatchModalForm({
                 assignmentOption={assignmentOption}
                 setAssignmentOption={setAssignmentOption}
                 teams={teams}
-                responders={responders}
                 editingDispatch={editingDispatch}
                 showOutcomeUpdate={showOutcomeUpdate}
               />
@@ -162,7 +162,7 @@ function TargetHouseholdDetails({ household }) {
   )
 }
 
-function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOption, teams, responders, editingDispatch, showOutcomeUpdate }) {
+function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOption, teams, editingDispatch, showOutcomeUpdate }) {
   const outcomeDisabled = !['on_scene', 'completed'].includes(form.status)
   const isEditing = Boolean(editingDispatch)
   const selectedTeamId = getSelectedTeamId(assignmentOption)
@@ -179,6 +179,7 @@ function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOpti
             <span className="form-label">Available team</span>
             <select value={assignmentOption} disabled={isEditing} onChange={(event) => handleTeamChange(event.target.value, setAssignmentOption, setForm)}>
               <option value="">Select available team</option>
+              {isEditing && !currentTeam && <option value={assignmentOption}>{editingDispatch.team_name || editingDispatch.responder_name || 'Assigned responder'}</option>}
               {isEditing && currentTeam && (
                 <option value={`team:${currentTeam.team_id}`}>{currentTeam.team_name}</option>
               )}
@@ -195,7 +196,7 @@ function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOpti
 
           <label>
             <span className="form-label">Field status</span>
-            <select value={form.status} onChange={(event) => setFormValue(setForm, 'status', event.target.value)}>
+            <select value={form.status} disabled={!isEditing} onChange={(event) => setFormValue(setForm, 'status', event.target.value)}>
               {dispatchStatuses.map((status) => (
                 <option value={status.value} key={status.value}>{status.label}</option>
               ))}
@@ -216,7 +217,7 @@ function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOpti
             <input
               type="number"
               min="1"
-              max={Math.max(1, Number(currentTeam?.available_responder_count) || 0)}
+              max={isEditing ? undefined : Math.max(1, Number(currentTeam?.available_responder_count) || 0)}
               value={form.responder_count || 1}
               disabled={isEditing || !currentTeam || !currentTeam.available_responder_count}
               onChange={(event) => setFormNumber(setForm, 'responder_count', form.dispatch_type === 'welfare_check' ? 2 : event.target.value)}

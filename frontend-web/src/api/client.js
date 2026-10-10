@@ -48,7 +48,16 @@ api.interceptors.request.use((config) => {
 })
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const method = String(response.config?.method || 'get').toLowerCase()
+    const path = response.config?.url || ''
+    if (['post', 'patch', 'put', 'delete'].includes(method)
+      && (/^\/(households|household|dispatches|broadcast|disaster-events|trusted-households|members)(\/|$)/.test(path)
+        || path === '/dashboard/active-event/close')) {
+      window.dispatchEvent(new Event('rescue-criteria:changed'))
+    }
+    return response
+  },
   (error) => {
     if (error.code === 'ECONNABORTED' || String(error.message || '').toLowerCase().includes('timeout')) {
       error.friendlyMessage = 'The server took too long to respond. Please check if Laravel and the shared database are running, then try again.'

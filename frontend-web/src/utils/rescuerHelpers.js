@@ -1,8 +1,8 @@
-export function emptyRescuerForm(nextAccountId = '', team = null, filters = {}) {
+export function emptyRescuerForm(defaults = {}) {
   return {
-    account_id: nextAccountId,
+    account_id: defaults.account_id || '',
     responder_code: '',
-    account_status: 'active',
+    account_status: defaults.account_status || '',
     first_name: '',
     middle_initial: '',
     last_name: '',
@@ -13,14 +13,14 @@ export function emptyRescuerForm(nextAccountId = '', team = null, filters = {}) 
     emergency_contact_number: '',
     date_of_birth: '',
     gender: '',
-    blood_type: filters.blood_types?.[0] || '',
+    blood_type: defaults.blood_type || '',
     address: '',
-    team_id: '',
-    team_code: team?.team_code || '',
-    team_name: team?.team_name || '',
-    team_type: team?.team_type || '',
-    title: filters.roles?.[0] || '',
-    duty_status: 'available',
+    team_id: defaults.team_id || '',
+    team_code: defaults.team_code || '',
+    team_name: defaults.team_name || '',
+    team_type: defaults.team_type || '',
+    title: defaults.title || '',
+    duty_status: defaults.duty_status || '',
     skills: '',
     training_notes: '',
     certification_reference: '',
@@ -29,15 +29,19 @@ export function emptyRescuerForm(nextAccountId = '', team = null, filters = {}) 
 }
 
 export function formFromRescuer(rescuer) {
-  const nameParts = namePartsFromRescuer(rescuer)
+  const nameParts = rescuer
 
   return {
     account_id: rescuer.account_id || '',
     responder_code: rescuer.responder_code || '',
-    account_status: rescuer.account_status || 'active',
-    first_name: nameParts.first_name,
-    middle_initial: nameParts.middle_initial,
-    last_name: nameParts.last_name,
+    account_status: rescuer.account_status || '',
+    account_status_display: rescuer.account_status_display,
+    full_name: rescuer.full_name,
+    team_display_name: rescuer.team_name,
+    duty_status_display: rescuer.duty_status,
+    first_name: nameParts.first_name || '',
+    middle_initial: nameParts.middle_initial || '',
+    last_name: nameParts.last_name || '',
     email: rescuer.email || '',
     password: '',
     contact_number: rescuer.contact_number || '',
@@ -49,10 +53,10 @@ export function formFromRescuer(rescuer) {
     address: rescuer.address || '',
     team_id: rescuer.team_id || '',
     team_code: rescuer.team_code || '',
-    team_name: rescuer.team_name === 'Unassigned' ? '' : rescuer.team_name || '',
+    team_name: rescuer.assigned_team_name || '',
     team_type: rescuer.team_type || '',
     title: rescuer.title || '',
-    duty_status: rescuer.duty_status?.key || 'available',
+    duty_status: rescuer.duty_status?.key || '',
     skills: rescuer.skills || '',
     training_notes: rescuer.training_notes || '',
     certification_reference: rescuer.certification_reference || '',
@@ -67,7 +71,6 @@ export function buildRescuerPayload(form, mode) {
     first_name: form.first_name,
     middle_initial: form.middle_initial,
     last_name: form.last_name,
-    full_name: fullNameFromForm(form),
     email: form.email,
     contact_number: form.contact_number,
     emergency_contact_name: form.emergency_contact_name,
@@ -131,28 +134,6 @@ export function fullNameFromForm(form) {
   return [form.first_name, formatMiddleInitial(form.middle_initial), form.last_name]
     .filter(Boolean)
     .join(' ')
-}
-
-function namePartsFromRescuer(rescuer) {
-  if (rescuer.first_name || rescuer.last_name) {
-    return {
-      first_name: rescuer.first_name || '',
-      middle_initial: rescuer.middle_initial || '',
-      last_name: rescuer.last_name || '',
-    }
-  }
-
-  const parts = String(rescuer.full_name || '').trim().split(/\s+/).filter(Boolean)
-
-  if (parts.length <= 1) {
-    return { first_name: parts[0] || '', middle_initial: '', last_name: '' }
-  }
-
-  return {
-    first_name: parts.slice(0, -1).join(' '),
-    middle_initial: '',
-    last_name: parts.at(-1) || '',
-  }
 }
 
 function formatMiddleInitial(value = '') {
