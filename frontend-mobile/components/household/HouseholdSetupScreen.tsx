@@ -1,3 +1,4 @@
+import { confirmHouseholdGps } from '@/utils/confirmHouseholdGps';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -77,6 +78,7 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
   }
 
   async function useCurrentLocation() {
+    if (!await confirmHouseholdGps()) return;
     const permission = await Location.requestForegroundPermissionsAsync();
 
     if (permission.status !== 'granted') {

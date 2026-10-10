@@ -381,6 +381,7 @@ function RouteDetailsPopup({ route, household, isLoading = false, error = '', on
         {isLoading ? <p className="mapmate-route-popup-message">Finding a route...</p> : error ? <p className="mapmate-route-popup-message is-error">{error}</p> : route && (
           <>
             <div className="mapmate-route-popup-grid">
+              <span>Origin</span><strong>{route?.origin_name || 'Rescue office'}</strong>
               <span>Household</span><strong>{household.label}</strong>
               <span>Area</span><strong>{household.purok || '-'}</strong>
               <span>Distance</span><strong>{route.distance_km != null ? `${Number(route.distance_km).toFixed(2)} km` : '-'}</strong>

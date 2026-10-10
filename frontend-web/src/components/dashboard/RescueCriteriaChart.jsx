@@ -90,7 +90,7 @@ export default function RescueCriteriaChart({ eventId }) {
       try {
         const feed = await getRescueCriteriaFeed({ signal: controller.signal })
         if (cancelled) return
-        const nextPoints = Array.isArray(feed.data) ? feed.data : []
+        const nextPoints = Array.isArray(feed.data) ? feed.data.filter((sitio) => !sitio.is_demo) : []
         const receivedAt = performance.now()
         const startedAt = Date.parse(feed.meta?.started_at)
         const serverTime = Date.parse(feed.meta?.ended_at || feed.meta?.server_time)

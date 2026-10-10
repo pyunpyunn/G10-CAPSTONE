@@ -170,6 +170,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:household_resident')->group(function () {
             Route::get('/household/overview', [HouseholdMobileController::class, 'overview']);
             Route::post('/household/setup', [HouseholdMobileController::class, 'completeSetup']);
+            Route::put('/household/geotag', [HouseholdMobileController::class, 'updateGeotag']);
             Route::post('/household/device-location', [HouseholdMobileController::class, 'updateDeviceLocation']);
             Route::patch('/household/members/{memberId}', [HouseholdMobileController::class, 'updateMember']);
             Route::post('/household/members/{memberId}/status', [HouseholdMobileController::class, 'storeMemberStatus']);

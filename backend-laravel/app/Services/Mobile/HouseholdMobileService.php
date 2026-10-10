@@ -35,6 +35,11 @@ class HouseholdMobileService
         return $this->setupWorkflow->completeSetup($request);
     }
 
+    public function updateGeotag(Request $request): JsonResponse
+    {
+        return $this->setupWorkflow->updateGeotag($request);
+    }
+
     public function updateDeviceLocation(Request $request): JsonResponse
     {
         return $this->setupWorkflow->updateDeviceLocation($request);

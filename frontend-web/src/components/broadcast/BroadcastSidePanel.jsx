@@ -7,7 +7,7 @@ import { eventTone } from '../../utils/broadcastHelpers'
 function pushStatusLabel(status) {
   return {
     pending_mobile_push: 'Queued for automatic delivery',
-    onesignal_sent: 'Accepted by push provider',
+    onesignal_sent: 'Accepted by OneSignal',
     onesignal_partial: 'Some devices could not be reached',
     onesignal_failed: 'Delivery failed',
     onesignal_no_recipients: 'No subscribed devices in this audience',

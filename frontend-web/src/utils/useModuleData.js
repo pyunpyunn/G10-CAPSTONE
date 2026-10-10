@@ -27,11 +27,17 @@ export function useModuleData(loader, topics = []) {
         if (!cancelled && pending) scheduler.request()
       }
     })
-    const requestRefresh = () => { pending = true; scheduler.request() }
+    let initialLoad = window.setTimeout(() => scheduler.request(), 0)
+    const requestRefresh = () => {
+      window.clearTimeout(initialLoad)
+      initialLoad = undefined
+      pending = true
+      scheduler.request()
+    }
     realtimeRefresh.current = requestRefresh
-    scheduler.request()
     return () => {
       cancelled = true
+      window.clearTimeout(initialLoad)
       scheduler.cancel()
       if (realtimeRefresh.current === requestRefresh) realtimeRefresh.current = null
     }

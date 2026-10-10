@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { confirmHouseholdGps } from '@/utils/confirmHouseholdGps';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -6,6 +7,7 @@ import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
+import { saveHouseholdGeotag } from '@/api/household';
 import { reverseGeocodeAddress } from '@/utils/geocoding';
 import { HouseholdBadge, HouseholdButton, HouseholdSection } from './HouseholdUI';
 
@@ -29,7 +31,7 @@ const relationships = [
 ];
 
 const defaultRegion = {
-  latitude: 10.3157,
+  latitude: 10.2875,
   longitude: 123.8854,
   latitudeDelta: 0.025,
   longitudeDelta: 0.025,
@@ -51,45 +53,70 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
   const [photoUri, setPhotoUri] = useState('');
   const [saving, setSaving] = useState(false);
   const [findingAddress, setFindingAddress] = useState(false);
+  const [locationMode, setLocationMode] = useState<'gps' | 'map'>('map');
+  const [geotagMessage, setGeotagMessage] = useState('Drag the pin to your household or use GPS.');
+  const lookupVersion = useRef(0);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
 
   const selectedAddress = useMemo(() => {
     return [unitNumber, houseNumber, street, barangay, city, province].filter(Boolean).join(', ');
   }, [unitNumber, houseNumber, street, barangay, city, province]);
 
   async function applyPinnedCoordinate(coordinate: any) {
+    const version = ++lookupVersion.current;
     setPin(coordinate);
     setFindingAddress(true);
+    setGeotagMessage('Finding address and saving geotag...');
     setLocationLabel('Finding address...');
-
-    try {
-      const address = await reverseGeocodeAddress(coordinate.latitude, coordinate.longitude);
-
-      setLocationLabel(address.label);
-      setStreet(address.street);
-      setBarangay(address.barangay);
-      setCity(address.city);
-      setProvince(address.province);
-    } catch {
-      setLocationLabel('Selected map location');
-    } finally {
-      setFindingAddress(false);
-    }
+    saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
+      if (version !== lookupVersion.current) return;
+      try {
+        const address = await reverseGeocodeAddress(coordinate.latitude, coordinate.longitude);
+        if (version !== lookupVersion.current) return;
+        setLocationLabel(address.label);
+        setStreet(address.street);
+        setBarangay(address.barangay);
+        setCity(address.city);
+        setProvince(address.province);
+        await saveHouseholdGeotag({
+          ...coordinate,
+          address_label: address.label.slice(0, 255),
+        });
+        if (version === lookupVersion.current) setGeotagMessage('Household geotag saved. HQ can see this location.');
+      } catch {
+        if (version === lookupVersion.current) setGeotagMessage('Geotag could not be saved. Tap Retry or move the pin again.');
+      } finally {
+        if (version === lookupVersion.current) setFindingAddress(false);
+      }
+    });
+    await saveQueue.current;
   }
 
   async function useCurrentLocation() {
-    const permission = await Location.requestForegroundPermissionsAsync();
-
-    if (permission.status !== 'granted') {
-      Alert.alert('Location required', 'Allow location access or pin the household location on the map.');
-      return;
+    if (!await confirmHouseholdGps()) return;
+    const version = ++lookupVersion.current;
+    setLocationMode('gps');
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Location access', 'Allow GPS access or drag the household pin on the map.');
+        return;
+      }
+      setFindingAddress(true);
+      setGeotagMessage('Getting GPS location...');
+      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      if (version !== lookupVersion.current) return;
+      await applyPinnedCoordinate({
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+        accuracy_m: current.coords.accuracy,
+      });
+    } catch {
+      if (version === lookupVersion.current) {
+        setFindingAddress(false);
+        setGeotagMessage('GPS is unavailable. You can drag the map pin instead.');
+      }
     }
-
-    const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-    await applyPinnedCoordinate({
-      latitude: current.coords.latitude,
-      longitude: current.coords.longitude,
-      accuracy_m: current.coords.accuracy,
-    });
   }
 
   async function pickPhoto() {
@@ -105,6 +132,7 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
   }
 
   async function handleSave() {
+    if (findingAddress) return;
     if (!pin) {
       Alert.alert('Location required', 'Use your current location or tap the map to pin your household.');
       return;
@@ -156,26 +184,35 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
       <View style={styles.card}>
         <HouseholdSection
           title="Location"
-          action={<HouseholdButton label="Use GPS" icon="locate-outline" tone="light" onPress={useCurrentLocation} />}
+          
         />
+        <View style={styles.twoColumn}>
+          <HouseholdButton label="Use GPS" icon="locate-outline" tone={locationMode === 'gps' ? 'primary' : 'light'} disabled={saving || findingAddress} onPress={useCurrentLocation} />
+          <HouseholdButton label="Drag map pin" icon="location-outline" tone={locationMode === 'map' ? 'primary' : 'light'} disabled={saving || findingAddress} onPress={() => setLocationMode('map')} />
+        </View>
+        <Text style={styles.mapHint}>Drag the blue pin to your household. Release it to find the address and save automatically.</Text>
         {Platform.OS !== 'android' ? (
           <MapView
             style={styles.map}
             initialRegion={pin ? { ...pin, latitudeDelta: 0.018, longitudeDelta: 0.018 } : defaultRegion}
             onPress={(event) => applyPinnedCoordinate({ ...event.nativeEvent.coordinate, accuracy_m: null })}
           >
-            {pin ? <Marker coordinate={pin} title="Household pin" /> : null}
+            {pin ? <Marker coordinate={pin} title="Household pin" draggable onDragEnd={(event) => applyPinnedCoordinate({ ...event.nativeEvent.coordinate, accuracy_m: null })} /> : null}
           </MapView>
         ) : (
           <MobileLeafletMap
-            markers={pin ? [{ ...pin, label: 'Household pin' }] : []}
+            markers={[]}
             routes={[]}
             center={pin || defaultRegion}
-            height={280}
-            onMapPress={(coordinate) => applyPinnedCoordinate({ ...coordinate, accuracy_m: null })}
+            height={360}
+            geotagPicker
+            selectedPoint={pin}
+            onPinMoving={() => { lookupVersion.current++; setLocationMode('map'); setFindingAddress(true); setGeotagMessage('Release the pin to save your location.'); }}
+            onMapPress={(coordinate) => { setLocationMode('map'); void applyPinnedCoordinate({ ...coordinate, accuracy_m: null }); }}
           />
         )}
-        <Text style={styles.mapHint}>{findingAddress ? 'Finding address...' : pin ? 'Pin selected' : 'Use GPS or tap map'}</Text>
+        <Text style={styles.mapHint}>{geotagMessage}</Text>
+        {geotagMessage.startsWith('Geotag could not') && pin ? <HouseholdButton label="Retry saving geotag" icon="refresh-outline" onPress={() => applyPinnedCoordinate(pin)} /> : null}
       </View>
 
       <View style={styles.card}>
@@ -241,7 +278,7 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
       <HouseholdButton
         label={saving ? 'Saving setup...' : 'Complete setup'}
         icon="checkmark-circle-outline"
-        disabled={saving}
+        disabled={saving || findingAddress}
         onPress={handleSave}
       />
     </View>

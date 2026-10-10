@@ -39,11 +39,21 @@ class RealtimeOutbox
         }
         // Insert on the SAME connection and transaction as the source write.
         // No socket or Redis dependency exists in the reporting request.
-        $query->connection->table('realtime_outbox')->insert([
+        $values = [
             'topics' => json_encode($sources[$table], JSON_THROW_ON_ERROR),
             'available_at' => time(),
             'created_at' => now(),
-        ]);
+        ];
+        if ($query->connection instanceof \Illuminate\Database\MySqlConnection) {
+            // A nested insert() overwrites MySQL's cached lastInsertId before the
+            // source insertGetId() reads it. statement() preserves that source ID.
+            $query->connection->statement(
+                'insert into realtime_outbox (topics, available_at, created_at) values (?, ?, ?)',
+                array_values($values),
+            );
+        } else {
+            $query->connection->table('realtime_outbox')->insert($values);
+        }
     }
 
     public function claim(): ?string

@@ -57,7 +57,11 @@ export default function MappingPage() {
   const visibleRoutes = selectedRoute ? [selectedRoute] : dispatchRoutes
   const visibleHouseholds = households
 
-  const closestRescueTeam = useMemo(() => rescueTeams[0] || null, [rescueTeams])
+  const rescueOffice = useMemo(() => (
+    workspace.rescue_offices.find((office) => office.latitude !== null && office.latitude !== undefined
+      && office.longitude !== null && office.longitude !== undefined
+      && Number.isFinite(Number(office.latitude)) && Number.isFinite(Number(office.longitude))) || null
+  ), [workspace.rescue_offices])
 
   useEffect(() => {
     function closeFullscreen(event) {
@@ -90,23 +94,17 @@ export default function MappingPage() {
       return
     }
 
-    if (!isHouseholdRouteAllowed(household)) {
-      setSelectedHousehold(household)
-      setSelectedRoute(null)
-      setRouteError('Only red-status households can be routed for dispatch or rescue guidance.')
-      return
-    }
-
-    if (!household.latitude || !household.longitude) {
+    if (household.latitude === null || household.latitude === undefined || household.latitude === ''
+      || household.longitude === null || household.longitude === undefined || household.longitude === '') {
       setSelectedHousehold(household)
       setRouteError('Only geotagged households can receive a rescue route.')
       setSelectedRoute(null)
       return
     }
 
-    if (!closestRescueTeam) {
+    if (!rescueOffice) {
       setSelectedHousehold(household)
-      setRouteError('No rescue team GPS point is available for route generation.')
+      setRouteError('Rescue office coordinates are not configured for route generation.')
       setSelectedRoute(null)
       return
     }
@@ -117,7 +115,7 @@ export default function MappingPage() {
     setSelectedRoute(null)
 
     try {
-      const route = await getRouteToSite(closestRescueTeam, household)
+      const route = await getRouteToSite(rescueOffice, household)
 
       if (!route) {
         setRouteError('A route cannot be generated for this household right now.')
@@ -127,7 +125,7 @@ export default function MappingPage() {
       setSelectedRoute({
         route_id: `household-${household.id}`,
         route_name: `Route to ${household.label}`,
-        team_name: closestRescueTeam.team_name || 'Rescue team',
+        origin_name: rescueOffice.name || 'Barangay Mambaling Hall',
         assigned_area: household.purok || 'Selected household',
         status: 'on_demand',
         coordinates: route.coordinates,
