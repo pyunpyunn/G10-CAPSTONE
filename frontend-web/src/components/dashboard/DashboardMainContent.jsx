@@ -1,5 +1,4 @@
-import { ArrowUpRight, Radio, Settings, TriangleAlert, X } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowUpRight } from 'lucide-react'
 import RescueCriteriaChart from './RescueCriteriaChart'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
@@ -10,6 +9,7 @@ import {
   eventTone,
   makeAxis,
   percent,
+  statusTone,
 } from '../../utils/dashboardHelpers'
 
 export default function DashboardMainContent({
@@ -19,8 +19,8 @@ export default function DashboardMainContent({
   stats,
   hasActiveEvent,
   onOpenModule,
+  refreshVersion,
 }) {
-  const [isStandbyStripVisible, setIsStandbyStripVisible] = useState(true)
 
   const households = summaryState?.data?.households || {
     total: 0,

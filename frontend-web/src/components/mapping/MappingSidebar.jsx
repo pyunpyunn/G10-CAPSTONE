@@ -1,4 +1,3 @@
-import { Route } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
 import { vacancyPercent } from '../../utils/mappingHelpers'
 import MappingSummary from './MappingSummary'

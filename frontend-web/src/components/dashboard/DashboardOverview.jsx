@@ -43,16 +43,16 @@ export default function DashboardOverview({
   return (
     <aside className="dashboard-overview" aria-label="Dashboard side information">
       {disasterAction && <div className="dashboard-layout-actions">{disasterAction}</div>}
-      <WeatherCard weatherState={weatherState} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
+      <WeatherCard weatherState={weatherState} latestSavedWeather={latestSavedWeather} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
       <DashboardMapCard hasActiveEvent={hasActiveEvent} onOpenMap={() => onOpenModule('/mapping')} />
       <RequestCard requestsState={requestsState} onOpenRequests={() => onOpenModule('/resources-requests')} />
     </aside>
   )
 }
 
-function WeatherCard({ weatherState, hasActiveEvent, onOpenWeather }) {
-  const weather = weatherState?.data
-  const isLoading = weatherState?.isLoading
+function WeatherCard({ weatherState, latestSavedWeather, hasActiveEvent, onOpenWeather }) {
+  const weather = weatherState?.data || latestSavedWeather
+  const isLoading = weatherState?.isLoading && !weather
   const hasWeather = Boolean(weather)
 
   return (

@@ -22,7 +22,6 @@ import {
 } from '../utils/broadcastHelpers'
 
 export default function BroadcastPage() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const requestedEventId = searchParams.get('event_id')
   const [workspace, setWorkspace] = useState(null)
@@ -225,8 +224,6 @@ export default function BroadcastPage() {
 
     try {
       let eventId = activeEvent?.event_id
-      let nextActiveEvent = activeEvent
-      let nextEvents = workspace.events
 
       if (!eventId) {
         const eventResult = await createDisasterEvent({
@@ -237,8 +234,6 @@ export default function BroadcastPage() {
         })
 
         eventId = eventResult.active_event.event_id
-        nextActiveEvent = eventResult.active_event
-        nextEvents = eventResult.events
       } else {
         await updateDisasterEvent(eventId, {
           name: form.event_name.trim(),

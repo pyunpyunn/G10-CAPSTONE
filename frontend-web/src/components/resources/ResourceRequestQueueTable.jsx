@@ -1,4 +1,4 @@
-import { AlertTriangle, Eye, MoreHorizontal, RefreshCcw } from 'lucide-react'
+import { AlertTriangle, MoreHorizontal, RefreshCcw } from 'lucide-react'
 import ActionMenu from '../ui/ActionMenu'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
