@@ -174,6 +174,10 @@ class OneSignalNotificationService
         }
 
         $this->applyRoleFilter($query, $options['roles'] ?? []);
+        if (! empty($options['platforms'])) {
+            if (! Schema::hasColumn('device_tokens', 'platform')) return [];
+            $query->whereIn('dt.platform', $options['platforms']);
+        }
         $this->applyUserFilter($query, $options['user_ids'] ?? []);
         $this->applyResponderFilter($query, $options['responder_ids'] ?? []);
 

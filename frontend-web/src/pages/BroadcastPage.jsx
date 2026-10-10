@@ -237,7 +237,7 @@ export default function BroadcastPage() {
 
       setWorkspace(broadcastResult)
       initForm(broadcastResult)
-      setFormNotice('Broadcast posted. Mobile notification delivery starts automatically; you can leave this page.')
+      setFormNotice('Broadcast posted. OneSignal push to subscribed Android devices is queued; check Mobile push in the broadcast log for the result.')
     } catch (saveError) {
       setFormError(apiErrorMessage(saveError, 'Unable to save this broadcast. Please check the entries and try again.'))
     } finally {

@@ -126,14 +126,24 @@ class RescuePriorityQuery
 
     public function contactMissingExpression(): string
     {
-        return "CASE WHEN NOT EXISTS (
-                SELECT 1 FROM geotagged_locations location WHERE location.household_id = h.household_id
-            )
-            AND NOT EXISTS (
+        $withoutDevice = Schema::hasTable('device_tokens') && Schema::hasColumn('device_tokens', 'is_active')
+            ? 'NOT EXISTS (SELECT 1 FROM device_tokens device WHERE device.household_id = h.household_id AND device.is_active = 1)'
+            : '1 = 1';
+        $hasCoordinates = Schema::hasColumn('geotagged_locations', 'latitude')
+            && Schema::hasColumn('geotagged_locations', 'longitude');
+        $coordinateFilter = $hasCoordinates ? ' AND location.latitude IS NOT NULL AND location.longitude IS NOT NULL' : '';
+        $withoutGeotag = Schema::hasTable('geotagged_locations')
+            ? "NOT EXISTS (SELECT 1 FROM geotagged_locations location WHERE location.household_id = h.household_id{$coordinateFilter})"
+            : '1 = 1';
+        $withoutTrusted = Schema::hasTable('trusted_households')
+            ? "NOT EXISTS (
                 SELECT 1 FROM trusted_households trust JOIN households trusted
                 ON ((trust.requesting_household_id = h.household_id AND trusted.household_id = trust.trusted_household_id)
                     OR (trust.trusted_household_id = h.household_id AND trusted.household_id = trust.requesting_household_id))
                 WHERE trust.validation_status IN ('validated', 'approved') AND trusted.deleted_at IS NULL
-            ) THEN 1 ELSE 0 END";
+            )"
+            : '1 = 1';
+
+        return "CASE WHEN ({$withoutDevice}) AND ({$withoutGeotag}) AND ({$withoutTrusted}) THEN 1 ELSE 0 END";
     }
 }

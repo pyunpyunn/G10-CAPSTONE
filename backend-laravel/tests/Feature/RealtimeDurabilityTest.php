@@ -18,6 +18,24 @@ use Tests\TestCase;
 
 class RealtimeDurabilityTest extends TestCase
 {
+    public function test_mysql_source_insert_id_survives_nested_outbox_capture(): void
+    {
+        // Exercise Laravel's MySQL ID caching with an isolated SQLite PDO.
+        $db = new \Illuminate\Database\MySqlConnection(new \PDO('sqlite::memory:'), 'test', '', ['name' => 'mysql']);
+        $db->statement('create table household_status_logs (id integer primary key autoincrement, status text)');
+        $db->statement('create table realtime_outbox (id integer primary key autoincrement, topics text, available_at integer, created_at text)');
+        $db->statement("insert into realtime_outbox (id) values (100)");
+        config(['realtime.connection' => 'mysql']);
+        $db->setEventDispatcher(new \Illuminate\Events\Dispatcher);
+        $db->listen(fn ($query) => app(RealtimeOutbox::class)->capture($query));
+
+        $id = $db->table('household_status_logs')->insertGetId(['status' => 'safe']);
+
+        $this->assertSame(1, $id);
+        $this->assertSame('safe', $db->table('household_status_logs')->where('id', $id)->value('status'));
+        $this->assertSame(101, $db->table('realtime_outbox')->max('id'));
+    }
+
     public function test_shared_read_cache_reuses_sources_and_invalidates_before_broadcast(): void
     {
         config(['realtime.read_cache' => true, 'realtime.cache_store' => 'array']);

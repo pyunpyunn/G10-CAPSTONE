@@ -4,7 +4,6 @@ import RescueCriteriaChart from './RescueCriteriaChart'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import Badge from '../ui/Badge'
-import EmptyState from '../ui/EmptyState'
 import Panel from '../ui/Panel'
 import StatCard from '../ui/StatCard'
 import {
@@ -58,8 +57,7 @@ export default function DashboardMainContent({
           <ChartCard
             title="Household status"
             bars={dashboard.households.bars}
-            emptyTitle="No household reports yet"
-            emptyMessage="Reports will come from household mobile users or authenticated responder field reports."
+            alwaysShowChart
             onManage={() => onOpenModule('/households')}
           />
           <ChartCard
@@ -168,7 +166,7 @@ function ReportingProgress({ households, hasActiveEvent }) {
   )
 }
 
-function ChartCard({ title, bars = [], emptyTitle, emptyMessage, alwaysShowChart = false, onManage }) {
+function ChartCard({ title, bars = [], alwaysShowChart = false, onManage }) {
   const hasValues = bars.some((bar) => Number(bar.value) > 0)
   const axis = makeAxis(bars)
 
@@ -195,9 +193,7 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, alwaysShowChart
             ))}
           </div>
         </div>
-      ) : (
-        <EmptyState title={emptyTitle} message={emptyMessage} />
-      )}
+      ) : null}
     </div>
   )
 }

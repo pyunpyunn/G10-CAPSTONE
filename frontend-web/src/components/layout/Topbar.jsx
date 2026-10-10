@@ -129,11 +129,19 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   }, [isFilterOpen, isSearchOpen])
 
   useEffect(() => {
-    return subscribeNotifications({ status: 'all', page: 1 }, (data) => {
-      setNotifications(data.preview || [])
-      setUnreadCount(data.summary?.unread || 0)
-      setNotificationError('')
-    }, (error) => setNotificationError(notificationErrorMessage(error)))
+    let unsubscribe
+    const notificationLoad = window.setTimeout(() => {
+      unsubscribe = subscribeNotifications({ status: 'all', page: 1 }, (data) => {
+        setNotifications(data.preview || [])
+        setUnreadCount(data.summary?.unread || 0)
+        setNotificationError('')
+      }, (error) => setNotificationError(notificationErrorMessage(error)))
+    }, 600)
+
+    return () => {
+      window.clearTimeout(notificationLoad)
+      unsubscribe?.()
+    }
   }, [user?.user_id])
 
   useEffect(() => {
