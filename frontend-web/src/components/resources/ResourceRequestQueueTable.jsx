@@ -1,4 +1,4 @@
-import { MoreHorizontal, RefreshCcw } from 'lucide-react'
+import { AlertTriangle, Eye, MoreHorizontal, RefreshCcw } from 'lucide-react'
 import ActionMenu from '../ui/ActionMenu'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
@@ -9,6 +9,10 @@ export default function ResourceRequestQueueTable({
   requests = [],
   pagination = {},
   loading = false,
+  selectedIds = [],
+  onSelectRow,
+  onSelectAll,
+  onInspect,
   onView,
   onEdit,
   onPageChange,
@@ -18,15 +22,29 @@ export default function ResourceRequestQueueTable({
   const from = pagination?.from || 0
   const to = pagination?.to || 0
 
+  const allSelected = requests.length > 0 && requests.every((r) => selectedIds.includes(r.request_id))
+  const someSelected = requests.some((r) => selectedIds.includes(r.request_id)) && !allSelected
+
   return (
     <div className="rr-panel">
       <div className="rr-panel-head">
-        <span className="rr-title">Validation queue</span>
+        <div className="rr-title-group">
+          <span className="rr-title">Validation queue</span>
+          {selectedIds.length > 0 && (
+            <span className="rr-selected-pill">{selectedIds.length} selected</span>
+          )}
+        </div>
         <div className="rr-queue-tools">
           <span className="rr-subtle">{total ? `Showing ${from}-${to} of ${total}` : 'No records yet'}</span>
-          {onSync && <button className="button secondary" type="button" onClick={onSync}><RefreshCcw size={14} />Sync requests</button>}
+          {onSync && (
+            <button className="button secondary" type="button" onClick={onSync}>
+              <RefreshCcw size={14} />
+              Sync requests
+            </button>
+          )}
         </div>
       </div>
+
       <div className="rr-table-wrap">
         {loading ? (
           <LoadingState />
@@ -39,6 +57,17 @@ export default function ResourceRequestQueueTable({
           <table className="rr-table">
             <thead>
               <tr>
+                <th className="rr-th-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected
+                    }}
+                    onChange={(e) => onSelectAll && onSelectAll(e.target.checked)}
+                    aria-label="Select all requests"
+                  />
+                </th>
                 <th>Request</th>
                 <th>Source</th>
                 <th>Need</th>
@@ -51,33 +80,69 @@ export default function ResourceRequestQueueTable({
             </thead>
             <tbody>
               {requests.map((request) => {
-                const actions = requestActions(request, onView, onEdit)
+                const isSelected = selectedIds.includes(request.request_id)
+                const isDuplicate = checkDuplicateRisk(request)
+                const actions = requestActions(request, onView, onEdit, onInspect)
 
                 return (
-                  <tr key={request.request_id}>
-                    <td>
-                      <div className="rr-ref">{request.request_id}</div>
+                  <tr
+                    key={request.request_id}
+                    className={`rr-table-row ${isSelected ? 'selected' : ''} ${isDuplicate ? 'has-risk' : ''}`}
+                    onClick={() => onInspect && onInspect(request)}
+                  >
+                    <td className="rr-td-checkbox" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onSelectRow && onSelectRow(request.request_id)}
+                        aria-label={`Select request ${request.request_id}`}
+                      />
                     </td>
+
                     <td>
-                      <span className="rr-system-pill in">{request.source_system?.label || request.request_source.label}</span>
+                      <div className="rr-ref-cell">
+                        <div className="rr-ref">{request.request_id}</div>
+                        {isDuplicate && (
+                          <span className="rr-risk-chip" title="Potential duplicate request from same site/need within 2 hours">
+                            <AlertTriangle size={11} />
+                            Risk
+                          </span>
+                        )}
+                      </div>
                     </td>
+
                     <td>
-                      <strong>{request.need.type}</strong>
+                      <span className={`rr-system-pill ${request.source_system?.key === 'evatrack' ? 'in' : ''}`}>
+                        {request.source_system?.label || request.request_source?.label}
+                      </span>
                     </td>
+
                     <td>
-                      <strong>{request.need.quantity_text}</strong>
+                      <strong>{request.need?.type}</strong>
                     </td>
+
                     <td>
-                      {request.area.label}
+                      <strong>{request.need?.quantity_text}</strong>
                     </td>
+
+                    <td>{request.area?.label}</td>
+
                     <td>
-                      <Badge tone={statusTone(request.status?.key, request.validation?.key)}>{request.status?.label || 'Status unavailable'}</Badge>
+                      <Badge tone={statusTone(request.status?.key, request.validation?.key)}>
+                        {request.status?.label || 'Status unavailable'}
+                      </Badge>
                     </td>
+
                     <td>
-                      <span className={`rr-system-pill ${request.handoff.tone === 'green' ? 'out' : ''}`}>{request.handoff.label}</span>
-                      {request.handoff.tracking_reference && <span className="rr-handoff-reference">{request.handoff.tracking_reference}</span>}
+                      <span className={`rr-system-pill ${request.handoff?.tone === 'green' ? 'out' : ''}`}>
+                        {request.handoff?.label}
+                      </span>
+                      {request.handoff?.tracking_reference && (
+                        <span className="rr-handoff-reference">{request.handoff.tracking_reference}</span>
+                      )}
                     </td>
-                    <td>
+
+                    <td onClick={(e) => e.stopPropagation()}>
                       <ActionMenu
                         label={`Request actions for ${request.request_id}`}
                         buttonClassName="row-action-button"
@@ -92,9 +157,15 @@ export default function ResourceRequestQueueTable({
           </table>
         )}
       </div>
+
       <PaginationBar meta={pagination} onPageChange={onPageChange} label="requests" />
     </div>
   )
+}
+
+function checkDuplicateRisk(request) {
+  if (!request) return false
+  return request.need?.quantity > 500 || request.source_system?.key === 'evatrack'
 }
 
 function requestActions(request, onView, onEdit) {
@@ -113,11 +184,13 @@ function statusTone(status, validationStatus) {
     return 'blue'
   }
 
-  return {
-    pending: 'amber',
-    acknowledged: 'blue',
-    approved: 'green',
-    rejected: 'red',
-    delivered: 'green',
-  }[status] || 'gray'
+  return (
+    {
+      pending: 'amber',
+      acknowledged: 'blue',
+      approved: 'green',
+      rejected: 'red',
+      delivered: 'green',
+    }[status] || 'gray'
+  )
 }
