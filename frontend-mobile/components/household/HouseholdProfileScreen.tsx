@@ -1,21 +1,29 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { confirmHouseholdGps } from '@/utils/confirmHouseholdGps';
+import { MobileLeafletMap as NativeLocationMap } from '@/components/MobileLeafletMap.native';
+import { MobileLeafletMap as WebLocationMap } from '@/components/MobileLeafletMap.web';
+import { saveHouseholdGeotag } from '@/api/household';
+import { useMemo, useRef, useState } from 'react';
+import { Alert, Image, StyleSheet, Text, Platform, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { reverseGeocodeAddress } from '@/utils/geocoding';
 import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
 
+const MobileLeafletMap = Platform.OS === 'web' ? WebLocationMap : NativeLocationMap;
+
 type ProfileProps = {
   overview: any;
   onUpdateGeotag: (payload: any) => Promise<void>;
   onLogout: () => void;
+  onGeotagSaved?: () => Promise<void>;
 };
 
 export function HouseholdProfileScreen({
   overview,
   onUpdateGeotag,
   onLogout,
+  onGeotagSaved,
 }: ProfileProps) {
   const household = overview.profile?.household || {};
   const user = overview.profile?.user || {};
@@ -23,6 +31,37 @@ export function HouseholdProfileScreen({
   const geotag = overview.geotag || null;
   const selectedMemberId = String(user.member_id || members[0]?.member_id || '');
   const [savingGeotag, setSavingGeotag] = useState(false);
+  const [showPinMap, setShowPinMap] = useState(false);
+  const [selectedPin, setSelectedPin] = useState<any>(null);
+  const [pinMessage, setPinMessage] = useState('Drag the pin to your household. Release it to save automatically.');
+  const [savedPin, setSavedPin] = useState<any>(null);
+  const pinVersion = useRef(0);
+  const pinSaveQueue = useRef<Promise<void>>(Promise.resolve());
+
+  async function saveMapPin(coordinate: { latitude: number; longitude: number }) {
+    const version = ++pinVersion.current;
+    setSelectedPin(coordinate);
+    setSavingGeotag(true);
+    setPinMessage('Finding address and saving geotag...');
+    pinSaveQueue.current = pinSaveQueue.current.catch(() => {}).then(async () => {
+      if (version !== pinVersion.current) return;
+      try {
+        const address = await reverseGeocodeAddress(coordinate.latitude, coordinate.longitude);
+        if (version !== pinVersion.current) return;
+        await saveHouseholdGeotag({ ...coordinate, accuracy_m: null, address_label: address.label.slice(0, 255) });
+        if (version !== pinVersion.current) return;
+        setSavedPin({ ...coordinate, location_label: address.label, updated_label: 'Just now' });
+        setPinMessage('Household geotag saved. HQ can see this location.');
+        await onGeotagSaved?.().catch(() => {});
+      } catch {
+        if (version === pinVersion.current) setPinMessage('Unable to save geotag. Move the pin again to retry.');
+      } finally {
+        if (version === pinVersion.current) setSavingGeotag(false);
+      }
+    });
+    await pinSaveQueue.current;
+  }
+
 
   const selectedMember = useMemo(() => {
     return members.find((member: any) => String(member.member_id) === String(selectedMemberId)) || members[0] || null;
@@ -36,19 +75,18 @@ export function HouseholdProfileScreen({
   const householdName = household.household_name || 'Household';
   const householdIdentifier = household.household_id || user.username || 'No household ID';
   const memberCount = members.length || Number(household.member_count || 0);
-  const hasGeotag = Boolean(geotag?.latitude && geotag?.longitude);
+  const displayGeotag = savedPin || geotag;
+  const hasGeotag = Boolean(displayGeotag?.latitude && displayGeotag?.longitude);
 
   async function handleUpdateGeotag() {
-    const permission = await Location.requestForegroundPermissionsAsync();
-
-    if (permission.status !== 'granted') {
-      Alert.alert('Location required', 'Allow location access to update your household geotag.');
-      return;
-    }
-
+    if (!await confirmHouseholdGps()) return;
     setSavingGeotag(true);
-
     try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Location required', 'Allow location access to update your household geotag.');
+        return;
+      }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const address = await reverseGeocodeAddress(location.coords.latitude, location.coords.longitude);
 
@@ -61,9 +99,12 @@ export function HouseholdProfileScreen({
         relationship_to_family: selectedMember?.relationship || 'Household member',
       });
 
+      const point = { latitude: location.coords.latitude, longitude: location.coords.longitude };
+      setSelectedPin(point);
+      setSavedPin({ ...point, location_label: address.label, updated_label: 'Just now' });
       Alert.alert('Geotag updated', 'Your household geotag was saved to the shared database.');
     } catch {
-      // Parent screen already shows the API error message.
+      Alert.alert('Unable to update location', 'Check your GPS and connection, then try again.');
     } finally {
       setSavingGeotag(false);
     }
@@ -128,7 +169,7 @@ export function HouseholdProfileScreen({
           title="Household geotag"
           action={<HouseholdBadge label={hasGeotag ? 'Saved' : 'Missing'} tone={hasGeotag ? 'safe' : 'warning'} />}
         />
-        {geotag ? (
+        {displayGeotag ? (
           <>
             <View style={styles.locationPanel}>
               <View style={styles.locationIcon}>
@@ -136,15 +177,37 @@ export function HouseholdProfileScreen({
               </View>
               <View style={styles.panelText}>
                 <Text style={styles.panelLabel}>Saved address</Text>
-                <Text style={styles.panelTitle}>{geotag.location_label || 'Household geotag'}</Text>
-                <Text style={styles.panelMeta}>{coordinatesLabel(geotag)}</Text>
+                <Text style={styles.panelTitle}>{displayGeotag.location_label || 'Household geotag'}</Text>
+                <Text style={styles.panelMeta}>{coordinatesLabel(displayGeotag)}</Text>
               </View>
             </View>
-            <InfoRow icon="time-outline" label="Updated" value={geotag.updated_label || 'Not recorded'} />
+            <InfoRow icon="time-outline" label="Updated" value={displayGeotag.updated_label || 'Not recorded'} />
           </>
         ) : (
           <HouseholdEmpty icon="location-outline" title="No geotag saved yet" />
         )}
+        {(
+          <HouseholdButton
+            label={showPinMap ? 'Close map pin' : 'Change geotag using map pin'}
+            icon="location-outline"
+            tone="light"
+            disabled={savingGeotag}
+            onPress={() => {
+              setSelectedPin(displayGeotag ? { latitude: Number(displayGeotag.latitude), longitude: Number(displayGeotag.longitude) } : null);
+              setShowPinMap((value) => !value);
+            }}
+          />
+        )}
+        {showPinMap ? (
+          <>
+            <MobileLeafletMap
+              markers={[]} routes={[]} geotagPicker height={360} selectedPoint={selectedPin}
+              onPinMoving={() => { pinVersion.current++; setSavingGeotag(true); setPinMessage('Release the pin to save your location.'); }}
+              onMapPress={(coordinate) => { void saveMapPin(coordinate); }}
+            />
+            <Text style={styles.panelMeta}>{pinMessage}</Text>
+          </>
+        ) : null}
         <HouseholdButton
           label={savingGeotag ? 'Updating geotag...' : 'Update geotag from GPS'}
           icon="locate-outline"

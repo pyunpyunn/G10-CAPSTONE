@@ -17,6 +17,7 @@ class DisasterBroadcastPushTest extends TestCase
         config(['services.onesignal.app_id' => 'test-app', 'services.onesignal.api_key' => 'test-key']);
         Schema::create('device_tokens', function (Blueprint $table) {
             $table->string('player_id');
+            $table->string('platform')->default('android');
             $table->string('app_role');
             $table->string('push_provider');
             $table->string('notification_permission_status');
@@ -70,6 +71,23 @@ class DisasterBroadcastPushTest extends TestCase
         $result = app(OneSignalNotificationService::class)->sendToMobileDevices('Flood', 'Evacuate');
         $this->assertSame('not_configured', $result['status']);
         Http::assertNothingSent();
+    }
+
+    public function test_android_broadcast_excludes_other_platforms_and_includes_event_metadata(): void
+    {
+        DB::table('device_tokens')->where('player_id', 'subscription-1')->update(['platform' => 'ios']);
+        Http::fake(['*' => Http::response(['id' => 'notification-id'], 200)]);
+        $workflow = app(\App\Services\Web\DisasterBroadcastWorkflow::class);
+        $result = $workflow->sendBroadcastPush(42, [
+            'broadcast_title' => 'Flood warning', 'message' => 'Prepare for rising water.',
+            'scope_type' => 'barangay_wide', 'allowed_statuses' => ['safe', 'unsafe'],
+        ], ['puroks' => []], (object) ['event_id' => 'EVT-TEST']);
+        $this->assertSame('sent', $result['status']);
+        Http::assertSent(fn ($request) => $request['include_subscription_ids'] === ['subscription-0']
+            && $request['target_channel'] === 'push'
+            && $request['data']['type'] === 'disaster_broadcast'
+            && $request['data']['event_id'] === 'EVT-TEST'
+            && $request['data']['broadcast_id'] === '42');
     }
 
     public function test_permanent_http_errors_are_not_retried_inline(): void

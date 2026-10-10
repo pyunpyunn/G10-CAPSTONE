@@ -169,12 +169,13 @@ class DisasterBroadcastWorkflow
             // Persist the audience and UUIDs in the transactional outbox payload.
             // Queue retries must reuse exactly the same provider request.
             $metadata['push_plan'] = $this->oneSignal->prepareDelivery([
+                'platforms' => ['android'],
                 'roles' => $validated['scope_type'] === 'selected_puroks' ? ['household'] : ['household', 'rescuer'],
                 'household_puroks' => $validated['scope_type'] === 'selected_puroks'
                     ? collect($metadata['puroks'])->pluck('name')->filter()->values()->all() : [],
             ]);
             DeliverDisasterBroadcast::dispatch($broadcastId, $validated, $metadata, (string) $event->event_id)
-                ->onConnection('operations_outbox')->onQueue('operations');
+                ->onConnection('operations_outbox')->onQueue('broadcasts');
 
             return $broadcastId;
         });
@@ -248,6 +249,7 @@ class DisasterBroadcastWorkflow
             $validated['broadcast_title'],
             $validated['message'],
             [
+                'platforms' => ['android'],
                 'roles' => $roles,
                 ...(isset($metadata['push_plan']) ? ['delivery_plan' => $metadata['push_plan']] : []),
                 'household_puroks' => $purokNames,

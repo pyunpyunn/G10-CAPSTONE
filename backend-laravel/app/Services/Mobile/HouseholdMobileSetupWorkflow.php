@@ -11,6 +11,26 @@ class HouseholdMobileSetupWorkflow
 {
     public function __construct(private HouseholdMobileSupport $support) {}
 
+    public function updateGeotag(Request $request): JsonResponse
+    {
+        $householdId = $this->support->householdId($request->user());
+        if (! $householdId) {
+            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
+        }
+        $validated = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'accuracy_m' => ['nullable', 'numeric', 'min:0'],
+            'address_label' => ['required', 'string', 'max:255'],
+        ]);
+        DB::transaction(function () use ($request, $householdId, $validated): void {
+            $this->saveGeotag($householdId, $request->user()?->user_id, $validated, now());
+            $this->support->writeAuditLog($request, 'mobile_household_geotag', 'households', $householdId, $validated);
+        });
+
+        return response()->json(['message' => 'Household geotag saved.']);
+    }
+
     public function completeSetup(Request $request): JsonResponse
     {
         $user = $request->user();

@@ -1,6 +1,6 @@
 import { api } from './client';
 import { submitReport } from './reportSubmission';
-import { cachedMobileRead } from '@/utils/mobileReadCache';
+import { cachedMobileRead, invalidateMobileReads } from '@/utils/mobileReadCache';
 
 export type HouseholdOverview = {
   profile: {
@@ -38,6 +38,14 @@ export async function getHouseholdOverview(refresh = false) {
 
 export async function completeHouseholdSetup(payload: any) {
   const response = await api.post('/household/setup', payload);
+  return response.data;
+}
+
+export async function saveHouseholdGeotag(payload: {
+  latitude: number; longitude: number; accuracy_m?: number | null; address_label: string;
+}) {
+  const response = await api.put('/household/geotag', payload);
+  invalidateMobileReads();
   return response.data;
 }
 

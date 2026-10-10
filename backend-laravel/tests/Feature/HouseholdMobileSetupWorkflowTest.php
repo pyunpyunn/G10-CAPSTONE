@@ -12,6 +12,30 @@ use Tests\TestCase;
 
 class HouseholdMobileSetupWorkflowTest extends TestCase
 {
+    public function test_pin_autosave_updates_only_the_authenticated_household_geotag(): void
+    {
+        DB::table('geotagged_locations')->insert([
+            'location_id' => 5, 'household_id' => 'HH-OTHER', 'latitude' => 10.1,
+            'longitude' => 123.8, 'location_label' => 'Other household',
+        ]);
+        $workflow = app(HouseholdMobileSetupWorkflow::class);
+        foreach ([10.287, 10.288] as $latitude) {
+            $response = $workflow->updateGeotag($this->householdRequest('/api/v1/household/geotag', 'PUT', [
+                'latitude' => $latitude, 'longitude' => 123.88,
+                'address_label' => 'Mambaling, Cebu City', 'accuracy_m' => null,
+                'household_id' => 'HH-OTHER',
+            ]));
+            $this->assertSame(200, $response->getStatusCode());
+        }
+        $this->assertDatabaseHas('geotagged_locations', [
+            'household_id' => 'HH-1', 'latitude' => 10.288, 'longitude' => 123.88,
+            'location_label' => 'Mambaling, Cebu City',
+        ]);
+        $this->assertDatabaseHas('geotagged_locations', ['household_id' => 'HH-OTHER', 'latitude' => 10.1]);
+        $this->assertDatabaseCount('geotagged_locations', 2);
+        $this->assertDatabaseCount('device_tokens', 0);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

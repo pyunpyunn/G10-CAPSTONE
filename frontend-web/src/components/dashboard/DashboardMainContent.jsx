@@ -78,6 +78,7 @@ export default function DashboardMainContent({
             isLoading={summaryState?.isLoading}
             emptyTitle="No household reports yet"
             emptyMessage="Reports will come from household mobile users or authenticated responder field reports."
+            alwaysShowChart
             onManage={() => onOpenModule('/households')}
           />
           <ChartCard
@@ -233,9 +234,7 @@ function ChartCard({ title, bars = [], isLoading, emptyTitle, emptyMessage, alwa
             ))}
           </div>
         </div>
-      ) : (
-        <EmptyState title={emptyTitle} message={emptyMessage} />
-      )}
+      ) : null}
     </div>
   )
 }

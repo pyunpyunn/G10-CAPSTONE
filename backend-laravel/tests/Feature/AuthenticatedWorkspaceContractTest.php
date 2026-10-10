@@ -254,7 +254,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
             ->assertJsonPath('data.push_delivery.status', 'queued')
             ->assertJsonPath('data.sms_delivery.status', 'queued');
 
-        Queue::assertPushedOn('operations', DeliverDisasterBroadcast::class);
+        Queue::assertPushedOn('broadcasts', DeliverDisasterBroadcast::class);
         $this->assertDatabaseCount('disaster_broadcasts', 1);
     }
 

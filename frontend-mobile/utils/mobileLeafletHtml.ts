@@ -1,3 +1,4 @@
+import mambalingBoundary from '@/assets/mambaling-boundary.json';
 export type LeafletPoint = {
   latitude: number | string;
   longitude: number | string;
@@ -18,16 +19,20 @@ export function mobileLeafletHtml({
   routes,
   center,
   interactive = false,
+  geotagPicker = false,
 }: {
   markers: LeafletPoint[];
   routes: LeafletRoute[];
   center?: { latitude: number; longitude: number };
   interactive?: boolean;
+  geotagPicker?: boolean;
 }) {
   const data = JSON.stringify({
     markers,
     routes,
     interactive,
+    geotagPicker,
+    boundary: geotagPicker ? mambalingBoundary : null,
     center: center || { latitude: 10.3157, longitude: 123.8854 },
   }).replace(/</g, '\\u003c');
 
@@ -56,7 +61,33 @@ export function mobileLeafletHtml({
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
     const bounds = L.latLngBounds([]);
-    if (data.interactive) {
+    if (data.geotagPicker) {
+      const border = L.geoJSON(data.boundary, { style: { color: '#236a73', weight: 3, fillOpacity: 0.06 } }).addTo(map);
+      map.fitBounds(border.getBounds(), { padding: [18, 18] });
+      const pin = L.marker(border.getBounds().getCenter(), { draggable: true, autoPan: true }).addTo(map);
+      pin.bindTooltip('Drag to your household', { direction: 'top', offset: [0, -35] });
+      const send = (message) => {
+        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(message));
+        else window.parent.postMessage(message, '*');
+      };
+      const publish = () => {
+        const point = pin.getLatLng();
+        send({ type: 'mapPress', latitude: point.lat, longitude: point.lng });
+      };
+      pin.on('dragstart', () => send({ type: 'pinMoving' }));
+      pin.on('dragend', publish);
+      map.on('click', (event) => { pin.setLatLng(event.latlng); publish(); });
+      window.addEventListener('message', (event) => {
+        if (event.source === window.parent && event.data?.type === 'setHouseholdPin' && Number.isFinite(event.data.latitude) && Number.isFinite(event.data.longitude)) {
+          window.setHouseholdPin(event.data.latitude, event.data.longitude);
+        }
+      });
+      window.setHouseholdPin = (latitude, longitude) => {
+        pin.setLatLng([latitude, longitude]);
+        if (!map.getBounds().contains(pin.getLatLng())) map.panTo(pin.getLatLng());
+      };
+    }
+    if (data.interactive && !data.geotagPicker) {
       map.on('click', (event) => {
         if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'mapPress', latitude: event.latlng.lat, longitude: event.latlng.lng
@@ -100,8 +131,9 @@ export function mobileLeafletHtml({
       }).addTo(map).bindPopup(route.label || 'Route');
       coordinates.forEach((point) => bounds.extend(point));
     });
-    if (bounds.isValid()) map.fitBounds(bounds.pad(0.18), { maxZoom: 16 });
+    if (!data.geotagPicker && bounds.isValid()) map.fitBounds(bounds.pad(0.18), { maxZoom: 16 });
   </script>
 </body>
 </html>`;
 }
+

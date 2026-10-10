@@ -5,24 +5,23 @@ import Panel from '../ui/Panel'
 import { Link } from 'react-router-dom'
 
 const factors = [
-  { key: 'impact', label: 'Sitio impact', color: '#378ADD' },
+  { key: 'impact', label: 'Unsafe Households', color: '#378ADD' },
   { key: 'special_needs', label: 'Special needs', color: '#7F77DD' },
-  { key: 'unreported', label: 'Unreported members', color: '#EF9F27' },
-  { key: 'no_contact', label: 'No contact channel', color: '#D85A30' },
+  { key: 'unreported', label: 'Unchecked Members', color: '#EF9F27' },
+  { key: 'no_contact', label: 'No mobile / geotag', color: '#D85A30' },
 ]
 
 export function SitioPriorityChart({ rows, loading, onRefresh }) {
-  const maxScore = Math.max(20, Math.ceil(Math.max(...rows.map((row) => Number(row.priority_score) || 0), 0) / 20) * 20)
-  const ticks = Array.from({ length: maxScore / 20 + 1 }, (_, index) => maxScore - index * 20)
-  const slotCount = Math.max(18, rows.length)
-  const emptySlotCount = slotCount - rows.length
+  const maxScore = 100
+  const ticks = [100, 80, 60, 40, 20, 0]
+  const slotCount = rows.length
 
   return (
     <Panel title="Sitio priority by criterion" className="sitio-priority-panel" action={<button className="button secondary" type="button" onClick={onRefresh} disabled={loading}>Refresh</button>}>
       {rows.length === 0 ? <EmptyState title="No Sitio ranking available" message="Sitio priorities appear when an active event has catalogued sitios." /> : (
         <>
         <div className="sitio-priority-chart-scroll">
-          <div className="sitio-priority-chart" style={{ minWidth: `${Math.max(600, slotCount * 34 + 50)}px` }} role="img" aria-label={`Vertical stacked graph of sitio rescue priority; ${rows.length} sitios with data and space for at least 18 sitios`}>
+          <div className="sitio-priority-chart" role="img" aria-label={`Vertical stacked graph of sitio rescue priority for ${rows.length} sitios`}>
             <div className="sitio-priority-legend">{factors.map((factor) => <span key={factor.key}><i style={{ background: factor.color }} />{factor.label}</span>)}</div>
             <div className="sitio-priority-y-axis">{ticks.map((tick) => <span key={tick}>{tick}%</span>)}</div>
             <div className="sitio-priority-plot" style={{ '--grid-step': `${100 / (ticks.length - 1)}%`, '--slot-count': slotCount }}>
@@ -35,12 +34,6 @@ export function SitioPriorityChart({ rows, loading, onRefresh }) {
                 </div>
                 <span className="sitio-priority-x-label" title={row.sitio}>{row.sitio}</span>
               </div>)}
-              {Array.from({ length: emptySlotCount }, (_, index) => (
-                <div className="sitio-priority-column sitio-priority-column--empty" key={`empty-slot-${index}`} aria-hidden="true">
-                  <div className="sitio-priority-bar-area" />
-                  <span className="sitio-priority-x-label" />
-                </div>
-              ))}
             </div>
           </div>
         </div>
@@ -68,10 +61,12 @@ export function SitioPriorityList({ rows, selectedSitioId, onSelect }) {
               </button>
               <span className="sitio-priority-tooltip" role="tooltip">
                 <b>{row.sitio} summary</b>
+                {row.is_catalogued === false && <span>Observed location; not linked to the sitio registry</span>}
                 <span>{row.households} households</span>
-                <span>{row.impacted_households} unsafe / affected</span>
-                <span>{row.unreported_members} unreported members</span>
-                <span>{row.no_contact_households} no contact channel</span>
+                <span>{row.impacted_households} unsafe households</span>
+                <span>{row.special_needs_members || 0} members with special needs</span>
+                <span>{row.unchecked_members ?? row.unreported_members} unchecked members</span>
+                <span>{row.no_contact_households} without registered mobile and geotag</span>
               </span>
             </li>)}
           </ol>
@@ -99,7 +94,11 @@ export function SitioPriorityList({ rows, selectedSitioId, onSelect }) {
                   </Link>
                 </span>
               </h4>
-              {selectedSitio.puroks?.length ? selectedSitio.puroks.map((purok) => <div className="sitio-purok-row" key={purok.purok_id}>
+              {selectedSitio.is_catalogued === false ? selectedSitio.address_labels?.map((address) => <div className="sitio-purok-row" key={address.label}>
+                <span>{address.label}</span>
+                <small>{address.households} households</small>
+                <Link className="button secondary" to={{ pathname: '/households/_household-list', search: `?${new URLSearchParams({ purok: address.label })}` }}>View households</Link>
+              </div>) : selectedSitio.puroks?.length ? selectedSitio.puroks.map((purok) => <div className="sitio-purok-row" key={purok.purok_id}>
                 <span>{purok.purok_name}</span>
                 <small>{purok.household_count} households</small>
                 <Link className="button secondary" to={{ pathname: '/households/_household-list', search: `?${new URLSearchParams({ sitio_id: String(selectedSitio.sitio_id), purok_id: String(purok.purok_id), sitio: selectedSitio.sitio, purok: purok.purok_name })}` }}>View sitio</Link>

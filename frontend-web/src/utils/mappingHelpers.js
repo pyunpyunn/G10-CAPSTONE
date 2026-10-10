@@ -43,6 +43,7 @@ export const defaultWorkspace = {
   evacuation_sites: [],
   rescue_teams: [],
   dispatch_routes: [],
+  rescue_offices: [],
   map_rules: [],
 }
 
@@ -72,6 +73,7 @@ export function normalizeWorkspaceData(data = {}) {
     evacuation_sites: Array.isArray(data?.evacuation_sites) ? data.evacuation_sites : [],
     rescue_teams: Array.isArray(data?.rescue_teams) ? data.rescue_teams : [],
     dispatch_routes: Array.isArray(data?.dispatch_routes) ? data.dispatch_routes : [],
+    rescue_offices: Array.isArray(data?.rescue_offices) ? data.rescue_offices : [],
   }
 }
 

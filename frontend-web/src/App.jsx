@@ -200,7 +200,8 @@ function AuthRoutes() {
       }
     }
 
-    loadSession()
+    const sessionCheck = window.setTimeout(() => loadSession(), 0)
+    return () => window.clearTimeout(sessionCheck)
   }, [])
 
   async function handleLogin(form) {

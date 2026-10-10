@@ -559,6 +559,7 @@ export default function HouseholdHomeScreen() {
         <HouseholdProfileScreen
           overview={overview}
           onUpdateGeotag={handleUpdateGeotag}
+          onGeotagSaved={() => loadOverview(true)}
           onLogout={handleLogout}
         />
       );

@@ -26,6 +26,11 @@ class HouseholdMobileController extends Controller
         return $this->service->completeSetup($request);
     }
 
+    public function updateGeotag(Request $request): JsonResponse
+    {
+        return $this->service->updateGeotag($request);
+    }
+
     public function updateDeviceLocation(Request $request): JsonResponse
     {
         return $this->service->updateDeviceLocation($request);

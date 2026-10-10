@@ -153,7 +153,7 @@ Schedule::command('queue:work trackingaid_outbox --queue=trackingaid --stop-when
     ->everyMinute()
     ->withoutOverlapping();
 
-Schedule::command('queue:work operations_outbox --queue=operations --stop-when-empty --max-time=50')
+Schedule::command('queue:work operations_outbox --queue=broadcasts,operations --stop-when-empty --max-time=50')
     ->everyMinute()
     ->withoutOverlapping();
 

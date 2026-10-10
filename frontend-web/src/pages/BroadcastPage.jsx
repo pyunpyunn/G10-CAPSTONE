@@ -259,7 +259,9 @@ export default function BroadcastPage() {
       const updatedWorkspace = broadcastResult.workspace || broadcastResult
       setWorkspace(updatedWorkspace)
       initForm(updatedWorkspace)
-      setFormNotice(activeEvent ? 'Disaster updated and broadcast posted. Mobile notification delivery starts automatically.' : 'Disaster declared and broadcast posted. Mobile notification delivery starts automatically.')
+      setFormNotice(activeEvent
+        ? 'Disaster updated and broadcast posted. OneSignal push to subscribed Android devices is queued; check Mobile push in the broadcast log for the result.'
+        : 'Disaster declared and broadcast posted. OneSignal push to subscribed Android devices is queued; check Mobile push in the broadcast log for the result.')
     } catch (saveError) {
       setFormError(apiErrorMessage(saveError, 'Unable to save this broadcast. Please check all entries and try again.'))
     } finally {

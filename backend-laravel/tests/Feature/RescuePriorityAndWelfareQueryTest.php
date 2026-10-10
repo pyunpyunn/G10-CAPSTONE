@@ -109,6 +109,8 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
         Schema::create('geotagged_locations', function (Blueprint $table): void {
             $table->integer('location_id')->primary();
             $table->string('household_id');
+            $table->decimal('latitude', 10, 7)->nullable();
+            $table->decimal('longitude', 10, 7)->nullable();
         });
         Schema::create('rescue_priority_settings', function (Blueprint $table): void {
             $table->increments('version');
@@ -199,6 +201,87 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
         $this->assertSame(0, $rows[1]['households']);
         $this->assertSame('Purok A1', $rows[0]['puroks'][0]['purok_name']);
         $this->assertSame(1, $rows[0]['puroks'][0]['household_count']);
+    }
+
+    public function test_sitio_priority_uses_weighted_population_rates_and_requires_both_mobile_and_geotag(): void
+    {
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
+        DB::table('rescue_priority_settings')->update([
+            'impact_weight' => 10, 'vulnerability_weight' => 50,
+            'unreported_weight' => 25, 'no_contact_weight' => 15,
+        ]);
+        DB::table('sitios')->insert(['sitio_id' => 10, 'barangay_id' => 1, 'sitio_name' => 'Sitio A']);
+        DB::table('addresses')->where('address_id', 1)->update(['sitio_id' => 10]);
+        DB::table('households')->insert([
+            'household_id' => 'HH-3', 'address_id' => 1, 'household_name' => 'Third', 'member_count' => 3,
+        ]);
+        DB::table('households')->insert([
+            'household_id' => 'HH-4', 'address_id' => 1, 'household_name' => 'Fourth', 'member_count' => 0,
+        ]);
+        DB::table('household_members')->insert([
+            ['member_id' => 'M-3', 'household_id' => 'HH-3', 'is_pwd' => 1],
+            ['member_id' => 'M-4', 'household_id' => 'HH-3', 'is_pwd' => 0],
+            ['member_id' => 'M-5', 'household_id' => 'HH-3', 'is_pwd' => 0],
+        ]);
+        DB::table('household_disasters')->insert([
+            'household_disaster_id' => 2, 'household_id' => 'HH-1', 'disaster_id' => 'EVT-1',
+            'current_status_id' => 1,
+        ]);
+        DB::table('member_statuses')->insert(['status_id' => 2, 'status_key' => 'safe']);
+        DB::table('member_disaster_statuses')->insert([
+            ['member_id' => 'M-3', 'disaster_id' => 'EVT-1', 'status_id' => 2],
+            ['member_id' => 'M-4', 'disaster_id' => 'EVT-1', 'status_id' => 2],
+        ]);
+        DB::table('device_tokens')->insert(['household_id' => 'HH-3', 'is_active' => 1]);
+        DB::table('geotagged_locations')->insert([
+            'location_id' => 1, 'household_id' => 'HH-4', 'latitude' => 10.29, 'longitude' => 123.88,
+        ]);
+
+        $row = app(SitioPriorityQuery::class)->ranked('EVT-1')[0];
+
+        $this->assertSame(3, $row['households']);
+        $this->assertSame(2, $row['special_needs_members']);
+        $this->assertSame(2, $row['unchecked_members']);
+        $this->assertSame(1, $row['no_contact_households']);
+        $this->assertSame(42.5, $row['priority_score']);
+        $this->assertSame([
+            'impact' => 10.0,
+            'special_needs' => 15.0,
+            'unreported' => 12.5,
+            'no_contact' => 5.0,
+        ], $row['contributions']);
+    }
+
+    public function test_sitio_priority_uses_catalog_names_and_ignores_unmatched_address_labels(): void
+    {
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
+        DB::table('sitios')->insert(['sitio_id' => 10, 'barangay_id' => 1, 'sitio_name' => 'Sitio A']);
+        DB::table('puroks')->insert(['purok_id' => 31, 'sitio_id' => 10, 'purok_name' => 'Purok A1']);
+        DB::table('addresses')->insert([
+            'address_id' => 3, 'purok_sitio' => 'Purok 5', 'barangay_id' => 1,
+        ]);
+        DB::table('addresses')->insert([
+            'address_id' => 4, 'purok_sitio' => 'Purok A1, Sitio A', 'barangay_id' => 1,
+        ]);
+        DB::table('households')->insert([
+            'household_id' => 'HH-3', 'address_id' => 3, 'household_name' => 'Third', 'member_count' => 1,
+        ]);
+        DB::table('households')->insert([
+            'household_id' => 'HH-4', 'address_id' => 4, 'household_name' => 'Fourth', 'member_count' => 1,
+        ]);
+
+        $rows = app(SitioPriorityQuery::class)->ranked('EVT-1');
+        $sitioNames = array_column($rows, 'sitio');
+
+        $this->assertSame(['Sitio A'], $sitioNames);
+        $this->assertSame(10, $rows[0]['sitio_id']);
+        $this->assertSame(1, $rows[0]['households']);
     }
 
     public function test_household_list_accepts_an_exact_purok_and_sitio_label_when_ids_are_missing(): void
