@@ -18,7 +18,6 @@ import {
 } from 'lucide-react'
 import { getResourceRequestTypes } from '../api/resourceRequestApi'
 import { useModuleData } from '../utils/useModuleData'
-import PageHeader from '../components/ui/PageHeader'
 import PaginationBar from '../components/ui/PaginationBar'
 import RequestTypeCard from '../components/resources/RequestTypeCard'
 import RequestTypeDetailDrawer from '../components/resources/RequestTypeDetailDrawer'
@@ -121,11 +120,27 @@ export default function RequestTypesPage() {
 
   return (
     <main className="ops-page resources-page req-types-page">
-      {/* Top Header */}
-      <PageHeader
-        title="Available Request Types"
-        actions={
-          <div className="req-header-actions">
+      <div className="workflow-page-wrap">
+        {/* Operations Hero Header (Matches External Requests) */}
+        <header className="workflow-hero-header">
+          <div className="workflow-hero-left">
+            <div className="workflow-hero-icon-box">
+              <Boxes size={22} />
+            </div>
+            <div>
+              <div className="workflow-hero-kicker">
+                Resource Catalog & Depot Inventory
+              </div>
+              <h1 className="workflow-hero-title">
+                Available Request Types
+              </h1>
+              <p className="workflow-hero-desc">
+                Browse cataloged emergency relief items, verify depot inventory levels, or declare new resource types.
+              </p>
+            </div>
+          </div>
+
+          <div className="workflow-hero-actions">
             {/* Live Shared DB Indicator */}
             <div
               className={`db-sync-indicator ${isTrackingAidLive ? 'is-live' : 'is-fallback'}`}
@@ -147,234 +162,272 @@ export default function RequestTypesPage() {
               onClick={refresh}
               disabled={loading}
               title="Refresh inventory and catalog"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
               <RotateCw size={14} className={loading ? 'spin-icon' : ''} />
-              <span>Refresh</span>
+              <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
             </button>
 
             <button
               type="button"
               className="btn btn-primary btn-header-declare"
               onClick={() => setIsDeclareModalOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
               <Plus size={15} />
               <span>Declare New Type</span>
             </button>
           </div>
-        }
-      />
+        </header>
 
-      {/* Success Notification Banner */}
-      {successToast && (
-        <div className="req-toast-banner" role="status">
-          <Sparkles size={15} className="sparkle-icon" />
-          <span>{successToast}</span>
-        </div>
-      )}
-
-      {/* Sleek KPI Stats Strip */}
-      <section className="req-stats-strip" aria-label="Catalog Quick Stats">
-        <div className="kpi-mini-card">
-          <div className="kpi-icon-box tone-blue">
-            <Layers size={17} />
+        {/* Success Notification Banner */}
+        {successToast && (
+          <div className="req-toast-banner" role="status">
+            <Sparkles size={15} className="sparkle-icon" />
+            <span>{successToast}</span>
           </div>
-          <div className="kpi-content">
-            <span className="kpi-label">Total Types</span>
-            <span className="kpi-value">{summary.total_types ?? 0}</span>
-          </div>
-        </div>
+        )}
 
-        <div className="kpi-mini-card">
-          <div className="kpi-icon-box tone-emerald">
-            <CheckCircle2 size={17} />
-          </div>
-          <div className="kpi-content">
-            <span className="kpi-label">Available In Stock</span>
-            <span className="kpi-value in-stock-val">{summary.in_stock_count ?? 0}</span>
-          </div>
-        </div>
-
-        <div className="kpi-mini-card">
-          <div className="kpi-icon-box tone-rose">
-            <XCircle size={17} />
-          </div>
-          <div className="kpi-content">
-            <span className="kpi-label">Out of Stock</span>
-            <span className="kpi-value out-of-stock-val">{summary.out_of_stock_count ?? 0}</span>
-          </div>
-        </div>
-
-        <div className="kpi-mini-card">
-          <div className="kpi-icon-box tone-amber">
-            <Boxes size={17} />
-          </div>
-          <div className="kpi-content">
-            <span className="kpi-label">Available Units</span>
-            <span className="kpi-value">
-              {Number(summary.total_available_units ?? 0).toLocaleString()}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* Simplified, Professional Filter Toolbar */}
-      <div className="req-toolbar">
-        {/* Search input with clean search icon */}
-        <div className="req-search-box">
-          <Search size={14} className="search-icon" />
-          <input
-            type="text"
-            placeholder="Search by name, SKU, or depot..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
-            className="req-search-input"
-          />
-          {search && (
-            <button
-              type="button"
-              className="req-clear-search-btn"
-              onClick={() => {
-                setSearch('')
-                setPage(1)
-              }}
-              aria-label="Clear search"
-            >
-              <X size={13} />
-            </button>
-          )}
-        </div>
-
-        {/* Stock Status Segmented Control */}
-        <div className="req-status-segmented">
-          <button
-            type="button"
-            className={`seg-btn ${status === 'all' ? 'active' : ''}`}
-            onClick={() => {
-              setStatus('all')
-              setPage(1)
-            }}
-          >
-            All <span className="seg-count">{summary.total_types ?? 0}</span>
-          </button>
-          <button
-            type="button"
-            className={`seg-btn ${status === 'in_stock' ? 'active seg-in-stock' : ''}`}
-            onClick={() => {
-              setStatus('in_stock')
-              setPage(1)
-            }}
-          >
-            In Stock <span className="seg-count">{summary.in_stock_count ?? 0}</span>
-          </button>
-          <button
-            type="button"
-            className={`seg-btn ${status === 'out_of_stock' ? 'active seg-out-stock' : ''}`}
-            onClick={() => {
-              setStatus('out_of_stock')
-              setPage(1)
-            }}
-          >
-            Out of Stock <span className="seg-count">{summary.out_of_stock_count ?? 0}</span>
-          </button>
-        </div>
-
-        {/* Category Dropdown & Results Counter */}
-        <div className="req-toolbar-right">
-          <div className="req-category-select-wrap">
-            <Filter size={13} className="filter-select-icon" />
-            <select
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value)
-                setPage(1)
-              }}
-              className="req-category-select"
-              aria-label="Filter by category"
-            >
-              {categories.map((cat) => (
-                <option key={cat.key} value={cat.key}>
-                  {cat.label} {typeof cat.count === 'number' ? `(${cat.count})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {activeFiltersCount > 0 && (
-            <button
-              type="button"
-              className="btn-toolbar-reset"
-              onClick={handleResetFilters}
-              title="Reset all active filters"
-            >
-              Reset
-            </button>
-          )}
-
-          <span className="req-results-counter">
-            Showing <strong>{items.length}</strong> of {cardsPagination.total ?? items.length}
-          </span>
-        </div>
-      </div>
-
-      {/* Main Content: Card Grid */}
-      <section className="req-catalog-wrapper" aria-label="Available Request Types Catalog">
-        {loading && items.length === 0 ? (
-          <div className="req-grid-loading">
-            <div className="loading-spinner-wrap">
-              <RotateCw size={26} className="spin-icon text-primary" />
-              <span>Loading Available Request Catalog...</span>
+        {/* Executive KPI Stats Cards (Matches RequestWorkflowPage exactly) */}
+        <section className="workflow-kpi-grid" aria-label="Catalog Quick Stats">
+          {/* Card 1: Total Types */}
+          <div className="workflow-kpi-card kpi-indigo">
+            <div className="workflow-kpi-icon">
+              <Layers size={19} />
+            </div>
+            <div className="workflow-kpi-info">
+              <span className="workflow-kpi-num">{summary.total_types ?? 0}</span>
+              <span className="workflow-kpi-label">Total Types</span>
+              <span className="workflow-kpi-sub">Emergency cataloged items</span>
             </div>
           </div>
-        ) : error ? (
-          <div className="req-grid-error" role="alert">
-            <AlertCircle size={28} className="text-danger" />
-            <div className="error-title">Failed to load request types</div>
-            <p className="error-desc">{error}</p>
-            <button type="button" className="btn btn-secondary" onClick={refresh}>
-              Retry Connection
-            </button>
+
+          {/* Card 2: Available In Stock */}
+          <div className="workflow-kpi-card kpi-emerald">
+            <div className="workflow-kpi-icon">
+              <CheckCircle2 size={19} />
+            </div>
+            <div className="workflow-kpi-info">
+              <span className="workflow-kpi-num">{summary.in_stock_count ?? 0}</span>
+              <span className="workflow-kpi-label">Available In Stock</span>
+              <span className="workflow-kpi-sub">Ready for allocation</span>
+            </div>
           </div>
-        ) : items.length === 0 ? (
-          <div className="req-grid-empty">
-            <Package size={40} className="empty-icon" />
-            <h3>No Request Types Found</h3>
-            <p>No catalog resources matched your active filters or search query.</p>
+
+          {/* Card 3: Out of Stock */}
+          <div className="workflow-kpi-card kpi-rose">
+            <div className="workflow-kpi-icon">
+              <XCircle size={19} />
+            </div>
+            <div className="workflow-kpi-info">
+              <span className="workflow-kpi-num">{summary.out_of_stock_count ?? 0}</span>
+              <span className="workflow-kpi-label">Out of Stock</span>
+              <span className="workflow-kpi-sub">Needs replenishment</span>
+            </div>
+          </div>
+
+          {/* Card 4: Available Units */}
+          <div className="workflow-kpi-card kpi-amber">
+            <div className="workflow-kpi-icon">
+              <Boxes size={19} />
+            </div>
+            <div className="workflow-kpi-info">
+              <span className="workflow-kpi-num">
+                {Number(summary.total_available_units ?? 0).toLocaleString()}
+              </span>
+              <span className="workflow-kpi-label">Available Units</span>
+              <span className="workflow-kpi-sub">Total stock in depot bays</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Unified Filter & Search Toolbar (Matches RequestWorkflowPage) */}
+        <section className="workflow-toolbar-box" aria-label="Search and Filter Controls">
+          <div className="workflow-toolbar-top">
+            {/* Search Input */}
+            <div className="workflow-search-wrap">
+              <Search size={15} className="workflow-search-icon" />
+              <input
+                type="text"
+                className="workflow-search-input"
+                placeholder="Search by name, SKU, or depot..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
+              />
+              {search && (
+                <button
+                  type="button"
+                  className="workflow-search-clear"
+                  onClick={() => {
+                    setSearch('')
+                    setPage(1)
+                  }}
+                  aria-label="Clear search"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* Stock Status Channel Pills */}
+            <div className="workflow-channel-pills">
+              <button
+                type="button"
+                className={`wf-channel-btn ${status === 'all' ? 'active' : ''}`}
+                onClick={() => {
+                  setStatus('all')
+                  setPage(1)
+                }}
+              >
+                All Types <span style={{ opacity: 0.75, fontSize: '11px', marginLeft: '3px' }}>({summary.total_types ?? 0})</span>
+              </button>
+              <button
+                type="button"
+                className={`wf-channel-btn ${status === 'in_stock' ? 'active' : ''}`}
+                onClick={() => {
+                  setStatus('in_stock')
+                  setPage(1)
+                }}
+              >
+                <CheckCircle2 size={13} style={{ color: '#16a34a' }} />
+                <span>In Stock</span>
+                <span style={{ opacity: 0.75, fontSize: '11px', marginLeft: '3px' }}>({summary.in_stock_count ?? 0})</span>
+              </button>
+              <button
+                type="button"
+                className={`wf-channel-btn ${status === 'out_of_stock' ? 'active' : ''}`}
+                onClick={() => {
+                  setStatus('out_of_stock')
+                  setPage(1)
+                }}
+              >
+                <XCircle size={13} style={{ color: '#dc2626' }} />
+                <span>Out of Stock</span>
+                <span style={{ opacity: 0.75, fontSize: '11px', marginLeft: '3px' }}>({summary.out_of_stock_count ?? 0})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Secondary Controls Row */}
+          <div className="workflow-toolbar-bottom">
+            <div className="workflow-filter-selects">
+              {/* Category Filter */}
+              <label className="workflow-filter-label">
+                <span>Category:</span>
+                <select
+                  className="workflow-filter-select"
+                  value={category}
+                  onChange={(e) => {
+                    setCategory(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Filter by category"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat.key} value={cat.key}>
+                      {cat.label} {typeof cat.count === 'number' ? `(${cat.count})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {/* Sort Filter */}
+              <label className="workflow-filter-label">
+                <span>Sort by:</span>
+                <select
+                  className="workflow-filter-select"
+                  value={sort}
+                  onChange={(e) => {
+                    setSort(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Sort catalog items"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="highest_stock">Highest Stock</option>
+                  <option value="lowest_stock">Lowest Stock</option>
+                  <option value="name_asc">Name (A-Z)</option>
+                </select>
+              </label>
+            </div>
+
             {activeFiltersCount > 0 && (
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="workflow-reset-btn"
                 onClick={handleResetFilters}
+                title="Reset all active filters"
               >
-                Clear All Filters
+                <X size={12} /> Reset filters
               </button>
             )}
-          </div>
-        ) : (
-          <div className="req-types-card-grid">
-            {items.map((item, index) => (
-              <RequestTypeCard
-                key={item.id || item.sku || index}
-                item={item}
-                isFirst={index === 0}
-                onSelect={handleSelectItem}
-                onRequestNow={handleRequestNow}
-              />
-            ))}
-          </div>
-        )}
 
-        {/* Pagination Bar */}
-        {cardsPagination.total > cardsPagination.per_page && (
-          <PaginationBar
-            meta={cardsPagination}
-            onPageChange={setPage}
-            label="request types"
-          />
-        )}
-      </section>
+            <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#64748b', fontWeight: 650 }}>
+              Showing <strong style={{ color: '#0f172a' }}>{items.length}</strong> of {cardsPagination.total ?? items.length} types
+            </div>
+          </div>
+        </section>
+
+        {/* Main Content: Card Grid */}
+        <section className="req-catalog-wrapper" aria-label="Available Request Types Catalog">
+          {loading && items.length === 0 ? (
+            <div className="req-grid-loading">
+              <div className="loading-spinner-wrap">
+                <RotateCw size={26} className="spin-icon text-primary" />
+                <span>Loading Available Request Catalog...</span>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="req-grid-error" role="alert">
+              <AlertCircle size={28} className="text-danger" />
+              <div className="error-title">Failed to load request types</div>
+              <p className="error-desc">{error}</p>
+              <button type="button" className="btn btn-secondary" onClick={refresh}>
+                Retry Connection
+              </button>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="req-grid-empty">
+              <Package size={40} className="empty-icon" />
+              <h3>No Request Types Found</h3>
+              <p>No catalog resources matched your active filters or search query.</p>
+              {activeFiltersCount > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleResetFilters}
+                >
+                  Clear All Filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="req-types-card-grid">
+              {items.map((item, index) => (
+                <RequestTypeCard
+                  key={item.id || item.sku || index}
+                  item={item}
+                  isFirst={index === 0}
+                  onSelect={handleSelectItem}
+                  onRequestNow={handleRequestNow}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Pagination Bar */}
+          {cardsPagination.total > cardsPagination.per_page && (
+            <PaginationBar
+              meta={cardsPagination}
+              onPageChange={setPage}
+              label="request types"
+            />
+          )}
+        </section>
+      </div>
 
       {/* Bottom-Right Circular Floating Action Button (FAB) */}
       {/* Matches user handwritten sketch: "button overlay at bottom right to filter request types" */}
