@@ -1,15 +1,15 @@
 export default function ProfileIdentity({ identity = {}, barangayProfile = {}, settingsMenu = null }) {
-  const name = identity.name || 'HQ/Admin Desk'
+  const name = identity.name || 'Name not recorded'
   const barangayName = barangayProfile.name || 'Registered barangay'
   const registered = barangayProfile.registered_barangay || {}
   const rows = [
     ['Account ID', identity.account_id || 'Not recorded'],
     ['User ID', identity.user_id || 'Not recorded'],
-    ['Role', identity.role_name || 'HQ/Admin'],
-    ['Account status', identity.status || 'Active and verified'],
+    ['Role', identity.role_name || 'Not recorded'],
+    ['Account status', identity.status || 'Status unavailable'],
     ['Email address', displayValue(identity.email, 'No email recorded')],
     ['Mobile number', displayValue(identity.contact_number, 'No mobile recorded')],
-    ['Assigned station', identity.assigned_station || 'Command desk'],
+    ['Assigned station', identity.assigned_station || 'Not recorded'],
   ]
   const barangayRows = [
     ['Registered barangay', registered.barangay_name || barangayName],
@@ -30,9 +30,9 @@ export default function ProfileIdentity({ identity = {}, barangayProfile = {}, s
           <div className="profile-hero-copy">
             <div className="profile-kicker">HQ/Admin profile</div>
             <div className="profile-name">{name}</div>
-            <div className="profile-role">{identity.role_name || 'HQ/Admin'} - {barangayName}</div>
+            <div className="profile-role">{identity.role_name || 'Role unavailable'} - {barangayName}</div>
             <div className="profile-status-line">
-              <span>{identity.status || 'Active and verified'}</span>
+              <span>{identity.status || 'Status unavailable'}</span>
               <span>{identity.account_id || identity.user_id || 'Account ID not recorded'}</span>
             </div>
           </div>

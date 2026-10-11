@@ -1,9 +1,9 @@
-export default function PageHeader({ title, actions }) {
+export default function PageHeader({ filters, actions }) {
+  if (!filters && !actions) return null
+
   return (
-    <div className="pg-head">
-      <div>
-        <h1 className="pg-title">{title}</h1>
-      </div>
+    <div className="app-page-controls-row">
+      {filters && <div className="app-page-controls-filters">{filters}</div>}
       {actions && <div className="pg-actions">{actions}</div>}
     </div>
   )

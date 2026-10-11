@@ -41,9 +41,20 @@ return [
     ],
 
     'onesignal' => [
+        'max_recipients' => (int) env('ONESIGNAL_MAX_RECIPIENTS', 10000),
         'app_id' => env('ONESIGNAL_APP_ID'),
         'api_key' => env('ONESIGNAL_API_KEY'),
         'base_url' => env('ONESIGNAL_BASE_URL', 'https://api.onesignal.com'),
+    ],
+
+    'sms_gateway' => [
+        'max_recipients' => (int) env('SMS_GATEWAY_MAX_RECIPIENTS', 10000),
+        'base_url' => env('SMS_GATEWAY_BASE_URL'),
+        'username' => env('SMS_GATEWAY_USERNAME'),
+        'password' => env('SMS_GATEWAY_PASSWORD'),
+        'message_path' => env('SMS_GATEWAY_MESSAGE_PATH', '/message'),
+        'batch_size' => env('SMS_GATEWAY_BATCH_SIZE', 20),
+        'webhook_signing_key' => env('SMS_GATEWAY_WEBHOOK_SIGNING_KEY'),
     ],
 
     'trackingaid' => [

@@ -54,9 +54,11 @@ export default function WeatherPage() {
     try {
       const data = await refreshWeather()
       setWorkspace(data)
-      setRefreshMessage(data.active_event
-        ? 'Weather snapshot saved for the active event.'
-        : 'Weather monitoring snapshot saved without an active disaster event.')
+      setRefreshMessage(data.refresh_queued
+        ? 'Weather refresh queued. The latest snapshot will appear after processing.'
+        : data.active_event
+          ? 'Weather snapshot saved for the active event.'
+          : 'Weather monitoring snapshot saved without an active disaster event.')
     } catch (refreshError) {
       setError(apiErrorMessage(refreshError, 'Unable to refresh weather data right now. Latest saved logs are still shown.'))
     } finally {
@@ -70,28 +72,11 @@ export default function WeatherPage() {
   const hasSnapshot = Boolean(latest)
   const activeConditionKey = latest?.condition_key || 'monitoring'
   const riskTone = riskToneFor(latest?.risk_level)
-  const locationName = 'Barangay Mambaling, Cebu City'
+  const locationName = workspace?.location?.name || 'Shared database weather'
   const updatedAt = latest?.observed_at || latest?.created_at || 'Not yet available'
 
   return (
     <section className="page weather-page active">
-      <header className="weather-page-header">
-        <div>
-          <h1>Weather Updates</h1>
-          <p>{locationName}</p>
-        </div>
-        <div className="weather-page-actions">
-          <div className="weather-live-status">
-            <strong>{isLoading ? 'Connecting' : 'Live'}</strong>
-            <span>Updated {updatedAt}</span>
-          </div>
-          <button className="btn btn-primary btn-sm wx-refresh-button" type="button" disabled={isRefreshing} onClick={handleRefresh}>
-            <RefreshCcw size={14} />
-            {isRefreshing ? 'Refreshing' : 'Refresh'}
-          </button>
-        </div>
-      </header>
-
       {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
       
@@ -119,6 +104,7 @@ export default function WeatherPage() {
             riskTone={riskTone}
             activeEvent={workspace.active_event}
             locationName={locationName}
+            updatedAt={updatedAt}
           />
           <WeatherSidebar
             workspace={workspace}
@@ -126,6 +112,18 @@ export default function WeatherPage() {
           />
         </div>
       )}
+
+      <button
+        className={`wx-refresh-button${isRefreshing ? ' is-refreshing' : ''}`}
+        type="button"
+        aria-label="Refresh weather data"
+        aria-busy={isRefreshing}
+        title="Refresh weather data"
+        disabled={isRefreshing}
+        onClick={handleRefresh}
+      >
+        <RefreshCcw size={20} aria-hidden="true" />
+      </button>
     </section>
   )
 }

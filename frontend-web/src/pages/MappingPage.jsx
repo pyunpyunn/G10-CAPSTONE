@@ -1,32 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getHouseholdGeotags, getMappingOverview, getRouteToSite } from '../api/mappingApi'
+import { getMappingOverview, getRouteToSite } from '../api/mappingApi'
 import MappingMap from '../components/mapping/MappingMap'
 import MappingSidebar from '../components/mapping/MappingSidebar'
 import LoadingState from '../components/ui/LoadingState'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
+import { useModuleData } from '../utils/useModuleData'
 import {
-  apiErrorMessage,
   defaultWorkspace,
   isActiveRouteStatus,
   isHouseholdRouteAllowed,
   normalizeWorkspaceData,
 } from '../utils/mappingHelpers'
 
+const loadMappingWorkspace = async () => normalizeWorkspaceData(await getMappingOverview() || {})
+
 export default function MappingPage() {
   const navigate = useNavigate()
-  const [workspace, setWorkspace] = useState(defaultWorkspace)
-  const [isLoading, setIsLoading] = useState(true)
-  const [hasLoaded, setHasLoaded] = useState(false)
-  const [error, setError] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [status, setStatus] = useState('all')
-  const [search, setSearch] = useState('')
+  const { data, error, loading: isLoading } = useModuleData(loadMappingWorkspace, ['mapping', 'households', 'dispatch', 'disasters'])
+  const workspace = data || defaultWorkspace
+  const hasLoaded = Boolean(data)
   const [layers, setLayers] = useState({
     households: true,
     evacuationSites: true,
     rescueTeams: true,
+    rescueOffices: true,
     routes: true,
   })
   const [selectedRoute, setSelectedRoute] = useState(null)
@@ -37,12 +35,13 @@ export default function MappingPage() {
 
   const hasActiveEvent = Boolean(workspace.active_event)
   const barangay = workspace?.barangay || defaultWorkspace.barangay
-  const filters = workspace?.filters || defaultWorkspace.filters
   const mapCenter = useMemo(() => [
-    Number(barangay?.center?.latitude ?? defaultWorkspace.barangay.center.latitude),
-    Number(barangay?.center?.longitude ?? defaultWorkspace.barangay.center.longitude),
+    barangay?.center?.latitude,
+    barangay?.center?.longitude,
   ], [barangay?.center?.latitude, barangay?.center?.longitude])
-  const mapBounds = useMemo(() => Array.isArray(barangay?.bounds) ? barangay.bounds : defaultWorkspace.barangay.bounds, [barangay?.bounds])
+  const hasMapCenter = mapCenter.every((coordinate) => coordinate !== null && coordinate !== undefined
+    && coordinate !== '' && Number.isFinite(Number(coordinate)))
+  const mapBounds = Array.isArray(barangay?.bounds) ? barangay.bounds : defaultWorkspace.barangay.bounds
   const households = useMemo(() => (
     hasActiveEvent ? workspace.households : []
   ), [hasActiveEvent, workspace.households])
@@ -56,49 +55,13 @@ export default function MappingPage() {
     hasActiveEvent ? (Array.isArray(workspace.dispatch_routes) ? workspace.dispatch_routes.filter(isActiveRouteStatus) : []) : []
   ), [hasActiveEvent, workspace.dispatch_routes])
   const visibleRoutes = selectedRoute ? [selectedRoute] : dispatchRoutes
-  const visibleHouseholds = useMemo(() => households.filter((household) => (
-    String(household.label || '').toLowerCase().includes(search.trim().toLowerCase())
-  )), [households, search])
+  const visibleHouseholds = households
 
-  const closestRescueTeam = useMemo(() => rescueTeams[0] || null, [rescueTeams])
-
-  useEffect(() => {
-    let ignore = false
-
-    async function loadPage() {
-      setIsLoading(true)
-      setError('')
-      setRouteError('')
-
-      try {
-        const [data, householdGeotags] = await Promise.all([
-          getMappingOverview({ purok, status }),
-          getHouseholdGeotags({ purok, status }),
-        ])
-
-        if (!ignore) {
-          setWorkspace(normalizeWorkspaceData({ ...(data || {}), households: householdGeotags }))
-          setHasLoaded(true)
-        }
-      } catch (loadError) {
-        if (!ignore) {
-          setWorkspace(defaultWorkspace)
-          setError(apiErrorMessage(loadError))
-          setHasLoaded(false)
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadPage()
-
-    return () => {
-      ignore = true
-    }
-  }, [purok, status])
+  const rescueOffice = useMemo(() => (
+    workspace.rescue_offices.find((office) => office.latitude !== null && office.latitude !== undefined
+      && office.longitude !== null && office.longitude !== undefined
+      && Number.isFinite(Number(office.latitude)) && Number.isFinite(Number(office.longitude))) || null
+  ), [workspace.rescue_offices])
 
   useEffect(() => {
     function closeFullscreen(event) {
@@ -112,6 +75,13 @@ export default function MappingPage() {
     return () => window.removeEventListener('keydown', closeFullscreen)
   }, [])
 
+  useEffect(() => {
+    if (!isMapFullscreen) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [isMapFullscreen])
+
   function changeLayer(layerName) {
     setLayers((current) => ({
       ...current,
@@ -124,23 +94,17 @@ export default function MappingPage() {
       return
     }
 
-    if (!isHouseholdRouteAllowed(household)) {
-      setSelectedHousehold(household)
-      setSelectedRoute(null)
-      setRouteError('Only red-status households can be routed for dispatch or rescue guidance.')
-      return
-    }
-
-    if (!household.latitude || !household.longitude) {
+    if (household.latitude === null || household.latitude === undefined || household.latitude === ''
+      || household.longitude === null || household.longitude === undefined || household.longitude === '') {
       setSelectedHousehold(household)
       setRouteError('Only geotagged households can receive a rescue route.')
       setSelectedRoute(null)
       return
     }
 
-    if (!closestRescueTeam) {
+    if (!rescueOffice) {
       setSelectedHousehold(household)
-      setRouteError('No rescue team GPS point is available for route generation.')
+      setRouteError('Rescue office coordinates are not configured for route generation.')
       setSelectedRoute(null)
       return
     }
@@ -151,7 +115,7 @@ export default function MappingPage() {
     setSelectedRoute(null)
 
     try {
-      const route = await getRouteToSite(closestRescueTeam, household)
+      const route = await getRouteToSite(rescueOffice, household)
 
       if (!route) {
         setRouteError('A route cannot be generated for this household right now.')
@@ -161,7 +125,7 @@ export default function MappingPage() {
       setSelectedRoute({
         route_id: `household-${household.id}`,
         route_name: `Route to ${household.label}`,
-        team_name: closestRescueTeam.team_name || 'Rescue team',
+        origin_name: rescueOffice.name || 'Barangay Mambaling Hall',
         assigned_area: household.purok || 'Selected household',
         status: 'on_demand',
         coordinates: route.coordinates,
@@ -215,18 +179,10 @@ export default function MappingPage() {
 
       {hasLoaded && (
         <>
-          <section className="mapmate-filter-bar" aria-label="Map filters">
-            <div className="mapmate-filter-heading"><span>View</span><strong>Map filters</strong></div>
-            <label className="mapmate-search"><Search size={14} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search household" aria-label="Search household" /></label>
-            <SelectField label="Area" value={purok} onChange={setPurok} options={[{ key: 'all', label: 'All puroks' }, ...((filters?.puroks || []).map((item) => ({ key: item, label: item })))]} />
-            <SelectField label="Status" value={status} onChange={setStatus} options={((filters?.statuses || []).map((item) => ({ key: item.key, label: item.label })))} />
-            <span className="mapmate-result-count">{visibleHouseholds.length} results</span>
-          </section>
-
           <div className="mapmate-grid">
             <main className="mapmate-main">
               <RefreshOverlay active={isRefreshing}>
-                <MappingMap
+                {hasMapCenter ? <MappingMap
                   workspace={workspace}
                   hasActiveEvent={hasActiveEvent}
                   layers={layers}
@@ -236,6 +192,8 @@ export default function MappingPage() {
                   visibleRoutes={visibleRoutes}
                   selectedRoute={selectedRoute}
                   selectedHousehold={selectedHousehold}
+                  routeLoadingId={routeLoadingId}
+                  routeError={routeError}
                   mapCenter={mapCenter}
                   mapBounds={mapBounds}
                   onChangeLayer={changeLayer}
@@ -243,7 +201,7 @@ export default function MappingPage() {
                   onRouteToDispatch={handleDispatchRoute}
                   isFullscreen={isMapFullscreen}
                   onToggleFullscreen={() => setIsMapFullscreen((current) => !current)}
-                />
+                /> : <div className="form-error" role="status">No map coordinates are configured or available in the shared database. Add a geotagged location or set the map center in backend configuration.</div>}
               </RefreshOverlay>
             </main>
 
@@ -264,14 +222,5 @@ export default function MappingPage() {
         </>
       )}
     </section>
-  )
-}
-
-function SelectField({ label, value, onChange, options }) {
-  return (
-    <label className="mapmate-select-field">
-      <span>{label}</span>
-      <div><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select><ChevronDown size={13} /></div>
-    </label>
   )
 }

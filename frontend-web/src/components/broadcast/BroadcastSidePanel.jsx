@@ -3,6 +3,18 @@ import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 import { eventTone } from '../../utils/broadcastHelpers'
 
+function pushStatusLabel(status) {
+  return {
+    pending_mobile_push: 'Queued for automatic delivery',
+    onesignal_sent: 'Accepted by OneSignal',
+    onesignal_partial: 'Some devices could not be reached',
+    onesignal_failed: 'Delivery failed',
+    onesignal_no_recipients: 'No subscribed devices in this audience',
+    onesignal_not_configured: 'Push provider is not configured',
+    onesignal_limit_exceeded: 'Audience exceeds delivery limit',
+  }[status] || 'Awaiting delivery status'
+}
+
 export default function BroadcastSidePanel({ activeEvent, broadcasts }) {
   return (
     <aside className="broadcast-side-panel">
@@ -91,9 +103,9 @@ function BroadcastLog({ broadcasts }) {
 
                 <div className="bc-log-meta">
                   <span><strong>Sent:</strong> {broadcast.sent_time || '-'}</span>
-                  <span><strong>Target:</strong> {broadcast.scope_label || broadcast.target_area || 'All'}</span>
+                  <span><strong>Target:</strong> {broadcast.scope_label || broadcast.target_area || 'Target unavailable'}</span>
                   <span><strong>Recipients:</strong> {broadcast.recipient_count || 0}</span>
-                  <span><strong>Status:</strong> {broadcast.status || 'Sent'}</span>
+                  <span><strong>Mobile push:</strong> {pushStatusLabel(broadcast.push_status)}</span>
                 </div>
               </div>
             </article>

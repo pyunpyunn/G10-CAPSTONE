@@ -3,16 +3,27 @@ import { getToken } from './token'
 
 function getApiBaseUrl() {
   const configuredUrl = import.meta.env.VITE_API_BASE_URL
+  const browserHost = window.location.hostname
+  const isLocalBrowser = ['localhost', '127.0.0.1', '0.0.0.0'].includes(browserHost)
 
   if (configuredUrl) {
-    return configuredUrl
+    try {
+      const parsedUrl = new URL(configuredUrl)
+
+      if (!isLocalBrowser && ['localhost', '127.0.0.1', '0.0.0.0'].includes(parsedUrl.hostname)) {
+        // A LAN browser cannot reach the developer machine's loopback-only
+        // Laravel listener. Vite proxies this same-origin path during development.
+        return parsedUrl.pathname.replace(/\/$/, '')
+      }
+
+      return configuredUrl
+    } catch {
+      return configuredUrl
+    }
   }
 
-  const browserHost = window.location.hostname
-  const openedFromNetwork = browserHost !== 'localhost' && browserHost !== '127.0.0.1'
-
-  if (openedFromNetwork) {
-    return `${window.location.protocol}//${browserHost}:8000/api/v1`
+  if (!isLocalBrowser) {
+    return '/api/v1'
   }
 
   return 'http://127.0.0.1:8000/api/v1'
@@ -37,7 +48,16 @@ api.interceptors.request.use((config) => {
 })
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const method = String(response.config?.method || 'get').toLowerCase()
+    const path = response.config?.url || ''
+    if (['post', 'patch', 'put', 'delete'].includes(method)
+      && (/^\/(households|household|dispatches|broadcast|disaster-events|trusted-households|members)(\/|$)/.test(path)
+        || path === '/dashboard/active-event/close')) {
+      window.dispatchEvent(new Event('rescue-criteria:changed'))
+    }
+    return response
+  },
   (error) => {
     if (error.code === 'ECONNABORTED' || String(error.message || '').toLowerCase().includes('timeout')) {
       error.friendlyMessage = 'The server took too long to respond. Please check if Laravel and the shared database are running, then try again.'

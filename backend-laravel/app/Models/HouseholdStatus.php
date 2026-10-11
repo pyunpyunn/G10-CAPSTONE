@@ -31,3 +31,5 @@ class HouseholdStatus extends Model
         return $this->hasMany(HouseholdStatusLog::class, 'status_id', 'status_id');
     }
 }
+
+

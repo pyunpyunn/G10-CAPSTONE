@@ -10,7 +10,8 @@ import {
 import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
 import PlaceholderPage from './pages/PlaceholderPage'
-import { getCurrentUser, loginUser, logoutUser } from './api/authApi'
+import HouseholdReviewPage from './pages/HouseholdReviewPage'
+import { getCurrentUser, loginUser, logoutUser, saveRememberedPassword } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
 import './App.css'
 import './styles/foundation.css'
@@ -30,8 +31,10 @@ import './styles/weather.css'
 import './styles/broadcast.css'
 import './styles/mapping.css'
 import './styles/dispatch.css'
+import './styles/situation.css'
 import './styles/responsive.css'
 import './styles/mapmate-reference.css'
+import './styles/map-enhancements.css'
 
 const webRoles = ['super_admin', 'admin']
 
@@ -42,9 +45,22 @@ const pageComponents = {
   '/weather': lazy(() => import('./pages/WeatherPage')),
   '/mapping': lazy(() => import('./pages/MappingPage')),
   '/households': lazy(() => import('./pages/HouseholdStatusPage')),
+  '/households/_household-list': lazy(() => import('./pages/HouseholdPurokListPage')),
+  '/rescue-management': lazy(() => import('./pages/RescueManagementPage')),
+  '/field-reports': lazy(() => import('./pages/FieldReportsPage')),
+  '/dispatch/communication': lazy(() => import('./pages/FieldCommunicationPage')),
+  '/request-types': lazy(() => import('./pages/RequestTypesPage')),
+  '/external-requests': lazy(() => import('./pages/RequestWorkflowPage')),
   '/dispatch': lazy(() => import('./pages/RescueDispatchPage')),
+  '/dispatch/new': lazy(() => import('./pages/NewDispatchPage')),
   '/rescuers': lazy(() => import('./pages/RescuerAccountsPage')),
-  '/resources-requests': lazy(() => import('./pages/ResourcesRequestsPage')),
+  '/rescuers/new': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/teams': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/view': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/edit': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/resources-requests': lazy(() => import('./pages/RequestWorkflowPage')),
+  '/resources-requests/new': lazy(() => import('./pages/ResourceRequestEditorPage')),
+  '/resources-requests/edit': lazy(() => import('./pages/ResourceRequestEditorPage')),
   '/situation': lazy(() => import('./pages/SituationReportPage')),
   '/archive': lazy(() => import('./pages/ArchivePage')),
   '/notifications': lazy(() => import('./pages/NotificationsPage')),
@@ -58,6 +74,7 @@ const modulePages = [
     kicker: 'Super Admin',
     summary: 'Review landing page inquiries and manage command-level account access.',
     superOnly: true,
+    navHidden: true,
   },
   {
     path: '/dashboard',
@@ -70,6 +87,7 @@ const modulePages = [
     title: 'Disaster Broadcasting',
     kicker: 'Alerts',
     summary: 'Create disaster events and send official barangay or purok-specific instructions.',
+    navHidden: true,
   },
   {
     path: '/weather',
@@ -91,21 +109,46 @@ const modulePages = [
   },
   {
     path: '/dispatch',
-    title: 'Rescue Dispatch',
+    title: 'Dispatch Dashboard',
     kicker: 'Operations',
     summary: 'Assign teams, monitor progress, and record field outcomes from rescuer updates.',
   },
   {
-    path: '/rescuers',
-    title: 'Rescuer Accounts',
-    kicker: 'Verified accounts',
-    summary: 'Create and manage HQ-created rescuer accounts, teams, duty status, and contact details.',
-  },
-  {
     path: '/resources-requests',
-    title: 'Resources & Requests',
+    title: 'Request Monitoring',
     kicker: 'Validation queue',
     summary: 'Validate EvaTrack/manual requests before forwarding verified records to TrackingAid/HQ.',
+  },
+  {
+    path: '/rescuers',
+    title: 'Account Management',
+    kicker: 'Verified accounts',
+    summary: 'Create and manage rescuer, Command Center Personnel, and Barangay Captain accounts.',
+  },
+  {
+    path: '/rescuers/teams',
+    title: 'Team Management',
+    summary: 'Configure rescue teams and their members.',
+  },
+  {
+    path: '/rescue-management',
+    title: 'Rescue Management',
+    summary: 'Review and manage saved operational records.',
+  },
+  {
+    path: '/field-reports',
+    title: 'Field Reports',
+    summary: 'Review and manage saved operational records.',
+  },
+  {
+    path: '/request-types',
+    title: 'Request Types',
+    summary: 'Review and manage saved operational records.',
+  },
+  {
+    path: '/external-requests',
+    title: 'External Requests',
+    summary: 'Review and manage saved operational records.',
   },
   {
     path: '/situation',
@@ -157,7 +200,8 @@ function AuthRoutes() {
       }
     }
 
-    loadSession()
+    const sessionCheck = window.setTimeout(() => loadSession(), 0)
+    return () => window.clearTimeout(sessionCheck)
   }, [])
 
   async function handleLogin(form) {
@@ -169,15 +213,15 @@ function AuthRoutes() {
 
       if (!isWebUser(nextUser)) {
         clearToken()
-        setLoginError('Household and rescuer accounts should use the mobile app.')
-        return
+        throw new Error('Household and rescuer accounts should use the mobile app.')
       }
 
+      await saveRememberedPassword(form.login, form.password, form.rememberPassword)
       saveToken(data.token)
       setUser(nextUser)
       navigate('/dashboard', { replace: true })
     } catch (error) {
-      setLoginError(getLoginMessage(error))
+      throw new Error(error.message === 'Household and rescuer accounts should use the mobile app.' ? error.message : getLoginMessage(error), { cause: error })
     }
   }
 
@@ -217,6 +261,15 @@ function AuthRoutes() {
         }
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dispatch/communication" element={<LazyPage page={{ path: '/dispatch/communication' }} />} />
+        <Route path="rescue-management/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
+        <Route path="rescue-management/:assignmentId/edit" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
+        <Route path="dispatch/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
+        <Route path="rescuers/new" element={<LazyPage page={{ path: '/rescuers/new' }} />} />
+        <Route path="rescuers/view" element={<LazyPage page={{ path: '/rescuers/view' }} />} />
+        <Route path="rescuers/edit" element={<LazyPage page={{ path: '/rescuers/edit' }} />} />
+        <Route path="resources-requests/new" element={<LazyPage page={{ path: '/resources-requests/new' }} />} />
+        <Route path="resources-requests/:requestId/:mode" element={<LazyPage page={{ path: '/resources-requests/edit' }} />} />
         {pagesForUser(user).map((page) => (
           <Route
             key={page.path}
@@ -224,6 +277,8 @@ function AuthRoutes() {
             element={<LazyPage page={page} />}
           />
         ))}
+        <Route path="households/_household-list" element={<LazyPage page={{ path: '/households/_household-list' }} />} />
+        <Route path="households/:householdId" element={<HouseholdReviewPage />} />
         <Route path="notifications" element={<LazyPage page={{ path: '/notifications' }} />} />
         <Route path="profile" element={<LazyPage page={{ path: '/profile' }} />} />
       </Route>

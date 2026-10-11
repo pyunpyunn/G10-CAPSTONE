@@ -16,3 +16,5 @@ class AffectedArea extends Model
     public function disaster(): BelongsTo { return $this->belongsTo(DisasterEvent::class, 'disaster_id', 'event_id'); }
     public function severity(): BelongsTo { return $this->belongsTo(SeverityLevel::class, 'severity_id', 'severity_id'); }
 }
+
+

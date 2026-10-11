@@ -1,382 +1,67 @@
-import { useEffect, useState } from 'react'
-import {
-  RefreshCcw,
-  Route,
-} from 'lucide-react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { completeDispatch, createDispatch, getDispatchDashboard, updateDispatch } from '../api/dispatchApi'
-import DispatchModalForm from '../components/dispatch/DispatchModalForm'
-import DispatchSidePanel from '../components/dispatch/DispatchSidePanel'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { getDispatchDashboard, getSitioPriorities } from '../api/dispatchApi'
 import DispatchSummary from '../components/dispatch/DispatchSummary'
-import DispatchTeamGrid from '../components/dispatch/DispatchTeamGrid'
-import LoadingState from '../components/ui/LoadingState'
-import Modal from '../components/ui/Modal'
+import DispatchSidePanel from '../components/dispatch/DispatchSidePanel'
+import FieldCommunicationPanel from '../components/dispatch/FieldCommunicationPanel'
+import EmptyState from '../components/ui/EmptyState'
 import PageHeader from '../components/ui/PageHeader'
-import {
-  buildRequestBody,
-  defaultForm,
-  emptySummary,
-  firstAssignmentOption,
-  getSaveMessage,
-  teamFilters,
-} from '../utils/dispatchHelpers'
+import LoadingState from '../components/ui/LoadingState'
+import { useModuleData } from '../utils/useModuleData'
+import { emptySummary } from '../utils/dispatchHelpers'
 
 export default function RescueDispatchPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [payload, setPayload] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [teamFilter, setTeamFilter] = useState('all')
-  const [dispatchFilter, setDispatchFilter] = useState('all')
-  const [searchText, setSearchText] = useState('')
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingDispatch, setEditingDispatch] = useState(null)
-  const [selectedRiskId, setSelectedRiskId] = useState('')
-  const [assignmentOption, setAssignmentOption] = useState('')
-  const [form, setForm] = useState(defaultForm())
-  const [formError, setFormError] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
-
+  const [selectedSitioId, setSelectedSitioId] = useState(null)
+  const loader = useCallback(async () => {
+    const [workspace, priorities] = await Promise.allSettled([getDispatchDashboard({ per_page: 5 }), getSitioPriorities()])
+    if (workspace.status === 'rejected') throw workspace.reason
+    return { ...workspace.value, priorities: priorities.status === 'fulfilled' ? priorities.value : [],
+      priorityError: priorities.status === 'rejected' ? 'Rescue priorities could not be loaded. Please refresh to try again.' : '' }
+  }, [])
+  const { data, error, loading, refresh } = useModuleData(loader)
   useEffect(() => {
-    let ignore = false
-
-    async function loadPage() {
-      setIsLoading(true)
-      setError('')
-
-      try {
-        const data = await getDispatchDashboard({
-          status: dispatchFilter,
-          search: searchText.trim(),
-          per_page: 20,
-        })
-
-        if (!ignore) {
-          setPayload(data)
-        }
-      } catch {
-        if (!ignore) {
-          setError('Rescue dispatch records cannot be loaded right now. Please check the backend or database connection.')
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadPage()
-
-    return () => {
-      ignore = true
-    }
-  }, [dispatchFilter, searchText])
-
-  async function loadDispatch() {
-    setIsLoading(true)
-    setError('')
-
-    try {
-      const data = await getDispatchDashboard({
-        status: dispatchFilter,
-        search: searchText.trim(),
-        per_page: 20,
-      })
-      setPayload(data)
-    } catch {
-      setError('Rescue dispatch records cannot be loaded right now. Please check the backend or database connection.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const teams = payload?.teams || []
-  const responders = payload?.responders || []
-  const riskAreas = payload?.risk_areas || []
-  const dispatches = payload?.dispatches?.data || []
-  const summary = payload?.summary || emptySummary()
-  const hasActiveEvent = Boolean(payload?.active_event)
-  const filteredTeams = teamFilter === 'all'
-    ? teams
-    : teams.filter((team) => team.status_key === teamFilter)
-  const isInitialLoading = isLoading && !payload
-  const isRefreshing = isLoading && Boolean(payload)
-  const hasBlockingError = error && !payload
-
-  useEffect(() => {
-    const selectedHousehold = location.state?.selectedHousehold
-
-    if (!selectedHousehold || !payload || !Array.isArray(riskAreas) || riskAreas.length === 0) {
-      return
-    }
-
-    const matchingArea = riskAreas.find((area) => {
-      const areaName = String(area.area_name || '').toLowerCase()
-      const householdPurok = String(selectedHousehold.purok || '').toLowerCase()
-      return areaName === householdPurok || householdPurok.includes(areaName) || areaName.includes(householdPurok)
-    })
-
-    const nextForm = {
-      ...defaultForm(),
-      assigned_area: matchingArea?.area_name || selectedHousehold.purok || '',
-      household_id: selectedHousehold.household_id || selectedHousehold.id || '',
-      households_to_cover: 1,
-      priority_level: selectedHousehold.priority_level || 'high',
-      unsafe_count: 1,
-      pending_count: 0,
-    }
-
-    setEditingDispatch(null)
-    setSelectedRiskId(matchingArea?.id || '')
-    setAssignmentOption(firstAssignmentOption(teams))
-    setForm(nextForm)
-    setFormError('')
-    setIsModalOpen(true)
-    navigate('/dispatch', { replace: true, state: {} })
-  }, [location.state, payload, riskAreas, teams, navigate])
-
-  function firstDispatchableHousehold(area) {
-    return area?.recommended_households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
-      || area?.households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
-      || null
-  }
-
-  function openNewDispatch() {
-    const firstOption = firstAssignmentOption(teams)
-
-    setEditingDispatch(null)
-    setSelectedRiskId('')
-    setAssignmentOption(firstOption)
-    setForm({
-      ...defaultForm(),
-      household_id: '',
-    })
-    setFormError('')
-    setIsModalOpen(true)
-  }
-
-  function openUpdateDispatch(team) {
-    const dispatch = dispatches.find((item) => item.assignment_id === team.active_assignment_id)
-
-    if (!dispatch) {
-      setAssignmentOption(team.active_responder_id ? `responder:${team.active_responder_id}` : '')
-      setForm({
-        ...defaultForm(),
-        assigned_area: ['No dispatch area yet', 'No active dispatch'].includes(team.assigned_area) ? '' : team.assigned_area,
-        households_to_cover: team.assigned_households || 0,
-      })
-      setEditingDispatch(null)
-      setIsModalOpen(true)
-      return
-    }
-
-    setEditingDispatch(dispatch)
-    setSelectedRiskId('')
-    setAssignmentOption(dispatch.team_id ? `team:${dispatch.team_id}` : `responder:${dispatch.responder_id}`)
-    setForm({
-      assigned_area: dispatch.assigned_area || '',
-      household_id: dispatch.household_id || '',
-      households_to_cover: dispatch.households_to_cover || 0,
-      responder_count: dispatch.responder_count || 1,
-      selected_responder_ids: dispatch.selected_responder_ids || (dispatch.responder_id ? [dispatch.responder_id] : []),
-      priority_level: dispatch.priority_level || 'monitor',
-      status: dispatch.status?.key || 'dispatched',
-      dispatch_notes: dispatch.dispatch_notes || '',
-      route_notes: dispatch.route_notes || '',
-      safe_count: dispatch.outcomes?.safe || 0,
-      evacuated_count: dispatch.outcomes?.evacuated || 0,
-      unsafe_count: dispatch.outcomes?.unsafe || 0,
-      injured_count: dispatch.outcomes?.injured || 0,
-      missing_count: dispatch.outcomes?.missing || 0,
-      pending_count: dispatch.outcomes?.pending || 0,
-      outcome_notes: dispatch.outcomes?.notes || '',
-    })
-    setFormError('')
-    setIsModalOpen(true)
-  }
-
-  function selectRiskArea(area) {
-    const firstHousehold = firstDispatchableHousehold(area)
-
-    setSelectedRiskId(area.id)
-    setForm((current) => ({
-      ...current,
-      assigned_area: area.area_name,
-      household_id: firstHousehold?.household_id || '',
-      households_to_cover: area.to_cover,
-      safe_count: area.safe_households || 0,
-      unsafe_count: area.unsafe_households || 0,
-      pending_count: area.unchecked_households || 0,
-      priority_level: area.priority,
-    }))
-  }
-
-  function selectRiskHousehold(area, household) {
-    setSelectedRiskId(area.id)
-    setForm((current) => ({
-      ...current,
-      assigned_area: area.area_name,
-      household_id: household.household_id,
-      households_to_cover: Math.max(1, current.households_to_cover || area.to_cover || 1),
-      priority_level: household.priority_level || area.priority || current.priority_level,
-    }))
-  }
-
-  function closeModal() {
-    if (isSaving) {
-      return
-    }
-
-    setIsModalOpen(false)
-    setEditingDispatch(null)
-    setFormError('')
-  }
-
-  async function submitDispatch(event) {
-    event.preventDefault()
-    setFormError('')
-
-    if (!hasActiveEvent) {
-      setFormError('Dispatch assignment requires an active disaster event.')
-      return
-    }
-
-    if (!assignmentOption) {
-      setFormError('Select an available team first.')
-      return
-    }
-
-    if (!form.assigned_area.trim()) {
-      setFormError('Assigned area is required.')
-      return
-    }
-
-    if (!editingDispatch && !form.household_id) {
-      setFormError('Select a household with GPS from the affected area list. This is required for routed dispatch.')
-      return
-    }
-
-    if (!editingDispatch && (!form.selected_responder_ids || form.selected_responder_ids.length === 0)) {
-      setFormError('Select at least one available responder from the selected team.')
-      return
-    }
-
-    const requestBody = buildRequestBody(assignmentOption, form)
-    setIsSaving(true)
-
-    try {
-      if (editingDispatch && form.status === 'completed') {
-        await completeDispatch(editingDispatch.assignment_id, requestBody)
-      } else if (editingDispatch) {
-        await updateDispatch(editingDispatch.assignment_id, requestBody)
-      } else {
-        await createDispatch(requestBody)
-      }
-
-      setIsModalOpen(false)
-      setEditingDispatch(null)
-      await loadDispatch()
-    } catch (saveError) {
-      setFormError(getSaveMessage(saveError))
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  return (
-    <section className="page active dispatch-page">
-      <PageHeader
-        title="Rescue Dispatch"
-        actions={
-          <>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={loadDispatch}>
-              <RefreshCcw size={14} />
-              Refresh
-            </button>
-            <button className="btn btn-primary btn-sm" type="button" disabled={!hasActiveEvent} onClick={openNewDispatch}>
-              <Route size={14} />
-              New dispatch
-            </button>
-          </>
-        }
-      />
-
-      {isInitialLoading && <LoadingState />}
-      {error && <div className="form-error">{error}</div>}
-
-      {!isInitialLoading && !hasBlockingError && payload && (
-        <>
-          {!hasActiveEvent && (
-            <div className="standby-strip">
-              <strong>No active disaster event</strong>
-              <span>New dispatch assignments are enabled after HQ/Admin declares an active event.</span>
-            </div>
-          )}
-
-          <DispatchSummary summary={summary} />
-
-          <div className="dp-dispatch-layout">
-            <DispatchSidePanel
-              teams={teams}
-              responders={responders}
-              logs={payload?.activity_log || []}
-              historyLogs={payload?.dispatch_history || []}
-              dispatches={dispatches}
-              filter={dispatchFilter}
-              setFilter={setDispatchFilter}
-              searchText={searchText}
-              setSearchText={setSearchText}
-              onSearch={loadDispatch}
-              isUpdating={isRefreshing}
-            />
-
-            <main className="dp-main-column dp-team-side-panel">
-              <div className="dp-team-toolbar">
-                <span>Team status cards</span>
-                <select className="dp-filter-select" value={teamFilter} onChange={(event) => setTeamFilter(event.target.value)} aria-label="Filter team status cards">
-                  {teamFilters.map((filter) => (
-                    <option value={filter.key} key={filter.key}>{filter.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <DispatchTeamGrid teams={filteredTeams} onOpenUpdate={openUpdateDispatch} onOpenNew={openNewDispatch} />
-            </main>
-          </div>
-        </>
-      )}
-
-      <Modal
-        title={editingDispatch ? 'Update Dispatch' : 'New Dispatch'}
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        className="dp-dispatch-modal"
-        footer={
-          <>
-            <button className="btn btn-secondary" type="button" disabled={isSaving} onClick={closeModal}>Cancel</button>
-            <button className="btn btn-primary" type="submit" form="dispatchForm" disabled={isSaving || !hasActiveEvent}>
-              {isSaving ? 'Saving...' : editingDispatch ? 'Save update' : 'Dispatch responders'}
-            </button>
-          </>
-        }
-      >
-        <DispatchModalForm
-          editingDispatch={editingDispatch}
-          form={form}
-          setForm={setForm}
-          formError={formError}
-          assignmentOption={assignmentOption}
-          setAssignmentOption={setAssignmentOption}
-          teams={teams}
-          responders={responders}
-          riskAreas={riskAreas}
-          selectedRiskId={selectedRiskId}
-          onSelectRiskArea={selectRiskArea}
-          onSelectRiskHousehold={selectRiskHousehold}
-          onSubmit={submitDispatch}
-        />
-      </Modal>
-    </section>
-  )
+    if (location.state?.selectedHousehold) navigate('/rescue-management/new', { replace: true, state: location.state })
+  }, [location.state, navigate])
+  return <main className="ops-page dispatch-page response-operations-page">
+    <PageHeader title="Dispatch Dashboard" subtitle={data?.active_event?.name || data?.area_label || 'Response Operations'}
+      actions={<div className="response-panel-actions"><button className="btn btn-secondary" type="button" onClick={refresh}>Refresh dashboard</button>
+        <Link className="button review" to="/rescue-management">Rescue Management</Link></div>} />
+    {error && <div className="form-error" role="alert">{error}</div>}
+    {loading && <LoadingState />}
+    {!loading && data && <>
+      {!data.active_event && <div className="standby-strip"><strong>No active disaster event</strong><span>Dispatch creation becomes available when a disaster event is declared.</span></div>}
+      <div className="dispatch-workspace-grid">
+        <div className="dispatch-main-panel">
+          <FieldCommunicationPanel compact recordingsOnly />
+          <section className="panel sitio-ranking-panel dispatch-priority-panel" aria-label="Rescue Priority Panel">
+            <div className="panel-head"><span className="panel-title">Rescue Priority</span></div>
+            {data.priorityError ? <div className="form-error" role="alert">{data.priorityError}</div> : !data.priorities.length ?
+              <EmptyState title="No sitio priorities yet" message="Sitio rankings appear when an active disaster event is available." /> :
+              <ol className="sitio-priority-list" aria-label="Sitio ranking list">
+                {data.priorities.map((row) => <li key={row.sitio_id} className={selectedSitioId === row.sitio_id ? 'is-selected' : ''}>
+                  <button className="sitio-priority-choice" type="button" aria-pressed={selectedSitioId === row.sitio_id}
+                    aria-describedby={`dispatch-sitio-${row.sitio_id}`} onClick={() => setSelectedSitioId(row.sitio_id)}>
+                    <span className="sitio-priority-rank">{row.rank}</span>
+                    <span className="sitio-priority-name">{row.sitio}</span>
+                    <span className={`sitio-priority-chip ${row.band?.key || 'low'}`}>{row.band?.label || 'Low'}</span>
+                    <strong>{Number(row.priority_score || 0).toFixed(1)}%</strong>
+                  </button>
+                  <span id={`dispatch-sitio-${row.sitio_id}`} className="sitio-priority-tooltip" role="tooltip">
+                    <b>{row.sitio} summary</b><span>{row.households} households</span>
+                    <span>{row.impacted_households} unsafe / affected</span><span>{row.unreported_members} unreported members</span>
+                    <span>{row.no_contact_households} no contact channel</span>
+                  </span>
+                </li>)}
+              </ol>}
+          </section>
+        </div>
+        <aside className="side-panel dispatch-side-panel" aria-label="Dispatch summary, progress and team coverage">
+          <DispatchSummary summary={data.summary || emptySummary()} />
+          <DispatchSidePanel teams={data.team_coverage || []} />
+        </aside>
+      </div>
+    </>}
+  </main>
 }

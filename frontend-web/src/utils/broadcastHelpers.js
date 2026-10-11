@@ -1,12 +1,3 @@
-export const defaultStatusKeys = ['safe', 'evacuated', 'need_help', 'unsafe']
-
-export const priorityOptions = [
-  { value: 'critical', label: 'Critical' },
-  { value: 'high', label: 'High' },
-  { value: 'watch', label: 'Watch' },
-  { value: 'monitor', label: 'Monitor' },
-]
-
 export const durationOptions = [
   { value: '2 hours', label: '2 hours' },
   { value: '6 hours', label: '6 hours' },
@@ -28,40 +19,15 @@ export function defaultForm(workspace = {}) {
     severity_id: preferredSeverityId(severityLevels),
     started_date: date,
     started_time: time,
-    estimated_duration: 'Until further notice',
+    estimated_duration: durationOptions[durationOptions.length - 1].value,
     scope_type: 'barangay_wide',
-    base_priority: 'high',
-    broadcast_title: 'Official disaster advisory',
-    message: 'Stay alert and follow official barangay instructions. Use the household mobile status buttons to report your current situation.',
-    attach_route: false,
+    broadcast_title: '',
+    message: '',
   }
-}
-
-export function getRecipientNote(typeName, scopeType, directPuroks) {
-  const normalizedType = (typeName || '').toLowerCase()
-
-  if (scopeType === 'rescuers_only') {
-    return 'Responder mobile users only.'
-  }
-
-  if (scopeType === 'selected_puroks' || scopeType === 'local_direct_impact') {
-    const areaLabel = directPuroks.length > 0 ? directPuroks.map((purok) => purok.name).join(', ') : 'selected puroks'
-    return `Household mobile users in ${areaLabel}, plus responder mobile users.`
-  }
-
-  if (normalizedType.includes('fire') || normalizedType.includes('landslide')) {
-    return 'Localized incident: use direct-impact puroks when only nearby households should receive the alert.'
-  }
-
-  return 'Barangay-wide: all household mobile users and responder mobile users.'
 }
 
 export function targetAreaLabel(scopeType, directPuroks) {
-  if (scopeType === 'rescuers_only') {
-    return 'Responders only'
-  }
-
-  if (['selected_puroks', 'local_direct_impact'].includes(scopeType)) {
+  if (scopeType === 'selected_puroks') {
     return directPuroks.map((purok) => purok.name).join(', ')
   }
 

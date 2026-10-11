@@ -1,0 +1,40 @@
+[supervisord]
+minfds=65536
+
+[program:resq-reverb]
+directory=/srv/resq/backend-laravel
+command=php artisan reverb:start --host=0.0.0.0 --port=8090
+user=www-data
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/var/log/resq-reverb.log
+redirect_stderr=true
+stopwaitsecs=30
+
+[program:resq-realtime-relay]
+directory=/srv/resq/backend-laravel
+command=php artisan realtime:dispatch
+user=www-data
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/var/log/resq-realtime-relay.log
+redirect_stderr=true
+stopwaitsecs=30
+
+[program:resq-realtime-worker]
+directory=/srv/resq/backend-laravel
+command=php artisan queue:work realtime_redis --queue=realtime --sleep=1 --tries=5 --timeout=20 --max-time=3600
+numprocs=4
+process_name=%(program_name)s_%(process_num)02d
+user=www-data
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/var/log/resq-realtime-worker.log
+redirect_stderr=true
+stopwaitsecs=30

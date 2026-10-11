@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\SituationReportService;
+use App\Http\Requests\ListRequest;
+use App\Services\Web\SituationReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,7 +17,7 @@ class SituationReportController extends Controller
         $this->service = $service;
     }
 
-    public function index(): JsonResponse
+    public function index(ListRequest $request): JsonResponse
     {
         return $this->service->index();
     }
@@ -41,3 +42,5 @@ class SituationReportController extends Controller
         return $this->service->pdf($sitRepId);
     }
 }
+
+

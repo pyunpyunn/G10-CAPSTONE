@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import {
+  exportArchive,
   createSavedArchiveGroup,
   deleteArchiveRecords,
   deleteSavedArchiveGroup,
   deleteSavedArchiveGroupRecord,
-  exportArchive,
   getArchiveRecords,
   getSavedArchiveGroups,
 } from '../api/archiveApi'
+import InquiryLogsView from './InquiryLogsView'
 import ArchiveDownloadMenu from '../components/archive/ArchiveDownloadMenu'
+import ArchiveFilters from '../components/archive/ArchiveFilters'
 import ArchiveRecordModal from '../components/archive/ArchiveRecordModal'
 import ArchiveSavedLogsModal from '../components/archive/ArchiveSavedLogsModal'
 import ArchiveSelectionTools from '../components/archive/ArchiveSelectionTools'
@@ -20,17 +22,12 @@ import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   ARCHIVE_TABS,
   archiveErrorMessage,
-  archiveFileName,
   archiveParams,
 } from '../utils/archiveHelpers'
-import {
-  detailsToRows,
-  downloadExcelWorkbook,
-  downloadPdfReport,
-  parseCsvText,
-} from '../utils/exportFileHelpers'
+
 
 export default function ArchivePage() {
+  const [isExporting, setIsExporting] = useState(false)
   const [activeCategory, setActiveCategory] = useState('disaster-events')
   const [payload, setPayload] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -45,16 +42,22 @@ export default function ArchivePage() {
   const [openGroupId, setOpenGroupId] = useState('')
   const [isSavedGroupsOpen, setIsSavedGroupsOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [search, setSearch] = useState('')
+  const [purok, setPurok] = useState('all')
+  const [eventId, setEventId] = useState('all')
+  const [status, setStatus] = useState('all')
 
   useEffect(() => {
     let ignore = false
 
     async function loadRecords() {
+      if (activeCategory === 'inquiry-logs') return
       setIsLoading(true)
       setError('')
 
       try {
-        const params = archiveParams({ search: '', purok: 'all', eventId: 'all', status: 'all', page })
+        const params = archiveParams({ search, purok, eventId, status, page })
         const data = await getArchiveRecords(activeCategory, params)
 
         if (!ignore) {
@@ -76,7 +79,7 @@ export default function ArchivePage() {
     return () => {
       ignore = true
     }
-  }, [activeCategory, page, refreshKey])
+  }, [activeCategory, eventId, page, purok, refreshKey, search, status])
 
   useEffect(() => {
     let ignore = false
@@ -103,7 +106,7 @@ export default function ArchivePage() {
   }, [])
 
   function currentParams() {
-    return archiveParams({ search: '', purok: 'all', eventId: 'all', status: 'all', page })
+    return archiveParams({ search, purok, eventId, status, page })
   }
 
   function changeCategory(category) {
@@ -112,40 +115,34 @@ export default function ArchivePage() {
     setSelectedRecordCategory(category)
     setMessage('')
     setPage(1)
+    setSearch('')
+    setPurok('all')
+    setEventId('all')
+    setStatus('all')
   }
 
   async function downloadCategory(type) {
-    setMessage('')
+    if (isExporting) return
+    setIsExporting(true)
+    setMessage('Generating report. Large exports may take a moment.')
 
     try {
-      const blob = await exportArchive(activeCategory, 'csv', currentParams())
-      const rows = parseCsvText(await blob.text())
-
-      if (type === 'pdf') {
-        downloadPdfReport(archiveFileName(activeCategory, 'pdf'), `${categoryLabel} archive`, rows)
-        setMessage('Archive PDF downloaded.')
-        return
-      }
-
-      downloadExcelWorkbook(archiveFileName(activeCategory, 'xls'), `${categoryLabel} archive`, rows)
-      setMessage('Archive Excel downloaded.')
+      await exportArchive(activeCategory, type, currentParams())
+      setMessage('Archive export generated.')
     } catch (downloadError) {
       setMessage(archiveErrorMessage(downloadError, 'Archive export cannot be downloaded right now.'))
+    } finally {
+      setIsExporting(false)
     }
   }
 
-  function downloadSelectedRecord(type) {
-    const rows = detailsToRows(selectedRecord?.details || [])
-    const fileBase = `resqperation-archive-record-${selectedRecord?.id || 'details'}`
-
-    if (type === 'pdf') {
-      downloadPdfReport(`${fileBase}.pdf`, recordExportTitle(selectedRecord, categoryLabel), rows)
-      setMessage('Archive record PDF downloaded.')
-      return
+  async function downloadSelectedRecord(type) {
+    try {
+      await exportArchive(selectedRecordCategory, type, { ids: [String(selectedRecord.id)] })
+      setMessage('Archive record export generated.')
+    } catch (downloadError) {
+      setMessage(archiveErrorMessage(downloadError, 'Archive record cannot be exported.'))
     }
-
-    downloadExcelWorkbook(`${fileBase}.xls`, recordExportTitle(selectedRecord, categoryLabel), rows)
-    setMessage('Archive record Excel downloaded.')
   }
 
   function selectedIds() {
@@ -349,17 +346,52 @@ export default function ArchivePage() {
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
   const hasBlockingError = error && !payload
+  const filters = payload?.filters || {}
+  const counts = { [activeCategory]: pagination.total || 0 }
+
+  if (activeCategory === 'inquiry-logs') {
+    return <section className="page active archive-page"><div className="archive-workspace-body">
+      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} />
+      <InquiryLogsView />
+    </div></section>
+  }
 
   return (
     <section className="page active archive-page">
-      <PageHeader
-        title="Archive"
-        actions={
-          <ArchiveDownloadMenu disabled={!payload || isLoading} onDownload={downloadCategory} />
-        }
-      />
-
-      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} />
+      <div className="archive-workspace-body">
+        <ArchiveTabs
+          activeCategory={activeCategory}
+          onChange={changeCategory}
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen((value) => !value)}
+          counts={counts}
+        />
+        <div className="archive-workspace-main">
+          <PageHeader
+            title={categoryLabel}
+            subtitle={`${pagination.total || 0} records`}
+            actions={<ArchiveDownloadMenu disabled={isExporting || isLoading || !payload} onDownload={downloadCategory} />}
+            filters={(
+              <ArchiveFilters
+              search={search}
+              onSearchChange={(value) => { setSearch(value); setPage(1) }}
+              purok={purok}
+              onPurokChange={(value) => { setPurok(value); setPage(1) }}
+              eventId={eventId}
+              onEventChange={(value) => { setEventId(value); setPage(1) }}
+              status={status}
+              onStatusChange={(value) => { setStatus(value); setPage(1) }}
+              onReset={() => {
+                setSearch('')
+                setPurok('all')
+                setEventId('all')
+                setStatus('all')
+                setPage(1)
+              }}
+              filters={filters}
+              />
+            )}
+          />
 
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
@@ -416,10 +448,8 @@ export default function ArchivePage() {
         onClose={() => setSelectedRecord(null)}
         onDownload={downloadSelectedRecord}
       />
+        </div>
+      </div>
     </section>
   )
-}
-
-function recordExportTitle(record, categoryLabel) {
-  return `${categoryLabel} - ${record?.id || 'Record details'}`
 }

@@ -1,12 +1,18 @@
 import api from './client'
 
-export async function getBroadcastWorkspace() {
-  const response = await api.get('/disaster-events')
+export async function getBroadcastWorkspace(eventId) {
+  const endpoint = eventId ? `/disaster-events/${encodeURIComponent(eventId)}` : '/disaster-events'
+  const response = await api.get(endpoint)
   return response.data.data
 }
 
 export async function createDisasterEvent(payload) {
   const response = await api.post('/disaster-events', payload)
+  return response.data.data
+}
+
+export async function updateDisasterEvent(eventId, payload) {
+  const response = await api.patch(`/disaster-events/${encodeURIComponent(eventId)}`, payload)
   return response.data.data
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  exportSituationReport,
   createSituationReport,
   getSituationReport,
   getSituationSummary,
@@ -12,16 +13,15 @@ import SituationEventPanel from '../components/situation/SituationEventPanel'
 import SitrepGenerateModal from '../components/situation/SitrepGenerateModal'
 import SitrepPreview from '../components/situation/SitrepPreview'
 import LoadingState from '../components/ui/LoadingState'
-import PageHeader from '../components/ui/PageHeader'
 import {
   buildGeneratePayload,
-  downloadSituationExcel,
-  downloadSituationPdf,
   emptyGenerateForm,
   situationErrorMessage,
 } from '../utils/situationReportHelpers'
 
 export default function SituationReportPage() {
+  const [isExporting, setIsExporting] = useState(false)
+  const [savedReportId, setSavedReportId] = useState(null)
   const [workspace, setWorkspace] = useState(null)
   const [selectedEventId, setSelectedEventId] = useState('')
   const [summary, setSummary] = useState(null)
@@ -80,6 +80,7 @@ export default function SituationReportPage() {
   }
 
   async function handleSelectEvent(eventId) {
+    setSavedReportId(null)
     setSelectedEventId(eventId)
     setSummary(null)
     setMessage('')
@@ -95,7 +96,6 @@ export default function SituationReportPage() {
       const data = await getSituationSummary(eventId)
       setSummary(data.summary)
       setGenerateForm(emptyGenerateForm(data.summary))
-      setMessage(`${data.summary.event.name} SitRep summary loaded.`)
     } catch {
       setError('Selected event summary cannot be loaded right now.')
     } finally {
@@ -121,6 +121,7 @@ export default function SituationReportPage() {
 
     try {
       const data = await createSituationReport(buildGeneratePayload(selectedEventId, generateForm))
+      setSavedReportId(data.report.sit_rep_id)
       setSummary(data.report.summary)
       setIsGenerateOpen(false)
       await reloadWorkspace(`${data.report.report_number} generated and locked.`)
@@ -138,6 +139,7 @@ export default function SituationReportPage() {
     try {
       const data = await getSituationReport(report.sit_rep_id)
       setSelectedEventId(data.report.event_id || '')
+      setSavedReportId(data.report.sit_rep_id)
       setSummary(data.report.summary)
       setGenerateForm(emptyGenerateForm(data.report.summary))
       setMessage(`${data.report.report_number} loaded from saved snapshots.`)
@@ -155,24 +157,18 @@ export default function SituationReportPage() {
     setMessage('The current SitRep snapshot is available for Archive after it is generated and locked.')
   }
 
-  function handlePdfPreview() {
-    if (!summary) {
-      setMessage('Select a disaster event first.')
-      return
+  async function handleExport(format) {
+    if (!summary || isExporting) return
+    setIsExporting(true)
+    setMessage('Generating report. Large exports may take a moment.')
+    try {
+      await exportSituationReport({ format, event_id: selectedEventId, sit_rep_id: savedReportId, included_sections: generateForm.included_sections, actions_text: generateForm.actions_text })
+      setMessage('SitRep export generated.')
+    } catch (exportError) {
+      setMessage(situationErrorMessage(exportError, 'SitRep export cannot be generated.'))
+    } finally {
+      setIsExporting(false)
     }
-
-    downloadSituationPdf(summary)
-    setMessage('SitRep PDF downloaded.')
-  }
-
-  function handleExcelExport() {
-    if (!summary) {
-      setMessage('Select a disaster event first.')
-      return
-    }
-
-    downloadSituationExcel(summary)
-    setMessage('SitRep Excel downloaded.')
   }
 
   const events = workspace?.events || []
@@ -186,10 +182,20 @@ export default function SituationReportPage() {
       }
     : events.find((event) => event.event_id === selectedEventId)
 
-  return (
-    <section className="page active situation-page">
-      <PageHeader title="Situation Reporting" />
+  function toggleSection(section) {
+    setGenerateForm((current) => {
+      const includedSections = current.included_sections || []
+      return {
+        ...current,
+        included_sections: includedSections.includes(section)
+          ? includedSections.filter((item) => item !== section)
+          : [...includedSections, section],
+      }
+    })
+  }
 
+  return (
+    <main className="ops-page situation-page">
       {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
@@ -200,29 +206,31 @@ export default function SituationReportPage() {
             selectedEventId={selectedEventId}
             selectedEvent={selectedEvent}
             onSelect={handleSelectEvent}
+            actions={(
+              <SituationActionMenu
+                hasSummary={Boolean(summary) && !isExporting}
+                onGenerate={openGenerateModal}
+                onArchive={handleArchiveCurrent}
+                onViewArchive={() => navigate('/archive')}
+                onExportExcel={() => handleExport('excel')}
+                onExportCsv={() => handleExport('csv')}
+                onExportPdf={() => handleExport('pdf')}
+              />
+            )}
           />
 
           {message && <div className="rr-message sr-message">{message}</div>}
           {isSummaryLoading && <LoadingState inline />}
 
-          {!summary && !isSummaryLoading && (
-            <div className="sitrep-empty-state">Choose a disaster event log to load the SitRep summary.</div>
-          )}
-
-          {summary && !isSummaryLoading && (
+          {!isSummaryLoading && (
             <div id="sitrepSummaryContent">
-              <div className="sr-live-toolbar">
-                <div className="sr-live-title">Live SitRep Preview</div>
-                <SituationActionMenu
-                  hasSummary={Boolean(summary)}
-                  onGenerate={openGenerateModal}
-                  onArchive={handleArchiveCurrent}
-                  onViewArchive={() => navigate('/archive')}
-                  onExportExcel={handleExcelExport}
-                  onExportPdf={handlePdfPreview}
-                />
-              </div>
-              <SitrepPreview summary={summary} />
+              <SitrepPreview
+                summary={summary}
+                includedSections={generateForm.included_sections}
+                actionsText={generateForm.actions_text}
+                onToggleSection={toggleSection}
+                onActionsChange={(value) => setGenerateForm((current) => ({ ...current, actions_text: value }))}
+              />
             </div>
           )}
 
@@ -239,8 +247,7 @@ export default function SituationReportPage() {
         isSaving={isSaving}
         onClose={() => setIsGenerateOpen(false)}
         onSubmit={submitGenerate}
-        onPreviewPdf={handlePdfPreview}
       />
-    </section>
+    </main>
   )
 }

@@ -15,8 +15,8 @@
   position: sticky;
   top: 0;
   z-index: 80;
-  border-bottom: 1px solid rgba(208, 217, 228, 0.72);
-  background: rgba(247, 249, 252, 0.88);
+  border-bottom: 1px solid var(--color-nav-hover);
+  background: var(--color-nav-bg);
   backdrop-filter: blur(18px);
 }
 
@@ -38,24 +38,37 @@
   gap: 16px;
 }
 
-.landing-page .brand-mark,
-.login-card .brand-mark {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 50%;
-  color: #ffffff;
-  background: transparent;
-  box-shadow: none;
-  font-size: 12px;
-  font-weight: 650;
-  overflow: hidden;
+.landing-wordmark,
+.login-brand-logo {
+  display: block;
+  width: min(210px, 42vw);
+  flex: 0 1 210px;
+}
+
+.login-brand-logo {
+  width: min(190px, 48vw);
+  flex-basis: 190px;
+}
+
+.landing-wordmark .left-sidebar-wordmark,
+.login-brand-logo .left-sidebar-wordmark {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  max-height: 46px;
+  height: auto;
+  aspect-ratio: 1756 / 368;
+  color: var(--color-nav-text);
+}
+
+.landing-wordmark .left-sidebar-pin-mark,
+.login-brand-logo .left-sidebar-pin-mark {
+  display: none;
 }
 
 .landing-brand {
   min-width: 0;
-  gap: 11px;
+  gap: 0;
   font-weight: 650;
 }
 
@@ -65,13 +78,13 @@
 }
 
 .landing-brand-text strong {
-  color: var(--color-text-2);
+  color: var(--color-nav-text);
   font-size: 12px;
   line-height: 1;
 }
 
 .landing-brand-text span {
-  color: var(--color-text-4);
+  color: var(--color-nav-text-muted);
   font-size: 11px;
   font-weight: 500;
   line-height: 1;
@@ -79,7 +92,7 @@
 
 .landing-nav {
   gap: 5px;
-  color: var(--color-text-4);
+  color: var(--color-nav-text-muted);
   font-size: 12px;
   font-weight: 500;
 }
@@ -92,8 +105,8 @@
 
 .landing-nav a:hover,
 .landing-nav a:focus-visible {
-  color: var(--color-text-2);
-  background: #edf1f6;
+  color: var(--color-nav-text);
+  background: var(--color-nav-active);
   transform: translateY(-1px);
   outline: none;
 }
@@ -126,8 +139,8 @@
 .landing-page .primary-button:focus-visible,
 .login-modal .primary-button:hover,
 .login-modal .primary-button:focus-visible {
-  background: var(--color-nav-bg);
-  border-color: var(--color-nav-bg);
+  background: var(--color-nav-hover);
+  border-color: var(--color-nav-hover);
   box-shadow: 0 14px 28px rgba(31, 62, 90, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
   transform: translateY(-1px);
   outline: none;
@@ -836,7 +849,7 @@
   display: grid;
   place-items: center;
   padding: clamp(20px, 5vh, 32px);
-  background: rgba(15, 28, 45, 0.34);
+  background: rgba(15, 28, 45, 0.78);
   backdrop-filter: blur(8px);
 }
 
@@ -844,22 +857,24 @@
   width: min(420px, 100%);
   max-height: calc(100vh - 72px);
   overflow-y: auto;
-  border-radius: 24px;
+  border: 1px solid var(--color-nav-hover);
+  border-radius: 16px;
   padding: 20px;
-  background: #ffffff;
+  color: var(--color-nav-text);
+  background: var(--color-nav-bg);
   box-shadow: 0 28px 80px rgba(15, 28, 45, 0.24);
 }
 
 .login-card h2 {
   margin: 16px 0 8px;
-  color: var(--color-text-2);
+  color: var(--color-nav-text);
   font-size: 20px;
   line-height: 1.1;
 }
 
 .login-card p {
   margin: 0;
-  color: var(--color-text-4);
+  color: var(--color-nav-text-muted);
   line-height: 1.55;
 }
 
@@ -874,10 +889,10 @@
   width: 36px;
   height: 36px;
   place-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  color: var(--color-text-4);
-  background: #f3f7fa;
+  border: 1px solid var(--color-nav-hover);
+  border-radius: 8px;
+  color: var(--color-nav-text-muted);
+  background: var(--color-nav-active);
   box-shadow: 0 4px 10px rgba(31, 62, 90, 0.08);
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease, color 150ms ease, background 150ms ease, border-color 150ms ease;
@@ -885,9 +900,9 @@
 
 .modal-close:hover,
 .modal-close:focus-visible {
-  color: var(--color-text-2);
-  border-color: var(--color-border-strong);
-  background: #e7eef4;
+  color: var(--color-nav-text);
+  border-color: var(--color-nav-hover);
+  background: var(--color-nav-hover);
   box-shadow: 0 8px 16px rgba(31, 62, 90, 0.12);
   transform: translateY(-1px);
   outline: none;
@@ -930,16 +945,147 @@
 
 .login-password-toggle:hover,
 .login-password-toggle:focus-visible {
-  color: var(--color-text-2);
-  background: var(--color-bg-secondary);
+  color: var(--color-nav-text);
+  background: var(--color-nav-hover);
   outline: none;
 }
 
 .login-note {
-  border-radius: 14px;
+  border: 1px solid var(--color-nav-hover);
+  border-radius: 8px;
   padding: 10px;
-  color: var(--color-text-4);
-  background: #f3f7fa;
+  color: var(--color-nav-text-muted);
+  background: var(--color-nav-active);
   font-size: 12px;
   line-height: 1.55;
 }
+
+.login-password-help {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.login-form input {
+  border-color: var(--color-nav-hover);
+  color: var(--color-nav-text);
+  background: var(--color-nav-active);
+}
+
+.login-form input::placeholder {
+  color: var(--color-nav-text-muted);
+  opacity: 1;
+}
+
+.login-form input:focus {
+  border-color: #8fb8d8;
+  box-shadow: 0 0 0 3px rgba(143, 184, 216, 0.2);
+}
+
+.login-password-toggle {
+  color: var(--color-nav-text-muted);
+}
+
+.login-remember,
+.login-remember-help {
+  color: var(--color-nav-text-muted);
+}
+
+.login-saved-password {
+  color: var(--color-nav-text);
+}
+
+.login-saved-password:hover,
+.login-saved-password:focus-visible {
+  color: #ffffff;
+}
+
+.login-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.login-actions .primary-button,
+.login-mode-toggle {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--color-nav-hover);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--color-nav-text);
+  background: var(--color-nav-active);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.login-actions .primary-button {
+  border-color: var(--color-nav-active);
+  background: var(--color-nav-active);
+}
+
+.login-actions .primary-button:hover:not(:disabled),
+.login-actions .primary-button:focus-visible,
+.login-mode-toggle:hover:not(:disabled),
+.login-mode-toggle:focus-visible {
+  border-color: var(--color-nav-hover);
+  background: var(--color-nav-hover);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.login-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* Account validation popups use the existing rounded card and button style. */
+.auth-error-popup {
+  width: min(420px, calc(100vw - 40px));
+  box-sizing: border-box;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 30px;
+  border: 1px solid var(--color-border, #d9e2ea);
+  border-radius: 22px;
+  background: var(--color-bg-card, #fff);
+  color: var(--color-text-2, #243a4d);
+  box-shadow: 0 24px 80px rgba(15, 35, 52, .24);
+  text-align: center;
+  font-family: inherit;
+}
+.auth-error-popup::backdrop {
+  background: rgba(17, 35, 49, .48);
+  backdrop-filter: blur(4px);
+}
+.auth-error-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  border: 1px solid #f0d1cc;
+  background: #fff0ed;
+  color: #ad493d;
+  font-size: 28px;
+  font-weight: 700;
+}
+.auth-error-popup h2 { margin: 0 0 10px; font-size: 21px; font-weight: 700; }
+.auth-error-message { margin: 0 0 24px; font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; color: var(--color-text-4, #627383); }
+.auth-error-popup .primary-button { width: 100%; justify-content: center; min-height: 44px; }
+.auth-error-popup .primary-button:focus-visible { outline: 3px solid var(--color-border-strong, #8daebc); outline-offset: 3px; }
+
+.login-remember-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.login-remember { display: flex; align-items: center; gap: 8px; color: var(--color-nav-text-muted); font-size: 12px; cursor: pointer; }
+.login-form .login-remember input { width: 16px; height: 16px; padding: 0; margin: 0; border-radius: 4px; accent-color: var(--color-nav-active); }
+.login-saved-password { padding: 4px 0; background: transparent; border: 0; color: var(--color-nav-text); font-size: 12px; text-decoration: underline; cursor: pointer; }
+.login-remember-help { color: var(--color-text-4); font-size: 11px; line-height: 1.5; }

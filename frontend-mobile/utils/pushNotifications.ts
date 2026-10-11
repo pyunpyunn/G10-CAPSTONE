@@ -1,5 +1,7 @@
 import Constants from 'expo-constants';
 import { Alert, Platform } from 'react-native';
+import { notifyDisasterBroadcast } from '@/utils/mobileReadCache';
+import { api } from '@/api/client';
 
 export type PushRegistration = {
   playerId: string | null;
@@ -17,7 +19,7 @@ export async function configureNotificationHandler() {
   await initializeOneSignal();
 }
 
-export async function getPushRegistration(externalUserId?: string): Promise<PushRegistration> {
+export async function getPushRegistration(_deviceUuid?: string): Promise<PushRegistration> {
   const oneSignalAppId = oneSignalAppIdFromConfig();
 
   if (!supportsRemotePushNotifications()) {
@@ -30,7 +32,22 @@ export async function getPushRegistration(externalUserId?: string): Promise<Push
     return emptyOneSignalRegistration('error');
   }
 
-  return getOneSignalRegistration(oneSignalAppId, externalUserId);
+  try {
+    const identity = await api.get('/auth/me');
+    const user = identity.data.user ?? identity.data.data;
+    if (!user?.user_id) return emptyOneSignalRegistration('error');
+    await initializeOneSignal();
+    return getOneSignalRegistration(oneSignalAppId, String(user.user_id));
+  } catch {
+    return emptyOneSignalRegistration('error');
+  }
+}
+
+export async function logoutPushIdentity() {
+  if (!oneSignalReady || !supportsRemotePushNotifications()) return;
+  const { OneSignal } = await import('react-native-onesignal');
+  OneSignal.User.pushSubscription.optOut();
+  OneSignal.logout();
 }
 
 async function initializeOneSignal() {
@@ -43,6 +60,12 @@ async function initializeOneSignal() {
   try {
     const { OneSignal } = await import('react-native-onesignal');
     OneSignal.initialize(appId);
+    OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event: { notification: { additionalData?: { type?: string } } }) => {
+      if (event.notification.additionalData?.type === 'disaster_broadcast') notifyDisasterBroadcast();
+    });
+    OneSignal.Notifications.addEventListener('click', (event: { notification: { additionalData?: { type?: string } } }) => {
+      if (event.notification.additionalData?.type === 'disaster_broadcast') notifyDisasterBroadcast();
+    });
     oneSignalReady = true;
   } catch {
     oneSignalReady = false;
@@ -64,7 +87,6 @@ async function getOneSignalRegistration(
     if (externalUserId) {
       OneSignal.login(externalUserId);
       OneSignal.User.addTags({
-        resqperation_device_uuid: externalUserId,
         app_role: 'mobile',
       });
     }
@@ -137,7 +159,7 @@ async function readOneSignalSubscription() {
     playerId = await OneSignal.User.pushSubscription.getIdAsync();
     token = await OneSignal.User.pushSubscription.getTokenAsync();
 
-    if (playerId || token) {
+    if (playerId && token) {
       break;
     }
 

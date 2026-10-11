@@ -7,7 +7,7 @@ export async function getWeatherWorkspace() {
 
 export async function refreshWeather() {
   const response = await api.post('/weather/refresh')
-  return response.data.data
+  return { ...response.data.data, refresh_queued: response.status === 202 }
 }
 
 export async function getWeatherLogs(eventId) {

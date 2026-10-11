@@ -1,6 +1,7 @@
-export default function SituationEventPanel({ events = [], selectedEventId, selectedEvent, onSelect }) {
+export default function SituationEventPanel({ events = [], selectedEventId, selectedEvent, onSelect, actions }) {
   return (
     <div className="sitrep-event-panel">
+      <div className="sitrep-event-actions">{actions}</div>
       <div className="sitrep-event-select">
         <label htmlFor="sitrepEventSelect">Disaster event log</label>
         <select
@@ -18,7 +19,6 @@ export default function SituationEventPanel({ events = [], selectedEventId, sele
         <ContextItem label="Disaster type" value={selectedEvent?.type || 'Select an event'} />
         <ContextItem label="Date declared" value={selectedEvent?.declared_at || '-'} />
         <ContextItem label="Date finished" value={selectedEvent?.finished_at || '-'} />
-        <ContextItem label="Scope" value={selectedEvent?.scope || '-'} />
       </div>
     </div>
   )

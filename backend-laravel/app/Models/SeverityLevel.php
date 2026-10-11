@@ -18,3 +18,5 @@ class SeverityLevel extends Model
         return $this->hasMany(DisasterEvent::class, 'severity_level_id', 'severity_id');
     }
 }
+
+

@@ -4,11 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class EvacuationCenter extends Model
 {
-    use SoftDeletes;
     protected $table = 'evacuation_centers';
     protected $primaryKey = 'evacuation_center_id';
     public $incrementing = false;
@@ -17,3 +15,5 @@ class EvacuationCenter extends Model
     public function units(): HasMany { return $this->hasMany(AccommodationUnit::class, 'center_id', 'evacuation_center_id'); }
     public function records(): HasMany { return $this->hasMany(EvacuationRecord::class, 'center_id', 'evacuation_center_id'); }
 }
+
+

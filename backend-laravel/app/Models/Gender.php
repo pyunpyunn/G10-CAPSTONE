@@ -12,3 +12,5 @@ class Gender extends Model
 
     protected $fillable = ['gender_key', 'gender_label'];
 }
+
+

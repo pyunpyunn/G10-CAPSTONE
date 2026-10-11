@@ -23,3 +23,4 @@ class ResourceRequestStatus extends Model
         return $this->hasMany(ResourceRequest::class, 'status_id', 'status_id');
     }
 }
+

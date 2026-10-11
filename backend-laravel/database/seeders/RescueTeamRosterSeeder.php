@@ -2,14 +2,14 @@
 
 namespace Database\Seeders;
 
+use Faker\Factory as FakerFactory;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class RescueTeamRosterSeeder extends Seeder
 {
-    private const DEFAULT_PASSWORD = 'password';
-
     private array $teamDefaults = [
         'SAR' => [
             'team_name' => 'Search & Rescue',
@@ -138,35 +138,58 @@ class RescueTeamRosterSeeder extends Seeder
             return;
         }
 
-        $mambalingPurokId = DB::table('addresses')
-            ->where('barangay_name', 'Mambaling')
-            ->orderBy('address_id')
-            ->value('address_id');
+        $teamsWereEmpty = ! DB::table('rescue_teams')->exists();
+        $faker = FakerFactory::create('en_PH');
+        $faker->seed(20260929);
 
-        DB::transaction(function () use ($rescuerRoleId, $mambalingPurokId): void {
+        DB::transaction(function () use ($rescuerRoleId, $teamsWereEmpty, $faker): void {
             foreach ($this->teamDefaults as $teamCode => $team) {
-                $teamId = $this->ensureTeam($teamCode, $team, $mambalingPurokId);
-                $leaderResponderId = null;
+                $teamRow = $teamsWereEmpty
+                    ? null
+                    : DB::table('rescue_teams')
+                        ->where(fn ($query) => $query->where('team_code', $teamCode)->orWhere('team_name', $team['team_name']))
+                        ->first();
 
-                foreach ($this->roster[$teamCode] as $index => $person) {
-                    $responderId = $this->ensureResponder($teamCode, $teamId, $person, $index + 1, $rescuerRoleId);
-
-                    if ($index === 0) {
-                        $leaderResponderId = $responderId;
-                    }
+                if (! $teamsWereEmpty && ! $teamRow) {
+                    $this->command?->warn("Roster skipped for {$teamCode}: no matching database team exists.");
+                    continue;
                 }
 
-                DB::table('rescue_teams')
+                $teamId = $teamsWereEmpty
+                    ? $this->ensureTeam($teamCode, $team)
+                    : (int) $teamRow->team_id;
+                $memberCount = DB::table('responders')
                     ->where('team_id', $teamId)
-                    ->update([
-                        'leader_responder_id' => $leaderResponderId,
-                        'updated_at' => now(),
-                    ]);
+                    ->whereNull('deleted_at')
+                    ->count();
+                $sequence = 1;
+                $firstResponderId = null;
+
+                while ($memberCount < 6 && $sequence <= 99) {
+                    $person = $this->randomizedPerson($faker, $teamCode, $sequence);
+                    $responderId = $this->ensureResponder($teamCode, $teamId, $person, $sequence, $rescuerRoleId);
+                    $firstResponderId ??= $responderId;
+                    $memberCount = DB::table('responders')
+                        ->where('team_id', $teamId)
+                        ->whereNull('deleted_at')
+                        ->count();
+                    $sequence++;
+                }
+
+                if ($firstResponderId) {
+                    DB::table('rescue_teams')
+                        ->where('team_id', $teamId)
+                        ->whereNull('leader_responder_id')
+                        ->update([
+                            'leader_responder_id' => $firstResponderId,
+                            'updated_at' => now(),
+                        ]);
+                }
             }
         });
     }
 
-    private function ensureTeam(string $teamCode, array $team, ?int $mambalingPurokId): int
+    private function ensureTeam(string $teamCode, array $team): int
     {
         $existing = DB::table('rescue_teams')
             ->where('team_code', $teamCode)
@@ -177,16 +200,10 @@ class RescueTeamRosterSeeder extends Seeder
             'team_code' => $teamCode,
             'team_name' => $team['team_name'],
             'team_type' => $team['team_type'],
-            'assigned_purok_id' => $mambalingPurokId,
             'duty_status' => 'standby',
-            'updated_at' => now(),
         ];
 
         if ($existing) {
-            DB::table('rescue_teams')
-                ->where('team_id', $existing->team_id)
-                ->update($data);
-
             return (int) $existing->team_id;
         }
 
@@ -198,6 +215,19 @@ class RescueTeamRosterSeeder extends Seeder
         ]));
 
         return $teamId;
+    }
+
+    private function randomizedPerson(object $faker, string $teamCode, int $sequence): array
+    {
+        $person = $this->roster[$teamCode][$sequence - 1];
+        $person[0] = $faker->unique()->firstName();
+        $person[1] = $faker->randomElement(range('A', 'Z')).'.';
+        $person[2] = $faker->unique()->lastName();
+        $person[5] = sprintf('DEMO-%s-%02d', $teamCode, $sequence);
+        $person[6] = $faker->name();
+        $person[7] = sprintf('DEMO-ICE-%s-%02d', $teamCode, $sequence);
+
+        return $person;
     }
 
     private function ensureResponder(string $teamCode, int $teamId, array $person, int $sequence, int $rescuerRoleId): int
@@ -215,12 +245,13 @@ class RescueTeamRosterSeeder extends Seeder
 
         $userId = $existing?->user_id ?: 'USR-RESCUER-'.$accountId;
         $existingUser = DB::table('users')->where('user_id', $userId)->first();
+        $passwordHash = Hash::make(Str::random(40));
         $userData = [
             'first_name' => $firstName,
             'last_name' => $lastName,
             'name' => $fullName,
             'username' => $displayUsername,
-            'email' => strtolower(str_replace(' ', '.', $firstName.'.'.$lastName)).'@resqperation.local',
+            'email' => strtolower($accountId).'@example.invalid',
             'role_id' => $rescuerRoleId,
             'contact_number' => $mobile,
             'is_active' => 1,
@@ -233,9 +264,8 @@ class RescueTeamRosterSeeder extends Seeder
         } else {
             DB::table('users')->insert(array_merge($userData, [
                 'user_id' => $userId,
-                'password' => Hash::make(self::DEFAULT_PASSWORD),
+                'password' => $passwordHash,
                 'must_change_password' => 1,
-                'temp_password' => self::DEFAULT_PASSWORD,
                 'created_at' => now(),
             ]));
         }
@@ -243,7 +273,7 @@ class RescueTeamRosterSeeder extends Seeder
         $responderData = [
             'user_id' => $userId,
             'responder_code' => $accountId,
-            'created_by_admin_id' => 'USR-HQ-2024035500',
+            'created_by_admin_id' => null,
             'team_id' => $teamId,
             'username' => $accountId,
             'full_name' => $fullName,
@@ -278,7 +308,7 @@ class RescueTeamRosterSeeder extends Seeder
 
         DB::table('responders')->insert(array_merge($responderData, [
             'responder_id' => $responderId,
-            'password_hash' => Hash::make(self::DEFAULT_PASSWORD),
+            'password_hash' => $passwordHash,
             'created_at' => now(),
         ]));
 
