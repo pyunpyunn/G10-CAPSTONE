@@ -1,3 +1,4 @@
+import { showAuthError, getRememberedLogin, saveRememberedPassword } from '../api/authApi'
 import { KeyRound, Pencil, Settings, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
@@ -27,7 +28,6 @@ export default function ProfilePage() {
   const [profileForm, setProfileForm] = useState(profileFormFromIdentity())
   const [passwordValues, setPasswordValues] = useState(passwordForm())
   const [profileFormError, setProfileFormError] = useState('')
-  const [passwordError, setPasswordError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
@@ -62,7 +62,6 @@ export default function ProfilePage() {
 
   function openPasswordModal() {
     setPasswordValues(passwordForm())
-    setPasswordError('')
     setMessage('')
     setIsPasswordOpen(true)
   }
@@ -103,16 +102,23 @@ export default function ProfilePage() {
   async function submitPassword(event) {
     event.preventDefault()
     setIsSaving(true)
-    setPasswordError('')
 
     try {
+      if (!passwordValues.current_password) throw new Error('Enter your old password.')
+      if (passwordValues.password.length < 8 || passwordValues.password.length > 128) throw new Error('New password must contain 8 to 128 characters.')
+      if (passwordValues.password !== passwordValues.password_confirmation) throw new Error('New password and confirmation do not match.')
       const data = await changePassword(passwordValues)
+      const rememberedLogin = getRememberedLogin()
+      const identifiers = [payload?.identity?.account_id, payload?.identity?.user_id, outlet.user?.username, outlet.user?.email]
+      if (rememberedLogin && identifiers.includes(rememberedLogin)) {
+        await saveRememberedPassword(rememberedLogin, passwordValues.password, true)
+      }
       setIsPasswordOpen(false)
       setPasswordValues(passwordForm())
       setMessage(data.message || 'Password changed successfully.')
       await loadProfile(false)
     } catch (saveError) {
-      setPasswordError(profileErrorMessage(saveError, 'Unable to change password.'))
+      showAuthError(saveError.response ? profileErrorMessage(saveError, 'Unable to change password.') : saveError.message || 'Unable to change password.')
     } finally {
       setIsSaving(false)
     }
@@ -163,7 +169,6 @@ export default function ProfilePage() {
         isOpen={isPasswordOpen}
         form={passwordValues}
         setForm={setPasswordValues}
-        formError={passwordError}
         isSaving={isSaving}
         onClose={() => setIsPasswordOpen(false)}
         onSubmit={submitPassword}

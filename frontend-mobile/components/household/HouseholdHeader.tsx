@@ -1,16 +1,13 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radius, spacing } from '@/constants/resqTheme';
+import { palette, spacing } from '@/constants/resqTheme';
+import { HouseholdBadge } from './HouseholdUI';
 
-type HeaderProps = {
-  connectionLabel?: string;
-  onRefresh: () => void;
-};
-
-export function HouseholdHeader({
-  connectionLabel,
-  onRefresh,
-}: HeaderProps) {
+export function HouseholdHeader({ isDisasterMode, notificationCount = 0, onOpenNotifications }: {
+  isDisasterMode: boolean;
+  notificationCount?: number;
+  onOpenNotifications?: () => void;
+}) {
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
@@ -21,12 +18,15 @@ export function HouseholdHeader({
         />
         <Text style={styles.brand}>RESQPERATION</Text>
         <View style={styles.actions}>
-          <View style={styles.signalPill}>
-            <Ionicons name="cellular-outline" size={14} color={palette.navText} />
-            <Text style={styles.signalText}>{connectionLabel || 'Offline'}</Text>
-          </View>
-          <Pressable style={styles.iconButton} onPress={onRefresh}>
-            <Ionicons name="refresh-outline" size={20} color={palette.navText} />
+          <HouseholdBadge label={isDisasterMode ? 'Disaster mode' : 'Standby'} tone={isDisasterMode ? 'danger' : 'safe'} />
+          <Pressable
+            style={styles.notificationButton}
+            onPress={onOpenNotifications}
+            accessibilityRole="button"
+            accessibilityLabel={`Notifications${notificationCount ? `, ${notificationCount} unread` : ''}`}
+          >
+            <Ionicons name="notifications-outline" size={21} color="#fff" />
+            {notificationCount > 0 ? <View style={styles.notificationDot} /> : null}
           </Pressable>
         </View>
       </View>
@@ -46,22 +46,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  signalPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderWidth: 1,
-    borderColor: '#2a4f72',
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 7,
-    backgroundColor: palette.navActive,
-  },
-  signalText: {
-    color: palette.navText,
-    fontSize: 11,
-    fontWeight: '900',
-  },
   logo: {
     width: 48,
     height: 42,
@@ -77,14 +61,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  iconButton: {
-    width: 42,
-    height: 42,
+  notificationButton: {
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#2a4f72',
-    borderRadius: radius.md,
-    backgroundColor: palette.navActive,
+    borderRadius: 17,
+    backgroundColor: '#ffffff20',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 6,
+    right: 7,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: palette.unsafe,
   },
 });

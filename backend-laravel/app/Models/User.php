@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Schema;
+use App\Support\RequestSchema as Schema;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -22,6 +22,7 @@ class User extends Authenticatable
     protected $keyType = 'string';
 
     protected $fillable = [
+        'user_id',
         'first_name',
         'last_name',
         'username',
@@ -145,3 +146,5 @@ class User extends Authenticatable
         };
     }
 }
+
+

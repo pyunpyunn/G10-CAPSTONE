@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import ResQperationLogo from './ResQperationLogo'
 import {
   Archive,
   ChevronDown,
@@ -18,6 +19,14 @@ import {
   ShieldUser,
 } from 'lucide-react'
 
+const navGroups = [
+  { title: 'Geospatial & Analytics', paths: ['/households', '/mapping', '/weather'] },
+  { title: 'Response Operations', paths: ['/dispatch', '/rescue-management', '/field-reports'] },
+  { title: 'Personnel Access Control', paths: ['/rescuers', '/rescuers/teams'] },
+  { title: 'Resources & Requests', paths: ['/request-types', '/external-requests', '/resources-requests'] },
+  { title: 'Reports Documentation', paths: ['/situation', '/archive'] },
+]
+
 const icons = {
   '/dashboard': LayoutDashboard,
   '/super-admin': Inbox,
@@ -26,6 +35,11 @@ const icons = {
   '/mapping': Map,
   '/households': House,
   '/dispatch': Route,
+  '/rescue-management': Route,
+  '/field-reports': FileCheck2,
+  '/rescuers/teams': ShieldUser,
+  '/request-types': PackageCheck,
+  '/external-requests': Inbox,
   '/rescuers': ShieldUser,
   '/resources-requests': PackageCheck,
   '/situation': FileCheck2,
@@ -68,6 +82,10 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
         }
       }}
     >
+      <div className="left-sidebar-brand" role="img" aria-label="ResQperation">
+        <ResQperationLogo />
+      </div>
+
       <div className="left-sidebar-actions" aria-label="Navigation controls">
         <button
           className="left-pin-button"
@@ -82,9 +100,23 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
       </div>
 
       <nav className="left-nav">
-        <NavGroup title="Main Views" pages={pages.slice(0, 3)} isOpen={openGroups.has('Main Views')} onToggle={toggleGroup} />
-        <NavGroup title="Response Operations" pages={pages.slice(3, 6)} isOpen={openGroups.has('Response Operations')} onToggle={toggleGroup} />
-        <NavGroup title="Management & Reports" pages={pages.slice(6)} isOpen={openGroups.has('Management & Reports')} onToggle={toggleGroup} />
+        <NavLink
+          to="/dashboard"
+          end
+          className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+        >
+          <LayoutDashboard size={17} />
+          <span>Dashboard</span>
+        </NavLink>
+        {navGroups.map((group) => (
+          <NavGroup
+            key={group.title}
+            title={group.title}
+            pages={group.paths.map((path) => pages.find((page) => page.path === path && !page.navHidden)).filter(Boolean)}
+            isOpen={openGroups.has(group.title)}
+            onToggle={toggleGroup}
+          />
+        ))}
       </nav>
 
       <div className="left-sidebar-logout">
@@ -117,6 +149,7 @@ function NavGroup({ title, pages, isOpen, onToggle }) {
             <NavLink
               key={page.path}
               to={page.path}
+              end
               className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
             >
               <Icon size={17} />
@@ -130,13 +163,10 @@ function NavGroup({ title, pages, isOpen, onToggle }) {
 }
 
 function getActiveGroup(pathname, pages) {
-  if (pages.slice(0, 3).some((page) => pathname === page.path || pathname.startsWith(`${page.path}/`))) {
-    return 'Main Views'
-  }
+  const activePage = pages
+    .filter((page) => !page.navHidden)
+    .sort((a, b) => b.path.length - a.path.length)
+    .find((page) => pathname === page.path || pathname.startsWith(`${page.path}/`))
 
-  if (pages.slice(3, 6).some((page) => pathname === page.path || pathname.startsWith(`${page.path}/`))) {
-    return 'Response Operations'
-  }
-
-  return 'Management & Reports'
+  return navGroups.find((group) => group.paths.includes(activePage?.path))?.title
 }

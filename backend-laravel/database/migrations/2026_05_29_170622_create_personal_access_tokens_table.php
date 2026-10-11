@@ -14,8 +14,8 @@ return new class extends Migration
         if (! Schema::hasTable('personal_access_tokens')) {
             Schema::create('personal_access_tokens', function (Blueprint $table) {
                 $table->id();
-                $table->string('tokenable_type');
-                $table->string('tokenable_id');
+                $table->string('tokenable_type', 255);
+                $table->string('tokenable_id', 255);
                 $table->text('name');
                 $table->string('token', 64)->unique();
                 $table->text('abilities')->nullable();

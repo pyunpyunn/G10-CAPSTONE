@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useModuleData } from '../../utils/useModuleData'
 import {
   CircleMarker,
+  GeoJSON,
   MapContainer,
-  Rectangle,
   TileLayer,
   Tooltip,
   useMap,
@@ -18,11 +19,13 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import { getMappingOverview } from '../../api/mappingApi'
+import { getWeatherWorkspace } from '../../api/weatherApi'
 import {
   defaultWorkspace,
   markerGroups,
   percent as mapPercent,
 } from '../../utils/mappingHelpers'
+import { outsideBoundaryMask } from '../../utils/boundaryMask'
 import { statusTone } from '../../utils/dashboardHelpers'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
@@ -32,11 +35,20 @@ export default function DashboardOverview({
   dashboard,
   hasActiveEvent,
   onOpenModule,
+  disasterAction,
 }) {
+  const { data: weatherWorkspace } = useModuleData(getWeatherWorkspace, ['weather', 'disasters'])
+  const latestSavedWeather = weatherWorkspace?.latest_snapshot || null
+
   return (
     <aside className="dashboard-overview" aria-label="Dashboard side information">
-      <WeatherCard weather={dashboard.weather} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
-      <DashboardMapCard hasActiveEvent={hasActiveEvent} onOpenMap={() => onOpenModule('/mapping')} />
+      <div className="dashboard-layout-actions">{disasterAction}</div>
+      <WeatherCard weather={latestSavedWeather || dashboard.weather} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
+      <DashboardMapCard
+        hasActiveEvent={hasActiveEvent}
+        reportedHouseholds={dashboard.households.reported}
+        onOpenMap={() => onOpenModule('/mapping')}
+      />
       <RequestCard requests={dashboard.requests} onOpenRequests={() => onOpenModule('/resources-requests')} />
     </aside>
   )
@@ -62,6 +74,7 @@ function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
           <div className="dashboard-weather-main">
             <span>{weather.condition_name || 'Current weather'}</span>
             <strong>{weather.temperature ?? '-'} C</strong>
+            {weather.observed_at && <small>Updated {weather.observed_at}</small>}
           </div>
           <div className="dashboard-weather-metrics">
             <span><Thermometer size={13} />Temp</span>
@@ -80,45 +93,15 @@ function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
   )
 }
 
-function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
-  const [workspace, setWorkspace] = useState(defaultWorkspace)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    let ignore = false
-
-    async function loadMap() {
-      setIsLoading(true)
-
-      try {
-        const data = await getMappingOverview()
-
-        if (!ignore) {
-          setWorkspace({ ...defaultWorkspace, ...data })
-        }
-      } catch {
-        if (!ignore) {
-          setWorkspace(defaultWorkspace)
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadMap()
-
-    return () => {
-      ignore = true
-    }
-  }, [hasActiveEvent])
-
+function DashboardMapCard({ hasActiveEvent, reportedHouseholds, onOpenMap }) {
+  const { data, loading: isLoading } = useModuleData(getMappingOverview, ['mapping', 'households', 'dispatch', 'disasters'])
+  const workspace = useMemo(() => data ? { ...defaultWorkspace, ...data } : defaultWorkspace, [data])
   const mapCenter = useMemo(() => [
     workspace.barangay.center.latitude,
     workspace.barangay.center.longitude,
   ], [workspace.barangay.center.latitude, workspace.barangay.center.longitude])
   const mapBounds = useMemo(() => workspace.barangay.bounds, [workspace.barangay.bounds])
+  const boundaryMask = useMemo(() => outsideBoundaryMask(workspace.barangay.boundary), [workspace.barangay.boundary])
   const households = hasActiveEvent ? workspace.households : []
 
   return (
@@ -148,7 +131,17 @@ function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
               url={workspace.barangay.tile_url}
               maxZoom={19}
             />
-            <Rectangle bounds={mapBounds} pathOptions={{ color: '#1f3e5a', weight: 2, fillOpacity: 0.02 }} />
+            {boundaryMask && <GeoJSON
+              key={`mask-${workspace.barangay.name}-${JSON.stringify(workspace.barangay.boundary)}`}
+              data={boundaryMask}
+              interactive={false}
+              style={{ color: 'transparent', weight: 0, fillColor: '#000000', fillOpacity: 0.2, fillRule: 'evenodd' }}
+            />}
+            {workspace.barangay.boundary && <GeoJSON
+              key={`${workspace.barangay.name}-${JSON.stringify(workspace.barangay.boundary)}`}
+              data={workspace.barangay.boundary}
+              style={{ color: '#1f3e5a', weight: 2, fillOpacity: 0.03 }}
+            />}
             {households.map((household) => (
               <HouseholdPoint household={household} key={household.id} />
             ))}
@@ -157,9 +150,9 @@ function DashboardMapCard({ hasActiveEvent, onOpenMap }) {
       </div>
 
       <div className="dashboard-side-metrics">
-        <div><strong>{workspace.summary.gps_tagged_households || households.length}</strong><span>GPS tagged</span></div>
-        <div><strong>{workspace.summary.evacuation_sites || 0}</strong><span>Evac sites</span></div>
-        <div><strong>{hasActiveEvent ? households.length : 0}</strong><span>Status points</span></div>
+        <div><strong>{workspace.summary.gps_tagged_households ?? 0}</strong><span>GPS tagged</span></div>
+        <div><strong>{workspace.summary.evacuation_sites ?? 0}</strong><span>Active evac sites</span></div>
+        <div><strong>{hasActiveEvent ? reportedHouseholds ?? 0 : 0}</strong><span>Status reported</span></div>
       </div>
     </section>
   )

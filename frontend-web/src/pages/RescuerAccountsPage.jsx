@@ -1,10 +1,12 @@
-import { Settings2, UserPlus } from 'lucide-react'
+import { ArrowLeft, Settings2, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   createRescueTeam,
   createRescuer,
   deleteRescueTeam,
   deactivateRescuer,
+  deleteRescuer,
   getRescueTeamConfig,
   getRescuer,
   getRescuers,
@@ -12,42 +14,81 @@ import {
   updateRescuer,
 } from '../api/rescuerApi'
 import RescuerAccountModal from '../components/rescuers/RescuerAccountModal'
-import RescuerFilters from '../components/rescuers/RescuerFilters'
+import HeadquartersAccountsPanel from '../components/rescuers/HeadquartersAccountsPanel'
 import RescuerRosterTable from '../components/rescuers/RescuerRosterTable'
 import RescuerTeamGrid from '../components/rescuers/RescuerTeamGrid'
 import RescueTeamConfigModal from '../components/rescuers/RescueTeamConfigModal'
 import LoadingState from '../components/ui/LoadingState'
-import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
+import PageHeader from '../components/ui/PageHeader'
 import {
   buildRescuerPayload,
-  commandCenterAccountForm,
   emptyRescuerForm,
-  accountIdForTeam,
-  firstTeam,
   formFromRescuer,
   rescuerErrorMessage,
 } from '../utils/rescuerHelpers'
 
 export default function RescuerAccountsPage() {
+  const location = useLocation()
+  return <RescuerAccountsWorkspace key={`${location.pathname}${location.search}`} />
+}
+
+function RescuerAccountsWorkspace() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const workflow = location.pathname !== '/rescuers'
+  const workflowType = location.pathname.split('/').pop()
   const [payload, setPayload] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [activeChip, setActiveChip] = useState('all')
-  const [modalMode, setModalMode] = useState('create')
+  const [page, setPage] = useState(1)
+  const [modalMode, setModalMode] = useState(workflowType === 'new' ? 'create' : workflowType)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [originalForm, setOriginalForm] = useState(null)
+  const notice = location.state?.notice || ''
   const [form, setForm] = useState(emptyRescuerForm())
   const [selectedRescuerId, setSelectedRescuerId] = useState(null)
   const [formError, setFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [teamConfigOpen, setTeamConfigOpen] = useState(false)
   const [teamConfig, setTeamConfig] = useState(null)
   const [teamConfigVersion, setTeamConfigVersion] = useState(0)
   const [teamConfigLoading, setTeamConfigLoading] = useState(false)
   const [teamConfigSaving, setTeamConfigSaving] = useState(false)
   const [teamConfigError, setTeamConfigError] = useState('')
+  const [activeAccountTab, setActiveAccountTab] = useState('responders')
+
+  useEffect(() => {
+    if (workflowType !== 'view' && workflowType !== 'edit') return
+    let ignore = false
+    async function loadDetail() {
+    const id = new URLSearchParams(location.search).get('id') || location.state?.rescuer?.responder_id
+    if (!id) {
+      setError('Select a rescuer from the roster to open their profile.')
+      return
+    }
+    setIsModalOpen(false)
+    setDetailLoading(true)
+    setFormError('')
+    getRescuer(id).then((data) => {
+      if (ignore) return
+      const nextForm = formFromRescuer(data.rescuer)
+      setModalMode(workflowType)
+      setSelectedRescuerId(data.rescuer.responder_id)
+      setForm(nextForm)
+      setOriginalForm(nextForm)
+      setIsModalOpen(true)
+    }).catch((loadError) => {
+      if (!ignore) setError(rescuerErrorMessage(loadError, 'Selected rescuer account cannot be loaded.'))
+    }).finally(() => { if (!ignore) setDetailLoading(false) })
+    }
+    loadDetail()
+    return () => { ignore = true }
+  }, [workflowType, location.search, location.state])
+
+  useEffect(() => {
+    if (workflowType === 'teams') loadTeamConfig()
+  }, [workflowType])
 
   useEffect(() => {
     let ignore = false
@@ -57,10 +98,14 @@ export default function RescuerAccountsPage() {
       setError('')
 
       try {
-        const data = await getRescuers(filterParams(search, purok, activeChip))
+        const data = await getRescuers({ page })
 
         if (!ignore) {
           setPayload(data)
+          if (workflowType === 'new') {
+            setForm(emptyRescuerForm(data.form_options?.defaults))
+            setIsModalOpen(true)
+          }
         }
       } catch {
         if (!ignore) {
@@ -78,14 +123,14 @@ export default function RescuerAccountsPage() {
     return () => {
       ignore = true
     }
-  }, [search, purok, activeChip])
+  }, [page, workflowType])
 
   const rescuers = payload?.rescuers?.data || []
   const pagination = payload?.rescuers || {}
   const teams = payload?.teams || []
   const teamOptions = payload?.team_options || []
   const accountIdOptions = payload?.account_id_options || []
-  const filters = payload?.filters || {}
+  const formOptions = payload?.form_options
   const isInitialLoading = isLoading && !payload
   const isRefreshing = isLoading && Boolean(payload)
   const hasBlockingError = error && !payload
@@ -95,7 +140,7 @@ export default function RescuerAccountsPage() {
     setError('')
 
     try {
-      const data = await getRescuers(filterParams(search, purok, activeChip))
+      const data = await getRescuers({ page })
       setPayload(data)
     } catch {
       setError('Rescuer accounts cannot be loaded right now. Please check the backend or database connection.')
@@ -105,26 +150,11 @@ export default function RescuerAccountsPage() {
   }
 
   function openCreateModal() {
-    const defaultTeam = firstTeam(teamOptions)
-
-    setModalMode('create')
-    setSelectedRescuerId(null)
-    setForm(emptyRescuerForm(accountIdForTeam(accountIdOptions, defaultTeam?.team_name, payload?.next_account_id || ''), defaultTeam))
-    setFormError('')
-    setIsModalOpen(true)
+    navigate('/rescuers/new')
   }
 
-  function openCommandCenterModal() {
-    setModalMode('create')
-    setSelectedRescuerId(null)
-    setForm(commandCenterAccountForm(accountIdOptions, 'BDRRM-HQCC-001', teamOptions))
-    setFormError('')
-    setIsModalOpen(true)
-  }
-
-  async function openTeamConfig() {
-    await loadTeamConfig()
-    setTeamConfigOpen(true)
+  function openTeamConfig() {
+    navigate('/rescuers/teams')
   }
 
   async function loadTeamConfig() {
@@ -135,49 +165,25 @@ export default function RescuerAccountsPage() {
       const data = await getRescueTeamConfig()
       setTeamConfig(data)
       setTeamConfigVersion((current) => current + 1)
-    } catch {
-      setTeamConfigError('Team configuration cannot be loaded right now.')
+    } catch (loadError) {
+      setTeamConfigError(rescuerErrorMessage(loadError, 'Team configuration cannot be loaded right now.'))
     } finally {
       setTeamConfigLoading(false)
     }
   }
 
   async function openViewModal(rescuer) {
-    await openExistingModal(rescuer, 'view')
+    navigate(`/rescuers/view?id=${rescuer.responder_id}`)
   }
 
   async function openEditModal(rescuer) {
-    await openExistingModal(rescuer, 'edit')
-  }
-
-  async function openExistingModal(rescuer, mode) {
-    setFormError('')
-
-    try {
-      const data = await getRescuer(rescuer.responder_id)
-      setModalMode(mode)
-      setSelectedRescuerId(data.rescuer.responder_id)
-      setForm(formFromRescuer(data.rescuer))
-      setIsModalOpen(true)
-    } catch {
-      setError('Selected rescuer account cannot be loaded right now.')
-    }
-  }
-
-  function closeModal() {
-    if (isSaving) {
-      return
-    }
-
-    setIsModalOpen(false)
-    setFormError('')
-    setSelectedRescuerId(null)
+    navigate(`/rescuers/edit?id=${rescuer.responder_id}`)
   }
 
   function resetForm() {
+    if (modalMode === 'edit' && originalForm) setForm({ ...originalForm })
     if (modalMode === 'create') {
-      const defaultTeam = firstTeam(teamOptions)
-      setForm(emptyRescuerForm(accountIdForTeam(accountIdOptions, defaultTeam?.team_name, payload?.next_account_id || ''), defaultTeam))
+      setForm(emptyRescuerForm(formOptions?.defaults))
     }
   }
 
@@ -189,19 +195,19 @@ export default function RescuerAccountsPage() {
     try {
       const body = buildRescuerPayload(form, modalMode)
 
+      let result
       if (modalMode === 'edit') {
         if (!selectedRescuerId) {
           setFormError('Selected rescuer account cannot be updated. Please reopen the record.')
           return
         }
 
-        await updateRescuer(selectedRescuerId, body)
+        result = await updateRescuer(selectedRescuerId, body)
       } else {
-        await createRescuer(body)
+        result = await createRescuer(body)
       }
 
-      setIsModalOpen(false)
-      await loadRescuers()
+      navigate('/rescuers', { state: { notice: result.message } })
     } catch (saveError) {
       setFormError(rescuerErrorMessage(saveError))
     } finally {
@@ -223,6 +229,17 @@ export default function RescuerAccountsPage() {
       await loadRescuers()
     } catch (deactivateError) {
       setError(rescuerErrorMessage(deactivateError, 'Unable to deactivate rescuer account.'))
+    }
+  }
+
+  async function handleDelete(rescuer) {
+    if (!window.confirm(`Delete ${rescuer.full_name} from the roster? This disables login and retains dispatch history.`)) return
+    setError('')
+    try {
+      await deleteRescuer(rescuer.responder_id)
+      await loadRescuers()
+    } catch (deleteError) {
+      setError(rescuerErrorMessage(deleteError, 'Unable to delete rescuer account.'))
     }
   }
 
@@ -268,109 +285,46 @@ export default function RescuerAccountsPage() {
   }
 
   return (
-    <section className="page active rescuer-page">
+    <main className="ops-page rescuer-page">
       <PageHeader
-        title="Rescuer Accounts"
-        actions={
+        title={workflow ? (workflowType === 'teams' ? 'Team Management' : workflowType === 'view' ? 'Rescuer profile' : workflowType === 'edit' ? 'Update profile' : 'New rescuer account') : 'Account Management'}
+        subtitle={payload?.area_label || 'Shared database records'}
+        actions={workflow ? (
+          <button className="button secondary" type="button" onClick={() => navigate('/rescuers')}><ArrowLeft size={15} />Back to roster</button>
+        ) : activeAccountTab === 'responders' ? (
           <>
-          <button className="btn btn-primary btn-sm" type="button" onClick={openTeamConfig}>
-            <Settings2 size={14} />
-            Configure rescue teams
-          </button>
-          <button className="btn btn-primary btn-sm" type="button" onClick={openCommandCenterModal}>
-            <UserPlus size={14} />
-            Add HQ command center
-          </button>
-          <button className="btn btn-primary btn-sm" type="button" onClick={openCreateModal}>
-            <UserPlus size={14} />
-            Create verified account
-          </button>
+            <button className="button secondary" type="button" onClick={openTeamConfig}><Settings2 size={15} />Manage teams</button>
+            <button className="button review" type="button" onClick={openCreateModal}><UserPlus size={15} />Create account</button>
           </>
-        }
+        ) : null}
       />
 
-      {isInitialLoading && <LoadingState />}
-      {error && <div className="form-error">{error}</div>}
+      {error && <div className="form-error" role="alert">{error}</div>}
+      {notice && !workflow && <div className="ra-success" role="status">{notice}</div>}
+      {workflow && workflowType === 'teams' && <section className="ra-team-status-panel"><div className="ra-side-head"><span className="ra-title">Team Status Cards</span></div><RescuerTeamGrid teams={teamConfig?.teams || teams} showStatus /></section>}
+      {workflow && workflowType === 'teams' && <RescueTeamConfigModal key={teamConfigVersion} embedded isOpen workspace={teamConfig} isLoading={teamConfigLoading} isSaving={teamConfigSaving} error={teamConfigError} onRetry={loadTeamConfig} onClose={() => navigate('/rescuers')} onSave={saveTeamConfig} onDelete={removeTeamConfig} />}
+      {workflow && workflowType !== 'teams' && !isInitialLoading && !detailLoading && isModalOpen && (modalMode === 'view' || formOptions) && <RescuerAccountModal embedded mode={modalMode} isOpen form={form} setForm={setForm} formError={formError} isSaving={isSaving} teamOptions={teamOptions} accountIdOptions={accountIdOptions} fallbackAccountId={payload?.next_account_id || ''} formOptions={formOptions} onClose={() => navigate('/rescuers')} onReset={resetForm} onSubmit={submitForm} onEdit={() => navigate(`/rescuers/edit?id=${selectedRescuerId}`)} />}
 
-      {!isInitialLoading && !hasBlockingError && payload && (
-        <>
-          <RescuerFilters
-            search={search}
-            onSearchChange={setSearch}
-            purok={purok}
-            onPurokChange={setPurok}
-            puroks={filters.puroks || []}
-            teamOptions={teamOptions}
-            activeChip={activeChip}
-            onChipChange={setActiveChip}
-          />
-
-          <div className="ra-workspace">
-            <div className="ra-main-panel">
-              <RefreshOverlay active={isRefreshing}>
-                <RescuerRosterTable
-                  rescuers={rescuers}
-                  pagination={pagination}
-                  onView={openViewModal}
-                  onEdit={openEditModal}
-                  onDeactivate={handleDeactivate}
-                />
-              </RefreshOverlay>
-            </div>
-            <aside className="ra-side-panel">
-              <div className="ra-side-head">
-                <span className="ra-title">Team cards</span>
-              </div>
-              <RescuerTeamGrid teams={teams} />
-            </aside>
+      {workflow && workflowType !== 'teams' && (isInitialLoading || detailLoading) && <LoadingState label="Loading rescuer profile..." />}
+      {!workflow && <>
+          <div className="account-management-tabs" role="tablist" aria-label="Account categories">
+            <button type="button" role="tab" aria-selected={activeAccountTab === 'responders'} className={activeAccountTab === 'responders' ? 'active' : ''} onClick={() => setActiveAccountTab('responders')}>Rescuers & teams</button>
+            <button type="button" role="tab" aria-selected={activeAccountTab === 'headquarters'} className={activeAccountTab === 'headquarters' ? 'active' : ''} onClick={() => setActiveAccountTab('headquarters')}>Headquarters accounts</button>
           </div>
-        </>
-      )}
+          {activeAccountTab === 'headquarters' && <HeadquartersAccountsPanel />}
+          {activeAccountTab === 'responders' && <>
+          {isInitialLoading && <LoadingState />}
+          {!isInitialLoading && !hasBlockingError && payload && (
+            <div className="ra-workspace">
+              <div className="ra-main-panel">
+                <div className="ra-roster-region"><RefreshOverlay active={isRefreshing}><RescuerRosterTable rescuers={rescuers} pagination={pagination} onPageChange={setPage} onView={openViewModal} onEdit={openEditModal} onDeactivate={handleDeactivate} onDelete={handleDelete} /></RefreshOverlay></div>
+              </div>
+              <aside className="ra-side-panel"><div className="ra-side-head"><span className="ra-title">Team cards</span></div><RescuerTeamGrid teams={teams} showStatus /><button className="button secondary" type="button" onClick={openTeamConfig}>View all teams</button></aside>
+            </div>
+          )}
+          </>}
+        </>}
 
-      <RescuerAccountModal
-        mode={modalMode}
-        isOpen={isModalOpen}
-        form={form}
-        setForm={setForm}
-        formError={formError}
-        isSaving={isSaving}
-        teamOptions={teamOptions}
-        accountIdOptions={accountIdOptions}
-        fallbackAccountId={payload?.next_account_id || ''}
-        roles={filters.roles || ['Responder']}
-        bloodTypes={filters.blood_types || ['Unknown']}
-        onClose={closeModal}
-        onReset={resetForm}
-        onSubmit={submitForm}
-      />
-
-      <RescueTeamConfigModal
-        key={teamConfigVersion}
-        isOpen={teamConfigOpen}
-        workspace={teamConfig}
-        isLoading={teamConfigLoading}
-        isSaving={teamConfigSaving}
-        error={teamConfigError}
-        onClose={() => !teamConfigSaving && setTeamConfigOpen(false)}
-        onSave={saveTeamConfig}
-        onDelete={removeTeamConfig}
-      />
-    </section>
+    </main>
   )
-}
-
-function filterParams(search, purok, activeChip) {
-  const params = {
-    search: search.trim(),
-    purok,
-    per_page: 25,
-  }
-
-  if (activeChip.startsWith('team:')) {
-    params.team = activeChip.replace('team:', '')
-  } else {
-    params.duty_status = activeChip
-  }
-
-  return params
 }

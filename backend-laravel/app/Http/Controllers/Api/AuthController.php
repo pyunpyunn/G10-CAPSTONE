@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
-use App\Services\AuthService;
+use App\Services\Shared\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -43,8 +43,15 @@ class AuthController extends Controller
         return $this->service->saveRecoveryQuestions($request);
     }
 
+    public function verifyPasswordChange(Request $request): JsonResponse
+    {
+        return $this->service->verifyPasswordChange($request);
+    }
+
     public function resetPassword(Request $request): JsonResponse
     {
         return $this->service->resetPassword($request);
     }
 }
+
+

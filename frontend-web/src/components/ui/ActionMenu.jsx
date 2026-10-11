@@ -1,5 +1,5 @@
 import { MoreVertical } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 export default function ActionMenu({ label = 'Actions', actions = [], buttonClassName = 'icon-button', icon = null }) {
@@ -7,8 +7,8 @@ export default function ActionMenu({ label = 'Actions', actions = [], buttonClas
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const buttonRef = useRef(null)
 
-  function toggleMenu() {
-    if (!isOpen && buttonRef.current) {
+  function updatePosition() {
+    if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
       const menuWidth = 168
       const menuHeight = Math.max(126, actions.length * 42 + 16)
@@ -17,6 +17,28 @@ export default function ActionMenu({ label = 'Actions', actions = [], buttonClas
       const top = hasRoomBelow ? rect.bottom + 6 : Math.max(12, rect.top - menuHeight - 6)
 
       setPosition({ top, left })
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined
+    }
+
+    updatePosition()
+    const handleViewportChange = () => updatePosition()
+    window.addEventListener('scroll', handleViewportChange, true)
+    window.addEventListener('resize', handleViewportChange)
+
+    return () => {
+      window.removeEventListener('scroll', handleViewportChange, true)
+      window.removeEventListener('resize', handleViewportChange)
+    }
+  }, [isOpen, actions.length])
+
+  function toggleMenu() {
+    if (!isOpen) {
+      updatePosition()
     }
 
     setIsOpen(!isOpen)

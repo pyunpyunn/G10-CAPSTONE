@@ -2,6 +2,47 @@
 
 Expo React Native app for the household and rescuer mobile roles.
 
+## Android OneSignal development
+
+`npm start` now opens the development client for OneSignal. Install a RESQPERATION
+Android development APK on your phone first. No iOS setup is needed for this workflow.
+
+One-time dependency installation and APK build:
+
+```powershell
+cd C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile
+npm ci
+npx eas-cli login
+npm run build:dev:android
+```
+
+Open the APK download link returned by EAS on your Android phone and install it.
+The development profile explicitly builds an installable APK. Keep the configured
+OneSignal App ID, or override it with `EXPO_PUBLIC_ONESIGNAL_APP_ID` in `.env`.
+In that OneSignal app, Android / Google (FCM) credentials must be configured.
+The phone needs Google Play Services. Log in and allow notifications, then check
+OneSignal's subscriptions and send a test push to the phone.
+
+Run Laravel in one terminal and Metro in another:
+
+```powershell
+cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
+php artisan serve --host=0.0.0.0 --port=8000
+```
+
+```powershell
+cd C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile
+npm run start:dev
+```
+
+Keep both devices on the same Wi-Fi and open the QR in the installed RESQPERATION
+development app. Use `npm run start:dev:clear` to clear Metro's cache.
+For tunnel mode (`npm run start:dev:tunnel`), set `EXPO_PUBLIC_API_BASE_URL` to a
+phone-reachable Laravel URL ending in `/api/v1`; Metro's tunnel does not expose Laravel.
+
+For screen previews only, download [Expo Go for SDK 54 on Android](https://expo.dev/go?device=true&platform=android&sdkVersion=54)
+and run `npm run start:go`. Expo Go cannot run OneSignal.
+
 The mobile app does not connect directly to MySQL. It connects to Laravel through the API, and Laravel connects to the shared MySQL database.
 
 ## Current API Connection
@@ -9,29 +50,30 @@ The mobile app does not connect directly to MySQL. It connects to Laravel throug
 `frontend-mobile/.env`
 
 ```env
-EXPO_PUBLIC_API_BASE_URL=http://192.168.112.109:8000/api/v1
+EXPO_PUBLIC_API_BASE_URL=
 ```
 
-This IP is the laptop Wi-Fi IP. If the laptop IP changes, update this value.
+Leave this blank for Expo Go: the app derives the API host from the LAN address Expo is using, so changing Wi-Fi IPs will not leave a stale API URL. If you set it manually, use the laptop's current Wi-Fi IPv4 address from `ipconfig`, not `localhost`, `127.0.0.1`, a WSL address, or a VPN address, and restart Expo afterward.
 
-## Required Backend Command For Phone Testing
+## Start Both Servers For Phone Login
 
-Run Laravel with `0.0.0.0`, not only `127.0.0.1`.
+Expo Go and Laravel must both be running. Start Laravel in one PowerShell terminal, from the backend folder:
 
-```bash
-cd backend-laravel
+```powershell
+cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-Reason: Expo Go on a phone must reach the backend through the laptop network IP.
+Keep that terminal open. Binding to `0.0.0.0` lets the phone reach Laravel through the laptop's Wi-Fi IP.
 
-## Start Mobile App
+In a second PowerShell terminal, start Expo:
 
-```bash
-cd frontend-mobile
-npm install
-npm start
+```powershell
+cd C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile
+npm run start:go
 ```
+
+Keep both terminals open, connect the phone and laptop to the same Wi-Fi, then scan the Expo Go QR code. Verify the API from the phone's browser at `http://<laptop-wi-fi-ip>:8000/api/v1/health/ready`; get the current Wi-Fi IP with `ipconfig`. It should return `{"status":"ready"}`. If it does not load, allow PHP/Laravel through Windows Firewall on the private network.
 
 Open the QR code in Expo Go.
 
@@ -46,10 +88,11 @@ Expo Go can run the app for normal QR testing, but it cannot load the native One
 If EAS says the monthly build credits are already used, do not keep running
 `npm run build:dev:android`. Install the latest already-finished APK instead.
 
-Latest checked Android development APK:
+Android map fix: build number 2 includes WebView and OneSignal. The build is
+finished; download and install its APK:
 
 ```text
-https://expo.dev/artifacts/eas/22yUVpAXJ9QmuOdlZNS5sPJuqfSqk2QgsYr9tu4FX80.apk
+https://expo.dev/artifacts/eas/HCBPTw9RYYWDW_Toc8Ga-RhDgl-AeUFWqr1_1DsPyGM.apk
 ```
 
 Open that link on the Android phone, download the APK, allow install from the
@@ -62,6 +105,12 @@ npm run start:dev
 ```
 
 Open the project using the installed RESQPERATION app, not Expo Go.
+
+If the map reports `RNCWebViewModule` missing, the installed APK lacks the native
+module used by the current screens. Install build number 2 above. Metro reloads
+JavaScript only; it cannot install native libraries. Older APKs now show a map
+fallback instead of throwing when WebView is missing. Full embedded maps require
+an APK with WebView. Verify the guard with `npm run test:map`.
 
 If the phone shows `failed to connect to /192.168... port 8082`, the phone
 cannot reach the laptop over LAN. Use tunnel mode instead:
@@ -78,7 +127,7 @@ Tunnel mode is slower, but it avoids Wi-Fi isolation and Windows Firewall issues
 npm run build:dev:android
 ```
 
-Download and install the generated APK/AAB from EAS on the phone. After it is installed, run:
+Download and install the generated APK from EAS on the phone. After it is installed, run:
 
 ```bash
 npm run start:dev

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
 import {
   dispatchStatuses,
@@ -16,65 +17,77 @@ export default function DispatchModalForm({
   assignmentOption,
   setAssignmentOption,
   teams,
-  responders,
   riskAreas,
   selectedRiskId,
   onSelectRiskArea,
   onSelectRiskHousehold,
   onSubmit,
+  showOutcomeUpdate = true,
 }) {
+  const [isAreasCollapsed, setIsAreasCollapsed] = useState(false)
+
   return (
     <form id="dispatchForm" className="dp-dispatch-form" onSubmit={onSubmit}>
-      <section className="dp-modal-section">
-        <div className="dp-modal-section-head">
-          <span className="dp-modal-section-title">Affected areas</span>
-          <span className="dp-modal-section-sub">Purok assignment</span>
+      <div className={`dp-dispatch-panels ${isAreasCollapsed ? 'is-areas-collapsed' : ''}`}>
+        <div className="dp-panel-column dp-affected-areas-column">
+          <section className="dp-modal-section dp-affected-areas-panel">
+            <div className="dp-modal-section-head">
+              <span className="dp-modal-section-title">{isAreasCollapsed ? 'Areas' : 'Affected areas'}</span>
+              {!isAreasCollapsed && <span className="dp-modal-section-sub">Purok assignment</span>}
+              <button
+                className="dp-panel-toggle"
+                type="button"
+                aria-label={isAreasCollapsed ? 'Expand affected areas' : 'Collapse affected areas'}
+                title={isAreasCollapsed ? 'Expand affected areas' : 'Collapse affected areas'}
+                onClick={() => setIsAreasCollapsed((current) => !current)}
+              >
+                {isAreasCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+              </button>
+            </div>
+            {!isAreasCollapsed && (
+              <div className="dp-modal-section-body dp-affected-areas-body">
+                <fieldset className="response-assignment-fields" disabled={Boolean(editingDispatch)}>
+                <RiskAreaList
+                  areas={riskAreas}
+                  selectedRiskId={selectedRiskId}
+                  selectedHouseholdId={form.household_id}
+                  onSelect={onSelectRiskArea}
+                  onSelectHousehold={onSelectRiskHousehold}
+                />
+                </fieldset>
+              </div>
+            )}
+          </section>
         </div>
-        <div className="dp-modal-section-body">
-          <RiskAreaList
-            areas={riskAreas}
-            selectedRiskId={selectedRiskId}
-            selectedHouseholdId={form.household_id}
-            onSelect={onSelectRiskArea}
-            onSelectHousehold={onSelectRiskHousehold}
-          />
-        </div>
-      </section>
 
-      <section className="dp-modal-section">
-        <div className="dp-modal-section-head">
-          <span className="dp-modal-section-title">{editingDispatch ? 'Update assignment' : 'Dispatch assignment'}</span>
-          <span className={`dp-priority-pill dp-priority-${form.priority_level}`}>{label(form.priority_level)}</span>
+        <div className="dp-panel-column dp-dispatch-assignment-column">
+          <section className="dp-modal-section">
+            <div className="dp-modal-section-head">
+              <span className="dp-modal-section-title">{editingDispatch ? 'Update assignment' : 'Dispatch assignment'}</span>
+              <span className={`dp-priority-pill dp-priority-${form.priority_level}`}>{label(form.priority_level)}</span>
+            </div>
+            <div className="dp-modal-section-body">
+              <TargetHouseholdDetails household={form.target_household} />
+              <DispatchFormFields
+                form={form}
+                setForm={setForm}
+                assignmentOption={assignmentOption}
+                setAssignmentOption={setAssignmentOption}
+                teams={teams}
+                editingDispatch={editingDispatch}
+                showOutcomeUpdate={showOutcomeUpdate}
+              />
+              {formError && <div className="form-error">{formError}</div>}
+            </div>
+          </section>
         </div>
-        <div className="dp-modal-section-body">
-          <PlanStats form={form} />
-          <DispatchFormFields
-            form={form}
-            setForm={setForm}
-            assignmentOption={assignmentOption}
-            setAssignmentOption={setAssignmentOption}
-            teams={teams}
-            responders={responders}
-            editingDispatch={editingDispatch}
-          />
-          {formError && <div className="form-error">{formError}</div>}
-        </div>
-      </section>
+      </div>
     </form>
   )
 }
 
 function RiskAreaList({ areas, selectedRiskId, selectedHouseholdId, onSelect, onSelectHousehold }) {
-  const pageSize = 5
-  const [page, setPage] = useState(1)
-
-  const selectedArea = useMemo(() => (
-    areas.find((area) => area.id === selectedRiskId) || null
-  ), [areas, selectedRiskId])
-
-  const pageCount = Math.max(1, Math.ceil(areas.length / pageSize))
-  const currentPage = Math.min(page, pageCount)
-  const visibleAreas = areas.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const selectedArea = areas.find((area) => area.id === selectedRiskId) || null
 
   if (areas.length === 0) {
     return <EmptyState title="No dispatch area yet" message="Areas appear after households send disaster status." />
@@ -102,89 +115,59 @@ function RiskAreaList({ areas, selectedRiskId, selectedHouseholdId, onSelect, on
         </select>
       </label>
 
-      <div className="dp-triage-list">
-        <div className="dp-household-target-head">
-          <span>Purok triage</span>
-          <small>5 areas per page</small>
-        </div>
-        {visibleAreas.map((area) => (
-          <button
-            className={`dp-triage-row ${selectedRiskId === area.id ? 'active' : ''}`}
-            type="button"
-            onClick={() => onSelect(area)}
-            key={area.id}
-          >
-            <span>{area.area_name}</span>
-            <strong>{area.unsafe_households || 0}/{area.total_households || 0} unsafe</strong>
-          </button>
-        ))}
-        <div className="dp-mini-pagination compact">
-          <span>Page {currentPage} of {pageCount}</span>
-          <div>
-            <button type="button" disabled={currentPage <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Prev</button>
-            <button type="button" disabled={currentPage >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>Next</button>
-          </div>
-        </div>
-      </div>
-
       {selectedArea ? (
-        <article className="dp-risk-card active">
-          <div className="dp-risk-top">
-            <div>
-              <div className="dp-risk-name">{selectedArea.area_name}</div>
-              <div className="dp-risk-zone">{selectedArea.zone} - {selectedArea.geotagged_households || 0} with GPS</div>
-            </div>
-            <span className={`dp-priority-pill dp-priority-${selectedArea.priority}`}>{selectedArea.priority_label}</span>
-          </div>
-          <div className="dp-risk-metrics">
-            <RiskMetric label="Total" value={selectedArea.total_households} />
-            <RiskMetric label="GPS" value={selectedArea.geotagged_households} />
-            <RiskMetric label="Unsafe" value={selectedArea.unsafe_households} />
-            <RiskMetric label="To cover" value={selectedArea.to_cover} />
-          </div>
-          <div className="dp-risk-actions">
-            <button className="btn btn-secondary btn-sm dp-use-purok-btn" type="button" onClick={() => onSelect(selectedArea)}>
-              Use this purok
-            </button>
+        <div className="dp-purok-households">
+          <div className="dp-purok-summary">
+            <div><strong>{selectedArea.unsafe_households || 0}</strong><span>Unsafe HH</span></div>
+            <div><strong>{selectedArea.unchecked_households || 0}</strong><span>Unchecked HH</span></div>
+            <div><strong>{selectedArea.to_cover || 0}</strong><span>To cover</span></div>
           </div>
           <HouseholdTargetList
             area={selectedArea}
             selectedHouseholdId={selectedHouseholdId}
             onSelectHousehold={onSelectHousehold}
           />
-        </article>
+        </div>
       ) : (
-        <div className="dp-household-empty">Select a purok to review households and route target.</div>
+        <div className="dp-household-empty">Select a purok to display its households.</div>
       )}
     </div>
   )
 }
 
-function RiskMetric({ label: metricLabel, value }) {
+function TargetHouseholdDetails({ household }) {
   return (
-    <div className="dp-risk-metric">
-      <strong>{value || 0}</strong>
-      <span>{metricLabel}</span>
+    <div className="dp-target-household">
+      <span className="dp-form-block-title">Target household</span>
+      {household ? (
+        <div className="dp-target-household-table-wrap">
+          <table className="dp-target-household-table">
+            <thead>
+              <tr><th>Household ID</th><th>Members</th><th>Status</th><th>Reported unsafe</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{household.household_id}</td>
+                <td>{household.member_count || 0}</td>
+                <td>{household.status_label || 'Status unavailable'}</td>
+                <td>{household.reported_unsafe_count || 0}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="dp-select-placeholder">Select a household from the purok table.</div>
+      )}
     </div>
   )
 }
 
-function PlanStats({ form }) {
-  return (
-    <div className="dp-plan-stats">
-      <div className="dp-plan-stat"><strong>{form.unsafe_count || 0}</strong><span>Unsafe HH</span></div>
-      <div className="dp-plan-stat"><strong>{form.pending_count || 0}</strong><span>Unchecked HH</span></div>
-      <div className="dp-plan-stat"><strong>{form.households_to_cover || 0}</strong><span>To cover</span></div>
-      <div className="dp-plan-stat"><strong>{form.household_id || '-'}</strong><span>Route target</span></div>
-    </div>
-  )
-}
-
-function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOption, teams, responders, editingDispatch }) {
+function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOption, teams, editingDispatch, showOutcomeUpdate }) {
   const outcomeDisabled = !['on_scene', 'completed'].includes(form.status)
   const isEditing = Boolean(editingDispatch)
   const selectedTeamId = getSelectedTeamId(assignmentOption)
-  const availableTeams = teams.filter((team) => team.team_id && team.is_available)
+  const availableTeams = teams.filter((team) => team.team_id && team.is_available
+    && (form.dispatch_type !== 'welfare_check' || Number(team.available_responder_count) >= 2))
   const currentTeam = teams.find((team) => String(team.team_id) === String(selectedTeamId))
 
   return (
@@ -196,6 +179,7 @@ function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOpti
             <span className="form-label">Available team</span>
             <select value={assignmentOption} disabled={isEditing} onChange={(event) => handleTeamChange(event.target.value, setAssignmentOption, setForm)}>
               <option value="">Select available team</option>
+              {isEditing && !currentTeam && <option value={assignmentOption}>{editingDispatch.team_name || editingDispatch.responder_name || 'Assigned responder'}</option>}
               {isEditing && currentTeam && (
                 <option value={`team:${currentTeam.team_id}`}>{currentTeam.team_name}</option>
               )}
@@ -206,31 +190,40 @@ function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOpti
               ))}
             </select>
             <span className="dp-field-help">
-              {isEditing ? 'Responder cannot be changed after dispatch is created.' : 'Select a team, then choose the available responders to send.'}
+              {isEditing ? 'Assigned responders cannot be changed here.' : 'Choose a team and the number of available rescuers to send.'}
             </span>
           </label>
 
           <label>
             <span className="form-label">Field status</span>
-            <select value={form.status} onChange={(event) => setFormValue(setForm, 'status', event.target.value)}>
+            <select value={form.status} disabled={!isEditing} onChange={(event) => setFormValue(setForm, 'status', event.target.value)}>
               {dispatchStatuses.map((status) => (
                 <option value={status.value} key={status.value}>{status.label}</option>
               ))}
             </select>
           </label>
 
+          {form.dispatch_type === 'welfare_check' && (
+            <div className="dp-field-help">Welfare Check: exactly two available rescuers are required.</div>
+          )}
+
           <label>
             <span className="form-label">Assigned area</span>
             <input value={form.assigned_area} readOnly />
           </label>
 
-          <ResponderChecklist
-            selectedTeamId={selectedTeamId}
-            responders={responders}
-            selectedIds={form.selected_responder_ids || []}
-            setForm={setForm}
-            disabled={isEditing}
-          />
+          <label>
+            <span className="form-label">Rescuers to dispatch</span>
+            <input
+              type="number"
+              min="1"
+              max={isEditing ? undefined : Math.max(1, Number(currentTeam?.available_responder_count) || 0)}
+              value={form.responder_count || 1}
+              disabled={isEditing || !currentTeam || !currentTeam.available_responder_count}
+              onChange={(event) => setFormNumber(setForm, 'responder_count', form.dispatch_type === 'welfare_check' ? 2 : event.target.value)}
+            />
+            <span className="dp-field-help">{currentTeam?.available_responder_count || 0} currently available in this team. The system selects and notifies them.</span>
+          </label>
 
           <label className="dp-field-wide">
             <span className="form-label">Priority level</span>
@@ -243,15 +236,17 @@ function DispatchFormFields({ form, setForm, assignmentOption, setAssignmentOpti
         </div>
       </div>
 
-      <div className="dp-form-block">
-        <div className="dp-form-block-title">On-scene outcome update</div>
-        <div className="dp-outcome-grid">
-          <OutcomeInput label="Safe" name="safe_count" value={form.safe_count} disabled={outcomeDisabled} setForm={setForm} className="safe" />
-          <OutcomeInput label="Evacuated" name="evacuated_count" value={form.evacuated_count} disabled={outcomeDisabled} setForm={setForm} className="evac" />
-          <OutcomeInput label="Unsafe" name="unsafe_count" value={form.unsafe_count} disabled={outcomeDisabled} setForm={setForm} className="unsafe" />
-          <OutcomeInput label="Pending" name="pending_count" value={form.pending_count} disabled={outcomeDisabled} setForm={setForm} className="pending" />
+      {showOutcomeUpdate && (
+        <div className="dp-form-block">
+          <div className="dp-form-block-title">On-scene outcome update</div>
+          <div className="dp-outcome-grid">
+            <OutcomeInput label="Safe" name="safe_count" value={form.safe_count} disabled={outcomeDisabled} setForm={setForm} className="safe" />
+            <OutcomeInput label="Evacuated" name="evacuated_count" value={form.evacuated_count} disabled={outcomeDisabled} setForm={setForm} className="evac" />
+            <OutcomeInput label="Unsafe" name="unsafe_count" value={form.unsafe_count} disabled={outcomeDisabled} setForm={setForm} className="unsafe" />
+            <OutcomeInput label="Pending" name="pending_count" value={form.pending_count} disabled={outcomeDisabled} setForm={setForm} className="pending" />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="dp-form-block">
         <label>
@@ -271,35 +266,30 @@ function HouseholdTargetList({ area, selectedHouseholdId, onSelectHousehold }) {
   }
 
   return (
-    <div className="dp-household-targets">
-      <div className="dp-household-target-head">
-        <span>Households in this purok</span>
-        <small>Select a GPS household for routing</small>
-      </div>
-      {households.map((household) => {
-        const cannotSelect = !household.is_available_for_dispatch || !household.has_geotag
-        const isSelected = selectedHouseholdId === household.household_id
+    <div className="dp-household-table-wrap">
+      <table className="dp-household-table">
+        <thead>
+          <tr><th>Family name</th><th>Household ID</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          {households.map((household) => {
+            const cannotSelect = !household.is_available_for_dispatch || !household.has_geotag
+            const isSelected = selectedHouseholdId === household.household_id
 
-        return (
-          <button
-            className={`dp-household-target ${isSelected ? 'active' : ''}`}
-            type="button"
-            key={household.household_id}
-            disabled={cannotSelect}
-            onClick={() => onSelectHousehold(area, household)}
-          >
-            <div>
-              <strong>{household.household_name}</strong>
-              <span>{household.household_id}{household.address ? ` - ${household.address}` : ''}</span>
-            </div>
-            <div className="dp-household-badges">
-              <span className={`badge b-${statusTone(household.status_key)}`}>{household.status_label || 'Unchecked'}</span>
-              <span className={`dp-mini-pill ${household.has_geotag ? 'ok' : 'muted'}`}>{household.has_geotag ? 'GPS' : 'No GPS'}</span>
-              {!household.is_available_for_dispatch && <span className="dp-mini-pill busy">Assigned</span>}
-            </div>
-          </button>
-        )
-      })}
+            return (
+              <tr className={isSelected ? 'active' : ''} key={household.household_id}>
+                <td>{household.household_name}</td>
+                <td>{household.household_id}</td>
+                <td>
+                  <button className="dp-household-select-button" type="button" disabled={cannotSelect} onClick={() => onSelectHousehold(area, household)}>
+                    Select
+                  </button>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -309,7 +299,7 @@ function handleTeamChange(value, setAssignmentOption, setForm) {
   setForm((current) => ({
     ...current,
     selected_responder_ids: [],
-    responder_count: 0,
+    responder_count: 1,
   }))
 }
 
@@ -318,90 +308,6 @@ function getSelectedTeamId(option) {
   return type === 'team' ? id : ''
 }
 
-function ResponderChecklist({ selectedTeamId, responders, selectedIds, setForm, disabled }) {
-  const availableResponders = responders.filter((responder) => (
-    responder.is_available && String(responder.team_id || '') === String(selectedTeamId || '')
-  ))
-  const normalizedIds = selectedIds.map((id) => Number(id)).filter(Boolean)
-
-  function toggleResponder(responderId) {
-    setForm((current) => {
-      const currentIds = Array.isArray(current.selected_responder_ids) ? current.selected_responder_ids.map(Number) : []
-      const nextIds = currentIds.includes(responderId)
-        ? currentIds.filter((id) => id !== responderId)
-        : [...currentIds, responderId]
-
-      return {
-        ...current,
-        selected_responder_ids: nextIds,
-        responder_count: nextIds.length,
-      }
-    })
-  }
-
-  if (!selectedTeamId) {
-    return (
-      <label>
-        <span className="form-label">Responders to send</span>
-        <div className="dp-select-placeholder">Select a team first</div>
-      </label>
-    )
-  }
-
-  if (disabled) {
-    return (
-      <label>
-        <span className="form-label">Responders to send</span>
-        <div className="dp-select-placeholder">{normalizedIds.length || 1} assigned responder{(normalizedIds.length || 1) === 1 ? '' : 's'}</div>
-      </label>
-    )
-  }
-
-  if (availableResponders.length === 0) {
-    return (
-      <label>
-        <span className="form-label">Responders to send</span>
-        <div className="dp-select-placeholder">No available rescuer in this team</div>
-      </label>
-    )
-  }
-
-  return (
-    <div className="dp-checklist-dropdown">
-      <span className="form-label">Responders to send</span>
-      <details>
-        <summary>{normalizedIds.length ? `${normalizedIds.length} selected` : 'Select rescuers'}</summary>
-        <div className="dp-checklist-menu">
-          {availableResponders.map((responder) => (
-            <label className="dp-checklist-item" key={responder.responder_id}>
-              <input
-                type="checkbox"
-                checked={normalizedIds.includes(Number(responder.responder_id))}
-                onChange={() => toggleResponder(Number(responder.responder_id))}
-              />
-              <span>
-                <strong>{responder.full_name}</strong>
-                <small>{responder.team_name}</small>
-              </span>
-            </label>
-          ))}
-        </div>
-      </details>
-    </div>
-  )
-}
-
-function statusTone(statusKey) {
-  if (['safe', 'evacuated', 'checked'].includes(statusKey)) {
-    return 'green'
-  }
-
-  if (['not_evacuated', 'displaced', 'unsafe', 'missing', 'injured'].includes(statusKey)) {
-    return 'red'
-  }
-
-  return 'gray'
-}
 
 function OutcomeInput({ label: inputLabel, name, value, disabled, setForm, className }) {
   return (

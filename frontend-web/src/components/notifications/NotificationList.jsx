@@ -5,6 +5,7 @@ export default function NotificationList({
   notifications = [],
   selectedIds = [],
   onToggleSelected,
+  onOpenNotification,
   pagination = {},
   onPrevious,
   onNext,
@@ -31,7 +32,7 @@ export default function NotificationList({
                   />
                 </label>
                 <div>
-                  <div className="notification-page-title">{item.title}</div>
+                  <button className="notification-page-title notification-open-button" type="button" onClick={() => onOpenNotification(item)}>{item.title}</button>
                   <div className="notification-page-body">{item.body}</div>
                   <div className="notification-page-meta">
                     <span>{item.time}</span>

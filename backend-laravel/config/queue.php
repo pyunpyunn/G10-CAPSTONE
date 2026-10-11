@@ -30,6 +30,39 @@ return [
     */
 
     'connections' => [
+        'realtime_database' => [
+            'driver' => 'database',
+            'connection' => env('REALTIME_DB_CONNECTION', env('DB_CONNECTION', 'resq_local')),
+            'table' => 'jobs', 'queue' => 'realtime', 'retry_after' => 90, 'after_commit' => true,
+        ],
+        'realtime_redis' => [
+            'driver' => 'redis', 'connection' => 'default', 'queue' => 'realtime',
+            'retry_after' => 90, 'block_for' => 1, 'after_commit' => true,
+        ],
+        'reports' => [
+            'driver' => 'database', 'connection' => env('DB_CONNECTION', 'resq_local'),
+            'table' => 'jobs', 'queue' => 'reports', 'retry_after' => 660, 'after_commit' => false,
+        ],
+
+        'operations_outbox' => [
+            'driver' => 'database',
+            'connection' => env('DB_CONNECTION', 'resq_local'),
+            'table' => 'jobs',
+            'queue' => 'operations',
+            'retry_after' => 180,
+            'after_commit' => false,
+        ],
+
+        // The jobs row is inserted through the operational connection within
+        // the same transaction as a resource-request change.
+        'trackingaid_outbox' => [
+            'driver' => 'database',
+            'connection' => env('DB_CONNECTION', 'resq_local'),
+            'table' => 'jobs',
+            'queue' => 'trackingaid',
+            'retry_after' => 180,
+            'after_commit' => false,
+        ],
 
         'sync' => [
             'driver' => 'sync',
@@ -84,6 +117,10 @@ return [
         'failover' => [
             'driver' => 'failover',
             'connections' => [
+                'reports' => [
+                    'driver' => 'database', 'connection' => env('DB_CONNECTION', 'resq_local'),
+                    'table' => 'jobs', 'queue' => 'reports', 'retry_after' => 660, 'after_commit' => false,
+                ],
                 'database',
                 'deferred',
             ],

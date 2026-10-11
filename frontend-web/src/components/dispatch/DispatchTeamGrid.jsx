@@ -1,82 +1,56 @@
 import EmptyState from '../ui/EmptyState'
 import DispatchStatusBadge from './DispatchStatusBadge'
-import { initials } from '../../utils/dispatchHelpers'
 
 export default function DispatchTeamGrid({ teams, onOpenUpdate, onOpenNew }) {
   if (teams.length === 0) {
-    return <EmptyState title="No rescue teams yet" message="Rescue team cards will appear after HQ/Admin registers teams and responders." />
+    return <EmptyState title="No rescue teams yet" message="Rescue teams will appear after HQ/Admin registers teams and responders." />
   }
 
   return (
-    <div className="dp-team-grid">
-      {teams.map((team) => (
-        <TeamCard key={team.team_id || team.team_code || team.team_name} team={team} onOpenUpdate={onOpenUpdate} onOpenNew={onOpenNew} />
-      ))}
+    <div className="dp-team-table-wrap">
+      <table className="dp-team-table">
+        <thead>
+          <tr>
+            <th>Abbreviation</th>
+            <th>Team name</th>
+            <th>Active members</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {teams.map((team) => (
+            <TeamRow key={team.team_id || team.team_code || team.team_name} team={team} onOpenUpdate={onOpenUpdate} onOpenNew={onOpenNew} />
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
 
-function TeamCard({ team, onOpenUpdate, onOpenNew }) {
-  const assigned = team.assigned_households || 0
-  const coverage = team.coverage_percent || 0
+function TeamRow({ team, onOpenUpdate, onOpenNew }) {
   const hasActiveAssignment = Boolean(team.active_assignment_id)
   const canDispatch = hasActiveAssignment || team.is_available
-  const memberLabel = team.member_count === 1 ? '1 member' : `${team.member_count || 0} members`
 
   return (
-    <article className={`dp-team-card status-${team.status_key}`}>
-      <div className="dp-team-head">
-        <div className="dp-team-icon">{initials(team.team_name)}</div>
-        <div>
-          <div className="dp-team-name">{team.team_name}</div>
-          <div className="dp-team-law">{team.team_type} - {memberLabel}</div>
-        </div>
-        <DispatchStatusBadge status={{ key: team.status_key, label: team.status_label, tone: team.status_key === 'on_scene' ? 'green' : team.status_key === 'dispatched' ? 'purple' : 'gray' }} />
-      </div>
-
-      <div className="dp-team-body">
-        <div className="dp-team-stat">
-          <div className="dp-team-stat-val">{assigned || '-'}</div>
-          <div className="dp-team-stat-lbl">HH assigned</div>
-        </div>
-        <div className="dp-team-stat">
-          <div className="dp-team-stat-val dp-green-text">{coverage}%</div>
-          <div className="dp-team-stat-lbl">Coverage</div>
-        </div>
-      </div>
-
-      <div className="dp-team-outcomes">
-        <OutcomeTile label="Safe" value={team.outcomes?.safe} className="safe" />
-        <OutcomeTile label="Evac" value={team.outcomes?.evacuated} className="evac" />
-        <OutcomeTile label="Unsafe" value={team.outcomes?.unsafe} className="unsafe" />
-        <OutcomeTile label="Pending" value={team.outcomes?.pending} className="pending" />
-      </div>
-
-      <div className="dp-coverage-bar">
-        <div className="dp-coverage-fill" style={{ width: `${coverage}%` }} />
-      </div>
-      <div className="dp-coverage-lbl">{assigned ? `Coverage accuracy: ${coverage}%` : 'No households assigned'}</div>
-
-      <div className="dp-team-footer">
-        <span className="dp-team-area">{team.assigned_area} {team.assigned_time ? `- ${team.assigned_time}` : ''}</span>
+    <tr className={`status-${team.status_key}`}>
+      <td><strong>{team.team_code || '--'}</strong></td>
+      <td>
+        <strong>{team.team_name}</strong>
+        <span className="dp-table-muted">{team.team_type || 'Response team'}</span>
+      </td>
+      <td>{team.active_member_count || 0} / {team.member_count || 0}</td>
+      <td><DispatchStatusBadge status={{ key: team.status_key, label: team.status_label, tone: team.status_key === 'on_scene' ? 'green' : team.status_key === 'dispatched' ? 'purple' : 'gray' }} /></td>
+      <td>
         <button
           className={`btn btn-${hasActiveAssignment ? 'secondary' : 'primary'} btn-sm`}
           type="button"
           disabled={!canDispatch}
-          onClick={() => (hasActiveAssignment ? onOpenUpdate(team) : onOpenNew())}
+          onClick={() => (hasActiveAssignment ? onOpenUpdate(team) : onOpenNew(team))}
         >
-          {hasActiveAssignment ? 'Update' : team.is_available ? 'Dispatch' : 'No available responder'}
+          {hasActiveAssignment ? 'Update' : 'Dispatch'}
         </button>
-      </div>
-    </article>
-  )
-}
-
-function OutcomeTile({ label, value, className }) {
-  return (
-    <div className={`dp-outcome ${className}`}>
-      <div className="dp-outcome-val">{value || 0}</div>
-      <div className="dp-outcome-lbl">{label}</div>
-    </div>
+      </td>
+    </tr>
   )
 }

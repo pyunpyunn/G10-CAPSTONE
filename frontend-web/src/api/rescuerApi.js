@@ -12,12 +12,12 @@ export async function getRescuer(responderId) {
 
 export async function createRescuer(payload) {
   const response = await api.post('/rescuers', payload)
-  return response.data.data
+  return { ...response.data.data, message: response.data.message }
 }
 
 export async function updateRescuer(responderId, payload) {
   const response = await api.patch(`/rescuers/${responderId}`, payload)
-  return response.data.data
+  return { ...response.data.data, message: response.data.message }
 }
 
 export async function deactivateRescuer(responderId) {
@@ -42,5 +42,10 @@ export async function updateRescueTeam(teamId, payload) {
 
 export async function deleteRescueTeam(teamId) {
   const response = await api.delete(`/rescuers/team-config/${teamId}`)
+  return response.data.data
+}
+
+export async function deleteRescuer(responderId) {
+  const response = await api.delete(`/rescuers/${responderId}`)
   return response.data.data
 }

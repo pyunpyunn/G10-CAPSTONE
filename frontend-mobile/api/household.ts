@@ -20,7 +20,10 @@ export type HouseholdOverview = {
   evacuation_centers: any[];
   trusted: {
     is_available: boolean;
+    pin_configured: boolean;
     households: any[];
+    incoming_requests: any[];
+    notifications?: any[];
   };
   qr: any;
 };
@@ -50,6 +53,11 @@ export async function saveHouseholdMemberStatus(memberId: string, payload: any) 
   return response.data.data;
 }
 
+export async function saveTrustedHouseholdMemberStatus(connectionId: string, memberId: string, payload: any) {
+  const response = await api.post(`/household/trusted-households/${connectionId}/members/${memberId}/status`, payload);
+  return response.data.data;
+}
+
 export async function saveHouseholdStatus(payload: any) {
   const response = await api.post('/household/status', payload);
   return response.data;
@@ -60,6 +68,16 @@ export async function getHouseholdQr() {
   return response.data.data;
 }
 
+export async function saveTrustedPin(payload: { pin: string; pin_confirmation: string; current_pin?: string }) {
+  const response = await api.put('/household/trusted-pin', payload);
+  return response.data;
+}
+
+export async function verifyTrustedPin(pin: string) {
+  const response = await api.post('/household/trusted-pin/verify', { pin });
+  return response.data;
+}
+
 export async function lookupTrustedHousehold(householdId: string) {
   const response = await api.get(`/household/trusted-households/lookup/${householdId}`);
   return response.data.data;
@@ -67,5 +85,15 @@ export async function lookupTrustedHousehold(householdId: string) {
 
 export async function createTrustedHousehold(payload: any) {
   const response = await api.post('/household/trusted-households', payload);
+  return response.data;
+}
+
+export async function deleteTrustedHousehold(connectionId: string) {
+  const response = await api.delete(`/household/trusted-households/${connectionId}`);
+  return response.data;
+}
+
+export async function respondToTrustedHousehold(connectionId: string, decision: 'accept' | 'reject') {
+  const response = await api.patch(`/household/trusted-households/${connectionId}`, { decision });
   return response.data;
 }

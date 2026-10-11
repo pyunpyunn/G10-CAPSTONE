@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\ArchiveService;
+use App\Http\Requests\ListRequest;
+use App\Services\Web\ArchiveService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,32 +18,47 @@ class ArchiveController extends Controller
         $this->service = $service;
     }
 
-    public function disasterEvents(Request $request): JsonResponse
+    public function inquiryLogs(ListRequest $request): JsonResponse
+    {
+        if (! \App\Support\RequestSchema::hasTable('landing_inquiries')) {
+            return response()->json(['data' => ['records' => ['data' => [], 'total' => 0]]]);
+        }
+        $search = trim((string) $request->query('search', ''));
+        $rows = \App\Models\LandingInquiry::query()
+            ->select(['inquiry_id', 'name', 'organization', 'email', 'message', 'status', 'created_at'])
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")->orWhere('message', 'like', "%{$search}%");
+            }))
+            ->orderByDesc('created_at')->paginate($request->integer('per_page', 20));
+        return response()->json(['data' => ['records' => $rows]]);
+    }
+
+    public function disasterEvents(ListRequest $request): JsonResponse
     {
         return $this->service->disasterEvents($request);
     }
 
-    public function householdStatusLogs(Request $request): JsonResponse
+    public function householdStatusLogs(ListRequest $request): JsonResponse
     {
         return $this->service->householdStatusLogs($request);
     }
 
-    public function dispatchLogs(Request $request): JsonResponse
+    public function dispatchLogs(ListRequest $request): JsonResponse
     {
         return $this->service->dispatchLogs($request);
     }
 
-    public function radioCommunicationLogs(Request $request): JsonResponse
+    public function radioCommunicationLogs(ListRequest $request): JsonResponse
     {
         return $this->service->radioCommunicationLogs($request);
     }
 
-    public function resourceRequests(Request $request): JsonResponse
+    public function resourceRequests(ListRequest $request): JsonResponse
     {
         return $this->service->resourceRequests($request);
     }
 
-    public function situationReports(Request $request): JsonResponse
+    public function situationReports(ListRequest $request): JsonResponse
     {
         return $this->service->situationReports($request);
     }
@@ -52,7 +68,7 @@ class ArchiveController extends Controller
         return $this->service->export($request);
     }
 
-    public function savedGroups(Request $request): JsonResponse
+    public function savedGroups(ListRequest $request): JsonResponse
     {
         return $this->service->savedGroups($request);
     }
@@ -77,3 +93,6 @@ class ArchiveController extends Controller
         return $this->service->deleteSelected($request);
     }
 }
+
+
+

@@ -1,12 +1,3 @@
-export const requestChips = [
-  { key: 'all', label: 'All', params: {} },
-  { key: 'needs_validation', label: 'Needs validation', params: { status: 'needs_validation' } },
-  { key: 'verified', label: 'Verified', params: { status: 'verified' } },
-  { key: 'forwarded', label: 'Forwarded', params: { status: 'forwarded' } },
-  { key: 'personnel', label: 'Personnel', params: { category: 'personnel' } },
-  { key: 'resource', label: 'Resource', params: { category: 'resource' } },
-]
-
 export function emptyResourceRequestForm(payload = {}) {
   const firstUrgency = payload.options?.urgencies?.find((item) => item.key === 'medium') || payload.options?.urgencies?.[0]
 
@@ -67,6 +58,10 @@ export function buildCreatePayload(form) {
   }
 }
 
+export function buildUpdatePayload(form) {
+  return buildCreatePayload(form)
+}
+
 export function buildValidationPayload(form) {
   return {
     validation_status: form.validation_status,
@@ -85,22 +80,23 @@ export function buildForwardPayload(form) {
 
 export function buildReturnPayload(form) {
   return {
-    validation_notes: form.validation_notes || 'Returned for missing information or duplicate check.',
+    validation_notes: form.validation_notes || '',
     missing_information: emptyToNull(form.missing_information),
     duplicate_request_id: emptyToNull(form.duplicate_request_id),
   }
 }
 
-export function filterParams(search, purok, activeChip, page = 1) {
-  const chip = requestChips.find((item) => item.key === activeChip)
+export function filterParams(search, purok, activeChip, page = 1, period = 'week') {
+  const [filterType, filterValue] = String(activeChip).split(':', 2)
 
   return {
     search: search.trim(),
     purok,
     page,
-    per_page: 6,
-    core: 1,
-    ...(chip?.params || {}),
+    per_page: 5,
+    period,
+    ...(filterType === 'status' && filterValue ? { status: filterValue } : {}),
+    ...(filterType === 'category' && filterValue ? { category: filterValue } : {}),
   }
 }
 

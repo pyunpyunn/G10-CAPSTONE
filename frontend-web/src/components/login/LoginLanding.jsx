@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { submitLandingInquiry } from '../../api/inquiryApi'
+import ResQperationLogo from '../layout/ResQperationLogo'
 
 const featureCards = [
   {
@@ -50,12 +51,8 @@ export default function LoginLanding({ onOpenLogin }) {
       <header className="landing-header">
         <div className="landing-wrap landing-header-inner">
           <a className="landing-brand" href="#top" aria-label="RESQPERATION landing page">
-            <span className="brand-mark">
-              <img className="brand-logo-image" src="/favicon.svg" alt="" aria-hidden="true" />
-            </span>
-            <span className="landing-brand-text">
-              <strong>RESQPERATION</strong>
-              <span>Barangay rescue operations</span>
+            <span className="landing-wordmark" aria-hidden="true">
+              <ResQperationLogo />
             </span>
           </a>
 
@@ -114,7 +111,7 @@ function HeroSection({ onOpenLogin }) {
         </div>
       </div>
 
-      <div className="hero-visual" role="img" aria-label="Barangay response dashboard and household map visual">
+      <div className="hero-visual" aria-hidden="true">
         <div className="map-route">
           <span className="map-pin" />
           <span className="map-pin red" />
@@ -125,16 +122,15 @@ function HeroSection({ onOpenLogin }) {
         </div>
 
         <div className="visual-panel dispatch-panel">
-          <div className="panel-kicker">Dispatch status</div>
-          <div className="dispatch-team"><strong>Search & Rescue</strong><span>En route</span></div>
-          <div className="dispatch-team"><strong>Evacuation</strong><span>Assigned</span></div>
-          <div className="dispatch-team"><strong>Medical Aid</strong><span>Ready</span></div>
+          <div className="panel-kicker">Dispatch coordination</div>
+          <div className="dispatch-team"><strong>Assign teams</strong></div>
+          <div className="dispatch-team"><strong>Track routes</strong></div>
+          <div className="dispatch-team"><strong>Review outcomes</strong></div>
         </div>
 
         <div className="visual-panel status-panel">
-          <div className="panel-kicker">Household reports</div>
-          <div className="panel-value">64%</div>
-          <div className="panel-line"><span>Accounted households</span><strong>320/500</strong></div>
+          <div className="panel-kicker">Household reporting</div>
+          <div className="panel-line"><span>Live records after sign-in</span></div>
           <div className="mini-bars" aria-hidden="true">
             <span />
             <span />
@@ -315,7 +311,7 @@ function ContactSection() {
       event.currentTarget.reset()
       setStatus('Inquiry sent. The Super Admin can review it in the Inquiries page.')
     } catch (error) {
-      const message = error?.response?.data?.message || 'Inquiry cannot be saved right now. Please contact the development team directly.'
+      const message = error?.response?.data?.message || 'Inquiry cannot be saved right now. Please try again later.'
       setStatus(message)
     } finally {
       setIsSending(false)
@@ -335,7 +331,7 @@ function ContactSection() {
                 <div className="contact-icon"><ShieldUser size={18} /></div>
                 <div>
                   <strong>Capstone Development Team</strong>
-                  <span>resqperation.devteam@example.com</span>
+                  <span>Use the inquiry form to reach the development team.</span>
                 </div>
               </div>
               <div className="contact-item">
@@ -349,14 +345,19 @@ function ContactSection() {
           </div>
 
           <form className="soft-card contact-form" onSubmit={submitInquiry}>
-            <div className="form-row">
-              <input type="text" name="name" placeholder="Name" aria-label="Name" />
-              <input type="text" name="organization" placeholder="Organization" aria-label="Organization" />
-            </div>
-            <input type="email" name="email" placeholder="Email" aria-label="Email" />
-            <textarea name="message" placeholder="Message" aria-label="Message" />
-            {status && <div className="landing-form-note">{status}</div>}
-            <button className="primary-button" type="submit" disabled={isSending}>{isSending ? 'Sending...' : 'Send inquiry'}</button>
+              <div className="form-row">
+                 <input type="text" name="name" placeholder="Name" aria-label="Name" required />
+                 <input type="text"name="organization" placeholder="Organization" aria-label="Organization" required />
+          </div>
+
+                <input type="email" name="email" placeholder="Email" aria-label="Email" required title="Please enter a valid email address." />
+                <textarea name="message" placeholder="Message" aria-label="Message" minLength={20} maxLength={100} required title="Message must be between 20 and 100 characters."
+                    onChange={(e) => {  e.target.nextElementSibling.textContent = `${e.target.value.length} / 100`; }} />
+                <small className="message-counter">0 / 100 characters</small>
+
+                  {status && <div className="landing-form-note">{status}</div>}
+                  <button className="primary-button" type="submit" disabled={isSending} >
+                {isSending ? 'Sending...' : 'Send inquiry'} </button>
           </form>
         </div>
       </div>
