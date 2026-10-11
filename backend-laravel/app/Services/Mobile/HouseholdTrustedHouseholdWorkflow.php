@@ -161,8 +161,9 @@ class HouseholdTrustedHouseholdWorkflow
             return response()->json(['message' => 'Household member was not found.'], 404);
         }
 
+        $options = $this->readQuery->statusOptions($targetHouseholdId, $activeEvent['event_id']);
         $validated = $request->validate([
-            'status_key' => ['required', Rule::in(['safe', 'evacuated', 'unsafe', 'needs_help'])],
+            'status_key' => ['required', Rule::in(array_column($options, 'key'))],
             'device_uuid' => ['nullable', 'string', 'max:150'],
             'latitude' => [Rule::requiredIf($request->input('status_key') === 'unsafe'), 'numeric', 'between:-90,90'],
             'longitude' => [Rule::requiredIf($request->input('status_key') === 'unsafe'), 'numeric', 'between:-180,180'],
@@ -176,7 +177,7 @@ class HouseholdTrustedHouseholdWorkflow
             'status_key.in' => 'Choose a valid family member status.',
         ]);
 
-        $status = $this->readQuery->resolveStatus($validated['status_key']);
+        $status = $this->readQuery->resolveStatus($validated['status_key'], collect($options)->firstWhere('key', $validated['status_key']));
 
         if (! $status) {
             throw ValidationException::withMessages([
@@ -184,6 +185,9 @@ class HouseholdTrustedHouseholdWorkflow
             ]);
         }
 
+        $validated['safety_basis'] = $status['safety_basis'] ?? null;
+        $validated['canonical_status_key'] = $status['status_key'];
+        $validated['selected_status_label'] = $status['status_label'];
         $user = $request->user();
         $now = now();
         $deviceId = $this->statusWriter->deviceIdForUuid($reportingHouseholdId, $validated['device_uuid'] ?? null);
@@ -196,7 +200,7 @@ class HouseholdTrustedHouseholdWorkflow
                 'member_id' => $memberId,
                 'member_name' => $memberName,
                 'mobile_status_key' => $validated['status_key'],
-                'mobile_status_label' => $this->presenter->mobileStatusLabel($validated['status_key'], null),
+                'mobile_status_label' => $status['status_label'],
                 'member_notes' => $validated['notes'] ?? null,
             ];
 
@@ -254,7 +258,7 @@ class HouseholdTrustedHouseholdWorkflow
                     'member_name' => $memberName,
                     'status_id' => $status['status_id'],
                     'status_key' => $validated['status_key'],
-                    'status_label' => $this->presenter->mobileStatusLabel($validated['status_key'], null),
+                    'status_label' => $status['status_label'],
                     'notes' => $validated['notes'] ?? null,
                     'submitted_at' => $now->toDateTimeString(),
                     'submitted_label' => $this->presenter->dateLabel($now->toDateTimeString()),

@@ -25,3 +25,23 @@ export async function getBroadcasts(eventId) {
   const response = await api.get(`/disaster-events/${eventId}/broadcasts`)
   return response.data.data
 }
+
+export async function createStatusOption(payload) {
+  const response = await api.post('/status-types', payload)
+  return response.data.data
+}
+
+export async function deleteStatusOption(statusKey) {
+  const response = await api.delete(`/status-types/${encodeURIComponent(statusKey)}`)
+  return response.data.data
+}
+
+export async function createDisasterType(payload) {
+  const response = await api.post('/disaster-types', payload)
+  return response.data.data
+}
+
+export async function deleteDisasterType(typeId) {
+  const response = await api.delete(`/disaster-types/${encodeURIComponent(typeId)}`)
+  return response.data.data
+}

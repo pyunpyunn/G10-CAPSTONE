@@ -12,7 +12,9 @@ OneSignal's delivery report is needed to confirm receipt.
 
 The local broadcast worker is started independently from the old operations
 backlog. Normal `composer dev` also consumes `broadcasts` before `operations`.
-For a dedicated worker after restarting the computer:
+The local Windows account now starts the dedicated broadcast worker automatically at sign-in through `RESQPERATIONBroadcastWorker`. The launcher checks for an existing broadcast worker to avoid duplicates. The startup command runs `start-broadcast-worker.ps1`, which consumes only the `broadcasts` queue.
+
+For a dedicated worker on another machine:
 
 ```powershell
 php artisan queue:work operations_outbox --queue=broadcasts --sleep=1 --tries=3 --timeout=120
@@ -33,3 +35,7 @@ Setup audit: the existing OneSignal API key authenticates, but Android Firebase
 credentials are empty and OneSignal reports zero messageable devices. Server
 delivery is wired; actual phone delivery remains blocked until Firebase credentials
 are supplied and a phone obtains its Android push subscription.
+
+Every newly saved broadcast uses `channel=onesignal`. Provider message IDs, errors, and accepted counts are stored on the broadcast and shown in its web history. Message IDs identify the corresponding request in OneSignal reports. An empty provider ID is never treated as a successful push.
+
+Latest audit: both the OneSignal account and Expo Android credentials lack an FCM v1 credential. No Firebase/gcloud login or service-account JSON was found locally. Actual delivery requires authenticating the Firebase integration or supplying an existing service-account file; the Expo build URL is an APK build, not a OneSignal account or Firebase credential.

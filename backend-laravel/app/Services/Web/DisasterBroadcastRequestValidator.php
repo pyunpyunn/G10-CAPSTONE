@@ -17,7 +17,7 @@ class DisasterBroadcastRequestValidator
     public function validateEvent(Request $request): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:100'],
+            'name' => ['required', 'string', 'max:20'],
             'type_id' => ['required', 'integer', 'exists:disaster_types,type_id'],
             'severity_level_id' => ['required', 'integer', 'exists:severity_levels,severity_id'],
             'started_at' => ['nullable', 'date'],
@@ -27,7 +27,7 @@ class DisasterBroadcastRequestValidator
     public function validateEventUpdate(Request $request): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:100'],
+            'name' => ['required', 'string', 'max:20'],
             'type_id' => ['required', 'integer', 'exists:disaster_types,type_id'],
             'severity_level_id' => ['required', 'integer', 'exists:severity_levels,severity_id'],
         ]);
@@ -36,16 +36,16 @@ class DisasterBroadcastRequestValidator
     public function validateBroadcast(Request $request): array
     {
         $validated = $request->validate([
-            'broadcast_title' => ['required', 'string', 'max:150'],
-            'message' => ['required', 'string', 'min:10', 'max:2000'],
+            'broadcast_title' => ['required', 'string', 'max:50'],
+            'message' => ['required', 'string', 'max:50'],
             'severity_id' => ['nullable', 'integer', 'exists:severity_levels,severity_id'],
             'scope_type' => ['required', 'string', Rule::in(['barangay_wide', 'selected_puroks'])],
             'target_area' => ['nullable', 'string', 'max:150'],
-            'estimated_duration' => ['nullable', 'string', 'max:50'],
+            'estimated_duration' => ['required', 'string', 'regex:/^\\d{1,3}\\s*(hours?|days?)$/i'],
             'channel' => ['nullable', 'string', 'max:50'],
             'allowed_statuses' => ['required', 'array', 'size:4'],
-            'allowed_statuses.*' => ['required', 'string', 'max:40'],
-            'direct_puroks' => ['nullable', 'array', 'max:5'],
+            'allowed_statuses.*' => ['required', 'string', 'max:40', Rule::in(array_column($this->presenter->statusOptions(), 'key'))],
+            'direct_puroks' => ['nullable', 'array'],
             'direct_puroks.*.name' => ['required_with:direct_puroks', 'string', 'max:80'],
             'direct_puroks.*.priority' => ['nullable', 'string', Rule::in(['critical', 'high', 'watch', 'monitor'])],
         ]);

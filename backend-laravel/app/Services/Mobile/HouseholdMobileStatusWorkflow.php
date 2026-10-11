@@ -55,8 +55,9 @@ class HouseholdMobileStatusWorkflow
             return response()->json(['message' => 'Household member was not found.'], 404);
         }
 
+        $options = $this->readQuery->statusOptions($householdId, $activeEvent['event_id']);
         $validated = $request->validate([
-            'status_key' => ['required', Rule::in(['safe', 'evacuated', 'unsafe', 'needs_help'])],
+            'status_key' => ['required', Rule::in(array_column($options, 'key'))],
             'device_uuid' => ['nullable', 'string', 'max:150'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -70,7 +71,7 @@ class HouseholdMobileStatusWorkflow
             'status_key.in' => 'Choose a valid family member status.',
         ]);
 
-        $status = $this->readQuery->resolveStatus($validated['status_key']);
+        $status = $this->readQuery->resolveStatus($validated['status_key'], collect($options)->firstWhere('key', $validated['status_key']));
 
         if (! $status) {
             throw ValidationException::withMessages([
@@ -78,6 +79,9 @@ class HouseholdMobileStatusWorkflow
             ]);
         }
 
+        $validated['safety_basis'] = $status['safety_basis'] ?? null;
+        $validated['canonical_status_key'] = $status['status_key'];
+        $validated['selected_status_label'] = $status['status_label'];
         $now = now();
         $statusLogId = null;
         $deviceId = $this->writer->deviceIdForUuid($householdId, $validated['device_uuid'] ?? null);
@@ -89,7 +93,8 @@ class HouseholdMobileStatusWorkflow
                 'member_id' => $memberId,
                 'member_name' => $memberName,
                 'mobile_status_key' => $validated['status_key'],
-                'mobile_status_label' => $this->presenter->mobileStatusLabel($validated['status_key'], null),
+                'mobile_status_label' => $status['status_label'],
+                'safety_basis' => $status['safety_basis'] ?? null,
                 'member_notes' => $validated['notes'] ?? null,
             ];
 
@@ -147,7 +152,7 @@ class HouseholdMobileStatusWorkflow
                     'member_name' => $memberName,
                     'status_id' => $status['status_id'],
                     'status_key' => $validated['status_key'],
-                    'status_label' => $this->presenter->mobileStatusLabel($validated['status_key'], null),
+                    'status_label' => $status['status_label'],
                     'notes' => $validated['notes'] ?? null,
                     'submitted_at' => $now->toDateTimeString(),
                     'submitted_label' => $this->presenter->dateLabel($now->toDateTimeString()),
@@ -179,8 +184,9 @@ class HouseholdMobileStatusWorkflow
             ], 409);
         }
 
+        $options = $this->readQuery->statusOptions($householdId, $activeEvent['event_id']);
         $validated = $request->validate([
-            'status_key' => ['required', Rule::in(['safe', 'evacuated', 'unsafe', 'needs_help'])],
+            'status_key' => ['required', Rule::in(array_column($options, 'key'))],
             'device_uuid' => ['nullable', 'string', 'max:150'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -194,7 +200,7 @@ class HouseholdMobileStatusWorkflow
             'status_key.in' => 'Choose a valid household status.',
         ]);
 
-        $status = $this->readQuery->resolveStatus($validated['status_key']);
+        $status = $this->readQuery->resolveStatus($validated['status_key'], collect($options)->firstWhere('key', $validated['status_key']));
 
         if (! $status) {
             throw ValidationException::withMessages([
@@ -202,8 +208,11 @@ class HouseholdMobileStatusWorkflow
             ]);
         }
 
-        $validated['notes'] = $this->presenter->statusNotesJson($validated['status_key'], $validated['notes'] ?? null);
+        $validated['notes'] = $this->presenter->statusNotesJson($validated['status_key'], $validated['notes'] ?? null, $status['status_label'], $status['safety_basis'] ?? null);
 
+        $validated['safety_basis'] = $status['safety_basis'] ?? null;
+        $validated['canonical_status_key'] = $status['status_key'];
+        $validated['selected_status_label'] = $status['status_label'];
         $now = now();
         $statusLogId = null;
         $deviceId = $this->writer->deviceIdForUuid($householdId, $validated['device_uuid'] ?? null);

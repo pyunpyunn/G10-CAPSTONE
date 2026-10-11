@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Jobs\SendDispatchChangePush;
 use App\Models\ResponderAssignment;
 use App\Services\Shared\OperationalSequence;
+use App\Services\Shared\RealtimeOutbox;
 use App\Support\RequestSchema as Schema;
 use Illuminate\Support\Facades\DB;
 
@@ -70,6 +71,10 @@ class UpdateHouseholdStatus
                 $this->withdrawAssignments($eventId, $householdId, $now);
             }
         }, 3);
+
+        DB::afterCommit(function (): void {
+            app(RealtimeOutbox::class)->deliverPendingNow();
+        });
     }
 
     private function withdrawAssignments(string $eventId, string $householdId, $now): void

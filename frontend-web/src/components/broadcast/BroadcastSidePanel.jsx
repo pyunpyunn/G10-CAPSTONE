@@ -106,6 +106,10 @@ function BroadcastLog({ broadcasts }) {
                   <span><strong>Target:</strong> {broadcast.scope_label || broadcast.target_area || 'Target unavailable'}</span>
                   <span><strong>Recipients:</strong> {broadcast.recipient_count || 0}</span>
                   <span><strong>Mobile push:</strong> {pushStatusLabel(broadcast.push_status)}</span>
+                  <span><strong>Channel:</strong> {broadcast.channel === 'onesignal' ? 'OneSignal' : broadcast.channel || 'OneSignal'}</span>
+                  <span><strong>Accepted by OneSignal:</strong> {broadcast.accepted_count || 0}</span>
+                  {(broadcast.provider_ids || []).map((id) => <span key={id}><strong>OneSignal message ID:</strong> {id}</span>)}
+                  {(broadcast.push_errors || []).map((error, index) => <span key={index}><strong>Push error:</strong> {error}</span>)}
                 </div>
               </div>
             </article>

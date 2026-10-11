@@ -3,12 +3,14 @@
 namespace App\Presenters;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use App\Support\RequestSchema as Schema;
 
 class DisasterBroadcastPresenter
 {
     public function statusOptions(): array
     {
-        return [
+        $fallback = [
             ['key' => 'safe', 'label' => 'Safe'],
             ['key' => 'evacuated', 'label' => 'Evacuated'],
             ['key' => 'need_help', 'label' => 'Need help'],
@@ -18,6 +20,23 @@ class DisasterBroadcastPresenter
             ['key' => 'needs_supplies', 'label' => 'Needs supplies'],
             ['key' => 'follow_up', 'label' => 'Follow-up'],
         ];
+
+        if (! Schema::hasTable('household_statuses') || ! Schema::hasColumn('household_statuses', 'status_key')) {
+            return array_map(fn ($option) => $option + ['safety_basis' => \App\Support\StatusSafety::basis($option['key'])], $fallback);
+        }
+
+        $labelColumn = Schema::hasColumn('household_statuses', 'status_label')
+            ? 'status_label'
+            : (Schema::hasColumn('household_statuses', 'status_name') ? 'status_name' : null);
+        if (! $labelColumn) return array_map(fn ($option) => $option + ['safety_basis' => \App\Support\StatusSafety::basis($option['key'])], $fallback);
+
+        $columns = ['status_key', $labelColumn.' as status_label'];
+        if (Schema::hasColumn('household_statuses', 'safety_basis')) $columns[] = 'safety_basis';
+        $options = DB::table('household_statuses')->orderBy('status_id')->get($columns)
+            ->map(fn (object $status): array => ['key' => $status->status_key, 'label' => $status->status_label, 'safety_basis' => \App\Support\StatusSafety::basis($status->status_key, $status->safety_basis ?? null)])
+            ->values()->all();
+
+        return $options;
     }
 
     public function formatEvent(object $event, int $statusSentCount = 0, array $latestWeather = []): array
@@ -85,6 +104,7 @@ class DisasterBroadcastPresenter
             'target_area' => $broadcast->target_area_label ?? $metadata['area'] ?? $this->scopeLabel($broadcast->scope_type),
             'direct_puroks' => $directPuroks,
             'allowed_statuses' => $statusKeys,
+            'status_options' => $this->decodeJsonArray($broadcast->status_options_json ?? null),
             'estimated_duration' => $metadata['duration'] ?? null,
             'recipient_count' => $recipientCount === null
                 ? $fallbackRecipientCount
@@ -92,6 +112,9 @@ class DisasterBroadcastPresenter
             'message' => $broadcast->message,
             'channel' => $broadcast->channel,
             'push_status' => $broadcast->push_status ?? null,
+            'provider_ids' => $this->decodeJsonArray($broadcast->push_provider_ids_json ?? null),
+            'push_errors' => $this->decodeJsonArray($broadcast->push_errors_json ?? null),
+            'accepted_count' => isset($broadcast->push_accepted_count) ? (int) $broadcast->push_accepted_count : 0,
             'sms_status' => $broadcast->sms_status ?? null,
             'status' => $broadcast->status,
             'sent_at' => $this->formatDateTime($broadcast->sent_at),
@@ -125,17 +148,12 @@ class DisasterBroadcastPresenter
 
     public function decodeJsonArray(mixed $text): array
     {
-        if (is_array($text)) {
-            return $text;
+        // Older broadcasts stored JSON strings through Eloquent array casts,
+        // so some records contain a JSON-encoded JSON string.
+        for ($attempt = 0; $attempt < 3 && is_string($text); $attempt++) {
+            $text = json_decode($text, true);
         }
-
-        if (! $text) {
-            return [];
-        }
-
-        $decoded = json_decode($text, true);
-
-        return is_array($decoded) ? $decoded : [];
+        return is_array($text) ? $text : [];
     }
 
     public function scopeLabel(string $scopeType): string

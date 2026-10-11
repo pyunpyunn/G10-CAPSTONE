@@ -23,7 +23,7 @@ class HouseholdMobileStatusWriter
             $eventId,
             $householdId,
             $statusId,
-            $validated['status_key'],
+            $validated['safety_basis'] ?? $validated['canonical_status_key'] ?? $validated['status_key'],
             $validated['status_source'] ?? 'household_mobile',
             $validated['notes'] ?? null,
             $userId,
@@ -51,6 +51,8 @@ class HouseholdMobileStatusWriter
 
         $this->saveLatestDisasterStatus($eventId, $householdId, $status['status_id'], array_merge($validated, [
             'status_key' => $statusKey,
+            'canonical_status_key' => $status['status_key'],
+            'safety_basis' => $status['safety_basis'] ?? null,
             'status_source' => 'household_member_mobile',
             'notes' => $notes,
         ]), $userId, $deviceId, $now);
@@ -62,16 +64,17 @@ class HouseholdMobileStatusWriter
             return;
         }
 
+        $memberKey = $validated['safety_basis'] ?? $validated['status_key'];
         $statusId = DB::table('member_statuses')
-            ->where('status_key', $validated['status_key'])
+            ->where('status_key', $memberKey)
             ->where('is_active', true)
             ->value('status_id');
 
         if (! $statusId) {
             $statusId = DB::table('member_statuses')
-                ->whereIn('status_key', $validated['status_key'] === 'needs_help'
+                ->whereIn('status_key', $memberKey === 'needs_help'
                     ? ['needs_assistance', 'unsafe', 'trapped']
-                    : [$validated['status_key']])
+                    : [$memberKey])
                 ->where('is_active', true)
                 ->orderBy('status_id')
                 ->value('status_id');
@@ -95,7 +98,7 @@ class HouseholdMobileStatusWriter
             'location_accuracy_m' => $validated['location_accuracy_m'] ?? null,
             'battery_level' => $validated['battery_level'] ?? null,
             'signal_strength' => $validated['signal_strength'] ?? null,
-            'notes' => $validated['notes'] ?? null,
+            'notes' => !empty($validated['safety_basis']) ? $this->presenter->statusNotesJson($validated['status_key'], $validated['notes'] ?? null, $validated['selected_status_label'] ?? null, $validated['safety_basis']) : ($validated['notes'] ?? null),
             'reported_at' => $now,
             'updated_at' => $now,
         ];

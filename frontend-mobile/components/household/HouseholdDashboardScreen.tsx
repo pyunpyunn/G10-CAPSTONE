@@ -54,6 +54,7 @@ export function HouseholdDashboardScreen({
     (member: any) => !currentUserMemberIds.has(String(member.member_id))
   );
   const statusOptions = overview.status_options?.length ? overview.status_options : defaultStatusOptions;
+  const latestAlert = overview.recent_alerts?.[0] || null;
   const hasStatusChanged = !currentStatus || pendingStatus !== currentStatus.status_key;
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
@@ -74,6 +75,17 @@ export function HouseholdDashboardScreen({
           <HouseholdBadge label="No current disaster" tone="safe" />
         </View>
       )}
+
+      {activeEvent && latestAlert ? (
+        <View style={styles.broadcastCard}>
+          <View style={styles.broadcastHeader}>
+            <HouseholdBadge label="Latest alert" tone="warning" />
+            {latestAlert.sent_at ? <Text style={styles.broadcastTime}>{latestAlert.sent_at}</Text> : null}
+          </View>
+          <Text style={styles.broadcastTitle}>{latestAlert.title}</Text>
+          <Text style={styles.broadcastMessage}>{latestAlert.message}</Text>
+        </View>
+      ) : null}
 
       {activeEvent ? (
         <View style={styles.card}>
@@ -102,17 +114,17 @@ export function HouseholdDashboardScreen({
                   key={status.key}
                   style={[
                     styles.statusButton,
-                    { borderColor: statusColor(status.key) },
-                    isSelected && editingStatus && { backgroundColor: statusColor(status.key) },
+                    { borderColor: statusColor(status.safety_basis || status.key) },
+                    isSelected && editingStatus && { backgroundColor: statusColor(status.safety_basis || status.key) },
                     locked && styles.statusLocked,
                   ]}
                   onPress={() => editingStatus && onSelectStatus(status.key)}
                   disabled={!editingStatus}
                 >
                   <Ionicons
-                    name={statusIcon(status.key)}
+                    name={statusIcon(status.safety_basis || status.key)}
                     size={20}
-                    color={isSelected && editingStatus ? '#fff' : statusColor(status.key)}
+                    color={isSelected && editingStatus ? '#fff' : statusColor(status.safety_basis || status.key)}
                   />
                   <Text style={[styles.statusText, isSelected && editingStatus && styles.statusTextActive]}>
                     {status.label}
@@ -252,7 +264,7 @@ export function HouseholdTrustedScreen({
                     <MemberRow
                       member={member}
                       activeEvent={activeEvent}
-                      statusOptions={overview.status_options?.length ? overview.status_options : defaultStatusOptions}
+                      statusOptions={viewingTrusted.status_options?.length ? viewingTrusted.status_options : overview.status_options?.length ? overview.status_options : defaultStatusOptions}
                       canEditStatus={isTrustedValidated(viewingTrusted)}
                       showMemberInfo={false}
                       onSaveMemberStatus={(memberId, status) => onSaveTrustedMemberStatus(viewingTrusted.connection_id, memberId, status)}
@@ -600,8 +612,8 @@ function MemberRow({
                       key={status.key}
                       style={[
                         styles.memberStatusChoice,
-                        { borderColor: statusColor(status.key) },
-                        isSelected && { backgroundColor: statusColor(status.key) },
+                        { borderColor: statusColor(status.safety_basis || status.key) },
+                        isSelected && { backgroundColor: statusColor(status.safety_basis || status.key) },
                       ]}
                       onPress={() => setSelectedStatus(status.key)}
                     >
@@ -741,6 +753,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     fontWeight: '800',
+  },
+  broadcastCard: {
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderLeftWidth: 4,
+    borderLeftColor: palette.warning,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: palette.card,
+  },
+  broadcastHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  broadcastTime: {
+    flexShrink: 1,
+    color: palette.textSoft,
+    fontSize: 11,
+    textAlign: 'right',
+  },
+  broadcastTitle: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  broadcastMessage: {
+    color: palette.textSoft,
+    fontSize: 13,
+    lineHeight: 18,
   },
   card: {
     gap: spacing.md,

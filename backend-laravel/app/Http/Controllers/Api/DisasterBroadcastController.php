@@ -45,6 +45,26 @@ class DisasterBroadcastController extends Controller
     {
         return $this->service->storeBroadcast($request, $eventId);
     }
+
+    public function storeStatusType(Request $request): JsonResponse
+    {
+        return $this->service->storeStatusType($request);
+    }
+
+    public function destroyStatusType(string $statusKey): JsonResponse
+    {
+        return $this->service->destroyStatusType($statusKey);
+    }
+
+    public function storeDisasterType(Request $request): JsonResponse
+    {
+        return $this->service->storeDisasterType($request);
+    }
+
+    public function destroyDisasterType(int $typeId): JsonResponse
+    {
+        return $this->service->destroyDisasterType($typeId);
+    }
 }
 
 
