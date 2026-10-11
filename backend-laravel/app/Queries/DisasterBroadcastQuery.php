@@ -55,6 +55,7 @@ class DisasterBroadcastQuery
             'disaster_types' => $this->getDisasterTypes(),
             'severity_levels' => $this->getSeverityLevels(),
             'puroks' => $this->getPuroks(),
+            'household_count' => $this->getHouseholdCount(),
             'status_options' => $this->presenter->statusOptions(),
         ];
     }
@@ -162,6 +163,10 @@ class DisasterBroadcastQuery
             'allowed_statuses_json',
             'recipient_count',
             'push_status',
+            'status_options_json',
+            'push_accepted_count',
+            'push_provider_ids_json',
+            'push_errors_json',
             'sms_status',
         ] as $column) {
             if (Schema::hasColumn('disaster_broadcasts', $column)) {
@@ -288,17 +293,31 @@ class DisasterBroadcastQuery
         }
 
         return $query
-            ->select('a.purok_sitio')
-            ->distinct()
+            ->select('a.purok_sitio', DB::raw('COUNT(DISTINCT h.household_id) as household_count'))
+            ->groupBy('a.purok_sitio')
             ->orderBy('a.purok_sitio')
             ->get()
             ->map(fn (object $purok): array => [
                 'purok_id' => null,
                 'name' => $purok->purok_sitio,
+                'household_count' => (int) $purok->household_count,
                 'source' => 'household_addresses',
             ])
             ->values()
             ->all();
+    }
+
+    public function statusOptions(): array
+    {
+        return $this->presenter->statusOptions();
+    }
+
+    public function getHouseholdCount(): int
+    {
+        if (! Schema::hasTable('households')) return 0;
+        $query = DB::table('households');
+        if (Schema::hasColumn('households', 'deleted_at')) $query->whereNull('deleted_at');
+        return (int) $query->count();
     }
 
     public function firstPurokId(array $directPuroks): ?int

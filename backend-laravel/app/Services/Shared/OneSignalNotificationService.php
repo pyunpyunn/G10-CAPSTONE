@@ -121,9 +121,16 @@ class OneSignalNotificationService
                     'data' => $data,
                 ]);
 
+            $errors = $response->json('errors', []);
+            $invalid = is_array($errors) ? ($errors['invalid_player_ids'] ?? $errors['invalid_subscription_ids'] ?? []) : [];
+            $invalid = is_array($invalid) ? array_values(array_intersect($playerIds, $invalid)) : [];
+            // Only retire IDs explicitly rejected for this request, never unrelated devices.
+            if ($response->successful() && $invalid && Schema::hasColumn('device_tokens', 'is_active')) {
+                $query = DB::table('device_tokens')->whereIn('player_id', $invalid);
+                if (Schema::hasColumn('device_tokens', 'push_provider')) $query->where('push_provider', 'onesignal');
+                $query->update(['is_active' => 0]);
+            }
             if ($response->successful() && is_string($response->json('id')) && $response->json('id') !== '') {
-                $errors = $response->json('errors', []);
-                $invalid = is_array($errors) ? ($errors['invalid_player_ids'] ?? $errors['invalid_subscription_ids'] ?? []) : [];
                 return [
                     'ok' => true,
                     'accepted_count' => max(0, count($playerIds) - count($invalid)),
@@ -135,7 +142,11 @@ class OneSignalNotificationService
             return [
                 'ok' => false,
                 'provider_id' => null,
-                'error' => 'HTTP '.$response->status().': '.substr($response->body(), 0, 300),
+                'error' => collect($response->json('warnings', []))->contains(
+                    fn ($warning) => is_string($warning) && str_contains($warning, 'configure Android notifications')
+                )
+                    ? 'OneSignal Android push is not configured. Connect Firebase Cloud Messaging credentials in the OneSignal Android settings.'
+                    : ($invalid ? 'OneSignal rejected outdated device subscriptions. Open the installed mobile app, allow notifications, and sign in to refresh its registration.' : 'HTTP '.$response->status().': '.substr($response->body(), 0, 300)),
             ];
         } catch (\Throwable $error) {
             Log::warning('OneSignal push failed', [

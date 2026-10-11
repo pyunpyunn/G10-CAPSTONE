@@ -114,7 +114,8 @@ export default function HouseholdHomeScreen() {
           ? data.trusted?.households?.find((household: any) => household.connection_id === current.connection_id) || null
           : null
       );
-      const savedStatus = data.current_status?.status_key || data.status_options?.[0]?.key || 'safe';
+      const currentKey = data.current_status?.status_key;
+      const savedStatus = data.status_options?.some((option: any) => option.key === currentKey) ? currentKey : data.status_options?.[0]?.key || 'safe';
       setPendingStatus(savedStatus);
       setEditingStatus(true);
     } catch (error: any) {
@@ -127,10 +128,17 @@ export default function HouseholdHomeScreen() {
 
   useEffect(() => {
     const removeBroadcast = onDisasterBroadcast(() => { void loadOverview(true); });
+    const timer = setInterval(() => {
+      if (AppState.currentState !== 'active') return;
+      void getHouseholdOverview(true).then((data) => {
+        setOverview(data);
+        setPendingStatus((key) => data.status_options?.some((option: any) => option.key === key) ? key : data.status_options?.[0]?.key || 'safe');
+      }).catch(() => {});
+    }, 15000);
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void loadOverview(true);
     });
-    return () => { removeBroadcast(); subscription.remove(); };
+    return () => { clearInterval(timer); removeBroadcast(); subscription.remove(); };
   }, [loadOverview]);
 
   const refreshDeviceSensors = useCallback(async () => {

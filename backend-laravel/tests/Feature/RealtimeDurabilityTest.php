@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Events\NotificationFeedChanged;
 use App\Events\OperationsChanged;
+use App\Actions\UpdateHouseholdStatus;
 use App\Http\Middleware\AtomicRealtimeWrite;
 use App\Models\User;
 use App\Services\Shared\RealtimeOutbox;
@@ -80,6 +81,39 @@ class RealtimeDurabilityTest extends TestCase
         $this->assertDatabaseCount('realtime_outbox', 1);
         Event::assertNotDispatched(OperationsChanged::class);
         Event::assertNotDispatched(NotificationFeedChanged::class);
+    }
+
+    public function test_household_status_update_notifies_web_operations_after_commit(): void
+    {
+        Schema::create('household_disasters', function (Blueprint $table): void {
+            $table->integer('household_disaster_id')->primary();
+            $table->string('disaster_id');
+            $table->string('household_id');
+            $table->integer('current_status_id')->nullable();
+            $table->string('last_status_source')->nullable();
+            $table->text('last_status_notes')->nullable();
+            $table->string('last_reported_by_user_id')->nullable();
+            $table->bigInteger('last_device_token_id')->nullable();
+            $table->decimal('last_latitude', 10, 7)->nullable();
+            $table->decimal('last_longitude', 10, 7)->nullable();
+            $table->integer('last_battery_level')->nullable();
+            $table->timestamp('last_reported_at')->nullable();
+            $table->string('priority_level')->nullable();
+            $table->boolean('needs_dispatch')->default(false);
+            $table->timestamp('updated_at')->nullable();
+        });
+        DB::table('household_disasters')->insert([
+            'household_disaster_id' => 1,
+            'disaster_id' => 'EV-1',
+            'household_id' => 'HH-1',
+            'current_status_id' => 1,
+        ]);
+        Event::fake([OperationsChanged::class]);
+
+        app(UpdateHouseholdStatus::class)->apply('EV-1', 'HH-1', 2, 'unsafe', 'household_mobile', null, 'USER-1', null);
+
+        Event::assertDispatched(OperationsChanged::class, fn (OperationsChanged $event): bool => in_array('households', $event->topics, true));
+        $this->assertDatabaseHas('household_disasters', ['household_disaster_id' => 1, 'current_status_id' => 2]);
     }
 
     public function test_burst_is_combined_into_one_topic_broadcast_and_one_feed_broadcast(): void

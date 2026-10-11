@@ -34,6 +34,7 @@ class DisasterBroadcast extends Model
         'allowed_statuses_json',
         'recipient_count',
         'push_status',
+        'status_options_json',
         'sms_status',
     ];
 
