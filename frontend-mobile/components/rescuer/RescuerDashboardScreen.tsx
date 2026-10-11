@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
@@ -17,6 +18,8 @@ export function RescuerDashboardScreen({
   onOpenReport,
   onStatusChange,
 }: DashboardProps) {
+  const [isQuickLinkHovered, setIsQuickLinkHovered] = useState(false);
+  const [isQuickLinkPressed, setIsQuickLinkPressed] = useState(false);
   const profile = overview?.profile || {};
   const responder = profile.responder || {};
   const activeEvent = overview?.active_event;
@@ -137,11 +140,25 @@ export function RescuerDashboardScreen({
       </View>
 
       <View style={styles.quickRow}>
-        <Pressable style={styles.quickLink} onPress={onOpenMap}>
+        <Pressable
+          style={[styles.quickLink, (isQuickLinkHovered || isQuickLinkPressed) && styles.quickLinkActive]}
+          onPress={onOpenMap}
+          onHoverIn={() => setIsQuickLinkHovered(true)}
+          onHoverOut={() => setIsQuickLinkHovered(false)}
+          onPressIn={() => setIsQuickLinkPressed(true)}
+          onPressOut={() => setIsQuickLinkPressed(false)}
+        >
           <Ionicons name="map-outline" size={18} color={palette.navActive} />
           <Text style={styles.quickText}>Open map</Text>
         </Pressable>
-        <Pressable style={styles.quickLink} onPress={onOpenReport}>
+        <Pressable
+          style={[styles.quickLink, (isQuickLinkHovered || isQuickLinkPressed) && styles.quickLinkActive]}
+          onPress={onOpenReport}
+          onHoverIn={() => setIsQuickLinkHovered(true)}
+          onHoverOut={() => setIsQuickLinkHovered(false)}
+          onPressIn={() => setIsQuickLinkPressed(true)}
+          onPressOut={() => setIsQuickLinkPressed(false)}
+        >
           <Ionicons name="create-outline" size={18} color={palette.navActive} />
           <Text style={styles.quickText}>Send field report</Text>
         </Pressable>
@@ -306,6 +323,14 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     borderRadius: radius.md,
     backgroundColor: palette.card,
+  },
+  quickLinkActive: {
+    borderColor: palette.navActive,
+    backgroundColor: palette.secondary,
+    shadowColor: palette.navActive,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
   quickText: {
     color: palette.nav,

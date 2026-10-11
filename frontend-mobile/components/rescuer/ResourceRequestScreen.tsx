@@ -26,7 +26,6 @@ export function ResourceRequestScreen({
 }: ResourceRequestProps) {
   const categories = categoryOptions?.length ? categoryOptions : defaultCategories;
   const [location, setLocation] = useState('');
-  const [cluster, setCluster] = useState('');
   const [requestCategory, setRequestCategory] = useState(categories[0]?.key || 'resource');
   const [resourceType, setResourceType] = useState('');
   const [itemName, setItemName] = useState('');
@@ -38,11 +37,9 @@ export function ResourceRequestScreen({
   const [submitting, setSubmitting] = useState(false);
   const isPersonnelRequest = requestCategory === 'personnel';
   const isVehicleRequest = requestCategory === 'vehicle';
-  const needsCluster = isPersonnelRequest || isVehicleRequest;
 
   async function handleSubmit() {
     const cleanLocation = location.trim();
-    const cleanCluster = cluster.trim();
     const cleanResourceType = resourceType.trim();
     const cleanItemName = itemName.trim();
     const cleanUnit = unit.trim();
@@ -50,12 +47,7 @@ export function ResourceRequestScreen({
     const quantityValue = Number(quantity.trim());
     const personnelCountValue = Number(personnelCount.trim());
 
-    if (!cleanLocation || !cleanResourceType || !quantity.trim() || (needsCluster && !cleanCluster)) {
-      if (needsCluster && !cleanCluster) {
-        Alert.alert('Missing Purok / cluster', 'Enter the Purok or cluster where assistance is needed.');
-        return;
-      }
-
+    if (!cleanLocation || !cleanResourceType || !quantity.trim()) {
       Alert.alert('Missing request details', 'Enter location, need type, and quantity.');
       return;
     }
@@ -85,7 +77,6 @@ export function ResourceRequestScreen({
     try {
       await onSubmitRequest({
         location: cleanLocation,
-        cluster: cleanCluster,
         request_category: requestCategory,
         resource_type: cleanResourceType,
         item_name: isPersonnelRequest || isVehicleRequest ? null : cleanItemName,
@@ -96,7 +87,6 @@ export function ResourceRequestScreen({
       });
 
       setLocation('');
-      setCluster('');
       setResourceType('');
       setItemName('');
       setQuantity('1');
@@ -133,14 +123,6 @@ export function ResourceRequestScreen({
           value={location}
           onChangeText={setLocation}
           placeholder="Needed at location"
-          placeholderTextColor="#7d8da0"
-        />
-
-        <TextInput
-          style={styles.input}
-          value={cluster}
-          onChangeText={setCluster}
-          placeholder={needsCluster ? 'Purok / cluster (required)' : 'Purok / cluster'}
           placeholderTextColor="#7d8da0"
         />
 

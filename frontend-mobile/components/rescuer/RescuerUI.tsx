@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 
 type ButtonProps = {
@@ -12,10 +12,23 @@ type ButtonProps = {
 };
 
 export function ActionButton({ label, icon, tone = 'primary', disabled = false, onPress }: ButtonProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
+
   return (
     <Pressable
-      style={[styles.button, styles[tone], disabled && styles.disabled]}
+      style={[
+        styles.button,
+        styles[tone],
+        disabled && styles.disabled,
+        isHovered && !disabled && styles.hovered,
+        isPressed && !disabled && styles.pressed,
+      ]}
       onPress={onPress}
+      onPressIn={() => setIsPressed(true)}
+      onPressOut={() => setIsPressed(false)}
+      onHoverIn={() => setIsHovered(true)}
+      onHoverOut={() => setIsHovered(false)}
       disabled={disabled}
     >
       {icon ? <Ionicons name={icon} size={17} color={tone === 'light' ? palette.nav : '#fff'} /> : null}
@@ -104,6 +117,18 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.6,
+  },
+  hovered: {
+    borderWidth: 1,
+    borderColor: palette.navActive,
+    shadowColor: palette.navActive,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  pressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.96,
   },
   buttonText: {
     color: '#fff',

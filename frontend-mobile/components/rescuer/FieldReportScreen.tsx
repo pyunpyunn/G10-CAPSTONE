@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
@@ -14,29 +14,93 @@ type FieldReportProps = {
 const defaultStatuses = [
   { key: 'safe', label: 'Safe' },
   { key: 'evacuated', label: 'Evacuated' },
-  { key: 'unsafe', label: 'Unsafe' },
+  { key: 'unsafe', label: 'Critical' },
 ];
 
+const incidentTypeOptions = [
+  { key: 'fire', label: 'Fire' },
+  { key: 'flood', label: 'Flood' },
+  { key: 'landslide', label: 'Landslide' },
+  { key: 'storm', label: 'Storm' },
+  { key: 'earthquake', label: 'Earthquake' },
+  { key: 'medical', label: 'Medical' },
+  { key: 'other', label: 'Other' },
+];
+
+const propertyDamageOptions = [
+  { key: 'minor', label: 'minor' },
+  { key: 'major', label: 'major damage' },
+  { key: 'destroyed', label: 'completely destroyed' },
+];
+
+type HouseholdMemberEntry = {
+  id: string;
+  name: string;
+  condition: string;
+};
+
 export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: FieldReportProps) {
-  const options = statusOptions?.length ? statusOptions : defaultStatuses;
+  const options = (statusOptions?.length ? statusOptions : defaultStatuses)
+    .filter((status) => !['active', 'relocated', 'displaced', 'returned'].includes(String(status?.key ?? '').toLowerCase()));
   const [householdId, setHouseholdId] = useState('');
   const [householdHead, setHouseholdHead] = useState('');
   const [address, setAddress] = useState('');
   const [statusKey, setStatusKey] = useState(options[0]?.key || 'safe');
-  const [batteryLevel, setBatteryLevel] = useState('');
-  const [memberName, setMemberName] = useState('');
-  const [memberCondition, setMemberCondition] = useState('');
+  const [members, setMembers] = useState<HouseholdMemberEntry[]>([{ id: 'member-1', name: '', condition: '' }]);
+  const [incidentType, setIncidentType] = useState('');
+  const [injuredCount, setInjuredCount] = useState('');
+  const [deathCount, setDeathCount] = useState('');
+  const [propertyDamage, setPropertyDamage] = useState('');
+  const [isIncidentMenuOpen, setIsIncidentMenuOpen] = useState(false);
+  const [isDamageMenuOpen, setIsDamageMenuOpen] = useState(false);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  function updateMember(id: string, field: 'name' | 'condition', value: string) {
+    setMembers((currentMembers) =>
+      currentMembers.map((member) => (member.id === id ? { ...member, [field]: value } : member)),
+    );
+  }
+
+  function addMember() {
+    setMembers((currentMembers) => [
+      ...currentMembers,
+      {
+        id: `member-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name: '',
+        condition: '',
+      },
+    ]);
+  }
+
+  function removeMember(id: string) {
+    setMembers((currentMembers) => {
+      if (currentMembers.length === 1) {
+        return [{ id, name: '', condition: '' }];
+      }
+
+      return currentMembers.filter((member) => member.id !== id);
+    });
+  }
 
   async function handleSubmit() {
     const cleanHouseholdId = householdId.trim();
     const cleanHouseholdHead = householdHead.trim();
     const cleanAddress = address.trim();
-    const cleanMemberName = memberName.trim();
-    const cleanMemberCondition = memberCondition.trim();
+    const cleanIncidentType = incidentType.trim();
+    const cleanInjuredCount = injuredCount.trim();
+    const cleanDeathCount = deathCount.trim();
+    const cleanPropertyDamage = propertyDamage.trim();
     const cleanNotes = notes.trim();
-    const batteryValue = batteryLevel.trim() ? Number(batteryLevel.trim()) : undefined;
+    const cleanPropertyDamageValue = propertyDamage.trim();
+    const injuredValue = cleanInjuredCount ? Number(cleanInjuredCount) : undefined;
+    const deathValue = cleanDeathCount ? Number(cleanDeathCount) : undefined;
+    const normalizedMembers = members
+      .map((member) => ({
+        name: member.name.trim(),
+        condition: member.condition.trim(),
+      }))
+      .filter((member) => member.name || member.condition);
 
     if (!cleanHouseholdId) {
       Alert.alert('Missing household ID', 'Enter the household ID before submitting.');
@@ -58,13 +122,18 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
       return;
     }
 
-    if ((cleanMemberName && !cleanMemberCondition) || (!cleanMemberName && cleanMemberCondition)) {
-      Alert.alert('Incomplete member condition', 'Enter both member name and condition, or leave both blank.');
+    if (normalizedMembers.some((member) => (member.name && !member.condition) || (!member.name && member.condition))) {
+      Alert.alert('Incomplete member condition', 'Enter both member name and condition, or leave both blank for that person.');
       return;
     }
 
-    if (batteryValue !== undefined && (Number.isNaN(batteryValue) || batteryValue < 0 || batteryValue > 100)) {
-      Alert.alert('Invalid battery level', 'Battery level must be from 0 to 100.');
+    if (injuredValue !== undefined && (Number.isNaN(injuredValue) || injuredValue < 0 || injuredValue > 999)) {
+      Alert.alert('Invalid injuries count', 'Injuries must be between 0 and 999.');
+      return;
+    }
+
+    if (deathValue !== undefined && (Number.isNaN(deathValue) || deathValue < 0 || deathValue > 999)) {
+      Alert.alert('Invalid deaths count', 'Deaths must be between 0 and 999.');
       return;
     }
 
@@ -76,20 +145,22 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
         household_head: cleanHouseholdHead,
         address: cleanAddress,
         status_key: statusKey,
-        battery_level: batteryValue,
         notes: cleanNotes,
-        members:
-          cleanMemberName || cleanMemberCondition
-            ? [{ name: cleanMemberName, condition: cleanMemberCondition }]
-            : [],
+        incident_type: cleanIncidentType || undefined,
+        injured_count: injuredValue,
+        death_count: deathValue,
+        property_damage: cleanPropertyDamageValue || undefined,
+        members: normalizedMembers,
       });
 
       setHouseholdId('');
       setHouseholdHead('');
       setAddress('');
-      setBatteryLevel('');
-      setMemberName('');
-      setMemberCondition('');
+      setMembers([{ id: 'member-1', name: '', condition: '' }]);
+      setIncidentType('');
+      setInjuredCount('');
+      setDeathCount('');
+      setPropertyDamage('');
       setNotes('');
     } finally {
       setSubmitting(false);
@@ -101,19 +172,39 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
       <View style={styles.card}>
         <SectionHeader title="Household field report" />
 
-        <View style={styles.statusRow}>
-          {options.map((status) => (
-            <Pressable
-              key={status.key}
-              style={[styles.statusChip, statusKey === status.key && styles.statusChipActive]}
-              onPress={() => setStatusKey(status.key)}
-            >
-              <Text style={[styles.statusChipText, statusKey === status.key && styles.statusChipTextActive]}>
-                {status.label}
-              </Text>
+        <Pressable style={styles.dropdownButton} onPress={() => setIsIncidentMenuOpen(true)}>
+          <View style={styles.dropdownValueRow}>
+            <Text style={styles.dropdownText}>
+              {incidentType ? incidentTypeOptions.find((option) => option.key === incidentType)?.label : 'Incident type'}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color={palette.textSoft} />
+          </View>
+        </Pressable>
+
+        {isIncidentMenuOpen && (
+          <Modal transparent visible={isIncidentMenuOpen} animationType="fade" onRequestClose={() => setIsIncidentMenuOpen(false)}>
+            <Pressable style={styles.modalOverlay} onPress={() => setIsIncidentMenuOpen(false)}>
+              <Pressable style={styles.modalContent} onPress={() => undefined}>
+                <ScrollView style={styles.modalList}>
+                  {incidentTypeOptions.map((option) => (
+                    <Pressable
+                      key={option.key}
+                      style={[styles.modalOption, incidentType === option.key && styles.modalOptionActive]}
+                      onPress={() => {
+                        setIncidentType(option.key);
+                        setIsIncidentMenuOpen(false);
+                      }}
+                    >
+                      <Text style={[styles.modalOptionText, incidentType === option.key && styles.modalOptionTextActive]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </Pressable>
             </Pressable>
-          ))}
-        </View>
+          </Modal>
+        )}
 
         <TextInput
           style={styles.input}
@@ -136,41 +227,100 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
           style={styles.input}
           value={address}
           onChangeText={setAddress}
-          placeholder="Location / purok / landmark"
+          placeholder="Location"
           placeholderTextColor="#7d8da0"
         />
+
+        <View style={styles.memberSection}>
+          <Text style={styles.memberSectionTitle}>Household members</Text>
+          {members.map((member, index) => (
+            <View key={member.id} style={styles.memberRow}>
+              <TextInput
+                style={[styles.input, styles.memberNameInput]}
+                value={member.name}
+                onChangeText={(text) => updateMember(member.id, 'name', text)}
+                placeholder={`Member ${index + 1} name`}
+                placeholderTextColor="#7d8da0"
+              />
+              <TextInput
+                style={[styles.input, styles.memberConditionInput]}
+                value={member.condition}
+                onChangeText={(text) => updateMember(member.id, 'condition', text)}
+                placeholder={`Member ${index + 1} condition`}
+                placeholderTextColor="#7d8da0"
+              />
+              {members.length > 1 && (
+                <Pressable style={styles.removeMemberButton} onPress={() => removeMember(member.id)}>
+                  <Ionicons name="close-circle" size={20} color={palette.textSoft} />
+                </Pressable>
+              )}
+            </View>
+          ))}
+
+          <Pressable style={styles.addMemberButton} onPress={addMember}>
+            <Ionicons name="add-circle-outline" size={18} color={palette.navActive} />
+            <Text style={styles.addMemberText}>Add household member</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.twoColumn}>
           <TextInput
             style={[styles.input, styles.flexInput]}
-            value={memberName}
-            onChangeText={setMemberName}
-            placeholder="Member name"
+            value={injuredCount}
+            onChangeText={setInjuredCount}
+            placeholder="Injuries"
             placeholderTextColor="#7d8da0"
+            keyboardType="number-pad"
           />
           <TextInput
             style={[styles.input, styles.flexInput]}
-            value={batteryLevel}
-            onChangeText={setBatteryLevel}
-            placeholder="Battery %"
+            value={deathCount}
+            onChangeText={setDeathCount}
+            placeholder="Deaths"
             placeholderTextColor="#7d8da0"
             keyboardType="number-pad"
           />
         </View>
 
-        <TextInput
-          style={styles.input}
-          value={memberCondition}
-          onChangeText={setMemberCondition}
-          placeholder="Member condition"
-          placeholderTextColor="#7d8da0"
-        />
+        <Pressable style={styles.dropdownButton} onPress={() => setIsDamageMenuOpen(true)}>
+          <View style={styles.dropdownValueRow}>
+            <Text style={styles.dropdownText}>
+              {propertyDamage ? propertyDamageOptions.find((option) => option.key === propertyDamage)?.label : 'Property damage'}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color={palette.textSoft} />
+          </View>
+        </Pressable>
+
+        {isDamageMenuOpen && (
+          <Modal transparent visible={isDamageMenuOpen} animationType="fade" onRequestClose={() => setIsDamageMenuOpen(false)}>
+            <Pressable style={styles.modalOverlay} onPress={() => setIsDamageMenuOpen(false)}>
+              <Pressable style={styles.modalContent} onPress={() => undefined}>
+                <ScrollView style={styles.modalList}>
+                  {propertyDamageOptions.map((option) => (
+                    <Pressable
+                      key={option.key}
+                      style={[styles.modalOption, propertyDamage === option.key && styles.modalOptionActive]}
+                      onPress={() => {
+                        setPropertyDamage(option.key);
+                        setIsDamageMenuOpen(false);
+                      }}
+                    >
+                      <Text style={[styles.modalOptionText, propertyDamage === option.key && styles.modalOptionTextActive]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
 
         <TextInput
           style={[styles.input, styles.textArea]}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Notes for HQ"
+          placeholder="Additional operational notes"
           placeholderTextColor="#7d8da0"
           multiline
           textAlignVertical="top"
@@ -270,6 +420,105 @@ const styles = StyleSheet.create({
   },
   flexInput: {
     flex: 1,
+  },
+  dropdownButton: {
+    minHeight: 54,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+  },
+  dropdownValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownText: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#fff',
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  modalTitle: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: spacing.sm,
+  },
+  modalList: {
+    maxHeight: 240,
+  },
+  modalOption: {
+    minHeight: 46,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+  },
+  modalOptionActive: {
+    backgroundColor: palette.navActive,
+  },
+  modalOptionText: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalOptionTextActive: {
+    color: '#fff',
+  },
+  memberSection: {
+    gap: spacing.sm,
+  },
+  memberSectionTitle: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  memberNameInput: {
+    flex: 1,
+  },
+  memberConditionInput: {
+    flex: 1.2,
+  },
+  removeMemberButton: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addMemberButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  addMemberText: {
+    color: palette.navActive,
+    fontSize: 13,
+    fontWeight: '800',
   },
   textArea: {
     minHeight: 96,
