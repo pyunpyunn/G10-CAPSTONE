@@ -70,8 +70,14 @@ Route::prefix('v1')->group(function () {
             Route::post('/dashboard/active-event/close', [DashboardController::class, 'closeActiveEvent']);
             Route::get('/disaster-events', [DisasterBroadcastController::class, 'index']);
             Route::post('/disaster-events', [DisasterBroadcastController::class, 'storeEvent']);
+            Route::get('/disaster-events/{eventId}', [DisasterBroadcastController::class, 'show']);
+            Route::patch('/disaster-events/{eventId}', [DisasterBroadcastController::class, 'updateEvent']);
             Route::get('/disaster-events/{eventId}/broadcasts', [DisasterBroadcastController::class, 'broadcasts']);
             Route::post('/disaster-events/{eventId}/broadcasts', [DisasterBroadcastController::class, 'storeBroadcast']);
+            Route::post('/status-types', [DisasterBroadcastController::class, 'storeStatusType']);
+            Route::delete('/status-types/{statusKey}', [DisasterBroadcastController::class, 'destroyStatusType']);
+            Route::post('/disaster-types', [DisasterBroadcastController::class, 'storeDisasterType']);
+            Route::delete('/disaster-types/{typeId}', [DisasterBroadcastController::class, 'destroyDisasterType']);
             Route::get('/weather', [WeatherController::class, 'workspace']);
             Route::post('/weather/refresh', [WeatherController::class, 'refreshWorkspace']);
             Route::get('/disaster-events/{eventId}/weather-logs', [WeatherController::class, 'index']);
