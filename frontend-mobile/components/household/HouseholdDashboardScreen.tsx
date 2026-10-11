@@ -25,9 +25,8 @@ type TrustedScreenProps = {
   onAddTrusted: () => void;
   onChangeTrustedPin: () => void;
   onOpenTrusted: (household: any) => void;
+  onDeleteTrusted: (household: any) => void;
   onBackFamily: () => void;
-  onRespondToIncomingRequest: (requestItem: any, decision: 'accept' | 'reject') => void;
-  respondingConnectionId: string | null;
   onSaveTrustedMemberStatus: (connectionId: string, memberId: string, status: string) => Promise<void>;
 };
 
@@ -46,15 +45,8 @@ export function HouseholdDashboardScreen({
 }: DashboardProps) {
   const activeEvent = overview.active_event;
   const currentStatus = overview.current_status;
-  const currentUser = overview.profile?.user || {};
-  const currentUserMemberIds = new Set(
-    [currentUser.member_id, currentUser.user_id].filter(Boolean).map(String)
-  );
-  const members = (overview.members || []).filter(
-    (member: any) => !currentUserMemberIds.has(String(member.member_id))
-  );
+  const members = overview.members || [];
   const statusOptions = overview.status_options?.length ? overview.status_options : defaultStatusOptions;
-  const latestAlert = overview.recent_alerts?.[0] || null;
   const hasStatusChanged = !currentStatus || pendingStatus !== currentStatus.status_key;
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
@@ -76,24 +68,13 @@ export function HouseholdDashboardScreen({
         </View>
       )}
 
-      {activeEvent && latestAlert ? (
-        <View style={styles.broadcastCard}>
-          <View style={styles.broadcastHeader}>
-            <HouseholdBadge label="Latest alert" tone="warning" />
-            {latestAlert.sent_at ? <Text style={styles.broadcastTime}>{latestAlert.sent_at}</Text> : null}
-          </View>
-          <Text style={styles.broadcastTitle}>{latestAlert.title}</Text>
-          <Text style={styles.broadcastMessage}>{latestAlert.message}</Text>
-        </View>
-      ) : null}
-
       {activeEvent ? (
         <View style={styles.card}>
           <HouseholdSection
             title="Household status"
             action={
               <Pressable style={styles.historyButton} onPress={onToggleHistory}>
-                <Ionicons name="time-outline" size={18} color={palette.navActive} />
+                <Ionicons name="time-outline" size={16} color={palette.navActive} />
               </Pressable>
             }
           />
@@ -114,17 +95,17 @@ export function HouseholdDashboardScreen({
                   key={status.key}
                   style={[
                     styles.statusButton,
-                    { borderColor: statusColor(status.safety_basis || status.key) },
-                    isSelected && editingStatus && { backgroundColor: statusColor(status.safety_basis || status.key) },
+                    { borderColor: statusColor(status.key) },
+                    isSelected && editingStatus && { backgroundColor: statusColor(status.key) },
                     locked && styles.statusLocked,
                   ]}
                   onPress={() => editingStatus && onSelectStatus(status.key)}
                   disabled={!editingStatus}
                 >
                   <Ionicons
-                    name={statusIcon(status.safety_basis || status.key)}
+                    name={statusIcon(status.key)}
                     size={20}
-                    color={isSelected && editingStatus ? '#fff' : statusColor(status.safety_basis || status.key)}
+                    color={isSelected && editingStatus ? '#fff' : statusColor(status.key)}
                   />
                   <Text style={[styles.statusText, isSelected && editingStatus && styles.statusTextActive]}>
                     {status.label}
@@ -169,7 +150,7 @@ export function HouseholdDashboardScreen({
       ) : null}
 
       <View style={styles.card}>
-        <HouseholdSection title="Family members" />
+        <HouseholdSection title="Household members" />
         {members.length === 0 ? (
           <HouseholdEmpty icon="people-outline" title="No members listed" />
         ) : (
@@ -209,13 +190,11 @@ export function HouseholdTrustedScreen({
   onAddTrusted,
   onChangeTrustedPin,
   onOpenTrusted,
+  onDeleteTrusted,
   onBackFamily,
-  onRespondToIncomingRequest,
-  respondingConnectionId,
   onSaveTrustedMemberStatus,
 }: TrustedScreenProps) {
   const activeEvent = overview.active_event;
-  const incomingRequests = overview.trusted?.incoming_requests || [];
   const members = viewingTrusted ? trustedMembers(viewingTrusted) : [];
   const trustedStatus = viewingTrusted?.current_status || null;
   const [selectedTrustedMemberId, setSelectedTrustedMemberId] = useState<string | null>(null);
@@ -264,8 +243,8 @@ export function HouseholdTrustedScreen({
                     <MemberRow
                       member={member}
                       activeEvent={activeEvent}
-                      statusOptions={viewingTrusted.status_options?.length ? viewingTrusted.status_options : overview.status_options?.length ? overview.status_options : defaultStatusOptions}
-                      canEditStatus={isTrustedValidated(viewingTrusted)}
+                      statusOptions={overview.status_options?.length ? overview.status_options : defaultStatusOptions}
+                      canEditStatus
                       showMemberInfo={false}
                       onSaveMemberStatus={(memberId, status) => onSaveTrustedMemberStatus(viewingTrusted.connection_id, memberId, status)}
                     />
@@ -281,21 +260,6 @@ export function HouseholdTrustedScreen({
 
   return (
     <View style={styles.stack}>
-      {incomingRequests.length ? (
-        <View style={styles.card}>
-          <HouseholdSection
-            title="Requests"
-            action={<HouseholdBadge label={`${incomingRequests.length} pending`} tone="warning" />}
-          />
-          <IncomingTrustedRequestList
-            overview={overview}
-            requests={incomingRequests}
-            respondingConnectionId={respondingConnectionId}
-            onRespond={onRespondToIncomingRequest}
-          />
-        </View>
-      ) : null}
-
       <View style={styles.card}>
         <HouseholdSection
           title="Trusted households"
@@ -306,84 +270,22 @@ export function HouseholdTrustedScreen({
               accessibilityRole="button"
               accessibilityLabel="Change household PIN"
             >
-              <Ionicons name="lock-closed" size={15} color={palette.navActive} />
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color={palette.navActive}
+              />
             </Pressable>
           }
         />
         <TrustedHouseholdList
           overview={overview}
           trusted={overview.trusted?.households || []}
-          activeEvent={activeEvent}
           onAddTrusted={onAddTrusted}
           onOpenTrusted={onOpenTrusted}
+          onDeleteTrusted={onDeleteTrusted}
         />
       </View>
-    </View>
-  );
-}
-
-function IncomingTrustedRequestList({
-  overview,
-  requests,
-  respondingConnectionId,
-  onRespond,
-}: {
-  overview: any;
-  requests: any[];
-  respondingConnectionId: string | null;
-  onRespond: (requestItem: any, decision: 'accept' | 'reject') => void;
-}) {
-  if (!overview.trusted?.is_available) {
-    return <HouseholdEmpty icon="lock-closed-outline" title="Trusted household storage not ready" />;
-  }
-
-  if (requests.length === 0) {
-    return <HouseholdEmpty icon="mail-outline" title="No pending connection requests" />;
-  }
-
-  return (
-    <View style={styles.incomingRequestList}>
-      {requests.map((requestItem: any) => {
-        const isSaving = respondingConnectionId === requestItem.connection_id;
-
-        return (
-          <View key={requestItem.connection_id} style={styles.incomingRequest}>
-            <View style={styles.incomingRequestHeader}>
-              <View style={styles.trustedIcon}>
-                <Ionicons name="people-outline" size={18} color={palette.navActive} />
-              </View>
-              <View style={styles.incomingRequestText}>
-                <Text style={styles.rowTitle}>{requestItem.family_name}</Text>
-                <Text style={styles.rowMeta}>{requestItem.requesting_household_id}</Text>
-              </View>
-              <HouseholdBadge label="Pending" tone="warning" />
-            </View>
-
-            <Text style={styles.incomingRequestReason}>{requestItem.reason || 'Trusted household connection request'}</Text>
-            <Text style={styles.incomingRequestDate}>Received {requestItem.created_label || formatDate(requestItem.created_at)}</Text>
-
-            <View style={styles.incomingRequestActions}>
-              <View style={styles.incomingRequestAction}>
-                <HouseholdButton
-                  label={isSaving ? 'Saving...' : 'Decline'}
-                  icon="close-outline"
-                  tone="light"
-                  disabled={isSaving}
-                  onPress={() => onRespond(requestItem, 'reject')}
-                />
-              </View>
-              <View style={styles.incomingRequestAction}>
-                <HouseholdButton
-                  label={isSaving ? 'Saving...' : 'Accept'}
-                  icon="checkmark-outline"
-                  disabled={isSaving}
-                  onPress={() => onRespond(requestItem, 'accept')}
-                />
-              </View>
-            </View>
-          </View>
-        );
-      })}
     </View>
   );
 }
@@ -391,15 +293,15 @@ function IncomingTrustedRequestList({
 function TrustedHouseholdList({
   overview,
   trusted,
-  activeEvent,
   onAddTrusted,
   onOpenTrusted,
+  onDeleteTrusted,
 }: {
   overview: any;
   trusted: any[];
-  activeEvent: any;
   onAddTrusted: () => void;
   onOpenTrusted: (household: any) => void;
+  onDeleteTrusted: (household: any) => void;
 }) {
   const addLabel = trusted.length ? 'Add another household' : 'Add a household';
   const addButton = (
@@ -442,35 +344,72 @@ function TrustedHouseholdList({
 
   return (
     <>
-      {trusted.map((householdItem: any) => (
-        <Pressable
-          key={householdItem.connection_id}
-          style={styles.trustedRow}
-          onPress={() => onOpenTrusted(householdItem)}
-        >
+      {trusted.map((householdItem: any) => {
+        const isAccepted = ['active', 'validated'].includes(householdItem.validation_status);
+
+        return (
+          <Pressable
+            key={householdItem.connection_id}
+            style={({ pressed }) => [styles.trustedRow, pressed && isAccepted && styles.trustedRowPressed]}
+            onPress={isAccepted ? () => onOpenTrusted(householdItem) : undefined}
+            onLongPress={() => onDeleteTrusted(householdItem)}
+            delayLongPress={500}
+            accessibilityHint={isAccepted ? 'Long press to remove this trusted household' : 'Long press to cancel this pending request'}
+          >
           <View style={styles.trustedIcon}>
             <Ionicons
-              name={isTrustedValidated(householdItem) ? 'home-outline' : 'lock-closed-outline'}
+              name="home-outline"
               size={18}
               color={palette.navActive}
             />
           </View>
           <View style={styles.trustedText}>
             <Text style={styles.rowTitle}>{trustedHouseholdName(householdItem)}</Text>
-            <Text style={styles.rowMeta}>
-              {householdItem.household_id} · {householdItem.reason || 'Trusted household request'}
+            <Text style={[styles.rowMeta, styles.trustedMeta]}>
+              {householdItem.household_id} · {householdItem.relationship_label || householdItem.reason || 'Trusted household request'}
             </Text>
-            {activeEvent && householdItem.current_status ? (
-              <Text style={styles.trustedStatusText}>
-                {householdItem.current_status.status_label} · {householdItem.current_status.last_saved_label}
-              </Text>
-            ) : null}
           </View>
-          <HouseholdBadge label={labelize(householdItem.validation_status)} tone={householdItem.validation_status} />
-        </Pressable>
-      ))}
+          <View style={styles.trustedStatusSlot}>
+            <HouseholdBadge
+              label={householdItem.validation_status === 'pending'
+                ? 'Pending'
+                : householdItem.current_status?.status_label || 'Unchecked'}
+              tone={householdItem.validation_status === 'pending'
+                ? 'pending'
+                : householdItem.current_status?.status_key || 'neutral'}
+            />
+            {householdItem.validation_status === 'pending' ? null : <MemberStatusDots members={householdItem.members || []} />}
+          </View>
+          </Pressable>
+        );
+      })}
       {addButton}
     </>
+  );
+}
+
+function MemberStatusDots({ members }: { members: any[] }) {
+  if (members.length === 0) {
+    return null;
+  }
+
+  return (
+    <View
+      style={styles.memberStatusDots}
+      accessibilityLabel={`${members.length} trusted household members with their current statuses`}
+    >
+      {members.map((member: any, index: number) => {
+        const status = member.current_status?.status_key || 'neutral';
+
+        return (
+          <View
+            key={member.member_id || index}
+            style={[styles.memberStatusDot, { backgroundColor: statusColor(status) }]}
+            accessibilityLabel={`${member.name || 'Household member'}: ${member.current_status?.status_label || 'Unchecked'}`}
+          />
+        );
+      })}
+    </View>
   );
 }
 
@@ -487,6 +426,7 @@ function MemberSummary({
   const memberLabel = member.is_registered_user
     ? 'Registered User'
     : device?.is_active ? 'Device active' : device ? 'Device inactive' : 'No device registered';
+  const currentStatus = member.current_status || null;
 
   return (
     <Pressable
@@ -503,7 +443,12 @@ function MemberSummary({
         <Text style={styles.rowTitle}>{member.name}</Text>
         <Text style={styles.rowMeta}>{member.relationship || 'Member'} · {memberLabel}</Text>
       </View>
-      <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={palette.navMuted} />
+      <View style={styles.memberSummaryStatus}>
+        <HouseholdBadge
+          label={currentStatus?.status_label || 'Unchecked'}
+          tone={currentStatus?.status_key || 'neutral'}
+        />
+      </View>
     </Pressable>
   );
 }
@@ -589,51 +534,45 @@ function MemberRow({
         </View>
       </View>
       ) : null}
-      {activeEvent ? (
-        <View style={[styles.memberStatusBox, !showMemberInfo && styles.memberStatusBoxNested]}>
-          <View style={styles.memberStatusTop}>
-            <Text style={styles.memberStatusLabel}>Status</Text>
-            <HouseholdBadge
-              label={currentStatus?.status_label || 'Unchecked'}
-              tone={currentStatus?.status_key || 'neutral'}
-            />
-          </View>
+      <View style={[styles.memberStatusBox, !showMemberInfo && styles.memberStatusBoxNested]}>
+        <View style={styles.memberStatusTop}>
+          <Text style={styles.memberStatusLabel}>Status</Text>
           {currentStatus?.submitted_label ? (
             <Text style={styles.memberStatusTime}>{currentStatus.submitted_label}</Text>
           ) : null}
-          {canEditStatus ? (
-            <>
-              <View style={styles.memberStatusGrid}>
-                {statusOptions.map((status: any) => {
-                  const isSelected = selectedStatus === status.key;
-
-                  return (
-                    <Pressable
-                      key={status.key}
-                      style={[
-                        styles.memberStatusChoice,
-                        { borderColor: statusColor(status.safety_basis || status.key) },
-                        isSelected && { backgroundColor: statusColor(status.safety_basis || status.key) },
-                      ]}
-                      onPress={() => setSelectedStatus(status.key)}
-                    >
-                      <Text style={[styles.memberStatusChoiceText, isSelected && styles.memberStatusChoiceTextActive]}>
-                        {status.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <HouseholdButton
-                label={saving ? 'Saving...' : 'Save member status'}
-                icon="save-outline"
-                disabled={saving || !hasStatusChanged}
-                onPress={handleSave}
-              />
-            </>
-          ) : null}
         </View>
-      ) : null}
+        {activeEvent && canEditStatus ? (
+          <>
+            <View style={styles.memberStatusGrid}>
+              {statusOptions.map((status: any) => {
+                const isSelected = selectedStatus === status.key;
+
+                return (
+                  <Pressable
+                    key={status.key}
+                    style={[
+                      styles.memberStatusChoice,
+                      { borderColor: statusColor(status.key) },
+                      isSelected && { backgroundColor: statusColor(status.key) },
+                    ]}
+                    onPress={() => setSelectedStatus(status.key)}
+                  >
+                    <Text style={[styles.memberStatusChoiceText, isSelected && styles.memberStatusChoiceTextActive]}>
+                      {status.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <HouseholdButton
+              label={saving ? 'Saving...' : 'Save member status'}
+              icon="save-outline"
+              disabled={saving || !hasStatusChanged}
+              onPress={handleSave}
+            />
+          </>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -680,10 +619,6 @@ const defaultStatusOptions = [
   { key: 'needs_help', label: 'Needs help' },
 ];
 
-function isTrustedValidated(household: any) {
-  return ['validated', 'approved'].includes(String(household.validation_status || '').toLowerCase());
-}
-
 function statusIcon(statusKey: string): keyof typeof Ionicons.glyphMap {
   if (statusKey === 'safe') return 'shield-checkmark-outline';
   if (statusKey === 'evacuated') return 'walk-outline';
@@ -697,11 +632,6 @@ function parseSpecialNeeds(value?: string) {
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 3);
-}
-
-function labelize(value?: string) {
-  if (!value) return 'Pending';
-  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatDate(value?: string) {
@@ -754,38 +684,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontWeight: '800',
   },
-  broadcastCard: {
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderLeftWidth: 4,
-    borderLeftColor: palette.warning,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: palette.card,
-  },
-  broadcastHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  broadcastTime: {
-    flexShrink: 1,
-    color: palette.textSoft,
-    fontSize: 11,
-    textAlign: 'right',
-  },
-  broadcastTitle: {
-    color: palette.text,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  broadcastMessage: {
-    color: palette.textSoft,
-    fontSize: 13,
-    lineHeight: 18,
-  },
   card: {
     gap: spacing.md,
     borderWidth: 1,
@@ -795,8 +693,8 @@ const styles = StyleSheet.create({
     backgroundColor: palette.card,
   },
   historyButton: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -868,7 +766,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: palette.border,
-    paddingTop: spacing.md,
+    minHeight: 64,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
   },
   historyList: {
     maxHeight: 180,
@@ -909,6 +809,9 @@ const styles = StyleSheet.create({
   },
   memberSummaryText: {
     flex: 1,
+  },
+  memberSummaryStatus: {
+    alignItems: 'flex-end',
   },
   memberRow: {
     gap: spacing.sm,
@@ -999,7 +902,7 @@ const styles = StyleSheet.create({
   },
   memberStatusLabel: {
     color: palette.textSoft,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
@@ -1007,6 +910,8 @@ const styles = StyleSheet.create({
     color: palette.textSoft,
     fontSize: 11,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   memberStatusGrid: {
     flexDirection: 'row',
@@ -1031,65 +936,34 @@ const styles = StyleSheet.create({
   memberStatusChoiceTextActive: {
     color: '#fff',
   },
-  incomingRequestList: {
-    gap: spacing.sm,
-  },
-  incomingRequest: {
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: palette.secondary,
-  },
-  incomingRequestHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  incomingRequestText: {
-    flex: 1,
-  },
-  incomingRequestReason: {
-    color: palette.text,
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: '700',
-  },
-  incomingRequestDate: {
-    color: palette.textSoft,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  incomingRequestActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  incomingRequestAction: {
-    flex: 1,
-  },
   trustedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: palette.border,
-    paddingTop: spacing.md,
+    minHeight: 64,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+  },
+  trustedRowPressed: {
+    backgroundColor: palette.secondary,
   },
   trustedAddSlot: {
     width: '100%',
     marginTop: 2,
   },
   trustedPinButton: {
-    width: 26,
-    height: 26,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: palette.navActive,
-    borderRadius: 13,
-    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: radius.md,
   },
+
   trustedAddButton: {
     minHeight: 56,
     flexDirection: 'row',
@@ -1126,11 +1000,26 @@ const styles = StyleSheet.create({
   },
   trustedText: {
     flex: 1,
+    justifyContent: 'center',
   },
-  trustedStatusText: {
-    marginTop: 5,
-    color: palette.navActive,
-    fontSize: 12,
-    fontWeight: '900',
+  trustedMeta: {
+    fontSize: 9,
+  },
+  trustedStatusSlot: {
+    alignSelf: 'center',
+    alignItems: 'flex-end',
+    gap: 5,
+  },
+  memberStatusDots: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 3,
+    maxWidth: 112,
+  },
+  memberStatusDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 4,
   },
 });

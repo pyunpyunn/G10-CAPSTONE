@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\Mobile\HouseholdMobileService;
+use App\Services\HouseholdMobileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,11 +24,6 @@ class HouseholdMobileController extends Controller
     public function completeSetup(Request $request): JsonResponse
     {
         return $this->service->completeSetup($request);
-    }
-
-    public function updateGeotag(Request $request): JsonResponse
-    {
-        return $this->service->updateGeotag($request);
     }
 
     public function updateDeviceLocation(Request $request): JsonResponse
@@ -91,11 +86,13 @@ class HouseholdMobileController extends Controller
         return $this->service->storeTrustedHousehold($request);
     }
 
+    public function deleteTrustedHousehold(Request $request, string $connectionId): JsonResponse
+    {
+        return $this->service->deleteTrustedHousehold($request, $connectionId);
+    }
+
     public function respondToTrustedHousehold(Request $request, string $connectionId): JsonResponse
     {
         return $this->service->respondToTrustedHousehold($request, $connectionId);
     }
 }
-
-
-
