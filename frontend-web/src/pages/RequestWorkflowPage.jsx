@@ -31,9 +31,11 @@ export default function RequestWorkflowPage() {
         { key: 'need', label: 'Request type', render: (row) => row.need?.type }, { key: 'quantity', label: 'Quantity', render: (row) => row.need?.quantity_text },
         { key: 'area', label: 'Area', render: (row) => row.area?.label }, { key: 'status', label: 'Status', render: (row) => row.status?.label || row.validation?.label },
         { key: 'tracking', label: 'Tracking', render: (row) => `${row.handoff?.label || 'Awaiting handoff'} ${row.handoff?.tracking_reference || ''}` },
-        { key: 'actions', label: 'Actions', render: (row) => <><button className="btn btn-secondary" onClick={() => open(row, 'view')}>View request</button>
-          {external && <button className="btn btn-primary" onClick={() => open(row, 'validate')}>Approve request</button>}
-          {!external && row.validation?.key === 'verified' && <button className="btn btn-primary" onClick={() => open(row, 'view')}>Manage handoff</button>}</> }]} />
+        { key: 'actions', label: 'Actions', render: (row) => <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => open(row, 'view')}>View request</button>
+          {external && <button className="btn btn-primary btn-sm" onClick={() => open(row, 'edit')}>Edit request</button>}
+          {!external && row.validation?.key === 'verified' && <button className="btn btn-primary btn-sm" onClick={() => open(row, 'view')}>Manage handoff</button>}
+        </div> }]} />
     <PaginationBar meta={data?.requests || {}} onPageChange={setPage} label="requests" />
     {!external && <TrackingAidMirror items={data?.tracking_mirror || []} />}
   </main>

@@ -32,7 +32,7 @@ export function formFromResourceRequest(request) {
     unit: request.need?.unit || '',
     requested_by: request.requested_by || '',
     evacuation_center_id: request.area?.evacuation_center_id || '',
-    urgency_id: '',
+    urgency_id: request.urgency_id || '',
     description: request.description || '',
     validation_status: request.validation?.key || 'needs_validation',
     validation_notes: request.validation_notes || '',
@@ -59,7 +59,11 @@ export function buildCreatePayload(form) {
 }
 
 export function buildUpdatePayload(form) {
-  return buildCreatePayload(form)
+  return {
+    ...buildCreatePayload(form),
+    validation_notes: emptyToNull(form.validation_notes),
+    validation_status: emptyToNull(form.validation_status),
+  }
 }
 
 export function buildValidationPayload(form) {
