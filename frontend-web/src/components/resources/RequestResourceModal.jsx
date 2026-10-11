@@ -1,20 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
-  ArrowRight,
   Boxes,
   Building,
   CheckCircle2,
   Clock,
+  Flame,
   Loader2,
   MapPin,
+  Minus,
   Package,
+  Plus,
   Send,
   Tag,
+  User,
   X,
 } from 'lucide-react'
 import { createResourceRequest, getResourceRequests } from '../../api/resourceRequestApi'
 import { getCurrentUser } from '../../api/authApi'
+
+function formatUnit(qty, unit = 'units') {
+  const q = Number(qty) || 0
+  const u = String(unit || 'units').trim()
+  if (q === 1) {
+    if (u.toLowerCase() === 'packs') return 'pack'
+    if (u.toLowerCase() === 'boxes') return 'box'
+    if (u.toLowerCase() === 'pieces' || u.toLowerCase() === 'pcs') return 'pc'
+    if (u.toLowerCase() === 'bottles') return 'bottle'
+    if (u.toLowerCase() === 'sacks') return 'sack'
+    if (u.toLowerCase() === 'bags') return 'bag'
+    if (u.toLowerCase() === 'kits') return 'kit'
+    if (u.toLowerCase() === 'units') return 'unit'
+    if (u.toLowerCase().endsWith('s') && !u.toLowerCase().endsWith('ss')) return u.slice(0, -1)
+  }
+  return u
+}
 
 export default function RequestResourceModal({
   item,
@@ -87,9 +107,67 @@ export default function RequestResourceModal({
     }
   }, [isOpen, item])
 
+  const maxAvailable = Math.max(1, Number(item?.quantity) || 1)
+
+  const urgencyList = useMemo(() => {
+    if (urgencies.length > 0) return urgencies
+    return [
+      { urgency_id: 1, key: 'low', label: 'Low Priority' },
+      { urgency_id: 2, key: 'medium', label: 'Medium Priority' },
+      { urgency_id: 3, key: 'high', label: 'High Priority' },
+      { urgency_id: 4, key: 'critical', label: 'Critical Priority' },
+    ]
+  }, [urgencies])
+
+  const selectedCenter = useMemo(() => {
+    if (!centers || centers.length === 0) return null
+    return (
+      centers.find((c) => String(c.evacuation_center_id) === String(evacuationCenterId)) ||
+      centers[0]
+    )
+  }, [centers, evacuationCenterId])
+
+  const quickPresets = useMemo(() => {
+    const list = []
+    if (maxAvailable >= 5) list.push(5)
+    if (maxAvailable >= 10) list.push(10)
+    if (maxAvailable >= 25) list.push(25)
+    return list.filter((p) => p < maxAvailable)
+  }, [maxAvailable])
+
   if (!isOpen || !item) return null
 
-  const maxAvailable = Math.max(1, Number(item.quantity) || 1)
+  const currentQtyNum = Math.min(maxAvailable, Math.max(1, parseInt(quantity, 10) || 1))
+  const percentStock = Math.min(100, Math.round((currentQtyNum / maxAvailable) * 100))
+  const remainingStock = Math.max(0, maxAvailable - currentQtyNum)
+
+  const stepQuantity = (delta) => {
+    const cur = parseInt(quantity, 10) || 1
+    const next = Math.min(maxAvailable, Math.max(1, cur + delta))
+    setQuantity(next)
+  }
+
+  const handleQuantityChange = (val) => {
+    if (val === '') {
+      setQuantity('')
+      return
+    }
+    const num = parseInt(val, 10)
+    if (isNaN(num)) return
+    if (num < 1) {
+      setQuantity(1)
+    } else if (num > maxAvailable) {
+      setQuantity(maxAvailable)
+    } else {
+      setQuantity(num)
+    }
+  }
+
+  const handleQuantityBlur = () => {
+    if (quantity === '' || isNaN(parseInt(quantity, 10)) || parseInt(quantity, 10) < 1) {
+      setQuantity(1)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -101,7 +179,7 @@ export default function RequestResourceModal({
     }
 
     if (reqQty > maxAvailable) {
-      setError(`Requested quantity cannot exceed available stock (${maxAvailable} ${item.unit || 'units'}).`)
+      setError(`Requested quantity cannot exceed available stock (${maxAvailable} ${formatUnit(maxAvailable, item.unit)}).`)
       return
     }
 
@@ -154,9 +232,15 @@ export default function RequestResourceModal({
         {/* Modal Head */}
         <div className="modal-head">
           <div className="modal-title-with-badge">
-            <h2>Request Resource</h2>
+            <div className="modal-title-left">
+              <div className="modal-icon-badge">
+                <Package size={17} />
+              </div>
+              <h2>Request Resource</h2>
+            </div>
             <span className="badge-stock-info">
-              {Number(item.quantity).toLocaleString()} {item.unit || 'units'} Available
+              <span className="stock-dot" />
+              {Number(item.quantity).toLocaleString()} {formatUnit(item.quantity, item.unit)} Available
             </span>
           </div>
           <button
@@ -165,7 +249,7 @@ export default function RequestResourceModal({
             aria-label="Close modal"
             onClick={onClose}
           >
-            <X size={18} />
+            <X size={17} />
           </button>
         </div>
 
@@ -198,59 +282,116 @@ export default function RequestResourceModal({
                   <Boxes size={12} /> {item.type || 'Consumable'}
                 </span>
               </div>
+
+              {/* Allocation Progress Bar */}
+              <div className="req-stock-bar-wrap">
+                <div className="req-stock-bar-labels">
+                  <span>
+                    Requesting <strong>{currentQtyNum}</strong> of {maxAvailable} {formatUnit(maxAvailable, item.unit)}
+                  </span>
+                  <span className="req-remaining-badge">
+                    {remainingStock} {formatUnit(remainingStock, item.unit)} remaining
+                  </span>
+                </div>
+                <div className="req-stock-progress-track">
+                  <div
+                    className="req-stock-progress-fill"
+                    style={{
+                      width: `${percentStock}%`,
+                      backgroundColor: percentStock > 80 ? '#f59e0b' : '#3b82f6',
+                    }}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Form Fields */}
             <div className="form-grid-2">
-              {/* Quantity Field */}
+              {/* Interactive Quantity Stepper */}
               <div className="form-field">
                 <label htmlFor="field-request-quantity">
                   Quantity Needed <span className="req-star">*</span>
                 </label>
-                <div className="input-with-unit">
-                  <input
-                    id="field-request-quantity"
-                    type="number"
-                    min="1"
-                    max={maxAvailable}
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    required
-                    className="form-control"
-                  />
-                  <span className="input-unit-label">{item.unit || 'units'}</span>
+                <div className="req-stepper-control">
+                  <button
+                    type="button"
+                    className="stepper-step-btn"
+                    onClick={() => stepQuantity(-1)}
+                    disabled={Number(quantity) <= 1}
+                    aria-label="Decrease quantity"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <div className="stepper-center-input">
+                    <input
+                      id="field-request-quantity"
+                      type="number"
+                      min="1"
+                      max={maxAvailable}
+                      value={quantity}
+                      onChange={(e) => handleQuantityChange(e.target.value)}
+                      onBlur={handleQuantityBlur}
+                      required
+                      className="stepper-num-field"
+                    />
+                    <span className="stepper-unit-tag">{formatUnit(quantity || 1, item.unit)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="stepper-step-btn"
+                    onClick={() => stepQuantity(1)}
+                    disabled={Number(quantity) >= maxAvailable}
+                    aria-label="Increase quantity"
+                  >
+                    <Plus size={14} />
+                  </button>
                 </div>
-                <span className="form-help-text">
-                  Max available: {maxAvailable} {item.unit || 'units'}
-                </span>
+
+                {/* Quick Presets */}
+                <div className="req-preset-row">
+                  {quickPresets.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className={`preset-chip ${Number(quantity) === preset ? 'is-active' : ''}`}
+                      onClick={() => setQuantity(preset)}
+                    >
+                      +{preset}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className={`preset-chip preset-max ${Number(quantity) === maxAvailable ? 'is-active' : ''}`}
+                    onClick={() => setQuantity(maxAvailable)}
+                  >
+                    Max ({maxAvailable})
+                  </button>
+                </div>
               </div>
 
-              {/* Urgency Level */}
+              {/* Urgency Level Selector */}
               <div className="form-field">
                 <label htmlFor="field-urgency">
                   Urgency Level <span className="req-star">*</span>
                 </label>
-                <select
-                  id="field-urgency"
-                  value={urgencyId}
-                  onChange={(e) => setUrgencyId(e.target.value)}
-                  className="form-control"
-                >
-                  {urgencies.length > 0 ? (
-                    urgencies.map((u) => (
-                      <option key={u.urgency_id} value={u.urgency_id}>
-                        {u.label} Priority
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="1">Low Priority</option>
-                      <option value="2">Medium Priority</option>
-                      <option value="3">High Priority</option>
-                      <option value="4">Critical Priority</option>
-                    </>
-                  )}
-                </select>
+                <div className="urgency-selector-grid">
+                  {urgencyList.map((u) => {
+                    const isSelected = Number(urgencyId) === Number(u.urgency_id)
+                    const key = u.key || 'medium'
+                    const labelShort = u.label ? u.label.replace(/Priority/i, '').trim() : 'Medium'
+                    return (
+                      <button
+                        key={u.urgency_id}
+                        type="button"
+                        className={`urgency-choice-btn urgency-${key} ${isSelected ? 'selected' : ''}`}
+                        onClick={() => setUrgencyId(u.urgency_id)}
+                      >
+                        <span className={`urgency-status-dot dot-${key}`} />
+                        <span className="urgency-choice-label">{labelShort}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               {/* Destination Evacuation Center */}
@@ -270,7 +411,7 @@ export default function RequestResourceModal({
                     {centers.length > 0 ? (
                       centers.map((c) => (
                         <option key={c.evacuation_center_id} value={c.evacuation_center_id}>
-                          {c.name} {c.address ? `(${c.address})` : ''}
+                          {c.name}
                         </option>
                       ))
                     ) : (
@@ -278,6 +419,17 @@ export default function RequestResourceModal({
                     )}
                   </select>
                 </div>
+
+                {/* Selected Center Address Hint */}
+                {selectedCenter && selectedCenter.address && (
+                  <div className="center-caption-info">
+                    <MapPin size={11} className="center-caption-pin" />
+                    <span className="center-caption-address">{selectedCenter.address}</span>
+                    {selectedCenter.current_event_status === 'active' && (
+                      <span className="center-caption-active-tag">Active event</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Requester Name */}
@@ -285,29 +437,36 @@ export default function RequestResourceModal({
                 <label htmlFor="field-requested-by">
                   Requested By / Authorized Person <span className="req-star">*</span>
                 </label>
-                <input
-                  id="field-requested-by"
-                  type="text"
-                  value={requestedBy}
-                  onChange={(e) => setRequestedBy(e.target.value)}
-                  placeholder="e.g. Nina Kathleen (Disaster Operations)"
-                  required
-                  className="form-control"
-                />
+                <div className="input-with-icon">
+                  <User size={14} className="field-icon" />
+                  <input
+                    id="field-requested-by"
+                    type="text"
+                    value={requestedBy}
+                    onChange={(e) => setRequestedBy(e.target.value)}
+                    placeholder="e.g. Nina Kathleen (Disaster Operations)"
+                    required
+                    className="form-control with-icon"
+                  />
+                </div>
               </div>
 
               {/* Purpose / Notes */}
               <div className="form-field full-width">
-                <label htmlFor="field-description">
-                  Disaster Context / Purpose (Optional)
-                </label>
+                <div className="field-label-row">
+                  <label htmlFor="field-description">
+                    Disaster Context / Purpose <span className="field-optional">(Optional)</span>
+                  </label>
+                  <span className="field-char-count">{description.length}/200</span>
+                </div>
                 <textarea
                   id="field-description"
                   rows={2}
+                  maxLength={200}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="e.g. Immediate food assistance for 15 displaced families at evacuation site."
-                  className="form-control"
+                  className="form-control req-textarea"
                 />
               </div>
             </div>
@@ -326,7 +485,7 @@ export default function RequestResourceModal({
             <button
               type="submit"
               className="btn btn-primary btn-submit-request"
-              disabled={submitting}
+              disabled={submitting || !quantity || Number(quantity) < 1}
             >
               {submitting ? (
                 <>
@@ -334,7 +493,7 @@ export default function RequestResourceModal({
                 </>
               ) : (
                 <>
-                  <Send size={15} /> Submit Request ({quantity} {item.unit || 'units'})
+                  <Send size={15} /> Submit Request ({quantity || 0} {formatUnit(quantity || 0, item.unit)})
                 </>
               )}
             </button>
