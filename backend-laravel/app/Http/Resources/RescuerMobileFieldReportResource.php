@@ -16,6 +16,8 @@ class RescuerMobileFieldReportResource extends JsonResource
             'household_id' => $row->household_id,
             'household_code' => $row->household_code ?? null,
             'household_head_name' => $row->household_head_name ?? 'Household',
+            'reporter_name' => $row->reporter_name ?? null,
+            'reporter_team_name' => $row->reporter_team_name ?? null,
             'status_id' => $row->status_id ?? null,
             'status_key' => $row->status_key ?? 'reported',
             'status_label' => $row->status_label ?? 'Reported',

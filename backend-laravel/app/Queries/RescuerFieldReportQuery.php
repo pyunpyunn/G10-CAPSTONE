@@ -42,6 +42,14 @@ class RescuerFieldReportQuery
             $this->optional('household_status_logs', 'submitted_at', 'submitted_at', 'hsl'),
         ];
         if (Schema::hasColumn('household_status_logs', 'source')) $query->where('hsl.source', 'responder_field_report');
+        if (Schema::hasColumn('household_status_logs', 'responder_id') && Schema::hasTable('responders')) {
+            $query->leftJoin('responders as reporter', 'reporter.responder_id', '=', 'hsl.responder_id');
+            $columns[] = $this->optional('responders', 'full_name', 'reporter_name', 'reporter');
+            if (Schema::hasColumn('responders', 'team_id') && Schema::hasTable('rescue_teams')) {
+                $query->leftJoin('rescue_teams as reporter_team', 'reporter_team.team_id', '=', 'reporter.team_id');
+                $columns[] = $this->optional('rescue_teams', 'team_name', 'reporter_team_name', 'reporter_team');
+            }
+        }
         if (Schema::hasTable('household_statuses')) {
             $query->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id');
             $columns[] = 'hs.status_key';

@@ -1,30 +1,23 @@
 import { useCallback, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { Plus } from 'lucide-react'
 import { getDispatchDashboard } from '../api/dispatchApi'
-import PageHeader from '../components/ui/PageHeader'
-import ModuleDataView from '../components/ui/ModuleDataView'
+import { ResponseOperationsLayout } from '../components/ui/PageHeader'
 import { useModuleData } from '../utils/useModuleData'
 import PaginationBar from '../components/ui/PaginationBar'
-import DataFilterBar from '../components/ui/DataFilterBar'
 import DispatchStatusBadge from '../components/dispatch/DispatchStatusBadge'
 
 export default function RescueManagementPage() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const loader = useCallback(() => getDispatchDashboard({ status: 'active', search, page, per_page: 20 }), [page, search])
-  const { data, error, loading, refresh } = useModuleData(loader)
-  return <main className="ops-page response-operations-page">
-    <PageHeader title="Rescue Management" subtitle={data?.active_event?.name || 'Active dispatch assignments'}
-      actions={<button className="button review" type="button" disabled={loading || !data?.active_event} onClick={() => navigate('/rescue-management/new')}>Create New Dispatch Assignment</button>} />
-    {!loading && !error && !data?.active_event && <div className="standby-strip"><strong>No active disaster event</strong><span>Declare an event before creating dispatch assignments.</span></div>}
-    <DataFilterBar search={search} onSearchChange={(value) => { setSearch(value); setPage(1) }} searchPlaceholder="Search assignment, team or area..." onReset={() => { setSearch(''); setPage(1) }} />
-    <ModuleDataView title="List of Active Dispatch Assignments" rows={data?.dispatches?.data || []} loading={loading} error={error}
-      actions={<button className="btn btn-secondary" type="button" onClick={refresh}>Refresh</button>}
-      columns={[{ key: 'assignment_code', label: 'Assignment' }, { key: 'team_name', label: 'Team' }, { key: 'assigned_area', label: 'Area' },
-        { key: 'priority_label', label: 'Priority' }, { key: 'assigned_at', label: 'Assigned' },
-        { key: 'status', label: 'Status', render: (row) => <DispatchStatusBadge status={row.status} /> },
-        { key: 'actions', label: 'Actions', render: (row) => <Link className="btn btn-secondary" to={`/rescue-management/${row.assignment_id}/edit`}>Update Dispatch Assignment</Link> }]} />
-    <PaginationBar meta={data?.dispatches?.meta || {}} onPageChange={setPage} label="assignments" />
-  </main>
+  const [status, setStatus] = useState('active')
+  const loader = useCallback(() => getDispatchDashboard({ status, page, per_page: 20 }), [page, status])
+  const { data, error, loading } = useModuleData(loader, ['dispatch', 'households', 'disasters'])
+  const rows = data?.dispatches?.data || []
+  return <ResponseOperationsLayout active={1}><section className="pg on">
+    <div className="hd"><span className={`ev${data?.active_event ? '' : ' off'}`}><i />{data?.active_event?.name || 'No active event'}</span><span className="sp" /><button className="bt p pl2" type="button" disabled={loading || !data?.active_event} onClick={() => navigate('/rescue-management/new')}>New Dispatch<i><Plus size={15} /></i></button></div>
+    {!loading && !error && !data?.active_event && <div className="nb">No active event · dispatch disabled</div>}
+    <div className="fb"><div className="ft">{[['active','Active'], ['dispatched','Dispatched'], ['on_scene','On-scene'], ['returning','Returning'], ['closed','Closed']].map(([value, name]) => <button key={value} type="button" className={status === value ? 'on' : ''} onClick={() => { setStatus(value); setPage(1) }}>{name}</button>)}</div></div>
+    <div className="cd" style={{ flex: 1 }}><div className="tw">{error ? <div className="form-error" role="alert">{error}</div> : loading ? <div className="empty-reference" role="status">Loading assignments…</div> : !rows.length ? <div className="empty-reference">No assignments</div> : <table><thead><tr><th>Code</th><th>Team</th><th>Area</th><th>Priority</th><th>Assigned</th><th>Status</th><th /></tr></thead><tbody>{rows.map((row) => <tr key={row.assignment_id} onClick={() => navigate(`/rescue-management/${row.assignment_id}/edit`)}><td><b>{row.assignment_code}</b></td><td>{row.team_name}</td><td>{row.assigned_area}</td><td><span className="pl" style={{ '--c': ['high','critical'].includes(row.priority_level) ? '#dc2626' : row.priority_level === 'watch' ? '#d97706' : '#2563eb' }}>{row.priority_label}</span></td><td>{row.assigned_at}</td><td><DispatchStatusBadge status={row.status} /></td><td><button className="lk" type="button" onClick={(event) => { event.stopPropagation(); navigate(`/rescue-management/${row.assignment_id}/edit`) }}>Update</button></td></tr>)}</tbody></table>}</div><PaginationBar reference meta={data?.dispatches?.meta || {}} onPageChange={setPage} label="assignments" /></div>
+  </section></ResponseOperationsLayout>
 }

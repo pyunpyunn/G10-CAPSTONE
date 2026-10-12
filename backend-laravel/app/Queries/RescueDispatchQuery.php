@@ -28,14 +28,83 @@ class RescueDispatchQuery
         return ResponderAssignment::query()->from('responder_assignments as ra')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')->where('ra.assignment_id', $id)->select(['ra.*', 'rt.team_name', 'rt.team_code', 'rt.team_type', 'r.full_name as responder_name', 'r.contact_number as responder_contact', 'r.user_id as responder_user_id'])->first();
     }
 
+    public function reportOutcomes(object $dispatch): ?array
+    {
+        if (!Schema::hasTable('household_status_logs') || !Schema::hasTable('household_statuses') || !Schema::hasColumn('household_status_logs', 'source')) return null;
+        $route = $this->presenter->decodeJson($dispatch->route_notes);
+        $ids = array_values(array_unique(array_filter(array_merge([$dispatch->household_id], $route['household_ids'] ?? []))));
+        $counts = ['safe_count'=>0,'evacuated_count'=>0,'unsafe_count'=>0,'pending_count'=>0,'report_count'=>0];
+        if (!$ids) return $counts;
+        $rows = DB::table('household_status_logs as log')->leftJoin('household_statuses as status', 'status.status_id', '=', 'log.status_id')
+            ->where('log.disaster_id', $dispatch->disaster_id)->where('log.source', 'responder_field_report')->whereIn('log.household_id', $ids)
+            ->orderByDesc('log.submitted_at')->orderByDesc('log.status_log_id')->get(['log.household_id','status.status_key'])->unique('household_id');
+        foreach ($rows as $row) {
+            $key = match ($row->status_key) {
+                'safe','active','returned' => 'safe_count', 'evacuated','relocated' => 'evacuated_count',
+                'unsafe','not_evacuated','displaced','needs_help','need_help','needs_assistance','missing','injured' => 'unsafe_count', default => 'pending_count',
+            };
+            $counts[$key]++; $counts['report_count']++;
+        }
+        return $counts;
+    }
+
+    public function coverageHouseholds(object $dispatch): array
+    {
+        if (!Schema::hasTable('households')) return [];
+        $route = $this->presenter->decodeJson($dispatch->route_notes);
+        $ids = array_values(array_unique(array_filter(array_merge([$dispatch->household_id], $route['household_ids'] ?? []))));
+        if (!$ids) return [];
+        $query = Household::query()->withoutGlobalScopes()->from('households as h')->whereIn('h.household_id', $ids);
+        $columns = ['h.household_id'];
+        foreach (['household_name','household_code','member_count'] as $column) $columns[] = Schema::hasColumn('households', $column) ? 'h.'.$column : DB::raw('NULL as '.$column);
+        if (Schema::hasTable('household_disasters') && Schema::hasTable('household_statuses')) {
+            $query->leftJoin('household_disasters as hd', fn ($join) => $join->on('hd.household_id','=','h.household_id')->where('hd.disaster_id',$dispatch->disaster_id))
+                ->leftJoin('household_statuses as hs','hs.status_id','=','hd.current_status_id');
+            $columns[] = 'hs.status_key';
+        }
+        $contacts = $this->contactChannels($ids);
+        return $query->get($columns)->unique('household_id')->map(fn ($row) => ['household_id'=>$row->household_id,'household_name'=>$row->household_name ?? $row->household_code ?? $row->household_id,
+            'member_count'=>$row->member_count,'has_contact_channel'=>$contacts[$row->household_id] ?? null,'reported_unsafe_count'=>in_array($row->status_key ?? null,['unsafe','not_evacuated','displaced','needs_help','need_help','missing','injured'],true) ? 1 : 0])->values()->all();
+    }
+
+    private function contactChannels(array $ids): array
+    {
+        if (!$ids || !Schema::hasColumn('households', 'contact_number') || !Schema::hasTable('device_tokens') || !Schema::hasTable('trusted_households')) return [];
+        $reachable = DB::table('households as contact')->whereIn('contact.household_id', $ids)->where(function ($query) {
+            $query->where(fn ($phone) => $phone->whereNotNull('contact.contact_number')->where('contact.contact_number','<>',''))
+                ->orWhereExists(fn ($device) => $device->selectRaw('1')->from('device_tokens as device')->whereColumn('device.household_id','contact.household_id')->where('device.is_active',true));
+        })->pluck('contact.household_id')->all();
+        foreach ([['requesting_household_id','trusted_household_id'],['trusted_household_id','requesting_household_id']] as [$owner,$other]) {
+            $reachable = array_merge($reachable, DB::table('trusted_households as trust')->join('households as contact','contact.household_id','=','trust.'.$other)
+                ->whereIn('trust.'.$owner,$ids)->whereIn('trust.validation_status',['validated','approved'])->where(function ($query) {
+                    $query->where(fn ($phone) => $phone->whereNotNull('contact.contact_number')->where('contact.contact_number','<>',''))
+                        ->orWhereExists(fn ($device) => $device->selectRaw('1')->from('device_tokens as device')->whereColumn('device.household_id','contact.household_id')->where('device.is_active',true));
+                })->pluck('trust.'.$owner)->all());
+        }
+        $reachable = array_fill_keys($reachable, true);
+        return array_combine($ids, array_map(fn ($id) => isset($reachable[$id]), $ids));
+    }
+
     public function dispatches(Request $request, string $eventId): object
     {
         $query = ResponderAssignment::query()->from('responder_assignments as ra')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')->where('ra.disaster_id', $eventId)->select(['ra.assignment_id', 'ra.assignment_code', 'ra.responder_id', 'ra.responder_count', 'ra.dispatch_type', 'ra.team_id', 'ra.disaster_id', 'ra.household_id', 'ra.assigned_area', 'ra.route_notes', 'ra.priority_level', 'ra.dispatch_notes', 'ra.status', 'ra.assigned_at', 'ra.accepted_at', 'ra.en_route_at', 'ra.arrived_at', 'ra.completed_at', 'ra.outcome_notes', 'ra.updated_at', 'rt.team_name', 'rt.team_code', 'rt.team_type', 'r.full_name as responder_name', 'r.contact_number as responder_contact']);
         $status = trim((string) $request->query('status', 'all')); $search = trim((string) $request->query('search', ''));
         if ($status === 'active') $query->whereIn('ra.status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning']);
+        elseif ($status === 'closed') $query->whereIn('ra.status', ['completed', 'cancelled']);
         elseif ($status !== '' && $status !== 'all') $query->where('ra.status', $this->presenter->statusKey($status));
         if ($search !== '') $query->where(function ($q) use ($search): void { $q->where('ra.assignment_code', 'like', "%{$search}%")->orWhere('ra.assigned_area', 'like', "%{$search}%")->orWhere('rt.team_name', 'like', "%{$search}%")->orWhere('r.full_name', 'like', "%{$search}%"); });
         return $query->orderByRaw('CASE WHEN ra.status IN ("on_scene", "onscene", "dispatched", "en_route") THEN 0 ELSE 1 END')->orderByDesc('ra.assigned_at')->orderByDesc('ra.assignment_id')->paginate(\App\Http\Requests\ListRequest::clampPerPage($request->query('per_page')));
+    }
+
+    public function activeDispatches(?string $eventId): array
+    {
+        if (!$eventId) return [];
+        return ResponderAssignment::query()->from('responder_assignments as ra')
+            ->leftJoin('rescue_teams as rt','rt.team_id','=','ra.team_id')->leftJoin('responders as r','r.responder_id','=','ra.responder_id')
+            ->where('ra.disaster_id',$eventId)->whereIn('ra.status',['dispatched','accepted','en_route','on_scene','onscene','returning'])
+            ->orderByDesc('ra.assigned_at')->orderByDesc('ra.assignment_id')
+            ->get(['ra.*','rt.team_name','rt.team_code','rt.team_type','r.full_name as responder_name','r.contact_number as responder_contact'])
+            ->map(fn ($assignment) => $this->presenter->dispatch($assignment))->all();
     }
 
     public function route(int $assignmentId): ?array
@@ -59,19 +128,24 @@ class RescueDispatchQuery
             $active = $activeByResponder->get($r->responder_id);
             $key=$this->presenter->statusKey($r->duty_status);
             $available = ! $active && ! (bool) $r->is_deployed && $key === 'available';
-            return ['responder_id'=>$r->responder_id,'user_id'=>$r->user_id,'team_id'=>$r->team_id,'full_name'=>$r->full_name?:'Unnamed responder','title'=>$r->title?:'Responder','contact_number'=>$r->contact_number,'team_name'=>$r->team_name?:'Unassigned','team_code'=>$r->team_code,'status'=>$this->presenter->status($active?$active->status:($eventId?$r->duty_status:'available')),'is_available'=>$available,'active_assignment_id'=>$active?->assignment_id,'active_assignment_code'=>$active?->assignment_code,'active_assigned_area'=>$active?->assigned_area,'last_active_at'=>$this->presenter->dateTime($r->last_active_at)];
+            return ['responder_id'=>$r->responder_id,'user_id'=>$r->user_id,'team_id'=>$r->team_id,'full_name'=>$r->full_name?:'Unnamed responder','title'=>$r->title?:'Responder','contact_number'=>$r->contact_number,'team_name'=>$r->team_name?:'Unassigned','team_code'=>$r->team_code,'status'=>$this->presenter->status($active?$active->status:($eventId?$r->duty_status:'available')),'is_available'=>$available,'active_assignment_id'=>$active?->assignment_id,'active_assignment_code'=>$active?->assignment_code,'active_assigned_area'=>$active?->assigned_area,'last_active_timestamp'=>$r->last_active_at ? \Carbon\Carbon::parse($r->last_active_at)->timestamp : 0,'last_active_at'=>$this->presenter->dateTime($r->last_active_at)];
         })->values();
     }
 
     public function riskAreas(?string $eventId)
     {
         if (!$eventId) return collect();
-        $rows=Household::query()->withoutGlobalScopes()->from('households as h')->leftJoin('addresses as a','a.address_id','=','h.address_id')->leftJoin('household_disasters as hd',function($j)use($eventId):void{$j->on('hd.household_id','=','h.household_id')->where('hd.disaster_id','=',$eventId);})->leftJoin('household_statuses as hs','hs.status_id','=','hd.current_status_id')->when(Schema::hasColumn('households','deleted_at'),fn($q)=>$q->whereNull('h.deleted_at'))->whereNotNull('h.household_id')->select(['h.household_id','h.household_code','h.household_name','h.member_count','a.full_address','a.house_number',DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned') as area_name"),DB::raw("(SELECT gl.location_label FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.location_label IS NOT NULL ORDER BY COALESCE(gl.updated_at,gl.created_at) DESC LIMIT 1) as geotag_label"),'hs.status_key','hs.status_label','hd.needs_dispatch','hd.priority_level','hd.last_battery_level','hd.last_reported_at',DB::raw('EXISTS (SELECT 1 FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.latitude IS NOT NULL AND gl.longitude IS NOT NULL) as has_geotag')])->get();
-        $busy=ResponderAssignment::query()->where('disaster_id',$eventId)->whereNotNull('household_id')->whereIn('status',['dispatched','accepted','en_route','on_scene','onscene','returning'])->pluck('assignment_id','household_id');
-        return $rows->groupBy('area_name')->map(function($items,string $area)use($busy):array{
+        $rows=Household::query()->withoutGlobalScopes()->from('households as h')->leftJoin('addresses as a','a.address_id','=','h.address_id')->leftJoin('household_disasters as hd',function($j)use($eventId):void{$j->on('hd.household_id','=','h.household_id')->where('hd.disaster_id','=',$eventId);})->leftJoin('household_statuses as hs','hs.status_id','=','hd.current_status_id')->when(Schema::hasColumn('households','deleted_at'),fn($q)=>$q->whereNull('h.deleted_at'))->whereNotNull('h.household_id')->select(['h.household_id','h.household_code','h.household_name','h.member_count',Schema::hasColumn('addresses','sitio_id') ? 'a.sitio_id' : DB::raw('NULL as sitio_id'),Schema::hasColumn('addresses','purok_id') ? 'a.purok_id' : DB::raw('NULL as purok_id'),'a.full_address','a.house_number',DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned') as area_name"),DB::raw("(SELECT gl.location_label FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.location_label IS NOT NULL ORDER BY COALESCE(gl.updated_at,gl.created_at) DESC LIMIT 1) as geotag_label"),'hs.status_key','hs.status_label','hd.needs_dispatch','hd.priority_level','hd.last_battery_level','hd.last_reported_at',DB::raw('EXISTS (SELECT 1 FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.latitude IS NOT NULL AND gl.longitude IS NOT NULL) as has_geotag')])->get();
+        $contacts = $this->contactChannels($rows->pluck('household_id')->unique()->all());
+        $busy = collect();
+        foreach (ResponderAssignment::query()->where('disaster_id', $eventId)->whereIn('status', ['dispatched','accepted','en_route','on_scene','onscene','returning'])->get(['assignment_id','household_id','route_notes']) as $assignment) {
+            $route = $this->presenter->decodeJson($assignment->route_notes);
+            foreach (array_filter(array_merge([$assignment->household_id], $route['household_ids'] ?? [])) as $householdId) $busy[$householdId] = $assignment->assignment_id;
+        }
+        return $rows->groupBy('area_name')->map(function($items,string $area)use($busy,$contacts):array{
             $total=$items->count();$unsafe=$items->filter(fn($i)=>in_array($i->status_key,['not_evacuated','displaced','unsafe','needs_help','need_help','needs_assistance','missing','injured'],true)||(bool)$i->needs_dispatch)->count();$unchecked=$items->whereNull('status_key')->count();$safe=$items->filter(fn($i)=>in_array($i->status_key,['active','returned','safe'],true))->count()+$items->filter(fn($i)=>in_array($i->status_key,['evacuated','relocated'],true))->count();$cover=$unsafe+$unchecked;$priority=$unsafe?'critical':($unchecked?'high':'watch');
-            $households=$items->sortBy(fn($i)=>sprintf('%d%d%s',$i->needs_dispatch?0:1,$i->has_geotag?0:1,strtolower($i->household_name?:$i->household_id)))->map(fn($i)=>$this->presenter->riskHousehold($i,$busy))->values();
-            return ['id'=>str($area)->slug('-')->toString()?:'unassigned','area_name'=>$area,'zone'=>$area,'context'=>$unsafe?'Unsafe households need dispatch focus.':'Unchecked households need field verification.','priority'=>$priority,'priority_label'=>$this->presenter->label($priority),'total_households'=>$total,'geotagged_households'=>$households->where('has_geotag',true)->count(),'unsafe_households'=>$unsafe,'unchecked_households'=>$unchecked,'safe_households'=>$safe,'to_cover'=>$cover,'households'=>$households,'recommended_households'=>$households->filter(fn($i)=>$i['needs_dispatch']||$i['status_key']==='unchecked'||in_array($i['status_key'],['not_evacuated','displaced','unsafe','needs_help','need_help','needs_assistance','missing','injured'],true))->take(10)->values()];
+            $households=$items->sortBy(fn($i)=>sprintf('%d%d%s',$i->needs_dispatch?0:1,$i->has_geotag?0:1,strtolower($i->household_name?:$i->household_id)))->map(fn($i)=>array_merge($this->presenter->riskHousehold($i,$busy), ['has_contact_channel'=>$contacts[$i->household_id] ?? null]))->values();
+            return ['sitio_id'=>$items->pluck('sitio_id')->filter()->unique()->count()===1?$items->pluck('sitio_id')->filter()->first():null,'purok_id'=>$items->pluck('purok_id')->filter()->unique()->count()===1?$items->pluck('purok_id')->filter()->first():null,'id'=>str($area)->slug('-')->toString()?:'unassigned','area_name'=>$area,'zone'=>$area,'context'=>$unsafe?'Unsafe households need dispatch focus.':'Unchecked households need field verification.','priority'=>$priority,'priority_label'=>$this->presenter->label($priority),'total_households'=>$total,'geotagged_households'=>$households->where('has_geotag',true)->count(),'unsafe_households'=>$unsafe,'unchecked_households'=>$unchecked,'safe_households'=>$safe,'to_cover'=>$cover,'households'=>$households,'recommended_households'=>$households->filter(fn($i)=>$i['needs_dispatch']||$i['status_key']==='unchecked'||in_array($i['status_key'],['not_evacuated','displaced','unsafe','needs_help','need_help','needs_assistance','missing','injured'],true))->take(10)->values()];
         })->filter(fn($area)=>$area['to_cover']>0)->sortByDesc('to_cover')->values();
     }
 
@@ -95,6 +169,8 @@ class RescueDispatchQuery
             ->whereIn('status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'])
             ->whereIn('team_id', $realTeams->pluck('team_id'))->distinct()->count('team_id') : 0;
         return ['total_teams' => $realTeams->count(), 'dispatched' => $dispatched, 'on_scene' => $onScene,
+            'available_responders' => (int) $realTeams->sum('available_responder_count'),
+            'total_responders' => (int) $realTeams->sum('member_count'),
             'available' => $available, 'completed' => $completed,
             'response_rate' => $realTeams->count() ? (int) round($activeTeams / $realTeams->count() * 100) : 0,
             'active_units' => $dispatched + $onScene + $returning,

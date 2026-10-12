@@ -38,6 +38,8 @@ function RescuerAccountsWorkspace() {
   const navigate = useNavigate()
   const workflow = location.pathname !== '/rescuers'
   const workflowType = location.pathname.split('/').pop()
+  const fromDispatchAssignment = workflowType === 'view' && location.state?.fromDispatchAssignment === true
+  const profileReturnPath = fromDispatchAssignment ? '/rescue-management' : '/rescuers'
   const [payload, setPayload] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -290,7 +292,7 @@ function RescuerAccountsWorkspace() {
         title={workflow ? (workflowType === 'teams' ? 'Team Management' : workflowType === 'view' ? 'Rescuer profile' : workflowType === 'edit' ? 'Update profile' : 'New rescuer account') : 'Account Management'}
         subtitle={payload?.area_label || 'Shared database records'}
         actions={workflow ? (
-          <button className="button secondary" type="button" onClick={() => navigate('/rescuers')}><ArrowLeft size={15} />Back to roster</button>
+          <button className="button secondary" type="button" onClick={() => navigate(profileReturnPath)}><ArrowLeft size={15} />{fromDispatchAssignment ? 'Back to rescue management' : 'Back to roster'}</button>
         ) : activeAccountTab === 'responders' ? (
           <>
             <button className="button secondary" type="button" onClick={openTeamConfig}><Settings2 size={15} />Manage teams</button>
@@ -303,7 +305,7 @@ function RescuerAccountsWorkspace() {
       {notice && !workflow && <div className="ra-success" role="status">{notice}</div>}
       {workflow && workflowType === 'teams' && <section className="ra-team-status-panel"><div className="ra-side-head"><span className="ra-title">Team Status Cards</span></div><RescuerTeamGrid teams={teamConfig?.teams || teams} showStatus /></section>}
       {workflow && workflowType === 'teams' && <RescueTeamConfigModal key={teamConfigVersion} embedded isOpen workspace={teamConfig} isLoading={teamConfigLoading} isSaving={teamConfigSaving} error={teamConfigError} onRetry={loadTeamConfig} onClose={() => navigate('/rescuers')} onSave={saveTeamConfig} onDelete={removeTeamConfig} />}
-      {workflow && workflowType !== 'teams' && !isInitialLoading && !detailLoading && isModalOpen && (modalMode === 'view' || formOptions) && <RescuerAccountModal embedded mode={modalMode} isOpen form={form} setForm={setForm} formError={formError} isSaving={isSaving} teamOptions={teamOptions} accountIdOptions={accountIdOptions} fallbackAccountId={payload?.next_account_id || ''} formOptions={formOptions} onClose={() => navigate('/rescuers')} onReset={resetForm} onSubmit={submitForm} onEdit={() => navigate(`/rescuers/edit?id=${selectedRescuerId}`)} />}
+      {workflow && workflowType !== 'teams' && !isInitialLoading && !detailLoading && isModalOpen && (modalMode === 'view' || formOptions) && <RescuerAccountModal embedded mode={modalMode} isOpen form={form} setForm={setForm} formError={formError} isSaving={isSaving} teamOptions={teamOptions} accountIdOptions={accountIdOptions} fallbackAccountId={payload?.next_account_id || ''} formOptions={formOptions} onClose={() => navigate(profileReturnPath)} onReset={resetForm} onSubmit={submitForm} onEdit={() => navigate(`/rescuers/edit?id=${selectedRescuerId}`)} />}
 
       {workflow && workflowType !== 'teams' && (isInitialLoading || detailLoading) && <LoadingState label="Loading rescuer profile..." />}
       {!workflow && <>

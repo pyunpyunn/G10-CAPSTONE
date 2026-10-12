@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getHousehold, getHouseholdStatusLogs } from '../api/householdApi'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
@@ -11,6 +11,15 @@ const HISTORY_PAGE_SIZE = 5
 export default function HouseholdReviewPage() {
   const navigate = useNavigate()
   const { householdId } = useParams()
+  const location = useLocation()
+  const dispatchContext = new URLSearchParams(location.search)
+  const dispatchId = dispatchContext.get('dispatch_id')
+  const dispatchCode = dispatchContext.get('dispatch_code')
+  const responderId = dispatchContext.get('responder_id')
+  const returnContext = new URLSearchParams()
+  if (/^DSP-\d+-\d+$/.test(dispatchCode || '')) returnContext.set('dispatch_code', dispatchCode)
+  if (/^\d+$/.test(responderId || '')) returnContext.set('responder_id', responderId)
+  const dispatchReturnPath = /^\d+$/.test(dispatchId || '') ? `/rescue-management/${dispatchId}/edit${returnContext.size ? `?${returnContext}` : ''}` : null
   const [detail, setDetail] = useState(null)
   const [history, setHistory] = useState([])
   const [historyPage, setHistoryPage] = useState(1)
@@ -74,6 +83,9 @@ export default function HouseholdReviewPage() {
             <button type="button" className="button secondary compact-button" onClick={() => navigate('/households')}>
               <ArrowLeft size={15} /> Back to households
             </button>
+            {dispatchReturnPath && <button type="button" className="button secondary compact-button" onClick={() => navigate(dispatchReturnPath)}>
+              <ArrowLeft size={15} /> Back to rescue dispatch
+            </button>}
           </>
         )}
       />
