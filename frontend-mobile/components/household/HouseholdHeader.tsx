@@ -18,7 +18,9 @@ export function HouseholdHeader({ isDisasterMode, notificationCount = 0, onOpenN
         />
         <Text style={styles.brand}>RESQPERATION</Text>
         <View style={styles.actions}>
-          <HouseholdBadge label={isDisasterMode ? 'Disaster mode' : 'Standby'} tone={isDisasterMode ? 'danger' : 'safe'} />
+          <View style={styles.disasterStatusBadge}>
+            <HouseholdBadge label={isDisasterMode ? 'Disaster mode' : 'Standby'} tone={isDisasterMode ? 'danger' : 'safe'} />
+          </View>
           <Pressable
             style={styles.notificationButton}
             onPress={onOpenNotifications}
@@ -60,6 +62,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  disasterStatusBadge: {
+    alignSelf: 'center',
   },
   notificationButton: {
     width: 34,

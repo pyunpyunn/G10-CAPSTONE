@@ -465,7 +465,9 @@ function TrustedHouseholdList({
                 </Text>
               ) : null}
             </View>
-            <HouseholdBadge label={labelize(householdItem.validation_status)} tone={householdItem.validation_status} />
+            <View style={styles.trustedStatusBadge}>
+              <HouseholdBadge label={labelize(householdItem.validation_status)} tone={householdItem.validation_status} />
+            </View>
           </Pressable>
         );
       })}
@@ -487,6 +489,7 @@ function MemberSummary({
   const memberLabel = member.is_registered_user
     ? 'Registered User'
     : device?.is_active ? 'Device active' : device ? 'Device inactive' : 'No device registered';
+  const currentStatus = member.current_status || null;
 
   return (
     <Pressable
@@ -1046,7 +1049,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: palette.border,
-    paddingTop: spacing.md,
+    minHeight: 64,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
   },
   trustedRowPressed: {
     backgroundColor: palette.secondary,
@@ -1101,11 +1107,15 @@ const styles = StyleSheet.create({
   },
   trustedText: {
     flex: 1,
+    justifyContent: 'center',
   },
   trustedStatusText: {
     marginTop: 5,
     color: palette.navActive,
     fontSize: 12,
     fontWeight: '900',
+  },
+  trustedStatusBadge: {
+    alignSelf: 'center',
   },
 });
