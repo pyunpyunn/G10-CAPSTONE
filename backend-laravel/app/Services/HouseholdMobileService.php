@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Shared\OneSignalNotificationService;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
