@@ -9,7 +9,8 @@ export default function HouseholdStatusPage() {
   const loader = useCallback(async () => {
     return getSitioPriorities()
   }, [])
-  const { data: ranking = [], error, loading: isLoading, refresh: load } = useModuleData(loader, ['households', 'disasters'])
+  const { data, error, loading: isLoading, refresh: load } = useModuleData(loader, ['households', 'disasters'])
+  const ranking = Array.isArray(data) ? data : []
   return (
     <main className="ops-page household-page">
       {isLoading && <LoadingState />}
