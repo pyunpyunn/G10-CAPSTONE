@@ -738,6 +738,7 @@ class HouseholdMobileService
         return response()->json([
             'data' => [
                 'household_id' => $household->household_id,
+                'household_name' => $household->household_name ?? null,
                 'family_name' => $this->familyName($household->household_name ?? $household->household_code ?? $household->household_id),
                 'household_code' => $household->household_code ?? null,
                 'household_username' => $this->householdUsername($trustedHouseholdId),
@@ -1899,6 +1900,7 @@ class HouseholdMobileService
             ->map(fn (object $row): array => [
                 'connection_id' => $row->connection_id,
                 'requesting_household_id' => $row->requesting_household_id,
+                'household_name' => $row->household_name ?? null,
                 'family_name' => $this->familyName($row->household_name ?? $row->household_code ?? $row->requesting_household_id),
                 'household_username' => $row->household_username ?? $this->familyName($row->household_name ?? $row->household_code ?? $row->requesting_household_id),
                 'reason' => $row->reason,
