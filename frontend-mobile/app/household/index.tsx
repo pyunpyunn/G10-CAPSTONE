@@ -454,7 +454,7 @@ export default function HouseholdHomeScreen() {
     const connectionId = String(request.connection_id);
     Alert.alert(
       'Reject trusted household request?',
-      `${request.family_name || 'This household'} (${request.requesting_household_id}) will not be added to your trusted households.`,
+      `${request.household_name || request.family_name || 'This household'} (${request.requesting_household_id}) will not be added to your trusted households.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -504,7 +504,12 @@ export default function HouseholdHomeScreen() {
 
     try {
       const response = await createTrustedHousehold(payload);
-      Alert.alert('Trusted household', response.message || 'Trusted household added.');
+      const targetHousehold = trustedLookup?.household_name || trustedLookup?.household_id;
+      const responseMessage = response.message || 'Trusted household request sent.';
+      Alert.alert(
+        'Trusted household',
+        targetHousehold ? `${responseMessage}\nHousehold: ${targetHousehold}` : responseMessage
+      );
       setShowAddTrusted(false);
       setTrustedLookup(null);
       await loadOverview(true);

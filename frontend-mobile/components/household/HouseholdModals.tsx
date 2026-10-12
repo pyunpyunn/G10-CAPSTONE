@@ -63,19 +63,19 @@ export function HouseholdNotificationsModal({ visible, requests, notices = [], b
             {requests.length ? requests.map((request) => {
               const id = String(request.connection_id);
               const expanded = expandedId === id;
-              const householdName = request.family_name || request.household_name || 'Household';
+              const householdName = request.household_name || request.family_name || 'Household';
               return (
                 <View key={id} style={styles.notificationCard}>
                   <Pressable
                     style={styles.notificationRow}
                     onPress={() => setExpandedId(expanded ? '' : id)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${request.household_username || householdName}, household ID ${request.requesting_household_id}`}
+                    accessibilityLabel={`${householdName}, household ID ${request.requesting_household_id}`}
                   >
                     <View style={styles.notificationIcon}><Ionicons name="people-outline" size={19} color={palette.navActive} /></View>
                     <View style={styles.notificationCopy}>
                       <Text style={styles.notificationTitle}>Trusted household request</Text>
-                      <Text style={styles.notificationMeta}>{request.household_username || householdName} · {request.requesting_household_id}</Text>
+                      <Text style={styles.notificationMeta}>{householdName} · {request.requesting_household_id}</Text>
                     </View>
                     <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={palette.textSoft} />
                   </Pressable>
@@ -282,6 +282,9 @@ export function AddTrustedHouseholdModal({
   const [relationship, setRelationship] = useState<(typeof trustedRelationshipOptions)[number] | null>(null);
   const [targetPin, setTargetPin] = useState('');
   const [isTargetPinVisible, setIsTargetPinVisible] = useState(false);
+  const householdDisplayName = String(
+    lookupResult?.household_name || lookupResult?.household_code || lookupResult?.household_id || 'Trusted household'
+  ).trim();
 
   useEffect(() => {
     if (!visible) {
@@ -354,7 +357,7 @@ export function AddTrustedHouseholdModal({
               <View style={styles.stepContent}>
                 <View style={styles.lookupCard}>
                   <Text style={styles.lookupLabel}>Adding</Text>
-                  <Text style={styles.lookupTitle}>{lookupResult.family_name} household</Text>
+                  <Text style={styles.lookupTitle}>{householdDisplayName}</Text>
                   <Text style={styles.lookupMeta}>{lookupResult.household_id}</Text>
                 </View>
                 <Text style={styles.stepTitle}>Select your relationship</Text>
@@ -390,10 +393,10 @@ export function AddTrustedHouseholdModal({
                 <View style={styles.lookupCard}>
                   <Text style={styles.lookupLabel}>Relationship</Text>
                   <Text style={styles.lookupTitle}>{relationship.relationshipLabel}</Text>
-                  <Text style={styles.lookupMeta}>{lookupResult.family_name} household · {lookupResult.household_id}</Text>
+                  <Text style={styles.lookupMeta}>{householdDisplayName} · {lookupResult.household_id}</Text>
                 </View>
                 <Text style={styles.stepTitle}>Verify household PIN</Text>
-                <Text style={styles.note}>Enter the PIN set by {lookupResult.family_name || 'this household'}. A correct PIN sends the request for their confirmation.</Text>
+                <Text style={styles.note}>Enter the PIN for {householdDisplayName}. A correct PIN sends the request for their confirmation.</Text>
                 <View style={styles.pinInputWrap}>
                 <TextInput
                   style={styles.pinInput}
