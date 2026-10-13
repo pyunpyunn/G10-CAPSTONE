@@ -16,6 +16,12 @@ class RescuerTeamWorkflow
         if (in_array($request->input('duty_status'), ['standby', 'stand-by'], true)) {
             $request->merge(['duty_status' => 'available']);
         }
+        if (blank($request->input('team_code'))) {
+            $existingCode = $teamId
+                ? DB::table('rescue_teams')->where('team_id', $teamId)->value('team_code')
+                : null;
+            $request->merge(['team_code' => $existingCode ?: $this->availableTeamCode((string) $request->input('team_name', ''), $teamId)]);
+        }
         $validated = app(\App\Http\Requests\RescueTeamPayloadValidator::class)->validate($request);
 
         $validated['team_code'] = $this->support->normalizeTeamCode($validated['team_code']);
@@ -34,6 +40,22 @@ class RescuerTeamWorkflow
         return $validated;
     }
 
+    private function availableTeamCode(string $teamName, ?int $teamId): string
+    {
+        $base = $this->support->teamCode($teamName);
+        $code = $base;
+        $suffix = 2;
+
+        while (DB::table('rescue_teams')->where('team_code', $code)
+            ->when($teamId, fn ($query) => $query->where('team_id', '<>', $teamId))
+            ->exists()) {
+            $suffixText = (string) $suffix++;
+            $code = substr($base, 0, 8 - strlen($suffixText)).$suffixText;
+        }
+
+        return $code;
+    }
+
     private function ensureMembershipMatchesType(array $validated): void
     {
         $ids = $this->normalizedResponderIds([
@@ -46,9 +68,9 @@ class RescuerTeamWorkflow
         $invalid = DB::table('responders')->whereIn('responder_id', $ids)->get(['username', 'full_name', 'deleted_at'])
             ->filter(function ($member) use ($isHq): bool {
                 $code = strtoupper((string) $member->username);
-                $hqMember = str_starts_with($code, 'BDRRM-HQCC-') && $code !== 'BDRRM-HQCC-001';
+                $hqMember = str_starts_with($code, 'BDRRM-HQCC-');
 
-                return $member->deleted_at !== null || $code === 'BDRRM-HQCC-001' || $hqMember !== $isHq;
+                return $member->deleted_at !== null || $hqMember !== $isHq;
             });
         if ($invalid->isNotEmpty()) {
             throw ValidationException::withMessages(['member_ids' => [
@@ -135,6 +157,15 @@ class RescuerTeamWorkflow
 
     public function syncTeamMembers(int $teamId, array $memberIds, ?int $leaderId, Carbon $now): void
     {
+        $affected = DB::table('responders')->where(fn ($query) => $query->where('team_id', $teamId)->orWhereIn('responder_id', $memberIds))
+            ->get(['user_id', 'responder_id']);
+        if ($memberIds) {
+            DB::table('rescue_teams')->where('team_id', '<>', $teamId)->whereIn('leader_responder_id', $memberIds)
+                ->update(['leader_responder_id' => null, 'updated_at' => $now]);
+        }
+        DB::table('responders')->where('team_id', $teamId)->where('username', 'like', 'BDRRM-HQCC-%')
+            ->when($memberIds, fn ($query) => $query->whereNotIn('responder_id', $memberIds))
+            ->update(['title' => 'HQ Personnel', 'updated_at' => $now]);
         DB::table('responders')
             ->where('team_id', $teamId)
             ->when(! empty($memberIds), fn ($query) => $query->whereNotIn('responder_id', $memberIds))
@@ -160,6 +191,8 @@ class RescuerTeamWorkflow
                     'updated_at' => $now,
                 ]);
         }
+        app(\App\Services\Web\HeadquartersTeamSupport::class)->synchronizeLeadership($teamId, $leaderId);
+        app(\App\Services\Web\PersonnelAccessNotifier::class)->notify($affected->pluck('user_id')->all());
     }
 }
 

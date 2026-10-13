@@ -1,6 +1,6 @@
 import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import {
   createResourceRequest,
   forwardResourceRequest,
@@ -23,8 +23,11 @@ import {
   formFromResourceRequest,
   resourceRequestErrorMessage,
 } from '../utils/resourceRequestHelpers'
+import { canApproveRequests } from '../utils/personnelAccess'
 
 export default function ResourceRequestEditorPage() {
+  const { user } = useOutletContext()
+  const canApprove = canApproveRequests(user)
   const navigate = useNavigate()
   const location = useLocation()
   const { requestId, mode = 'create' } = useParams()
@@ -87,6 +90,9 @@ export default function ResourceRequestEditorPage() {
 
   const options = payload?.options || {}
   const returnTo = location.state?.returnTo === '/external-requests' ? '/external-requests' : '/resources-requests'
+  if (requestId && ['validate', 'return', 'forward'].includes(mode) && !canApprove) {
+    return <Navigate to={returnTo} replace />
+  }
 
   function closePage() {
     navigate(returnTo)
@@ -180,6 +186,7 @@ export default function ResourceRequestEditorPage() {
       {isLoading ? <LoadingState /> : error ? <div className="form-error">{error}</div> : (
         <ResourceValidationModal
           mode={mode}
+          canApprove={canApprove}
           form={form}
           setForm={setForm}
           options={options}

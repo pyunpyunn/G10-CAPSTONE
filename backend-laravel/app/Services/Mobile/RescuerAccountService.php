@@ -32,10 +32,11 @@ class RescuerAccountService
         $teamOptions = $view['team_options'];
         $accountIds = $this->query->accountIdChoices($teamOptions);
         $formOptions = $this->presenter->accountFormOptions();
-        $defaultTeam = $teamOptions[0] ?? [];
+        $defaultTeam = collect($teamOptions)->first(fn ($team) => strtoupper($team['team_code']) !== 'HQCC'
+            && ! in_array(strtoupper($team['team_type']), ['HQ', 'HQCC', 'HEADQUARTERS'], true)) ?? [];
         $formOptions['defaults'] = [
             ...$formOptions['defaults'],
-            'account_id' => $accountIds['options'][0]['account_id'] ?? '',
+            'account_id' => collect($accountIds['options'])->firstWhere('team_name', $defaultTeam['team_name'] ?? '')['account_id'] ?? '',
             'team_id' => $defaultTeam['team_id'] ?? null,
             'team_name' => $defaultTeam['team_name'] ?? '',
             'team_code' => $defaultTeam['team_code'] ?? '',

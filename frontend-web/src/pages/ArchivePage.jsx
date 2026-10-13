@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import {
   exportArchive,
   createSavedArchiveGroup,
@@ -16,6 +17,7 @@ import ArchiveSavedLogsModal from '../components/archive/ArchiveSavedLogsModal'
 import ArchiveSelectionTools from '../components/archive/ArchiveSelectionTools'
 import ArchiveTable from '../components/archive/ArchiveTable'
 import ArchiveTabs from '../components/archive/ArchiveTabs'
+import EvaTrackReportsPanel from '../components/archive/EvaTrackReportsPanel'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
@@ -27,6 +29,8 @@ import {
 
 
 export default function ArchivePage() {
+  const { user } = useOutletContext()
+  const isSuperAdmin = user?.role?.role_key === 'super_admin'
   const [isExporting, setIsExporting] = useState(false)
   const [activeCategory, setActiveCategory] = useState('disaster-events')
   const [payload, setPayload] = useState(null)
@@ -52,7 +56,7 @@ export default function ArchivePage() {
     let ignore = false
 
     async function loadRecords() {
-      if (activeCategory === 'inquiry-logs') return
+      if (['inquiry-logs', 'evatrack-reports'].includes(activeCategory)) return
       setIsLoading(true)
       setError('')
 
@@ -110,6 +114,7 @@ export default function ArchivePage() {
   }
 
   function changeCategory(category) {
+    if (category === 'inquiry-logs' && !isSuperAdmin) return
     setActiveCategory(category)
     setSelectedRecord(null)
     setSelectedRecordCategory(category)
@@ -349,9 +354,17 @@ export default function ArchivePage() {
   const filters = payload?.filters || {}
   const counts = { [activeCategory]: pagination.total || 0 }
 
-  if (activeCategory === 'inquiry-logs') {
+  if (activeCategory === 'evatrack-reports') {
     return <section className="page active archive-page"><div className="archive-workspace-body">
-      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} />
+      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} isSuperAdmin={isSuperAdmin} />
+      <EvaTrackReportsPanel />
+    </div></section>
+  }
+
+  if (activeCategory === 'inquiry-logs') {
+    if (!isSuperAdmin) return null
+    return <section className="page active archive-page"><div className="archive-workspace-body">
+      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} isSuperAdmin={isSuperAdmin} />
       <InquiryLogsView />
     </div></section>
   }
@@ -365,6 +378,7 @@ export default function ArchivePage() {
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen((value) => !value)}
           counts={counts}
+          isSuperAdmin={isSuperAdmin}
         />
         <div className="archive-workspace-main">
           <PageHeader

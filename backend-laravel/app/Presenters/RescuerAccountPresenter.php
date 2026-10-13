@@ -86,6 +86,7 @@ class RescuerAccountPresenter
             'account_statuses' => collect(config('rescuers.account_statuses'))->map(fn (array $status, string $key): array => ['key' => $key, ...$status])->values()->all(),
             'roles' => $this->responderRoles(),
             'blood_types' => $this->bloodTypes(),
+            'gender_options' => config('rescuers.gender_options'),
             'defaults' => config('rescuers.account_defaults'),
         ];
     }

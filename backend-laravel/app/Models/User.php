@@ -124,8 +124,10 @@ class User extends Authenticatable
         }
 
         return match (strtolower((string) $roleKey)) {
-            'super_admin', 'super admin' => 'super_admin',
+            'superadmin', 'super_admin', 'super admin' => 'super_admin',
             'admin', 'hq_admin', 'hq admin' => 'admin',
+            'hq_leader', 'hq leader', 'hqcc_leader' => 'hq_leader',
+            'hq_personnel', 'hq personnel' => 'hq_personnel',
             'rescuer', 'responder' => 'rescuer',
             'household', 'household_resident', 'resident' => 'household_resident',
             default => $roleKey,
@@ -140,7 +142,9 @@ class User extends Authenticatable
         return match ($this->roleKey()) {
             'super_admin' => 'Super Admin',
             'admin' => 'Admin',
-            'rescuer' => 'Rescuer',
+            'hq_leader' => 'HQ Leader',
+            'hq_personnel' => 'HQ Personnel',
+            'rescuer' => 'Rescuer Member',
             'household_resident' => 'Household Resident',
             default => $roleName,
         };
@@ -148,27 +152,16 @@ class User extends Authenticatable
 
     public function isHqccLeader(): bool
     {
-        if ($this->is_active === false || ($this->attributes['deleted_at'] ?? null)) return false;
-        foreach (['responders' => ['user_id', 'team_id', 'responder_id'], 'rescue_teams' => ['team_id', 'team_code', 'team_type', 'leader_responder_id']] as $table => $columns) {
-            if (! Schema::hasTable($table)) return false;
-            foreach ($columns as $column) if (! Schema::hasColumn($table, $column)) return false;
-        }
-
-        return \Illuminate\Support\Facades\DB::table('rescue_teams as t')
-            ->join('responders as r', 'r.responder_id', '=', 't.leader_responder_id')
-            ->whereColumn('r.team_id', 't.team_id')
-            ->where('r.user_id', $this->getKey())
-            ->when(Schema::hasColumn('responders', 'deleted_at'), fn ($query) => $query->whereNull('r.deleted_at'))
-            ->where(fn ($query) => $query->whereRaw('UPPER(t.team_code) = ?', ['HQCC'])
-                ->orWhereRaw('UPPER(t.team_type) IN (?, ?, ?)', ['HQ', 'HQCC', 'HEADQUARTERS']))
-            ->exists();
+        return $this->is_active !== false
+            && ! ($this->attributes['deleted_at'] ?? null)
+            && $this->roleKey() === 'hq_leader';
     }
 
     public function canManagePersonnel(): bool
     {
         if ($this->is_active === false || ($this->attributes['deleted_at'] ?? null)) return false;
 
-        return in_array($this->roleKey(), ['super_admin', 'admin'], true) || $this->isHqccLeader();
+        return $this->roleKey() === 'super_admin' || $this->isHqccLeader();
     }
 }
 

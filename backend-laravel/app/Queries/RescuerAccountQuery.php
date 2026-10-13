@@ -21,7 +21,7 @@ class RescuerAccountQuery
         if (($filters['account_type'] ?? 'all') === 'rescuer') {
             $query->where('r.username', 'not like', 'BDRRM-HQCC-%');
         } elseif (($filters['account_type'] ?? 'all') === 'command_center') {
-            $query->where('r.username', 'like', 'BDRRM-HQCC-%')->where('r.username', '<>', 'BDRRM-HQCC-001');
+            $query->where('r.username', 'like', 'BDRRM-HQCC-%');
         }
         if ($search !== '') {
             $query->where(function ($inner) use ($search): void {

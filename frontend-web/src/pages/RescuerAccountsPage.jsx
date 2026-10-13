@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { createRescueTeam, createRescuer, deleteRescueTeam, deactivateRescuer, deleteRescuer, getRescueTeamConfig, getRescuer, getRescuers, updateRescueTeam, updateRescuer } from '../api/rescuerApi'
 import { getHeadquartersAccounts } from '../api/headquartersAccountsApi'
+import { getCurrentUser } from '../api/authApi'
 import RescuerAccountModal, { AccountProfile } from '../components/rescuers/RescuerAccountModal'
-import HeadquartersAccountsPanel from '../components/rescuers/HeadquartersAccountsPanel'
+import HeadquartersPersonnelPanel from '../components/rescuers/HeadquartersPersonnelPanel'
 import RescuerRosterTable from '../components/rescuers/RescuerRosterTable'
 import RescueTeamConfigModal from '../components/rescuers/RescueTeamConfigModal'
 import { buildRescuerPayload, emptyRescuerForm, formFromRescuer, rescuerErrorMessage } from '../utils/rescuerHelpers'
@@ -15,6 +16,7 @@ export default function RescuerAccountsPage() {
 }
 
 function RescuerAccountsWorkspace() {
+  const { onUserChange } = useOutletContext()
   const location = useLocation()
   const navigate = useNavigate()
   const route = location.pathname.split('/').pop()
@@ -52,7 +54,7 @@ function RescuerAccountsWorkspace() {
   useEffect(() => {
     if (isTeams) return
     let ignore = false
-    getRescuers({ page, per_page: 8, team: teamFilter }).then(data => {
+    getRescuers({ page, per_page: 8, team: teamFilter, account_type: 'rescuer' }).then(data => {
       if (ignore) return
       setPayload(data)
       if (isNew) setForm(emptyRescuerForm(data.form_options?.defaults))
@@ -79,7 +81,19 @@ function RescuerAccountsWorkspace() {
     return () => { ignore = true }
   }, [isNew, isRoster])
 
-  useEffect(() => { if (isTeams) loadTeamConfig() }, [isTeams])
+  useEffect(() => {
+    if (!isTeams) return
+    loadTeamConfig()
+    const refresh = () => loadTeamConfig()
+    window.addEventListener('personnel-access:changed', refresh)
+    window.addEventListener('rescue-criteria:changed', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.removeEventListener('personnel-access:changed', refresh)
+      window.removeEventListener('rescue-criteria:changed', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [isTeams])
 
   async function loadTeamConfig() {
     setTeamLoading(true); setTeamError('')
@@ -90,7 +104,7 @@ function RescuerAccountsWorkspace() {
   async function reloadRoster() {
     setLoading(true)
     try {
-      const data = await getRescuers({ page, per_page: 8, team: teamFilter })
+      const data = await getRescuers({ page, per_page: 8, team: teamFilter, account_type: 'rescuer' })
       setPayload(data)
       if (!data.rescuers?.data?.length && page > 1) setPage(page - 1)
       else setSelectedId(current => data.rescuers?.data?.some(r => String(r.responder_id) === String(current)) ? current : data.rescuers?.data?.[0]?.responder_id || null)
@@ -112,6 +126,7 @@ function RescuerAccountsWorkspace() {
     try {
       setTeamConfig(body.team_id ? await updateRescueTeam(body.team_id, body) : await createRescueTeam(body))
       setTeamVersion(current => current + 1); setNotice('Team saved.')
+      await refreshAccess()
     } catch (saveError) { setTeamError(rescuerErrorMessage(saveError, 'Unable to save the team.')) }
     finally { setSaving(false) }
   }
@@ -128,30 +143,33 @@ function RescuerAccountsWorkspace() {
         await reloadRoster()
       }
       setNotice(`${confirmation.title} completed.`); setConfirmation(null)
+      await refreshAccess()
     } catch (actionError) {
       const message = rescuerErrorMessage(actionError, 'The action could not be completed.')
       if (confirmation.type === 'team') setTeamError(message); else setError(message)
       setConfirmation(null)
     } finally { setSaving(false) }
   }
-  const captain = hq?.accounts?.find(account => account.account_type === 'barangay_captain')
+  async function refreshAccess() {
+    try { onUserChange?.(await getCurrentUser()) } catch { /* API authorization remains authoritative if session refresh is unavailable. */ }
+  }
   const detailPending = detailLoading || (selectedId && String(detailId) !== String(selectedId) && !detailError)
   function changePage(nextPage) { setLoading(true); setError(''); setDetailError(''); setPage(nextPage) }
   function selectRescuer(rescuer) {
     if (String(selectedId) === String(rescuer.responder_id)) return
     setDetailError(''); setSelectedId(rescuer.responder_id)
   }
-  const roleSelector = <div className="rc" aria-label="Account type">{[['rescuer', 'Rescuer', 'R'], ['command_center', 'HQ Personnel', 'H'], ['barangay_captain', 'Captain', 'C']].map(([type, label, initial]) => <button key={type} className={accountType === type ? 'on' : ''} type="button" disabled={saving} aria-pressed={accountType === type} onClick={() => { setAccountType(type); setFormError('') }}><span className="av s" style={{ '--c': type === 'barangay_captain' ? '#7c3aed' : '#3b82f6' }}>{initial}</span>{label}{type === 'barangay_captain' && <em>{captain ? '1/1 · Edit' : '0/1'}</em>}</button>)}</div>
+  const roleSelector = <div className="rc" aria-label="Account type">{[['rescuer', 'Rescuer', 'R'], ['command_center', 'HQ Personnel', 'H']].map(([type, label, initial]) => <button key={type} className={accountType === type ? 'on' : ''} type="button" disabled={saving} aria-pressed={accountType === type} onClick={() => { setAccountType(type); setFormError('') }}><span className="av s" style={{ '--c': '#3b82f6' }}>{initial}</span>{label}</button>)}</div>
   const askAccount = type => setConfirmation({ type, title: type === 'delete' ? 'Delete user' : type === 'deactivate' ? 'Deactivate account' : 'Reactivate account', name: detail?.full_name || '', rows: type === 'delete' ? [['Login', 'Disabled'], ['Roster record', 'Removed'], ['Dispatch history', 'Kept']] : [['Login', type === 'deactivate' ? 'Disabled' : 'Enabled'], ['Record', 'Kept'], ['Dispatch history', 'Kept']] })
 
   return <main className="tm-page" aria-label={isTeams ? 'Team Management' : 'Account Management'}>
-    <div className="pg on"><div className="hd">{isRoster ? <><div className="sg2 tm-category"><button type="button" className={category === 'responders' ? 'on' : ''} onClick={() => setCategory('responders')}>Rescuers</button><button type="button" className={category === 'headquarters' ? 'on' : ''} onClick={() => setCategory('headquarters')}>Headquarters</button></div><span className="sp" /><button className="bt" type="button" onClick={() => navigate('/rescuers/teams')}>Manage teams</button><button className="bt p pl2" type="button" onClick={() => navigate('/rescuers/new')}>Create account<i>+</i></button></> : <><span className="tm-page-title">{isTeams ? 'Team Management' : route === 'view' ? 'User details' : route === 'edit' ? 'Edit account' : 'Add new user'}</span><span className="sp" /><button className="bt" type="button" disabled={saving} onClick={() => navigate(returnPath)}>Back to {returnPath === '/rescue-management' ? 'rescue management' : 'accounts'}</button></>}</div>
+    <div className="pg on">{!isTeams && <div className="hd">{isRoster ? <><div className="sg2 tm-category"><button type="button" className={category === 'responders' ? 'on' : ''} onClick={() => setCategory('responders')}>Rescuers</button><button type="button" className={category === 'headquarters' ? 'on' : ''} onClick={() => setCategory('headquarters')}>Headquarters</button></div><span className="sp" /><button className="bt" type="button" onClick={() => navigate('/rescuers/teams')}>Manage teams</button><button className="bt p pl2" type="button" onClick={() => navigate('/rescuers/new')}>Create account<i>+</i></button></> : <><span className="tm-page-title">{route === 'view' ? 'User details' : route === 'edit' ? 'Edit account' : 'Add new user'}</span><span className="sp" /><button className="bt" type="button" disabled={saving} onClick={() => navigate(returnPath)}>Back to {returnPath === '/rescue-management' ? 'rescue management' : 'accounts'}</button></>}</div>}
       {error && <div className="tm-feedback" role="alert">{error}<button className="bt sm" type="button" onClick={reloadRoster}>Retry</button></div>}
       {notice && <div className="tm-feedback tm-success" role="status">{notice}<button className="x" aria-label="Dismiss notification" type="button" onClick={() => setNotice('')}>×</button></div>}
       {isTeams && <RescueTeamConfigModal key={teamVersion} embedded isOpen workspace={teamConfig} isLoading={teamLoading} isSaving={saving} error={teamError} onRetry={loadTeamConfig} onClose={() => navigate('/rescuers')} onSave={saveTeam} onDelete={(id, name) => setConfirmation({ type: 'team', id, title: 'Delete team', name, rows: [['Accounts', 'Kept'], ['Members', 'Moved to Unassigned'], ['Dispatch history', 'Kept']] })} />}
-      {isRoster && category === 'headquarters' && <HeadquartersAccountsPanel onManageCaptain={() => navigate('/rescuers/new?type=barangay_captain')} />}
+      {isRoster && category === 'headquarters' && <HeadquartersPersonnelPanel onManagePersonnel={account => navigate(`/rescuers/edit?id=${account.responder_id}`)} />}
       {isRoster && category === 'responders' && <div className="acc">{detailPending ? <div className="cd emp" role="status">Loading user details…</div> : detailError ? <div className="cd emp" role="alert">{detailError}<button className="bt" onClick={() => { setDetailError(''); setDetailLoading(true); setDetailVersion(current => current + 1) }}>Retry</button></div> : detail && selectedId ? <AccountProfile key={selectedId} form={detail} onEdit={() => navigate(`/rescuers/edit?id=${selectedId}`)} onDeactivate={saving ? undefined : () => askAccount('deactivate')} onReactivate={saving ? undefined : () => askAccount('reactivate')} onDelete={saving ? undefined : () => askAccount('delete')} /> : <div className="cd emp" role="status">{loading ? 'Loading accounts…' : 'Select a rescuer to view their profile.'}</div>}<RescuerRosterTable rescuers={payload?.rescuers?.data || []} pagination={payload?.rescuers} onPageChange={changePage} selectedId={selectedId} onView={selectRescuer} teamOptions={payload?.team_options || []} teamFilter={teamFilter} onTeamFilter={value => { setLoading(true); setError(''); setDetailError(''); setTeamFilter(value); setPage(1) }} /></div>}
-      {isNew && accountType !== 'rescuer' && <HeadquartersAccountsPanel key={accountType} editor onBusyChange={setSaving} initialType={accountType} roleSelector={roleSelector} onClose={() => navigate('/rescuers')} onSaved={message => navigate('/rescuers', { state: { notice: message, category: 'headquarters' } })} />}
+      {isNew && accountType !== 'rescuer' && <HeadquartersPersonnelPanel key={accountType} editor onBusyChange={setSaving} roleSelector={roleSelector} onClose={() => navigate('/rescuers')} onSaved={message => navigate('/rescuers', { state: { notice: message, category: 'headquarters' } })} />}
       {((isNew && accountType === 'rescuer') || route === 'edit' || route === 'view') && <>{(loading && !payload) || detailPending ? <div className="cd emp" role="status">Loading account…</div> : (isNew ? payload?.form_options : detail) && <RescuerAccountModal embedded isOpen mode={isNew ? 'create' : route} form={form} setForm={setForm} formError={formError} isSaving={saving} teamOptions={payload?.team_options || []} accountIdOptions={payload?.account_id_options || []} fallbackAccountId={payload?.next_account_id || ''} formOptions={payload?.form_options} onClose={() => navigate(returnPath)} onReset={() => { setForm(isNew ? emptyRescuerForm(payload?.form_options?.defaults) : { ...original }); setFormError('') }} onSubmit={submitAccount} onEdit={() => navigate(`/rescuers/edit?id=${selectedId}`)} roleSelector={isNew ? roleSelector : undefined} />}{detailError && <div className="tm-feedback" role="alert">{detailError}</div>}{!isNew && !requestedId && <div className="cd emp">Select a user from the account list first.</div>}</>}
     </div>
     {confirmation && <ConfirmDialog action={confirmation} busy={saving} onCancel={() => { if (!saving) setConfirmation(null) }} onConfirm={confirmAction} />}

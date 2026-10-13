@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\WeatherController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::post('/external/reports/handshake', [\App\Http\Controllers\Api\ExternalReportController::class, 'handshake'])->middleware([\App\Http\Middleware\ValidateExternalApiKey::class, 'throttle:30,1']);
     Route::post('/external/reports/generate', [\App\Http\Controllers\Api\ExternalReportController::class, 'generate'])->middleware([\App\Http\Middleware\ValidateExternalApiKey::class, 'throttle:30,1']);
     Route::get('/external/reports/status/{token}', [\App\Http\Controllers\Api\ExternalReportController::class, 'status'])->middleware('signed')->name('external.reports.status');
     Route::get('/external/reports/download/{filename}', [\App\Http\Controllers\Api\ExternalReportController::class, 'download'])->middleware('signed')->name('external.reports.download');
@@ -40,6 +41,8 @@ Route::prefix('v1')->group(function () {
     Route::post('/inquiries', [InquiryController::class, 'store'])
         ->middleware(['throttle:10,1', 'realtime.atomic']);
 
+    Route::post('/external/resource-requests/handshake', [ResourceRequestController::class, 'externalHandshake'])
+        ->middleware('throttle:60,1');
     Route::post('/external/resource-requests', [ResourceRequestController::class, 'externalStore'])
         ->middleware(['throttle:60,1', 'realtime.atomic']);
     Route::post('/sms/inbound', [SmsInboundController::class, 'handle'])
@@ -62,12 +65,13 @@ Route::prefix('v1')->group(function () {
         Route::get('/auth/security-questions', [AuthController::class, 'recoveryQuestions']);
         Route::put('/auth/security-questions', [AuthController::class, 'saveRecoveryQuestions']);
 
-        Route::middleware('role:super_admin,admin')->group(function () {
+        Route::middleware('role:super_admin')->group(function () {
             Route::get('/inquiries', [InquiryController::class, 'index']);
             Route::patch('/inquiries/{inquiryId}', [InquiryController::class, 'updateStatus']);
+            Route::get('/archive/inquiry-logs', [ArchiveController::class, 'inquiryLogs']);
         });
 
-        Route::middleware('role:super_admin,admin')->group(function () {
+        Route::middleware('web.access')->group(function () {
             Route::get('/global-search', [GlobalSearchController::class, 'index']);
             Route::get('/dashboard', [DashboardController::class, 'index']);
             Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
@@ -125,7 +129,6 @@ Route::prefix('v1')->group(function () {
             Route::get('/situation-reports/{sitRepId}', [SituationReportController::class, 'show']);
             Route::get('/situation-reports/{sitRepId}/pdf', [SituationReportController::class, 'pdf']);
             Route::get('/disaster-events/{eventId}/situation-summary', [SituationReportController::class, 'eventSummary']);
-            Route::get('/archive/inquiry-logs', [ArchiveController::class, 'inquiryLogs']);
             Route::get('/archive/disaster-events', [ArchiveController::class, 'disasterEvents']);
             Route::get('/archive/household-status-logs', [ArchiveController::class, 'householdStatusLogs']);
             Route::get('/archive/dispatch-logs', [ArchiveController::class, 'dispatchLogs']);
@@ -133,6 +136,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/archive/resource-requests', [ArchiveController::class, 'resourceRequests']);
             Route::get('/archive/situation-reports', [ArchiveController::class, 'situationReports']);
             Route::post('/reports/generate', [\App\Http\Controllers\Api\ExternalReportController::class, 'generate'])->middleware('throttle:30,1');
+            Route::get('/reports/evatrack/configuration', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'configuration']);
+            Route::post('/reports/evatrack/generate', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'generate'])->middleware('throttle:30,1');
             Route::get('/archive/export', [ArchiveController::class, 'export']);
             Route::get('/archive/saved-groups', [ArchiveController::class, 'savedGroups']);
             Route::post('/archive/saved-groups', [ArchiveController::class, 'storeSavedGroup']);
@@ -194,7 +199,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('/household/trusted-households/{connectionId}', [HouseholdMobileController::class, 'respondToTrustedHousehold']);
         });
 
-        Route::middleware('role:super_admin,admin,rescuer')->group(function () {
+        Route::middleware('role:super_admin,hq_leader,hq_personnel,rescuer')->group(function () {
             Route::patch('/dispatches/{assignmentId}', [RescueDispatchController::class, 'update']);
             Route::post('/evacuation/check-in', [EvacuationCheckInController::class, 'store']);
             Route::post('/evacuation/verify-qr', [EvacuationCheckInController::class, 'verifyQr']);

@@ -14,7 +14,7 @@ import PlaceholderPage from './pages/PlaceholderPage'
 import HouseholdReviewPage from './pages/HouseholdReviewPage'
 import { getCurrentUser, loginUser, logoutUser, saveRememberedPassword } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
-import { canManagePersonnel, canOpenWebPage, hasAdminWebAccess, webHomeForUser } from './utils/personnelAccess'
+import { canOpenWebPage, hasWebAccess, webHomeForUser } from './utils/personnelAccess'
 import './App.css'
 import './styles/foundation.css'
 import './styles/index.css'
@@ -123,7 +123,7 @@ const modulePages = [
     path: '/rescuers',
     title: 'Account Management',
     kicker: 'Verified accounts',
-    summary: 'Create and manage rescuer, Command Center Personnel, and Barangay Captain accounts.',
+    summary: 'Create and manage rescuer and HQ Personnel accounts.',
   },
   {
     path: '/rescuers/teams',
@@ -177,6 +177,55 @@ function AuthRoutes() {
   const [checkingSession, setCheckingSession] = useState(true)
   const [loginError, setLoginError] = useState('')
   const navigate = useNavigate()
+  const sessionUserId = user?.user_id || user?.id
+
+  useEffect(() => {
+    if (!sessionUserId) return undefined
+    let disposed = false
+    let inFlight = false
+    let queued = false
+    async function refreshAccess() {
+      if (disposed || !getToken()) return
+      if (inFlight) { queued = true; return }
+      inFlight = true
+      const token = getToken()
+      try {
+        const nextUser = await getCurrentUser()
+        if (disposed || token !== getToken()) return
+        if (isWebUser(nextUser)) {
+          setUser(current => JSON.stringify(current) === JSON.stringify(nextUser) ? current : nextUser)
+        } else {
+          clearToken()
+          setUser(null)
+          setLoginError('Your role access changed. Please sign in again.')
+          navigate('/login', { replace: true })
+        }
+      } catch (error) {
+        if (!disposed && token === getToken() && [401, 403].includes(error.response?.status)) {
+          clearToken(); setUser(null); navigate('/login', { replace: true })
+        }
+      } finally {
+        inFlight = false
+        if (queued && !disposed) { queued = false; refreshAccess() }
+      }
+    }
+    const onVisible = () => { if (!document.hidden) refreshAccess() }
+    const onOperations = event => { if (event.detail?.topics?.includes('accounts')) refreshAccess() }
+    const interval = window.setInterval(onVisible, 3000)
+    window.addEventListener('personnel-access:changed', refreshAccess)
+    window.addEventListener('operations:changed', onOperations)
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
+    refreshAccess()
+    return () => {
+      disposed = true
+      window.clearInterval(interval)
+      window.removeEventListener('personnel-access:changed', refreshAccess)
+      window.removeEventListener('operations:changed', onOperations)
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [sessionUserId, navigate])
 
   useEffect(() => {
     async function loadSession() {
@@ -235,6 +284,16 @@ function AuthRoutes() {
     }
   }
 
+  function handleUserChange(nextUser) {
+    if (isWebUser(nextUser)) {
+      setUser(nextUser)
+    } else {
+      clearToken()
+      setUser(null)
+      navigate('/login', { replace: true })
+    }
+  }
+
   if (checkingSession) {
     return <div className="screen-loader">Loading...</div>
   }
@@ -256,7 +315,7 @@ function AuthRoutes() {
         path="/"
         element={
           <ProtectedRoute user={user}>
-            <AppShell user={user} pages={pagesForUser(user)} onLogout={handleLogout} onUserChange={setUser} />
+            <AppShell user={user} pages={pagesForUser(user)} onLogout={handleLogout} onUserChange={handleUserChange} />
           </ProtectedRoute>
         }
       >
@@ -278,7 +337,7 @@ function AuthRoutes() {
           />
         ))}
         <Route path="households/_household-list" element={<LazyPage page={{ path: '/households/_household-list' }} />} />
-        <Route path="households/:householdId" element={<HouseholdReviewPage />} />
+        <Route path="households/:householdId" element={<GuardedHouseholdReviewPage />} />
         <Route path="notifications" element={<LazyPage page={{ path: '/notifications' }} />} />
         <Route path="profile" element={<LazyPage page={{ path: '/profile' }} />} />
       </Route>
@@ -307,6 +366,12 @@ function LazyPage({ page }) {
   )
 }
 
+function GuardedHouseholdReviewPage() {
+  const { user } = useOutletContext()
+  if (!canOpenWebPage(user, '/households')) return <Navigate to={webHomeForUser(user)} replace />
+  return <HouseholdReviewPage />
+}
+
 function ProtectedRoute({ user, children }) {
   const location = useLocation()
 
@@ -318,7 +383,7 @@ function ProtectedRoute({ user, children }) {
 }
 
 function isWebUser(user) {
-  return hasAdminWebAccess(user) || canManagePersonnel(user)
+  return hasWebAccess(user)
 }
 
 function pagesForUser(user) {

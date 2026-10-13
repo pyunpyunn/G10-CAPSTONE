@@ -55,7 +55,7 @@ export default function DispatchModalForm({ editingDispatch, groups, group, onGr
               {busy && responderRows(card.name, households, assignment?.selected_responders || [], assignment?.selected_responder_ids, assignment?.responder_households)}
             </div>
           })}</div>
-          {!selectedCards.length && <div className="empty-reference">No puroks available for this area.</div>}
+          {!selectedCards.length && <div className="empty-reference">{groups.length ? 'No puroks available for this area.' : 'No unassigned priority sitios. Areas with an active team or rescuer assignment are excluded.'}</div>}
         </> : <>
           {closed && <div className="cl2">Closed · read-only</div>}
           {responderRows(editingDispatch.assigned_area, coveredHouseholds, editingDispatch.selected_responders || [], editingDispatch.selected_responder_ids, editingDispatch.responder_households)}

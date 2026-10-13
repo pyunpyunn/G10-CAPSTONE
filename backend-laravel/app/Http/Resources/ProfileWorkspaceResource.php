@@ -18,7 +18,7 @@ class ProfileWorkspaceResource extends JsonResource
             'user' => new UserResource($user),
             'summary' => $presenter->summaryCards($user, $snapshot['last_seen']),
             'identity' => $presenter->identity($user),
-            'permissions' => $presenter->permissions($user->roleKey()),
+            'permissions' => $presenter->permissions($user),
             'activity' => $presenter->activity($snapshot['recent_activity']),
             'barangay_profile' => $snapshot['barangay_profile'],
         ];

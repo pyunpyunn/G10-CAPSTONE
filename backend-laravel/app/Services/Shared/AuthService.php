@@ -72,7 +72,7 @@ class AuthService
 
     public function me(Request $request): UserResource
     {
-        return new UserResource($request->user()->load('role'));
+        return new UserResource($request->user()->refresh()->load('role'));
     }
 
     public function logout(Request $request): JsonResponse

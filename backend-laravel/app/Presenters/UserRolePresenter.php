@@ -14,8 +14,10 @@ class UserRolePresenter
             };
         }
         return match (strtolower((string) $key)) {
-            'super_admin', 'super admin' => 'super_admin',
+            'superadmin', 'super_admin', 'super admin' => 'super_admin',
             'admin', 'hq_admin', 'hq admin' => 'admin',
+            'hq_leader', 'hq leader', 'hqcc_leader' => 'hq_leader',
+            'hq_personnel', 'hq personnel' => 'hq_personnel',
             'rescuer', 'responder' => 'rescuer',
             'household', 'household_resident', 'resident' => 'household_resident',
             default => $key,
@@ -27,7 +29,8 @@ class UserRolePresenter
         $name = $role?->role_name ?? ($attributes['role'] ?? null);
         return match ($key) {
             'super_admin' => 'Super Admin', 'admin' => 'Admin',
-            'rescuer' => 'Rescuer', 'household_resident' => 'Household Resident',
+            'hq_leader' => 'HQ Leader', 'hq_personnel' => 'HQ Personnel',
+            'rescuer' => 'Rescuer Member', 'household_resident' => 'Household Resident',
             default => $name,
         };
     }

@@ -25,7 +25,7 @@ const searchablePages = [
   { title: 'Mapping', href: '/mapping', keywords: 'map routes evacuation centers' },
   { title: 'Household Status', href: '/households', keywords: 'residents family safety' },
   { title: 'Rescue Dispatch', href: '/dispatch', keywords: 'teams rescue assignments' },
-  { title: 'Account Management', href: '/rescuers', keywords: 'responders personnel hcc command center captain' },
+  { title: 'Account Management', href: '/rescuers', keywords: 'responders personnel hq command center' },
   { title: 'Resources & Requests', href: '/resources-requests', keywords: 'supplies inventory requests' },
   { title: 'Situation Reporting', href: '/situation', keywords: 'sitrep reports' },
   { title: 'Archive', href: '/archive', keywords: 'history records logs' },
@@ -99,7 +99,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
       ignore = true
       window.clearTimeout(timeout)
     }
-  }, [searchTerm, selectedTypes])
+  }, [searchTerm, selectedTypes, user])
 
   useEffect(() => {
     if (!isSearchOpen && !isFilterOpen) {
@@ -145,7 +145,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
       window.clearTimeout(notificationLoad)
       unsubscribe?.()
     }
-  }, [user?.user_id])
+  }, [user])
 
   useEffect(() => {
     if (!isOpen) {
@@ -347,7 +347,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
           </button>
         )}
 
-        <button
+        {canOpenWebPage(user, '/notifications') && <button
           className="header-action"
           ref={bellButtonRef}
           type="button"
@@ -362,9 +362,9 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
         >
           <Bell size={17} />
           {unreadCount > 0 && <span className="notification-badge" aria-hidden="true">{unreadLabel}</span>}
-        </button>
+        </button>}
 
-        <button
+        {canOpenWebPage(user, '/profile') && <button
           className="header-profile"
           type="button"
           title="Profile"
@@ -376,7 +376,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
             <span className="profile-label">{displayName}</span>
             <span className="profile-role-label">{roleName}</span>
           </span>
-        </button>
+        </button>}
       </div>
 
       {isOpen && (

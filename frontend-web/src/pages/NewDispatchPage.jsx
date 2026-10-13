@@ -6,6 +6,7 @@ import { completeDispatch, createDispatch, getDispatchDashboard, getDispatch, ge
 import DispatchModalForm from '../components/dispatch/DispatchModalForm'
 import RescueManagementPage from './RescueManagementPage'
 import { useModuleData } from '../utils/useModuleData'
+import { splitDispatchAreaAvailability } from '../utils/dispatchAreaAvailability'
 import { buildDispatchAreaGroups, defaultForm, getSaveMessage, planSelectedAreaResponders, shuffleDispatchItems, splitCoverageHouseholds } from '../utils/dispatchHelpers'
 
 export default function NewDispatchPage() {
@@ -15,7 +16,8 @@ export default function NewDispatchPage() {
   const id = assignmentId || location.state?.dispatch?.assignment_id
   const loader = useCallback(async () => {
     const [workspace, priorities, detail] = await Promise.all([getDispatchDashboard({ status:'active', per_page:100 }), getSitioPriorities(), id ? getDispatch(id) : null])
-    return { workspace, groups: buildDispatchAreaGroups(Array.isArray(priorities) ? priorities : [], workspace?.risk_areas || []), detail }
+    const groups = buildDispatchAreaGroups(Array.isArray(priorities) ? priorities : [], workspace?.risk_areas || [])
+    return { workspace, groups: detail?.dispatch ? groups : splitDispatchAreaAvailability(groups, workspace).available, detail }
   }, [id])
   const { data, error, loading, refresh } = useModuleData(loader, ['dispatch', 'households', 'disasters'])
   const close = useCallback(() => navigate('/rescue-management'), [navigate])

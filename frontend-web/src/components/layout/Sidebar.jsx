@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import ResQperationLogo from './ResQperationLogo'
 import {
   Archive,
@@ -49,15 +49,15 @@ const icons = {
 export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onPeekEnd, onLogout }) {
   const location = useLocation()
   const activeGroup = getActiveGroup(location.pathname, pages)
-  const [openGroups, setOpenGroups] = useState(() => new Set([activeGroup]))
-
-  useEffect(() => {
-    setOpenGroups((groups) => new Set(groups).add(activeGroup))
-  }, [activeGroup])
+  const [navigation, setNavigation] = useState(() => ({ activeGroup, openGroups: new Set([activeGroup]) }))
+  const openGroups = navigation.openGroups
+  if (navigation.activeGroup !== activeGroup) {
+    setNavigation({ activeGroup, openGroups: new Set(openGroups).add(activeGroup) })
+  }
 
   function toggleGroup(title) {
-    setOpenGroups((groups) => {
-      const nextGroups = new Set(groups)
+    setNavigation((current) => {
+      const nextGroups = new Set(current.openGroups)
 
       if (nextGroups.has(title)) {
         nextGroups.delete(title)
@@ -65,7 +65,7 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
         nextGroups.add(title)
       }
 
-      return nextGroups
+      return { ...current, openGroups: nextGroups }
     })
   }
 

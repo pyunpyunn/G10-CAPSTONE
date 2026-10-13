@@ -125,6 +125,7 @@ class RescuerTeamWriteWorkflow
 
         DB::transaction(function () use ($request, $teamId, $existing): void {
             $now = now();
+            app(\App\Services\Web\HeadquartersTeamSupport::class)->synchronizeLeadership($teamId, null);
 
             DB::table('responders')
                 ->where('team_id', $teamId)

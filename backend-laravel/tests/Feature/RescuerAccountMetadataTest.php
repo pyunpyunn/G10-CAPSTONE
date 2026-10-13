@@ -77,6 +77,37 @@ class RescuerAccountMetadataTest extends TestCase
         $workflow->validateTeamPayload(\Illuminate\Http\Request::create('/', 'POST', $payload));
     }
 
+    public function test_team_workflow_generates_unique_codes_on_backend_when_code_is_omitted(): void
+    {
+        Schema::create('rescue_teams', function (Blueprint $table) {
+            $table->integer('team_id'); $table->string('team_code'); $table->string('team_name');
+        });
+        DB::table('rescue_teams')->insert(['team_id' => 1, 'team_code' => 'FIRST', 'team_name' => 'First Team']);
+
+        $workflow = app(\App\Services\Mobile\RescuerTeamWorkflow::class);
+        $payload = ['team_name' => 'First Aid', 'team_type' => 'Medical', 'duty_status' => 'available'];
+        $validated = $workflow->validateTeamPayload(\Illuminate\Http\Request::create('/', 'POST', $payload));
+
+        $this->assertSame('FIRST2', $validated['team_code']);
+        $this->assertSame('Male', app(RescuerAccountPresenter::class)->accountFormOptions()['gender_options'][0]);
+    }
+
+    public function test_account_team_assignment_uses_existing_database_team_instead_of_catalog_fallback(): void
+    {
+        Schema::create('rescue_teams', function (Blueprint $table) {
+            $table->integer('team_id'); $table->string('team_code'); $table->string('team_name'); $table->string('team_type');
+        });
+        DB::table('rescue_teams')->insert(['team_id' => 4, 'team_code' => 'ACTUAL', 'team_name' => 'Search & Rescue', 'team_type' => 'Response']);
+
+        $support = app(\App\Services\Mobile\RescuerAccountSupport::class);
+        $validated = ['team_name' => 'Search & Rescue', 'team_code' => 'HQCC'];
+        $this->assertSame('ACTUAL', $support->teamCodeFromPayload($validated));
+        $this->assertSame(4, $support->teamIdFromPayload($validated));
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $support->teamIdFromPayload(['team_name' => 'Ghost Team']);
+    }
+
     public function test_roster_response_exposes_form_metadata_from_backend_layers(): void
     {
         $query = $this->createMock(RescuerAccountQuery::class);
@@ -142,5 +173,47 @@ class RescuerAccountMetadataTest extends TestCase
         $this->assertSame('On duty', $cards[0]['duty_status_display']['label']);
         $this->assertSame(0, $cards[1]['active_dispatch_count']);
         $this->assertSame(0, $cards[1]['member_count']);
+    }
+
+    public function test_team_configuration_carousel_uses_database_members_and_dispatches(): void
+    {
+        Schema::create('rescue_teams', function (Blueprint $table) {
+            $table->integer('team_id'); $table->string('team_code'); $table->string('team_name');
+            $table->string('team_type'); $table->integer('assigned_purok_id')->nullable();
+            $table->integer('leader_responder_id')->nullable(); $table->string('duty_status');
+        });
+        Schema::create('addresses', function (Blueprint $table) {
+            $table->integer('address_id'); $table->string('purok_sitio')->nullable();
+        });
+        Schema::create('responders', function (Blueprint $table) {
+            $table->integer('responder_id'); $table->integer('team_id')->nullable(); $table->string('full_name');
+            $table->string('title')->nullable(); $table->string('duty_status'); $table->boolean('is_deployed');
+            $table->timestamp('deleted_at')->nullable();
+        });
+        Schema::create('responder_assignments', function (Blueprint $table) {
+            $table->integer('team_id'); $table->string('status');
+        });
+        DB::table('addresses')->insert(['address_id' => 3, 'purok_sitio' => 'Purok 3']);
+        DB::table('rescue_teams')->insert([
+            'team_id' => 1, 'team_code' => 'SAR', 'team_name' => 'Search and Rescue', 'team_type' => 'Rescue',
+            'assigned_purok_id' => 3, 'leader_responder_id' => 10, 'duty_status' => 'available',
+        ]);
+        DB::table('responders')->insert([
+            ['responder_id' => 10, 'team_id' => 1, 'full_name' => 'Alex Leader', 'title' => 'Leader', 'duty_status' => 'available', 'is_deployed' => false, 'deleted_at' => null],
+            ['responder_id' => 11, 'team_id' => 1, 'full_name' => 'Sam Rescuer', 'title' => 'Rescuer', 'duty_status' => 'on_scene', 'is_deployed' => true, 'deleted_at' => null],
+        ]);
+        DB::table('responder_assignments')->insert([
+            ['team_id' => 1, 'status' => 'dispatched'],
+            ['team_id' => 1, 'status' => 'completed'],
+        ]);
+
+        $card = app(RescuerAccountQuery::class)->teamConfigCards()[0];
+
+        $this->assertSame('Search and Rescue', $card['team_name']);
+        $this->assertSame('Purok 3', $card['assigned_purok']);
+        $this->assertSame('Alex Leader', $card['leader_name']);
+        $this->assertSame(2, $card['member_count']);
+        $this->assertSame(1, $card['deployed_count']);
+        $this->assertSame(1, $card['active_dispatch_count']);
     }
 }

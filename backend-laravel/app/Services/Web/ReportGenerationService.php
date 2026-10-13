@@ -44,6 +44,11 @@ class ReportGenerationService
             $summary['actions_text'] = $data['actions_text'] ?? $summary['actions_text'];
             $summary['included_sections'] = $data['included_sections'] ?? $summary['included_sections'];
         }
+
+        if ($data['format'] === 'pdf') {
+            return response()->json($this->files->generateSituationPdf($summary));
+        }
+
         $rows = app(\App\Presenters\SituationReportExportPresenter::class)->rows($summary);
         return response()->json($this->files->generate('situation', $data['format'], ['Section', 'Field', 'Value'], $rows));
     }

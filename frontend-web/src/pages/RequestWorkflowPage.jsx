@@ -1,13 +1,16 @@
 import { useCallback, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { getResourceRequests } from '../api/resourceRequestApi'
 import PageHeader from '../components/ui/PageHeader'
 import ModuleDataView from '../components/ui/ModuleDataView'
 import { useModuleData } from '../utils/useModuleData'
 import PaginationBar from '../components/ui/PaginationBar'
 import TrackingAidMirror from '../components/resources/TrackingAidMirror'
+import { canApproveRequests } from '../utils/personnelAccess'
 
 export default function RequestWorkflowPage() {
+  const { user } = useOutletContext()
+  const canApprove = canApproveRequests(user)
   const location = useLocation()
   const navigate = useNavigate()
   const external = location.pathname === '/external-requests'
@@ -32,8 +35,8 @@ export default function RequestWorkflowPage() {
         { key: 'area', label: 'Area', render: (row) => row.area?.label }, { key: 'status', label: 'Status', render: (row) => row.status?.label || row.validation?.label },
         { key: 'tracking', label: 'Tracking', render: (row) => `${row.handoff?.label || 'Awaiting handoff'} ${row.handoff?.tracking_reference || ''}` },
         { key: 'actions', label: 'Actions', render: (row) => <><button className="btn btn-secondary" onClick={() => open(row, 'view')}>View request</button>
-          {external && <button className="btn btn-primary" onClick={() => open(row, 'validate')}>Approve request</button>}
-          {!external && row.validation?.key === 'verified' && <button className="btn btn-primary" onClick={() => open(row, 'view')}>Manage handoff</button>}</> }]} />
+          {external && canApprove && <button className="btn btn-primary" onClick={() => open(row, 'validate')}>Review request</button>}
+          {!external && canApprove && row.validation?.key === 'verified' && <button className="btn btn-primary" onClick={() => open(row, 'view')}>Manage handoff</button>}</> }]} />
     <PaginationBar meta={data?.requests || {}} onPageChange={setPage} label="requests" />
     {!external && <TrackingAidMirror items={data?.tracking_mirror || []} />}
   </main>
