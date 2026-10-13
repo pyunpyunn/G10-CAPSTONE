@@ -332,18 +332,23 @@ export function AddTrustedHouseholdModal({
               <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>Find a household</Text>
                 <Text style={styles.note}>Enter the trusted household ID or the household account username.</Text>
-                <TextInput
-                  style={styles.input}
-                  value={householdIdentifier}
-                  onChangeText={setHouseholdIdentifier}
-                  placeholder="Household ID or username"
-                  placeholderTextColor="#7d8da0"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="search"
-                  onSubmitEditing={() => onLookup(householdIdentifier.trim())}
-                  accessibilityLabel="Trusted household ID or username"
-                />
+                <View style={styles.identifierInputRow}>
+                  <TextInput
+                    style={[styles.input, styles.identifierInput]}
+                    value={householdIdentifier}
+                    onChangeText={setHouseholdIdentifier}
+                    placeholder="Household ID or username"
+                    placeholderTextColor="#7d8da0"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="search"
+                    onSubmitEditing={() => onLookup(householdIdentifier.trim())}
+                    accessibilityLabel="Trusted household ID or username"
+                  />
+                  <View style={styles.scanIconButton} accessible accessibilityRole="image" accessibilityLabel="Scan household code">
+                    <Ionicons name="scan-outline" size={21} color={palette.navActive} />
+                  </View>
+                </View>
                 <HouseholdButton
                   label={loading ? 'Looking up household...' : 'Continue'}
                   icon="arrow-forward-outline"
@@ -624,6 +629,25 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 14,
     fontWeight: '700',
+    backgroundColor: '#fff',
+  },
+  identifierInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  identifierInput: {
+    flex: 1,
+    minWidth: 0,
+  },
+  scanIconButton: {
+    width: 46,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: radius.md,
     backgroundColor: '#fff',
   },
   pinInputWrap: {

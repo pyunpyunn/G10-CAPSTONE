@@ -379,9 +379,6 @@ function TrustedHouseholdList({
                 </Text>
               ) : null}
             </View>
-            <View style={styles.trustedStatusBadge}>
-              <HouseholdBadge label={labelize(householdItem.validation_status)} tone={householdItem.validation_status} />
-            </View>
           </Pressable>
         );
       })}
@@ -615,11 +612,6 @@ function parseSpecialNeeds(value?: string) {
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 3);
-}
-
-function labelize(value?: string) {
-  if (!value) return 'Pending';
-  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatDate(value?: string) {
@@ -991,8 +983,5 @@ const styles = StyleSheet.create({
     color: palette.navActive,
     fontSize: 12,
     fontWeight: '900',
-  },
-  trustedStatusBadge: {
-    alignSelf: 'center',
   },
 });
