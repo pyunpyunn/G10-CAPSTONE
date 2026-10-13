@@ -23,10 +23,19 @@ import {
   User,
   X,
 } from 'lucide-react'
-import { getResourceRequests } from '../api/resourceRequestApi'
+import {
+  getResourceRequests,
+  validateResourceRequest,
+  forwardResourceRequest,
+} from '../api/resourceRequestApi'
+import {
+  buildValidationPayload,
+  buildForwardPayload,
+} from '../utils/resourceRequestHelpers'
 import { useModuleData } from '../utils/useModuleData'
 import PaginationBar from '../components/ui/PaginationBar'
 import TrackingAidMirror from '../components/resources/TrackingAidMirror'
+import ResourceRequestDetailDrawer from '../components/resources/ResourceRequestDetailDrawer'
 
 export default function RequestWorkflowPage() {
   const location = useLocation()
@@ -39,6 +48,10 @@ export default function RequestWorkflowPage() {
   const [source, setSource] = useState('all')
   const [status, setStatus] = useState('all')
   const [urgency, setUrgency] = useState('all')
+
+  // Live Tracking Drawer State (Option 1)
+  const [inspectingRequest, setInspectingRequest] = useState(null)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const loader = useCallback(
     () =>
@@ -60,6 +73,32 @@ export default function RequestWorkflowPage() {
     navigate(`/resources-requests/${row.request_id}/${mode}`, {
       state: { returnTo: location.pathname },
     })
+
+  // Drawer Action Handlers (Validate & Forward to TrackingAid Shared DB)
+  const handleValidateAndForwardFromDrawer = async (req) => {
+    setIsProcessing(true)
+    try {
+      await validateResourceRequest(
+        req.request_id,
+        buildValidationPayload({ validation_status: 'verified', validation_notes: 'Verified via Tracking Drawer' })
+      )
+      await forwardResourceRequest(
+        req.request_id,
+        buildForwardPayload({ forward_notes: 'Forwarded to TrackingAid via Tracking Drawer' })
+      )
+      setInspectingRequest(null)
+      refresh()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleReturnFromDrawer = (req) => {
+    setInspectingRequest(null)
+    open(req, 'return')
+  }
 
   // Summary counts
   const summary = data?.summary || {}
@@ -449,7 +488,14 @@ export default function RequestWorkflowPage() {
 
                         {/* Destination Evacuation Center */}
                         <td>
-                          <div className="workflow-center-name">{row.area?.label || 'General Relief Hub'}</div>
+                          <div
+                            className="workflow-center-name"
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => setInspectingRequest(row)}
+                            title="Click to track destination and handoff"
+                          >
+                            {row.area?.label || 'General Relief Hub'}
+                          </div>
                           {row.area?.meta && (
                             <div className="workflow-center-sub">
                               <MapPin size={10} style={{ flexShrink: 0 }} />
@@ -508,7 +554,11 @@ export default function RequestWorkflowPage() {
 
                         {/* Tracking / Handoff */}
                         <td>
-                          <div style={{ fontSize: '11.5px', fontWeight: 650, color: '#334155' }}>
+                          <div
+                            style={{ fontSize: '11.5px', fontWeight: 650, color: '#334155', cursor: 'pointer' }}
+                            onClick={() => setInspectingRequest(row)}
+                            title="Click to inspect live tracking and handoff status"
+                          >
                             {row.handoff?.label || 'Awaiting handoff'}
                           </div>
                           {row.handoff?.tracking_reference && (
@@ -523,12 +573,21 @@ export default function RequestWorkflowPage() {
                           <div className="workflow-action-cell" style={{ justifyContent: 'flex-end' }}>
                             <button
                               type="button"
+                              className="btn-wf-action btn-wf-track"
+                              onClick={() => setInspectingRequest(row)}
+                              title="Track destination and TrackingAid handoff status"
+                            >
+                              <Truck size={12} />
+                              <span>Track Handoff</span>
+                            </button>
+                            <button
+                              type="button"
                               className="btn-wf-action btn-wf-view"
                               onClick={() => open(row, 'view')}
-                              title="View full request details"
+                              title="View request details"
                             >
                               <Eye size={12} />
-                              <span>View request</span>
+                              <span>View Request</span>
                             </button>
                             {external && (
                               <button
@@ -539,16 +598,6 @@ export default function RequestWorkflowPage() {
                               >
                                 <CheckCircle2 size={12} />
                                 <span>Approve request</span>
-                              </button>
-                            )}
-                            {!external && row.validation?.key === 'verified' && (
-                              <button
-                                type="button"
-                                className="btn-wf-action btn-wf-manage"
-                                onClick={() => open(row, 'view')}
-                                title="Manage field handoff"
-                              >
-                                <span>Manage handoff</span>
                               </button>
                             )}
                           </div>
@@ -569,6 +618,17 @@ export default function RequestWorkflowPage() {
 
         {/* TrackingAid Mirror for Monitoring */}
         {!external && <TrackingAidMirror items={data?.tracking_mirror || []} />}
+
+        {/* Live Tracking & Handoff Inspection Drawer (Option 1) */}
+        <ResourceRequestDetailDrawer
+          request={inspectingRequest}
+          isOpen={Boolean(inspectingRequest)}
+          onClose={() => setInspectingRequest(null)}
+          onValidateAndForward={handleValidateAndForwardFromDrawer}
+          onReturn={handleReturnFromDrawer}
+          onEdit={(req) => open(req, 'edit')}
+          isProcessing={isProcessing}
+        />
       </div>
     </main>
   )

@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Clock,
   ExternalLink,
+  MapPin,
   Package,
   Send,
   ShieldCheck,
@@ -99,9 +100,21 @@ export default function ResourceRequestDetailDrawer({
                 <span className="rr-detail-value">{request.need?.quantity_text}</span>
               </div>
               <div className="rr-detail-row">
-                <span className="rr-detail-label">Target Area / Site:</span>
-                <span className="rr-detail-value">{request.area?.label}</span>
+                <span className="rr-detail-label">Target Evacuation Site:</span>
+                <span className="rr-detail-value highlight">{request.area?.label || 'General Relief Hub'}</span>
               </div>
+              {request.area?.meta && (
+                <div className="rr-detail-row">
+                  <span className="rr-detail-label">Destination Address:</span>
+                  <span className="rr-detail-value">{request.area.meta}</span>
+                </div>
+              )}
+              {request.area?.event?.name && (
+                <div className="rr-detail-row">
+                  <span className="rr-detail-label">Disaster Event:</span>
+                  <span className="rr-detail-value">{request.area.event.name}</span>
+                </div>
+              )}
               <div className="rr-detail-row">
                 <span className="rr-detail-label">Beneficiary Count:</span>
                 <span className="rr-detail-value">{request.beneficiaries?.label || request.beneficiaries?.count || 'Not specified'}</span>
@@ -112,6 +125,45 @@ export default function ResourceRequestDetailDrawer({
                   <span className="rr-detail-value">{request.requester.name} ({request.requester.contact || 'No contact info'})</span>
                 </div>
               )}
+              <div className="rr-detail-row">
+                <span className="rr-detail-label">TrackingAid Shared DB:</span>
+                <span className="rr-detail-value" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span
+                    style={{
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      background: request.handoff?.tracking_reference ? '#16a34a' : '#f59e0b',
+                      boxShadow: request.handoff?.tracking_reference ? '0 0 6px #16a34a' : 'none',
+                    }}
+                  />
+                  <span>
+                    {request.handoff?.tracking_reference
+                      ? `Connected (${request.handoff.tracking_reference})`
+                      : 'Pending Sync to Shared DB'}
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '12px' }}>
+              <a
+                href="/mapping"
+                className="btn btn-secondary btn-sm"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  textDecoration: 'none',
+                  fontSize: '11.5px',
+                  padding: '6px 12px',
+                  fontWeight: 650,
+                  borderRadius: '6px',
+                }}
+              >
+                <MapPin size={13} style={{ color: '#2563eb' }} />
+                <span>View Evacuation Center on Live Map</span>
+              </a>
             </div>
           </div>
 
@@ -150,11 +202,11 @@ export default function ResourceRequestDetailDrawer({
                   {handoffStep >= 3 ? <Send size={16} /> : <ExternalLink size={16} />}
                 </div>
                 <div className="rr-timeline-content">
-                  <div className="rr-timeline-title">TrackingAid Forwarding</div>
+                  <div className="rr-timeline-title">TrackingAid Shared DB Forwarding</div>
                   <div className="rr-timeline-sub">
                     {request.handoff?.tracking_reference
-                      ? `Shared DB Reference: ${request.handoff.tracking_reference}`
-                      : 'Pending sync to shared tracking aid'}
+                      ? `Ref: ${request.handoff.tracking_reference} (resqperation_forwarded_requests)`
+                      : 'Synced to TrackingAid shared database upon approval'}
                   </div>
                 </div>
               </div>
@@ -230,12 +282,14 @@ function checkDuplicateRisk(request) {
 }
 
 function getHandoffStep(request) {
+  if (!request) return 1
   const vKey = request.validation?.key || 'needs_validation'
   const hTone = request.handoff?.tone
+  const hLabel = request.handoff?.label
 
-  if (request.status?.key === 'delivered') return 4
-  if (hTone === 'green' || vKey === 'forwarded') return 3
-  if (vKey === 'verified') return 2
+  if (request.status?.key === 'delivered' || request.status?.key === 'fulfilled') return 4
+  if (hTone === 'green' || vKey === 'forwarded' || hLabel === 'Acknowledged' || request.handoff?.tracking_reference) return 3
+  if (vKey === 'verified' || vKey === 'approved') return 2
   return 1
 }
 

@@ -16,11 +16,51 @@ class ResourceRequestWriteWorkflow
 
     public function create(Request $request,array $v,?object $event):array
     {
-        return DB::transaction(function()use($request,$v,$event):array{$now=now();$id=$this->query->nextRequestId();ResourceRequest::create(['request_id'=>$id,'request_source'=>$v['request_source'],'source_reference'=>$v['source_reference']??$event?->event_id,'request_category'=>$v['request_category'],'evacuation_center_id'=>$v['evacuation_center_id']??null,'requested_by'=>$v['requested_by'],'handled_by'=>$request->user()?->user_id,'resource_type'=>$v['resource_type'],'item_name'=>$v['item_name']??null,'quantity'=>(int)$v['quantity'],'unit'=>$v['unit']??'units','description'=>$v['description']??null,'urgency_id'=>(int)($v['urgency_id']??$this->query->urgencyId('medium')),'status_id'=>$this->query->statusId('needs_validation'),'validation_status'=>'needs_validation','validation_notes'=>null,'validated_by_user_id'=>null,'validated_at'=>null,'released_for_tracking_at'=>null,'tracking_reference'=>null,'created_at'=>$now,'updated_at'=>$now]);$result=$this->format($this->query->find($id),true);$this->audit($request,'create',$id,null,$result);return$result;});
+        return DB::transaction(function()use($request,$v,$event):array{
+            $now=now();
+            $id=$this->query->nextRequestId();
+            ResourceRequest::create(['request_id'=>$id,'request_source'=>$v['request_source'],'source_reference'=>$v['source_reference']??$event?->event_id,'request_category'=>$v['request_category'],'evacuation_center_id'=>$v['evacuation_center_id']??null,'requested_by'=>$v['requested_by'],'handled_by'=>$request->user()?->user_id,'resource_type'=>$v['resource_type'],'item_name'=>$v['item_name']??null,'quantity'=>(int)$v['quantity'],'unit'=>$v['unit']??'units','description'=>$v['description']??null,'urgency_id'=>(int)($v['urgency_id']??$this->query->urgencyId('medium')),'status_id'=>$this->query->statusId('needs_validation'),'validation_status'=>'needs_validation','validation_notes'=>null,'validated_by_user_id'=>null,'validated_at'=>null,'released_for_tracking_at'=>null,'tracking_reference'=>null,'created_at'=>$now,'updated_at'=>$now]);
+            $this->trackingAid->deductStock($v['item_name'] ?? null, $v['sku'] ?? null, (int)$v['quantity'], $id);
+            $result=$this->format($this->query->find($id),true);
+            $this->audit($request,'create',$id,null,$result);
+            return $result;
+        });
     }
-    public function update(Request $request,ResourceRequest $row,string $id,array $v):array{return DB::transaction(function()use($request,$row,$id,$v):array{$old=$this->format($this->query->find($id),true);$fill=['request_source'=>$v['request_source'],'source_reference'=>$v['source_reference']??null,'request_category'=>$v['request_category'],'evacuation_center_id'=>$v['evacuation_center_id']??null,'requested_by'=>$v['requested_by'],'resource_type'=>$v['resource_type'],'item_name'=>$v['item_name']??null,'quantity'=>(int)$v['quantity'],'unit'=>$v['unit']??'units','description'=>$v['description']??null,'urgency_id'=>(int)($v['urgency_id']??$row->urgency_id),'updated_at'=>now()];if(array_key_exists('validation_notes',$v))$fill['validation_notes']=$v['validation_notes'];if(!empty($v['validation_status'])){$statusKey=$this->presenter->statusKey($v['validation_status']);$fill['validation_status']=$statusKey;$fill['status_id']=$this->query->statusId($statusKey);}$row->fill($fill);$row->save();$updated=$this->format($this->query->find($id),true);$this->audit($request,'update',$id,$old,$updated);return$updated;}, 3);}
+    public function update(Request $request,ResourceRequest $row,string $id,array $v):array{
+        return DB::transaction(function()use($request,$row,$id,$v):array{
+            $old=$this->format($this->query->find($id),true);
+            $oldQty=(int)$row->quantity;
+            $newQty=(int)$v['quantity'];
+            if($newQty>$oldQty){
+                $this->trackingAid->deductStock($v['item_name']??$row->item_name,$v['sku']??null,$newQty-$oldQty,$id);
+            }elseif($newQty<$oldQty){
+                $this->trackingAid->restoreStock($v['item_name']??$row->item_name,$v['sku']??null,$oldQty-$newQty,$id);
+            }
+            $fill=['request_source'=>$v['request_source'],'source_reference'=>$v['source_reference']??null,'request_category'=>$v['request_category'],'evacuation_center_id'=>$v['evacuation_center_id']??null,'requested_by'=>$v['requested_by'],'resource_type'=>$v['resource_type'],'item_name'=>$v['item_name']??null,'quantity'=>$newQty,'unit'=>$v['unit']??'units','description'=>$v['description']??null,'urgency_id'=>(int)($v['urgency_id']??$row->urgency_id),'updated_at'=>now()];
+            if(array_key_exists('validation_notes',$v))$fill['validation_notes']=$v['validation_notes'];
+            if(!empty($v['validation_status'])){$statusKey=$this->presenter->statusKey($v['validation_status']);$fill['validation_status']=$statusKey;$fill['status_id']=$this->query->statusId($statusKey);}
+            $row->fill($fill);$row->save();
+            $updated=$this->format($this->query->find($id),true);
+            $this->audit($request,'update',$id,$old,$updated);
+            return $updated;
+        }, 3);
+    }
     public function validate(Request $request,string $id,object $row,array $v):array{return DB::transaction(function()use($request,$id,$row,$v):array{$now=now();$status=$this->presenter->statusKey($v['validation_status']);$old=$this->format($row,true);ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>$status,'validation_notes'=>$v['validation_notes']??null,'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId($status),'updated_at'=>$now]);$this->trackingAid->syncRequestStatus($id,$status,$now);$this->query->insertValidation($id,$status,$request->user()?->user_id,$v['validation_notes']??null,$v['missing_information']??null,$v['duplicate_request_id']??null,$now);$result=$this->format($this->query->find($id),true);$this->audit($request,'validate',$id,$old,$result);return$result;}, 3);}
-    public function returnRequest(Request $request,string $id,object $row,array $v):array{return DB::transaction(function()use($request,$id,$row,$v):array{$now=now();$old=$this->format($row,true);ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>'returned','validation_notes'=>$v['validation_notes'],'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId('returned'),'updated_at'=>$now]);$this->trackingAid->syncRequestStatus($id,'returned',$now);$this->query->insertValidation($id,'returned',$request->user()?->user_id,$v['validation_notes'],$v['missing_information']??null,$v['duplicate_request_id']??null,$now);$result=$this->format($this->query->find($id),true);$this->audit($request,'return',$id,$old,$result);return$result;}, 3);}
+    public function returnRequest(Request $request,string $id,object $row,array $v):array{
+        return DB::transaction(function()use($request,$id,$row,$v):array{
+            $now=now();
+            $old=$this->format($row,true);
+            ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>'returned','validation_notes'=>$v['validation_notes'],'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId('returned'),'updated_at'=>$now]);
+            $this->trackingAid->syncRequestStatus($id,'returned',$now);
+            $this->trackingAid->restoreStock($row->item_name ?? null, null, (int)$row->quantity, $id);
+            $this->query->insertValidation($id,'returned',$request->user()?->user_id,$v['validation_notes'],$v['missing_information']??null,$v['duplicate_request_id']??null,$now);
+            $result=$this->format($this->query->find($id),true);
+            $this->audit($request,'return',$id,$old,$result);
+            return $result;
+        }, 3);
+    }
+    public function deductStock(?string $itemName,?string $sku,int $quantity,?string $id=null):array{return $this->trackingAid->deductStock($itemName,$sku,$quantity,$id);}
+    public function restoreStock(?string $itemName,?string $sku,int $quantity,?string $id=null):array{return $this->trackingAid->restoreStock($itemName,$sku,$quantity,$id);}
     public function complete(Request $request,string $id,object $row,array $v):array{return DB::transaction(function()use($request,$id,$row,$v):array{$now=now();$old=$this->format($row,true);ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>'fulfilled','validation_notes'=>$v['validation_notes']??$row->validation_notes,'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId('fulfilled'),'updated_at'=>$now]);$this->trackingAid->syncRequestStatus($id,'fulfilled',$now);$this->query->insertValidation($id,'fulfilled',$request->user()?->user_id,$v['validation_notes']??'Request marked completed by HQ.',null,null,$now);$result=$this->format($this->query->find($id),true);$this->audit($request,'complete',$id,$old,$result);return$result;}, 3);}
     public function forward(Request $request,string $id,object $row,array $v):array{return DB::transaction(function()use($request,$id,$row,$v):array{$now=now();$old=$this->format($row,true);$given=trim((string)($v['tracking_reference']??''));$ref=$given!==''?$given:($row->tracking_reference?:$this->query->nextTrackingReference());$notes=$v['validation_notes']??$row->validation_notes??'Verified request forwarded to TrackingAid.';$this->trackingAid->forwardRequest($row,$ref,$request->user(),$notes);ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>'forwarded','validation_notes'=>$notes,'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$row->validated_at?:$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId('forwarded'),'released_for_tracking_at'=>$row->released_for_tracking_at?:$now,'tracking_reference'=>$ref,'updated_at'=>$now]);$this->query->insertValidation($id,'forwarded',$request->user()?->user_id,$notes,null,null,$now);$result=$this->format($this->query->find($id),true);$this->audit($request,'forward',$id,$old,$result);return$result;}, 3);}
     public function auditExternal(Request $request,string $action,string $id,mixed $result):void{$this->audit($request,$action,$id,null,$result);}

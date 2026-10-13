@@ -203,6 +203,8 @@ export default function RequestResourceModal({
         evacuation_center_id: evacuationCenterId || null,
         urgency_id: urgencyId ? Number(urgencyId) : 2,
         description: description.trim() || `Disaster resource request for ${item.name || item.label} (${item.sku || ''})`,
+        sku: item.sku || null,
+        item_id: item.id || null,
       }
 
       const res = await createResourceRequest(payload)
