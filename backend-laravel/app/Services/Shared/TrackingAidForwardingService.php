@@ -18,50 +18,60 @@ class TrackingAidForwardingService
         string|object|null $forwardedBy,
         ?string $validationNotes
     ): array {
+        $writeDirectly = function () use ($resourceRequest, $trackingReference, $forwardedBy, $validationNotes): array {
+            $connection = (string) config('services.trackingaid.connection', 'trackingaid');
+            $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
+
+            try {
+                config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 2]);
+
+                $now = now();
+                $payload = app(TrackingAidPayloadPresenter::class)->payload($resourceRequest, $trackingReference, $forwardedBy, $validationNotes, $now);
+
+                DB::connection($connection)
+                    ->table($table)
+                    ->updateOrInsert(
+                        ['tracking_reference' => $trackingReference],
+                        $payload
+                    );
+
+                return [
+                    'tracking_reference' => $trackingReference,
+                    'forwarded_at' => $now->toDateTimeString(),
+                    'table' => $table,
+                ];
+            } catch (Throwable $exception) {
+                report($exception);
+
+                throw new RuntimeException(
+                    'TrackingAid database cannot receive the request right now. Check the TrackingAid DB credentials and permissions.',
+                    0,
+                    $exception
+                );
+            }
+        };
+
         if (DB::transactionLevel() > 0) {
-            SyncTrackingAidRequest::dispatch(
-                (string) $resourceRequest->request_id,
-                true,
-                $trackingReference,
-                is_string($forwardedBy) ? $forwardedBy : ($forwardedBy->user_id ?? null),
-                is_object($forwardedBy) ? ($forwardedBy->name ?? trim(($forwardedBy->first_name ?? '').' '.($forwardedBy->last_name ?? ''))) : null,
-                is_object($forwardedBy) ? ($forwardedBy->role?->role_key ?? $forwardedBy->role_key ?? null) : null,
-                $validationNotes,
-            )->onConnection('trackingaid_outbox');
+            DB::afterCommit(function () use ($writeDirectly, $resourceRequest, $trackingReference, $forwardedBy, $validationNotes): void {
+                try {
+                    $writeDirectly();
+                } catch (Throwable) {
+                    SyncTrackingAidRequest::dispatch(
+                        (string) $resourceRequest->request_id,
+                        true,
+                        $trackingReference,
+                        is_string($forwardedBy) ? $forwardedBy : ($forwardedBy->user_id ?? null),
+                        is_object($forwardedBy) ? ($forwardedBy->name ?? trim(($forwardedBy->first_name ?? '').' '.($forwardedBy->last_name ?? ''))) : null,
+                        is_object($forwardedBy) ? ($forwardedBy->role?->role_key ?? $forwardedBy->role_key ?? null) : null,
+                        $validationNotes,
+                    )->onConnection('trackingaid_outbox');
+                }
+            });
 
             return ['tracking_reference' => $trackingReference, 'forwarded_at' => now()->toDateTimeString(), 'table' => (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests')];
         }
 
-        $connection = (string) config('services.trackingaid.connection', 'trackingaid');
-        $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
-
-        try {
-            config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 2]);
-
-            $now = now();
-            $payload = app(TrackingAidPayloadPresenter::class)->payload($resourceRequest, $trackingReference, $forwardedBy, $validationNotes, $now);
-
-            DB::connection($connection)
-                ->table($table)
-                ->updateOrInsert(
-                    ['tracking_reference' => $trackingReference],
-                    $payload
-                );
-
-            return [
-                'tracking_reference' => $trackingReference,
-                'forwarded_at' => $now->toDateTimeString(),
-                'table' => $table,
-            ];
-        } catch (Throwable $exception) {
-            report($exception);
-
-            throw new RuntimeException(
-                'TrackingAid database cannot receive the request right now. Check the TrackingAid DB credentials and permissions.',
-                0,
-                $exception
-            );
-        }
+        return $writeDirectly();
     }
 
     public function syncRequestStatus(string $requestId, string $status, ?Carbon $updatedAt = null): void
@@ -71,7 +81,9 @@ class TrackingAidForwardingService
         }
 
         if (DB::transactionLevel() > 0) {
-            SyncTrackingAidRequest::dispatch($requestId)->onConnection('trackingaid_outbox');
+            DB::afterCommit(function () use ($requestId, $status, $updatedAt): void {
+                $this->syncRequestStatus($requestId, $status, $updatedAt);
+            });
             return;
         }
 
