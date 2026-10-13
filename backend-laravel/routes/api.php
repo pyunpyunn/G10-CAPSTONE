@@ -111,18 +111,6 @@ Route::prefix('v1')->group(function () {
             Route::post('/evacuation/verify-qr', [EvacuationCheckInController::class, 'verifyQr']);
             Route::get('/field-reports', [RescuerMobileController::class, 'fieldReportsAdmin']);
             Route::get('/rescue-teams', [RescueDispatchController::class, 'teams']);
-            Route::get('/rescuers', [RescuerAccountController::class, 'index']);
-            Route::get('/headquarters-accounts', [RescuerAccountController::class, 'headquartersAccounts']);
-            Route::post('/headquarters-accounts', [RescuerAccountController::class, 'storeHeadquartersAccount']);
-            Route::get('/rescuers/team-config', [RescuerAccountController::class, 'teamConfig']);
-            Route::post('/rescuers/team-config', [RescuerAccountController::class, 'storeTeam']);
-            Route::patch('/rescuers/team-config/{teamId}', [RescuerAccountController::class, 'updateTeam']);
-            Route::delete('/rescuers/team-config/{teamId}', [RescuerAccountController::class, 'deleteTeam']);
-            Route::post('/rescuers', [RescuerAccountController::class, 'store']);
-            Route::get('/rescuers/{responderId}', [RescuerAccountController::class, 'show']);
-            Route::patch('/rescuers/{responderId}', [RescuerAccountController::class, 'update']);
-            Route::delete('/rescuers/{responderId}', [RescuerAccountController::class, 'destroy']);
-            Route::post('/rescuers/{responderId}/deactivate', [RescuerAccountController::class, 'deactivate']);
             Route::get('/resource-request-types', [ResourceRequestController::class, 'types']);
             Route::get('/resource-requests', [ResourceRequestController::class, 'index']);
             Route::post('/resource-requests', [ResourceRequestController::class, 'store']);
@@ -164,6 +152,21 @@ Route::prefix('v1')->group(function () {
             Route::post('/dispatches', [RescueDispatchController::class, 'store']);
             Route::get('/dispatches/{assignmentId}', [RescueDispatchController::class, 'show'])->whereNumber('assignmentId');
             Route::post('/dispatches/{assignmentId}/complete', [RescueDispatchController::class, 'complete']);
+        });
+
+        Route::middleware('personnel.access')->group(function () {
+            Route::get('/rescuers', [RescuerAccountController::class, 'index']);
+            Route::get('/headquarters-accounts', [RescuerAccountController::class, 'headquartersAccounts']);
+            Route::post('/headquarters-accounts', [RescuerAccountController::class, 'storeHeadquartersAccount']);
+            Route::get('/rescuers/team-config', [RescuerAccountController::class, 'teamConfig']);
+            Route::post('/rescuers/team-config', [RescuerAccountController::class, 'storeTeam']);
+            Route::patch('/rescuers/team-config/{teamId}', [RescuerAccountController::class, 'updateTeam']);
+            Route::delete('/rescuers/team-config/{teamId}', [RescuerAccountController::class, 'deleteTeam']);
+            Route::post('/rescuers', [RescuerAccountController::class, 'store']);
+            Route::get('/rescuers/{responderId}', [RescuerAccountController::class, 'show']);
+            Route::patch('/rescuers/{responderId}', [RescuerAccountController::class, 'update']);
+            Route::delete('/rescuers/{responderId}', [RescuerAccountController::class, 'destroy']);
+            Route::post('/rescuers/{responderId}/deactivate', [RescuerAccountController::class, 'deactivate']);
         });
 
         Route::middleware('role:household_resident,rescuer')->group(function () {

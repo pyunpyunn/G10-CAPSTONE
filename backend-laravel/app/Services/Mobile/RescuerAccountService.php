@@ -24,6 +24,7 @@ class RescuerAccountService
             'team' => trim((string) $request->query('team', 'all')),
             'duty_status' => trim((string) $request->query('duty_status', 'all')),
             'purok' => trim((string) $request->query('purok', 'all')),
+            'account_type' => trim((string) $request->query('account_type', 'all')),
         ];
         $perPage = \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page'));
         $paginator = $this->query->paginateResponders($filters, $perPage);

@@ -21,10 +21,13 @@ class HeadquartersAccountWorkflow
     {
         $accounts = DB::table('users as u')
             ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
+            ->leftJoin('responders as p', fn ($join) => $join->on('p.user_id', '=', 'u.user_id')->whereNull('p.deleted_at'))
+            ->leftJoin('rescue_teams as t', 't.team_id', '=', 'p.team_id')
             ->where('u.username', 'like', self::ACCOUNT_PREFIX.'%')
             ->orderBy('u.username')
             ->get(['u.user_id', 'u.username', 'u.first_name', 'u.last_name', 'u.name', 'u.email',
-                'u.contact_number', 'u.is_active', 'u.must_change_password', 'r.role_name']);
+                'u.contact_number', 'u.is_active', 'u.must_change_password', 'r.role_name',
+                'p.responder_id', 'p.team_id', 't.team_name', 't.team_code', 't.team_type', 't.leader_responder_id']);
 
         return response()->json(['data' => [
             'accounts' => $accounts->map(fn (object $account): array => $this->present($account))->values()->all(),
@@ -101,6 +104,10 @@ class HeadquartersAccountWorkflow
                 DB::table('users')->insert($values);
             }
 
+            if (! $isCaptain) {
+                app(HeadquartersTeamSupport::class)->syncUser(DB::table('users')->where('user_id', $values['user_id'])->first());
+            }
+
             return [
                 'account_id' => $accountId,
                 'user_id' => $existing->user_id ?? $userId,
@@ -154,6 +161,12 @@ class HeadquartersAccountWorkflow
             'is_active' => (bool) $account->is_active,
             'must_change_password' => (bool) $account->must_change_password,
             'role_name' => $account->role_name,
+            'responder_id' => $account->responder_id,
+            'team_id' => $account->team_id,
+            'team_name' => $account->team_name,
+            'team_code' => $account->team_code,
+            'team_type' => $account->team_type,
+            'is_team_leader' => $account->responder_id && (int) $account->responder_id === (int) $account->leader_responder_id,
         ];
     }
 }

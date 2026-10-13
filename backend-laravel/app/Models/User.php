@@ -145,6 +145,31 @@ class User extends Authenticatable
             default => $roleName,
         };
     }
+
+    public function isHqccLeader(): bool
+    {
+        if ($this->is_active === false || ($this->attributes['deleted_at'] ?? null)) return false;
+        foreach (['responders' => ['user_id', 'team_id', 'responder_id'], 'rescue_teams' => ['team_id', 'team_code', 'team_type', 'leader_responder_id']] as $table => $columns) {
+            if (! Schema::hasTable($table)) return false;
+            foreach ($columns as $column) if (! Schema::hasColumn($table, $column)) return false;
+        }
+
+        return \Illuminate\Support\Facades\DB::table('rescue_teams as t')
+            ->join('responders as r', 'r.responder_id', '=', 't.leader_responder_id')
+            ->whereColumn('r.team_id', 't.team_id')
+            ->where('r.user_id', $this->getKey())
+            ->when(Schema::hasColumn('responders', 'deleted_at'), fn ($query) => $query->whereNull('r.deleted_at'))
+            ->where(fn ($query) => $query->whereRaw('UPPER(t.team_code) = ?', ['HQCC'])
+                ->orWhereRaw('UPPER(t.team_type) IN (?, ?, ?)', ['HQ', 'HQCC', 'HEADQUARTERS']))
+            ->exists();
+    }
+
+    public function canManagePersonnel(): bool
+    {
+        if ($this->is_active === false || ($this->attributes['deleted_at'] ?? null)) return false;
+
+        return in_array($this->roleKey(), ['super_admin', 'admin'], true) || $this->isHqccLeader();
+    }
 }
 
 

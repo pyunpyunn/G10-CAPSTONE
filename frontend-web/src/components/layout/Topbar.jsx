@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { searchGlobalRecords } from '../../api/globalSearchApi'
 import { markNotificationsRead, subscribeNotifications } from '../../api/notificationApi'
 import { notificationErrorMessage } from '../../utils/notificationHelpers'
+import { canOpenWebPage, hasAdminWebAccess } from '../../utils/personnelAccess'
 
 const searchTypes = [
   { id: 'pages', label: 'Pages' },
@@ -58,13 +59,14 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   const query = searchTerm.trim()
   const recordTypes = selectedTypes.filter((type) => type !== 'pages')
   const recordSearchKey = `${query}::${recordTypes.join('|')}`
-  const canSearchRecords = query.length >= 2 && recordTypes.length > 0
+  const canSearchRecords = hasAdminWebAccess(user) && query.length >= 2 && recordTypes.length > 0
   const currentRecordSearch = canSearchRecords && recordSearch.key === recordSearchKey ? recordSearch : null
   const isSearching = currentRecordSearch?.status === 'loading'
   const searchError = currentRecordSearch?.error || ''
   const pageResults = query.length >= 2 && selectedTypes.includes('pages')
     ? searchablePages
       .filter((page) => (!page.superAdminOnly || canViewInquiries))
+      .filter((page) => canOpenWebPage(user, page.href))
       .filter((page) => `${page.title} ${page.keywords}`.toLowerCase().includes(query.toLowerCase()))
       .map((page) => ({ ...page, type: 'pages', subtitle: 'Open page' }))
     : []
@@ -73,7 +75,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   useEffect(() => {
     const currentQuery = searchTerm.trim()
     const types = selectedTypes.filter((type) => type !== 'pages')
-    if (currentQuery.length < 2 || types.length === 0) return undefined
+    if (!hasAdminWebAccess(user) || currentQuery.length < 2 || types.length === 0) return undefined
 
     const key = `${currentQuery}::${types.join('|')}`
     let ignore = false
@@ -130,6 +132,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
 
   useEffect(() => {
     let unsubscribe
+    if (!hasAdminWebAccess(user)) return undefined
     const notificationLoad = window.setTimeout(() => {
       unsubscribe = subscribeNotifications({ status: 'all', page: 1 }, (data) => {
         setNotifications(data.preview || [])

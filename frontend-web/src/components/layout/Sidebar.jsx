@@ -100,15 +100,15 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
       </div>
 
       <nav className="left-nav">
-        <NavLink
+        {pages.some(page => page.path === '/dashboard') && <NavLink
           to="/dashboard"
           end
           className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
         >
           <LayoutDashboard size={17} />
           <span>Dashboard</span>
-        </NavLink>
-        {navGroups.map((group) => (
+        </NavLink>}
+        {navGroups.filter(group => group.paths.some(path => pages.some(page => page.path === path && !page.navHidden))).map((group) => (
           <NavGroup
             key={group.title}
             title={group.title}

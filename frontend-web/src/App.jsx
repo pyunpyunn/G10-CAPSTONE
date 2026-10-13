@@ -6,6 +6,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useOutletContext,
 } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
@@ -13,6 +14,7 @@ import PlaceholderPage from './pages/PlaceholderPage'
 import HouseholdReviewPage from './pages/HouseholdReviewPage'
 import { getCurrentUser, loginUser, logoutUser, saveRememberedPassword } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
+import { canManagePersonnel, canOpenWebPage, hasAdminWebAccess, webHomeForUser } from './utils/personnelAccess'
 import './App.css'
 import './styles/foundation.css'
 import './styles/index.css'
@@ -35,8 +37,6 @@ import './styles/situation.css'
 import './styles/responsive.css'
 import './styles/mapmate-reference.css'
 import './styles/map-enhancements.css'
-
-const webRoles = ['super_admin', 'admin']
 
 const pageComponents = {
   '/super-admin': lazy(() => import('./pages/SuperAdminPage')),
@@ -219,7 +219,7 @@ function AuthRoutes() {
       await saveRememberedPassword(form.login, form.password, form.rememberPassword)
       saveToken(data.token)
       setUser(nextUser)
-      navigate('/dashboard', { replace: true })
+      navigate(webHomeForUser(nextUser), { replace: true })
     } catch (error) {
       throw new Error(error.message === 'Household and rescuer accounts should use the mobile app.' ? error.message : getLoginMessage(error), { cause: error })
     }
@@ -245,7 +245,7 @@ function AuthRoutes() {
         path="/login"
         element={
           user ? (
-            <Navigate to="/dashboard" replace />
+            <Navigate to={webHomeForUser(user)} replace />
           ) : (
             <LoginPage onLogin={handleLogin} error={loginError} />
           )
@@ -260,7 +260,7 @@ function AuthRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={<Navigate to={webHomeForUser(user)} replace />} />
         <Route path="dispatch/communication" element={<LazyPage page={{ path: '/dispatch/communication' }} />} />
         <Route path="rescue-management/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
         <Route path="rescue-management/:assignmentId/edit" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
@@ -283,13 +283,18 @@ function AuthRoutes() {
         <Route path="profile" element={<LazyPage page={{ path: '/profile' }} />} />
       </Route>
 
-      <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={user ? webHomeForUser(user) : '/login'} replace />} />
     </Routes>
   )
 }
 
 function LazyPage({ page }) {
+  const { user } = useOutletContext()
   const PageComponent = pageComponents[page.path]
+
+  if (!canOpenWebPage(user, page.path)) {
+    return <Navigate to={webHomeForUser(user)} replace />
+  }
 
   if (!PageComponent) {
     return <PlaceholderPage page={page} />
@@ -313,13 +318,13 @@ function ProtectedRoute({ user, children }) {
 }
 
 function isWebUser(user) {
-  return webRoles.includes(user?.role?.role_key)
+  return hasAdminWebAccess(user) || canManagePersonnel(user)
 }
 
 function pagesForUser(user) {
   const roleKey = user?.role?.role_key
 
-  return modulePages.filter((page) => !page.superOnly || roleKey === 'super_admin')
+  return modulePages.filter((page) => canOpenWebPage(user, page.path) && (!page.superOnly || roleKey === 'super_admin'))
 }
 
 function getLoginMessage(error) {

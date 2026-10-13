@@ -1,152 +1,41 @@
 import { useEffect, useState } from 'react'
-import { Save, UserPlus } from 'lucide-react'
 import { getHeadquartersAccounts, saveHeadquartersAccount } from '../../api/headquartersAccountsApi'
+import { AccountProfile } from './RescuerAccountModal'
 
-const emptyForm = (accountType = 'command_center') => ({
-  account_type: accountType,
-  first_name: '',
-  last_name: '',
-  email: '',
-  contact_number: '',
-  password: '',
-})
+const emptyForm = type => ({ account_type: type, first_name: '', last_name: '', email: '', contact_number: '', password: '' })
 
-export default function HeadquartersAccountsPanel() {
+export default function HeadquartersAccountsPanel({ editor = false, initialType = 'command_center', roleSelector, onClose, onSaved, onManageCaptain, onBusyChange }) {
   const [workspace, setWorkspace] = useState(null)
-  const [accountType, setAccountType] = useState('command_center')
-  const [form, setForm] = useState(() => emptyForm())
+  const [form, setForm] = useState(() => emptyForm(initialType))
+  const [selectedId, setSelectedId] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-
+  const [section, setSection] = useState('personal')
+  const captain = workspace?.accounts?.find(account => account.account_type === 'barangay_captain')
+  const selected = workspace?.accounts?.find(account => account.account_id === selectedId) || workspace?.accounts?.[0]
   useEffect(() => {
-    loadAccounts()
-  }, [])
-
-  const captain = workspace?.accounts?.find((account) => account.account_type === 'barangay_captain')
-
-  async function loadAccounts() {
-    setIsLoading(true)
-    setError('')
-    try {
-      setWorkspace(await getHeadquartersAccounts())
-    } catch {
-      setError('Headquarters accounts could not be loaded. Check the backend or database connection.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  function chooseType(nextType) {
-    setAccountType(nextType)
-    setNotice('')
-    setError('')
-    if (nextType === 'barangay_captain' && captain) {
-      setForm({
-        account_type: nextType,
-        first_name: captain.first_name || '',
-        last_name: captain.last_name || '',
-        email: captain.email || '',
-        contact_number: captain.contact_number || '',
-        password: '',
-      })
-      return
-    }
-    setForm(emptyForm(nextType))
-  }
-
-  function update(key, value) {
-    setForm((current) => ({ ...current, [key]: value }))
-  }
-
+    let ignore = false
+    getHeadquartersAccounts().then(data => {
+      if (ignore) return
+      setWorkspace(data)
+      const existing = data.accounts?.find(account => account.account_type === 'barangay_captain')
+      if (initialType === 'barangay_captain' && existing) setForm({ ...emptyForm(initialType), first_name: existing.first_name || '', last_name: existing.last_name || '', email: existing.email || '', contact_number: existing.contact_number || '' })
+    }).catch(() => { if (!ignore) setError('Headquarters accounts could not be loaded. Check the backend connection.') }).finally(() => { if (!ignore) setIsLoading(false) })
+    return () => { ignore = true }
+  }, [initialType])
+  function reset() { setForm(initialType === 'barangay_captain' && captain ? { ...emptyForm(initialType), first_name: captain.first_name || '', last_name: captain.last_name || '', email: captain.email || '', contact_number: captain.contact_number || '' } : emptyForm(initialType)); setError('') }
   async function submit(event) {
-    event.preventDefault()
-    setIsSaving(true)
-    setError('')
-    setNotice('')
+    event.preventDefault(); setIsSaving(true); onBusyChange?.(true); setError(''); setNotice('')
     try {
       const result = await saveHeadquartersAccount(form)
-      setNotice(`${result.message} Account ID: ${result.data.account.account_id}`)
-      setForm((current) => ({ ...current, password: '' }))
-      await loadAccounts()
-    } catch (saveError) {
-      const validationErrors = saveError.response?.data?.errors
-      setError(validationErrors ? Object.values(validationErrors).flat().join(' ') : saveError.response?.data?.message || 'The account could not be saved.')
-    } finally {
-      setIsSaving(false)
-    }
+      if (onSaved) onSaved(result.message)
+      else { setNotice(result.message); setWorkspace(await getHeadquartersAccounts()); setForm(current => ({ ...current, password: '' })) }
+    } catch (saveError) { setError(saveError.response?.data?.errors ? Object.values(saveError.response.data.errors).flat().join(' ') : saveError.response?.data?.message || 'The account could not be saved.') }
+    finally { setIsSaving(false); onBusyChange?.(false) }
   }
-
-  return (
-    <div className="hq-account-workspace">
-      <section className="ra-profile-section hq-account-form-section">
-        <div className="hq-account-heading">
-          <div>
-            <h3>Headquarters accounts</h3>
-            <p className="ra-section-description">Manage Command Center Personnel and the single Barangay Captain account.</p>
-          </div>
-        </div>
-
-        <div className="hq-account-type-switch" role="group" aria-label="Headquarters account type">
-          <button type="button" className={accountType === 'command_center' ? 'active' : ''} aria-pressed={accountType === 'command_center'} onClick={() => chooseType('command_center')}>Command Center Personnel (HCC)</button>
-          <button type="button" className={accountType === 'barangay_captain' ? 'active' : ''} aria-pressed={accountType === 'barangay_captain'} onClick={() => chooseType('barangay_captain')}>Barangay Captain</button>
-        </div>
-
-        <form className="hq-account-form" onSubmit={submit}>
-          <div className="ra-form-grid">
-            <Field label="First name"><input required maxLength={100} value={form.first_name} onChange={(event) => update('first_name', event.target.value)} /></Field>
-            <Field label="Last name"><input required maxLength={100} value={form.last_name} onChange={(event) => update('last_name', event.target.value)} /></Field>
-            <Field label="Email"><input type="email" maxLength={255} value={form.email} onChange={(event) => update('email', event.target.value)} /></Field>
-            <Field label="Contact number"><input type="tel" maxLength={50} value={form.contact_number} onChange={(event) => update('contact_number', event.target.value)} /></Field>
-            <Field label={captain && accountType === 'barangay_captain' ? 'New temporary password (optional)' : 'Temporary password'}>
-              <input type="password" autoComplete="new-password" minLength={8} maxLength={100} required={!(captain && accountType === 'barangay_captain')} value={form.password} onChange={(event) => update('password', event.target.value)} />
-            </Field>
-          </div>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          {notice && <p className="ra-success" role="status">{notice}</p>}
-          <div className="hq-account-form-footer">
-            <span>{accountType === 'barangay_captain'
-              ? `Reserved account: ${workspace?.captain_account_id || 'BDRRM-HQCC-001'}. Saving updates the single captain account.`
-              : `Next account ID: ${workspace?.next_account_id || 'assigned on save'}.`}</span>
-            <button className="button review" type="submit" disabled={isSaving || isLoading}>
-              {accountType === 'command_center' ? <UserPlus size={16} /> : <Save size={16} />}
-              {isSaving ? 'Saving...' : accountType === 'command_center' ? 'Create HCC account' : captain ? 'Save captain account' : 'Create captain account'}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <section className="ra-profile-section hq-account-list-section">
-        <div className="hq-account-heading">
-          <div>
-            <h3>Current accounts</h3>
-            <p className="ra-section-description">HQ web access uses the standard Admin role. Accounts here are not responder roster entries.</p>
-          </div>
-          <button className="button secondary" type="button" onClick={loadAccounts} disabled={isLoading}>Refresh</button>
-        </div>
-        {isLoading ? <p role="status">Loading headquarters accounts...</p> : !workspace?.accounts?.length ? (
-          <p className="hq-account-empty">No headquarters accounts found.</p>
-        ) : (
-          <div className="hq-account-list">
-            {workspace.accounts.map((account) => (
-              <div className="hq-account-row" key={account.account_id}>
-                <div className="hq-account-person">
-                  <strong>{account.name || account.account_id}</strong>
-                  <span>{account.account_type_label}</span>
-                </div>
-                <code>{account.account_id}</code>
-                <span className={`hq-account-status ${account.is_active ? 'is-active' : ''}`}>{account.is_active ? 'Active' : 'Inactive'}</span>
-                {account.account_type === 'barangay_captain' && <button className="button secondary" type="button" onClick={() => chooseType('barangay_captain')}>Manage</button>}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
-  )
-}
-
-function Field({ label, children }) {
-  return <label><span className="ra-mini-label">{label}</span>{children}</label>
+  const field = (key, label, type = 'text', span = 's3') => <label className={`fl ${span}`}><span>{label}</span><input type={type} required={key === 'first_name' || key === 'last_name'} maxLength={key === 'email' ? 255 : key === 'contact_number' ? 50 : 100} value={form[key]} onChange={e => setForm(current => ({ ...current, [key]: e.target.value }))} /></label>
+  if (!editor) return <>{error && <div className="tm-feedback" role="alert">{error}</div>}{isLoading ? <div className="cd emp" role="status">Loading headquarters accounts…</div> : <div className="acc">{selected ? <AccountProfile key={selected.account_id} form={{ ...selected, full_name: selected.name, title: selected.account_type_label }} role={selected.account_type === 'barangay_captain' ? 'Captain' : 'HQ Personnel'} onEdit={selected.account_type === 'barangay_captain' ? onManageCaptain : undefined} /> : <div className="cd emp">No headquarters accounts found</div>}<aside className="cd tm-account-list"><div className="ch">Headquarters<em className="mu">{workspace?.accounts?.length || 0}</em></div><div className="cb">{(workspace?.accounts || []).map(account => <button className={`nr${selected?.account_id === account.account_id ? ' on' : ''}`} key={account.account_id} aria-pressed={selected?.account_id === account.account_id} onClick={() => setSelectedId(account.account_id)}><span>{account.name}</span><em>{account.account_type === 'barangay_captain' ? 'Captain' : 'HQ Personnel'}</em></button>)}</div></aside></div>}</>
+  return <div className="cd tm-account-editor"><header className="mh2"><h3>{initialType === 'barangay_captain' && captain ? 'Edit captain account' : 'New account'}</h3></header>{error && <div className="tm-feedback" role="alert">{error}</div>}{notice && <div className="tm-feedback" role="status">{notice}</div>}<form id="hqAccountForm" className="fm" onSubmit={submit}><aside className="rail">{['personal', 'access'].map((id, index) => <button type="button" className={section === id ? 'on' : ''} key={id} onClick={() => { setSection(id); document.getElementById(`hq-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }}><i>{index + 1}</i>{id === 'personal' ? 'Personal' : 'Access'}</button>)}</aside><div className="fbody">{roleSelector}{isLoading ? <div className="emp" role="status">Loading account details…</div> : <><section className="sec" id="hq-personal"><div className="st">Personal</div><div className="fg">{field('first_name', 'First name')}{field('last_name', 'Last name')}{field('contact_number', 'Mobile', 'tel')}{field('email', 'Email', 'email')}</div></section><section className="sec" id="hq-access"><div className="st">Account access</div><div className="fg"><label className="fl s3"><span>Account ID</span><input disabled value={(initialType === 'barangay_captain' ? workspace?.captain_account_id : workspace?.next_account_id) || ''} /></label><label className="fl s3"><span>{initialType === 'barangay_captain' && captain ? 'New password (optional)' : 'Temporary password'}</span><div className="tm-password"><input type="password" autoComplete="new-password" minLength={8} maxLength={100} required={!(initialType === 'barangay_captain' && captain)} value={form.password} onChange={e => setForm(current => ({ ...current, password: e.target.value }))} /><button className="bt sm" type="button" onClick={() => setForm(current => ({ ...current, password: `Tmp-${Array.from(crypto.getRandomValues(new Uint8Array(8)), n => n.toString(16).padStart(2, '0')).join('')}` }))}>Generate</button></div></label></div>{initialType === 'barangay_captain' && <p className="mu">One Barangay Captain account only. Saving updates the reserved captain account.</p>}</section></>}</div></form><footer className="mf"><button className="bt" type="button" onClick={onClose} disabled={isSaving}>Cancel</button><button className="bt" type="button" onClick={reset} disabled={isLoading || isSaving}>Reset changes</button><button className="bt p nx" type="submit" form="hqAccountForm" disabled={isLoading || isSaving || !workspace}>{isSaving ? 'Saving…' : initialType === 'barangay_captain' && captain ? 'Save changes' : 'Create account'}</button></footer></div>
 }

@@ -26,6 +26,8 @@ class UserResource extends JsonResource
             'assigned_center_id' => $this->assigned_center_id,
             'household_id' => $this->household_id,
             'is_active' => (bool) $this->is_active,
+            'is_hqcc_leader' => $this->resource->isHqccLeader(),
+            'permissions' => ['can_manage_personnel' => $this->resource->canManagePersonnel()],
             'role' => [
                 'role_id' => $loadedRole?->role_id ?? $roleKey,
                 'role_key' => $roleKey,

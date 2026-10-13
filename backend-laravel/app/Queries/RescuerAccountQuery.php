@@ -18,6 +18,11 @@ class RescuerAccountQuery
         $team = $filters['team'];
         $dutyStatus = $filters['duty_status'];
         $purok = $filters['purok'];
+        if (($filters['account_type'] ?? 'all') === 'rescuer') {
+            $query->where('r.username', 'not like', 'BDRRM-HQCC-%');
+        } elseif (($filters['account_type'] ?? 'all') === 'command_center') {
+            $query->where('r.username', 'like', 'BDRRM-HQCC-%')->where('r.username', '<>', 'BDRRM-HQCC-001');
+        }
         if ($search !== '') {
             $query->where(function ($inner) use ($search): void {
                 $inner->where('r.full_name', 'like', "%{$search}%")->orWhere('r.responder_code', 'like', "%{$search}%")
@@ -156,6 +161,7 @@ class RescuerAccountQuery
             ->get([
                 'r.responder_id',
                 'r.full_name',
+                'r.username',
                 'r.title',
                 'r.team_id',
                 'r.duty_status',
@@ -167,6 +173,7 @@ class RescuerAccountQuery
                 'responder_id' => (int) $responder->responder_id,
                 'full_name' => $responder->full_name ?: 'Unnamed rescuer',
                 'title' => $responder->title ?: 'Responder',
+                'account_type' => str_starts_with(strtoupper((string) $responder->username), 'BDRRM-HQCC-') ? 'command_center' : 'rescuer',
                 'team_id' => $responder->team_id ? (int) $responder->team_id : null,
                 'team_name' => $responder->team_name ?: 'Unassigned',
                 'team_code' => $responder->team_code,
@@ -206,6 +213,7 @@ class RescuerAccountQuery
             ->pluck('team_type');
 
         return $databaseTypes
+            ->push('HQCC')
             ->unique()
             ->sort()
             ->values()

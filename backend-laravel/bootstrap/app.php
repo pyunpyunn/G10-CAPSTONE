@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            'personnel.access' => \App\Http\Middleware\EnsurePersonnelAccess::class,
             'realtime.atomic' => \App\Http\Middleware\AtomicRealtimeWrite::class,
         ]);
     })

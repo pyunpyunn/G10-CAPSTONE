@@ -29,8 +29,32 @@ class RescuerTeamWorkflow
         }
 
         $this->ensureUniqueTeam($validated['team_name'], $validated['team_code'], $teamId);
+        $this->ensureMembershipMatchesType($validated);
 
         return $validated;
+    }
+
+    private function ensureMembershipMatchesType(array $validated): void
+    {
+        $ids = $this->normalizedResponderIds([
+            ...($validated['member_ids'] ?? []),
+            ...(! empty($validated['leader_responder_id']) ? [$validated['leader_responder_id']] : []),
+        ]);
+        if (! $ids) return;
+        $isHq = $validated['team_code'] === 'HQCC'
+            || in_array(strtoupper($validated['team_type']), ['HQ', 'HQCC', 'HEADQUARTERS'], true);
+        $invalid = DB::table('responders')->whereIn('responder_id', $ids)->get(['username', 'full_name', 'deleted_at'])
+            ->filter(function ($member) use ($isHq): bool {
+                $code = strtoupper((string) $member->username);
+                $hqMember = str_starts_with($code, 'BDRRM-HQCC-') && $code !== 'BDRRM-HQCC-001';
+
+                return $member->deleted_at !== null || $code === 'BDRRM-HQCC-001' || $hqMember !== $isHq;
+            });
+        if ($invalid->isNotEmpty()) {
+            throw ValidationException::withMessages(['member_ids' => [
+                $isHq ? 'HQCC teams can contain only HQ personnel.' : 'HQ personnel must be assigned to an HQCC team.',
+            ]]);
+        }
     }
 
     public function ensureUniqueTeam(string $teamName, string $teamCode, ?int $teamId): void
