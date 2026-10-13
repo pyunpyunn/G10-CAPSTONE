@@ -230,10 +230,12 @@ export function HouseholdTrustedScreen({
                   {trustedStatus ? `${trustedStatus.status_label} · ${trustedStatus.last_saved_label}` : 'No status saved yet'}
                 </Text>
               </View>
-              <HouseholdBadge
-                label={trustedStatus ? trustedStatus.status_label : 'Unchecked'}
-                tone={trustedStatus?.status_key || 'neutral'}
-              />
+              <View style={styles.trustedStatusBadge}>
+                <HouseholdBadge
+                  label={trustedStatus ? trustedStatus.status_label : 'Unchecked'}
+                  tone={trustedStatus?.status_key || 'neutral'}
+                />
+              </View>
             </View>
           ) : null}
           {members.length === 0 ? (
@@ -303,7 +305,6 @@ export function HouseholdTrustedScreen({
         <TrustedHouseholdList
           overview={overview}
           trusted={overview.trusted?.households || []}
-          activeEvent={activeEvent}
           onAddTrusted={onAddTrusted}
           onOpenTrusted={onOpenTrusted}
           onDeleteTrusted={onDeleteTrusted}
@@ -382,14 +383,12 @@ function IncomingTrustedRequestList({
 function TrustedHouseholdList({
   overview,
   trusted,
-  activeEvent,
   onAddTrusted,
   onOpenTrusted,
   onDeleteTrusted,
 }: {
   overview: any;
   trusted: any[];
-  activeEvent: any;
   onAddTrusted: () => void;
   onOpenTrusted: (household: any) => void;
   onDeleteTrusted: (household: any) => void;
@@ -459,20 +458,50 @@ function TrustedHouseholdList({
               <Text style={styles.rowMeta}>
                 {householdItem.household_id} · {householdItem.reason || 'Trusted household request'}
               </Text>
-              {activeEvent && householdItem.current_status ? (
-                <Text style={styles.trustedStatusText}>
-                  {householdItem.current_status.status_label} · {householdItem.current_status.last_saved_label}
-                </Text>
-              ) : null}
             </View>
-            <View style={styles.trustedStatusBadge}>
-              <HouseholdBadge label={labelize(householdItem.validation_status)} tone={householdItem.validation_status} />
-            </View>
+            {isAccepted ? (
+              <View style={styles.trustedStatusSlot}>
+                <HouseholdBadge
+                  label={householdItem.current_status?.status_label || 'Unchecked'}
+                  tone={householdItem.current_status?.status_key || 'neutral'}
+                />
+                <MemberStatusDots members={householdItem.members || []} />
+              </View>
+            ) : null}
           </Pressable>
         );
       })}
       {addButton}
     </>
+  );
+}
+
+function MemberStatusDots({ members }: { members: any[] }) {
+  if (members.length === 0) {
+    return null;
+  }
+
+  const memberStatusLabels = members.map((member: any) =>
+    `${member.name || 'Household member'}: ${member.current_status?.status_label || 'Unchecked'}`
+  );
+
+  return (
+    <View
+      style={styles.memberStatusDots}
+      accessible
+      accessibilityLabel={`Trusted household member statuses: ${memberStatusLabels.join(', ')}`}
+    >
+      {members.map((member: any, index: number) => {
+        const status = member.current_status?.status_key || 'neutral';
+
+        return (
+          <View
+            key={member.member_id || index}
+            style={[styles.memberStatusDot, { backgroundColor: statusColor(status) }]}
+          />
+        );
+      })}
+    </View>
   );
 }
 
@@ -703,11 +732,6 @@ function parseSpecialNeeds(value?: string) {
     .slice(0, 3);
 }
 
-function labelize(value?: string) {
-  if (!value) return 'Pending';
-  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
 function formatDate(value?: string) {
   return formatPhilippineDateTime(value, 'Date not recorded');
 }
@@ -788,6 +812,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
     backgroundColor: palette.secondary,
+  },
+  trustedStatusBadge: {
+    alignSelf: 'center',
   },
   lastSavedLabel: {
     color: palette.textSoft,
@@ -1109,13 +1136,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  trustedStatusText: {
-    marginTop: 5,
-    color: palette.navActive,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  trustedStatusBadge: {
+  trustedStatusSlot: {
     alignSelf: 'center',
+    alignItems: 'flex-end',
+    gap: 5,
+  },
+  memberStatusDots: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 3,
+    maxWidth: 112,
+  },
+  memberStatusDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 4,
   },
 });

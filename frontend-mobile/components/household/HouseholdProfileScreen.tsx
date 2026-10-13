@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
@@ -23,6 +23,7 @@ export function HouseholdProfileScreen({
   const geotag = overview.geotag || null;
   const selectedMemberId = String(user.member_id || members[0]?.member_id || '');
   const [savingGeotag, setSavingGeotag] = useState(false);
+  const [expandedMemberProfile, setExpandedMemberProfile] = useState<string | null>(null);
 
   const selectedMember = useMemo(() => {
     return members.find((member: any) => String(member.member_id) === String(selectedMemberId)) || members[0] || null;
@@ -107,15 +108,33 @@ export function HouseholdProfileScreen({
           <View style={styles.memberProfilePanel}>
             <Text style={styles.panelLabel}>Member profile</Text>
             {householdMembers.map((member: any) => {
+              const memberKey = memberProfileKey(member);
+              const isExpanded = expandedMemberProfile === memberKey;
+              const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'Household member';
+
               return (
-                <View key={member.member_id || member.name || member.full_name || `${member.first_name || 'member'}-${member.last_name || ''}`} style={styles.memberRow}>
-                  <View style={styles.memberAvatar}>
-                    <Text style={styles.memberAvatarText}>{initials(member.name || `${member.first_name || ''} ${member.last_name || ''}` || 'H')}</Text>
-                  </View>
-                  <View style={styles.panelText}>
-                    <Text style={styles.panelTitle}>{member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'Household member'}</Text>
-                    <Text style={styles.panelMeta}>{memberIdentifier(member)}</Text>
-                  </View>
+                <View key={memberKey} style={styles.memberEntry}>
+                  <Pressable
+                    style={styles.memberRow}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isExpanded ? 'Collapse' : 'Expand'} ${memberName} profile`}
+                    accessibilityState={{ expanded: isExpanded }}
+                    onPress={() => setExpandedMemberProfile((current) => current === memberKey ? null : memberKey)}
+                  >
+                    <View style={styles.memberAvatar}>
+                      <Text style={styles.memberAvatarText}>{initials(memberName)}</Text>
+                    </View>
+                    <View style={styles.panelText}>
+                      <Text style={styles.panelTitle}>{memberName}</Text>
+                      <Text style={styles.panelMeta}>{memberIdentifier(member)}</Text>
+                    </View>
+                  </Pressable>
+                  {isExpanded ? (
+                    <View style={styles.memberDataSection}>
+                      <Text style={styles.memberDataLabel}>Data</Text>
+                      <View style={styles.memberDataBlank} />
+                    </View>
+                  ) : null}
                 </View>
               );
             })}
@@ -193,6 +212,10 @@ function memberIdentifier(member: any) {
   const memberId = member?.member_id || 'No member ID';
 
   return `${title}: ${memberId}`;
+}
+
+function memberProfileKey(member: any) {
+  return String(member.member_id || member.name || member.full_name || `${member.first_name || 'member'}-${member.last_name || ''}`);
 }
 
 function coordinatesLabel(geotag: any) {
@@ -285,7 +308,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     borderRadius: radius.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  memberEntry: {
+    gap: spacing.xs,
+  },
+  memberDataSection: {
+    gap: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  memberDataLabel: {
+    color: palette.textSoft,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  memberDataBlank: {
+    minHeight: 72,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.sm,
+    backgroundColor: '#fff',
   },
   memberAvatar: {
     width: 36,
