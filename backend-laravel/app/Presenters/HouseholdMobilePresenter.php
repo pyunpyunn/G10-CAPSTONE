@@ -7,12 +7,13 @@ use Illuminate\Support\Str;
 
 class HouseholdMobilePresenter
 {
-    public function statusNotesJson(string $mobileStatusKey, ?string $userNotes): string
+    public function statusNotesJson(string $mobileStatusKey, ?string $userNotes, ?string $selectedLabel = null, ?string $basis = null): string
     {
         return json_encode([
             'report_type' => 'household_status',
             'mobile_status_key' => $mobileStatusKey,
-            'mobile_status_label' => $this->mobileStatusLabel($mobileStatusKey, null),
+            'mobile_status_label' => $selectedLabel ?? $this->mobileStatusLabel($mobileStatusKey, null),
+            'safety_basis' => $basis,
             'user_notes' => $userNotes,
         ], JSON_UNESCAPED_SLASHES);
     }
@@ -89,7 +90,7 @@ class HouseholdMobilePresenter
             'evacuated' => 'Evacuated',
             'unsafe' => 'Unsafe',
             'needs_help' => 'Needs help',
-            default => $statusLabel ?: 'Unchecked',
+            default => $statusLabel ?: ($statusKey ? ucwords(str_replace('_', ' ', $statusKey)) : 'Unchecked'),
         };
     }
 
@@ -97,7 +98,7 @@ class HouseholdMobilePresenter
     {
         $mobileStatusKey = $notes['mobile_status_key'] ?? null;
 
-        if (in_array($mobileStatusKey, ['safe', 'evacuated', 'unsafe', 'needs_help'], true)) {
+        if (is_string($mobileStatusKey) && $mobileStatusKey !== '') {
             return $mobileStatusKey;
         }
 

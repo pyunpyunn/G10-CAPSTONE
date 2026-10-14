@@ -12,6 +12,150 @@ use Tests\TestCase;
 
 class HouseholdMobileStatusWorkflowTest extends TestCase
 {
+    public function test_mobile_options_match_the_broadcast_order_labels_and_safety_basis(): void
+    {
+        $this->configureBroadcastStatuses();
+        $options = app(\App\Queries\HouseholdMobileReadQuery::class)->statusOptions('HH-1', 'EVT-1');
+        $this->assertSame(['all_clear', 'needs_help', 'unsafe', 'safe'], array_column($options, 'key'));
+        $this->assertSame(['All Clear', 'Need assistance', 'Unsafe', 'Safe'], array_column($options, 'label'));
+        $this->assertSame(['safe', 'unsafe', 'unsafe', 'safe'], array_column($options, 'safety_basis'));
+    }
+
+    public function test_legacy_double_encoded_broadcast_statuses_are_read_correctly(): void
+    {
+        $this->configureBroadcastStatuses();
+        DB::table('disaster_broadcasts')->update([
+            'allowed_statuses_json' => json_encode(json_encode(['all_clear', 'needs_help', 'unsafe', 'safe'])),
+        ]);
+        $options = app(\App\Queries\HouseholdMobileReadQuery::class)->statusOptions('HH-1', 'EVT-1');
+        $this->assertSame(['all_clear', 'needs_help', 'unsafe', 'safe'], array_column($options, 'key'));
+    }
+
+    public function test_custom_safe_status_is_recorded_as_safe_and_keeps_its_selected_name(): void
+    {
+        $this->configureBroadcastStatuses();
+        app(HouseholdMobileStatusWorkflow::class)->storeStatus($this->householdRequest(['status_key' => 'all_clear']));
+        $this->assertDatabaseHas('household_status_logs', ['status_id' => 1]);
+        $this->assertDatabaseHas('household_disasters', ['current_status_id' => 1, 'needs_dispatch' => 0]);
+        $notes = json_decode(DB::table('household_disasters')->value('last_status_notes'), true);
+        $this->assertSame('all_clear', $notes['mobile_status_key']);
+        $this->assertSame('All Clear', $notes['mobile_status_label']);
+        $this->assertSame('safe', $notes['safety_basis']);
+    }
+
+    public function test_selected_purok_options_only_replace_the_broadcast_for_targeted_households(): void
+    {
+        $this->configureBroadcastStatuses();
+        Schema::create('addresses', function (Blueprint $table): void {
+            $table->integer('address_id')->primary();
+            $table->string('purok_sitio');
+        });
+        Schema::create('households', function (Blueprint $table): void {
+            $table->string('household_id')->primary();
+            $table->integer('address_id');
+        });
+        DB::table('addresses')->insert([['address_id' => 1, 'purok_sitio' => 'A'], ['address_id' => 2, 'purok_sitio' => 'B']]);
+        DB::table('households')->insert([['household_id' => 'HH-1', 'address_id' => 1], ['household_id' => 'HH-2', 'address_id' => 2]]);
+        DB::table('disaster_broadcasts')->insert([
+            'broadcast_id' => 2, 'disaster_id' => 'EVT-1', 'scope_type' => 'selected_puroks',
+            'direct_impact_puroks_json' => json_encode([['name' => 'B']]),
+            'allowed_statuses_json' => json_encode(['safe', 'unsafe', 'needs_help', 'all_clear']),
+        ]);
+        $query = app(\App\Queries\HouseholdMobileReadQuery::class);
+        $this->assertSame(['all_clear', 'needs_help', 'unsafe', 'safe'], array_column($query->statusOptions('HH-1', 'EVT-1'), 'key'));
+        $this->assertSame(['safe', 'unsafe', 'needs_help', 'all_clear'], array_column($query->statusOptions('HH-2', 'EVT-1'), 'key'));
+    }
+
+    public function test_recent_alerts_include_only_broadcasts_targeted_to_the_household(): void
+    {
+        Schema::create('addresses', function (Blueprint $table): void {
+            $table->integer('address_id')->primary();
+            $table->string('purok_sitio');
+        });
+        Schema::create('households', function (Blueprint $table): void {
+            $table->string('household_id')->primary();
+            $table->integer('address_id');
+        });
+        Schema::create('disaster_broadcasts', function (Blueprint $table): void {
+            $table->integer('broadcast_id')->primary();
+            $table->string('disaster_id');
+            $table->string('broadcast_title');
+            $table->text('message');
+            $table->string('scope_type');
+            $table->timestamp('sent_at')->nullable();
+            $table->timestamp('created_at')->nullable();
+            $table->json('direct_impact_puroks_json')->nullable();
+            $table->text('allowed_statuses')->nullable();
+        });
+        DB::table('addresses')->insert([
+            ['address_id' => 1, 'purok_sitio' => 'Sitio A'],
+            ['address_id' => 2, 'purok_sitio' => 'Sitio B'],
+        ]);
+        DB::table('households')->insert([
+            ['household_id' => 'HH-1', 'address_id' => 1],
+            ['household_id' => 'HH-2', 'address_id' => 2],
+        ]);
+        DB::table('disaster_broadcasts')->insert([
+            ['broadcast_id' => 1, 'disaster_id' => 'EVT-1', 'broadcast_title' => 'Barangay Alert', 'message' => 'All areas', 'scope_type' => 'barangay_wide', 'direct_impact_puroks_json' => null, 'allowed_statuses' => null, 'sent_at' => now()->subMinutes(2), 'created_at' => now()->subMinutes(2)],
+            ['broadcast_id' => 2, 'disaster_id' => 'EVT-1', 'broadcast_title' => 'Sitio A Alert', 'message' => 'A only', 'scope_type' => 'selected_puroks', 'direct_impact_puroks_json' => json_encode([['name' => 'Sitio A']]), 'allowed_statuses' => null, 'sent_at' => now()->subMinute(), 'created_at' => now()->subMinute()],
+            ['broadcast_id' => 3, 'disaster_id' => 'EVT-1', 'broadcast_title' => 'Sitio B Alert', 'message' => 'B only', 'scope_type' => 'selected_puroks', 'direct_impact_puroks_json' => json_encode([['name' => 'Sitio B']]), 'allowed_statuses' => null, 'sent_at' => now(), 'created_at' => now()],
+        ]);
+
+        $query = app(\App\Queries\HouseholdMobileReadQuery::class);
+
+        $this->assertSame(['Sitio A Alert', 'Barangay Alert'], array_column($query->recentAlerts('EVT-1', 'HH-1'), 'title'));
+        $this->assertSame(['Sitio B Alert', 'Barangay Alert'], array_column($query->recentAlerts('EVT-1', 'HH-2'), 'title'));
+    }
+
+    public function test_help_status_classification_controls_the_recorded_status(): void
+    {
+        $this->configureBroadcastStatuses();
+        $workflow = app(HouseholdMobileStatusWorkflow::class);
+        $workflow->storeStatus($this->householdRequest(['status_key' => 'needs_help']));
+        $this->assertDatabaseHas('household_disasters', ['current_status_id' => 3, 'needs_dispatch' => 1]);
+        $snapshot = json_decode(DB::table('disaster_broadcasts')->value('status_options_json'), true);
+        $snapshot[1]['safety_basis'] = 'safe';
+        DB::table('disaster_broadcasts')->update(['status_options_json' => json_encode($snapshot)]);
+        $workflow->storeStatus($this->householdRequest(['status_key' => 'needs_help']));
+        $this->assertDatabaseHas('household_disasters', ['current_status_id' => 1, 'needs_dispatch' => 0]);
+    }
+
+    private function configureBroadcastStatuses(): void
+    {
+        Schema::create('responder_assignments', function (Blueprint $table): void {
+            $table->integer('assignment_id')->primary();
+            $table->string('disaster_id');
+            $table->string('household_id');
+            $table->string('status');
+        });
+        Schema::table('household_statuses', fn (Blueprint $table) => $table->string('safety_basis')->nullable());
+        DB::table('household_statuses')->where('status_key', 'safe')->update(['safety_basis' => 'safe']);
+        DB::table('household_statuses')->where('status_key', 'needs_help')->update(['safety_basis' => 'unsafe']);
+        DB::table('household_statuses')->insert([
+            ['status_id' => 3, 'status_key' => 'unsafe', 'status_label' => 'Unsafe', 'safety_basis' => 'unsafe'],
+            ['status_id' => 4, 'status_key' => 'all_clear', 'status_label' => 'All Clear', 'safety_basis' => 'safe'],
+        ]);
+        Schema::create('disaster_broadcasts', function (Blueprint $table): void {
+            $table->integer('broadcast_id')->primary();
+            $table->string('disaster_id');
+            $table->string('scope_type');
+            $table->text('allowed_statuses')->nullable();
+            $table->text('allowed_statuses_json')->nullable();
+            $table->text('direct_impact_puroks_json')->nullable();
+            $table->text('status_options_json')->nullable();
+        });
+        DB::table('disaster_broadcasts')->insert([
+            'broadcast_id' => 1, 'disaster_id' => 'EVT-1', 'scope_type' => 'barangay_wide',
+            'allowed_statuses_json' => json_encode(['all_clear', 'needs_help', 'unsafe', 'safe']),
+            'status_options_json' => json_encode([
+                ['key' => 'all_clear', 'label' => 'All Clear', 'safety_basis' => 'safe'],
+                ['key' => 'needs_help', 'label' => 'Need assistance', 'safety_basis' => 'unsafe'],
+                ['key' => 'unsafe', 'label' => 'Unsafe', 'safety_basis' => 'unsafe'],
+                ['key' => 'safe', 'label' => 'Safe', 'safety_basis' => 'safe'],
+            ]),
+        ]);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

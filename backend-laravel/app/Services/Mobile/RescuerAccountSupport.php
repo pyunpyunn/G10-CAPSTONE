@@ -3,7 +3,6 @@
 namespace App\Services\Mobile;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -14,8 +13,6 @@ class RescuerAccountSupport
     private const ACCOUNT_PREFIX = 'BDRRM';
     private const ACCOUNT_START_SEQUENCE = 0;
     private const ACCOUNT_SEQUENCE_LENGTH = 3;
-    private const TEAM_CATALOG = [ ['team_name' => 'Search & Rescue', 'team_type' => 'SAR', 'team_code' => 'SAR'], ['team_name' => 'Evacuation', 'team_type' => 'Evacuation', 'team_code' => 'EVC'], ['team_name' => 'Medical / First Aid', 'team_type' => 'Medical', 'team_code' => 'MED'], ['team_name' => 'Relief & Transport', 'team_type' => 'Relief / Transport', 'team_code' => 'LOG'], ['team_name' => 'Communication', 'team_type' => 'Communication', 'team_code' => 'COM'], ['team_name' => 'Fire Brigade', 'team_type' => 'Fire Brigade', 'team_code' => 'FIR'], ['team_name' => 'DANA', 'team_type' => 'Damage Assessment', 'team_code' => 'DANA'], ['team_name' => 'Security', 'team_type' => 'Security', 'team_code' => 'SEC'], ];
-
     public function validatePayload(Request $request, bool $isUpdate = false): array
     {
         $validated = app(\App\Http\Requests\RescuerAccountPayloadValidator::class)->validate($request, $isUpdate);
@@ -65,10 +62,27 @@ class RescuerAccountSupport
         }
     }
 
+    public function ensureAccountTeamType(string $accountId, array $validated): void
+    {
+        $team = ! empty($validated['team_id'])
+            ? DB::table('rescue_teams')->where('team_id', $validated['team_id'])->first()
+            : DB::table('rescue_teams')->where('team_name', $validated['team_name'] ?? '')->first();
+        if (! $team) {
+            if (empty($validated['team_name'])) return;
+            throw ValidationException::withMessages(['team_name' => ['Select a team that exists in team management.']]);
+        }
+        $hqTeam = strtoupper($team->team_code) === 'HQCC'
+            || in_array(strtoupper($team->team_type), ['HQ', 'HQCC', 'HEADQUARTERS'], true);
+        $hqAccount = str_starts_with(strtoupper($accountId), 'BDRRM-HQCC-');
+        if ($hqAccount !== $hqTeam) {
+            throw ValidationException::withMessages(['team_name' => ['HQ personnel belong to HQCC teams; rescuers belong to rescue teams.']]);
+        }
+    }
+
     public function roleIdForAccount(string $teamCode): int
     {
         if ($teamCode === 'HQCC') {
-            return $this->adminRoleId();
+            return app(\App\Services\Web\HeadquartersTeamSupport::class)->personnelRoleId();
         }
 
         return $this->rescuerRoleId();
@@ -104,7 +118,7 @@ class RescuerAccountSupport
         return (int) $roleId;
     }
 
-    public function teamIdFromPayload(array $validated, Carbon $now): ?int
+    public function teamIdFromPayload(array $validated): ?int
     {
         if (! empty($validated['team_id'])) {
             return (int) $validated['team_id'];
@@ -120,25 +134,11 @@ class RescuerAccountSupport
             ->where('team_name', $teamName)
             ->value('team_id');
 
-        if ($existingTeamId) {
-            return (int) $existingTeamId;
+        if (! $existingTeamId) {
+            throw ValidationException::withMessages(['team_name' => ['Select a team that exists in team management.']]);
         }
 
-        $teamId = $this->nextId('rescue_teams', 'team_id');
-        $catalog = collect(self::TEAM_CATALOG)->firstWhere('team_name', $teamName);
-        $teamCode = $this->teamCodeFromPayload($validated);
-
-        DB::table('rescue_teams')->insert([
-            'team_id' => $teamId,
-            'team_code' => $teamCode,
-            'team_name' => $teamName,
-            'team_type' => $validated['team_type'] ?? $catalog['team_type'] ?? $teamName,
-            'duty_status' => 'available',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-
-        return $teamId;
+        return (int) $existingTeamId;
     }
 
     public function fullNameFromPayload(array $validated): string
@@ -254,24 +254,18 @@ class RescuerAccountSupport
 
     public function teamCodeFromPayload(array $validated): string
     {
-        if (! empty($validated['team_code'])) {
-            return $this->normalizeTeamCode($validated['team_code']);
-        }
-
-        if (! empty($validated['team_id'])) {
-            $teamCode = DB::table('rescue_teams')
-                ->where('team_id', $validated['team_id'])
-                ->value('team_code');
-
-            if ($teamCode) {
-                return $this->normalizeTeamCode($teamCode);
-            }
-        }
-
         $teamName = trim((string) ($validated['team_name'] ?? ''));
-        $catalog = collect(self::TEAM_CATALOG)->firstWhere('team_name', $teamName);
+        $team = DB::table('rescue_teams')
+            ->when(! empty($validated['team_id']), fn ($query) => $query->where('team_id', $validated['team_id']))
+            ->when(empty($validated['team_id']) && $teamName !== '', fn ($query) => $query->where('team_name', $teamName))
+            ->first(['team_code']);
 
-        return $this->normalizeTeamCode($catalog['team_code'] ?? $this->teamCode($teamName));
+        if ($team) return $this->normalizeTeamCode($team->team_code);
+        if ($teamName !== '') {
+            throw ValidationException::withMessages(['team_name' => ['Select a team that exists in team management.']]);
+        }
+
+        return $this->normalizeTeamCode('SAR');
     }
 
     public function normalizeTeamCode(string $teamCode): string

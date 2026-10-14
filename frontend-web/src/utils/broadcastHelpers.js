@@ -19,7 +19,7 @@ export function defaultForm(workspace = {}) {
     severity_id: preferredSeverityId(severityLevels),
     started_date: date,
     started_time: time,
-    estimated_duration: durationOptions[durationOptions.length - 1].value,
+    estimated_duration: '12 hours',
     scope_type: 'barangay_wide',
     broadcast_title: '',
     message: '',

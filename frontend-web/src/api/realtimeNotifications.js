@@ -5,7 +5,7 @@ import api from './client'
 let realtimeConnected = false
 export function isRealtimeConnected() { return realtimeConnected }
 
-export function connectRealtimeNotifications(userId, topics = []) {
+export function connectRealtimeNotifications(userId, topics = [], { adminAccess = true, notificationsAccess = true } = {}) {
   let fallbackTimer
   let fallbackDelay = 5000
   let disposed = false
@@ -46,7 +46,11 @@ export function connectRealtimeNotifications(userId, topics = []) {
   })
   const connection = echo.connector.pusher.connection
   const subscribed = new Set()
-  const channelNames = ['notifications.admin', `users.${userId}`, ...topics.map((topic) => `operations.${topic}`)]
+  const channelNames = [
+    `users.${userId}`,
+    ...(notificationsAccess ? ['notifications.admin'] : []),
+    ...(adminAccess ? topics.map((topic) => `operations.${topic}`) : []),
+  ]
   const updateConnection = () => {
     if (connection.state !== 'connected') subscribed.clear()
     realtimeConnected = connection.state === 'connected' && subscribed.size === channelNames.length
@@ -69,6 +73,9 @@ export function connectRealtimeNotifications(userId, topics = []) {
       window.dispatchEvent(new Event('notifications:changed'))
       // Compatibility with the synchronous mode during rolling deployments.
       if (!event.batch_id) operationsRefresh()
+    })
+    if (name === `users.${userId}`) channel.listen('.personnel-access.changed', () => {
+      window.dispatchEvent(new Event('personnel-access:changed'))
     })
     channel.subscribed(() => {
       subscribed.add(name)

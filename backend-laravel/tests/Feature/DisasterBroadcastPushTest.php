@@ -11,6 +11,47 @@ use Tests\TestCase;
 
 class DisasterBroadcastPushTest extends TestCase
 {
+    public function test_missing_android_setup_returns_a_clear_provider_error(): void
+    {
+        Http::fake(['*' => Http::response([
+            'id' => '', 'warnings' => ['You must configure Android notifications in your OneSignal settings if you wish to send messages to Android users.'],
+        ], 200)]);
+        $result = app(OneSignalNotificationService::class)->sendToMobileDevices('Flood', 'Evacuate');
+        $this->assertSame('failed', $result['status']);
+        $this->assertStringContainsString('Firebase Cloud Messaging', $result['errors'][0]);
+    }
+
+    public function test_provider_message_ids_and_errors_are_persisted_for_the_broadcast_log(): void
+    {
+        Schema::create('disaster_broadcasts', function (Blueprint $table): void {
+            $table->integer('broadcast_id')->primary();
+            $table->string('push_status')->nullable();
+            $table->string('channel')->nullable();
+            $table->unsignedInteger('push_accepted_count')->nullable();
+            $table->text('push_provider_ids_json')->nullable();
+            $table->text('push_errors_json')->nullable();
+            $table->timestamps();
+        });
+        DB::table('disaster_broadcasts')->insert(['broadcast_id' => 42]);
+        $workflow = app(\App\Services\Web\DisasterBroadcastWorkflow::class);
+        $workflow->updateBroadcastPushStatus(42, [
+            'status' => 'partial', 'recipient_count' => 2, 'sent_count' => 1,
+            'provider_ids' => ['provider-1'], 'errors' => ['One subscription is invalid.'],
+        ]);
+        $this->assertDatabaseHas('disaster_broadcasts', [
+            'broadcast_id' => 42, 'channel' => 'onesignal', 'push_status' => 'onesignal_partial',
+            'push_accepted_count' => 1, 'push_errors_json' => '["One subscription is invalid."]',
+        ]);
+        $workflow->updateBroadcastPushStatus(42, [
+            'status' => 'sent', 'recipient_count' => 2, 'sent_count' => 2,
+            'provider_ids' => ['provider-1', 'provider-2'], 'errors' => [],
+        ]);
+        $this->assertDatabaseHas('disaster_broadcasts', [
+            'broadcast_id' => 42, 'push_status' => 'onesignal_sent',
+            'push_provider_ids_json' => '["provider-1","provider-2"]', 'push_errors_json' => '[]',
+        ]);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -64,6 +105,19 @@ class DisasterBroadcastPushTest extends TestCase
         $this->assertSame(1, $result['sent_count']);
     }
 
+    public function test_rejected_subscriptions_are_retired_without_disabling_other_devices(): void
+    {
+        Http::fake(['*' => Http::response(['id' => '', 'errors' => ['invalid_player_ids' => ['subscription-0', 'not-targeted']]], 200)]);
+        $service = app(OneSignalNotificationService::class);
+        $result = $service->sendToMobileDevices('Flood', 'Evacuate', ['roles' => ['household']]);
+        $this->assertSame('failed', $result['status']);
+        $this->assertSame(0, $result['sent_count']);
+        $this->assertStringContainsString('outdated device subscriptions', $result['errors'][0]);
+        $this->assertSame(0, (int) DB::table('device_tokens')->where('player_id', 'subscription-0')->value('is_active'));
+        $this->assertSame(1, (int) DB::table('device_tokens')->where('player_id', 'subscription-1')->value('is_active'));
+        $this->assertSame([], $service->prepareDelivery(['roles' => ['household']])['recipient_ids']);
+    }
+
     public function test_missing_credentials_skip_provider(): void
     {
         config(['services.onesignal.api_key' => '']);
@@ -88,6 +142,8 @@ class DisasterBroadcastPushTest extends TestCase
             && $request['data']['type'] === 'disaster_broadcast'
             && $request['data']['event_id'] === 'EVT-TEST'
             && $request['data']['broadcast_id'] === '42');
+        Http::assertSent(fn ($request) => array_column($request['data']['status_options'], 'key') === ['safe', 'unsafe']
+            && array_column($request['data']['status_options'], 'safety_basis') === ['safe', 'unsafe']);
     }
 
     public function test_permanent_http_errors_are_not_retried_inline(): void

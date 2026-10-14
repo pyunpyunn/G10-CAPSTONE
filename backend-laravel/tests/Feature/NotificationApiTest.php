@@ -155,9 +155,12 @@ class NotificationApiTest extends TestCase
             });
         }
 
-        $role = \DB::table('roles')->where('role_key', 'admin')->first();
+        $role = \DB::table('roles')->where('role_key', 'hq_leader')->first();
         if (! $role) {
-            \DB::table('roles')->insert(['role_id' => 2, 'role_key' => 'admin', 'role_name' => 'Admin']);
+            $roleId = (int) \DB::table('roles')->max('role_id') + 1;
+            \DB::table('roles')->insert(['role_id' => $roleId, 'role_key' => 'hq_leader', 'role_name' => 'HQ Leader']);
+        } else {
+            $roleId = (int) $role->role_id;
         }
 
         $user = User::query()->where('user_id', 'USR-ADMIN-001')->first();
@@ -168,12 +171,13 @@ class NotificationApiTest extends TestCase
                 'name' => 'Admin User',
                 'email' => 'admin@example.com',
                 'password' => Hash::make('password'),
-                'role_id' => 2,
+                'role_id' => $roleId,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
         }
+        User::query()->where('user_id', 'USR-ADMIN-001')->update(['role_id' => $roleId]);
 
         Notification::query()->updateOrCreate(
             ['notif_id' => 1],
@@ -197,7 +201,7 @@ class NotificationApiTest extends TestCase
         );
     }
 
-    public function test_admin_can_fetch_notifications_feed(): void
+    public function test_hq_leader_can_fetch_notifications_feed(): void
     {
         $user = User::query()->where('user_id', 'USR-ADMIN-001')->firstOrFail();
         $token = $user->createToken('test')->plainTextToken;
@@ -216,6 +220,28 @@ class NotificationApiTest extends TestCase
             ->assertJsonStructure(['data' => ['summary' => ['total', 'unread', 'critical', 'selected'],
                 'notifications' => ['data', 'current_page', 'per_page', 'total', 'page_count'],
                 'preview', 'status_filter', 'scope_note']]);
+    }
+
+    public function test_notification_feed_is_limited_to_modules_and_assignments_available_to_each_role(): void
+    {
+        $feed = collect([
+            ['id' => 'broadcast-1', 'type' => 'Broadcast', 'access_module' => 'dashboard', 'recipient_user_id' => null],
+            ['id' => 'household-1', 'type' => 'Household status', 'access_module' => 'geospatial_analytics', 'recipient_user_id' => null],
+            ['id' => 'dispatch-own', 'type' => 'Dispatch route', 'access_module' => 'response_operations', 'recipient_user_id' => 'USR-RESCUER'],
+            ['id' => 'dispatch-other', 'type' => 'Dispatch route', 'access_module' => 'response_operations', 'recipient_user_id' => 'USR-OTHER'],
+            ['id' => 'request-1', 'type' => 'Resources', 'access_module' => 'resources_requests', 'recipient_user_id' => null],
+            ['id' => 'inquiry-1', 'type' => 'System activity', 'access_module' => 'inquiries', 'recipient_user_id' => null],
+        ]);
+        $presenter = app(\App\Presenters\NotificationPresenter::class);
+        $personnel = new User(['user_id' => 'USR-HQ', 'role' => 'hq_personnel', 'is_active' => true]);
+        $rescuer = new User(['user_id' => 'USR-RESCUER', 'role' => 'rescuer', 'is_active' => true]);
+
+        $personnelItems = $presenter->forUser($feed, $personnel);
+        $rescuerItems = $presenter->forUser($feed, $rescuer);
+
+        $this->assertSame(['broadcast-1', 'household-1', 'dispatch-own', 'dispatch-other', 'request-1'], $personnelItems->pluck('id')->all());
+        $this->assertSame(['broadcast-1', 'household-1', 'dispatch-own'], $rescuerItems->pluck('id')->all());
+        $this->assertArrayNotHasKey('access_module', $rescuerItems->first());
     }
 
     public function test_repeated_feed_requests_include_new_weather_and_preserve_user_actions(): void

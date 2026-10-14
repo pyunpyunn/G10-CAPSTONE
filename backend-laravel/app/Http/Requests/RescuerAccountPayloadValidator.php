@@ -47,7 +47,7 @@ class RescuerAccountPayloadValidator
             'gender' => ['nullable', 'string', 'max:20'],
             'blood_type' => ['nullable', 'string', 'max:10'],
             'address' => ['nullable', 'string', 'max:1000'],
-            'team_id' => ['nullable', 'integer'],
+            'team_id' => ['nullable', 'integer', 'exists:rescue_teams,team_id'],
             'team_name' => [$isUpdate ? 'nullable' : 'required', 'string', 'max:100'],
             'team_code' => ['nullable', 'string', 'max:20'],
             'team_type' => ['nullable', 'string', 'max:80'],

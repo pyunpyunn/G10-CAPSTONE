@@ -20,7 +20,7 @@ export default function WeatherLivePanel({
 }) {
   return (
     <aside className="weather-left-column">
-      <p className="wx-location-updated">{locationName} · Updated {updatedAt}</p>
+      <p className="wx-location-updated">{locationName} · As of {updatedAt}</p>
       <section className="wx-panel wx-current-panel">
         <div className="wx-panel-head"><span className="wx-panel-title">Current condition</span></div>
         <div className="wx-current-row">

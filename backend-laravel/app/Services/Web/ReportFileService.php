@@ -51,17 +51,43 @@ class ReportFileService
                 Pdf::loadView('reports.table', ['title' => str_replace('-', ' ', $type), 'headers' => $headers, 'rows' => $pdfRows, 'generatedAt' => now()])
                     ->setPaper('a4', 'landscape')->save($path);
             }
-            $disk = Storage::disk(config('reports.disk'));
-            $handle = fopen($path, 'r');
-            try {
-                if (!$disk->put('reports/'.$filename, $handle)) throw new \RuntimeException('Report storage failed.');
-            } finally { fclose($handle); }
-            $expires = now()->addMinutes(config('reports.expires_minutes'));
-            $url = config('reports.disk') === 's3'
-                ? $disk->temporaryUrl('reports/'.$filename, $expires)
-                : URL::temporarySignedRoute('external.reports.download', $expires, ['filename' => $filename]);
-            return ['status' => 'success', 'report_type' => $type, 'format' => $format, 'file_name' => $filename, 'download_url' => $url,
-                'expires_at' => $expires->toIso8601String(), 'expires_in_minutes' => config('reports.expires_minutes')];
+            return $this->persistReportFile($filename, $path, $type, $format);
         } finally { if (file_exists($path)) unlink($path); }
+    }
+
+    public function generateSituationPdf(array $summary): array
+    {
+        $filename = 'situation_'.now()->format('Ymd_His').'_'.Str::random(16).'.pdf';
+        $path = tempnam(sys_get_temp_dir(), 'report-');
+
+        try {
+            Pdf::loadHTML(view('reports.situation', [
+                'summary' => $summary,
+                'generatedAt' => now()->toDateTimeString(),
+            ])->render())
+                ->setPaper('a4', 'portrait')
+                ->save($path);
+
+            return $this->persistReportFile($filename, $path, 'situation', 'pdf');
+        } finally {
+            if (file_exists($path)) unlink($path);
+        }
+    }
+
+    private function persistReportFile(string $filename, string $path, string $type, string $format): array
+    {
+        $disk = Storage::disk(config('reports.disk'));
+        $handle = fopen($path, 'r');
+        try {
+            if (!$disk->put('reports/'.$filename, $handle)) throw new \RuntimeException('Report storage failed.');
+        } finally { fclose($handle); }
+
+        $expires = now()->addMinutes(config('reports.expires_minutes'));
+        $url = config('reports.disk') === 's3'
+            ? $disk->temporaryUrl('reports/'.$filename, $expires)
+            : URL::temporarySignedRoute('external.reports.download', $expires, ['filename' => $filename]);
+
+        return ['status' => 'success', 'report_type' => $type, 'format' => $format, 'file_name' => $filename, 'download_url' => $url,
+            'expires_at' => $expires->toIso8601String(), 'expires_in_minutes' => config('reports.expires_minutes')];
     }
 }

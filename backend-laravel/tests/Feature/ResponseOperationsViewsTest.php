@@ -16,6 +16,121 @@ use Tests\TestCase;
 
 class ResponseOperationsViewsTest extends TestCase
 {
+    public function test_deployed_sitios_receive_all_active_assignments_for_the_event_without_pagination(): void
+    {
+        $this->dispatchTables();
+        DB::table('rescue_teams')->insert(['team_id'=>1,'team_code'=>'SAR','team_name'=>'Search & Rescue','team_type'=>'rescue']);
+        DB::table('responders')->insert(['responder_id'=>1,'full_name'=>'Assigned rescuer']);
+        foreach (['dispatched','accepted','en_route','on_scene','onscene','returning','completed','cancelled'] as $index => $status) {
+            DB::table('responder_assignments')->insert(['assignment_id'=>$index+1,'assignment_code'=>'DSP-'.($index+1),'team_id'=>1,'responder_id'=>1,'disaster_id'=>'EV-1','status'=>$status,'assigned_area'=>'Purok 1, Test Sitio',
+                'route_notes'=>json_encode(['selected_responder_ids'=>[1],'household_ids'=>['HH-1']])]);
+        }
+        DB::table('responder_assignments')->insert(['assignment_id'=>9,'disaster_id'=>'OLD','status'=>'dispatched']);
+        $rows = app(RescueDispatchQuery::class)->activeDispatches('EV-1');
+        $this->assertCount(6, $rows);
+        $this->assertSame([6,5,4,3,2,1], array_column($rows,'assignment_id'));
+        $this->assertSame('SAR', $rows[0]['team_code']);
+        $this->assertSame([1], $rows[0]['selected_responder_ids']);
+        $this->assertSame([], app(RescueDispatchQuery::class)->activeDispatches(null));
+    }
+
+    public function test_mobile_assignments_include_only_the_current_rescuers_personal_household_list(): void
+    {
+        Schema::create('households', function (Blueprint $table) { $table->string('household_id')->primary(); $table->string('household_name'); });
+        DB::table('households')->insert([['household_id'=>'HH-1','household_name'=>'First family'],['household_id'=>'HH-2','household_name'=>'Second family']]);
+        $assignment = (object) ['assignment_id'=>1,'household_id'=>null,'route_notes'=>json_encode(['selected_responder_ids'=>[2,1],'responder_households'=>[2=>['HH-1'],1=>['HH-2']]])];
+        $method = new \ReflectionMethod(\App\Services\Mobile\RescuerMobileService::class, 'personalizeAssignmentHouseholds');
+        $service = app(\App\Services\Mobile\RescuerMobileService::class);
+        foreach ([2=>'HH-1',1=>'HH-2'] as $responderId => $householdId) {
+            $result = $method->invoke($service, collect([$assignment]), $responderId)->first();
+            $notes = json_decode($result->route_notes, true);
+            $this->assertSame([$householdId], $notes['assigned_household_ids']);
+            $this->assertSame(1, $notes['assigned_household_count']);
+            $this->assertSame($householdId, $notes['assigned_households'][0]['household_id']);
+        }
+        $this->assertArrayNotHasKey('assigned_household_ids', json_decode($assignment->route_notes, true));
+    }
+
+    public function test_empty_second_household_group_is_valid_and_saved_under_the_correct_rescuer(): void
+    {
+        $this->dispatchTables();
+        DB::table('rescue_teams')->insert(['team_id'=>1,'team_code'=>'A','team_name'=>'Alpha','team_type'=>'rescue']);
+        DB::table('responders')->insert([['responder_id'=>1,'full_name'=>'Alpha rescuer'],['responder_id'=>2,'full_name'=>'Zulu rescuer']]);
+        $payload = ['team_id'=>1,'assigned_area'=>'Purok 1','priority_level'=>'high','status'=>'dispatched','responder_count'=>2,
+            'selected_responder_ids'=>[2,1],'household_ids'=>['HH-1'],'household_groups'=>[['HH-1'],[]],'households_to_cover'=>1];
+        $validate = new \ReflectionMethod(\App\Services\Web\RescueDispatchService::class, 'validateDispatch');
+        $validated = $validate->invoke(app(\App\Services\Web\RescueDispatchService::class), Request::create('/', 'POST', $payload));
+        $this->assertSame([['HH-1'],[]], $validated['household_groups']);
+        $serialize = new \ReflectionMethod(\App\Services\Web\RescueDispatchWorkflow::class, 'routeNotesJson');
+        $route = json_decode($serialize->invoke(app(\App\Services\Web\RescueDispatchWorkflow::class), $validated), true);
+        $this->assertSame([2,1], $route['selected_responder_ids']);
+        $this->assertSame(['Zulu rescuer','Alpha rescuer'], $route['selected_responders']);
+        $this->assertSame(['HH-1'], $route['responder_households'][2]);
+        $this->assertSame([], $route['responder_households'][1]);
+    }
+
+    public function test_household_details_use_real_phone_device_and_approved_trusted_contact_channels(): void
+    {
+        Schema::create('households', function (Blueprint $table) { $table->string('household_id')->primary(); $table->string('contact_number')->nullable(); });
+        Schema::create('device_tokens', function (Blueprint $table) { $table->string('household_id'); $table->boolean('is_active'); });
+        Schema::create('trusted_households', function (Blueprint $table) { $table->string('requesting_household_id'); $table->string('trusted_household_id'); $table->string('validation_status'); });
+        foreach (range(1,5) as $id) DB::table('households')->insert(['household_id'=>'HH-'.$id,'contact_number'=>$id === 5 ? '09123456789' : null]);
+        DB::table('device_tokens')->insert([['household_id'=>'HH-1','is_active'=>true],['household_id'=>'HH-4','is_active'=>false]]);
+        DB::table('trusted_households')->insert([
+            ['requesting_household_id'=>'HH-2','trusted_household_id'=>'HH-5','validation_status'=>'approved'],
+            ['requesting_household_id'=>'HH-5','trusted_household_id'=>'HH-3','validation_status'=>'validated'],
+            ['requesting_household_id'=>'HH-4','trusted_household_id'=>'HH-5','validation_status'=>'pending'],
+        ]);
+        $dispatch = (object) ['household_id'=>null,'disaster_id'=>'EV-1','route_notes'=>json_encode(['household_ids'=>['HH-1','HH-2','HH-3','HH-4','HH-5']])];
+        $rows = collect(app(RescueDispatchQuery::class)->coverageHouseholds($dispatch))->keyBy('household_id');
+        foreach (['HH-1','HH-2','HH-3','HH-5'] as $id) $this->assertTrue($rows[$id]['has_contact_channel']);
+        $this->assertFalse($rows['HH-4']['has_contact_channel']);
+    }
+
+    public function test_dispatch_batch_rolls_back_previous_assignments_when_a_later_area_fails(): void
+    {
+        $this->dispatchTables();
+        DB::table('rescue_teams')->insert(['team_id'=>1,'team_code'=>'A','team_name'=>'Alpha','team_type'=>'rescue']);
+        \Illuminate\Support\Facades\Queue::fake();
+        $this->mock(RescueDispatchQuery::class, function ($mock) {
+            $mock->shouldReceive('activeEvent')->twice()->andReturn((object) ['event_id'=>'EV-1']);
+        });
+        $calls = 0;
+        $this->mock(\App\Services\Web\RescueDispatchWorkflow::class, function ($mock) use (&$calls) {
+            $mock->shouldReceive('store')->twice()->andReturnUsing(function () use (&$calls) {
+                if (++$calls === 2) throw \Illuminate\Validation\ValidationException::withMessages(['team_id'=>['Available rescuers changed.']]);
+                DB::table('responder_assignments')->insert(['assignment_id'=>1,'assignment_code'=>'DSP-1','assigned_area'=>'Area 1']);
+                return ['dispatch'=>['assignment_id'=>1,'assignment_code'=>'DSP-1','assigned_area'=>'Area 1'], 'responder_ids'=>[1,2], 'requested_count'=>2,'available_count'=>2,'assigned_count'=>2];
+            });
+        });
+        $assignment = ['team_id'=>1,'assigned_area'=>'Area 1','responder_count'=>2,'priority_level'=>'high','status'=>'dispatched'];
+        try {
+            app(\App\Services\Web\RescueDispatchService::class)->store(Request::create('/', 'POST', ['assignments'=>[$assignment,$assignment]]));
+            $this->fail('A failed area must reject the batch.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('team_id', $exception->errors());
+        }
+        $this->assertSame(2, $calls);
+        $this->assertSame(0, DB::table('responder_assignments')->count());
+    }
+
+    public function test_outcome_sync_uses_latest_field_report_for_each_covered_household_in_the_assignment_event(): void
+    {
+        Schema::create('household_statuses', function (Blueprint $table) {
+            $table->integer('status_id')->primary(); $table->string('status_key');
+        });
+        Schema::create('household_status_logs', function (Blueprint $table) {
+            $table->integer('status_log_id')->primary(); $table->string('household_id');
+            $table->string('disaster_id'); $table->integer('status_id'); $table->string('source'); $table->timestamp('submitted_at');
+        });
+        DB::table('household_statuses')->insert([['status_id'=>1,'status_key'=>'unsafe'],['status_id'=>2,'status_key'=>'safe'],['status_id'=>3,'status_key'=>'evacuated']]);
+        foreach ([['HH-1','EV-1',1,'responder_field_report'],['HH-1','EV-1',2,'responder_field_report'],['HH-2','EV-1',3,'responder_field_report'],['HH-3','EV-1',1,'responder_field_report'],['HH-1','OLD',1,'responder_field_report'],['HH-2','EV-1',1,'household_mobile']] as $index => [$household,$event,$status,$source]) {
+            DB::table('household_status_logs')->insert(['status_log_id'=>$index+1,'household_id'=>$household,'disaster_id'=>$event,'status_id'=>$status,'source'=>$source,'submitted_at'=>'2026-10-12 12:00:00']);
+        }
+        $dispatch = (object) ['household_id'=>null,'disaster_id'=>'EV-1','route_notes'=>json_encode(['household_ids'=>['HH-1','HH-2']])];
+        $this->assertSame(['safe_count'=>1,'evacuated_count'=>1,'unsafe_count'=>0,'pending_count'=>0,'report_count'=>2], app(RescueDispatchQuery::class)->reportOutcomes($dispatch));
+    }
+
     public function test_field_communications_scope_and_paginate_operational_logs(): void
     {
         Schema::create('responder_communication_logs', function (Blueprint $table) {
@@ -125,6 +240,38 @@ class ResponseOperationsViewsTest extends TestCase
         $active = $query->dispatches(Request::create('/', 'GET', ['status' => 'active', 'per_page' => 1]), 'EV-1');
         $this->assertSame(3, $active->total());
         $this->assertCount(1, $active->items());
+        $closed = $query->dispatches(Request::create('/', 'GET', ['status' => 'closed', 'per_page' => 20]), 'EV-1');
+        $this->assertSame(2, $closed->total());
+        $this->assertEqualsCanonicalizing(['completed', 'cancelled'], collect($closed->items())->pluck('status')->all());
+    }
+
+    public function test_field_report_resource_exposes_the_recorded_reporter_and_team(): void
+    {
+        Schema::create('household_status_logs', function (Blueprint $table) {
+            $table->integer('status_log_id')->primary(); $table->string('household_id');
+            $table->string('disaster_id'); $table->string('source'); $table->integer('responder_id')->nullable();
+            $table->text('notes'); $table->timestamp('submitted_at');
+        });
+        Schema::create('responders', function (Blueprint $table) {
+            $table->integer('responder_id')->primary(); $table->integer('team_id'); $table->string('full_name');
+        });
+        Schema::create('rescue_teams', function (Blueprint $table) {
+            $table->integer('team_id')->primary(); $table->string('team_name');
+        });
+        DB::table('rescue_teams')->insert(['team_id' => 2, 'team_name' => 'Rescue team']);
+        DB::table('responders')->insert(['responder_id' => 7, 'team_id' => 2, 'full_name' => 'Alex Rescuer']);
+        foreach ([7, null] as $index => $reporter) {
+            DB::table('household_status_logs')->insert(['status_log_id' => $index + 1, 'household_id' => 'HH-1',
+                'disaster_id' => 'EV-1', 'source' => 'responder_field_report', 'responder_id' => $reporter,
+                'notes' => 'Saved report', 'submitted_at' => now()]);
+        }
+        $rows = app(RescuerFieldReportQuery::class)->paginateAdmin(['event_id' => 'EV-1'], 20);
+        $this->assertSame(2, $rows->total());
+        $reports = collect($rows->items())->keyBy('status_log_id');
+        $resource = (new \App\Http\Resources\RescuerMobileFieldReportResource($reports[1]))->resolve();
+        $this->assertSame('Alex Rescuer', $resource['reporter_name']);
+        $this->assertSame('Rescue team', $resource['reporter_team_name']);
+        $this->assertNull($reports[2]->reporter_name);
     }
 
     public function test_response_read_endpoints_reject_resident_and_rescuer_roles(): void

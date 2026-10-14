@@ -10,6 +10,7 @@ use App\Jobs\DeliverDisasterBroadcast;
 use Illuminate\Http\Request;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -43,6 +44,8 @@ class AuthenticatedWorkspaceContractTest extends TestCase
             $table->integer('severity_level_id');
             $table->timestamp('started_at')->nullable();
             $table->timestamp('ended_at')->nullable();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
             $table->timestamp('deleted_at')->nullable();
         });
         Schema::create('disaster_broadcasts', function (Blueprint $table): void {
@@ -242,20 +245,172 @@ class AuthenticatedWorkspaceContractTest extends TestCase
         Queue::assertPushedOn('operations', RefreshWeatherSnapshot::class);
     }
 
-    public function test_broadcast_save_queues_delivery_without_calling_providers(): void
+    public function test_broadcast_save_attempts_push_immediately_and_queues_delivery_fallback(): void
     {
         Queue::fake();
+        config(['services.onesignal.app_id' => 'test-app', 'services.onesignal.api_key' => 'test-key']);
+        Schema::create('device_tokens', function (Blueprint $table): void {
+            $table->string('player_id');
+            $table->string('platform')->default('android');
+            $table->string('app_role');
+            $table->string('push_provider');
+            $table->string('notification_permission_status');
+            $table->boolean('is_active');
+        });
+        DB::table('device_tokens')->insert([
+            'player_id' => 'household-device-1',
+            'platform' => 'android',
+            'app_role' => 'household',
+            'push_provider' => 'onesignal',
+            'notification_permission_status' => 'granted',
+            'is_active' => true,
+        ]);
+        Http::fake(['*' => Http::response(['id' => 'notification-1'], 200)]);
+
         $this->postJson('/api/v1/disaster-events/EV-1/broadcasts', [
             'broadcast_title' => 'Flood warning',
             'message' => 'Please prepare for rising water.',
             'scope_type' => 'barangay_wide',
-            'allowed_statuses' => ['safe', 'unsafe', 'evacuated', 'unchecked'],
+            'estimated_duration' => '12 hours',
+            'allowed_statuses' => ['safe', 'unsafe', 'evacuated', 'need_help'],
         ])->assertCreated()
-            ->assertJsonPath('data.push_delivery.status', 'queued')
+            ->assertJsonPath('data.push_delivery.status', 'sent')
+            ->assertJsonPath('data.push_delivery.sent_count', 1)
             ->assertJsonPath('data.sms_delivery.status', 'queued');
 
+        Http::assertSentCount(1);
         Queue::assertPushedOn('broadcasts', DeliverDisasterBroadcast::class);
         $this->assertDatabaseCount('disaster_broadcasts', 1);
+    }
+
+    public function test_broadcast_limits_are_validated_by_the_server(): void
+    {
+        $this->postJson('/api/v1/disaster-events/EV-1/broadcasts', [
+            'broadcast_title' => str_repeat('T', 51),
+            'message' => 'Instruction',
+            'scope_type' => 'barangay_wide',
+            'estimated_duration' => '12 hours',
+            'allowed_statuses' => ['safe', 'unsafe', 'evacuated', 'need_help'],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['broadcast_title']);
+    }
+
+    public function test_disaster_name_is_limited_to_twenty_characters(): void
+    {
+        $this->postJson('/api/v1/disaster-events', [
+            'name' => str_repeat('N', 21),
+            'type_id' => 1,
+            'severity_level_id' => 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+    }
+
+    public function test_custom_status_is_persisted_in_the_shared_household_catalog(): void
+    {
+        Schema::create('household_statuses', function (Blueprint $table): void {
+            $table->integer('status_id')->primary();
+            $table->string('status_key')->unique();
+            $table->string('status_label')->unique();
+            $table->string('safety_basis')->nullable();
+        });
+        DB::table('household_statuses')->insert([
+            ['status_id' => 1, 'status_key' => 'safe', 'status_label' => 'Safe'],
+        ]);
+
+        $this->postJson('/api/v1/status-types', ['label' => 'All Clear', 'safety_basis' => 'safe'])
+            ->assertCreated()
+            ->assertJsonPath('data.status_options.1.key', 'all_clear')
+            ->assertJsonPath('data.status_options.1.label', 'All Clear')
+            ->assertJsonPath('data.status_options.1.safety_basis', 'safe');
+        $this->assertDatabaseHas('household_statuses', ['status_key' => 'all_clear', 'status_label' => 'All Clear', 'safety_basis' => 'safe']);
+    }
+
+    public function test_unused_custom_status_can_be_deleted_from_the_shared_catalog(): void
+    {
+        Schema::create('household_statuses', function (Blueprint $table): void {
+            $table->integer('status_id')->primary();
+            $table->string('status_key')->unique();
+            $table->string('status_label')->unique();
+        });
+        DB::table('household_statuses')->insert(['status_id' => 1, 'status_key' => 'all_clear', 'status_label' => 'All Clear']);
+
+        $this->deleteJson('/api/v1/status-types/all_clear')
+            ->assertOk()
+            ->assertJsonPath('data.status_options', []);
+        $this->assertDatabaseMissing('household_statuses', ['status_key' => 'all_clear']);
+    }
+
+    public function test_deleting_status_used_by_household_history_only_deletes_catalog_row(): void
+    {
+        Schema::create('household_statuses', function (Blueprint $table): void {
+            $table->integer('status_id')->primary();
+            $table->string('status_key')->unique();
+            $table->string('status_label')->unique();
+        });
+        Schema::create('household_status_logs', function (Blueprint $table): void {
+            $table->integer('status_log_id')->primary();
+            $table->integer('status_id');
+        });
+        DB::table('household_statuses')->insert(['status_id' => 1, 'status_key' => 'all_clear', 'status_label' => 'All Clear']);
+        DB::table('household_status_logs')->insert(['status_log_id' => 1, 'status_id' => 1]);
+
+        $this->deleteJson('/api/v1/status-types/all_clear')->assertOk();
+        $this->assertDatabaseMissing('household_statuses', ['status_key' => 'all_clear']);
+        $this->assertDatabaseHas('household_status_logs', ['status_log_id' => 1, 'status_id' => 1]);
+    }
+
+    public function test_unused_custom_disaster_type_can_be_added_and_deleted(): void
+    {
+        Schema::create('disaster_event_types', function (Blueprint $table): void {
+            $table->integer('event_type_id')->primary();
+            $table->string('event_id')->nullable();
+            $table->integer('type_id');
+        });
+
+        $response = $this->postJson('/api/v1/disaster-types', ['name' => 'Tsunami'])
+            ->assertCreated()
+            ->assertJsonPath('data.created_type.type_name', 'Tsunami');
+        $typeId = $response->json('data.created_type.type_id');
+        $this->assertDatabaseHas('disaster_types', ['type_id' => $typeId, 'type_name' => 'Tsunami']);
+        $this->assertDatabaseHas('disaster_event_types', ['type_id' => $typeId, 'event_id' => null]);
+
+        $this->deleteJson('/api/v1/disaster-types/'.$typeId)->assertOk();
+        $this->assertDatabaseMissing('disaster_types', ['type_id' => $typeId]);
+    }
+
+    public function test_deleting_disaster_type_removes_catalog_and_link_but_preserves_event(): void
+    {
+        Schema::create('disaster_event_types', function (Blueprint $table): void {
+            $table->integer('event_type_id')->primary();
+            $table->string('event_id')->nullable();
+            $table->integer('type_id');
+        });
+        DB::table('disaster_event_types')->insert(['event_type_id' => 1, 'event_id' => 'EV-1', 'type_id' => 1]);
+
+        $this->deleteJson('/api/v1/disaster-types/1')->assertOk();
+        $this->assertDatabaseMissing('disaster_types', ['type_id' => 1]);
+        $this->assertDatabaseMissing('disaster_event_types', ['type_id' => 1]);
+        $this->assertDatabaseHas('disaster_events', ['event_id' => 'EV-1', 'type_id' => 1]);
+    }
+
+    public function test_declaring_event_persists_its_type_association(): void
+    {
+        Schema::create('disaster_event_types', function (Blueprint $table): void {
+            $table->integer('event_type_id')->primary();
+            $table->string('event_id')->nullable();
+            $table->integer('type_id');
+        });
+        DB::table('disaster_events')->where('event_id', 'EV-1')->update(['ended_at' => now()]);
+
+        $response = $this->postJson('/api/v1/disaster-events', [
+            'name' => 'Coastal flooding',
+            'type_id' => 1,
+            'severity_level_id' => 1,
+        ])->assertCreated();
+        $eventId = $response->json('data.active_event.event_id');
+
+        $this->assertDatabaseHas('disaster_event_types', [
+            'event_id' => $eventId,
+            'type_id' => 1,
+        ]);
     }
 
     public function test_dashboard_clears_ended_event_references_without_loading_event_ids(): void

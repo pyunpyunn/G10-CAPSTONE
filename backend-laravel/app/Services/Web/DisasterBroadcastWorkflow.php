@@ -8,6 +8,7 @@ use App\Models\DisasterEvent;
 use App\Models\RescuePrioritySetting;
 use App\Queries\DisasterBroadcastQuery;
 use App\Presenters\DisasterBroadcastPresenter;
+use App\Services\Shared\RealtimeOutbox;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,9 @@ class DisasterBroadcastWorkflow
 
         $eventId = DB::transaction(function () use ($validated): string {
             $now = now();
-            $eventId = 'EVT-'.$now->format('Ymd').'-'.Str::upper(Str::random(5));
+            do {
+                $eventId = 'EVT-'.$now->format('Ymd').'-'.random_int(1000, 9999);
+            } while (DisasterEvent::query()->where('event_id', $eventId)->exists());
 
             $event = [
                 'event_id' => $eventId,
@@ -47,6 +50,7 @@ class DisasterBroadcastWorkflow
                 $event['rescue_priority_version'] = RescuePrioritySetting::query()->orderByDesc('version')->value('version');
             }
             DisasterEvent::query()->create($event);
+            $this->syncEventTypeAssociation($eventId, (int) $validated['type_id']);
 
             return $eventId;
         });
@@ -80,6 +84,7 @@ class DisasterBroadcastWorkflow
 
             $event->fill($validated);
             $event->save();
+            $this->syncEventTypeAssociation($eventId, (int) $validated['type_id']);
 
             return 'updated';
         });
@@ -136,7 +141,7 @@ class DisasterBroadcastWorkflow
                 'target_area_id' => null,
                 'message' => $validated['message'],
                 'allowed_statuses' => $this->compactMetadataText($metadata),
-                'channel' => $validated['channel'] ?? 'mobile_app_pending_push',
+                'channel' => 'onesignal',
                 'status' => 'saved',
                 'notification_id' => null,
                 'weather_log_id' => null,
@@ -150,11 +155,11 @@ class DisasterBroadcastWorkflow
             }
 
             if (Schema::hasColumn('disaster_broadcasts', 'direct_impact_puroks_json')) {
-                $data['direct_impact_puroks_json'] = $this->jsonText($metadata['puroks']);
+                $data['direct_impact_puroks_json'] = $metadata['puroks'];
             }
 
             if (Schema::hasColumn('disaster_broadcasts', 'allowed_statuses_json')) {
-                $data['allowed_statuses_json'] = $this->jsonText($metadata['statuses']);
+                $data['allowed_statuses_json'] = $metadata['statuses'];
             }
 
             if (Schema::hasColumn('disaster_broadcasts', 'recipient_count')) {
@@ -165,6 +170,9 @@ class DisasterBroadcastWorkflow
                 $data['push_status'] = 'pending_mobile_push';
             }
 
+            if (Schema::hasColumn('disaster_broadcasts', 'status_options_json')) {
+                $data['status_options_json'] = $this->jsonText($metadata['status_options']);
+            }
             DisasterBroadcast::query()->create($data);
             // Persist the audience and UUIDs in the transactional outbox payload.
             // Queue retries must reuse exactly the same provider request.
@@ -180,11 +188,22 @@ class DisasterBroadcastWorkflow
             return $broadcastId;
         });
 
+        app(RealtimeOutbox::class)->deliverPendingNow();
         $pushResult = ['status' => 'queued', 'recipient_count' => 0, 'sent_count' => 0];
+        try {
+            $pushResult = $this->sendBroadcastPush($broadcastId, $validated, $metadata, $event);
+            $this->updateBroadcastPushStatus($broadcastId, $pushResult);
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::warning('Immediate disaster broadcast push failed; queued delivery will retry.', [
+                'broadcast_id' => $broadcastId,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+        app(RealtimeOutbox::class)->deliverPendingNow();
         $smsResult = ['status' => 'queued', 'recipient_count' => 0, 'accepted_count' => 0];
 
         return response()->json([
-            'message' => 'Broadcast saved. Push and SMS delivery are queued.',
+            'message' => 'Broadcast saved. Mobile push was submitted immediately; SMS delivery is queued.',
             'data' => array_merge($this->query->getWorkspacePayload($event, $this->query->getBroadcastsForEvent($event->event_id)), [
                 'broadcast' => $this->query->findBroadcast($broadcastId),
                 'push_delivery' => $pushResult,
@@ -259,6 +278,7 @@ class DisasterBroadcastWorkflow
                     'broadcast_id' => (string) $broadcastId,
                     'scope_type' => $scope,
                     'allowed_statuses' => array_values($validated['allowed_statuses']),
+                    'status_options' => $metadata['status_options'] ?? $this->selectedStatusOptions($validated['allowed_statuses']),
                 ],
             ]
         );
@@ -278,23 +298,53 @@ class DisasterBroadcastWorkflow
             return;
         }
 
+        $updates = [
+            'push_status' => 'onesignal_'.$pushResult['status'],
+            'channel' => 'onesignal',
+            'updated_at' => now(),
+        ];
+        if (Schema::hasColumn('disaster_broadcasts', 'push_accepted_count')) {
+            $updates['push_accepted_count'] = (int) ($pushResult['sent_count'] ?? 0);
+        }
+        if (Schema::hasColumn('disaster_broadcasts', 'push_provider_ids_json')) {
+            $existingIds = $this->presenter->decodeJsonArray(
+                DisasterBroadcast::query()->where('broadcast_id', $broadcastId)->value('push_provider_ids_json')
+            );
+            $updates['push_provider_ids_json'] = $this->jsonText(array_values(array_unique([
+                ...$existingIds, ...($pushResult['provider_ids'] ?? []),
+            ])));
+        }
+        if (Schema::hasColumn('disaster_broadcasts', 'push_errors_json')) {
+            $errors = $pushResult['errors'] ?? [];
+            if ($errors === [] && ! in_array($pushResult['status'], ['sent', 'queued'], true)) {
+                $errors = [$pushResult['message'] ?? 'OneSignal did not accept this notification.'];
+            }
+            $updates['push_errors_json'] = $this->jsonText(array_values($errors));
+        }
+
         DisasterBroadcast::query()
             ->where('broadcast_id', $broadcastId)
-            ->update($this->query->filterColumns('disaster_broadcasts', [
-                'push_status' => 'onesignal_'.$pushResult['status'],
-                'channel' => 'onesignal',
-                'updated_at' => now(),
-            ]));
+            ->update($this->query->filterColumns('disaster_broadcasts', $updates));
     }
 
     public function broadcastMetadata(array $validated): array
     {
         return [
             'statuses' => array_values($validated['allowed_statuses']),
+            'status_options' => $this->selectedStatusOptions($validated['allowed_statuses']),
             'puroks' => array_values($validated['direct_puroks'] ?? []),
             'area' => $validated['target_area'] ?? $this->presenter->scopeLabel($validated['scope_type']),
             'duration' => $validated['estimated_duration'] ?? null,
         ];
+    }
+
+    private function selectedStatusOptions(array $keys): array
+    {
+        $catalog = collect($this->presenter->statusOptions())->keyBy('key');
+        return array_map(fn ($key) => $catalog->get($key) ?? [
+            'key' => $key, 'label' => ucwords(str_replace('_', ' ', $key)),
+            'safety_basis' => \App\Support\StatusSafety::basis($key),
+        ], array_values($keys));
     }
 
     public function compactMetadataText(array $metadata): string
@@ -308,6 +358,39 @@ class DisasterBroadcastWorkflow
     public function jsonText(array $value): string
     {
         return json_encode($value, JSON_UNESCAPED_SLASHES);
+    }
+
+    private function syncEventTypeAssociation(string $eventId, int $typeId): void
+    {
+        if (! Schema::hasTable('disaster_event_types')
+            || ! Schema::hasColumn('disaster_event_types', 'event_type_id')
+            || ! Schema::hasColumn('disaster_event_types', 'event_id')
+            || ! Schema::hasColumn('disaster_event_types', 'type_id')) {
+            return;
+        }
+
+        $alreadyLinked = DB::table('disaster_event_types')
+            ->where('event_id', $eventId)
+            ->where('type_id', $typeId)
+            ->exists();
+        if ($alreadyLinked) return;
+
+        DB::table('disaster_event_types')->where('event_id', $eventId)->delete();
+        $unassigned = DB::table('disaster_event_types')
+            ->whereNull('event_id')
+            ->where('type_id', $typeId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($unassigned) {
+            DB::table('disaster_event_types')
+                ->where('event_type_id', $unassigned->event_type_id)
+                ->update(['event_id' => $eventId]);
+            return;
+        }
+
+        $eventTypeId = ((int) DB::table('disaster_event_types')->lockForUpdate()->max('event_type_id')) + 1;
+        DB::table('disaster_event_types')->insert(['event_type_id' => $eventTypeId, 'event_id' => $eventId, 'type_id' => $typeId]);
     }
 }
 

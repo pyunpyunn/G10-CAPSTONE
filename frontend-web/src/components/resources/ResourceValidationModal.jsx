@@ -2,6 +2,7 @@ import { FileCheck2, Send, Undo2, X } from 'lucide-react'
 
 export default function ResourceValidationModal({
   mode,
+  canApprove = false,
   form,
   setForm,
   options = {},
@@ -21,7 +22,7 @@ export default function ResourceValidationModal({
   const isValidate = mode === 'validate'
   const isReturn = mode === 'return'
   const isForward = mode === 'forward'
-  const canReview = isView && ['needs_validation', 'returned'].includes(form.validation_status)
+  const canReview = canApprove && isView && ['needs_validation', 'returned'].includes(form.validation_status)
   const isReadOnly = isView || isForward || isEdit
   const requestFieldsDisabled = !isCreate && !isEdit
   const decisionDisabled = !isValidate

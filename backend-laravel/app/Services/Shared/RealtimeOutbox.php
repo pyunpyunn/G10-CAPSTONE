@@ -96,6 +96,27 @@ class RealtimeOutbox
         return true;
     }
 
+    public function deliverPendingNow(): bool
+    {
+        $token = null;
+        try {
+            $token = $this->claim();
+            if ($token === null) return false;
+            $this->deliver($token);
+            return true;
+        } catch (Throwable $exception) {
+            if ($token !== null) {
+                try {
+                    $this->release($token, 5);
+                } catch (Throwable $releaseException) {
+                    report($releaseException);
+                }
+            }
+            report($exception);
+            return false;
+        }
+    }
+
     public function deliver(string $token): void
     {
         $db = DB::connection(config('realtime.connection'));

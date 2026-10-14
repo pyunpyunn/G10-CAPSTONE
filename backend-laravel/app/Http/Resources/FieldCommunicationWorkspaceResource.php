@@ -17,6 +17,7 @@ class FieldCommunicationWorkspaceResource extends JsonResource
                 'total' => $logs->total(), 'last_page' => $logs->lastPage(),
                 'from' => $logs->firstItem(), 'to' => $logs->lastItem()],
             'teams' => $this->resource['teams'],
+            'responders' => $this->resource['responders'] ?? [],
             'channels' => [['key' => 'command', 'label' => 'HQ Command'],
                 ['key' => 'team', 'label' => 'Team'], ['key' => 'event', 'label' => 'Event']],
         ];

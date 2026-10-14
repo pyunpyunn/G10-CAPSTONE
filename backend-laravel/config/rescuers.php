@@ -22,6 +22,7 @@ return [
         'account_status' => 'active', 'duty_status' => 'available',
         'blood_type' => 'Unknown', 'title' => 'Responder',
     ],
+    'gender_options' => ['Male', 'Female', 'Other'],
     'team_defaults' => [
         'team_id' => null, 'team_code' => '', 'team_name' => '', 'team_type' => '',
         'duty_status' => 'available', 'assigned_purok_id' => null,

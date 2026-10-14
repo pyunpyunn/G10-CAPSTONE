@@ -124,8 +124,10 @@ class User extends Authenticatable
         }
 
         return match (strtolower((string) $roleKey)) {
-            'super_admin', 'super admin' => 'super_admin',
+            'superadmin', 'super_admin', 'super admin' => 'super_admin',
             'admin', 'hq_admin', 'hq admin' => 'admin',
+            'hq_leader', 'hq leader', 'hqcc_leader' => 'hq_leader',
+            'hq_personnel', 'hq personnel' => 'hq_personnel',
             'rescuer', 'responder' => 'rescuer',
             'household', 'household_resident', 'resident' => 'household_resident',
             default => $roleKey,
@@ -140,10 +142,26 @@ class User extends Authenticatable
         return match ($this->roleKey()) {
             'super_admin' => 'Super Admin',
             'admin' => 'Admin',
-            'rescuer' => 'Rescuer',
+            'hq_leader' => 'HQ Leader',
+            'hq_personnel' => 'HQ Personnel',
+            'rescuer' => 'Rescuer Member',
             'household_resident' => 'Household Resident',
             default => $roleName,
         };
+    }
+
+    public function isHqccLeader(): bool
+    {
+        return $this->is_active !== false
+            && ! ($this->attributes['deleted_at'] ?? null)
+            && $this->roleKey() === 'hq_leader';
+    }
+
+    public function canManagePersonnel(): bool
+    {
+        if ($this->is_active === false || ($this->attributes['deleted_at'] ?? null)) return false;
+
+        return $this->roleKey() === 'super_admin' || $this->isHqccLeader();
     }
 }
 

@@ -1,79 +1,68 @@
-import { Pencil, Save, ShieldCheck, X } from 'lucide-react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { AlertTriangle, Award, BookOpen, Calendar, CheckCircle, Droplet, Mail, MapPin, MoreHorizontal, Phone, Shield, User, Users } from 'lucide-react'
 import { accountIdForTeam, fullNameFromForm } from '../../utils/rescuerHelpers'
-import Badge from '../ui/Badge'
 
+export function StatusDot({ children, muted = false }) {
+  return <span className="bg" style={{ '--c': muted ? '#94a3b8' : '#0ea5e9' }}>{children}</span>
+}
 
-export default function RescuerAccountModal({ mode, isOpen, form, setForm, formError, isSaving, teamOptions = [], accountIdOptions = [], fallbackAccountId, formOptions, onClose, onReset, onSubmit, onEdit, embedded = false }) {
-  if (!isOpen) return null
-  const isView = mode === 'view'
-  const isEdit = mode === 'edit'
-  const name = (isView ? form.full_name : fullNameFromForm(form)) || 'New rescuer'
-  const constraints = formOptions?.constraints?.[isEdit ? 'edit' : 'create'] || {}
-  const dutyStatus = isView ? form.duty_status_display : formOptions?.duty_statuses?.find((status) => status.key === form.duty_status)
-  const accountStatus = isView ? form.account_status_display : formOptions?.account_statuses?.find((status) => status.key === form.account_status)
-  const initials = [form.first_name?.[0], form.last_name?.[0]].filter(Boolean).join('') || 'R'
-  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
-  function selectTeam(value) {
-    const selected = teamOptions.find((team) => team.team_name === value)
-    setForm((current) => ({ ...current,
-      account_id: mode === 'create' ? accountIdForTeam(accountIdOptions, value, fallbackAccountId) : current.account_id,
-      team_id: selected?.team_id || '', team_code: selected?.team_code || '',
-      team_name: selected?.team_name || value, team_type: selected?.team_type || '',
-    }))
-  }
-  function input(key, label, type = 'text') {
-    return <Field label={label}><input type={type} value={form[key] || ''} {...constraints[key]} onChange={(event) => update(key, event.target.value)} /></Field>
-  }
-  function select(key, label, options) {
-    return <Field label={label}><select value={form[key]} {...constraints[key]} onChange={(event) => update(key, event.target.value)}><option value="">Select {label.toLowerCase()}</option>{options.map((option) => { const value = typeof option === 'string' ? option : option.key; return <option key={value} value={value}>{typeof option === 'string' ? option : option.label}</option> })}</select></Field>
-  }
-  function text(key, label) {
-    return <Field label={label} full><textarea value={form[key]} {...constraints[key]} rows={3} onChange={(event) => update(key, event.target.value)} /></Field>
-  }
-  const content = <div className={embedded ? 'ra-profile-page' : 'ra-modal-overlay open'}>
-    <div className={embedded ? 'ra-profile-shell' : 'ra-modal ra-profile-shell'} role={embedded ? 'region' : 'dialog'} aria-modal={embedded ? undefined : true} aria-label={isView ? 'Rescuer profile' : 'Rescuer profile form'}>
-      <header className="ra-profile-hero">
-        <div className="ra-profile-avatar" aria-hidden="true">{initials}</div>
-        <div className="ra-profile-identity"><span className="rtc-kicker"><ShieldCheck size={14} /> Rescuer profile</span><h2>{name}</h2><p>{form.title || 'Not recorded'} · {(isView ? form.team_display_name : form.team_name) || 'No team selected'}</p><div className="ra-profile-badges"><Badge tone={accountStatus?.tone}>{accountStatus?.label || 'Not recorded'}</Badge><Badge tone={dutyStatus?.tone}>{dutyStatus?.label || 'Not recorded'}</Badge><span>{form.account_id || 'Account ID assigned on creation'}</span></div></div>
-        {isView && <button className="button review" type="button" onClick={onEdit}><Pencil size={16} />Update profile</button>}
-        {!embedded && <button type="button" className="ra-modal-close" aria-label="Close profile" onClick={onClose}><X size={16} /></button>}
-      </header>
-      {formError && <div className="form-error" role="alert">{formError}</div>}
-      {isView ? <div className="ra-profile-layout">
-        <div className="ra-profile-main">
-          <Section title="About" description="Personal and contact information"><Details items={[["Mobile number", form.contact_number], ["Email", form.email], ["Home address / purok", form.address], ["Date of birth", form.date_of_birth], ["Gender", form.gender], ["Blood type", form.blood_type]]} /></Section>
-          <Section title="Qualifications" description="Skills and operational preparation"><Details items={[["Skills", form.skills], ["Training / certifications", form.training_notes], ["Certification reference", form.certification_reference], ["Issued equipment", form.equipment_notes]]} /></Section>
-        </div>
-        <aside className="ra-profile-side"><Section title="Assignment"><Details items={[["Team", form.team_display_name], ["Team type", form.team_type], ["Role", form.title], ["Duty availability", dutyStatus?.label], ["Responder code", form.responder_code]]} /></Section><Section title="Emergency contact"><Details items={[["Contact name", form.emergency_contact_name], ["Contact number", form.emergency_contact_number]]} /></Section></aside>
-      </div> : <form id="rescuerAccountForm" className="ra-profile-layout" onSubmit={onSubmit}>
-        <div className="ra-profile-main">
-          <Section title="Personal information" description="Keep the responder’s identity and contact details current."><div className="ra-form-grid">
-            {input('first_name', 'First name', 'text')}{input('last_name', 'Last name', 'text')}{input('middle_initial', 'Middle initial')}{input('contact_number', 'Mobile number', 'tel')}{input('email', 'Email', 'email')}{input('date_of_birth', 'Date of birth', 'date')}{input('gender', 'Gender')}{select('blood_type', 'Blood type', formOptions?.blood_types || [])}<Field label="Home address / purok" full><input {...constraints.address} value={form.address} onChange={(event) => update('address', event.target.value)} /></Field>
-          </div></Section>
-          <Section title="Qualifications & equipment" description="Record capabilities that help dispatchers assign the right responder."><div className="ra-form-grid">{text('skills', 'Skills')}{text('training_notes', 'Training / certifications')}{input('certification_reference', 'Certification reference')}{text('equipment_notes', 'Issued equipment')}</div></Section>
-          <Section title="Emergency contact"><div className="ra-form-grid">{input('emergency_contact_name', 'Contact name')}{input('emergency_contact_number', 'Contact number', 'tel')}</div></Section>
-        </div>
-        <aside className="ra-profile-side">
-          <Section title="Team & duty" description="Set the responder’s operational assignment."><div className="ra-form-grid ra-form-stack">
-            <Field label="Team"><select value={form.team_name} {...constraints.team_name} onChange={(event) => selectTeam(event.target.value)}><option value="">Unassigned</option>{[...new Set([form.team_name, ...teamOptions.map((team) => team.team_name)].filter(Boolean))].map((value) => <option key={value} value={value}>{value}</option>)}</select></Field>
-            <Field label="Role"><input list="rescuerRoles" value={form.title} {...constraints.title} onChange={(event) => update('title', event.target.value)} /><datalist id="rescuerRoles">{(formOptions?.roles || []).map((role) => <option value={role} key={role} />)}</datalist></Field>{select('duty_status', 'Duty availability', formOptions?.duty_statuses || [])}{select('account_status', 'Account status', formOptions?.account_statuses || [])}
-          </div></Section>
-          <Section title="Account access"><div className="ra-form-grid ra-form-stack"><Field label="Account ID"><input {...constraints.account_id} value={form.account_id} readOnly /><span className="ra-field-note">{isEdit ? 'Permanent account identifier.' : 'Generated from the selected team.'}</span></Field><Field label={isEdit ? 'New password' : 'Temporary password'}><input type="password" autoComplete="new-password" value={form.password} {...constraints.password} onChange={(event) => update('password', event.target.value)} /><span className="ra-field-note">{isEdit ? 'Leave blank to keep the current password.' : `Use at least ${constraints.password?.minLength} characters.`}</span></Field></div></Section>
-        </aside>
-      </form>}
-      {!isView && <footer className="ra-profile-footer"><span>{isEdit ? 'Update the account and operational profile.' : 'Create a rescuer account for the team roster.'}</span><div><button className="button secondary" type="button" disabled={isSaving} onClick={onClose}>Cancel</button><button className="button secondary" type="button" disabled={isSaving} onClick={onReset}>Reset changes</button><button className="button review" form="rescuerAccountForm" type="submit" disabled={isSaving}><Save size={16} />{isSaving ? 'Saving...' : isEdit ? 'Save changes' : 'Create account'}</button></div></footer>}
+export function AccountProfile({ form, onEdit, onDeactivate, onDelete, onReactivate, role = 'Rescuer' }) {
+  const [menu, setMenu] = useState(false)
+  const name = form.full_name || fullNameFromForm(form) || 'Unnamed account'
+  const accountStatus = form.account_status_display?.label || (form.is_active === false ? 'Inactive' : 'Active')
+  const active = accountStatus.toLowerCase() === 'active'
+  const duty = form.duty_status_display?.label
+  const skills = Array.isArray(form.skills) ? form.skills : String(form.skills || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean)
+  const metric = (Icon, color, label, value) => <div className="k" style={{ '--c': color }}><span className="ic"><Icon size={20} /></span><div><em>{label}</em><b title={value || ''}>{value || 'Not recorded'}</b></div></div>
+  const field = (Icon, label, value, link) => <div className="fd"><span className="fi"><Icon size={16} /></span><div><em>{label}</em><b>{value ? link ? <a href={`${link}${value}`}>{value}</a> : value : <span className="mu">Not recorded</span>}</b></div></div>
+  return <article className="cd prof" aria-label={`${name} profile`}>
+    <div className="cover"><span className="slot" /><span className="rl2">{role}</span>
+      <div className="ca">{onEdit && <button className="bt sm" type="button" onClick={onEdit}>Edit profile</button>}
+        {(onDeactivate || onDelete || onReactivate) && <div className="tm-menu-anchor"><button className="mb3" type="button" aria-label="Profile actions" aria-expanded={menu} onClick={() => setMenu(!menu)}><MoreHorizontal size={16} /></button>{menu && <><button className="tm-menu-dismiss" aria-label="Close profile actions" onClick={() => setMenu(false)} /><div className="pp tm-menu" role="menu">{onEdit && <button role="menuitem" onClick={() => { setMenu(false); onEdit() }}>Edit</button>}{active && onDeactivate && <button role="menuitem" onClick={() => { setMenu(false); onDeactivate() }}>Deactivate</button>}{!active && onReactivate && <button role="menuitem" onClick={() => { setMenu(false); onReactivate() }}>Reactivate</button>}{onDelete && <button role="menuitem" onClick={() => { setMenu(false); onDelete() }}>Delete user</button>}</div></>}</div>}
+      </div>
+      <span className="pav" style={{ '--c': '#3b82f6' }}>{initials(name)}</span><div className="cn"><div className="nm">{name}</div><div className="cm">{form.account_id || form.responder_code || '—'} · {form.title || role}</div><div className="pbd">{duty && <StatusDot muted={/off|disabled/i.test(duty)}>{duty}</StatusDot>}<StatusDot muted={!active}>{accountStatus}</StatusDot></div></div>
     </div>
-  </div>
-  return embedded ? content : createPortal(content, document.body)
+    <div className="pbody">
+      <div className="kp">{metric(Users, '#2563eb', 'Team', form.team_display_name || form.team_name || 'Unassigned')}{metric(Shield, '#7c3aed', 'Role', form.title || role)}{metric(Droplet, '#0891b2', 'Blood type', form.blood_type)}{metric(Calendar, '#0d9488', 'Born', form.date_of_birth)}</div>
+      <div className="pgd"><ProfileSection Icon={User} title="About"><div className="pf2">{field(Phone, 'Mobile', form.contact_number, 'tel:')}{field(Mail, 'Email', form.email, 'mailto:')}{field(MapPin, 'Address', form.address)}{field(User, 'Gender', form.gender)}</div></ProfileSection>
+        <ProfileSection Icon={AlertTriangle} title="Emergency contact" className="emg">{form.emergency_contact_name ? <><div className="ec"><span className="av" style={{ '--c': '#0891b2' }}>{initials(form.emergency_contact_name)}</span><div><b>{form.emergency_contact_name}</b><em>Primary contact</em></div></div>{form.emergency_contact_number && <a className="call" href={`tel:${form.emergency_contact_number}`}><Phone size={15} />{form.emergency_contact_number}</a>}</> : <span className="mu">Not recorded</span>}</ProfileSection>
+      </div>
+      {role === 'Rescuer' && <ProfileSection Icon={Award} title="Qualifications"><div><em className="lb">Skills</em>{skills.length ? <div className="chs sk">{skills.map(skill => <span key={skill} className="rt" style={{ '--c': '#3b82f6' }}>{skill}</span>)}</div> : <span className="mu">Not recorded</span>}</div><div className="pf2">{field(BookOpen, 'Training', form.training_notes)}{field(CheckCircle, 'Certification', form.certification_reference)}{field(Shield, 'Equipment', form.equipment_notes)}</div></ProfileSection>}
+    </div>
+  </article>
 }
 
-function Field({ label, full = false, children }) {
-  return <label className={full ? 'full' : ''}><span className="ra-mini-label">{label}</span>{children}</label>
+export default function RescuerAccountModal({ mode, isOpen, form, setForm, formError, isSaving, teamOptions = [], accountIdOptions = [], fallbackAccountId, formOptions, onClose, onReset, onSubmit, onEdit, embedded = false, roleSelector }) {
+  const [activeSection, setActiveSection] = useState('personal')
+  if (!isOpen) return null
+  const isEdit = mode === 'edit'
+  const hqAccount = /^BDRRM-HQCC-/i.test(form.account_id || '')
+  teamOptions = teamOptions.filter(team => (String(team.team_code).toUpperCase() === 'HQCC' || ['HQ', 'HQCC', 'HEADQUARTERS'].includes(String(team.team_type).toUpperCase())) === hqAccount)
+  const constraints = formOptions?.constraints?.[isEdit ? 'edit' : 'create'] || {}
+  const update = (key, value) => setForm(current => ({ ...current, [key]: value }))
+  const sections = [['personal', 'Personal'], ['qualifications', 'Qualifications'], ['emergency', 'Emergency'], ['assignment', 'Team & duty'], ['access', 'Access']]
+  if (isEdit) sections.unshift(...sections.splice(3, 1))
+  function selectTeam(value) {
+    const team = teamOptions.find(t => t.team_name === value)
+    setForm(current => ({ ...current, account_id: isEdit ? current.account_id : accountIdForTeam(accountIdOptions, value, fallbackAccountId), team_id: team?.team_id || '', team_code: team?.team_code || '', team_name: value, team_type: team?.team_type || '' }))
+  }
+  const field = (key, label, span = 's2', type = 'text') => <label className={`fl ${span}`}><span>{label}</span><input type={type} value={form[key] || ''} {...constraints[key]} onChange={event => update(key, event.target.value)} /></label>
+  const select = (key, label, options, span = 's3') => <label className={`fl ${span}`}><span>{label}</span><select value={form[key] || ''} {...constraints[key]} onChange={event => update(key, event.target.value)}><option value="">Select</option>{options.map(option => <option key={typeof option === 'string' ? option : option.key} value={typeof option === 'string' ? option : option.key}>{typeof option === 'string' ? option : option.label}</option>)}</select></label>
+  const bodies = {
+    personal: <div className="fg">{field('first_name', 'First name')}{field('last_name', 'Last name')}{field('middle_initial', 'M.I.')}{field('contact_number', 'Mobile', 's2', 'tel')}{field('email', 'Email', 's4', 'email')}{field('date_of_birth', 'Date of birth', 's2', 'date')}{select('gender', 'Gender', formOptions?.gender_options || [], 's2')}{select('blood_type', 'Blood type', formOptions?.blood_types || [], 's2')}{field('address', 'Address / Purok', 's6')}</div>,
+    qualifications: <div className="fg"><label className="fl s6"><span>Skills (comma-separated)</span><input value={form.skills || ''} {...constraints.skills} onChange={e => update('skills', e.target.value)} /></label>{field('training_notes', 'Training / certification', 's3')}{field('certification_reference', 'Certification reference', 's3')}{field('equipment_notes', 'Equipment', 's6')}</div>,
+    emergency: <div className="fg">{field('emergency_contact_name', 'Name', 's3')}{field('emergency_contact_number', 'Number', 's3', 'tel')}</div>,
+    assignment: <div className="fg"><label className="fl s3"><span>Team</span><select value={form.team_name || ''} {...constraints.team_name} onChange={e => selectTeam(e.target.value)}><option value="">Unassigned</option>{[...new Set([form.team_name, ...teamOptions.map(t => t.team_name)].filter(Boolean))].map(name => <option key={name}>{name}</option>)}</select></label><label className="fl s3"><span>Title</span>{hqAccount ? <select value={form.title === 'HQ Leader' ? 'HQ Leader' : 'HQ Personnel'} onChange={e => update('title', e.target.value)}><option>HQ Personnel</option><option>HQ Leader</option></select> : <><input list="tm-rescuer-titles" value={form.title || ''} {...constraints.title} onChange={e => update('title', e.target.value)} /><datalist id="tm-rescuer-titles">{(formOptions?.roles || []).map(title => <option key={title} value={title} />)}</datalist></>}</label>{select('duty_status', 'Duty', formOptions?.duty_statuses || [])}{select('account_status', 'Status', formOptions?.account_statuses || [])}</div>,
+    access: <div className="fg"><label className="fl s3"><span>Account ID</span><input value={form.account_id || fallbackAccountId || ''} disabled /></label><label className="fl s3"><span>{isEdit ? 'New password (optional)' : 'Temporary password'}</span><div className="tm-password"><input type="password" autoComplete="new-password" value={form.password || ''} {...constraints.password} onChange={e => update('password', e.target.value)} /><button type="button" className="bt sm" onClick={() => update('password', `Tmp-${Array.from(crypto.getRandomValues(new Uint8Array(8)), n => n.toString(16).padStart(2, '0')).join('')}`)}>Generate</button></div></label></div>,
+  }
+  const content = mode === 'view' ? <AccountProfile form={form} onEdit={onEdit} /> : <div className="cd tm-account-editor"><header className="mh2"><h3>{isEdit ? 'Edit account' : 'New account'}</h3></header>{formError && <div className="tm-feedback" role="alert">{formError}</div>}<form id="rescuerAccountForm" className="fm" onSubmit={onSubmit}><aside className="rail">{sections.map(([id, label], i) => <button type="button" key={id} className={activeSection === id ? 'on' : ''} onClick={() => { setActiveSection(id); document.getElementById(`tm-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }}><i>{i + 1}</i>{label}</button>)}</aside><section className="fbody">{roleSelector}{sections.map(([id, label]) => <section className="sec" id={`tm-${id}`} key={id}><div className="st">{label === 'Qualifications' ? 'Qualifications & equipment' : label === 'Access' ? 'Account access' : label === 'Emergency' ? 'Emergency contact' : label}</div>{bodies[id]}</section>)}</section></form><footer className="mf"><button className="bt" type="button" disabled={isSaving} onClick={onClose}>Cancel</button><button className="bt" type="button" disabled={isSaving} onClick={onReset}>Reset changes</button><button className="bt p nx" type="submit" form="rescuerAccountForm" disabled={isSaving}>{isSaving ? 'Saving…' : isEdit ? 'Save changes' : 'Create account'}</button></footer></div>
+  return embedded ? content : createPortal(<div className="tm-page ov on" onClick={e => { if (e.target === e.currentTarget) onClose() }}><div className="md" role="dialog" aria-modal="true" aria-label="Account profile"><button className="x tm-dialog-close" onClick={onClose} aria-label="Close">×</button>{content}</div></div>, document.body)
 }
-function Section({ title, description, children }) {
-  return <section className="ra-profile-section"><h3>{title}</h3>{description && <p className="ra-section-description">{description}</p>}{children}</section>
+
+function ProfileSection({ Icon, title, children, className = '' }) {
+  return <section className={`pc ${className}`}><header><Icon size={16} /><h4>{title}</h4></header>{children}</section>
 }
-function Details({ items }) {
-  return <dl className="ra-profile-details">{items.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Not recorded'}</dd></div>)}</dl>
+function initials(name = '') {
+  return name.replace(/^Hon\.\s*/i, '').split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('') || '?'
 }

@@ -1,7 +1,8 @@
 import Constants from 'expo-constants';
-import { Alert, Platform } from 'react-native';
+import { Alert, AppState, Platform } from 'react-native';
 import { notifyDisasterBroadcast } from '@/utils/mobileReadCache';
 import { api } from '@/api/client';
+import { savePushRegistration } from '@/api/device';
 
 export type PushRegistration = {
   playerId: string | null;
@@ -12,6 +13,9 @@ export type PushRegistration = {
 };
 
 let oneSignalReady = false;
+let pushSyncContext: { deviceUuid: string; userId: string } | null = null;
+let syncingSubscription = false;
+let subscriptionSyncTimer: ReturnType<typeof setInterval> | null = null;
 let unsupportedNoticeShown = false;
 let settingsNoticeShown = false;
 
@@ -36,6 +40,7 @@ export async function getPushRegistration(_deviceUuid?: string): Promise<PushReg
     const identity = await api.get('/auth/me');
     const user = identity.data.user ?? identity.data.data;
     if (!user?.user_id) return emptyOneSignalRegistration('error');
+    if (_deviceUuid) pushSyncContext = { deviceUuid: _deviceUuid, userId: String(user.user_id) };
     await initializeOneSignal();
     return getOneSignalRegistration(oneSignalAppId, String(user.user_id));
   } catch {
@@ -44,6 +49,7 @@ export async function getPushRegistration(_deviceUuid?: string): Promise<PushReg
 }
 
 export async function logoutPushIdentity() {
+  pushSyncContext = null;
   if (!oneSignalReady || !supportsRemotePushNotifications()) return;
   const { OneSignal } = await import('react-native-onesignal');
   OneSignal.User.pushSubscription.optOut();
@@ -60,6 +66,11 @@ async function initializeOneSignal() {
   try {
     const { OneSignal } = await import('react-native-onesignal');
     OneSignal.initialize(appId);
+    OneSignal.User.pushSubscription.addEventListener('change', () => { void syncCurrentSubscription(); });
+    AppState.addEventListener('change', (state) => { if (state === 'active') void syncCurrentSubscription(); });
+    if (!subscriptionSyncTimer) subscriptionSyncTimer = setInterval(() => {
+      if (AppState.currentState === 'active') void syncCurrentSubscription();
+    }, 30000);
     OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event: { notification: { additionalData?: { type?: string } } }) => {
       if (event.notification.additionalData?.type === 'disaster_broadcast') notifyDisasterBroadcast();
     });
@@ -143,10 +154,44 @@ async function getOneSignalRegistration(
       playerId: subscription.playerId,
       oneSignalUserId: await OneSignal.User.getOnesignalId(),
       pushProvider: 'onesignal',
-      permissionStatus: 'granted',
+      permissionStatus: subscription.playerId && subscription.token ? 'granted' : 'undetermined',
     };
   } catch {
     return emptyOneSignalRegistration('error');
+  }
+}
+
+// A subscription can arrive after login, rotate, or change when Firebase is configured.
+// Keep the database current without displaying another permission prompt.
+async function syncCurrentSubscription() {
+  const context = pushSyncContext;
+  if (!context || !oneSignalReady || syncingSubscription) return;
+  syncingSubscription = true;
+  try {
+    const { OneSignal } = await import('react-native-onesignal');
+    const identity = await api.get('/auth/me');
+    const user = identity.data.user ?? identity.data.data;
+    if (pushSyncContext !== context || String(user?.user_id) !== context.userId ||
+        await OneSignal.User.getExternalId() !== context.userId) return;
+    const playerId = await OneSignal.User.pushSubscription.getIdAsync();
+    const token = await OneSignal.User.pushSubscription.getTokenAsync();
+    const permission = await OneSignal.Notifications.getPermissionAsync();
+    const optedIn = await OneSignal.User.pushSubscription.getOptedInAsync();
+    if (pushSyncContext !== context) return;
+    await savePushRegistration({
+      device_uuid: context.deviceUuid,
+      device_name: user.role_key === 'rescuer' ? 'Rescuer mobile' : 'Household mobile',
+      platform: Platform.OS === 'ios' ? 'ios' : 'android',
+      player_id: playerId,
+      push_token: token,
+      one_signal_user_id: await OneSignal.User.getOnesignalId(),
+      push_provider: 'onesignal',
+      notification_permission_status: !permission ? 'denied' : playerId && token && optedIn ? 'granted' : 'undetermined',
+    });
+  } catch {
+    // Retry while the authenticated app is active or when its subscription changes.
+  } finally {
+    syncingSubscription = false;
   }
 }
 

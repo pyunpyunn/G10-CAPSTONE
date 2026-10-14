@@ -8,6 +8,20 @@ use Illuminate\Support\Facades\Storage;
 
 class ExternalReportController extends Controller
 {
+    public function handshake()
+    {
+        return response()->json([
+            'status' => 'success',
+            'authenticated' => true,
+            'source' => 'RESQPERATION',
+            'generate_endpoint' => '/api/v1/external/reports/generate',
+            'report_types' => ['archive', 'situation'],
+            'formats' => ['pdf', 'csv', 'xlsx'],
+            'archive_categories' => ['disaster-events', 'household-status-logs', 'dispatch-logs', 'radio-communication-logs', 'resource-requests', 'situation-reports'],
+            'expires_in_minutes' => (int) config('reports.expires_minutes', 30),
+        ])->header('Cache-Control', 'no-store');
+    }
+
     public function generate(Request $request, \App\Services\Web\ReportGenerationService $reports)
     {
         return $reports->generate($request);

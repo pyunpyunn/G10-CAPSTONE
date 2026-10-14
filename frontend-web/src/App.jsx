@@ -6,6 +6,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useOutletContext,
 } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
@@ -13,6 +14,7 @@ import PlaceholderPage from './pages/PlaceholderPage'
 import HouseholdReviewPage from './pages/HouseholdReviewPage'
 import { getCurrentUser, loginUser, logoutUser, saveRememberedPassword } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
+import { canOpenWebPage, hasWebAccess, webHomeForUser } from './utils/personnelAccess'
 import './App.css'
 import './styles/foundation.css'
 import './styles/index.css'
@@ -35,8 +37,6 @@ import './styles/situation.css'
 import './styles/responsive.css'
 import './styles/mapmate-reference.css'
 import './styles/map-enhancements.css'
-
-const webRoles = ['super_admin', 'admin']
 
 const pageComponents = {
   '/super-admin': lazy(() => import('./pages/SuperAdminPage')),
@@ -123,7 +123,7 @@ const modulePages = [
     path: '/rescuers',
     title: 'Account Management',
     kicker: 'Verified accounts',
-    summary: 'Create and manage rescuer, Command Center Personnel, and Barangay Captain accounts.',
+    summary: 'Create and manage rescuer and HQ Personnel accounts.',
   },
   {
     path: '/rescuers/teams',
@@ -177,6 +177,55 @@ function AuthRoutes() {
   const [checkingSession, setCheckingSession] = useState(true)
   const [loginError, setLoginError] = useState('')
   const navigate = useNavigate()
+  const sessionUserId = user?.user_id || user?.id
+
+  useEffect(() => {
+    if (!sessionUserId) return undefined
+    let disposed = false
+    let inFlight = false
+    let queued = false
+    async function refreshAccess() {
+      if (disposed || !getToken()) return
+      if (inFlight) { queued = true; return }
+      inFlight = true
+      const token = getToken()
+      try {
+        const nextUser = await getCurrentUser()
+        if (disposed || token !== getToken()) return
+        if (isWebUser(nextUser)) {
+          setUser(current => JSON.stringify(current) === JSON.stringify(nextUser) ? current : nextUser)
+        } else {
+          clearToken()
+          setUser(null)
+          setLoginError('Your role access changed. Please sign in again.')
+          navigate('/login', { replace: true })
+        }
+      } catch (error) {
+        if (!disposed && token === getToken() && [401, 403].includes(error.response?.status)) {
+          clearToken(); setUser(null); navigate('/login', { replace: true })
+        }
+      } finally {
+        inFlight = false
+        if (queued && !disposed) { queued = false; refreshAccess() }
+      }
+    }
+    const onVisible = () => { if (!document.hidden) refreshAccess() }
+    const onOperations = event => { if (event.detail?.topics?.includes('accounts')) refreshAccess() }
+    const interval = window.setInterval(onVisible, 3000)
+    window.addEventListener('personnel-access:changed', refreshAccess)
+    window.addEventListener('operations:changed', onOperations)
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
+    refreshAccess()
+    return () => {
+      disposed = true
+      window.clearInterval(interval)
+      window.removeEventListener('personnel-access:changed', refreshAccess)
+      window.removeEventListener('operations:changed', onOperations)
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [sessionUserId, navigate])
 
   useEffect(() => {
     async function loadSession() {
@@ -219,7 +268,7 @@ function AuthRoutes() {
       await saveRememberedPassword(form.login, form.password, form.rememberPassword)
       saveToken(data.token)
       setUser(nextUser)
-      navigate('/dashboard', { replace: true })
+      navigate(webHomeForUser(nextUser), { replace: true })
     } catch (error) {
       throw new Error(error.message === 'Household and rescuer accounts should use the mobile app.' ? error.message : getLoginMessage(error), { cause: error })
     }
@@ -229,6 +278,16 @@ function AuthRoutes() {
     try {
       await logoutUser()
     } finally {
+      clearToken()
+      setUser(null)
+      navigate('/login', { replace: true })
+    }
+  }
+
+  function handleUserChange(nextUser) {
+    if (isWebUser(nextUser)) {
+      setUser(nextUser)
+    } else {
       clearToken()
       setUser(null)
       navigate('/login', { replace: true })
@@ -245,7 +304,7 @@ function AuthRoutes() {
         path="/login"
         element={
           user ? (
-            <Navigate to="/dashboard" replace />
+            <Navigate to={webHomeForUser(user)} replace />
           ) : (
             <LoginPage onLogin={handleLogin} error={loginError} />
           )
@@ -256,11 +315,11 @@ function AuthRoutes() {
         path="/"
         element={
           <ProtectedRoute user={user}>
-            <AppShell user={user} pages={pagesForUser(user)} onLogout={handleLogout} onUserChange={setUser} />
+            <AppShell user={user} pages={pagesForUser(user)} onLogout={handleLogout} onUserChange={handleUserChange} />
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={<Navigate to={webHomeForUser(user)} replace />} />
         <Route path="dispatch/communication" element={<LazyPage page={{ path: '/dispatch/communication' }} />} />
         <Route path="rescue-management/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
         <Route path="rescue-management/:assignmentId/edit" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
@@ -278,18 +337,23 @@ function AuthRoutes() {
           />
         ))}
         <Route path="households/_household-list" element={<LazyPage page={{ path: '/households/_household-list' }} />} />
-        <Route path="households/:householdId" element={<HouseholdReviewPage />} />
+        <Route path="households/:householdId" element={<GuardedHouseholdReviewPage />} />
         <Route path="notifications" element={<LazyPage page={{ path: '/notifications' }} />} />
         <Route path="profile" element={<LazyPage page={{ path: '/profile' }} />} />
       </Route>
 
-      <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={user ? webHomeForUser(user) : '/login'} replace />} />
     </Routes>
   )
 }
 
 function LazyPage({ page }) {
+  const { user } = useOutletContext()
   const PageComponent = pageComponents[page.path]
+
+  if (!canOpenWebPage(user, page.path)) {
+    return <Navigate to={webHomeForUser(user)} replace />
+  }
 
   if (!PageComponent) {
     return <PlaceholderPage page={page} />
@@ -300,6 +364,12 @@ function LazyPage({ page }) {
       <PageComponent />
     </Suspense>
   )
+}
+
+function GuardedHouseholdReviewPage() {
+  const { user } = useOutletContext()
+  if (!canOpenWebPage(user, '/households')) return <Navigate to={webHomeForUser(user)} replace />
+  return <HouseholdReviewPage />
 }
 
 function ProtectedRoute({ user, children }) {
@@ -313,13 +383,13 @@ function ProtectedRoute({ user, children }) {
 }
 
 function isWebUser(user) {
-  return webRoles.includes(user?.role?.role_key)
+  return hasWebAccess(user)
 }
 
 function pagesForUser(user) {
   const roleKey = user?.role?.role_key
 
-  return modulePages.filter((page) => !page.superOnly || roleKey === 'super_admin')
+  return modulePages.filter((page) => canOpenWebPage(user, page.path) && (!page.superOnly || roleKey === 'super_admin'))
 }
 
 function getLoginMessage(error) {

@@ -36,6 +36,68 @@ class ExternalReportsTest extends TestCase
         }
     }
 
+    public function test_situation_pdf_uses_report_layout_and_keeps_event_metadata(): void
+    {
+        Storage::fake('local');
+        config(['reports.disk' => 'local']);
+
+        $summary = json_decode('{
+            "report": {
+                "report_number": "SITREP-01",
+                "period_start": "Oct 08, 2026 8:00 AM",
+                "period_end": "Oct 08, 2026 6:00 PM",
+                "prepared_by": "Admin",
+                "reviewed_by": "Duty Officer"
+            },
+            "event": {
+                "name": "Flooding Response",
+                "type": "Flood",
+                "declared_at": "Oct 08, 2026 8:00 AM",
+                "finished_at": "Ongoing",
+                "status": "Active",
+                "scope": "Barangay Wide"
+            },
+            "barangay_profile": {"name": "Barangay Sample"},
+            "weather": {
+                "condition": "Cloudy",
+                "wind": "30 km/h",
+                "rainfall": "5 mm",
+                "temperature": "29 C",
+                "source": "PAGASA",
+                "advisory": "Monitor rainfall"
+            },
+            "household": {
+                "total": 100,
+                "reported": 80,
+                "safe_total": 60,
+                "evacuated": 10,
+                "unsafe": 8,
+                "unchecked": 20,
+                "progress_text": "80%",
+                "progress_sub": "80 / 100",
+                "puroks": [{"purok": "Purok A", "total": 40, "safe": 30, "evacuated": 5, "unsafe": 3, "unchecked": 2}]
+            },
+            "casualties": {"deaths": 0, "missing": 2, "injured": 4, "rescued": 3},
+            "evacuation": [{"name": "School Hall", "type": "Shelter", "status": "Open", "capacity_status": "12 slots left"}],
+            "dispatch": {
+                "timeline": [{"time": "9:00 AM", "title": "Rescue dispatch", "actor": "Team Alpha", "detail": "Deployment", "status": "On scene"}],
+                "rows": [{"team": "Team Alpha", "deployed_at": "9:00 AM", "area": "Zone 2", "outcomes": "3 rescued"}]
+            },
+            "damage": {"partial": 6, "total": 2, "cost": "PHP 250,000"},
+            "resources": {"rows": [{"item": "Bottled water", "quantity": "200 packs", "source": "Relief team", "status": "Verified"}]},
+            "actions_text": "Continue monitoring, support evacuations, and check remaining households.",
+            "included_sections": ["I", "II", "VIII"]
+        }', true);
+
+        $result = app(ReportFileService::class)->generateSituationPdf($summary);
+        $bytes = Storage::disk('local')->get('reports/'.$result['file_name']);
+
+        $this->assertStringStartsWith('%PDF', $bytes);
+        $this->assertStringContainsString('Situation Report', $bytes);
+        $this->assertStringContainsString('Flooding Response', $bytes);
+        $this->assertStringContainsString('Barangay Sample', $bytes);
+    }
+
     public function test_pdf_limit_rejects_instead_of_truncating_records(): void
     {
         config(['reports.pdf_max_rows' => 1]);

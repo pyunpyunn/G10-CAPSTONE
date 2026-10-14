@@ -310,25 +310,45 @@ class HouseholdMobileReadQuery
         return $centers;
     }
 
-    public function recentAlerts(?string $eventId): array
+    public function recentAlerts(?string $eventId, ?string $householdId = null): array
     {
         if (! $eventId || ! Schema::hasTable('disaster_broadcasts')) {
             return [];
         }
 
+        $householdPurok = null;
+        if ($householdId && Schema::hasTable('households') && Schema::hasTable('addresses')
+            && Schema::hasColumn('households', 'address_id') && Schema::hasColumn('addresses', 'purok_sitio')) {
+            $householdPurok = DB::table('households as h')
+                ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
+                ->where('h.household_id', $householdId)
+                ->value('a.purok_sitio');
+        }
+
+        $columns = ['broadcast_id', 'broadcast_title', 'message', 'scope_type', 'sent_at', 'created_at'];
+        if (Schema::hasColumn('disaster_broadcasts', 'direct_impact_puroks_json')) $columns[] = 'direct_impact_puroks_json';
+        if (Schema::hasColumn('disaster_broadcasts', 'allowed_statuses')) $columns[] = 'allowed_statuses';
+
         return DB::table('disaster_broadcasts')
             ->where('disaster_id', $eventId)
             ->orderByDesc('sent_at')
             ->orderByDesc('created_at')
-            ->limit(10)
-            ->get([
-                'broadcast_id',
-                'broadcast_title',
-                'message',
-                'scope_type',
-                'sent_at',
-                'created_at',
-            ])
+            ->limit(30)
+            ->get($columns)
+            ->filter(function (object $row) use ($householdId, $householdPurok): bool {
+                if (($row->scope_type ?? '') !== 'selected_puroks') return true;
+                if (! $householdId || ! $householdPurok) return false;
+
+                $areas = json_decode((string) ($row->direct_impact_puroks_json ?? ''), true);
+                if (! is_array($areas)) $areas = [];
+                if ($areas === []) {
+                    $metadata = json_decode((string) ($row->allowed_statuses ?? ''), true);
+                    $areas = is_array($metadata) ? ($metadata['puroks'] ?? []) : [];
+                }
+
+                return in_array($householdPurok, array_column($areas, 'name'), true);
+            })
+            ->take(10)
             ->map(fn (object $row): array => [
                 'broadcast_id' => $row->broadcast_id,
                 'title' => $row->broadcast_title ?: 'Disaster alert',
@@ -471,7 +491,7 @@ class HouseholdMobileReadQuery
                     'member_name' => $notes['member_name'] ?? null,
                     'status_id' => $log->status_id,
                     'status_key' => $displayStatusKey,
-                    'status_label' => $this->presenter->displayStatusLabel($displayStatusKey, $log->status_label),
+                    'status_label' => $notes['mobile_status_label'] ?? $this->presenter->displayStatusLabel($displayStatusKey, $log->status_label),
                     'notes' => $notes['member_notes'] ?? null,
                     'submitted_at' => $log->submitted_at,
                     'submitted_label' => $this->presenter->dateLabel($log->submitted_at),
@@ -531,7 +551,7 @@ class HouseholdMobileReadQuery
         return [
             'status_id' => $row->status_id,
             'status_key' => $displayStatusKey,
-            'status_label' => $this->presenter->displayStatusLabel($displayStatusKey, $row->status_label),
+            'status_label' => $notes['mobile_status_label'] ?? $this->presenter->displayStatusLabel($displayStatusKey, $row->status_label),
             'notes' => $notes['user_notes'] ?? $row->last_status_notes,
             'battery_level' => $row->last_battery_level,
             'last_saved_at' => $row->last_reported_at,
@@ -589,7 +609,7 @@ class HouseholdMobileReadQuery
                 return [
                     'status_log_id' => $log->status_log_id,
                     'status_key' => $displayStatusKey,
-                    'status_label' => $this->presenter->displayStatusLabel($displayStatusKey, $log->status_label),
+                    'status_label' => $notes['mobile_status_label'] ?? $this->presenter->displayStatusLabel($displayStatusKey, $log->status_label),
                     'location_label' => $log->location_label,
                     'battery_level' => $log->battery_level,
                     'notes' => $notes['user_notes'] ?? $log->notes,
@@ -636,6 +656,7 @@ class HouseholdMobileReadQuery
                     'validation_status' => $row->validation_status ?? 'pending',
                     'member_relationships' => $this->decodeJson($row->member_relationships),
                     'current_status' => $isValidated ? $this->currentStatus($trustedHouseholdId, $activeEvent['event_id'] ?? null) : null,
+                    'status_options' => $isValidated ? $this->statusOptions($trustedHouseholdId, $activeEvent['event_id'] ?? null) : [],
                     'members' => $isValidated ? $this->members($trustedHouseholdId, $devices, $activeEvent['event_id'] ?? null)->values() : [],
                     'devices' => $devices->values(),
                     'created_at' => $row->created_at,
@@ -684,27 +705,59 @@ class HouseholdMobileReadQuery
             && DB::table('household_trusted_pins')->where('household_id', $householdId)->exists();
     }
 
-    public function statusOptions(): array
+    public function statusOptions(?string $householdId = null, ?string $eventId = null): array
     {
-        return collect([
-            ['key' => 'safe', 'label' => 'Safe'],
-            ['key' => 'evacuated', 'label' => 'Evacuated'],
-            ['key' => 'unsafe', 'label' => 'Unsafe'],
-            ['key' => 'needs_help', 'label' => 'Needs help'],
-        ])->map(function (array $option): array {
-            $status = $this->resolveStatus($option['key']);
-            $option['status_id'] = $status['status_id'] ?? null;
-
+        $options = [
+            ['key' => 'safe', 'label' => 'Safe'], ['key' => 'evacuated', 'label' => 'Evacuated'],
+            ['key' => 'unsafe', 'label' => 'Unsafe'], ['key' => 'needs_help', 'label' => 'Needs help'],
+        ];
+        $broadcastPresenter = app(\App\Presenters\DisasterBroadcastPresenter::class);
+        $catalog = collect($broadcastPresenter->statusOptions())->keyBy('key');
+        if ($eventId && Schema::hasTable('disaster_broadcasts')) {
+            $purok = null;
+            if ($householdId && Schema::hasTable('households') && Schema::hasTable('addresses') && Schema::hasColumn('households', 'address_id')) {
+                $purok = DB::table('households as h')->join('addresses as a', 'a.address_id', '=', 'h.address_id')
+                    ->where('h.household_id', $householdId)->value('a.purok_sitio');
+            }
+            foreach (DB::table('disaster_broadcasts')->where('disaster_id', $eventId)->orderByDesc('broadcast_id')->get() as $broadcast) {
+                $metadata = json_decode($broadcast->allowed_statuses ?? '', true);
+                $metadata = is_array($metadata) ? $metadata : [];
+                $areas = $broadcastPresenter->decodeJsonArray($broadcast->direct_impact_puroks_json ?? null) ?: ($metadata['puroks'] ?? []);
+                if (($broadcast->scope_type ?? 'barangay_wide') === 'selected_puroks' && ! in_array($purok, array_column($areas, 'name'), true)) continue;
+                $keys = $broadcastPresenter->decodeJsonArray($broadcast->allowed_statuses_json ?? null) ?: ($metadata['statuses'] ?? []);
+                if ($keys === [] && ! $metadata) $keys = array_filter(array_map('trim', explode(',', $broadcast->allowed_statuses ?? '')));
+                if ($keys === []) continue;
+                $snapshot = collect($broadcastPresenter->decodeJsonArray($broadcast->status_options_json ?? null))->keyBy('key');
+                $options = array_map(fn ($key) => $snapshot->get($key) ?? $catalog->get($key) ?? [
+                    'key' => $key, 'label' => ucwords(str_replace('_', ' ', $key)),
+                ], array_values($keys));
+                break;
+            }
+        }
+        return array_map(function ($option) use ($catalog) {
+            $option['safety_basis'] = \App\Support\StatusSafety::basis($option['key'], $option['safety_basis'] ?? $catalog->get($option['key'])['safety_basis'] ?? null);
+            $option['status_id'] = $this->resolveStatus($option['key'], $option)['status_id'] ?? null;
             return $option;
-        })->values()->all();
+        }, $options);
     }
 
-    public function resolveStatus(string $mobileKey): ?array
+    public function resolveStatus(string $mobileKey, ?array $selection = null): ?array
     {
         if (! Schema::hasTable('household_statuses')) {
             return null;
         }
 
+        if (Schema::hasColumn('household_statuses', 'safety_basis')) {
+            $original = DB::table('household_statuses')->where('status_key', $mobileKey)->first();
+            if (! $original && ! $selection && ! in_array($mobileKey, ['safe', 'evacuated', 'unsafe', 'needs_help'], true)) return null;
+            $basis = \App\Support\StatusSafety::basis($mobileKey, $selection['safety_basis'] ?? $original?->safety_basis);
+            $canonical = DB::table('household_statuses')->where('status_key', $basis)->first();
+            if (! $canonical) return null;
+            return [
+                'status_id' => $canonical->status_id, 'status_key' => $basis, 'safety_basis' => $basis,
+                'status_label' => $selection['label'] ?? $original?->status_label ?? $original?->status_name ?? ucwords(str_replace('_', ' ', $mobileKey)),
+            ];
+        }
         $map = [
             'safe' => ['safe', 'active', 'returned'],
             'evacuated' => ['evacuated', 'relocated'],

@@ -24,6 +24,7 @@ class RescuerAccountService
             'team' => trim((string) $request->query('team', 'all')),
             'duty_status' => trim((string) $request->query('duty_status', 'all')),
             'purok' => trim((string) $request->query('purok', 'all')),
+            'account_type' => trim((string) $request->query('account_type', 'all')),
         ];
         $perPage = \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page'));
         $paginator = $this->query->paginateResponders($filters, $perPage);
@@ -31,10 +32,11 @@ class RescuerAccountService
         $teamOptions = $view['team_options'];
         $accountIds = $this->query->accountIdChoices($teamOptions);
         $formOptions = $this->presenter->accountFormOptions();
-        $defaultTeam = $teamOptions[0] ?? [];
+        $defaultTeam = collect($teamOptions)->first(fn ($team) => strtoupper($team['team_code']) !== 'HQCC'
+            && ! in_array(strtoupper($team['team_type']), ['HQ', 'HQCC', 'HEADQUARTERS'], true)) ?? [];
         $formOptions['defaults'] = [
             ...$formOptions['defaults'],
-            'account_id' => $accountIds['options'][0]['account_id'] ?? '',
+            'account_id' => collect($accountIds['options'])->firstWhere('team_name', $defaultTeam['team_name'] ?? '')['account_id'] ?? '',
             'team_id' => $defaultTeam['team_id'] ?? null,
             'team_name' => $defaultTeam['team_name'] ?? '',
             'team_code' => $defaultTeam['team_code'] ?? '',

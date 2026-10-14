@@ -51,6 +51,9 @@ api.interceptors.response.use(
   (response) => {
     const method = String(response.config?.method || 'get').toLowerCase()
     const path = response.config?.url || ''
+    if (['post', 'patch', 'put', 'delete'].includes(method) && /^\/(rescuers|headquarters-accounts)(\/|$)/.test(path)) {
+      window.dispatchEvent(new Event('personnel-access:changed'))
+    }
     if (['post', 'patch', 'put', 'delete'].includes(method)
       && (/^\/(households|household|dispatches|broadcast|disaster-events|trusted-households|members)(\/|$)/.test(path)
         || path === '/dashboard/active-event/close')) {
@@ -59,6 +62,9 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
+    if ([401, 403].includes(error.response?.status) && !String(error.config?.url || '').startsWith('/auth/')) {
+      window.dispatchEvent(new Event('personnel-access:changed'))
+    }
     if (error.code === 'ECONNABORTED' || String(error.message || '').toLowerCase().includes('timeout')) {
       error.friendlyMessage = 'The server took too long to respond. Please check if Laravel and the shared database are running, then try again.'
     }
