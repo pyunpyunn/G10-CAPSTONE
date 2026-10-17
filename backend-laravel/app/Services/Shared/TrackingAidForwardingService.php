@@ -144,7 +144,6 @@ class TrackingAidForwardingService
                     'resource_type',
                     'quantity',
                     'unit',
-                    'urgency',
                     'area_label',
                     'area_note',
                     'requested_by',

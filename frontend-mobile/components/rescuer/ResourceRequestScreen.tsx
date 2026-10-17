@@ -32,7 +32,6 @@ export function ResourceRequestScreen({
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState('');
-  const [urgencyKey, setUrgencyKey] = useState('medium');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -76,7 +75,6 @@ export function ResourceRequestScreen({
         item_name: cleanItemName,
         quantity: quantityValue,
         unit: cleanUnit,
-        urgency_key: urgencyKey,
         description: cleanDescription,
       });
 
@@ -86,7 +84,6 @@ export function ResourceRequestScreen({
       setItemName('');
       setQuantity('1');
       setUnit('');
-      setUrgencyKey('medium');
       setDescription('');
     } finally {
       setSubmitting(false);
@@ -161,20 +158,6 @@ export function ResourceRequestScreen({
             placeholder="Unit"
             placeholderTextColor="#7d8da0"
           />
-        </View>
-
-        <View style={styles.chipRow}>
-          {['low', 'medium', 'high', 'urgent'].map((urgency) => (
-            <Pressable
-              key={urgency}
-              style={[styles.chip, urgencyKey === urgency && styles.chipActive]}
-              onPress={() => setUrgencyKey(urgency)}
-            >
-              <Text style={[styles.chipText, urgencyKey === urgency && styles.chipTextActive]}>
-                {labelize(urgency)}
-              </Text>
-            </Pressable>
-          ))}
         </View>
 
         <TextInput

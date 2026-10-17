@@ -19,7 +19,7 @@ class ResourceRequestWriteWorkflow
         return DB::transaction(function()use($request,$v,$event):array{
             $now=now();
             $id=$this->query->nextRequestId();
-            ResourceRequest::create(['request_id'=>$id,'request_source'=>$v['request_source'],'source_reference'=>$v['source_reference']??$event?->event_id,'request_category'=>$v['request_category'],'evacuation_center_id'=>$v['evacuation_center_id']??null,'requested_by'=>$v['requested_by'],'handled_by'=>$request->user()?->user_id,'resource_type'=>$v['resource_type'],'item_name'=>$v['item_name']??null,'quantity'=>(int)$v['quantity'],'unit'=>$v['unit']??'units','description'=>$v['description']??null,'urgency_id'=>(int)($v['urgency_id']??$this->query->urgencyId('medium')),'status_id'=>$this->query->statusId('needs_validation'),'validation_status'=>'needs_validation','validation_notes'=>null,'validated_by_user_id'=>null,'validated_at'=>null,'released_for_tracking_at'=>null,'tracking_reference'=>null,'created_at'=>$now,'updated_at'=>$now]);
+            ResourceRequest::create(['request_id'=>$id,'request_source'=>$v['request_source'],'source_reference'=>$v['source_reference']??$event?->event_id,'request_category'=>$v['request_category'],'evacuation_center_id'=>$v['evacuation_center_id']??null,'requested_by'=>$v['requested_by'],'handled_by'=>$request->user()?->user_id,'resource_type'=>$v['resource_type'],'item_name'=>$v['item_name']??null,'quantity'=>(int)$v['quantity'],'unit'=>$v['unit']??'units','description'=>$v['description']??null,'status_id'=>$this->query->statusId('needs_validation'),'validation_status'=>'needs_validation','validation_notes'=>null,'validated_by_user_id'=>null,'validated_at'=>null,'released_for_tracking_at'=>null,'tracking_reference'=>null,'created_at'=>$now,'updated_at'=>$now]);
             $this->trackingAid->deductStock($v['item_name'] ?? null, $v['sku'] ?? null, (int)$v['quantity'], $id);
             $result=$this->format($this->query->find($id),true);
             $this->audit($request,'create',$id,null,$result);
@@ -36,7 +36,7 @@ class ResourceRequestWriteWorkflow
             }elseif($newQty<$oldQty){
                 $this->trackingAid->restoreStock($v['item_name']??$row->item_name,$v['sku']??null,$oldQty-$newQty,$id);
             }
-            $fill=['request_source'=>$v['request_source'],'source_reference'=>$v['source_reference']??null,'request_category'=>$v['request_category'],'evacuation_center_id'=>$v['evacuation_center_id']??null,'requested_by'=>$v['requested_by'],'resource_type'=>$v['resource_type'],'item_name'=>$v['item_name']??null,'quantity'=>$newQty,'unit'=>$v['unit']??'units','description'=>$v['description']??null,'urgency_id'=>(int)($v['urgency_id']??$row->urgency_id),'updated_at'=>now()];
+            $fill=['request_source'=>$v['request_source'],'source_reference'=>$v['source_reference']??null,'request_category'=>$v['request_category'],'evacuation_center_id'=>$v['evacuation_center_id']??null,'requested_by'=>$v['requested_by'],'resource_type'=>$v['resource_type'],'item_name'=>$v['item_name']??null,'quantity'=>$newQty,'unit'=>$v['unit']??'units','description'=>$v['description']??null,'updated_at'=>now()];
             if(array_key_exists('validation_notes',$v))$fill['validation_notes']=$v['validation_notes'];
             if(!empty($v['validation_status'])){$statusKey=$this->presenter->statusKey($v['validation_status']);$fill['validation_status']=$statusKey;$fill['status_id']=$this->query->statusId($statusKey);}
             $row->fill($fill);$row->save();

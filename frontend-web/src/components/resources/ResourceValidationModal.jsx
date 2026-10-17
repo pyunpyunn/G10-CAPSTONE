@@ -134,15 +134,7 @@ export default function ResourceValidationModal({
                   onChange={(event) => setField('source_reference', event.target.value)}
                 />
               </div>
-              <div>
-                <label className="rr-mini-label">Urgency</label>
-                <select value={form.urgency_id} disabled={requestFieldsDisabled} onChange={(event) => setField('urgency_id', event.target.value)}>
-                  <option value="">Select urgency</option>
-                  {(options.urgencies || []).map((urgency) => (
-                    <option value={urgency.urgency_id} key={urgency.urgency_id}>{urgency.label}</option>
-                  ))}
-                </select>
-              </div>
+
               <div className="full">
                 <label className="rr-mini-label">Area / beneficiaries</label>
                 <select value={form.evacuation_center_id} disabled={requestFieldsDisabled} onChange={(event) => setField('evacuation_center_id', event.target.value)}>
@@ -159,7 +151,7 @@ export default function ResourceValidationModal({
                 <textarea
                   value={form.description}
                   readOnly={requestFieldsDisabled}
-                  placeholder="Incident link, urgency, vulnerability, beneficiary count, or evacuation site note..."
+                  placeholder="Incident link, vulnerability, beneficiary count, or evacuation site note..."
                   onChange={(event) => setField('description', event.target.value)}
                 />
               </div>
