@@ -175,6 +175,112 @@ class RescuerMobileService
         ]);
     }
 
+    public function assignmentHousehold(Request $request, int $assignmentId): JsonResponse
+    {
+        foreach (['households', 'household_members', 'member_statuses'] as $table) {
+            if (! Schema::hasTable($table)) {
+                return $this->missingTableResponse($table);
+            }
+        }
+
+        $responder = $this->responderForUser($request->user());
+        $assignment = $this->findAssignment($assignmentId, $responder?->responder_id);
+
+        if (! $assignment || empty($assignment->household_id)) {
+            return response()->json([
+                'message' => 'Household assignment was not found for your rescuer account.',
+            ], 404);
+        }
+
+        $householdQuery = DB::table('households as h')
+            ->where('h.household_id', $assignment->household_id)
+            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('h.deleted_at'));
+        $householdColumns = [
+            'h.household_id',
+            $this->firstExistingColumnSelect('households', ['household_code'], 'household_code', 'h'),
+            $this->firstExistingColumnSelect('households', ['household_number'], 'household_number', 'h'),
+            $this->firstExistingColumnSelect('households', ['household_name'], 'household_name', 'h'),
+        ];
+
+        if (Schema::hasTable('addresses') && Schema::hasColumn('households', 'address_id')) {
+            $householdQuery->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id');
+            $householdColumns[] = $this->firstExistingColumnSelect('addresses', ['full_address'], 'full_address', 'a');
+            $householdColumns[] = $this->firstExistingColumnSelect('addresses', ['purok_sitio'], 'purok_sitio', 'a');
+        } else {
+            $householdColumns[] = DB::raw('NULL as full_address');
+            $householdColumns[] = DB::raw('NULL as purok_sitio');
+        }
+
+        $household = $householdQuery->first($householdColumns);
+        if (! $household) {
+            return response()->json([
+                'message' => 'The assigned household record was not found.',
+            ], 404);
+        }
+
+        $memberQuery = DB::table('household_members as hm')
+            ->where('hm.household_id', $assignment->household_id)
+            ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('hm.deleted_at'));
+        $memberColumns = [
+            'hm.member_id',
+            $this->firstExistingColumnSelect('household_members', ['first_name'], 'first_name', 'hm'),
+            $this->firstExistingColumnSelect('household_members', ['middle_name'], 'middle_name', 'hm'),
+            $this->firstExistingColumnSelect('household_members', ['last_name'], 'last_name', 'hm'),
+            $this->firstExistingColumnSelect('household_members', ['is_household_head'], 'is_household_head', 'hm'),
+            DB::raw('NULL as member_status_key'),
+            DB::raw('NULL as member_status_label'),
+        ];
+
+        if (Schema::hasTable('member_disaster_statuses') && Schema::hasTable('member_statuses')) {
+            $memberQuery->leftJoin('member_disaster_statuses as mds', function ($join) use ($assignment): void {
+                $join->on('mds.member_id', '=', 'hm.member_id')
+                    ->where('mds.disaster_id', '=', $assignment->disaster_id);
+            })->leftJoin('member_statuses as ms', 'ms.status_id', '=', 'mds.status_id');
+            $memberColumns[5] = $this->firstExistingColumnSelect('member_statuses', ['status_key'], 'member_status_key', 'ms');
+            $memberColumns[6] = $this->firstExistingColumnSelect('member_statuses', ['status_label'], 'member_status_label', 'ms');
+        }
+
+        $members = $memberQuery
+            ->orderByDesc('hm.is_household_head')
+            ->orderBy('hm.last_name')
+            ->orderBy('hm.first_name')
+            ->get($memberColumns)
+            ->map(fn (object $member): array => [
+                'member_id' => (string) $member->member_id,
+                'name' => trim(implode(' ', array_filter([
+                    $member->first_name,
+                    $member->middle_name,
+                    $member->last_name,
+                ]))) ?: 'Unnamed member',
+                'is_household_head' => (bool) $member->is_household_head,
+                'member_status' => $member->member_status_key
+                    ? ['key' => $member->member_status_key, 'label' => $member->member_status_label]
+                    : null,
+            ])
+            ->values();
+        $head = $members->firstWhere('is_household_head', true);
+        $activeEvent = $this->activeEvent();
+
+        return response()->json([
+            'data' => [
+                'assignment_id' => $assignmentId,
+                'active_event' => $activeEvent,
+                'household' => [
+                    'household_id' => $household->household_id,
+                    'household_code' => $household->household_code,
+                    'household_number' => $household->household_number,
+                    'household_name' => $household->household_name,
+                    'address' => $household->full_address,
+                    'purok' => $household->purok_sitio,
+                    'location' => ['label' => $household->full_address ?: $household->purok_sitio],
+                    'household_head_name' => $head['name'] ?? $household->household_name,
+                ],
+                'members' => $members,
+                'member_status_options' => $this->memberStatusOptions(),
+            ],
+        ]);
+    }
+
     public function updateAssignmentStatus(Request $request, int $assignmentId): JsonResponse
     {
         if (! Schema::hasTable('responder_assignments')) {
@@ -201,6 +307,30 @@ class RescuerMobileService
             return response()->json([
                 'message' => 'Assignment was not found for your rescuer account.',
             ], 404);
+        }
+
+        if ($validated['status'] === 'completed' && ! empty($assignment->household_id)) {
+            if (! Schema::hasTable('responder_field_reports')) {
+                return $this->missingTableResponse('responder_field_reports');
+            }
+            if (! Schema::hasColumn('responder_field_reports', 'assignment_id')) {
+                return response()->json([
+                    'message' => 'The field report schema is out of date. Apply the latest Laravel migrations before completing household assignments.',
+                ], 503);
+            }
+
+            $hasFieldReport = DB::table('responder_field_reports')
+                ->where('assignment_id', $assignmentId)
+                ->where('responder_id', $responder?->responder_id)
+                ->where('disaster_id', $assignment->disaster_id)
+                ->where('household_id', $assignment->household_id)
+                ->exists();
+
+            if (! $hasFieldReport) {
+                return response()->json([
+                    'message' => 'Submit the household field report before completing this assignment.',
+                ], 409);
+            }
         }
 
         $status = $validated['status'];
@@ -307,8 +437,23 @@ class RescuerMobileService
 
     public function storeFieldReport(Request $request): JsonResponse
     {
-        if (! Schema::hasTable('household_status_logs')) {
-            return $this->missingTableResponse('household_status_logs');
+        foreach (['household_status_logs', 'responder_field_reports', 'responder_field_report_members', 'households', 'household_members', 'member_statuses', 'member_disaster_statuses', 'household_statuses'] as $table) {
+            if (! Schema::hasTable($table)) {
+                return $this->missingTableResponse($table);
+            }
+        }
+
+        if (! Schema::hasColumn('responder_field_reports', 'assignment_id')) {
+            return response()->json([
+                'message' => 'The field report schema is out of date. Apply the latest Laravel migrations before submitting reports.',
+            ], 503);
+        }
+
+        $responder = $this->responderForUser($request->user());
+        if (! $responder) {
+            return response()->json([
+                'message' => 'Rescuer profile was not found for this account.',
+            ], 404);
         }
 
         $activeEvent = $this->activeEvent();
@@ -320,79 +465,307 @@ class RescuerMobileService
         }
 
         $validated = $request->validate([
+            'assignment_id' => ['required', 'integer', 'min:1'],
             'household_id' => ['required', 'string', 'max:255'],
-            'household_head' => ['required', 'string', 'min:2', 'max:150'],
-            'address' => ['required', 'string', 'min:3', 'max:255'],
-            'status_key' => ['required', 'string', 'max:50'],
+            'idempotency_key' => ['required', 'string', 'max:100'],
+            'incident_type' => ['required', Rule::in(['flood', 'fire', 'earthquake', 'landslide', 'typhoon_strong_winds', 'other'])],
+            'incident_type_other' => ['nullable', 'string', 'max:255', 'required_if:incident_type,other'],
+            'property_damage' => ['required', Rule::in(['no_damage', 'minor_damage', 'major_damage', 'completely_destroyed', 'not_yet_assessed'])],
+            'death_count' => ['required', 'integer', 'min:0', 'max:4294967295'],
+            'injured_count' => ['required', 'integer', 'min:0', 'max:4294967295'],
+            'notes' => ['nullable', 'string', 'max:2000'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'battery_level' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'notes' => ['required', 'string', 'min:5', 'max:1000'],
-            'injured_count' => ['nullable', 'integer', 'min:0', 'max:999'],
-            'death_count' => ['nullable', 'integer', 'min:0', 'max:999'],
-            'property_damage' => ['nullable', 'string', 'max:255'],
-            'members' => ['nullable', 'array'],
-            'members.*.name' => ['nullable', 'string', 'max:150'],
-            'members.*.condition' => ['nullable', 'string', 'max:255'],
+            'members' => ['required', 'array', 'min:1'],
+            'members.*.member_id' => ['required', 'string', 'max:255'],
+            'members.*.status_key' => ['required', 'string', 'max:50'],
         ], [
-            'household_id.required' => 'Household ID is required.',
-            'household_head.required' => 'Household head name is required.',
-            'address.required' => 'Location, purok, or landmark is required.',
-            'status_key.required' => 'Select the household status.',
-            'notes.required' => 'Field notes are required.',
-            'notes.min' => 'Field notes must describe the situation clearly.',
+            'assignment_id.required' => 'Select an assigned household before submitting.',
+            'incident_type.required' => 'Select an incident type.',
+            'incident_type_other.required_if' => 'Specify the incident type.',
+            'property_damage.required' => 'Select the property damage level.',
+            'death_count.required' => 'Enter the number of deaths, or 0 if there are none.',
+            'death_count.min' => 'The number of deaths cannot be negative.',
+            'injured_count.required' => 'Enter the number of injured people, or 0 if there are none.',
+            'injured_count.min' => 'The number of injured people cannot be negative.',
+            'members.required' => 'Assess every household member before submitting.',
+            'members.*.member_id.required' => 'A household member could not be identified.',
+            'members.*.status_key.required' => 'Select a status for every household member.',
         ]);
 
-        $this->validateFieldReportMembers($validated['members'] ?? []);
+        $user = $request->user();
+        $assignment = $this->findAssignment((int) $validated['assignment_id'], (int) $responder->responder_id);
 
-        $statusId = $this->resolveHouseholdStatusId($validated['status_key']);
+        if (! $assignment || empty($assignment->household_id)) {
+            return response()->json([
+                'message' => 'Household assignment was not found for your rescuer account.',
+            ], 404);
+        }
+
+        if ((string) $assignment->household_id !== (string) $validated['household_id']) {
+            return response()->json([
+                'message' => 'The selected household does not match this assignment.',
+            ], 422);
+        }
+
+        if ((string) $assignment->disaster_id !== (string) $activeEvent['event_id']) {
+            return response()->json([
+                'message' => 'This assignment does not belong to the active disaster event.',
+            ], 409);
+        }
+
+        $household = DB::table('households')
+            ->where('household_id', $assignment->household_id)
+            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->first();
+
+        if (! $household) {
+            return response()->json([
+                'message' => 'The assigned household record is no longer available.',
+            ], 404);
+        }
+
+        $householdMembers = DB::table('household_members')
+            ->where('household_id', $assignment->household_id)
+            ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->pluck('member_id')
+            ->map(fn ($id): string => (string) $id)
+            ->all();
+
+        $submittedMembers = collect($validated['members'])
+            ->map(fn (array $member): array => [
+                'member_id' => (string) $member['member_id'],
+                'status_key' => $member['status_key'] === 'unchecked' ? 'unknown' : $member['status_key'],
+            ]);
+
+        if (count($householdMembers) === 0 || $submittedMembers->count() !== count($householdMembers)
+            || $submittedMembers->pluck('member_id')->unique()->count() !== count($householdMembers)
+            || $submittedMembers->pluck('member_id')->diff($householdMembers)->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'members' => ['The report must include one assessment for every current member of the assigned household.'],
+            ]);
+        }
+
+        $memberStatuses = DB::table('member_statuses')
+            ->whereIn('status_key', $submittedMembers->pluck('status_key')->unique())
+            ->when(Schema::hasColumn('member_statuses', 'is_active'), fn ($query) => $query->where('is_active', true))
+            ->get(['status_id', 'status_key'])
+            ->keyBy('status_key');
+
+        if ($submittedMembers->contains(fn (array $member): bool => ! $memberStatuses->has($member['status_key']))) {
+            throw ValidationException::withMessages([
+                'members' => ['One or more selected member statuses are no longer available. Refresh the household and try again.'],
+            ]);
+        }
+
+        $submittedMembers = $submittedMembers
+            ->sortBy('member_id')
+            ->values()
+            ->all();
+        $payloadHash = hash('sha256', json_encode([
+            'assignment_id' => (int) $validated['assignment_id'],
+            'household_id' => (string) $validated['household_id'],
+            'incident_type' => $validated['incident_type'],
+            'incident_type_other' => trim((string) ($validated['incident_type_other'] ?? '')),
+            'property_damage' => $validated['property_damage'],
+            'death_count' => (int) $validated['death_count'],
+            'injured_count' => (int) $validated['injured_count'],
+            'notes' => trim((string) ($validated['notes'] ?? '')),
+            'members' => $submittedMembers,
+        ], JSON_UNESCAPED_SLASHES));
+
+        $statusKey = $this->householdStatusFromMemberAssessments($submittedMembers);
+        $statusId = $this->resolveHouseholdStatusId($statusKey);
 
         if (! $statusId) {
             throw ValidationException::withMessages([
-                'status_key' => ['Selected status is not available in the database.'],
+                'members' => ['The household status for these assessments is not available in the database.'],
             ]);
         }
 
-        if (Schema::hasTable('households') && ! DB::table('households')->where('household_id', $validated['household_id'])->exists()) {
-            throw ValidationException::withMessages([
-                'household_id' => ['Household ID was not found in the shared database.'],
-            ]);
-        }
-
-        $user = $request->user();
-        $responder = $this->responderForUser($user);
         $now = now();
-        $statusLogId = $this->nextId('household_status_logs', 'status_log_id');
+        $reportId = (string) $this->nextId('responder_field_reports', 'report_id');
+        $notes = json_encode([
+            'report_type' => 'rescuer_field_report',
+            'assignment_id' => (int) $validated['assignment_id'],
+            'incident_type' => $validated['incident_type'],
+            'incident_type_other' => $validated['incident_type'] === 'other'
+                ? trim((string) $validated['incident_type_other'])
+                : null,
+            'property_damage' => $validated['property_damage'],
+            'death_count' => (int) $validated['death_count'],
+            'injured_count' => (int) $validated['injured_count'],
+            'user_notes' => trim((string) ($validated['notes'] ?? '')),
+            'members' => $submittedMembers,
+        ], JSON_UNESCAPED_SLASHES);
 
-        $notes = $this->fieldReportNotes($validated);
+        $result = DB::transaction(function () use (
+            $request,
+            $user,
+            $responder,
+            $assignment,
+            $activeEvent,
+            $validated,
+            $submittedMembers,
+            $memberStatuses,
+            $statusId,
+            $statusKey,
+            $reportId,
+            $payloadHash,
+            $notes,
+            $now
+        ): array {
+            $lockedAssignment = DB::table('responder_assignments')
+                ->where('assignment_id', $assignment->assignment_id)
+                ->where('responder_id', $responder->responder_id)
+                ->lockForUpdate()
+                ->first();
 
-        DB::table('household_status_logs')->insert($this->filterColumns('household_status_logs', [
-            'status_log_id' => $statusLogId,
-            'disaster_id' => $activeEvent['event_id'],
-            'household_id' => $validated['household_id'],
-            'status_id' => $statusId,
-            'source' => 'responder_field_report',
-            'submitted_by_user_id' => $user?->user_id,
-            'responder_id' => $responder?->responder_id,
-            'latitude' => $validated['latitude'] ?? null,
-            'longitude' => $validated['longitude'] ?? null,
-            'battery_level' => $validated['battery_level'] ?? null,
-            'notes' => $notes,
-            'submitted_at' => $now,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]));
+            if (! $lockedAssignment
+                || (string) $lockedAssignment->household_id !== (string) $assignment->household_id
+                || (string) $lockedAssignment->disaster_id !== (string) $activeEvent['event_id']
+                || ! in_array($lockedAssignment->status, ['dispatched', 'accepted', 'en_route', 'on_scene'], true)) {
+                throw ValidationException::withMessages([
+                    'assignment_id' => ['The selected assignment is no longer active. Refresh assignments and try again.'],
+                ]);
+            }
 
-        $this->saveLatestFieldReportStatus($activeEvent['event_id'], $validated['household_id'], $statusId, $validated, $notes, $user?->user_id, $responder?->responder_id, $now);
-        $this->saveResponderFieldReportRow($responder?->responder_id, $activeEvent['event_id'], $validated, $notes, $now);
-        $this->writeAuditLog($request, 'mobile_field_report', 'household_status_logs', (string) $statusLogId, $validated);
+            $existingReport = DB::table('responder_field_reports')
+                ->where('assignment_id', $assignment->assignment_id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existingReport) {
+                if ($existingReport->idempotency_key === $validated['idempotency_key']
+                    && hash_equals((string) $existingReport->payload_hash, $payloadHash)) {
+                    return [
+                        'report_id' => $existingReport->report_id,
+                        'status_log_id' => $existingReport->status_log_id,
+                        'submitted_at' => $existingReport->submitted_at,
+                        'duplicate' => true,
+                    ];
+                }
+
+                abort(409, 'A field report has already been saved for this assignment.');
+            }
+
+            $statusLogId = DB::table('household_status_logs')->insertGetId($this->filterColumns('household_status_logs', [
+                'disaster_id' => $activeEvent['event_id'],
+                'household_id' => $assignment->household_id,
+                'status_id' => $statusId,
+                'source' => 'responder_field_report',
+                'submitted_by_user_id' => $user?->user_id,
+                'responder_id' => $responder->responder_id,
+                'assignment_id' => $assignment->assignment_id,
+                'latitude' => $validated['latitude'] ?? null,
+                'longitude' => $validated['longitude'] ?? null,
+                'battery_level' => $validated['battery_level'] ?? null,
+                'notes' => $notes,
+                'submitted_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]), 'status_log_id');
+
+            DB::table('responder_field_reports')->insert($this->filterColumns('responder_field_reports', [
+                'report_id' => $reportId,
+                'responder_id' => $responder->responder_id,
+                'disaster_id' => $activeEvent['event_id'],
+                'household_id' => $assignment->household_id,
+                'assignment_id' => $assignment->assignment_id,
+                'submitted_by_user_id' => $user?->user_id,
+                'status_log_id' => $statusLogId,
+                'incident_type' => $validated['incident_type'],
+                'incident_type_other' => $validated['incident_type'] === 'other'
+                    ? trim((string) $validated['incident_type_other'])
+                    : null,
+                'property_damage' => $validated['property_damage'],
+                'death_count' => (int) $validated['death_count'],
+                'injured_count' => (int) $validated['injured_count'],
+                'idempotency_key' => $validated['idempotency_key'],
+                'payload_hash' => $payloadHash,
+                'latitude' => $validated['latitude'] ?? null,
+                'longitude' => $validated['longitude'] ?? null,
+                'notes' => $notes,
+                'submitted_at' => $now,
+                'created_at' => $now,
+            ]));
+
+            foreach ($submittedMembers as $member) {
+                $memberStatusId = $memberStatuses->get($member['status_key'])->status_id;
+
+                DB::table('responder_field_report_members')->insert([
+                    'report_id' => $reportId,
+                    'household_id' => $assignment->household_id,
+                    'disaster_id' => $activeEvent['event_id'],
+                    'member_id' => $member['member_id'],
+                    'status_id' => $memberStatusId,
+                    'status_key' => $member['status_key'],
+                    'assessed_at' => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                DB::table('member_disaster_statuses')->updateOrInsert(
+                    ['disaster_id' => $activeEvent['event_id'], 'member_id' => $member['member_id']],
+                    $this->filterColumns('member_disaster_statuses', [
+                        'household_id' => $assignment->household_id,
+                        'status_id' => $memberStatusId,
+                        'report_source' => 'responder',
+                        'reported_by_user_id' => $user?->user_id,
+                        'responder_id' => $responder->responder_id,
+                        'notes' => 'Field report '.$reportId,
+                        'reported_at' => $now,
+                        'updated_at' => $now,
+                    ])
+                );
+            }
+
+            $reportValues = [
+                'assignment_id' => $assignment->assignment_id,
+                'household_id' => $assignment->household_id,
+                'status_key' => $statusKey,
+                'notes' => trim((string) ($validated['notes'] ?? '')),
+                'members' => $submittedMembers,
+            ];
+
+            $this->saveLatestFieldReportStatus(
+                (string) $activeEvent['event_id'],
+                (string) $assignment->household_id,
+                (int) $statusId,
+                $reportValues,
+                $notes,
+                $user?->user_id,
+                $responder->responder_id,
+                $now
+            );
+            $this->writeAuditLog($request, 'mobile_field_report', 'responder_field_reports', $reportId, [
+                'assignment_id' => $assignment->assignment_id,
+                'household_id' => $assignment->household_id,
+                'event_id' => $activeEvent['event_id'],
+                'member_count' => count($submittedMembers),
+                'incident_type' => $validated['incident_type'],
+                'death_count' => (int) $validated['death_count'],
+                'injured_count' => (int) $validated['injured_count'],
+            ]);
+
+            return [
+                'report_id' => $reportId,
+                'status_log_id' => $statusLogId,
+                'submitted_at' => $now,
+                'duplicate' => false,
+            ];
+        });
 
         return response()->json([
-            'message' => 'Field report submitted to HQ.',
+            'message' => ! empty($result['duplicate']) ? 'Field report was already submitted.' : 'Field report submitted to HQ.',
             'data' => [
-                'status_log_id' => $statusLogId,
+                'report_id' => $result['report_id'],
+                'status_log_id' => $result['status_log_id'],
+                'assignment_id' => $assignment->assignment_id,
+                'submitted_at' => $result['submitted_at'],
             ],
-        ], 201);
+        ], ! empty($result['duplicate']) ? 200 : 201);
     }
 
     public function fieldReportsAdmin(Request $request): JsonResponse
@@ -1086,6 +1459,17 @@ class RescuerMobileService
             $columns[] = DB::raw('NULL as household_head_name');
         }
 
+        if (Schema::hasTable('responder_field_reports')
+            && Schema::hasColumn('responder_field_reports', 'status_log_id')
+            && Schema::hasColumn('responder_field_reports', 'assignment_id')) {
+            $query->leftJoin('responder_field_reports as rfr', 'rfr.status_log_id', '=', 'hsl.status_log_id');
+            $columns[] = 'rfr.assignment_id';
+            $columns[] = 'rfr.report_id';
+        } else {
+            $columns[] = DB::raw('NULL as assignment_id');
+            $columns[] = DB::raw('NULL as report_id');
+        }
+
         if ($responderId && Schema::hasColumn('household_status_logs', 'responder_id')) {
             $query->where('hsl.responder_id', $responderId);
         } elseif ($userId && Schema::hasColumn('household_status_logs', 'submitted_by_user_id')) {
@@ -1113,11 +1497,15 @@ class RescuerMobileService
             ->map(fn (object $row): array => [
                 'status_log_id' => $row->status_log_id,
                 'household_id' => $row->household_id,
+                'assignment_id' => $row->assignment_id ?? null,
+                'report_id' => $row->report_id ?? null,
                 'household_code' => $row->household_code ?? null,
                 'household_head_name' => $row->household_head_name ?? 'Household',
                 'status_id' => $row->status_id ?? null,
                 'status_key' => $row->status_key ?? 'reported',
                 'status_label' => $row->status_label ?? 'Reported',
+                'household_status_key' => $row->status_key ?? null,
+                'household_status_label' => $row->status_label ?? null,
                 'event_id' => $row->disaster_id ?? null,
                 'latitude' => $row->latitude,
                 'longitude' => $row->longitude,
@@ -1405,6 +1793,110 @@ class RescuerMobileService
         return $query->value('status_id');
     }
 
+    private function memberStatusOptions(): array
+    {
+        if (! Schema::hasTable('member_statuses')) {
+            return [];
+        }
+
+        $query = DB::table('member_statuses');
+        if (Schema::hasColumn('member_statuses', 'is_active')) {
+            $query->where('is_active', true);
+        }
+        if (Schema::hasColumn('member_statuses', 'sort_order')) {
+            $query->orderBy('sort_order');
+        }
+
+        return $query
+            ->orderBy('status_id')
+            ->get(['status_id', 'status_key', 'status_label'])
+            ->map(fn (object $status): array => [
+                'status_id' => $status->status_id,
+                'key' => $status->status_key,
+                'label' => $status->status_key === 'unknown'
+                    ? 'Unchecked'
+                    : $status->status_label,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function householdStatusFromMemberAssessments(array $members): string
+    {
+        $keys = collect($members)->pluck('status_key');
+
+        if ($keys->contains(fn (string $key): bool => in_array($key, [
+            'injured', 'missing', 'needs_help', 'need_help', 'needs_assistance',
+            'unsafe', 'trapped', 'unreachable', 'deceased',
+        ], true))) {
+            foreach (['needs_help', 'needs_assistance', 'unsafe', 'not_evacuated'] as $key) {
+                if ($this->resolveHouseholdStatusId($key)) {
+                    return $key;
+                }
+            }
+
+            return '';
+        }
+
+        if ($keys->contains(fn (string $key): bool => in_array($key, ['evacuated', 'relocated'], true))) {
+            foreach (['evacuated', 'relocated', 'safe', 'active'] as $key) {
+                if ($this->resolveHouseholdStatusId($key)) {
+                    return $key;
+                }
+            }
+
+            return '';
+        }
+
+        if ($keys->contains('displaced')) {
+            foreach (['displaced', 'not_evacuated', 'unknown'] as $key) {
+                if ($this->resolveHouseholdStatusId($key)) {
+                    return $key;
+                }
+            }
+
+            return '';
+        }
+
+        if ($keys->every(fn (string $key): bool => in_array($key, ['unknown', 'unchecked'], true))) {
+            foreach (['unknown', 'unchecked'] as $key) {
+                if ($this->resolveHouseholdStatusId($key)) {
+                    return $key;
+                }
+            }
+
+            return '';
+        }
+
+        if ($keys->contains('safe_at_home')) {
+            foreach (['safe_at_home', 'safe', 'active'] as $key) {
+                if ($this->resolveHouseholdStatusId($key)) {
+                    return $key;
+                }
+            }
+
+            return '';
+        }
+
+        if ($keys->contains(fn (string $key): bool => in_array($key, ['unknown', 'unchecked'], true))) {
+            foreach (['unknown', 'unchecked'] as $key) {
+                if ($this->resolveHouseholdStatusId($key)) {
+                    return $key;
+                }
+            }
+
+            return '';
+        }
+
+        foreach (['safe', 'active', 'returned', 'not_evacuated', 'unsafe'] as $key) {
+            if ($this->resolveHouseholdStatusId($key)) {
+                return $key;
+            }
+        }
+
+        return '';
+    }
+
     private function urgencyId(string $urgencyKey): ?int
     {
         if (! Schema::hasTable('urgency_levels')) {
@@ -1657,24 +2149,6 @@ class RescuerMobileService
             ->all();
     }
 
-    private function saveResponderFieldReportRow(?int $responderId, string $eventId, array $validated, string $notes, $now): void
-    {
-        if (! Schema::hasTable('responder_field_reports') || ! $responderId) {
-            return;
-        }
-
-        DB::table('responder_field_reports')->insert($this->filterColumns('responder_field_reports', [
-            'report_id' => (string) $this->nextId('responder_field_reports', 'report_id'),
-            'responder_id' => $responderId,
-            'disaster_id' => $eventId,
-            'household_id' => $validated['household_id'],
-            'latitude' => $validated['latitude'] ?? null,
-            'longitude' => $validated['longitude'] ?? null,
-            'notes' => $notes,
-            'created_at' => $now,
-        ]));
-    }
-
     private function evacuationCenters(?string $eventId): array
     {
         if (! Schema::hasTable('evacuation_centers') || ! Schema::hasColumn('evacuation_centers', 'latitude')) {
@@ -1796,59 +2270,6 @@ class RescuerMobileService
             'cancelled' => 'Cancelled',
             default => 'Dispatched',
         };
-    }
-
-    private function fieldReportNotes(array $validated): string
-    {
-        $parts = [];
-
-        if (! empty($validated['household_head'])) {
-            $parts[] = 'Household head: ' . $validated['household_head'];
-        }
-
-        if (! empty($validated['address'])) {
-            $parts[] = 'Address: ' . $validated['address'];
-        }
-
-        if (! empty($validated['notes'])) {
-            $parts[] = 'Notes: ' . $validated['notes'];
-        }
-
-        if (array_key_exists('injured_count', $validated) && $validated['injured_count'] !== null) {
-            $parts[] = 'Injuries: ' . (int) $validated['injured_count'];
-        }
-
-        if (array_key_exists('death_count', $validated) && $validated['death_count'] !== null) {
-            $parts[] = 'Deaths: ' . (int) $validated['death_count'];
-        }
-
-        if (! empty($validated['property_damage'])) {
-            $parts[] = 'Property damage: ' . $validated['property_damage'];
-        }
-
-        if (! empty($validated['members'])) {
-            $parts[] = 'Members: ' . json_encode($validated['members'], JSON_UNESCAPED_SLASHES);
-        }
-
-        return implode("\n", $parts);
-    }
-
-    private function validateFieldReportMembers(array $members): void
-    {
-        foreach ($members as $index => $member) {
-            $name = trim((string) ($member['name'] ?? ''));
-            $condition = trim((string) ($member['condition'] ?? ''));
-
-            if ($name === '' && $condition === '') {
-                continue;
-            }
-
-            if ($name === '' || $condition === '') {
-                throw ValidationException::withMessages([
-                    'members.'.($index + 1) => ['Enter both member name and condition, or leave both blank.'],
-                ]);
-            }
-        }
     }
 
     private function saveLatestFieldReportStatus(string $eventId, string $householdId, int $statusId, array $validated, string $notes, ?string $userId, ?int $responderId, $now): void

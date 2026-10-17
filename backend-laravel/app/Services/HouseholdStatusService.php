@@ -822,6 +822,9 @@ class HouseholdStatusService
                     'is_pwd' => (bool) $member->is_pwd,
                     'is_senior' => (bool) $member->is_senior,
                     'is_pregnant' => (bool) $member->is_pregnant,
+                    'member_status' => $member->status_key
+                        ? ['key' => $member->status_key, 'label' => $member->status_label]
+                        : null,
                     'status' => $status,
                     'status_updated_at' => $this->formatDateTime($member->status_updated_at),
                     'risk_flags' => $this->memberRiskFlags($member),

@@ -41,6 +41,11 @@ class RescuerMobileController extends Controller
         return $this->service->assignment($request, $assignmentId);
     }
 
+    public function assignmentHousehold(Request $request, int $assignmentId): JsonResponse
+    {
+        return $this->service->assignmentHousehold($request, $assignmentId);
+    }
+
     public function updateAssignmentStatus(Request $request, int $assignmentId): JsonResponse
     {
         return $this->service->updateAssignmentStatus($request, $assignmentId);

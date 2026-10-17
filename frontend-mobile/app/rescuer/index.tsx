@@ -53,6 +53,7 @@ export default function RescuerHomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
   const [overview, setOverview] = useState<RescuerOverview | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -125,6 +126,30 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleStatusChange(assignmentId: number, status: string) {
+    if (status === 'completed') {
+      const assignment = overview?.assignments.find((item: any) => item.assignment_id === assignmentId);
+      const householdId = assignment?.household_id;
+      const hasSubmittedFieldReport = !householdId || (overview?.field_reports || []).some((report: any) =>
+        String(report.assignment_id) === String(assignmentId)
+        &&
+        String(report.household_id) === String(householdId)
+        && String(report.event_id) === String(assignment?.event_id)
+      );
+
+      if (!hasSubmittedFieldReport) {
+        Alert.alert(
+          'Field report required',
+          'Submit the household field report before completing this assignment.',
+          [
+            { text: 'Fill report', onPress: () => openReport(assignment) },
+            { text: 'Cancel', style: 'cancel' },
+          ],
+        );
+        return;
+      }
+      setSelectedAssignment(assignment);
+    }
+
     try {
       const payload = ['accepted', 'en_route'].includes(status)
         ? await currentLocationPayload()
@@ -175,18 +200,8 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleSubmitFieldReport(payload: any) {
-    if (!payload.household_id) {
-      Alert.alert('Missing household ID', 'Enter the household ID before submitting.');
-      return;
-    }
-
-    try {
-      await createFieldReport(payload);
-      Alert.alert('Report submitted', 'Your household field report was sent to HQ.');
-      await loadOverview(true);
-    } catch (error: any) {
-      Alert.alert('Unable to submit report', errorMessage(error));
-    }
+    await createFieldReport(payload);
+    await loadOverview(true);
   }
 
   async function handleSubmitResourceRequest(payload: any) {
@@ -213,6 +228,34 @@ export default function RescuerHomeScreen() {
     }
   }
 
+  function openMap(assignment?: any) {
+    const targetAssignment = assignment || activeAssignment || null;
+    if (targetAssignment && overview?.field_reports?.some((report: any) =>
+      String(report.assignment_id) === String(targetAssignment.assignment_id)
+      && String(report.household_id) === String(targetAssignment.household_id)
+      && String(report.event_id) === String(targetAssignment.event_id)
+    )) {
+      const report = overview.field_reports.find((item: any) =>
+        String(item.assignment_id) === String(targetAssignment.assignment_id)
+        && String(item.household_id) === String(targetAssignment.household_id)
+      );
+      setSelectedAssignment({
+        ...targetAssignment,
+        household_status_key: report?.household_status_key || targetAssignment.household_status_key,
+        household_status_label: report?.household_status_label || targetAssignment.household_status_label,
+      });
+    } else {
+      setSelectedAssignment(targetAssignment);
+    }
+    setActiveTab('map');
+  }
+
+  function openReport(assignment?: any) {
+    const targetAssignment = assignment || selectedAssignment || activeAssignment || null;
+    setSelectedAssignment(targetAssignment);
+    setActiveTab('report');
+  }
+
   async function handleUpdateProfile(payload: any) {
     try {
       await updateRescuerProfile(payload);
@@ -233,8 +276,8 @@ export default function RescuerHomeScreen() {
       return (
         <RescuerDashboardScreen
           overview={overview}
-          onOpenMap={() => setActiveTab('map')}
-          onOpenReport={() => setActiveTab('report')}
+          onOpenMap={openMap}
+          onOpenReport={openReport}
           onStatusChange={handleStatusChange}
         />
       );
@@ -245,6 +288,7 @@ export default function RescuerHomeScreen() {
         <RescueMapScreen
           assignments={assignments}
           activeAssignment={activeAssignment}
+          selectedAssignment={selectedAssignment}
           onSendLocation={handleSendLocation}
         />
       );
@@ -254,7 +298,8 @@ export default function RescuerHomeScreen() {
       return (
         <FieldReportScreen
           reports={overview.field_reports || []}
-          statusOptions={overview.status_options || []}
+          assignmentId={Number(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || 0)}
+          householdId={String(selectedAssignment?.household_id || activeAssignment?.household_id || '')}
           onSubmitReport={handleSubmitFieldReport}
         />
       );

@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
-import { ActionButton, SectionHeader, StatusBadge } from './RescuerUI';
+import { ActionButton, SectionHeader } from './RescuerUI';
 
 type ProfileProps = {
   profile: any;
@@ -51,6 +51,11 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
     }
   }
 
+  function handleCancelEdit() {
+    setForm(profileForm(user, responder));
+    setIsEditing(false);
+  }
+
   return (
     <View style={styles.stack}>
       <View style={styles.hero}>
@@ -58,24 +63,27 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
         <View style={styles.heroText}>
-          <Text style={styles.role}>Verified rescuer</Text>
+          <Text style={styles.role}>RESPONDER PROFILE</Text>
           <Text style={styles.name}>{responder.full_name || user.full_name || 'Responder'}</Text>
-          <Text style={styles.meta}>
-            @{user.username || 'username'} · {responder.responder_code || 'No account ID'} · {responder.team_name || 'No team'}
-          </Text>
+          <Text style={styles.meta}>@{user.username || 'username'}</Text>
+          <View style={styles.heroStatus}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>{responder.duty_status || 'Stand-by'}</Text>
+          </View>
         </View>
-        <StatusBadge label={responder.duty_status || 'Stand-by'} tone={responder.duty_status || 'neutral'} textColor="#ffffff" />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isEditing ? 'Cancel profile editing' : 'Edit profile'}
+          style={styles.editButton}
+          onPress={isEditing ? handleCancelEdit : () => setIsEditing(true)}
+          disabled={saving}
+        >
+          <Ionicons name={isEditing ? 'close' : 'create-outline'} size={19} color="#fff" />
+        </Pressable>
       </View>
 
       <View style={styles.card}>
-        <SectionHeader
-          title="Account"
-          action={
-            <Pressable style={styles.iconButton} onPress={() => setIsEditing((value) => !value)}>
-              <Ionicons name={isEditing ? 'close' : 'create-outline'} size={18} color={palette.navActive} />
-            </Pressable>
-          }
-        />
+        <SectionHeader title="Account information" />
         <InfoRow icon="card-outline" label="Account ID" value={responder.responder_code || 'Not recorded'} />
         <InfoRow icon="at-outline" label="Username" value={user.username ? `@${user.username}` : 'Not recorded'} />
         <InfoRow icon="shield-checkmark-outline" label="Role" value={user.role?.role_name || 'Rescuer'} />
@@ -86,33 +94,34 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
       {isEditing ? (
         <View style={styles.card}>
           <SectionHeader title="Edit profile" />
+          <Text style={styles.cardHint}>Keep your contact and readiness information up to date.</Text>
           <View style={styles.formGrid}>
-            <Text style={styles.formSectionTitle}>Identity</Text>
+            <FormSectionTitle icon="person-outline" title="Personal information" />
             <ProfileInput label="Username" value={form.username} onChangeText={(value) => updateForm(setForm, 'username', value)} />
             <ProfileInput label="First name" value={form.first_name} onChangeText={(value) => updateForm(setForm, 'first_name', value)} />
             <ProfileInput label="MI" value={form.middle_initial} onChangeText={(value) => updateForm(setForm, 'middle_initial', value)} />
             <ProfileInput label="Last name" value={form.last_name} onChangeText={(value) => updateForm(setForm, 'last_name', value)} />
 
-            <Text style={styles.formSectionTitle}>Contact</Text>
+            <FormSectionTitle icon="call-outline" title="Contact details" />
             <ProfileInput label="Email" value={form.email} onChangeText={(value) => updateForm(setForm, 'email', value)} keyboardType="email-address" />
             <ProfileInput label="Mobile" value={form.contact_number} onChangeText={(value) => updateForm(setForm, 'contact_number', value)} keyboardType="phone-pad" />
             <ProfileInput label="Emergency contact name" value={form.emergency_contact_name} onChangeText={(value) => updateForm(setForm, 'emergency_contact_name', value)} />
             <ProfileInput label="Emergency contact mobile" value={form.emergency_contact_number} onChangeText={(value) => updateForm(setForm, 'emergency_contact_number', value)} keyboardType="phone-pad" />
 
-            <Text style={styles.formSectionTitle}>Field readiness</Text>
+            <FormSectionTitle icon="medkit-outline" title="Field readiness" />
             <ProfileInput label="Blood type" value={form.blood_type} onChangeText={(value) => updateForm(setForm, 'blood_type', value)} />
             <ProfileInput label="Address" value={form.address} onChangeText={(value) => updateForm(setForm, 'address', value)} multiline />
             <ProfileInput label="Skills" value={form.skills} onChangeText={(value) => updateForm(setForm, 'skills', value)} multiline />
           </View>
           <View style={styles.actionRow}>
-            <ActionButton label="Cancel" icon="close" tone="light" onPress={() => setIsEditing(false)} />
+            <ActionButton label="Cancel" icon="close" tone="light" disabled={saving} onPress={handleCancelEdit} />
             <ActionButton label={saving ? 'Saving...' : 'Save profile'} icon="save-outline" disabled={saving} onPress={handleSave} />
           </View>
         </View>
       ) : null}
 
       <View style={styles.card}>
-        <SectionHeader title="Responder details" />
+        <SectionHeader title="Team & readiness" />
         <InfoRow icon="people-outline" label="Team" value={responder.team_name || 'Unassigned'} />
         <InfoRow icon="key-outline" label="Team code" value={responder.team_code || 'Not recorded'} />
         <InfoRow icon="briefcase-outline" label="Title" value={responder.title || 'Responder'} />
@@ -127,6 +136,15 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
       </View>
 
       <ActionButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
+    </View>
+  );
+}
+
+function FormSectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
+  return (
+    <View style={styles.formSectionHeader}>
+      <Ionicons name={icon} size={16} color={palette.navActive} />
+      <Text style={styles.formSectionTitle}>{title}</Text>
     </View>
   );
 }
@@ -163,11 +181,11 @@ function ProfileInput({
 function InfoRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
-      <View style={styles.infoLabelWrap}>
+      <View style={styles.infoIcon}>
         <Ionicons name={icon} size={16} color={palette.navActive} />
-        <Text style={styles.infoLabel}>{label}</Text>
       </View>
-      <View style={styles.infoValueWrap}>
+      <View style={styles.infoContent}>
+        <Text style={styles.infoLabel}>{label}</Text>
         <Text style={styles.infoValue}>{value}</Text>
       </View>
     </View>
@@ -251,7 +269,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.md,
     borderRadius: radius.lg,
     padding: spacing.lg,
@@ -277,22 +295,56 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   role: {
-    color: palette.navMuted,
+    color: '#c6d5e3',
     fontSize: 11,
     fontWeight: '900',
-    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   name: {
     marginTop: 3,
     color: '#fff',
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '900',
   },
   meta: {
     marginTop: 3,
-    color: palette.navText,
+    color: '#d6e1ec',
     fontSize: 12,
+    fontWeight: '700',
+  },
+  heroStatus: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#ffffff38',
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#ffffff14',
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radius.pill,
+    backgroundColor: '#c6d5e3',
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 11,
     fontWeight: '800',
+  },
+  editButton: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#ffffff55',
+    borderRadius: radius.md,
+    backgroundColor: '#ffffff18',
   },
   card: {
     gap: spacing.sm,
@@ -302,27 +354,30 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     backgroundColor: palette.card,
   },
-  iconButton: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    backgroundColor: palette.page,
+  cardHint: {
+    marginTop: -spacing.xs,
+    color: palette.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
   },
   formGrid: {
     gap: spacing.sm,
   },
+  formSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+    paddingBottom: spacing.xs,
+  },
   formSectionTitle: {
-    marginTop: spacing.sm,
-    marginBottom: 2,
     color: palette.navActive,
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.7,
   },
   inputGroup: {
     gap: 6,
@@ -352,39 +407,35 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  infoIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    backgroundColor: palette.secondary,
+  },
+  infoContent: {
+    flex: 1,
+    gap: 3,
   },
   infoRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-    paddingTop: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   infoLabel: {
     color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  infoLabelWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    minWidth: 112,
-  },
-  infoValueWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 6,
+    fontSize: 11,
+    fontWeight: '700',
   },
   infoValue: {
-    flexShrink: 1,
     color: palette.text,
     fontSize: 13,
     fontWeight: '900',
-    textAlign: 'right',
+    lineHeight: 18,
   },
 });

@@ -11,6 +11,7 @@ import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerU
 type RescueMapProps = {
   assignments: any[];
   activeAssignment: any;
+  selectedAssignment?: any;
   onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
 };
 
@@ -21,19 +22,39 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
-export function RescueMapScreen({ assignments, activeAssignment, onSendLocation }: RescueMapProps) {
+export function RescueMapScreen({
+  assignments,
+  activeAssignment,
+  selectedAssignment,
+  onSendLocation,
+}: RescueMapProps) {
+  const mapRef = useRef<MapView | null>(null);
   const watcher = useRef<Location.LocationSubscription | null>(null);
   const [tracking, setTracking] = useState(false);
   const [position, setPosition] = useState<any>(null);
   const [lastUpdated, setLastUpdated] = useState('');
   const [locError, setLocError] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const mapTarget = selectedAssignment || activeAssignment;
 
   useEffect(() => {
     return () => {
       watcher.current?.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (!mapTarget?.latitude || !mapTarget?.longitude) {
+      return;
+    }
+
+    mapRef.current?.animateToRegion({
+      latitude: Number(mapTarget.latitude),
+      longitude: Number(mapTarget.longitude),
+      latitudeDelta: 0.025,
+      longitudeDelta: 0.025,
+    });
+  }, [mapTarget?.assignment_id, mapTarget?.latitude, mapTarget?.longitude]);
 
   async function startTracking() {
     const permission = await Location.requestForegroundPermissionsAsync();
@@ -142,7 +163,7 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
         ) : null}
 
         {canUseNativeMap ? (
-          <MapView style={styles.map} initialRegion={defaultRegion}>
+          <MapView ref={mapRef} style={styles.map} initialRegion={defaultRegion}>
             {mappedAssignments.map((assignment) => (
               <Marker
                 key={assignment.assignment_id}
@@ -152,7 +173,9 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
                 }}
                 title={assignment.assigned_area || assignment.household_id || 'Assignment'}
                 description={assignment.status_label}
-                pinColor={assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated}
+                pinColor={assignment.assignment_id === mapTarget?.assignment_id || assignment.priority_level === 'urgent'
+                  ? palette.unsafe
+                  : palette.evacuated}
               />
             ))}
 
@@ -178,7 +201,9 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
                 latitude: assignment.latitude,
                 longitude: assignment.longitude,
                 label: assignment.assigned_area || assignment.household_id || 'Assignment',
-                color: assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated,
+                color: assignment.assignment_id === mapTarget?.assignment_id || assignment.priority_level === 'urgent'
+                  ? palette.unsafe
+                  : palette.evacuated,
               })),
             ]}
           />

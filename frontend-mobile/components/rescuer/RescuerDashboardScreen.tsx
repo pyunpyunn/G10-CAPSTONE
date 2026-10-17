@@ -7,8 +7,8 @@ import { ActionButton, EmptyState, SectionHeader, StatTile, StatusBadge } from '
 
 type DashboardProps = {
   overview: any;
-  onOpenMap: () => void;
-  onOpenReport: () => void;
+  onOpenMap: (assignment?: any) => void;
+  onOpenReport: (assignment?: any) => void;
   onStatusChange: (assignmentId: number, status: string) => void;
 };
 
@@ -20,6 +20,7 @@ export function RescuerDashboardScreen({
 }: DashboardProps) {
   const [isQuickLinkHovered, setIsQuickLinkHovered] = useState(false);
   const [isQuickLinkPressed, setIsQuickLinkPressed] = useState(false);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
   const profile = overview?.profile || {};
   const responder = profile.responder || {};
   const activeEvent = overview?.active_event;
@@ -27,6 +28,12 @@ export function RescuerDashboardScreen({
   const assignments = overview?.assignments || [];
   const activeAssignment = assignments.find((item: any) =>
     ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(item.status_key)
+  );
+  const activeEventId = overview?.active_event?.event_id;
+  const hasSubmittedFieldReport = !activeAssignment?.household_id || (overview?.field_reports || []).some((report: any) =>
+    String(report.assignment_id) === String(activeAssignment.assignment_id)
+    && String(report.household_id) === String(activeAssignment.household_id)
+    && (!activeEventId || String(report.event_id) === String(activeEventId))
   );
 
   return (
@@ -102,13 +109,35 @@ export function RescuerDashboardScreen({
                 onPress={() => onStatusChange(activeAssignment.assignment_id, 'en_route')}
               />
             ) : null}
+            {activeAssignment.household_id ? (
+              <>
+                <ActionButton
+                  label="Map"
+                  icon="map-outline"
+                  tone="light"
+                  onPress={() => onOpenMap(activeAssignment)}
+                />
+                <ActionButton
+                  label="Field Report"
+                  icon="document-text-outline"
+                  tone="light"
+                  onPress={() => onOpenReport(activeAssignment)}
+                />
+              </>
+            ) : null}
             <ActionButton
               label="Complete"
               icon="flag-outline"
-              disabled={!['en_route', 'on_scene'].includes(activeAssignment.status_key)}
+              disabled={!['en_route', 'on_scene'].includes(activeAssignment.status_key) || !hasSubmittedFieldReport}
               onPress={() => onStatusChange(activeAssignment.assignment_id, 'completed')}
             />
           </View>
+          {activeAssignment.household_id && !hasSubmittedFieldReport ? (
+            <Pressable style={styles.reportRequiredButton} onPress={() => onOpenReport(activeAssignment)}>
+              <Ionicons name="document-text-outline" size={16} color={palette.navActive} />
+              <Text style={styles.reportRequiredText}>Submit field report to enable completion</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         <EmptyState
@@ -123,18 +152,52 @@ export function RescuerDashboardScreen({
           <EmptyState icon="file-tray-outline" title="No assignments yet" />
         ) : (
           assignments.map((assignment: any) => (
-            <Pressable key={assignment.assignment_id} style={styles.queueItem} onPress={onOpenMap}>
-              <View style={styles.queueIcon}>
-                <Ionicons name="trail-sign-outline" size={18} color={palette.navActive} />
-              </View>
-              <View style={styles.queueText}>
-                <Text style={styles.queueTitle}>{assignment.assigned_area || assignment.household_id || 'Assigned location'}</Text>
-                <Text style={styles.queueMeta}>
-                  {assignment.destination_label || assignment.assignment_code || `Assignment ${assignment.assignment_id}`} · {formatDate(assignment.assigned_at)}
-                </Text>
-              </View>
-              <StatusBadge label={assignment.status_label} tone={assignment.status_key} />
-            </Pressable>
+            <View key={assignment.assignment_id} style={styles.queueEntry}>
+              <Pressable
+                style={styles.queueItem}
+                onPress={() => setSelectedAssignmentId((current) =>
+                  current === assignment.assignment_id ? null : assignment.assignment_id
+                )}
+              >
+                <View style={styles.queueIcon}>
+                  <Ionicons name="trail-sign-outline" size={18} color={palette.navActive} />
+                </View>
+                <View style={styles.queueText}>
+                  <Text style={styles.queueTitle}>{assignment.assigned_area || assignment.household_id || 'Assigned location'}</Text>
+                  <Text style={styles.queueMeta}>
+                    {assignment.destination_label || assignment.assignment_code || `Assignment ${assignment.assignment_id}`} · {formatDate(assignment.assigned_at)}
+                  </Text>
+                  <Text style={styles.queueMeta}>Household {assignment.household_id || 'not linked'}</Text>
+                </View>
+                <StatusBadge label={assignment.status_label} tone={assignment.status_key} />
+              </Pressable>
+              {selectedAssignmentId === assignment.assignment_id
+                && assignment.household_id
+                && ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(assignment.status_key) ? (
+                <View style={styles.assignmentActions}>
+                  <ActionButton
+                    label="Map"
+                    icon="map-outline"
+                    tone="light"
+                    onPress={() => onOpenMap(assignment)}
+                  />
+                  <ActionButton
+                    label="Field Report"
+                    icon="document-text-outline"
+                    onPress={() => onOpenReport(assignment)}
+                  />
+                </View>
+              ) : null}
+              {selectedAssignmentId === assignment.assignment_id
+                && !['dispatched', 'accepted', 'en_route', 'on_scene'].includes(assignment.status_key) ? (
+                <Text style={styles.queueMeta}>This assignment is no longer active.</Text>
+              ) : null}
+              {selectedAssignmentId === assignment.assignment_id
+                && !assignment.household_id
+                && ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(assignment.status_key) ? (
+                <Text style={styles.queueMeta}>This assignment has no linked household.</Text>
+              ) : null}
+            </View>
           ))
         )}
       </View>
@@ -142,7 +205,7 @@ export function RescuerDashboardScreen({
       <View style={styles.quickRow}>
         <Pressable
           style={[styles.quickLink, (isQuickLinkHovered || isQuickLinkPressed) && styles.quickLinkActive]}
-          onPress={onOpenMap}
+          onPress={() => onOpenMap(activeAssignment)}
           onHoverIn={() => setIsQuickLinkHovered(true)}
           onHoverOut={() => setIsQuickLinkHovered(false)}
           onPressIn={() => setIsQuickLinkPressed(true)}
@@ -151,17 +214,19 @@ export function RescuerDashboardScreen({
           <Ionicons name="map-outline" size={18} color={palette.navActive} />
           <Text style={styles.quickText}>Open map</Text>
         </Pressable>
-        <Pressable
-          style={[styles.quickLink, (isQuickLinkHovered || isQuickLinkPressed) && styles.quickLinkActive]}
-          onPress={onOpenReport}
-          onHoverIn={() => setIsQuickLinkHovered(true)}
-          onHoverOut={() => setIsQuickLinkHovered(false)}
-          onPressIn={() => setIsQuickLinkPressed(true)}
-          onPressOut={() => setIsQuickLinkPressed(false)}
-        >
-          <Ionicons name="create-outline" size={18} color={palette.navActive} />
-          <Text style={styles.quickText}>Send field report</Text>
-        </Pressable>
+        {activeAssignment?.household_id ? (
+          <Pressable
+            style={[styles.quickLink, (isQuickLinkHovered || isQuickLinkPressed) && styles.quickLinkActive]}
+            onPress={() => onOpenReport(activeAssignment)}
+            onHoverIn={() => setIsQuickLinkHovered(true)}
+            onHoverOut={() => setIsQuickLinkHovered(false)}
+            onPressIn={() => setIsQuickLinkPressed(true)}
+            onPressOut={() => setIsQuickLinkPressed(false)}
+          >
+            <Ionicons name="create-outline" size={18} color={palette.navActive} />
+            <Text style={styles.quickText}>Send field report</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -278,6 +343,17 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
+  reportRequiredButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  reportRequiredText: {
+    color: palette.navActive,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   queueItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -285,6 +361,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: palette.border,
     paddingTop: spacing.md,
+  },
+  queueEntry: {
+    gap: spacing.sm,
+  },
+  assignmentActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingLeft: 46,
   },
   queueIcon: {
     width: 38,

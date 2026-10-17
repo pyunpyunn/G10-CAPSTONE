@@ -170,6 +170,9 @@ Actual mobile login is DB-driven. Household accounts from SafeTrack work in RESQ
 - Household app loads `/api/v1/household/overview`
 - Rescuer login uses `/api/v1/auth/login`
 - Rescuer app loads `/api/v1/rescuer/overview`
+- Rescuer assignment household details use `/api/v1/rescuer/assignments/{assignmentId}/household`
+- Rescuer field reports use `/api/v1/rescuer/field-reports`
+- Laravel rejects household assignment completion until a report is saved for that assignment
 
 If login fails on the phone but works on the browser/laptop, check:
 
@@ -177,3 +180,21 @@ If login fails on the phone but works on the browser/laptop, check:
 - Laravel is running with `--host=0.0.0.0`
 - Windows Firewall allows port `8000`
 - `EXPO_PUBLIC_API_BASE_URL` uses the current laptop Wi-Fi IP
+
+## Rescuer Field Report Workflow
+
+Apply the latest Laravel migrations before testing:
+
+```bash
+cd backend-laravel
+php artisan migrate
+php artisan test --filter=RescuerFieldReportApiTest
+```
+
+Select a mission in the rescuer queue, then choose **Map** or **Field Report**.
+The form loads household and individual member records from the assigned
+household. A report must include an assessment for each member, an incident type,
+property damage, and non-negative death/injury counts. Laravel saves the report,
+member assessment history, household status log, and latest member statuses in
+one transaction. Reports are idempotent per assignment, and Laravel enforces
+the report requirement when completing an assignment.
