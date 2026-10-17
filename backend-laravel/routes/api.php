@@ -24,6 +24,9 @@ use App\Http\Controllers\Api\WeatherController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::get('/external/reports/options', [\App\Http\Controllers\Api\ReportExchangeController::class, 'options'])->middleware([\App\Http\Middleware\ValidateExternalApiKey::class, 'throttle:30,1']);
+    Route::post('/external/report-requests', [\App\Http\Controllers\Api\ReportExchangeController::class, 'store'])->middleware([\App\Http\Middleware\ValidateExternalApiKey::class, 'throttle:30,1']);
+    Route::get('/external/report-requests/{id}', [\App\Http\Controllers\Api\ReportExchangeController::class, 'externalStatus'])->middleware(['signed', 'throttle:60,1'])->name('external.report-requests.status');
     Route::post('/external/reports/handshake', [\App\Http\Controllers\Api\ExternalReportController::class, 'handshake'])->middleware([\App\Http\Middleware\ValidateExternalApiKey::class, 'throttle:30,1']);
     Route::post('/external/reports/generate', [\App\Http\Controllers\Api\ExternalReportController::class, 'generate'])->middleware([\App\Http\Middleware\ValidateExternalApiKey::class, 'throttle:30,1']);
     Route::get('/external/reports/status/{token}', [\App\Http\Controllers\Api\ExternalReportController::class, 'status'])->middleware('signed')->name('external.reports.status');
@@ -139,8 +142,14 @@ Route::prefix('v1')->group(function () {
             Route::get('/archive/situation-reports', [ArchiveController::class, 'situationReports']);
             Route::post('/reports/generate', [\App\Http\Controllers\Api\ExternalReportController::class, 'generate'])->middleware('throttle:30,1');
             Route::get('/reports/external/providers', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'providers']);
+            Route::get('/reports/situation/sitios', [SituationReportController::class, 'sitios']);
+            Route::get('/reports/external/requests', [\App\Http\Controllers\Api\ReportExchangeController::class, 'index']);
+            Route::post('/reports/external/requests/{id}/decision', [\App\Http\Controllers\Api\ReportExchangeController::class, 'decide'])->middleware('throttle:10,1');
+            Route::post('/reports/external/requests/{id}/file', [\App\Http\Controllers\Api\ReportExchangeController::class, 'refreshFile'])->middleware('throttle:10,1');
             Route::get('/reports/evatrack/configuration', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'configuration']);
             Route::post('/reports/evatrack/generate', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'generate'])->middleware('throttle:30,1');
+            Route::post('/reports/safetrack/generate', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'generateSafeTrack'])->middleware('throttle:10,1');
+            Route::post('/reports/trackingaid/generate', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'generateTrackingAid'])->middleware('throttle:30,1');
             Route::get('/archive/export', [ArchiveController::class, 'export']);
             Route::get('/archive/saved-groups', [ArchiveController::class, 'savedGroups']);
             Route::post('/archive/saved-groups', [ArchiveController::class, 'storeSavedGroup']);

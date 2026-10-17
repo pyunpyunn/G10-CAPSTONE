@@ -32,7 +32,7 @@ class SituationReportWorkflow
                 'report_number' => $reportNumber, 'period_start' => $validated['period_start'] ?? null,
                 'period_end' => $validated['period_end'] ?? null, 'prepared_by' => $validated['prepared_by'] ?? $request->user()?->name,
                 'reviewed_by' => $validated['reviewed_by'] ?? null, 'actions_text' => $validated['actions_text'] ?? '',
-                'included_sections' => $validated['included_sections'] ?? ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'],
+                'included_sections' => $validated['included_sections'] ?? ['I', 'II', 'III', 'V', 'VI', 'VII', 'VIII'],
                 'generated_at' => $now->toDateTimeString(),
             ]);
             DB::table('situation_reports')->insert([
@@ -60,7 +60,7 @@ class SituationReportWorkflow
         $summary = $this->presenter->buildSummary($event, $this->query->summarySources($eventId), $this->barangayProfile->current(), [
             'report_number' => $reportNumber, 'period_start' => $event->started_at, 'period_end' => $endedAt->toDateTimeString(),
             'prepared_by' => \App\Models\User::query()->where('user_id', $adminId)->first()?->name, 'reviewed_by' => null, 'actions_text' => $closureNote,
-            'included_sections' => ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'], 'generated_at' => $endedAt->toDateTimeString(),
+            'included_sections' => ['I', 'II', 'III', 'V', 'VI', 'VII', 'VIII'], 'generated_at' => $endedAt->toDateTimeString(),
         ]);
         DB::table('situation_reports')->insert([
             'sit_rep_id' => $sitRepId, 'report_number' => $reportNumber, 'disaster_id' => $event->event_id,

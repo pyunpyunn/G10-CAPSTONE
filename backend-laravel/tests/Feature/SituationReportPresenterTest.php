@@ -17,7 +17,7 @@ class SituationReportPresenterTest extends TestCase
             'household_total' => 4, 'household_reported' => 3,
             'household_counts' => collect(['safe' => 1, 'evacuated' => 1, 'unsafe' => 1]),
             'purok_rows' => collect([
-                (object) ['purok' => 'Sitio Uno', 'total' => 2, 'safe' => 1, 'evacuated' => 0, 'unsafe' => 1, 'reported' => 2],
+                (object) ['purok' => 'Sitio Uno', 'sitio_id' => 'S1', 'sitio_name' => 'Upper Sitio', 'persons' => 9, 'affected_persons' => 4, 'total' => 2, 'safe' => 1, 'evacuated' => 0, 'unsafe' => 1, 'reported' => 2],
                 (object) ['purok' => 'Unassigned', 'total' => 1, 'safe' => 0, 'evacuated' => 0, 'unsafe' => 0, 'reported' => 0],
             ]),
             'weather' => null, 'evacuation' => collect(), 'assignments' => collect(),
@@ -31,6 +31,13 @@ class SituationReportPresenterTest extends TestCase
 
         $this->assertSame('EV-1', $summary['event']['event_id']);
         $this->assertSame(4, $summary['household']['total']);
+        $this->assertSame(2, $summary['household']['affected']);
+        $this->assertSame('Upper Sitio', $summary['household']['puroks'][0]['sitio']);
+        $this->assertSame(9, $summary['household']['puroks'][0]['persons']);
+        $this->assertSame(4, $summary['household']['puroks'][0]['affected_persons']);
+        $this->assertSame(1, $summary['household']['sitios'][0]['affected']);
+        $this->assertNull($summary['household']['puroks'][1]['persons']);
+        $this->assertArrayNotHasKey('evacuation', $summary);
         $this->assertSame(3, $summary['household']['reported']);
         $this->assertSame(1, $summary['household']['unchecked']);
         $this->assertSame(50, $summary['household']['safe_percent']);
