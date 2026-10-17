@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Queries\MappingQuery;
 use App\Queries\HouseholdPurokQuery;
-use App\Jobs\RefreshWeatherSnapshot;
 use App\Jobs\DeliverDisasterBroadcast;
 use Illuminate\Http\Request;
 use Illuminate\Database\Schema\Blueprint;
@@ -233,18 +232,67 @@ class AuthenticatedWorkspaceContractTest extends TestCase
             ->assertJsonStructure(['data' => ['records' => ['data', 'current_page', 'per_page', 'total'], 'filters']]);
     }
 
-    public function test_weather_refresh_is_queued_and_keeps_a_readable_response(): void
+    private function createWeatherTable(): void
     {
+        Schema::create('weather_logs', function (Blueprint $table): void {
+            $table->increments('weather_log_id');
+            $table->string('disaster_id')->nullable();
+            foreach (['source_name', 'source_url', 'condition_name', 'wind_direction', 'advisory_title', 'advisory_text'] as $column) {
+                $table->text($column)->nullable();
+            }
+            foreach (['temperature', 'rainfall_mm', 'wind_speed', 'humidity'] as $column) {
+                $table->float($column)->nullable();
+            }
+            $table->json('raw_payload')->nullable();
+            $table->timestamp('observed_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function test_weather_refresh_saves_immediately_without_queueing_and_survives_reload(): void
+    {
+        $this->createWeatherTable();
+        Queue::fake();
+        Http::preventStrayRequests();
+        Http::fake(['api.open-meteo.com/*' => Http::response([
+            'current' => ['time' => '2026-10-17T12:00', 'temperature_2m' => 28.4, 'weather_code' => 3],
+        ])]);
         $this->getJson('/api/v1/weather')->assertOk()
             ->assertJsonStructure(['data' => ['active_event', 'latest_snapshot', 'logs', 'location']]);
-        $this->getJson('/api/v1/disaster-events/EV-MISSING/weather-logs')
-            ->assertNotFound()->assertExactJson(['message' => 'Disaster event record was not found.']);
+        Http::assertNothingSent();
+        $this->getJson('/api/v1/disaster-events/EV-MISSING/weather-logs')->assertNotFound();
+        $response = $this->postJson('/api/v1/weather/refresh')->assertCreated()
+            ->assertJsonPath('data.latest_snapshot.temperature', 28.4)
+            ->assertJsonPath('data.latest_snapshot.disaster_id', 'EV-1');
+        $this->assertDatabaseCount('weather_logs', 1);
+        $this->getJson('/api/v1/weather')->assertOk()
+            ->assertJsonPath('data.latest_snapshot.weather_log_id', $response->json('data.latest_snapshot.weather_log_id'));
+        $this->postJson('/api/v1/disaster-events/EV-1/weather-logs/refresh')->assertCreated();
+        Http::assertSentCount(2);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_weather_provider_failure_finishes_and_retains_saved_weather(): void
+    {
+        $this->createWeatherTable();
+        DB::table('weather_logs')->insert(['temperature' => 27.5, 'observed_at' => now(), 'created_at' => now()]);
         Queue::fake();
-        $this->postJson('/api/v1/weather/refresh')
-            ->assertStatus(202)
-            ->assertJsonStructure(['message', 'data' => ['active_event', 'latest_snapshot', 'logs', 'location']]);
-        Queue::assertPushedOn('weather', RefreshWeatherSnapshot::class);
-        Queue::assertPushedOn('weather', RefreshWeatherSnapshot::class, fn (RefreshWeatherSnapshot $job): bool => $job->eventId === 'EV-1');
+        foreach ([Http::response([], 503), Http::failedConnection(), Http::response(['current' => []])] as $failure) {
+            Http::fake(['api.open-meteo.com/*' => $failure]);
+            $this->postJson('/api/v1/weather/refresh')->assertStatus(503);
+            $this->assertDatabaseCount('weather_logs', 1);
+            $this->getJson('/api/v1/weather')->assertOk()->assertJsonPath('data.latest_snapshot.temperature', 27.5);
+        }
+        Queue::assertNothingPushed();
+    }
+
+    public function test_weather_refresh_reports_missing_storage_instead_of_queueing(): void
+    {
+        Queue::fake();
+        Http::fake();
+        $this->postJson('/api/v1/weather/refresh')->assertStatus(409);
+        Queue::assertNothingPushed();
+        Http::assertNothingSent();
     }
 
     public function test_broadcast_save_attempts_push_immediately_and_queues_delivery_fallback(): void

@@ -18,7 +18,7 @@ class WeatherWorkerTest extends TestCase
             DB::table('weather_logs')->delete();
             DB::table('weather_logs')->insert(['created_at' => now()->subHours($hoursAgo)]);
             $command = \Mockery::mock(WorkWeatherUpdates::class)->makePartial();
-            $command->shouldReceive('call')->once()->with('queue:work', \Mockery::on(fn ($args) => $args['--queue'] === 'weather' && $args['connection'] === 'operations_outbox'))->andReturn(0);
+            $command->shouldNotReceive('call');
             $command->shouldReceive('option')->with('once')->andReturn(true);
             $command->shouldReceive('line')->zeroOrMoreTimes();
             $weather = \Mockery::mock(WeatherSnapshotService::class);

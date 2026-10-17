@@ -22,6 +22,7 @@ export default function AppShell({ user, pages, onLogout, onUserChange }) {
   useEffect(() => connectRealtimeNotifications(userId, topicKey.split(','), { adminAccess, notificationsAccess }), [userId, topicKey, adminAccess, notificationsAccess])
   const shellClass = [
     'app-shell',
+    ['/situation', '/archive'].includes(location.pathname) ? 'hide-page-scrollbar' : '',
     location.pathname.startsWith('/situation') ? 'situation-shell' : '',
     ['/mapping', '/weather'].includes(location.pathname) ? 'monitoring-shell' : '',
     location.pathname === '/households' || location.pathname.startsWith('/households/') ? 'household-shell' : '',

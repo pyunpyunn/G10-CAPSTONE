@@ -2,7 +2,6 @@
 
 namespace App\Services\Shared;
 
-use App\Jobs\RefreshWeatherSnapshot;
 use App\Services\Shared\WeatherSnapshotService;
 
 class WeatherService
@@ -42,8 +41,7 @@ class WeatherService
 
     private function saveRefresh(?string $eventId): array
     {
-        RefreshWeatherSnapshot::dispatch($eventId)->onConnection('operations_outbox')->onQueue('weather');
-        return $this->weather->pageData($eventId);
+        return $this->weather->saveLatestSnapshot($eventId);
     }
 }
 
