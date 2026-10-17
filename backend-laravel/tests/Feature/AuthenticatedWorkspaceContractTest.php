@@ -25,6 +25,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
         Schema::create('users', function (Blueprint $table): void {
             $table->string('user_id')->primary();
             $table->string('role')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
         Schema::create('disaster_types', function (Blueprint $table): void {
@@ -80,7 +81,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
             'severity_level_id' => 1, 'started_at' => '2026-01-01 08:00:00',
         ]);
         DB::table('households')->insert(['household_id' => 'HH-1']);
-        Sanctum::actingAs(User::query()->create(['user_id' => 'ADMIN-TEST', 'role' => 'admin']));
+        Sanctum::actingAs(User::query()->create(['user_id' => 'HQ-PERSONNEL-TEST', 'role' => 'hq_personnel']));
     }
 
     public function test_dashboard_summary_keeps_authenticated_json_shape(): void
@@ -242,7 +243,8 @@ class AuthenticatedWorkspaceContractTest extends TestCase
         $this->postJson('/api/v1/weather/refresh')
             ->assertStatus(202)
             ->assertJsonStructure(['message', 'data' => ['active_event', 'latest_snapshot', 'logs', 'location']]);
-        Queue::assertPushedOn('operations', RefreshWeatherSnapshot::class);
+        Queue::assertPushedOn('weather', RefreshWeatherSnapshot::class);
+        Queue::assertPushedOn('weather', RefreshWeatherSnapshot::class, fn (RefreshWeatherSnapshot $job): bool => $job->eventId === 'EV-1');
     }
 
     public function test_broadcast_save_attempts_push_immediately_and_queues_delivery_fallback(): void

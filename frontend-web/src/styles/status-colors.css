@@ -1,0 +1,6 @@
+/* Status meaning and hues follow the dashboard, including legacy table badges. */
+.badge[style*="--status-color"],.status-badge[style*="--status-color"]{color:var(--status-color);background:color-mix(in srgb,var(--status-color) 10%,white);border:1px solid color-mix(in srgb,var(--status-color) 30%,white)}
+.status-swatch.blue{background:var(--chart-evacuated)}
+.dispatch-bar-fill.available,.dispatch-bar-fill.completed{background:var(--chart-safe)}
+.dispatch-bar-fill.returning{background:var(--chart-warning)}
+.dispatch-bar-fill.cancelled{background:var(--chart-unchecked)}

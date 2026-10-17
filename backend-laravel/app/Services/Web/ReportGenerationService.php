@@ -19,6 +19,8 @@ class ReportGenerationService
             'included_sections' => 'nullable|array', 'included_sections.*' => 'in:I,II,III,IV,V,VI,VII,VIII',
             'actions_text' => 'nullable|string|max:20000', 'start_date' => 'nullable|date', 'end_date' => 'nullable|date|after_or_equal:start_date',
             'ids' => 'nullable|array', 'ids.*' => 'string|max:255',
+            'report_number' => 'nullable|string|max:80', 'prepared_by' => 'nullable|string|max:150', 'reviewed_by' => 'nullable|string|max:150',
+            'period_start' => 'nullable|date', 'period_end' => 'nullable|date|after_or_equal:period_start',
         ]);
         $data['format'] = $data['format'] ?? 'pdf';
         if ($data['report_type'] === 'archive') {
@@ -43,6 +45,10 @@ class ReportGenerationService
         if (empty($data['sit_rep_id'])) {
             $summary['actions_text'] = $data['actions_text'] ?? $summary['actions_text'];
             $summary['included_sections'] = $data['included_sections'] ?? $summary['included_sections'];
+            foreach (['report_number', 'prepared_by', 'reviewed_by', 'period_start', 'period_end'] as $field) {
+                if (isset($data[$field])) $summary['report'][$field] = in_array($field, ['period_start', 'period_end'], true)
+                    ? \Carbon\Carbon::parse($data[$field])->format('M d, Y g:i A') : $data[$field];
+            }
         }
 
         if ($data['format'] === 'pdf') {

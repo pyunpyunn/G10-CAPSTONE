@@ -28,6 +28,7 @@ const searchablePages = [
   { title: 'Account Management', href: '/rescuers', keywords: 'responders personnel hq command center' },
   { title: 'Resources & Requests', href: '/resources-requests', keywords: 'supplies inventory requests' },
   { title: 'Situation Reporting', href: '/situation', keywords: 'sitrep reports' },
+  { title: 'External Reports', href: '/situation/external-reports', keywords: 'evatrack export pdf excel csv' },
   { title: 'Archive', href: '/archive', keywords: 'history records logs' },
   { title: 'Notifications', href: '/notifications', keywords: 'alerts inbox' },
   { title: 'Profile', href: '/profile', keywords: 'account settings' },
@@ -430,6 +431,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
 }
 
 function getPageTitle(pathname, state) {
+  if (pathname === '/situation/external-reports') return 'External Reports'
   const normalizedPath = pathname.replace(/\/$/, '') || '/dashboard'
   const navigationTitles = {
     '/dispatch': 'Dispatch Dashboard',

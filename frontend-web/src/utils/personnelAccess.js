@@ -26,7 +26,7 @@ export function canOpenWebPage(user, path) {
   else if (['/mapping', '/weather', '/households'].some(prefix => route === prefix || route.startsWith(`${prefix}/`))) module = 'geospatial_analytics'
   else if (['/broadcast', '/dispatch', '/rescue-management', '/field-reports'].some(prefix => route === prefix || route.startsWith(`${prefix}/`))) module = 'response_operations'
   else if (['/request-types', '/external-requests', '/resources-requests'].some(prefix => route === prefix || route.startsWith(`${prefix}/`))) module = 'resources_requests'
-  else if (route === '/situation' || route === '/archive' || route.startsWith('/archive/')) module = 'reports_documentation'
+  else if ((route === '/situation' || route.startsWith('/situation/')) || route === '/archive' || route.startsWith('/archive/')) module = 'reports_documentation'
 
   return Boolean(module && user?.permissions?.web_modules?.includes(module))
 }

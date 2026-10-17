@@ -1,3 +1,4 @@
+import { statusColor as unifiedStatusColor } from '../utils/statusPalette'
 import { useCallback, useEffect, useState } from 'react'
 
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -1150,17 +1151,13 @@ function pushDeliveryLabel(status) {
 
 
 
-function statusColor(key) {
-
-  return ({ safe: '#16a34a', evacuated: '#2563eb', need_help: '#ea580c', needs_help: '#ea580c', unsafe: '#dc2626' })[key] || '#64748b'
-
-}
+function statusColor(key) { return unifiedStatusColor(key) }
 
 
 
 function severityTone(key) {
 
-  return ({ low: '#16a34a', medium: '#d97706', moderate: '#d97706', high: '#ea580c', critical: '#dc2626' })[key] || '#d97706'
+  return unifiedStatusColor(key || 'warning')
 
 }
 

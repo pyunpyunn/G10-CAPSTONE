@@ -1,15 +1,17 @@
+import { statusColor } from './statusPalette'
 export const markerGroups = {
   green: {
-    label: 'Safe or evacuated',
-    color: '#3a7d57',
+    label: 'Safe',
+    color: statusColor('safe'),
   },
+  blue: { label: 'Evacuated', color: statusColor('evacuated') },
   red: {
     label: 'Unsafe or needs help',
-    color: '#962020',
+    color: statusColor('unsafe'),
   },
   gray: {
     label: 'Unchecked',
-    color: '#6a7f94',
+    color: statusColor('unchecked'),
   },
 }
 
@@ -102,7 +104,8 @@ export function isHouseholdRouteAllowed(household) {
 
 export function defaultRules() {
   return [
-    { color: 'green', title: 'Green marker', text: 'Safe, evacuated, or checked household with GPS coordinates.' },
+    { color: 'green', title: 'Green marker', text: 'Safe or checked household with GPS coordinates.' },
+    { color: 'blue', title: 'Blue marker', text: 'Evacuated household with GPS coordinates.' },
     { color: 'red', title: 'Red marker', text: 'Unsafe, missing, injured, or needs-help household with GPS coordinates.' },
     { color: 'gray', title: 'Grey marker', text: 'Unchecked household with GPS coordinates.' },
     { color: 'hidden', title: 'No coordinates, no marker', text: 'Households without latitude and longitude stay hidden from the map.' },

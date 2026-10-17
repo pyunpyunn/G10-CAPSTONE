@@ -102,7 +102,7 @@ class HouseholdMobileSetupWorkflowTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame([
             'message' => 'Household mobile setup saved.',
-            'data' => ['device_token_id' => 1],
+            'data' => ['device_token_id' => 1, 'geographic_classification' => ['status' => 'outside_barangay']],
         ], $response->getData(true));
         $this->assertDatabaseHas('geotagged_locations', [
             'household_id' => 'HH-1', 'latitude' => 10.2, 'longitude' => 123.8,

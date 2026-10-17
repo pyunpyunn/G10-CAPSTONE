@@ -31,7 +31,8 @@ class WeatherService
 
     public function refreshWorkspace(): array
     {
-        return $this->saveRefresh(null);
+        $activeEvent = $this->weather->getActiveEvent();
+        return $this->saveRefresh($activeEvent ? (string) $activeEvent->event_id : null);
     }
 
     public function refreshEvent(string $eventId): array
@@ -41,7 +42,7 @@ class WeatherService
 
     private function saveRefresh(?string $eventId): array
     {
-        RefreshWeatherSnapshot::dispatch($eventId)->onConnection('operations_outbox')->onQueue('operations');
+        RefreshWeatherSnapshot::dispatch($eventId)->onConnection('operations_outbox')->onQueue('weather');
         return $this->weather->pageData($eventId);
     }
 }

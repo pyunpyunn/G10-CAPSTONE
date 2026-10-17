@@ -1,3 +1,4 @@
+import { statusColor } from '../utils/statusPalette'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
@@ -8,7 +9,7 @@ import DispatchSidePanel from '../components/dispatch/DispatchSidePanel'
 import FieldCommunicationPanel from '../components/dispatch/FieldCommunicationPanel'
 import { ResponseOperationsLayout } from '../components/ui/PageHeader'
 import { useModuleData } from '../utils/useModuleData'
-import { emptySummary, groupSitioDeployments } from '../utils/dispatchHelpers'
+import { emptySummary } from '../utils/dispatchHelpers'
 
 export default function RescueDispatchPage() {
   const location = useLocation()
@@ -17,7 +18,9 @@ export default function RescueDispatchPage() {
   const loader = useCallback(async () => {
     const [workspace, priorities] = await Promise.allSettled([getDispatchDashboard({ per_page: 5 }), getSitioPriorities()])
     if (workspace.status === 'rejected') throw workspace.reason
-    return { ...workspace.value, priorities: groupSitioDeployments(priorities.status === 'fulfilled' && Array.isArray(priorities.value) ? priorities.value : [], workspace.value?.risk_areas || [], workspace.value?.active_dispatches || []), priorityError: priorities.status === 'rejected' ? 'Rescue priorities could not be loaded. Please refresh.' : '' }
+    const sitioCoverage = new Map((workspace.value?.sitio_coverage || []).map((item) => [String(item.sitio_id), item]))
+    const rankedSitios = priorities.status === 'fulfilled' && Array.isArray(priorities.value) ? priorities.value : []
+    return { ...workspace.value, priorities: rankedSitios.map((row) => ({ ...row, activeDispatches: sitioCoverage.get(String(row.sitio_id))?.active_assignments || [] })), priorityError: priorities.status === 'rejected' ? 'Rescue priorities could not be loaded. Please refresh.' : '' }
   }, [])
   const { data, error, loading } = useModuleData(loader, ['dispatch', 'households', 'disasters', 'accounts'])
   const selected = open === undefined ? data?.priorities?.[0]?.sitio_id : open
@@ -30,10 +33,10 @@ export default function RescueDispatchPage() {
       <div className="dash"><DispatchSummary summary={data.summary || emptySummary()} /><div className="r2">
         <div className="cd pri"><div className="ch">Rescue Priority</div><div className="cb">
           {data.priorityError ? <div className="form-error" role="alert">{data.priorityError}</div> : !data.priorities.length ? <div className="empty-reference">No rescue priorities</div> : [
-            { title:'Awaiting deployment', rows:data.priorities.filter((row) => !row.activeDispatches.length) },
-            { title:'Deployed sitios', rows:data.priorities.filter((row) => row.activeDispatches.length) },
-          ].map((list) => <section className="sitio-priority-list" key={list.title} aria-label={list.title}><h3>{list.title}<span>{list.rows.length}</span></h3>{!list.rows.length ? <div className="mu sitio-list-empty">{list.title === 'Deployed sitios' ? 'No sitios have active dispatches.' : 'All listed sitios have active dispatches.'}</div> : list.rows.map((row) => {
-            const color = row.band?.key === 'high' ? '#dc2626' : row.band?.key === 'moderate' ? '#d97706' : '#2563eb'
+            { title:'Awaiting assignment', rows:data.priorities.filter((row) => !row.activeDispatches.length) },
+            { title:'Already assigned sitios', rows:data.priorities.filter((row) => row.activeDispatches.length) },
+          ].map((list) => <section className="sitio-priority-list" key={list.title} aria-label={list.title}><h3>{list.title}<span>{list.rows.length}</span></h3>{!list.rows.length ? <div className="mu sitio-list-empty">{list.title === 'Already assigned sitios' ? 'No sitios have active dispatches.' : 'No sitios are awaiting assignment.'}</div> : list.rows.map((row) => {
+            const color = statusColor(row.band?.key || 'low')
             const statuses = [...new Map(row.activeDispatches.map((assignment) => [assignment.status.key, assignment.status])).values()]
             const rescuerIds = new Set(row.activeDispatches.flatMap((assignment) => assignment.selected_responder_ids || (assignment.responder_id ? [assignment.responder_id] : [])).map(String))
             return <div key={row.sitio_id} className={`pr${selected === row.sitio_id ? ' on' : ''}`}><button className="ph2" type="button" aria-expanded={selected === row.sitio_id} onClick={() => setOpen(selected === row.sitio_id ? null : row.sitio_id)}><span className="rk">{row.rank}</span><b>{row.sitio}</b><span className="sc"><i style={{ width: `${Math.max(0, Math.min(100, Number(row.priority_score) || 0))}%`, background: color }} /></span><em>{row.priority_score}%</em><span className="pl" style={{ '--c': color }}>{row.band?.label || 'Low'}</span></button>

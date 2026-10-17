@@ -25,9 +25,7 @@ class MappingService
     {
         [, $eventId, $hasEvent] = $this->eventContext($request);
         $focus = $this->barangayProfile->mapFocus();
-        return $hasEvent ? $this->insideBoundary(
-            $this->query->getHouseholdGeotags($request, $eventId, $focus['barangay_id']), $focus,
-        ) : [];
+        return $hasEvent ? $this->query->getHouseholdGeotags($request, $eventId, $focus['barangay_id']) : [];
     }
 
     public function evacuationSites(Request $request): array
@@ -49,6 +47,7 @@ class MappingService
 
     private function snapshot(Request $request, bool $full): MappingSnapshot
     {
+        $request->validate(['purok_id' => ['sometimes', 'integer', 'min:1']]);
         [$event, $eventId, $hasEvent] = $this->eventContext($request);
         $focus = $this->barangayProfile->mapFocus();
         $sites = $hasEvent ? $this->insideBoundary($this->query->getEvacuationSites($eventId), $focus) : [];
@@ -61,12 +60,31 @@ class MappingService
             $summary,
             $this->query->getPuroks($focus['barangay_id']),
             $full,
-            $full && $hasEvent ? $this->insideBoundary(
-                $this->query->getHouseholdGeotags($request, $eventId, $focus['barangay_id']), $focus) : [],
+            $full && $hasEvent ? $this->query->getHouseholdGeotags($request, $eventId, $focus['barangay_id']) : [],
             $full && $hasEvent ? $sites : [],
             $full && $hasEvent ? $this->insideBoundary($this->query->getRescueTeamMarkers($eventId), $focus) : [],
             $full && $hasEvent ? $this->routesInsideBoundary($this->query->getDispatchRoutes($eventId), $focus) : [],
+            $this->query->getPurokOptions($focus['barangay_id']),
         );
+    }
+
+    public function householdRoute(string $householdId): array
+    {
+        $event = $this->query->getActiveEvent();
+        abort_unless($event, 409, 'Household routing requires an active disaster event.');
+        $focus = $this->barangayProfile->mapFocus();
+        $request = Request::create('/', 'GET', ['household_id' => $householdId]);
+        $points = $this->query->getHouseholdGeotags($request, $event->event_id, $focus['barangay_id']);
+        $household = collect($points)->firstWhere('household_id', $householdId);
+        abort_unless($household, 404, 'This household has no available geotag in the current barangay.');
+        $office = config('rescue_office');
+        abort_unless(is_numeric($office['latitude'] ?? null) && is_numeric($office['longitude'] ?? null), 422, 'Rescue office coordinates are not configured.');
+        $route = app(\App\Services\Shared\RoutingService::class)->drivingRoute(
+            (float) $office['latitude'], (float) $office['longitude'], $household['latitude'], $household['longitude']);
+        abort_unless($route, 503, 'A driving route cannot be generated right now. Please try again later.');
+        return ['household_id' => $householdId, 'origin_name' => $office['name'] ?? 'Rescue office',
+            'distance_km' => $route['distance_km'], 'duration_min' => $route['duration_min'],
+            'coordinates' => array_map(fn ($point) => [$point['lat'], $point['lng']], $route['coordinates'])];
     }
 
     private function insideBoundary(array $points, array $focus): array

@@ -56,7 +56,7 @@ class EvaTrackReportsTest extends TestCase
     {
         $this->withoutMiddleware();
         $this->postJson('/api/v1/reports/evatrack/generate', [
-            'report_type' => 'archive', 'format' => 'xlsx', 'start_date' => '2026-10-14', 'end_date' => '2026-10-01',
+            'report_type' => 'archive', 'format' => 'html', 'start_date' => '2026-10-14', 'end_date' => '2026-10-01',
         ])->assertUnprocessable()->assertJsonValidationErrors(['report_type', 'format', 'end_date']);
         Http::assertNothingSent();
     }
@@ -92,6 +92,29 @@ class EvaTrackReportsTest extends TestCase
     {
         Http::fake(['*' => Http::response(array_merge($this->report(), ['download_url' => 'javascript:alert(1)']))]);
         $this->assertSame(502, app(EvaTrackReportClient::class)->generate(['report_type' => 'general'])->getStatusCode());
+    }
+
+    public function test_excel_export_converts_real_evatrack_csv_without_sending_the_api_key_to_the_download(): void
+    {
+        Storage::fake('local'); config(['reports.disk' => 'local']);
+        Http::fake([
+            'evatrack.test/api/*' => Http::response($this->report()),
+            'evatrack.test/download*' => Http::response("Area,Persons\nReal area,3\n", 200, ['Content-Type' => 'text/csv']),
+        ]);
+        $response = app(EvaTrackReportClient::class)->generate(['report_type'=>'demographics','format'=>'xlsx']);
+        $this->assertSame(200, $response->getStatusCode());
+        $data = $response->getData(true);
+        $this->assertSame('xlsx', $data['format']);
+        $this->assertStringStartsWith('PK', Storage::disk('local')->get('reports/'.$data['file_name']));
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/generate') && $request['format'] === 'csv');
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/download') && ! $request->hasHeader('X-API-KEY'));
+    }
+
+    public function test_excel_export_rejects_downloads_outside_the_configured_origin(): void
+    {
+        Http::fake(['evatrack.test/*' => Http::response(array_merge($this->report(), ['download_url'=>'http://other.test/private.csv']))]);
+        $this->assertSame(502, app(EvaTrackReportClient::class)->generate(['report_type'=>'general','format'=>'xlsx'])->getStatusCode());
+        Http::assertSentCount(1);
     }
 
     public function test_verification_command_downloads_and_saves_the_report(): void

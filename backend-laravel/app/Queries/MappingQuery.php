@@ -38,7 +38,7 @@ class MappingQuery
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', $statusColumn)
             ->whereNotNull('gl.latitude')
             ->whereNotNull('gl.longitude')
-            ->when($barangayId !== null, fn ($builder) => $builder->where('a.barangay_id', $barangayId));
+            ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId));
 
         if ($this->hasColumn('households', 'deleted_at')) {
             $query->whereNull('h.deleted_at');
@@ -48,6 +48,8 @@ class MappingQuery
             ? "COALESCE(NULLIF(a.purok_sitio, ''), p.purok_name)"
             : 'p.purok_name';
         $purok = $request->query('purok', 'all');
+        if ($request->filled('purok_id')) $query->where('a.purok_id', (int) $request->query('purok_id'));
+        if ($request->filled('household_id')) $query->where('h.household_id', $request->query('household_id'));
 
         if ($purok !== 'all') {
             $query->whereRaw($purokExpression.' = ?', [$purok]);
@@ -74,6 +76,7 @@ class MappingQuery
                         $point['status_key'] = $fallback['status_key'];
                         $point['status_label'] = $fallback['status_label'];
                         $point['marker_group'] = $this->presenter->statusGroup($fallback['status_key']);
+                        $point['marker_color'] = $this->presenter->statusColor($point['marker_group']);
                     }
                 }
 
@@ -123,7 +126,7 @@ class MappingQuery
 
     public function getRescueTeamMarkers(?string $eventId): array
     {
-        if (! Schema::hasTable('responder_location_logs')) {
+        if (! $eventId || ! Schema::hasTable('responder_location_logs')) {
             return [];
         }
 
@@ -149,10 +152,7 @@ class MappingQuery
             ->whereNotNull('rll.longitude');
 
         if ($eventId) {
-            $query->where(function ($where): void {
-                $where->whereNull('ra.status')
-                    ->orWhereNotIn('ra.status', ['completed', 'cancelled', 'returned']);
-            });
+            $query->whereIn('ra.status', ['assigned', 'accepted', 'dispatched', 'en_route', 'on_scene', 'returning']);
         }
 
         return $query
@@ -187,7 +187,7 @@ class MappingQuery
             ->limit(50)
             ->get()
             ->map(fn (object $route): array => $this->presenter->formatRoute($route, $this->routeCoordinates($route)))
-            ->filter(fn (array $route): bool => $this->isActiveDispatchRoute($route['status']) && count($route['coordinates']) >= 2)
+            ->filter(fn (array $route): bool => $this->isActiveDispatchRoute($route['status']) && $this->isActiveDispatchRoute($route['route_status'] ?? null) && count($route['coordinates']) >= 2)
             ->values()
             ->all();
 
@@ -218,14 +218,14 @@ class MappingQuery
         $hasAddresses = Schema::hasTable('addresses');
         $totalHouseholds = Schema::hasTable('households')
             ? DB::table('households as h')
-                ->when($hasAddresses && $barangayId !== null, fn ($query) => $query->join('addresses as a', 'a.address_id', '=', 'h.address_id')->where('a.barangay_id', $barangayId))
+                ->when($hasAddresses, fn ($query) => $query->join('addresses as a', 'a.address_id', '=', 'h.address_id')->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId)))
                 ->when($this->hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('h.deleted_at'))->count()
             : 0;
 
             $gpsTagged = Schema::hasTable('geotagged_locations') && Schema::hasTable('households')
                 ? DB::table('geotagged_locations as gl')
                     ->join('households as h', 'h.household_id', '=', 'gl.household_id')
-                    ->when($hasAddresses && $barangayId !== null, fn ($query) => $query->join('addresses as a', 'a.address_id', '=', 'h.address_id')->where('a.barangay_id', $barangayId))
+                    ->when($hasAddresses, fn ($query) => $query->join('addresses as a', 'a.address_id', '=', 'h.address_id')->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId)))
                     ->when($this->hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('h.deleted_at'))
                     ->whereNotNull('gl.latitude')
                     ->whereNotNull('gl.longitude')
@@ -237,15 +237,16 @@ class MappingQuery
 
         if (Schema::hasTable('geotagged_locations') && $this->hasColumn('geotagged_locations', 'accuracy_m')) {
             $averageAccuracy = GeotaggedLocation::query()
-                ->when($hasAddresses && $barangayId !== null, fn ($query) => $query
+                ->when($hasAddresses, fn ($query) => $query
                     ->join('households as h', 'h.household_id', '=', 'geotagged_locations.household_id')
                     ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
-                    ->where('a.barangay_id', $barangayId))
+                    ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId)))
                 ->whereNotNull('accuracy_m')
                 ->avg('accuracy_m');
         }
 
         return [
+            'total_households' => (int) $totalHouseholds,
             'gps_tagged_households' => (int) $gpsTagged,
             'no_verified_geotag' => max((int) $totalHouseholds - (int) $gpsTagged, 0),
             'average_accuracy_m' => $averageAccuracy ? round((float) $averageAccuracy, 1) : null,
@@ -288,6 +289,16 @@ class MappingQuery
         return app(HouseholdPurokQuery::class)->names($barangayId);
     }
 
+    public function getPurokOptions(int|string|null $barangayId): array
+    {
+        if ($barangayId === null || ! Schema::hasTable('puroks') || ! Schema::hasTable('sitios')) return [];
+        return DB::table('puroks as p')->join('sitios as s', 's.sitio_id', '=', 'p.sitio_id')
+            ->where('s.barangay_id', $barangayId)->orderBy('s.sitio_name')->orderBy('p.purok_name')
+            ->get(['p.purok_id', 'p.purok_name', 's.sitio_id', 's.sitio_name'])
+            ->map(fn ($p) => ['purok_id' => (int) $p->purok_id, 'purok_name' => $p->purok_name,
+                'sitio_id' => (int) $p->sitio_id, 'sitio_name' => $p->sitio_name])->all();
+    }
+
     public function householdSelectColumns(): array
     {
         $columns = [
@@ -298,6 +309,8 @@ class MappingQuery
             'gl.updated_at',
             'h.household_code',
             'h.household_name',
+            'a.purok_id',
+            'p.sitio_id',
             'hs.status_key',
             'hs.status_label',
         ];
@@ -373,6 +386,7 @@ class MappingQuery
             'rr.created_at',
             'ra.assigned_area',
             'ra.status',
+            'ra.status as assignment_status',
             'r.full_name',
             'rt.team_name',
         ];

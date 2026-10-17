@@ -64,6 +64,8 @@ class RescueDispatchService
 
     public function index(Request $request): JsonResponse
     {
+        $request->validate(['sitio_id' => ['sometimes', 'integer', 'min:1']]);
+        if ($request->has('sitio_id')) app(\App\Queries\HouseholdStatusQuery::class)->listScope($request);
         $activeEvent = $this->query->activeEvent();
         $eventId = $request->query('event_id') ?: $activeEvent?->event_id;
         $perPage = \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page'));
@@ -80,6 +82,7 @@ class RescueDispatchService
                     'responders' => $this->query->responders(null),
                     'risk_areas' => collect(),
                     'active_dispatches' => [],
+                    'sitio_coverage' => [],
                     'dispatches' => [
                         'data' => [],
                         'meta' => [
@@ -98,6 +101,9 @@ class RescueDispatchService
         }
 
         $dispatches = $this->query->dispatches($request, (string) $eventId);
+        $riskAreas = $this->query->riskAreas($eventId);
+        $activeAssignments = $this->query->activeDispatches((string) $eventId);
+        $sitioCoverage = app(\App\Queries\SitioDispatchCoverageQuery::class)->forEvent((string) $eventId, $riskAreas, $activeAssignments);
 
         return response()->json([
             'data' => [
@@ -107,8 +113,9 @@ class RescueDispatchService
                 'team_coverage' => $this->query->teamCoverage($eventId),
                 'teams' => $teamCards,
                 'responders' => $this->query->responders($eventId),
-                'risk_areas' => $this->query->riskAreas($eventId),
-                'active_dispatches' => $this->query->activeDispatches((string) $eventId),
+                'risk_areas' => $riskAreas,
+                'active_dispatches' => $activeAssignments,
+                'sitio_coverage' => $sitioCoverage,
                 'dispatches' => [
                     'data' => collect($dispatches->items())
                         ->map(fn (object $dispatch): array => $this->presenter->dispatch($dispatch))
@@ -286,6 +293,8 @@ class RescueDispatchService
 
         $validated = $request->validate([
             'team_id' => [$isCreate ? 'required' : 'sometimes', 'integer', 'exists:rescue_teams,team_id'],
+            'sitio_id' => ['sometimes', 'integer', 'min:1', 'exists:sitios,sitio_id'],
+            'purok_id' => ['sometimes', 'integer', 'min:1', 'exists:puroks,purok_id'],
             'household_id' => ['nullable', 'string', 'max:255'],
             'household_ids' => [$isCreate ? 'required_with:household_groups' : 'prohibited', 'array', 'list', 'min:1', 'max:1000'],
             'household_ids.*' => ['required', 'string', 'distinct', 'max:255'],

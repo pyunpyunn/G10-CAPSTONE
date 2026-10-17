@@ -19,6 +19,8 @@ class HouseholdStatusService
 
     public function index(Request $request): JsonResponse
     {
+        $request->validate(['sitio_id' => ['sometimes', 'integer', 'min:1'], 'purok_id' => ['sometimes', 'integer', 'min:1']]);
+        $scope = $this->query->listScope($request);
         $event = $this->query->getActiveEvent();
         $eventId = $event?->event_id;
         $perPage = \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page'));
@@ -44,6 +46,7 @@ class HouseholdStatusService
         ))->values();
 
         return response()->json(['data' => [
+            'selected_scope' => $scope,
             'area_label' => $this->coverage->label(),
             'active_event' => $event ? $this->presenter->formatActiveEvent($event) : null,
             'summary' => $this->query->getSummary($eventId),
@@ -71,13 +74,14 @@ class HouseholdStatusService
         $latestDevice = $this->query->getLatestDevices(collect([$householdId]))->get($householdId);
         $accountUser = $this->query->getHouseholdAccountUsers(collect([$householdId]))->get($householdId);
         $devices = $this->query->getDevices($householdId);
+        $scope = $this->query->listScope(Request::create('/', 'GET', array_filter(['sitio_id' => $household->sitio_id, 'purok_id' => $household->purok_id])));
 
         return response()->json(['data' => [
             'active_event' => $event ? $this->presenter->formatActiveEvent($event) : null,
-            'household' => $this->presenter->formatHouseholdDetail(
+            'household' => array_merge($this->presenter->formatHouseholdDetail(
                 $household, $latestLog, $latestDevice, $accountUser, $devices, (bool) $event,
                 $this->query->householdRiskSummary($householdId),
-            ),
+            ), ['household_head' => $this->query->householdHead($householdId), 'sitio' => $scope['sitio'], 'purok_id' => $household->purok_id]),
             'members' => $this->query->getMembers($householdId, $eventId, $devices),
             'devices' => $devices,
         ]]);

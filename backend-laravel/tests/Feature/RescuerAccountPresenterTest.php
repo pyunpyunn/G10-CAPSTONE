@@ -23,7 +23,7 @@ class RescuerAccountPresenterTest extends TestCase
 
         $payload = app(RescuerAccountPresenter::class)->formatResponder($row, true);
 
-        $this->assertSame(['key' => 'on_scene', 'label' => 'On-scene', 'tone' => 'green'], $payload['duty_status']);
+        $this->assertSame(['key' => 'on_scene', 'label' => 'On-scene', 'tone' => 'purple'], $payload['duty_status']);
         $this->assertSame('M.', $payload['middle_initial']);
         $this->assertTrue($payload['training_due']);
         $this->assertSame('alex@example.test', $payload['email']);

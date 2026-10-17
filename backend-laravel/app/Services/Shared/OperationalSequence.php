@@ -50,6 +50,7 @@ class OperationalSequence
     }
 
     private const NUMERIC_IDS = [
+        'addresses' => 'address_id',
         'device_tokens' => 'id',
         'device_tracking_logs' => 'tracking_id',
         'disaster_broadcasts' => 'broadcast_id',

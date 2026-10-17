@@ -17,7 +17,7 @@ class MappingPresenterTest extends TestCase
             'priority_level'=>null,'created_at'=>'2026-09-30 10:00:00','updated_at'=>null,
         ]);
         $this->assertSame('green',$marker['marker_group']);
-        $this->assertSame('#16a34a',$marker['marker_color']);
+        $this->assertSame('#3a7d57',$marker['marker_color']);
         $this->assertSame(10.1,$marker['latitude']);
         $this->assertSame('HH-4',$marker['household_id']);
     }

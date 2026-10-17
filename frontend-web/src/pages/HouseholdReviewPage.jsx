@@ -1,326 +1,50 @@
-import { useEffect, useState } from 'react'
-import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useState } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { getHousehold, getHouseholdStatusLogs } from '../api/householdApi'
-import LoadingState from '../components/ui/LoadingState'
-import PageHeader from '../components/ui/PageHeader'
-import { StatusBadge } from '../components/households/HouseholdTable'
+import { useModuleData } from '../utils/useModuleData'
+import { HouseholdStatus, HouseholdPagination, RefreshButton } from '../components/households/HouseholdPrototype'
 
-const HISTORY_PAGE_SIZE = 5
+const recorded = value => value === null || value === undefined || value === '' ? 'Not recorded' : value
+const percentage = value => value === null || value === undefined || value === '' ? 'Not recorded' : `${value}%`
+function Fact({ label, value }) { return <div><em>{label}</em><b>{recorded(value)}</b></div> }
+function Section({ title, children }) { return <div className="ps"><h4>{title}</h4><div>{children}</div></div> }
+function Table({ headings, children, empty, count }) {
+  return count ? <div className="tw2"><table><thead><tr>{headings.map(heading => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{children}</tbody></table></div> : <div className="emp">{empty}</div>
+}
+function Battery({ value }) { return <><span className="bat"><i style={{ width: `${Math.max(0, Math.min(100, Number(value) || 0))}%` }} /></span>{percentage(value)}</> }
 
 export default function HouseholdReviewPage() {
-  const navigate = useNavigate()
   const { householdId } = useParams()
   const location = useLocation()
-  const dispatchContext = new URLSearchParams(location.search)
-  const dispatchId = dispatchContext.get('dispatch_id')
-  const dispatchCode = dispatchContext.get('dispatch_code')
-  const responderId = dispatchContext.get('responder_id')
-  const returnContext = new URLSearchParams()
-  if (/^DSP-\d+-\d+$/.test(dispatchCode || '')) returnContext.set('dispatch_code', dispatchCode)
-  if (/^\d+$/.test(responderId || '')) returnContext.set('responder_id', responderId)
-  const dispatchReturnPath = /^\d+$/.test(dispatchId || '') ? `/rescue-management/${dispatchId}/edit${returnContext.size ? `?${returnContext}` : ''}` : null
-  const [detail, setDetail] = useState(null)
-  const [history, setHistory] = useState([])
-  const [historyPage, setHistoryPage] = useState(1)
-  const [historyExpanded, setHistoryExpanded] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  const totalHistoryPages = Math.max(1, Math.ceil(history.length / HISTORY_PAGE_SIZE))
-  const currentHistoryPage = Math.min(historyPage, totalHistoryPages)
-  const historyStart = (currentHistoryPage - 1) * HISTORY_PAGE_SIZE
-  const paginatedHistory = history.slice(historyStart, historyStart + HISTORY_PAGE_SIZE)
-
-  useEffect(() => {
-    let ignore = false
-
-    async function loadDetail() {
-      setIsLoading(true)
-      setError('')
-
-      try {
-        const [detailData, historyData] = await Promise.all([
-          getHousehold(householdId),
-          getHouseholdStatusLogs(householdId),
-        ])
-
-        if (!ignore) {
-          setDetail(detailData)
-          setHistory(historyData.logs || [])
-          setHistoryPage(1)
-        }
-      } catch {
-        if (!ignore) {
-          setError('Household details cannot be loaded right now.')
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    if (householdId) {
-      loadDetail()
-    }
-
-    return () => {
-      ignore = true
-    }
+  const [expanded, setExpanded] = useState(false)
+  const [pageState, setPage] = useState({ id: '', page: 1 })
+  const loader = useCallback(async () => {
+    const [detail, logs] = await Promise.all([getHousehold(householdId), getHouseholdStatusLogs(householdId)])
+    return { detail, logs: logs.logs || [] }
   }, [householdId])
-
-  return (
-    <main className="household-review-page">
-      <PageHeader
-        title={detail?.household?.household_name || 'Household record'}
-        subtitle={detail?.household?.purok || 'Purok not assigned'}
-        actions={(
-          <>
-            <span className={`review-header-status status-badge ${detail?.household?.status?.key || 'unchecked'}`}>
-              {detail?.household?.status?.label || 'Status not reported'}
-            </span>
-            <button type="button" className="button secondary compact-button" onClick={() => navigate('/households')}>
-              <ArrowLeft size={15} /> Back to households
-            </button>
-            {dispatchReturnPath && <button type="button" className="button secondary compact-button" onClick={() => navigate(dispatchReturnPath)}>
-              <ArrowLeft size={15} /> Back to rescue dispatch
-            </button>}
-          </>
-        )}
-      />
-
-      {isLoading && <LoadingState />}
-      {error && <div className="form-error">{error}</div>}
-
-      {!isLoading && detail && (
-        <>
-          <div className="hh-detail-group">
-            <div className="hh-section-label">
-              <span>Household profile</span>
-              <span>{detail.household?.household_id || 'ID not recorded'}</span>
-            </div>
-            <div className="hh-household-facts">
-              <Fact label="Household code" value={detail.household?.household_code || detail.household?.household_id} />
-              <Fact label="Account holder" value={detail.household?.account_holder} />
-              <Fact label="Account ID" value={detail.household?.account_id} />
-              <Fact label="Contact number" value={detail.household?.contact_number} />
-              <Fact label="Address" value={detail.household?.address} />
-              <Fact label="Purok" value={detail.household?.purok} />
-              <Fact label="Reported by" value={detail.household?.source?.submitted_by} />
-              <Fact label="Report source" value={detail.household?.source?.label} />
-              <Fact label="Last report" value={detail.household?.source?.datetime} />
-              <Fact label="Last location" value={detail.household?.location?.label} />
-              <Fact label="Coordinates" value={coordinateLabel(detail.household?.location)} />
-            </div>
-            <div className="hh-detail-metrics">
-              {(detail.household?.detail_tiles || []).map((tile) => (
-                <div className="hh-detail-metric" key={tile.label}>
-                  <span>{tile.label}</span>
-                  <strong>{tile.value}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="hh-detail-group">
-            <div className="hh-section-label">
-              <span>Registered devices</span>
-              <span>{detail.devices?.length || 0} devices</span>
-            </div>
-            <div className="hh-detail-table-wrap">
-              <table className="hh-detail-table compact-detail-table">
-                <thead>
-                  <tr>
-                    <th>Device</th>
-                    <th>Member</th>
-                    <th>Platform / role</th>
-                    <th>Battery</th>
-                    <th>Signal</th>
-                    <th>Last location</th>
-                    <th>Location permission</th>
-                    <th>Last seen</th>
-                    <th>State</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!detail.devices?.length ? (
-                    <EmptyTableRow colSpan={9} text="No device records are linked to this household." />
-                  ) : detail.devices.map((device) => (
-                    <tr key={device.id || device.device_uuid}>
-                      <td>{device.device_name || 'Unnamed device'}</td>
-                      <td>{device.member_name || 'Household user'}</td>
-                      <td>{[device.platform, device.app_role].filter(Boolean).join(' / ') || 'Not recorded'}</td>
-                      <td>{formatPercent(device.battery_level)}</td>
-                      <td>{formatPercent(device.signal_strength)}</td>
-                      <td>{device.last_location_label || 'No location yet'}</td>
-                      <td>{device.location_permission_status || 'Unknown'}</td>
-                      <td>{device.last_seen_at || 'Not recorded'}</td>
-                      <td>{device.is_active ? 'Active' : 'Inactive'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="hh-detail-group">
-            <div className="hh-section-label">
-              <span>Family members</span>
-              <span>{detail.members?.length || 0} members</span>
-            </div>
-            <div className="hh-detail-table-wrap">
-              <table className="hh-detail-table compact-detail-table">
-                <thead>
-                  <tr>
-                    <th>Member</th>
-                    <th>Member ID</th>
-                    <th>Role</th>
-                    <th>Gender</th>
-                    <th>Head</th>
-                    <th>Vulnerable Indicators</th>
-                    <th>Last location</th>
-                    <th>Device</th>
-                    <th>Battery</th>
-                    <th>Status reported</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(!detail.members || detail.members.length === 0) ? (
-                    <EmptyTableRow colSpan={10} text="No household members are synced yet." />
-                  ) : (
-                    detail.members.map((member) => (
-                      <tr key={member.member_id || member.name}>
-                        <td>
-                          <div className="hh-household-name">{member.name}</div>
-                          <div className="hh-household-meta">{member.age ? `${member.age} yrs` : 'Age not recorded'}</div>
-                        </td>
-                        <td>{member.member_id}</td>
-                        <td>{member.relation}</td>
-                        <td>{member.gender}</td>
-                        <td>{member.is_household_head ? 'Yes' : 'No'}</td>
-                        <td>{getVulnerableIndicators(member)}</td>
-                        <td>{member.last_location_label || 'No location yet'}</td>
-                        <td>{member.device_name || 'No assigned mobile'}{member.device_platform ? ` (${member.device_platform})` : ''}</td>
-                        <td>{formatPercent(member.battery_level)}</td>
-                        <td>{member.status?.label || 'No report'}{member.status_updated_at ? <div className="hh-household-meta">{member.status_updated_at}</div> : null}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="hh-detail-group hh-history-collapsible">
-            <button
-              type="button"
-              className="hh-history-toggle"
-              onClick={() => setHistoryExpanded((current) => !current)}
-              aria-expanded={historyExpanded}
-            >
-              <div className="hh-section-label no-margin">
-                <span>Status history</span>
-                <span>Active event</span>
-              </div>
-              <span className="hh-history-toggle-icon">
-                {historyExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </span>
-            </button>
-
-            {historyExpanded && (
-              <div className="hh-detail-table-wrap">
-                <table className="hh-detail-table compact-detail-table">
-                  <thead>
-                    <tr>
-                      <th>Time</th>
-                      <th>Status</th>
-                      <th>Submitted by</th>
-                      <th>Source</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedHistory.length === 0 ? (
-                      <EmptyTableRow colSpan={4} text="No status history for this active event yet." />
-                    ) : (
-                      paginatedHistory.map((log) => (
-                        <tr key={log.status_log_id}>
-                          <td>{log.submitted_at || 'No time'}</td>
-                          <td><StatusBadge status={log.status} /></td>
-                          <td>{log.submitted_by}</td>
-                          <td>{log.source}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-
-                {history.length > 0 && (
-                  <div className="hh-history-pagination">
-                    <button
-                      type="button"
-                      className="button secondary compact-button"
-                      onClick={() => setHistoryPage((page) => Math.max(1, page - 1))}
-                      disabled={currentHistoryPage === 1}
-                    >
-                      Prev
-                    </button>
-                    <span className="hh-history-page-indicator">Page {currentHistoryPage} of {totalHistoryPages}</span>
-                    <button
-                      type="button"
-                      className="button secondary compact-button"
-                      onClick={() => setHistoryPage((page) => Math.min(totalHistoryPages, page + 1))}
-                      disabled={currentHistoryPage >= totalHistoryPages}
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </main>
-  )
-}
-
-function getVulnerableIndicators(member) {
-  const flags = []
-
-  if (member.is_pwd) flags.push('PWD')
-  if (member.is_senior) flags.push('Senior')
-  if (member.is_pregnant) flags.push('Pregnant')
-
-  return flags.length ? flags.join(' • ') : 'None'
-}
-
-function formatPercent(value) {
-  return value === null || value === undefined || value === '' ? 'Not recorded' : `${value}%`
-}
-
-function coordinateLabel(location) {
-  if (location?.latitude === null || location?.latitude === undefined
-    || location?.longitude === null || location?.longitude === undefined) {
-    return 'Not recorded'
-  }
-
-  return `${location.latitude}, ${location.longitude}`
-}
-
-function Fact({ label, value }) {
-  return (
-    <div className="hh-household-fact">
-      <span>{label}</span>
-      <strong>{value || 'Not recorded'}</strong>
-    </div>
-  )
-}
-
-function EmptyTableRow({ colSpan, text }) {
-  return (
-    <tr>
-      <td colSpan={colSpan} className="hh-empty-cell">{text}</td>
-    </tr>
-  )
+  const { data, error, loading, refresh } = useModuleData(loader, ['households', 'disasters'])
+  const h = data?.detail?.household
+  const devices = data?.detail?.devices || [], members = data?.detail?.members || []
+  const history = data?.logs || []
+  const page = Math.min(pageState.id === householdId ? pageState.page : 1, Math.max(1, Math.ceil(history.length / 5)))
+  const context = new URLSearchParams(location.search)
+  const dispatchId = context.get('dispatch_id')
+  const returnContext = new URLSearchParams()
+  if (/^DSP-\d+-\d+$/.test(context.get('dispatch_code') || '')) returnContext.set('dispatch_code', context.get('dispatch_code'))
+  if (/^\d+$/.test(context.get('responder_id') || '')) returnContext.set('responder_id', context.get('responder_id'))
+  const dispatchReturn = /^\d+$/.test(dispatchId || '') ? `/rescue-management/${dispatchId}/edit${returnContext.size ? `?${returnContext}` : ''}` : null
+  const householdListPath = h?.sitio ? `/households/_household-list?${new URLSearchParams({ sitio_id: String(h.sitio.sitio_id), ...(h.purok_id ? { purok_id: String(h.purok_id) } : {}) })}` : '/households/_household-list'
+  const returnTo = location.state?.returnTo?.startsWith('/households/_household-list') ? location.state.returnTo : householdListPath
+  const coordinates = h?.location?.latitude != null && h?.location?.longitude != null ? `${h.location.latitude}, ${h.location.longitude}` : null
+  return <section className="hh-prototype" aria-label="Household account">
+    <div className="hd"><Link className="bk" to={returnTo} title="Back to households" aria-label="Back to households">‹</Link><b className="ttl">{h?.sitio?.sitio_name || h?.purok || 'Household account'}</b><span className="sp" />{dispatchReturn && <Link className="bt" to={dispatchReturn}>Back to rescue dispatch</Link>}<RefreshButton onClick={refresh} loading={loading} /></div>
+    {error && <div className="emp" role="alert">{error}</div>}
+    {loading ? <div className="cd sby" role="status">Loading household account…</div> : h && <div className="cd acv">
+      <div className="cover"><span className="slot" /><span className="hv">{(h.household_name || 'HH').slice(0, 2).toUpperCase()}</span><div className="hn"><div className="nm">{h.household_name}</div><div className="cm">{h.household_code || h.household_id} · {h.purok || 'Purok not assigned'}</div><HouseholdStatus status={h.status} /></div></div>
+      <Section title="Profile"><div className="pf"><Fact label="Head of the house" value={h.household_head?.name} /><Fact label="Account ID" value={h.account_id} /><Fact label="Contact" value={h.contact_number} /><Fact label="Address" value={h.address} /><Fact label="Last location" value={h.location?.label} /><Fact label="Coordinates" value={coordinates} /><Fact label="Last report" value={[h.source?.label, h.source?.submitted_by, h.source?.datetime].filter(Boolean).join(' · ')} /></div></Section>
+      <Section title="Devices"><Table headings={['Device', 'Member', 'Battery', 'Signal', 'Location', 'Last seen']} count={devices.length} empty="No devices linked">{devices.map(device => <tr key={device.id || device.device_uuid}><td title={`Role: ${recorded(device.app_role)} · ${device.is_active ? 'Active' : 'Inactive'}`}><span className="bg" style={{ '--c': device.is_active ? '#0ea5e9' : '#94a3b8' }}>{device.device_name}</span> <span className="mu">{device.platform}</span></td><td>{device.member_name}</td><td><Battery value={device.battery_level} /></td><td>{percentage(device.signal_strength)}</td><td title={device.last_location_label}>{device.location_permission_status || 'Unknown'}</td><td>{recorded(device.last_seen_at)}</td></tr>)}</Table></Section>
+      <Section title="Members"><Table headings={['Member', 'Relationship', 'Vulnerability', 'Status']} count={members.length} empty="Members have not synced">{members.map(member => <tr key={member.member_id || member.name}><td title={`${recorded(member.member_id)} · ${recorded(member.gender)} · ${member.is_household_head ? 'Household head' : 'Member'} · ${recorded(member.last_location_label)} · ${recorded(member.device_name)} · ${percentage(member.battery_level)}`}>{member.name} <span className="mu">· {recorded(member.age)}</span></td><td>{member.relation}</td><td>{[member.is_pwd && 'PWD', member.is_senior && 'Senior', member.is_pregnant && 'Pregnant'].filter(Boolean).map(flag => <span className="tag" key={flag}>{flag}</span>)}{!member.is_pwd && !member.is_senior && !member.is_pregnant && '–'}</td><td><HouseholdStatus status={member.status} /> <span className="mu">{member.status_updated_at}</span></td></tr>)}</Table></Section>
+      <Section title="History"><button type="button" className={`acc ${expanded ? 'on' : ''}`} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}><i>›</i><span>{history.length}</span><span className="sr-only">Toggle status history for the active event</span></button>{expanded && <><Table headings={['Time', 'Status', 'Submitted by']} count={history.length} empty="No history for the active event">{history.slice((page - 1) * 5, page * 5).map(log => <tr key={log.status_log_id}><td>{log.submitted_at}</td><td><HouseholdStatus status={log.status} /></td><td>{log.source} · {log.submitted_by}</td></tr>)}</Table>{history.length > 5 && <HouseholdPagination meta={{ total: history.length, current_page: page, last_page: Math.ceil(history.length / 5), from: (page - 1) * 5 + 1, to: Math.min(page * 5, history.length) }} onPageChange={next => setPage({ id: householdId, page: next })} />}</>}</Section>
+    </div>}
+  </section>
 }

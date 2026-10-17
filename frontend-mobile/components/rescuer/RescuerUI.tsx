@@ -1,3 +1,4 @@
+import { statusColor as unifiedStatusColor } from '@/constants/statusPalette';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
@@ -74,11 +75,7 @@ export function EmptyState({ icon, title, body }: { icon: keyof typeof Ionicons.
 }
 
 function toneColor(tone: string) {
-  if (['safe', 'completed', 'available'].includes(tone)) return palette.safe;
-  if (['evacuated', 'en_route', 'dispatched', 'accepted'].includes(tone)) return palette.evacuated;
-  if (['unsafe', 'urgent', 'cancelled', 'danger'].includes(tone)) return palette.unsafe;
-  if (['warning', 'pending', 'needs_validation'].includes(tone)) return palette.warning;
-  return palette.textSoft;
+  return unifiedStatusColor(tone);
 }
 
 const styles = StyleSheet.create({

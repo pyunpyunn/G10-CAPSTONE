@@ -13,7 +13,7 @@ class EvaTrackReportClient
             'configured' => $this->validOrigin() && trim((string) config('evatrack.reports_api_key')) !== '',
             'source' => 'EvaTrack',
             'report_types' => ['demographics', 'dromic', 'utilization', 'vulnerable', 'general'],
-            'formats' => ['pdf', 'csv'],
+            'formats' => ['pdf', 'csv', 'xlsx'],
         ];
     }
 
@@ -31,6 +31,8 @@ class EvaTrackReportClient
         if (! $this->configuration()['configured']) {
             return response()->json(['message' => 'EvaTrack reports are not configured. Set EVATRACK_REPORTS_URL and EVATRACK_REPORTS_API_KEY on the backend.'], 503);
         }
+
+        if (($payload['format'] ?? 'pdf') === 'xlsx') return $this->excel($payload);
 
         try {
             $response = Http::acceptJson()->asJson()
@@ -75,5 +77,41 @@ class EvaTrackReportClient
             'expires_at' => $data['expires_at'],
             'expires_in_minutes' => (int) ($data['expires_in_minutes'] ?? 30),
         ])->header('Cache-Control', 'no-store');
+    }
+    private function excel(array $payload): JsonResponse
+    {
+        // EvaTrack's current API supplies PDF/CSV. Build Excel from its real CSV through our existing writer.
+        $generated = $this->generate(array_replace($payload, ['format' => 'csv']));
+        if ($generated->getStatusCode() !== 200) return $generated;
+        $report = $generated->getData(true);
+        $url = $report['download_url'];
+        $origin = fn (string $value): array => [strtolower((string) parse_url($value, PHP_URL_SCHEME)), strtolower((string) parse_url($value, PHP_URL_HOST)), parse_url($value, PHP_URL_PORT) ?: (parse_url($value, PHP_URL_SCHEME) === 'https' ? 443 : 80)];
+        if ($origin($url) !== $origin(config('evatrack.reports_url'))) {
+            return response()->json(['message' => 'EvaTrack returned a download address outside its configured server.'], 502);
+        }
+        $handle = null;
+        try {
+            if (\Carbon\Carbon::parse($report['expires_at'])->isPast()) return response()->json(['message' => 'The EvaTrack download link has expired. Generate the report again.'], 502);
+            $response = Http::timeout(max(1, (int) config('evatrack.timeout')))->withoutRedirecting()->withOptions(['stream' => true])->get($url);
+            if (! $response->successful()) return response()->json(['message' => 'EvaTrack report could not be downloaded for Excel export.'], 502);
+            $handle = fopen('php://temp/maxmemory:2097152', 'w+');
+            $stream = $response->toPsrResponse()->getBody();
+            $size = 0;
+            while (! $stream->eof()) {
+                $chunk = $stream->read(8192); $size += strlen($chunk);
+                if ($size > 20 * 1024 * 1024) return response()->json(['message' => 'The EvaTrack report is too large for Excel conversion. Export CSV instead.'], 422);
+                fwrite($handle, $chunk);
+            }
+            rewind($handle);
+            $headers = fgetcsv($handle, 0, ',', '"', '');
+            if (! $headers || $headers === [null]) return response()->json(['message' => 'EvaTrack returned an empty CSV report.'], 502);
+            $headers[0] = preg_replace('/^\xEF\xBB\xBF/', '', $headers[0] ?? '');
+            $rows = (function () use ($handle) { while (($row = fgetcsv($handle, 0, ',', '"', '')) !== false) yield $row; })();
+            $file = app(\App\Services\Web\ReportFileService::class)->generate('evatrack-'.$payload['report_type'], 'xlsx', $headers, $rows);
+            return response()->json(array_merge($file, ['source' => 'EvaTrack', 'report_type' => $payload['report_type'], 'format' => 'xlsx']))->header('Cache-Control', 'no-store');
+        } catch (\Throwable $failure) {
+            report($failure);
+            return response()->json(['message' => 'EvaTrack Excel export could not be generated. Try again or export CSV.'], 502);
+        } finally { if (is_resource($handle)) fclose($handle); }
     }
 }

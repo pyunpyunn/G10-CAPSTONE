@@ -8,8 +8,8 @@ return [
         'reserve' => ['label' => 'Reserve', 'tone' => 'blue'],
         'off_duty' => ['label' => 'Off duty', 'tone' => 'gray'],
         'unavailable' => ['label' => 'Unavailable', 'tone' => 'amber'],
-        'dispatched' => ['label' => 'Dispatched', 'tone' => 'purple'],
-        'on_scene' => ['label' => 'On-scene', 'tone' => 'green'],
+        'dispatched' => ['label' => 'Dispatched', 'tone' => 'blue'],
+        'on_scene' => ['label' => 'On-scene', 'tone' => 'purple'],
         'disabled' => ['label' => 'Disabled', 'tone' => 'gray'],
     ],
     'account_statuses' => [

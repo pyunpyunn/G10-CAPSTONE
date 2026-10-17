@@ -53,7 +53,7 @@ class DashboardQuery
         $total = 0;
 
         if (Schema::hasTable('households')) {
-            $total = Household::query()
+            $total = Household::query()->whereIn('households.household_id', HouseholdEligibilityQuery::ids())
                 ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
                 ->count();
         }
@@ -74,7 +74,7 @@ class DashboardQuery
 
         $counts = HouseholdDisaster::query()
             ->from('household_disasters as hd')
-            ->join('households as h', 'h.household_id', '=', 'hd.household_id')
+            ->join('households as h', 'h.household_id', '=', 'hd.household_id')->whereIn('h.household_id', HouseholdEligibilityQuery::ids())
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
             ->where('hd.disaster_id', $eventId)
             ->whereNull('h.deleted_at')
@@ -89,7 +89,7 @@ class DashboardQuery
 
         $reportedRows = HouseholdDisaster::query()
             ->from('household_disasters as hd')
-            ->join('households as h', 'h.household_id', '=', 'hd.household_id')
+            ->join('households as h', 'h.household_id', '=', 'hd.household_id')->whereIn('h.household_id', HouseholdEligibilityQuery::ids())
             ->where('hd.disaster_id', $eventId)
             ->whereNotNull('hd.current_status_id')
             ->whereNull('h.deleted_at')

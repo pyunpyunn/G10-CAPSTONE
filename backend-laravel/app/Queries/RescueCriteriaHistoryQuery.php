@@ -39,7 +39,7 @@ class RescueCriteriaHistoryQuery
             : null;
         $barangayId = $this->barangay->current()['barangay_id'] ?? null;
         $households = DB::table('households as h')->join('addresses as a', 'a.address_id', '=', 'h.address_id')
-            ->when($barangayId !== null, fn ($q) => $q->where('a.barangay_id', $barangayId))
+            ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId))
             ->where(fn ($q) => $q->whereNull('h.created_at')->orWhere('h.created_at', '<=', $startedAt))
             ->where(fn ($q) => $q->whereNull('h.deleted_at')->orWhere('h.deleted_at', '>', $startedAt))
             ->select('h.household_id', 'a.purok_sitio')
@@ -195,7 +195,7 @@ class RescueCriteriaHistoryQuery
             $labels[mb_strtolower(trim($label))] = [$purok->sitio_id, $purok->purok_id];
         }
         $households = DB::table('households as h')->join('addresses as a', 'a.address_id', '=', 'h.address_id')
-            ->where('a.barangay_id', $barangayId)
+            ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId))
             ->where(fn ($q) => $q->whereNull('h.created_at')->orWhere('h.created_at', '<=', $until))
             ->where(fn ($q) => $q->whereNull('h.deleted_at')->orWhere('h.deleted_at', '>', $startedAt))
             ->select('h.household_id', 'h.created_at', 'h.deleted_at', 'a.sitio_id', 'a.purok_id', 'a.purok_sitio')

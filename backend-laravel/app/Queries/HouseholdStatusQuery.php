@@ -20,6 +20,8 @@ class HouseholdStatusQuery
 
     public function statusLogs(string $householdId, ?string $eventId)
     {
+        if (! $eventId) return collect();
+
         return HouseholdStatusLog::query()->from('household_status_logs as hsl')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
             ->leftJoin('users as u', 'u.user_id', '=', 'hsl.submitted_by_user_id')
@@ -45,9 +47,13 @@ class HouseholdStatusQuery
             )
             ->groupBy('household_id');
 
+        $latestReports = HouseholdEventStatusQuery::latestReports($eventId);
+        $barangayId = app(\App\Services\Shared\BarangayProfileService::class)->current()['barangay_id'] ?? null;
+
         return Household::query()
             ->from('households as h')
             ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->leftJoin('puroks as household_purok', 'household_purok.purok_id', '=', 'a.purok_id')
             ->leftJoin('household_disasters as hd', function ($join) use ($eventId): void {
                 $join->on('hd.household_id', '=', 'h.household_id');
 
@@ -57,8 +63,11 @@ class HouseholdStatusQuery
                     $join->whereRaw('1 = 0');
                 }
             })
-            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
-            ->leftJoin('users as reporter', 'reporter.user_id', '=', 'hd.last_reported_by_user_id')
+            ->leftJoinSub($latestReports, 'latest_report', 'latest_report.household_id', '=', 'h.household_id')
+            ->leftJoin('household_status_logs as valid_report', 'valid_report.status_log_id', '=', 'latest_report.status_log_id')
+            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'latest_report.status_id')
+            ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId))
+            ->leftJoin('users as reporter', 'reporter.user_id', '=', 'valid_report.submitted_by_user_id')
             ->leftJoinSub($memberCounts, 'members', 'members.household_id', '=', 'h.household_id')
             ->leftJoinSub($deviceSummary, 'devices', 'devices.household_id', '=', 'h.household_id')
             ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('h.deleted_at'))
@@ -73,15 +82,17 @@ class HouseholdStatusQuery
                 'h.member_count',
                 'a.full_address',
                 'a.purok_sitio',
-                DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned') as purok"),
-                'hd.current_status_id',
-                'hd.last_status_source',
-                'hd.last_status_notes',
-                'hd.last_reported_by_user_id',
-                'hd.last_latitude',
-                'hd.last_longitude',
-                'hd.last_battery_level',
-                'hd.last_reported_at',
+                DB::raw("COALESCE(household_purok.purok_name, NULLIF(a.purok_sitio, ''), 'Unassigned') as purok"),
+                'a.purok_id',
+                DB::raw('COALESCE(household_purok.sitio_id, a.sitio_id) as sitio_id'),
+                'latest_report.status_id as current_status_id',
+                'valid_report.source as last_status_source',
+                'valid_report.notes as last_status_notes',
+                'valid_report.submitted_by_user_id as last_reported_by_user_id',
+                'valid_report.latitude as last_latitude',
+                'valid_report.longitude as last_longitude',
+                'valid_report.battery_level as last_battery_level',
+                'valid_report.submitted_at as last_reported_at',
                 'hd.priority_level',
                 'hd.needs_dispatch',
                 'hs.status_key',
@@ -106,33 +117,17 @@ class HouseholdStatusQuery
 
         $sitioId = (string) $request->query('sitio_id', '');
         $purokId = (string) $request->query('purok_id', '');
-        if (ctype_digit($sitioId) && ctype_digit($purokId)) {
-            $selected = DB::table('puroks as selected_purok')
-                ->join('sitios as selected_sitio', 'selected_sitio.sitio_id', '=', 'selected_purok.sitio_id')
-                ->where('selected_sitio.sitio_id', (int) $sitioId)
-                ->where('selected_purok.purok_id', (int) $purokId)
-                ->first(['selected_purok.purok_name', 'selected_sitio.sitio_name']);
-            if (! $selected) {
-                $query->whereRaw('1 = 0');
-            } else {
-                $composite = $selected->purok_name.', '.$selected->sitio_name;
-                $query->where(function ($q) use ($sitioId, $purokId, $selected, $composite): void {
-                    $q->where('a.purok_id', (int) $purokId)
-                        ->orWhere(function ($named) use ($sitioId, $selected): void {
-                            $named->whereNull('a.purok_id')->where('a.sitio_id', (int) $sitioId)
-                                ->where('a.purok_sitio', $selected->purok_name);
-                        })
-                        ->orWhere(function ($named) use ($composite): void {
-                            $named->whereNull('a.purok_id')->whereNull('a.sitio_id')
-                                ->where('a.purok_sitio', $composite);
-                        });
-                });
-            }
-        } elseif (ctype_digit($sitioId)) {
+        if (($sitioId !== '' && (! ctype_digit($sitioId) || (int) $sitioId < 1))
+            || ($purokId !== '' && (! ctype_digit($purokId) || (int) $purokId < 1))) {
+            $query->whereRaw('1 = 0');
+        } elseif ($purokId !== '') {
+            $selected = DB::table('puroks')->where('purok_id', (int) $purokId)
+                ->when($sitioId !== '', fn ($q) => $q->where('sitio_id', (int) $sitioId))->first();
+            if (! $selected) $query->whereRaw('1 = 0');
+            else $query->where('a.purok_id', (int) $purokId);
+        } elseif ($sitioId !== '') {
             $query->leftJoin('puroks as filter_purok', 'filter_purok.purok_id', '=', 'a.purok_id')
-                ->whereRaw('COALESCE(a.sitio_id, filter_purok.sitio_id) = ?', [(int) $sitioId]);
-        } elseif (ctype_digit($purokId)) {
-            $query->where('a.purok_id', (int) $purokId);
+                ->whereRaw('COALESCE(filter_purok.sitio_id, a.sitio_id) = ?', [(int) $sitioId]);
         }
 
         if ($search !== '') {
@@ -152,7 +147,7 @@ class HouseholdStatusQuery
         }
 
         if ($status === 'unchecked') {
-            $query->whereNull('hd.current_status_id');
+            $query->whereNull('hs.status_key');
         }
 
         if ($status === 'safe') {
@@ -160,7 +155,7 @@ class HouseholdStatusQuery
         }
 
         if ($status === 'safe_only') {
-            $query->whereIn('hs.status_key', ['active', 'returned', 'safe']);
+            $query->whereIn('hs.status_key', ['active', 'returned', 'safe', 'safe_at_home']);
         }
 
         if ($status === 'evacuated') {
@@ -203,6 +198,36 @@ class HouseholdStatusQuery
                     });
             });
         }
+    }
+
+    public function listScope(Request $request): array
+    {
+        $barangayId = app(\App\Services\Shared\BarangayProfileService::class)->current()['barangay_id'] ?? null;
+        $sitioId = $request->query('sitio_id');
+        $purokId = $request->query('purok_id');
+        $purok = $purokId ? DB::table('puroks')->where('purok_id', (int) $purokId)->first(['purok_id', 'sitio_id', 'purok_name']) : null;
+        if ($purokId && ! $purok) abort(422, 'The selected purok was not found.');
+        if ($sitioId && $purok && (int) $purok->sitio_id !== (int) $sitioId) abort(422, 'The selected purok does not belong to this sitio.');
+        $resolvedId = $sitioId ?: $purok?->sitio_id;
+        $sitio = $resolvedId ? DB::table('sitios')->where('sitio_id', (int) $resolvedId)
+            ->when($barangayId !== null, fn ($q) => $q->where('barangay_id', $barangayId))
+            ->first(['sitio_id', 'sitio_name']) : null;
+        if ($resolvedId && ! $sitio) abort(422, 'The selected sitio is not in the current barangay.');
+        return [
+            'sitio' => $sitio ? ['sitio_id' => (int) $sitio->sitio_id, 'sitio_name' => $sitio->sitio_name] : null,
+            'purok' => $purok ? ['purok_id' => (int) $purok->purok_id, 'purok_name' => $purok->purok_name] : null,
+            'puroks' => $sitio ? DB::table('puroks')->where('sitio_id', $sitio->sitio_id)->orderBy('purok_name')
+                ->get(['purok_id', 'purok_name'])->map(fn ($p) => ['purok_id' => (int) $p->purok_id, 'purok_name' => $p->purok_name])->all() : [],
+        ];
+    }
+
+    public function householdHead(string $householdId): ?array
+    {
+        $head = DB::table('household_members')->where('household_id', $householdId)->where('is_household_head', 1)
+            ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
+            ->orderBy('member_id')->first(['member_id', 'first_name', 'middle_name', 'last_name']);
+        if (! $head) return null;
+        return ['member_id' => $head->member_id, 'name' => trim(implode(' ', array_filter([$head->first_name, $head->middle_name, $head->last_name]))) ?: null];
     }
 
     public function getSummary(?string $eventId): array
@@ -294,7 +319,7 @@ class HouseholdStatusQuery
             )
             ->groupBy('household_id');
 
-        return DB::table('households as h')
+        return DB::table('households as h')->whereIn('h.household_id', HouseholdEligibilityQuery::ids())
             ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->leftJoin('household_disasters as hd', function ($join) use ($eventId): void {
                 $join->on('hd.household_id', '=', 'h.household_id');
@@ -389,7 +414,7 @@ class HouseholdStatusQuery
 
     public function getLatestLogs($householdIds, ?string $eventId)
     {
-        if ($householdIds->isEmpty()) {
+        if ($householdIds->isEmpty() || ! $eventId) {
             return collect();
         }
 
@@ -397,6 +422,7 @@ class HouseholdStatusQuery
             ->from('household_status_logs as hsl')
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
             ->whereIn('hsl.household_id', $householdIds)
+            ->whereIn('hs.status_key', HouseholdEventStatusQuery::VALID_KEYS)
             ->when($eventId, fn ($query) => $query->where('hsl.disaster_id', $eventId))
             ->orderByDesc('hsl.submitted_at')
             ->orderByDesc('hsl.created_at')
@@ -634,7 +660,7 @@ class HouseholdStatusQuery
             return [
                 'key' => 'unsafe',
                 'label' => 'Unsafe',
-                'color' => '#DC2626',
+                'color' => \App\Support\StatusPalette::color('unsafe'),
             ];
         }
 
@@ -642,7 +668,7 @@ class HouseholdStatusQuery
             return [
                 'key' => 'safe',
                 'label' => 'Safe',
-                'color' => '#0D9488',
+                'color' => \App\Support\StatusPalette::color('safe'),
             ];
         }
 

@@ -279,7 +279,7 @@ class DisasterBroadcastQuery
             return [];
         }
 
-        $query = DB::table('households as h')
+        $query = DB::table('households as h')->whereIn('h.household_id', HouseholdEligibilityQuery::ids())
             ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->whereNotNull('a.purok_sitio')
             ->where('a.purok_sitio', '<>', '');
@@ -348,7 +348,7 @@ class DisasterBroadcastQuery
             $rescuers = $responderQuery->count();
         }
 
-        $householdQuery = Household::query();
+        $householdQuery = Household::query()->whereIn('households.household_id', HouseholdEligibilityQuery::ids());
 
         if (Schema::hasColumn('households', 'deleted_at')) {
             $householdQuery->whereNull('households.deleted_at');

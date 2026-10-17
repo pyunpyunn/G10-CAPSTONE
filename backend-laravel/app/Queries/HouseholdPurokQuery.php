@@ -14,7 +14,7 @@ class HouseholdPurokQuery
 
         $query = DB::table('households as h')
             ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
-            ->when($barangayId !== null, fn ($builder) => $builder->where('a.barangay_id', $barangayId))
+            ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId))
             ->when(Schema::hasColumn('households', 'deleted_at'), fn ($builder) => $builder->whereNull('h.deleted_at'));
 
         $hasAddressLabel = Schema::hasColumn('addresses', 'purok_sitio');

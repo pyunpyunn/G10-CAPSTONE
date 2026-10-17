@@ -58,30 +58,35 @@ class SituationReportQuery
 
     public function summarySources(string $eventId): array
     {
-        $households = Household::query();
+        $households = Household::query()->whereIn('households.household_id', HouseholdEligibilityQuery::ids());
         if (Schema::hasColumn('households', 'deleted_at')) {
             $households->whereNull('deleted_at');
         }
-        $counts = HouseholdDisaster::query()->from('household_disasters as hd')
-            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
-            ->where('hd.disaster_id', $eventId)->select('hs.status_key', DB::raw('COUNT(DISTINCT hd.household_id) as total'))
+        // The report and household pages share the latest valid event report and registered area IDs.
+        $base = Household::query()->from('households as h')
+            ->whereIn('h.household_id', HouseholdEligibilityQuery::ids())
+            ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->join('puroks as p', 'p.purok_id', '=', 'a.purok_id')
+            ->join('sitios as s', 's.sitio_id', '=', 'p.sitio_id')
+            ->leftJoinSub(HouseholdEventStatusQuery::latestReports($eventId), 'latest_report', 'latest_report.household_id', '=', 'h.household_id')
+            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'latest_report.status_id');
+        $counts = (clone $base)->select('hs.status_key', DB::raw('COUNT(DISTINCT h.household_id) as total'))
             ->groupBy('hs.status_key')->pluck('total', 'status_key');
-        $reported = HouseholdDisaster::query()->where('disaster_id', $eventId)->whereNotNull('current_status_id')->distinct('household_id')->count('household_id');
-        $puroks = Household::query()->from('households as h')->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
-            ->leftJoin('household_disasters as hd', function ($join) use ($eventId): void { $join->on('hd.household_id', '=', 'h.household_id')->where('hd.disaster_id', '=', $eventId); })
-            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
-            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('h.deleted_at'))
-            ->selectRaw("COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned') as purok")
-            ->selectRaw('COUNT(*) as total')
-            ->selectRaw("SUM(CASE WHEN hs.status_key IN ('active', 'returned', 'safe') THEN 1 ELSE 0 END) as safe")
-            ->selectRaw("SUM(CASE WHEN hs.status_key IN ('evacuated', 'relocated') THEN 1 ELSE 0 END) as evacuated")
-            ->selectRaw("SUM(CASE WHEN hs.status_key IN ('not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured') THEN 1 ELSE 0 END) as unsafe")
-            ->selectRaw('SUM(CASE WHEN hs.status_key IS NOT NULL THEN 1 ELSE 0 END) as reported')
-            ->groupByRaw("COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned')")
-            ->orderBy('purok')->get();
+        $reported = (clone $base)->whereNotNull('hs.status_key')->distinct()->count('h.household_id');
+        $safeKeys = "'".implode("','", HouseholdEventStatusQuery::SAFE_KEYS)."'";
+        $unsafeKeys = "'".implode("','", HouseholdEventStatusQuery::UNSAFE_KEYS)."'";
+        $puroks = (clone $base)->select('p.purok_id', 's.sitio_id', 's.sitio_name', 'p.purok_name as purok')
+            ->selectRaw('COUNT(DISTINCT h.household_id) as total')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN hs.status_key IN ({$safeKeys}) THEN h.household_id END) as safe")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN hs.status_key IN ('evacuated', 'relocated') THEN h.household_id END) as evacuated")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN hs.status_key IN ({$unsafeKeys}) THEN h.household_id END) as unsafe")
+            ->selectRaw('COUNT(DISTINCT CASE WHEN hs.status_key IS NOT NULL THEN h.household_id END) as reported')
+            ->groupBy('p.purok_id', 's.sitio_id', 's.sitio_name', 'p.purok_name')->orderBy('s.sitio_name')->orderBy('p.purok_name')->get();
 
-        $weather = WeatherLog::query()->where(fn ($query) => $query->where('disaster_id', $eventId)->orWhereNull('disaster_id'))
-            ->orderByRaw('CASE WHEN disaster_id = ? THEN 0 ELSE 1 END', [$eventId])->orderByDesc('observed_at')->orderByDesc('created_at')->first();
+        $endedAt = Schema::hasTable('disaster_events') ? DB::table('disaster_events')->where('event_id', $eventId)->value('ended_at') : null;
+        $weather = WeatherLog::query()
+            ->when($endedAt, fn ($query) => $query->where('observed_at', '<=', $endedAt))
+            ->orderByDesc('observed_at')->orderByDesc('created_at')->orderByDesc('weather_log_id')->first();
         $evacuation = EvacuationCenter::query()->where(fn ($query) => $query->where('current_event_id', $eventId)->orWhereNull('current_event_id'))
             ->when(Schema::hasColumn('evacuation_centers', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))->orderBy('name')->limit(8)->get();
         $assignments = ResponderAssignment::query()->from('responder_assignments as ra')

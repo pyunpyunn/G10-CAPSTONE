@@ -14,5 +14,6 @@ class MappingSnapshot
         public readonly array $evacuationSites = [],
         public readonly array $rescueTeams = [],
         public readonly array $dispatchRoutes = [],
+        public readonly array $purokOptions = [],
     ) {}
 }

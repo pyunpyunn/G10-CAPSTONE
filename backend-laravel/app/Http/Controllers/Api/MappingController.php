@@ -45,10 +45,17 @@ class MappingController extends Controller
         return $this->safeResponse(fn () => response()->json(['data' => $this->service->dispatchRoutes($request)]));
     }
 
+    public function householdRoute(string $householdId): JsonResponse
+    {
+        return response()->json(['data' => $this->service->householdRoute($householdId)]);
+    }
+
     private function safeResponse(callable $callback): JsonResponse
     {
         try {
             return $callback();
+        } catch (\Illuminate\Validation\ValidationException|\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception) {
+            throw $exception;
         } catch (QueryException $exception) {
             report($exception);
             return response()->json(['message' => 'Map data cannot be loaded because the database is not available right now.'], 503);

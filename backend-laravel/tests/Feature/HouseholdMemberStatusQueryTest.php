@@ -28,6 +28,15 @@ class HouseholdMemberStatusQueryTest extends TestCase
         $this->assertSame('Unsafe', $members[1]['status']['label']);
     }
 
+    public function test_household_head_is_the_registered_head_and_not_another_family_member(): void
+    {
+        $query = new HouseholdStatusQuery(new HouseholdStatusPresenter());
+        $this->assertSame(['member_id' => 11, 'name' => 'Ana Dela Cruz'], $query->householdHead('hh-1'));
+        $this->assertNull($query->householdHead('missing-household'));
+        DB::table('household_members')->where('member_id', 11)->update(['deleted_at' => now()]);
+        $this->assertNull($query->householdHead('hh-1'));
+    }
+
     protected function createMemberStatusTables(): void
     {
         Schema::dropIfExists('device_tracking_logs');

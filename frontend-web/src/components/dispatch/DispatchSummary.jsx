@@ -1,11 +1,12 @@
+import { statusColor } from '../../utils/statusPalette'
 import { useState } from 'react'
 
 export default function DispatchSummary({ summary }) {
   const [highlight, setHighlight] = useState(null)
   const total = Number(summary.dispatch_progress?.total) || 0
   const progress = [
-    ['dispatched', 'Dispatched', '#3b82f6'], ['on_scene', 'On-scene', '#f59e0b'],
-    ['returning', 'Returning', '#8b5cf6'], ['completed', 'Completed', '#0ea5e9'], ['cancelled', 'Cancelled', '#64748b'],
+    ['dispatched', 'Dispatched', statusColor('dispatched')], ['on_scene', 'On-scene', statusColor('on_scene')],
+    ['returning', 'Returning', statusColor('returning')], ['completed', 'Completed', statusColor('completed')], ['cancelled', 'Cancelled', statusColor('cancelled')],
   ].map(([key, label, color]) => ({ key, label, color, value: Number(summary.dispatch_progress?.[key]) || 0 }))
   return <section className="cd strip nv" aria-label="Dispatch summary and progress">
     <div className="kk">

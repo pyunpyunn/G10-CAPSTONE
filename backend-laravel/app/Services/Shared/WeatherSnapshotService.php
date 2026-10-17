@@ -60,6 +60,7 @@ class WeatherSnapshotService
         return $query
             ->orderByDesc('observed_at')
             ->orderByDesc('created_at')
+            ->orderByDesc('weather_log_id')
             ->limit(50)
             ->get()
             ->map(fn (object $log): array => $this->presenter->formatWeatherLog($log))

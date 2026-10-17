@@ -107,6 +107,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/map/household-geotags', [MappingController::class, 'householdGeotags']);
             Route::get('/map/evacuation-sites', [MappingController::class, 'evacuationSites']);
             Route::get('/map/dispatch-routes', [MappingController::class, 'dispatchRoutes']);
+            Route::get('/map/households/{householdId}/route', [MappingController::class, 'householdRoute']);
             Route::get('/households', [HouseholdStatusController::class, 'index']);
             Route::get('/households/{householdId}', [HouseholdStatusController::class, 'show']);
             Route::get('/households/{householdId}/status-logs', [HouseholdStatusController::class, 'statusLogs']);
@@ -136,6 +137,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/archive/resource-requests', [ArchiveController::class, 'resourceRequests']);
             Route::get('/archive/situation-reports', [ArchiveController::class, 'situationReports']);
             Route::post('/reports/generate', [\App\Http\Controllers\Api\ExternalReportController::class, 'generate'])->middleware('throttle:30,1');
+            Route::get('/reports/external/providers', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'providers']);
             Route::get('/reports/evatrack/configuration', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'configuration']);
             Route::post('/reports/evatrack/generate', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'generate'])->middleware('throttle:30,1');
             Route::get('/archive/export', [ArchiveController::class, 'export']);

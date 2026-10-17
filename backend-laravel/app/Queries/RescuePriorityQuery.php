@@ -44,7 +44,7 @@ class RescuePriorityQuery
                 ->where('area_disaster.disaster_id', $eventId))
             ->leftJoin('household_statuses as area_status', 'area_status.status_id', '=', 'area_disaster.current_status_id')
             ->whereNull('area_household.deleted_at')
-            ->when($barangayId !== null, fn ($query) => $query->where('area_address.barangay_id', $barangayId))
+            ->whereIn('area_address.purok_id', HouseholdEligibilityQuery::puroks($barangayId))
             ->groupBy('area_address.purok_sitio')
             ->selectRaw('area_address.purok_sitio as area_name, COUNT(DISTINCT area_household.household_id) as total_households')
             ->selectRaw("COUNT(DISTINCT CASE WHEN area_status.status_key IN ('unsafe', 'needs_help', 'needs_assistance') THEN area_household.household_id END) as impacted_households");
@@ -58,7 +58,7 @@ class RescuePriorityQuery
                 ->where('vulnerable_report.disaster_id', $eventId))
             ->leftJoin('member_statuses as vulnerable_status', 'vulnerable_status.status_id', '=', 'vulnerable_report.status_id')
             ->whereNull('area_member.deleted_at')->whereNull('member_household.deleted_at')
-            ->when($barangayId !== null, fn ($query) => $query->where('member_address.barangay_id', $barangayId))
+            ->whereIn('member_address.purok_id', HouseholdEligibilityQuery::puroks($barangayId))
             ->groupBy('member_address.purok_sitio')
             ->selectRaw('member_address.purok_sitio as area_name, COUNT(DISTINCT area_member.member_id) as total_members')
             ->selectRaw("COUNT(DISTINCT CASE WHEN area_member.is_pwd = 1 OR area_member.is_senior = 1 OR area_member.is_pregnant = 1 OR member_group.member_id IS NOT NULL{$minorPredicate} THEN area_member.member_id END) as total_vulnerable_members")
@@ -89,7 +89,7 @@ class RescuePriorityQuery
             ->leftJoinSub($areaVulnerability, 'area_vulnerability', fn ($join) => $join->on('area_vulnerability.area_name', '=', 'a.purok_sitio'))
             ->leftJoinSub($memberReports, 'member_reports', fn ($join) => $join->on('member_reports.household_id', '=', 'h.household_id'))
             ->whereNull('h.deleted_at')
-            ->when($barangayId !== null, fn ($query) => $query->where('a.barangay_id', $barangayId))
+            ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId))
             ->select(['h.household_id', 'h.household_code', 'h.household_name', 'a.purok_id', 'a.purok_sitio as area_name',
                 'hs.status_key', 'hd.last_reported_at'])
             ->selectRaw("CASE WHEN hd.needs_dispatch = 1 OR hs.status_key IN ('unsafe', 'needs_help') THEN 1 ELSE 0 END as urgent_tier")

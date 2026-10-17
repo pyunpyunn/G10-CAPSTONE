@@ -130,19 +130,17 @@ export function getSaveMessage(error) {
 
 export function buildDispatchAreaGroups(priorities = [], areas = []) {
   const used = new Set()
-  const normalize = (value) => String(value || '').trim().toLowerCase()
   const groups = priorities.map((sitio) => {
     const cards = (sitio.puroks || []).map((purok) => {
-      const names = [`${purok.purok_name}, ${sitio.sitio}`, `${sitio.sitio} - ${purok.purok_name}`].map(normalize)
-      const matches = areas.filter((area) => (area.sitio_id != null && area.purok_id != null && String(area.sitio_id) === String(sitio.sitio_id) && String(area.purok_id) === String(purok.purok_id)) || names.includes(normalize(area.area_name)))
+      const matches = areas.filter((area) => area.sitio_id != null && area.purok_id != null && String(area.sitio_id) === String(sitio.sitio_id) && String(area.purok_id) === String(purok.purok_id))
       matches.forEach((area) => used.add(area.id))
       const households = matches.flatMap((area) => area.households || [])
-      return { id: `purok:${purok.purok_id}`, name: purok.purok_name, area_name: matches[0]?.area_name || `${purok.purok_name}, ${sitio.sitio}`, households, total_households: purok.household_count ?? households.length, priority: matches[0]?.priority || 'monitor' }
+      return { purok_id: purok.purok_id, sitio_id: sitio.sitio_id, id: `purok:${purok.purok_id}`, name: purok.purok_name, area_name: matches[0]?.area_name || `${purok.purok_name}, ${sitio.sitio}`, households, total_households: purok.household_count ?? households.length, priority: matches[0]?.priority || 'monitor' }
     })
-    for (const area of areas.filter((item) => !used.has(item.id) && (String(item.sitio_id) === String(sitio.sitio_id) || normalize(item.area_name) === normalize(sitio.sitio) || (sitio.address_labels || []).some((entry) => normalize(entry.label) === normalize(item.area_name))))) {
+    for (const area of areas.filter((item) => !used.has(item.id) && String(item.sitio_id) === String(sitio.sitio_id))) {
       used.add(area.id); cards.push({ ...area, name: area.area_name })
     }
-    return { id: `sitio:${sitio.sitio_id}`, name: sitio.sitio, rank: sitio.rank, band: sitio.band, cards }
+    return { sitio_id: sitio.sitio_id, id: `sitio:${sitio.sitio_id}`, name: sitio.sitio, rank: sitio.rank, band: sitio.band, cards }
   })
   for (const area of areas.filter((item) => !used.has(item.id))) groups.push({ id: `area:${area.id}`, name: area.area_name, rank: groups.length + 1, band: { label: label(area.priority), key: ['critical','high'].includes(area.priority) ? 'high' : 'low' }, cards: [{ ...area, name: area.area_name }] })
   return groups

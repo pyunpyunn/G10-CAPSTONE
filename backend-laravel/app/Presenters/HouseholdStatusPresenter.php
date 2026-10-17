@@ -147,23 +147,7 @@ class HouseholdStatusPresenter
 
     public function statusTone(string $statusKey): string
     {
-        if (in_array($statusKey, ['safe', 'active', 'returned'], true)) {
-            return 'green';
-        }
-
-        if (in_array($statusKey, ['evacuated', 'relocated'], true)) {
-            return 'blue';
-        }
-
-        if (in_array($statusKey, ['unsafe', 'missing', 'not-evacuated', 'displaced', 'needs-help'], true)) {
-            return 'red';
-        }
-
-        if ($statusKey === 'injured') {
-            return 'amber';
-        }
-
-        return 'gray';
+        return \App\Support\StatusPalette::tone($statusKey);
     }
 
     public function sourceLabel(?string $source): string

@@ -24,7 +24,7 @@ const navGroups = [
   { title: 'Response Operations', paths: ['/dispatch', '/rescue-management', '/field-reports'] },
   { title: 'Personnel Access Control', paths: ['/rescuers', '/rescuers/teams'] },
   { title: 'Resources & Requests', paths: ['/request-types', '/external-requests', '/resources-requests'] },
-  { title: 'Reports Documentation', paths: ['/situation', '/archive'] },
+  { title: 'Reports Documentation', paths: ['/situation', '/situation/external-reports', '/archive'] },
 ]
 
 const icons = {
@@ -43,6 +43,7 @@ const icons = {
   '/rescuers': ShieldUser,
   '/resources-requests': PackageCheck,
   '/situation': FileCheck2,
+  '/situation/external-reports': FileCheck2,
   '/archive': Database,
 }
 

@@ -28,7 +28,7 @@ class HouseholdMobileSetupWorkflow
             $this->support->writeAuditLog($request, 'mobile_household_geotag', 'households', $householdId, $validated);
         });
 
-        return response()->json(['message' => 'Household geotag saved.']);
+        return response()->json(['message' => 'Household geotag saved.', 'data' => ['geographic_classification' => app(\App\Services\Shared\HouseholdGeographicClassifier::class)->resolve((float) $validated['latitude'], (float) $validated['longitude'])]]);
     }
 
     public function completeSetup(Request $request): JsonResponse
@@ -85,6 +85,7 @@ class HouseholdMobileSetupWorkflow
             'message' => 'Household mobile setup saved.',
             'data' => [
                 'device_token_id' => $deviceId,
+                'geographic_classification' => app(\App\Services\Shared\HouseholdGeographicClassifier::class)->resolve((float) $validated['latitude'], (float) $validated['longitude']),
             ],
         ]);
     }
@@ -130,6 +131,7 @@ class HouseholdMobileSetupWorkflow
 
     private function saveGeotag(string $householdId, ?string $userId, array $validated, $now): void
     {
+        app(\App\Services\Shared\HouseholdGeographicClassifier::class)->classify($householdId, (float) $validated['latitude'], (float) $validated['longitude']);
         $data = $this->support->filterColumns('geotagged_locations', [
             'household_id' => $householdId,
             'latitude' => $validated['latitude'],

@@ -138,6 +138,7 @@ class HouseholdMobileService
             'message' => 'Household mobile setup saved.',
             'data' => [
                 'device_token_id' => $deviceId,
+                'geographic_classification' => app(\App\Services\Shared\HouseholdGeographicClassifier::class)->resolve((float) $validated['latitude'], (float) $validated['longitude']),
             ],
         ]);
     }
@@ -2013,6 +2014,7 @@ class HouseholdMobileService
 
     private function saveGeotag(string $householdId, ?string $userId, array $validated, $now): void
     {
+        app(\App\Services\Shared\HouseholdGeographicClassifier::class)->classify($householdId, (float) $validated['latitude'], (float) $validated['longitude']);
         $data = $this->filterColumns('geotagged_locations', [
             'household_id' => $householdId,
             'latitude' => $validated['latitude'],

@@ -1,3 +1,4 @@
+import { statusTone as unifiedStatusTone } from '../../utils/statusPalette'
 import { MoreHorizontal, RefreshCcw } from 'lucide-react'
 import ActionMenu from '../ui/ActionMenu'
 import Badge from '../ui/Badge'
@@ -109,15 +110,5 @@ function requestActions(request, onView, onEdit) {
 }
 
 function statusTone(status, validationStatus) {
-  if (['verified', 'forwarded'].includes(validationStatus)) {
-    return 'blue'
-  }
-
-  return {
-    pending: 'amber',
-    acknowledged: 'blue',
-    approved: 'green',
-    rejected: 'red',
-    delivered: 'green',
-  }[status] || 'gray'
+  return unifiedStatusTone(['verified','forwarded'].includes(validationStatus) ? validationStatus : status)
 }

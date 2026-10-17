@@ -54,7 +54,7 @@ class RescueDispatchQuery
         $route = $this->presenter->decodeJson($dispatch->route_notes);
         $ids = array_values(array_unique(array_filter(array_merge([$dispatch->household_id], $route['household_ids'] ?? []))));
         if (!$ids) return [];
-        $query = Household::query()->withoutGlobalScopes()->from('households as h')->whereIn('h.household_id', $ids);
+        $query = Household::query()->withoutGlobalScopes()->from('households as h')->whereIn('h.household_id', HouseholdEligibilityQuery::ids())->whereIn('h.household_id', $ids);
         $columns = ['h.household_id'];
         foreach (['household_name','household_code','member_count'] as $column) $columns[] = Schema::hasColumn('households', $column) ? 'h.'.$column : DB::raw('NULL as '.$column);
         if (Schema::hasTable('household_disasters') && Schema::hasTable('household_statuses')) {
@@ -135,17 +135,37 @@ class RescueDispatchQuery
     public function riskAreas(?string $eventId)
     {
         if (!$eventId) return collect();
-        $rows=Household::query()->withoutGlobalScopes()->from('households as h')->leftJoin('addresses as a','a.address_id','=','h.address_id')->leftJoin('household_disasters as hd',function($j)use($eventId):void{$j->on('hd.household_id','=','h.household_id')->where('hd.disaster_id','=',$eventId);})->leftJoin('household_statuses as hs','hs.status_id','=','hd.current_status_id')->when(Schema::hasColumn('households','deleted_at'),fn($q)=>$q->whereNull('h.deleted_at'))->whereNotNull('h.household_id')->select(['h.household_id','h.household_code','h.household_name','h.member_count',Schema::hasColumn('addresses','sitio_id') ? 'a.sitio_id' : DB::raw('NULL as sitio_id'),Schema::hasColumn('addresses','purok_id') ? 'a.purok_id' : DB::raw('NULL as purok_id'),'a.full_address','a.house_number',DB::raw("COALESCE(NULLIF(a.purok_sitio, ''), 'Unassigned') as area_name"),DB::raw("(SELECT gl.location_label FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.location_label IS NOT NULL ORDER BY COALESCE(gl.updated_at,gl.created_at) DESC LIMIT 1) as geotag_label"),'hs.status_key','hs.status_label','hd.needs_dispatch','hd.priority_level','hd.last_battery_level','hd.last_reported_at',DB::raw('EXISTS (SELECT 1 FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.latitude IS NOT NULL AND gl.longitude IS NOT NULL) as has_geotag')])->get();
+        $barangayId = app(\App\Services\Shared\BarangayProfileService::class)->current()['barangay_id'] ?? null;
+        $areaLabel = DB::connection()->getDriverName() === 'sqlite'
+            ? "(p.purok_name || ', ' || s.sitio_name)" : "CONCAT(p.purok_name, ', ', s.sitio_name)";
+        $rows = Household::query()->withoutGlobalScopes()->from('households as h')
+            ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->leftJoin('puroks as p', 'p.purok_id', '=', 'a.purok_id')
+            ->leftJoin('sitios as s', 's.sitio_id', '=', DB::raw('COALESCE(p.sitio_id, a.sitio_id)'))
+            ->leftJoin('household_disasters as hd', fn ($join) => $join->on('hd.household_id', '=', 'h.household_id')->where('hd.disaster_id', $eventId))
+            ->leftJoinSub(HouseholdEventStatusQuery::latestReports($eventId), 'latest_report', 'latest_report.household_id', '=', 'h.household_id')
+            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'latest_report.status_id')
+            ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId))
+            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($q) => $q->whereNull('h.deleted_at'))
+            ->whereNotNull('h.household_id')
+            ->select(['h.household_id', 'h.household_code', 'h.household_name', 'h.member_count',
+                DB::raw('COALESCE(p.sitio_id, a.sitio_id) as sitio_id'), 'a.purok_id',
+                'a.full_address', 'a.house_number',
+                DB::raw("COALESCE({$areaLabel}, s.sitio_name, NULLIF(a.purok_sitio, ''), 'Unassigned') as area_name"),
+                DB::raw("(SELECT gl.location_label FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.location_label IS NOT NULL ORDER BY COALESCE(gl.updated_at,gl.created_at) DESC LIMIT 1) as geotag_label"),
+                'hs.status_key', 'hs.status_label', 'hd.needs_dispatch', 'hd.priority_level', 'hd.last_battery_level', 'hd.last_reported_at',
+                DB::raw('EXISTS (SELECT 1 FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.latitude IS NOT NULL AND gl.longitude IS NOT NULL) as has_geotag')])->get();
         $contacts = $this->contactChannels($rows->pluck('household_id')->unique()->all());
         $busy = collect();
         foreach (ResponderAssignment::query()->where('disaster_id', $eventId)->whereIn('status', ['dispatched','accepted','en_route','on_scene','onscene','returning'])->get(['assignment_id','household_id','route_notes']) as $assignment) {
             $route = $this->presenter->decodeJson($assignment->route_notes);
-            foreach (array_filter(array_merge([$assignment->household_id], $route['household_ids'] ?? [])) as $householdId) $busy[$householdId] = $assignment->assignment_id;
+            foreach (array_filter(array_merge([$assignment->household_id], $route['household_ids'] ?? [], array_merge([], ...array_values($route['responder_households'] ?? [])))) as $householdId) $busy[$householdId] = $assignment->assignment_id;
         }
-        return $rows->groupBy('area_name')->map(function($items,string $area)use($busy,$contacts):array{
+        return $rows->groupBy(fn ($row) => $row->purok_id !== null ? 'purok:'.$row->purok_id : ($row->sitio_id !== null ? 'sitio:'.$row->sitio_id : 'unregistered:'.$row->area_name))->map(function($items,string $areaId)use($busy,$contacts):array{
+            $area = $items->first()->area_name;
             $total=$items->count();$unsafe=$items->filter(fn($i)=>in_array($i->status_key,['not_evacuated','displaced','unsafe','needs_help','need_help','needs_assistance','missing','injured'],true)||(bool)$i->needs_dispatch)->count();$unchecked=$items->whereNull('status_key')->count();$safe=$items->filter(fn($i)=>in_array($i->status_key,['active','returned','safe'],true))->count()+$items->filter(fn($i)=>in_array($i->status_key,['evacuated','relocated'],true))->count();$cover=$unsafe+$unchecked;$priority=$unsafe?'critical':($unchecked?'high':'watch');
             $households=$items->sortBy(fn($i)=>sprintf('%d%d%s',$i->needs_dispatch?0:1,$i->has_geotag?0:1,strtolower($i->household_name?:$i->household_id)))->map(fn($i)=>array_merge($this->presenter->riskHousehold($i,$busy), ['has_contact_channel'=>$contacts[$i->household_id] ?? null]))->values();
-            return ['sitio_id'=>$items->pluck('sitio_id')->filter()->unique()->count()===1?$items->pluck('sitio_id')->filter()->first():null,'purok_id'=>$items->pluck('purok_id')->filter()->unique()->count()===1?$items->pluck('purok_id')->filter()->first():null,'id'=>str($area)->slug('-')->toString()?:'unassigned','area_name'=>$area,'zone'=>$area,'context'=>$unsafe?'Unsafe households need dispatch focus.':'Unchecked households need field verification.','priority'=>$priority,'priority_label'=>$this->presenter->label($priority),'total_households'=>$total,'geotagged_households'=>$households->where('has_geotag',true)->count(),'unsafe_households'=>$unsafe,'unchecked_households'=>$unchecked,'safe_households'=>$safe,'to_cover'=>$cover,'households'=>$households,'recommended_households'=>$households->filter(fn($i)=>$i['needs_dispatch']||$i['status_key']==='unchecked'||in_array($i['status_key'],['not_evacuated','displaced','unsafe','needs_help','need_help','needs_assistance','missing','injured'],true))->take(10)->values()];
+            return ['sitio_id'=>$items->pluck('sitio_id')->filter()->unique()->count()===1?$items->pluck('sitio_id')->filter()->first():null,'purok_id'=>$items->pluck('purok_id')->filter()->unique()->count()===1?$items->pluck('purok_id')->filter()->first():null,'id'=>$areaId,'area_name'=>$area,'zone'=>$area,'context'=>$unsafe?'Unsafe households need dispatch focus.':'Unchecked households need field verification.','priority'=>$priority,'priority_label'=>$this->presenter->label($priority),'total_households'=>$total,'geotagged_households'=>$households->where('has_geotag',true)->count(),'unsafe_households'=>$unsafe,'unchecked_households'=>$unchecked,'safe_households'=>$safe,'to_cover'=>$cover,'households'=>$households,'recommended_households'=>$households->filter(fn($i)=>$i['needs_dispatch']||$i['status_key']==='unchecked'||in_array($i['status_key'],['not_evacuated','displaced','unsafe','needs_help','need_help','needs_assistance','missing','injured'],true))->take(10)->values()];
         })->filter(fn($area)=>$area['to_cover']>0)->sortByDesc('to_cover')->values();
     }
 

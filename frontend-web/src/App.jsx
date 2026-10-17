@@ -37,6 +37,11 @@ import './styles/situation.css'
 import './styles/responsive.css'
 import './styles/mapmate-reference.css'
 import './styles/map-enhancements.css'
+import './styles/household-prototype.css'
+import './styles/mapping-reference.css'
+import './styles/weather-reference.css'
+import './styles/status-colors.css'
+import './styles/situation-reference.css'
 
 const pageComponents = {
   '/super-admin': lazy(() => import('./pages/SuperAdminPage')),
@@ -62,6 +67,7 @@ const pageComponents = {
   '/resources-requests/new': lazy(() => import('./pages/ResourceRequestEditorPage')),
   '/resources-requests/edit': lazy(() => import('./pages/ResourceRequestEditorPage')),
   '/situation': lazy(() => import('./pages/SituationReportPage')),
+  '/situation/external-reports': lazy(() => import('./pages/ExternalReportsPage')),
   '/archive': lazy(() => import('./pages/ArchivePage')),
   '/notifications': lazy(() => import('./pages/NotificationsPage')),
   '/profile': lazy(() => import('./pages/ProfilePage')),
@@ -156,6 +162,7 @@ const modulePages = [
     kicker: 'Reports',
     summary: 'Generate saved event snapshots for household, dispatch, resources, weather, and casualty summaries.',
   },
+  { path: '/situation/external-reports', title: 'External Reports', kicker: 'Reports', summary: 'Generate and download reports from EvaTrack.' },
   {
     path: '/archive',
     title: 'Archive',

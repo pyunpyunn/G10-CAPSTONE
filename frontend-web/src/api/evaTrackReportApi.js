@@ -9,3 +9,8 @@ export async function generateEvaTrackReport(payload) {
   const { data } = await api.post('/reports/evatrack/generate', payload, { timeout: 90000 })
   return data
 }
+
+export async function getExternalReportProviders() {
+  const { data } = await api.get('/reports/external/providers')
+  return data.data.providers
+}

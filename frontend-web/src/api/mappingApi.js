@@ -42,3 +42,8 @@ export async function getRouteToSite(startPoint, endPoint) {
     duration_min: Math.round(route.duration / 60),
   }
 }
+
+export async function getHouseholdRoute(householdId) {
+  const response = await api.get(`/map/households/${encodeURIComponent(householdId)}/route`)
+  return response.data.data
+}
