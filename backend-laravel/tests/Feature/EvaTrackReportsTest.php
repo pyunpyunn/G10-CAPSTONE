@@ -35,6 +35,22 @@ class EvaTrackReportsTest extends TestCase
             && $request['end_date'] === '2026-10-14');
     }
 
+    public function test_external_provider_catalog_exposes_only_implemented_report_capabilities(): void
+    {
+        $this->getJson('/api/v1/reports/external/providers')->assertUnauthorized();
+        $this->withoutMiddleware();
+        $this->getJson('/api/v1/reports/external/providers')->assertOk()
+            ->assertJsonPath('data.providers.0.key', 'evatrack')
+            ->assertJsonPath('data.providers.0.implemented', true)
+            ->assertJsonPath('data.providers.0.configured', true)
+            ->assertJsonPath('data.providers.1.name', 'SafeTrack')
+            ->assertJsonPath('data.providers.1.implemented', false)
+            ->assertJsonPath('data.providers.2.name', 'TrackingAid')
+            ->assertJsonPath('data.providers.2.report_types', [])
+            ->assertDontSee('private-test-key');
+        Http::assertNothingSent();
+    }
+
     public function test_routes_require_user_authentication(): void
     {
         $this->getJson('/api/v1/reports/evatrack/configuration')->assertUnauthorized();

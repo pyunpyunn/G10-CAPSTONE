@@ -42,6 +42,7 @@ import './styles/mapping-reference.css'
 import './styles/weather-reference.css'
 import './styles/status-colors.css'
 import './styles/situation-reference.css'
+import './styles/situation-workspace.css'
 
 const pageComponents = {
   '/super-admin': lazy(() => import('./pages/SuperAdminPage')),
