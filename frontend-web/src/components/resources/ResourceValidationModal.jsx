@@ -1,4 +1,4 @@
-import { FileCheck2, Send, Undo2, X } from 'lucide-react'
+import { FileCheck2, Save, Send, Undo2, X } from 'lucide-react'
 
 export default function ResourceValidationModal({
   mode,
@@ -22,8 +22,8 @@ export default function ResourceValidationModal({
   const isValidate = mode === 'validate'
   const isReturn = mode === 'return'
   const isForward = mode === 'forward'
-  const canReview = canApprove && isView && ['needs_validation', 'returned'].includes(form.validation_status)
-  const isReadOnly = isView || isForward || isEdit
+  const canReview = canApprove && (isView || isValidate) && ['needs_validation', 'returned'].includes(form.validation_status)
+  const isReadOnly = isView || isForward
   const requestFieldsDisabled = !isCreate && !isEdit
   const decisionDisabled = !isValidate
   const modalTitle = modalTitleFor(mode)
@@ -208,7 +208,7 @@ export default function ResourceValidationModal({
           <div className="rr-validation-modal-actions">
             <button className="btn btn-secondary btn-sm" type="button" disabled={isSaving} onClick={onClose}>
               <X size={14} />
-              {isView ? 'Close' : isEdit ? 'Discard' : 'Cancel'}
+              {isView ? 'Close' : 'Cancel'}
             </button>
             {canReview && (
               <>
@@ -230,8 +230,8 @@ export default function ResourceValidationModal({
             )}
             {isEdit && (
               <button className="btn btn-primary btn-sm" type="submit" disabled={isSaving}>
-                <FileCheck2 size={14} />
-                {isSaving ? 'Saving...' : 'Save changes'}
+                <Save size={14} />
+                {isSaving ? 'Saving...' : 'Save'}
               </button>
             )}
             {isReturn && (
