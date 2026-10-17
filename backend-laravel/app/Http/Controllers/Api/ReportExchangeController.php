@@ -143,7 +143,7 @@ class ReportExchangeController extends Controller
     private function generateFile(array $summary, string $format, ReportFileService $files): array
     {
         if ($format === 'pdf') return $files->generateSituationPdf($summary);
-        return $files->generate('situation', $format, ['Section', 'Field', 'Value'], app(\App\Presenters\SituationReportExportPresenter::class)->rows($summary));
+        return $files->generateSituationSpreadsheet($summary, $format);
     }
 
     private function present(object $row): array

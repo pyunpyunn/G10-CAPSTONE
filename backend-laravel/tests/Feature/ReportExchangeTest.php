@@ -123,7 +123,7 @@ class ReportExchangeTest extends TestCase
         $row = $response->getData(true)['data'];
         $this->assertSame('accepted', $row['status']);
         $bytes = Storage::disk('local')->get('reports/'.$row['file']['file_name']);
-        $this->assertStringContainsString('Sitio A / Purok 1', $bytes);
+        $this->assertStringContainsString('"Sitio A","Purok 1",12', $bytes);
         $this->assertStringNotContainsString('Private unrelated operations note', $bytes);
         $this->assertStringNotContainsString('Injured', $bytes);
         $stored = DB::table('external_report_requests')->where('id', $row['id'])->first();
