@@ -117,6 +117,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/field-reports', [RescuerMobileController::class, 'fieldReportsAdmin']);
             Route::get('/rescue-teams', [RescueDispatchController::class, 'teams']);
             Route::get('/resource-request-types', [ResourceRequestController::class, 'types']);
+            Route::post('/resource-request-types', [ResourceRequestController::class, 'storeType']);
             Route::get('/resource-requests', [ResourceRequestController::class, 'index']);
             Route::post('/resource-requests', [ResourceRequestController::class, 'store']);
             Route::get('/resource-requests/{requestId}', [ResourceRequestController::class, 'show']);
