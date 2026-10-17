@@ -11,7 +11,6 @@ class SituationReportPresenter
         $household = $this->householdSummary($sources);
         $dispatch = $this->dispatchSummary($sources);
         $weather = $this->weatherSummary($sources['weather']);
-        $evacuation = $this->evacuationSummary($sources['evacuation']);
         $resources = $this->resourceSummary($sources['requests']);
         $casualties = $this->casualtySummary($dispatch);
 
@@ -37,7 +36,7 @@ class SituationReportPresenter
                 'scope' => 'All registered households in barangay scope', 'coverage' => $household['total'].' households in scope',
             ],
             'weather' => $weather, 'household' => $household, 'casualties' => $casualties,
-            'evacuation' => $evacuation, 'dispatch' => $dispatch,
+            'dispatch' => $dispatch,
             'damage' => ['partial' => null, 'total' => null, 'cost' => null],
             'resources' => $resources, 'actions_text' => $meta['actions_text'] ?? '',
             'included_sections' => $meta['included_sections'] ?? [],
@@ -83,7 +82,12 @@ class SituationReportPresenter
         $unchecked = max($total - $reported, 0);
         $progress = $total > 0 ? round(($reported / $total) * 100) : 0;
         $purokRows = collect($sources['purok_rows'])->map(function (object $row): array {
-            return ['purok' => $row->purok.(isset($row->sitio_name) ? ', '.$row->sitio_name : ''),
+            return ['purok' => $row->purok, 'sitio' => $row->sitio_name ?? 'Not recorded',
+                'persons' => isset($row->persons) ? (int) $row->persons : null,
+                'affected_persons' => isset($row->affected_persons) ? (int) $row->affected_persons : null,
+                'affected' => (int) $row->unsafe + (int) $row->evacuated,
+                'reported' => (int) $row->reported,
+                'coverage' => $this->percent((int) $row->reported, (int) $row->total).'%',
                 'purok_id' => $row->purok_id ?? null, 'sitio_id' => $row->sitio_id ?? null, 'total' => (int) $row->total, 'safe' => (int) $row->safe,
                 'evacuated' => (int) $row->evacuated, 'unsafe' => (int) $row->unsafe,
                 'unchecked' => max((int) $row->total - (int) $row->reported, 0)];
@@ -96,7 +100,13 @@ class SituationReportPresenter
             'unsafe' => $unsafe, 'unchecked' => $unchecked,
             'safe_percent' => $this->percent($safeTotal, $total), 'evacuated_percent' => $this->percent($evacuated, $total),
             'unsafe_percent' => $this->percent($unsafe, $total), 'unchecked_percent' => $this->percent($unchecked, $total),
+            'affected' => $unsafe + $evacuated,
             'puroks' => $purokRows,
+            'sitios' => collect($purokRows)->groupBy(fn ($row) => $row['sitio_id'] ?? $row['sitio'])->map(function ($rows): array {
+                $result = ['sitio' => $rows->first()['sitio']];
+                foreach (['total', 'reported', 'affected', 'safe', 'evacuated', 'unsafe', 'unchecked'] as $key) $result[$key] = $rows->sum($key);
+                return $result;
+            })->values()->all(),
         ];
     }
 
@@ -113,32 +123,20 @@ class SituationReportPresenter
         ];
     }
 
-    private function evacuationSummary($centers): array
-    {
-        return $centers->map(function (object $center): array {
-            $capacity = (int) ($center->capacity ?? 0); $occupancy = (int) ($center->current_occupancy ?? 0); $remaining = max($capacity - $occupancy, 0);
-            return ['name' => $center->name ?: $center->evacuation_center_id, 'type' => $center->center_type ?: 'Evacuation site',
-                'status' => $center->status ?: 'active', 'families' => 'For update',
-                'persons' => $occupancy > 0 ? $occupancy.' persons' : 'Occupancy not encoded',
-                'capacity_status' => $capacity > 0 ? $remaining.' slots left' : 'Capacity not encoded',
-                'capacity_tone' => $capacity > 0 && $remaining <= 10 ? 'amber' : 'green'];
-        })->values()->all();
-    }
-
     private function dispatchSummary(array $sources): array
     {
         $assignments = $sources['assignments'];
-        $rows = $assignments->take(8)->map(function (object $assignment): array {
+        $rows = $assignments->map(function (object $assignment): array {
             $route = $this->decodeJson($assignment->route_notes); $outcomes = $this->decodeJson($assignment->outcome_notes);
             return ['team' => $assignment->team_name ?: $assignment->responder_name ?: 'Assigned responder',
-                'deployed_at' => $this->formatTime($assignment->assigned_at), 'area' => $assignment->assigned_area ?: 'Area not encoded',
+                'deployed_at' => $this->formatDateTime($assignment->assigned_at), 'area' => $assignment->assigned_area ?: 'Area not encoded',
                 'households_reached' => $this->reachedHouseholds($outcomes).' / '.(int) ($route['households_to_cover'] ?? 0),
                 'outcomes' => $this->outcomeText($outcomes), 'status' => $this->label($assignment->status ?: 'assigned'),
                 'status_tone' => $this->statusTone($assignment->status), 'outcome_counts' => $outcomes];
         })->values()->all();
         $timeline = collect();
-        foreach ($sources['broadcasts'] as $broadcast) $timeline->push(['time' => $this->formatTime($broadcast->sent_at), 'title' => 'Public broadcast', 'actor' => $broadcast->broadcast_title ?: 'HQ/Admin desk', 'detail' => $broadcast->scope_type ? $this->label($broadcast->scope_type).' alert sent' : 'Alert sent', 'status' => $this->label($broadcast->status ?: 'sent'), 'tone' => 'green']);
-        foreach ($assignments->take(4) as $assignment) $timeline->push(['time' => $this->formatTime($assignment->assigned_at), 'title' => 'Dispatch assignment', 'actor' => $assignment->team_name ?: $assignment->responder_name ?: 'Response team', 'detail' => $assignment->assigned_area ?: 'No area encoded', 'status' => $this->label($assignment->status ?: 'assigned'), 'tone' => $this->statusTone($assignment->status)]);
+        foreach ($sources['broadcasts'] as $broadcast) $timeline->push(['time' => $this->formatDateTime($broadcast->sent_at), 'title' => 'Public broadcast', 'actor' => $broadcast->broadcast_title ?: 'HQ/Admin desk', 'detail' => $broadcast->scope_type ? $this->label($broadcast->scope_type).' alert sent' : 'Alert sent', 'status' => $this->label($broadcast->status ?: 'sent'), 'tone' => 'green']);
+        foreach ($assignments as $assignment) $timeline->push(['time' => $this->formatDateTime($assignment->assigned_at), 'title' => 'Dispatch assignment', 'actor' => $assignment->team_name ?: $assignment->responder_name ?: 'Response team', 'detail' => $assignment->assigned_area ?: 'No area encoded', 'status' => $this->label($assignment->status ?: 'assigned'), 'tone' => $this->statusTone($assignment->status)]);
         $stats = ['total' => 0, 'dispatched' => 0, 'on_scene' => 0, 'completed' => 0];
         $outcomes = ['safe_count' => 0, 'evacuated_count' => 0, 'unsafe_count' => 0, 'injured_count' => 0, 'missing_count' => 0];
         foreach ($sources['assignment_outcomes'] as $assignment) {

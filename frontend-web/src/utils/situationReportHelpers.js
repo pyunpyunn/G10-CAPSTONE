@@ -1,3 +1,5 @@
+import { reportSections } from './situationSections'
+
 export function emptyGenerateForm(summary) {
   return {
     report_number: summary?.report?.report_number || '',
@@ -6,7 +8,7 @@ export function emptyGenerateForm(summary) {
     prepared_by: summary?.report?.prepared_by || '',
     reviewed_by: summary?.report?.reviewed_by || '',
     actions_text: summary?.actions_text || '',
-    included_sections: summary?.included_sections || [],
+    included_sections: (summary?.included_sections || []).filter(key => reportSections.some(([number]) => number === key)),
   }
 }
 

@@ -163,7 +163,7 @@ const modulePages = [
     kicker: 'Reports',
     summary: 'Generate saved event snapshots for household, dispatch, resources, weather, and casualty summaries.',
   },
-  { path: '/situation/external-reports', title: 'External Reports', kicker: 'Reports', summary: 'Generate and download reports from EvaTrack.' },
+  { path: '/situation/external-reports', title: 'External Reports', kicker: 'Reports', summary: 'Request reports from connected systems and review incoming section requests.' },
   {
     path: '/archive',
     title: 'Archive',

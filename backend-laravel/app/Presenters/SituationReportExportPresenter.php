@@ -11,6 +11,11 @@ class SituationReportExportPresenter
             $rows[] = [$section, $label, $value === null || $value === '' ? 'Not recorded' : (string) $value];
         };
         $add('Report details', 'Barangay', $summary['barangay_profile']['name'] ?? null);
+        if (isset($summary['event']['sitio_name'])) {
+            $add('Report details', 'Sitio', $summary['event']['sitio_name']);
+            $add('Report details', 'Area coverage', $summary['event']['coverage'] ?? null);
+            $add('Report details', 'Data scope', $summary['scope_note'] ?? null);
+        }
         foreach (['name' => 'Disaster name', 'type' => 'Disaster type', 'declared_at' => 'Date declared', 'finished_at' => 'Date finished', 'status' => 'Event status'] as $key => $label) {
             $add('Report details', $label, $summary['event'][$key] ?? null);
         }
@@ -20,7 +25,7 @@ class SituationReportExportPresenter
         foreach ($summary['included_sections'] ?? [] as $section) {
             $fields = match ($section) {
                 'I' => ['weather', ['condition' => 'Condition', 'wind' => 'Wind', 'rainfall' => 'Rainfall', 'temperature' => 'Temperature', 'source' => 'Source', 'advisory' => 'Advisory']],
-                'II' => ['household', ['total' => 'Households in scope', 'reported' => 'Reported households', 'safe_total' => 'Safe households', 'evacuated' => 'Evacuated households', 'unsafe' => 'Unsafe households', 'unchecked' => 'Unchecked households']],
+                'II' => ['household', ['affected' => 'Reported affected households', 'total' => 'Households in scope', 'reported' => 'Reported households', 'safe_total' => 'Safe households', 'evacuated' => 'Evacuated households', 'unsafe' => 'Unsafe households', 'unchecked' => 'Unchecked households']],
                 'III' => ['casualties', ['deaths' => 'Deaths', 'missing' => 'Missing', 'injured' => 'Injured', 'rescued' => 'Rescued']],
                 'VI' => ['damage', ['partial' => 'Partially damaged houses', 'total' => 'Totally damaged houses', 'cost' => 'Estimated damage cost']],
                 default => null,
@@ -30,20 +35,15 @@ class SituationReportExportPresenter
             }
             if ($section === 'II') {
                 foreach ($summary['household']['puroks'] ?? [] as $row) {
-                    foreach (['total' => 'Households', 'safe' => 'Safe', 'evacuated' => 'Evacuated', 'unsafe' => 'Unsafe', 'unchecked' => 'Unchecked'] as $key => $label) $add($section, ($row['purok'] ?? '').' — '.$label, $row[$key] ?? null);
-                }
-            }
-            if ($section === 'IV') {
-                foreach ($summary['evacuation'] ?? [] as $row) {
-                    foreach (['type' => 'Type', 'status' => 'Status', 'capacity_status' => 'Capacity'] as $key => $label) $add($section, ($row['name'] ?? '').' — '.$label, $row[$key] ?? null);
+                    foreach (['persons' => 'Persons in scope', 'affected_persons' => 'Persons in affected households', 'affected' => 'Affected households', 'reported' => 'Reported households', 'coverage' => 'Coverage', 'total' => 'Households', 'safe' => 'Safe', 'evacuated' => 'Evacuated', 'unsafe' => 'Unsafe', 'unchecked' => 'Unchecked'] as $key => $label) $add($section, (($row['sitio'] ?? 'Not recorded').' / '.($row['purok'] ?? '')).' â€” '.$label, $row[$key] ?? null);
                 }
             }
             if ($section === 'V') {
-                foreach ($summary['dispatch']['timeline'] ?? [] as $row) $add($section, trim(($row['title'] ?? '').' — '.($row['actor'] ?? '')), $row['detail'] ?? $row['status'] ?? null);
-                foreach ($summary['dispatch']['rows'] ?? [] as $row) $add($section, trim(($row['team'] ?? '').' — '.($row['area'] ?? '')), $row['outcomes'] ?? null);
+                foreach ($summary['dispatch']['timeline'] ?? [] as $row) $add($section, trim(($row['title'] ?? '').' â€” '.($row['actor'] ?? '')), $row['detail'] ?? $row['status'] ?? null);
+                foreach ($summary['dispatch']['rows'] ?? [] as $row) $add($section, trim(($row['team'] ?? '').' â€” '.($row['area'] ?? '')), $row['outcomes'] ?? null);
             }
             if ($section === 'VII') {
-                foreach ($summary['resources']['rows'] ?? [] as $row) $add($section, $row['item'] ?? 'Resource request', implode(' — ', array_filter([$row['quantity'] ?? null, $row['source'] ?? null, $row['status'] ?? null])));
+                foreach ($summary['resources']['rows'] ?? [] as $row) $add($section, $row['item'] ?? 'Resource request', implode(' â€” ', array_filter([$row['quantity'] ?? null, $row['source'] ?? null, $row['status'] ?? null])));
             }
             if ($section === 'VIII') $add($section, 'Actions taken and recommendations', $summary['actions_text'] ?? null);
         }

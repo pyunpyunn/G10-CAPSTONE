@@ -238,7 +238,7 @@
         $evacuation = $summary['evacuation'] ?? [];
         $dispatch = $summary['dispatch'] ?? [];
         $includedSections = $summary['included_sections'] ?? ['I'];
-        $emptyValue = '-';
+        $emptyValue = 'Not recorded';
         $text = fn($value) => ($value === null || $value === '') ? $emptyValue : (string) $value;
     @endphp
 
@@ -261,6 +261,9 @@
             <div class="meta-item"><span class="meta-label">Prepared by</span><span class="meta-value">{{ $text($report['prepared_by'] ?? null) }}</span></div>
         </div>
 
+        @if(!empty($summary['scope_note']))
+            <div class="note-box">{{ $summary['scope_note'] }}</div>
+        @endif
         @foreach($includedSections as $section)
             @switch($section)
                 @case('I')
@@ -281,21 +284,23 @@
                     <div class="section">
                         <div class="section-header"><span class="section-number">II</span><span class="section-title">Affected Population</span></div>
                         <div class="card-grid">
-                            <div class="card quarter"><span class="card-label">Total HH affected</span><span class="card-value">{{ $text($household['total'] ?? null) }}</span></div>
+                            <div class="card quarter"><span class="card-label">Households in scope</span><span class="card-value">{{ $text($household['total'] ?? null) }}</span></div>
                             <div class="card quarter"><span class="card-label">Safe total</span><span class="card-value">{{ $text($household['safe_total'] ?? null) }}</span></div>
                             <div class="card quarter"><span class="card-label">Evacuated</span><span class="card-value">{{ $text($household['evacuated'] ?? null) }}</span></div>
                             <div class="card quarter"><span class="card-label">Unsafe / At risk</span><span class="card-value">{{ $text($household['unsafe'] ?? null) }}</span></div>
                             <div class="card quarter"><span class="card-label">Unchecked</span><span class="card-value">{{ $text($household['unchecked'] ?? null) }}</span></div>
-                            <div class="card quarter"><span class="card-label">Deaths</span><span class="card-value">{{ $text($casualties['deaths'] ?? null) }}</span></div>
-                            <div class="card quarter"><span class="card-label">Missing</span><span class="card-value">{{ $text($casualties['missing'] ?? null) }}</span></div>
-                            <div class="card quarter"><span class="card-label">Injured</span><span class="card-value">{{ $text($casualties['injured'] ?? null) }}</span></div>
                         </div>
-                        <div class="note-box">Reporting progress: {{ $text($household['progress_text'] ?? null) }} checked - {{ $text($household['progress_sub'] ?? null) }}</div>
+                        <div class="note-box">Affected means unsafe or evacuated/relocated households. Person counts describe registered household members, not verified individual casualties. Reporting progress: {{ $text($household['progress_text'] ?? null) }} checked - {{ $text($household['progress_sub'] ?? null) }}</div>
+                        <div class="table-wrap"><table><thead><tr><th>Sitio</th><th>HH in scope</th><th>Reported</th><th>Affected HH</th><th>Unchecked</th></tr></thead><tbody>
+                        @foreach($household['sitios'] ?? [] as $row)
+                        <tr>@foreach(['sitio', 'total', 'reported', 'affected', 'unchecked'] as $key)<td>{{ $text($row[$key] ?? null) }}</td>@endforeach</tr>
+                        @endforeach
+                        </tbody></table></div>
                         <div class="table-wrap">
                             <table>
                                 <thead>
                                 <tr>
-                                    <th>Purok</th>
+                                    <th>Sitio</th><th>Purok</th><th>Persons in scope</th><th>Affected HH</th><th>Persons in affected HH</th>
                                     <th>Households</th>
                                     <th>Safe</th>
                                     <th>Evacuated</th>
@@ -306,7 +311,7 @@
                                 <tbody>
                                 @forelse($household['puroks'] ?? [] as $row)
                                     <tr>
-                                        <td>{{ $text($row['purok'] ?? null) }}</td>
+                                        <td>{{ $text($row['sitio'] ?? null) }}</td><td>{{ $text($row['purok'] ?? null) }}</td><td>{{ $text($row['persons'] ?? null) }}</td><td>{{ $text($row['affected'] ?? null) }}</td><td>{{ $text($row['affected_persons'] ?? null) }}</td>
                                         <td>{{ $text($row['total'] ?? null) }}</td>
                                         <td>{{ $text($row['safe'] ?? null) }}</td>
                                         <td>{{ $text($row['evacuated'] ?? null) }}</td>
@@ -314,7 +319,7 @@
                                         <td>{{ $text($row['unchecked'] ?? null) }}</td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="6">No purok-level data linked to this event.</td></tr>
+                                    <tr><td colspan="10">No purok-level data linked to this event.</td></tr>
                                 @endforelse
                                 </tbody>
                             </table>
@@ -330,29 +335,6 @@
                             <div class="card quarter"><span class="card-label">Missing</span><span class="card-value">{{ $text($casualties['missing'] ?? null) }}</span></div>
                             <div class="card quarter"><span class="card-label">Injured</span><span class="card-value">{{ $text($casualties['injured'] ?? null) }}</span></div>
                             <div class="card quarter"><span class="card-label">Rescued</span><span class="card-value">{{ $text($casualties['rescued'] ?? null) }}</span></div>
-                        </div>
-                    </div>
-                    @break
-
-                @case('IV')
-                    <div class="section">
-                        <div class="section-header"><span class="section-number">IV</span><span class="section-title">Evacuation Centers</span></div>
-                        <div class="table-wrap">
-                            <table>
-                                <thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Capacity</th></tr></thead>
-                                <tbody>
-                                @forelse($evacuation as $center)
-                                    <tr>
-                                        <td>{{ $text($center['name'] ?? null) }}</td>
-                                        <td>{{ $text($center['type'] ?? null) }}</td>
-                                        <td>{{ $text($center['status'] ?? null) }}</td>
-                                        <td>{{ $text($center['capacity_status'] ?? null) }}</td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="4">No evacuation center details linked to this event.</td></tr>
-                                @endforelse
-                                </tbody>
-                            </table>
                         </div>
                     </div>
                     @break
