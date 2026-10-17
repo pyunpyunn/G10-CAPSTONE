@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle, Path } from 'react-native-svg';
 import * as Location from 'expo-location';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { reverseGeocodeAddress } from '@/utils/geocoding';
@@ -21,10 +22,9 @@ export function HouseholdProfileScreen({
   const user = overview.profile?.user || {};
   const members = useMemo(() => overview.members || [], [overview.members]);
   const geotag = overview.geotag || null;
+  const currentStatus = overview.current_status || null;
   const selectedMemberId = String(user.member_id || members[0]?.member_id || '');
   const [savingGeotag, setSavingGeotag] = useState(false);
-  const [expandedMemberProfile, setExpandedMemberProfile] = useState<string | null>(null);
-
   const selectedMember = useMemo(() => {
     return members.find((member: any) => String(member.member_id) === String(selectedMemberId)) || members[0] || null;
   }, [members, selectedMemberId]);
@@ -75,11 +75,7 @@ export function HouseholdProfileScreen({
       <View style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.avatar}>
-            <Image
-              source={require('@/assets/images/household-default-profile.jpg')}
-              style={styles.avatarImage}
-              resizeMode="contain"
-            />
+            <HouseholdAccountIcon />
           </View>
           <View style={styles.heroText}>
             <Text style={styles.role}>Household account</Text>
@@ -94,13 +90,19 @@ export function HouseholdProfileScreen({
         <HouseholdSection title="User Information" />
 
         <View style={styles.devicePanel}>
-          <View style={styles.deviceIcon}>
-            <Ionicons name="phone-portrait-outline" size={24} color={palette.navActive} />
+          <View style={styles.memberAvatar}>
+            <Text style={styles.memberAvatarText}>{initials(deviceOwnerName)}</Text>
           </View>
           <View style={styles.panelText}>
             <Text style={styles.panelLabel}>User</Text>
             <Text style={styles.panelTitle}>{deviceOwnerName}</Text>
-            <Text style={styles.panelMeta}>{memberIdentifier(user)}</Text>
+            <Text style={styles.panelMeta}>{memberRelationship(user)}</Text>
+          </View>
+          <View style={styles.statusCell}>
+            <HouseholdBadge
+              label={currentStatus?.status_label || 'Unchecked'}
+              tone={currentStatus?.status_key || 'neutral'}
+            />
           </View>
         </View>
 
@@ -109,32 +111,23 @@ export function HouseholdProfileScreen({
             <Text style={styles.panelLabel}>Member profile</Text>
             {householdMembers.map((member: any) => {
               const memberKey = memberProfileKey(member);
-              const isExpanded = expandedMemberProfile === memberKey;
               const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'Household member';
 
               return (
-                <View key={memberKey} style={styles.memberEntry}>
-                  <Pressable
-                    style={styles.memberRow}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${isExpanded ? 'Collapse' : 'Expand'} ${memberName} profile`}
-                    accessibilityState={{ expanded: isExpanded }}
-                    onPress={() => setExpandedMemberProfile((current) => current === memberKey ? null : memberKey)}
-                  >
-                    <View style={styles.memberAvatar}>
-                      <Text style={styles.memberAvatarText}>{initials(memberName)}</Text>
-                    </View>
-                    <View style={styles.panelText}>
-                      <Text style={styles.panelTitle}>{memberName}</Text>
-                      <Text style={styles.panelMeta}>{memberIdentifier(member)}</Text>
-                    </View>
-                  </Pressable>
-                  {isExpanded ? (
-                    <View style={styles.memberDataSection}>
-                      <Text style={styles.memberDataLabel}>Data</Text>
-                      <View style={styles.memberDataBlank} />
-                    </View>
-                  ) : null}
+                <View key={memberKey} style={styles.memberRow}>
+                  <View style={styles.memberAvatar}>
+                    <Text style={styles.memberAvatarText}>{initials(memberName)}</Text>
+                  </View>
+                  <View style={styles.panelText}>
+                    <Text style={styles.panelTitle}>{memberName}</Text>
+                    <Text style={styles.panelMeta}>{memberRelationship(member)}</Text>
+                  </View>
+                  <View style={styles.statusCell}>
+                    <HouseholdBadge
+                      label={member.current_status?.status_label || 'Unchecked'}
+                      tone={member.current_status?.status_key || 'neutral'}
+                    />
+                  </View>
                 </View>
               );
             })}
@@ -186,6 +179,30 @@ export function HouseholdProfileScreen({
   );
 }
 
+function HouseholdAccountIcon() {
+  return (
+    <Svg width={54} height={54} viewBox="0 0 64 64" fill="none">
+      <Path
+        d="M8 29L32 9L56 29M14 24V55H50V24M43 18V12H49V23"
+        stroke={palette.navActive}
+        strokeWidth={2.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle cx={32} cy={31} r={4} stroke={palette.navActive} strokeWidth={2.6} />
+      <Circle cx={22} cy={36} r={3.2} stroke={palette.navActive} strokeWidth={2.4} />
+      <Circle cx={42} cy={36} r={3.2} stroke={palette.navActive} strokeWidth={2.4} />
+      <Path
+        d="M23 51V47C23 42.6 26.6 39 31 39H33C37.4 39 41 42.6 41 47V51M15.5 51V48.5C15.5 45.2 18.2 42.5 21.5 42.5H23M41 42.5H42.5C45.8 42.5 48.5 45.2 48.5 48.5V51"
+        stroke={palette.navActive}
+        strokeWidth={2.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 function InfoRow({ icon, label, value }: { icon?: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
@@ -207,11 +224,8 @@ function initials(value: string) {
     .join('');
 }
 
-function memberIdentifier(member: any) {
-  const title = member?.relationship || member?.relation || 'Member';
-  const memberId = member?.member_id || 'No member ID';
-
-  return `${title}: ${memberId}`;
+function memberRelationship(member: any) {
+  return member?.relationship || member?.relation || 'Member';
 }
 
 function memberProfileKey(member: any) {
@@ -251,11 +265,6 @@ const styles = StyleSheet.create({
     borderColor: '#ffffff66',
     borderRadius: 31,
     backgroundColor: '#fff',
-  },
-  avatarImage: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
   },
   heroText: {
     flex: 1,
@@ -309,59 +318,29 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     borderRadius: radius.sm,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-  },
-  memberEntry: {
-    gap: spacing.xs,
-  },
-  memberDataSection: {
-    gap: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.xs,
-  },
-  memberDataLabel: {
-    color: palette.textSoft,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  memberDataBlank: {
-    minHeight: 72,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.sm,
-    backgroundColor: '#fff',
   },
   memberAvatar: {
-    width: 36,
-    height: 36,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
+    borderRadius: 24,
     backgroundColor: palette.secondary,
     borderWidth: 1,
     borderColor: palette.border,
   },
   memberAvatarText: {
     color: palette.navActive,
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '900',
-  },
-  deviceIcon: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    backgroundColor: '#fff',
   },
   panelText: {
     flex: 1,
     minWidth: 0,
+  },
+  statusCell: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   panelLabel: {
     color: palette.textSoft,
