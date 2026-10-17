@@ -14,7 +14,6 @@ use App\Http\Controllers\Api\MappingController;
 use App\Http\Controllers\Api\MobileDeviceController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
-use App\Http\Controllers\Api\ProfilePhotoController;
 use App\Http\Controllers\Api\RescueDispatchController;
 use App\Http\Controllers\Api\RescuerAccountController;
 use App\Http\Controllers\Api\RescuerMobileController;
@@ -60,8 +59,6 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware(['auth:sanctum', 'throttle:300,1', 'realtime.atomic'])->group(function () {
         Route::get('/realtime/health', \App\Http\Controllers\Api\RealtimeHealthController::class)->middleware('role:super_admin');
-        Route::post('/profile/photo', [ProfilePhotoController::class, 'store']);
-        Route::delete('/profile/photo', [ProfilePhotoController::class, 'destroy']);
         Route::patch('/profile/password', [ProfileController::class, 'changePassword'])->middleware('throttle:5,1,password-change');
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);

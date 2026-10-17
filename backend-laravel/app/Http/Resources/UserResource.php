@@ -24,7 +24,6 @@ class UserResource extends JsonResource
             'username' => $this->username,
             'email' => $this->email,
             'contact_number' => $this->contact_number,
-            'profile_photo' => $this->profile_photo,
             'assigned_center_id' => $this->assigned_center_id,
             'household_id' => $this->household_id,
             'is_active' => (bool) $this->is_active,

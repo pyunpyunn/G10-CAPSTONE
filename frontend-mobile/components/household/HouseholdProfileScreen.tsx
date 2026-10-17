@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path } from 'react-native-svg';
-import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { storageUrl } from '@/api/client';
-import { removeProfilePhoto, uploadProfilePhoto } from '@/api/profilePhoto';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { reverseGeocodeAddress } from '@/utils/geocoding';
 import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
@@ -28,14 +25,6 @@ export function HouseholdProfileScreen({
   const currentStatus = overview.current_status || null;
   const selectedMemberId = String(user.member_id || members[0]?.member_id || '');
   const [savingGeotag, setSavingGeotag] = useState(false);
-  const [profilePhoto, setProfilePhoto] = useState(user.profile_photo || null);
-  const [pendingPhoto, setPendingPhoto] = useState<any>(null);
-  const [savingProfilePhoto, setSavingProfilePhoto] = useState(false);
-
-  useEffect(() => {
-    setProfilePhoto(user.profile_photo || null);
-  }, [user.profile_photo]);
-
   const selectedMember = useMemo(() => {
     return members.find((member: any) => String(member.member_id) === String(selectedMemberId)) || members[0] || null;
   }, [members, selectedMemberId]);
@@ -49,75 +38,6 @@ export function HouseholdProfileScreen({
   const householdIdentifier = household.household_id || user.username || 'No household ID';
   const memberCount = members.length || Number(household.member_count || 0);
   const hasGeotag = Boolean(geotag?.latitude && geotag?.longitude);
-
-  async function handleChangeProfilePhoto() {
-    let result;
-    try {
-      result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.85,
-      });
-    } catch {
-      Alert.alert('Unable to open photos', 'Check photo library access and try again.');
-      return;
-    }
-
-    if (result.canceled || !result.assets[0]) return;
-
-    const photo = result.assets[0];
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (photo.mimeType && !allowedTypes.includes(photo.mimeType)) {
-      Alert.alert('Unsupported image', 'Choose a JPG, PNG, or WebP image.');
-      return;
-    }
-    if (photo.fileSize && photo.fileSize > 5 * 1024 * 1024) {
-      Alert.alert('Image is too large', 'Choose an image smaller than 5 MB.');
-      return;
-    }
-
-    setPendingPhoto(photo);
-  }
-
-  async function handleSaveProfilePhoto() {
-    if (!pendingPhoto) return;
-
-    setSavingProfilePhoto(true);
-    try {
-      const response = await uploadProfilePhoto(pendingPhoto);
-      setProfilePhoto(response.profile_photo);
-      setPendingPhoto(null);
-      Alert.alert('Profile picture updated', 'Your picture is saved to your account.');
-    } catch (error: any) {
-      Alert.alert('Unable to update picture', error?.response?.data?.message || error?.userMessage || 'Please try again.');
-    } finally {
-      setSavingProfilePhoto(false);
-    }
-  }
-
-  function handleRemoveProfilePhoto() {
-    Alert.alert('Remove profile picture?', 'Your default initials avatar will be shown.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          setSavingProfilePhoto(true);
-          try {
-            await removeProfilePhoto();
-            setProfilePhoto(null);
-            setPendingPhoto(null);
-            Alert.alert('Profile picture removed', 'Your default initials avatar is restored.');
-          } catch (error: any) {
-            Alert.alert('Unable to remove picture', error?.response?.data?.message || error?.userMessage || 'Please try again.');
-          } finally {
-            setSavingProfilePhoto(false);
-          }
-        },
-      },
-    ]);
-  }
 
   async function handleUpdateGeotag() {
     const permission = await Location.requestForegroundPermissionsAsync();
@@ -170,29 +90,8 @@ export function HouseholdProfileScreen({
         <HouseholdSection title="User Information" />
 
         <View style={styles.devicePanel}>
-          <View style={styles.profilePhotoColumn}>
-            <Pressable
-              style={styles.profilePhotoTouchable}
-              accessibilityRole="button"
-              accessibilityLabel={profilePhoto ? 'Change profile picture' : 'Add profile picture'}
-              accessibilityHint="Opens the photo library"
-              disabled={savingProfilePhoto}
-              onPress={handleChangeProfilePhoto}
-            >
-              <View style={styles.memberAvatar}>
-                {pendingPhoto ? (
-                  <Image source={{ uri: pendingPhoto.uri }} style={styles.profilePhotoImage} />
-                ) : profilePhoto ? (
-                  <Image source={{ uri: storageUrl(profilePhoto) }} style={styles.profilePhotoImage} />
-                ) : (
-                  <Text style={styles.memberAvatarText}>{initials(deviceOwnerName)}</Text>
-                )}
-              </View>
-              <View style={styles.profilePhotoEditBadge}>
-                <Ionicons name="camera-outline" size={13} color={palette.navActive} />
-              </View>
-            </Pressable>
-            {savingProfilePhoto ? <Text style={styles.photoSavingText}>Saving...</Text> : null}
+          <View style={styles.memberAvatar}>
+            <Text style={styles.memberAvatarText}>{initials(deviceOwnerName)}</Text>
           </View>
           <View style={styles.panelText}>
             <Text style={styles.panelTitle}>{deviceOwnerName}</Text>
@@ -207,53 +106,6 @@ export function HouseholdProfileScreen({
               tone={currentStatus?.status_key || 'neutral'}
             />
           </View>
-        </View>
-        <View style={styles.profilePhotoControls}>
-          {pendingPhoto ? (
-            <>
-              <Pressable
-                style={[styles.profilePhotoAction, styles.profilePhotoActionPrimary]}
-                accessibilityRole="button"
-                disabled={savingProfilePhoto}
-                onPress={handleSaveProfilePhoto}
-              >
-                <Ionicons name="save-outline" size={16} color="#fff" />
-                <Text style={styles.profilePhotoActionPrimaryText}>{savingProfilePhoto ? 'Saving...' : 'Save picture'}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.profilePhotoAction}
-                accessibilityRole="button"
-                disabled={savingProfilePhoto}
-                onPress={() => setPendingPhoto(null)}
-              >
-                <Ionicons name="arrow-back-outline" size={16} color={palette.nav} />
-                <Text style={styles.profilePhotoActionText}>Cancel</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <Pressable
-                style={styles.profilePhotoAction}
-                accessibilityRole="button"
-                disabled={savingProfilePhoto}
-                onPress={handleChangeProfilePhoto}
-              >
-                <Ionicons name={profilePhoto ? 'camera-outline' : 'person-add-outline'} size={16} color={palette.nav} />
-                <Text style={styles.profilePhotoActionText}>{profilePhoto ? 'Change picture' : 'Add profile picture'}</Text>
-              </Pressable>
-              {profilePhoto ? (
-                <Pressable
-                  style={[styles.profilePhotoAction, styles.profilePhotoActionDanger]}
-                  accessibilityRole="button"
-                  disabled={savingProfilePhoto}
-                  onPress={handleRemoveProfilePhoto}
-                >
-                  <Ionicons name="trash-outline" size={16} color={palette.brandRed} />
-                  <Text style={styles.profilePhotoActionDangerText}>Delete picture</Text>
-                </Pressable>
-              ) : null}
-            </>
-          )}
         </View>
 
         {householdMembers.length ? (
@@ -483,76 +335,6 @@ const styles = StyleSheet.create({
     color: palette.navActive,
     fontSize: 16,
     fontWeight: '900',
-  },
-  profilePhotoColumn: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  profilePhotoImage: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-  },
-  profilePhotoTouchable: {
-    position: 'relative',
-  },
-  profilePhotoEditBadge: {
-    position: 'absolute',
-    right: -3,
-    bottom: -3,
-    width: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: palette.card,
-    borderRadius: 11,
-    backgroundColor: palette.secondary,
-  },
-  profilePhotoControls: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  profilePhotoAction: {
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: palette.card,
-  },
-  profilePhotoActionText: {
-    color: palette.nav,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  profilePhotoActionPrimary: {
-    borderColor: palette.brandRed,
-    backgroundColor: palette.brandRed,
-  },
-  profilePhotoActionPrimaryText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  profilePhotoActionDanger: {
-    borderColor: `${palette.brandRed}55`,
-    backgroundColor: `${palette.brandRed}0d`,
-  },
-  profilePhotoActionDangerText: {
-    color: palette.brandRed,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  photoSavingText: {
-    color: palette.textSoft,
-    fontSize: 10,
-    fontWeight: '700',
   },
   panelText: {
     flex: 1,

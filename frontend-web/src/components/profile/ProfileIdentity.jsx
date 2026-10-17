@@ -1,5 +1,3 @@
-import { profilePhotoUrl } from '../../api/profileApi'
-
 export default function ProfileIdentity({ identity = {}, barangayProfile = {}, settingsMenu = null }) {
   const name = identity.name || 'Name not recorded'
   const barangayName = barangayProfile.name || 'Registered barangay'
@@ -28,11 +26,7 @@ export default function ProfileIdentity({ identity = {}, barangayProfile = {}, s
     <section className="profile-identity profile-identity-large">
       <div className="profile-hero-block">
         <div className="profile-hero-main">
-          {identity.profile_photo ? (
-            <img className="profile-page-avatar profile-page-avatar-image" src={profilePhotoUrl(identity.profile_photo)} alt={`${name} profile`} />
-          ) : (
-            <div className="profile-page-avatar">{initials(name)}</div>
-          )}
+          <div className="profile-page-avatar">{initials(name)}</div>
           <div className="profile-hero-copy">
             <div className="profile-kicker">HQ/Admin profile</div>
             <div className="profile-name">{name}</div>

@@ -1,8 +1,8 @@
 import { showAuthError, getRememberedLogin, saveRememberedPassword } from '../api/authApi'
-import { Camera, KeyRound, Pencil, Settings, Trash2 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { KeyRound, Pencil, Settings, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { changePassword, getProfile, removeProfilePhoto, updateProfile, uploadProfilePhoto } from '../api/profileApi'
+import { changePassword, getProfile, updateProfile } from '../api/profileApi'
 import ActionMenu from '../components/ui/ActionMenu'
 import DeleteAccountModal from '../components/profile/DeleteAccountModal'
 import PasswordModal from '../components/profile/PasswordModal'
@@ -29,10 +29,6 @@ export default function ProfilePage() {
   const [passwordValues, setPasswordValues] = useState(passwordForm())
   const [profileFormError, setProfileFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [isPhotoSaving, setIsPhotoSaving] = useState(false)
-  const [photoMessage, setPhotoMessage] = useState('')
-  const [photoError, setPhotoError] = useState('')
-  const photoInput = useRef(null)
 
   useEffect(() => {
     loadProfile()
@@ -73,64 +69,6 @@ export default function ProfilePage() {
   function openDeleteModal() {
     setMessage('')
     setIsDeleteOpen(true)
-  }
-
-  async function handlePhotoSelection(event) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-
-    if (file.size > 5 * 1024 * 1024) {
-      setPhotoError('Choose an image smaller than 5 MB.')
-      setPhotoMessage('')
-      return
-    }
-
-    if (file.type && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setPhotoError('Choose a JPG, PNG, or WebP image.')
-      setPhotoMessage('')
-      return
-    }
-
-    setIsPhotoSaving(true)
-    setPhotoError('')
-    setPhotoMessage('Uploading profile picture...')
-
-    try {
-      const result = await uploadProfilePhoto(file)
-      setPayload((currentPayload) => ({
-        ...currentPayload,
-        user: { ...currentPayload.user, profile_photo: result.profile_photo },
-        identity: { ...currentPayload.identity, profile_photo: result.profile_photo },
-      }))
-      setPhotoMessage(result.message || 'Profile picture updated.')
-    } catch (uploadError) {
-      setPhotoMessage('')
-      setPhotoError(profileErrorMessage(uploadError, 'Unable to upload the profile picture.'))
-    } finally {
-      setIsPhotoSaving(false)
-    }
-  }
-
-  async function handleRemovePhoto() {
-    setIsPhotoSaving(true)
-    setPhotoError('')
-    setPhotoMessage('Removing profile picture...')
-
-    try {
-      const result = await removeProfilePhoto()
-      setPayload((currentPayload) => ({
-        ...currentPayload,
-        user: { ...currentPayload.user, profile_photo: null },
-        identity: { ...currentPayload.identity, profile_photo: null },
-      }))
-      setPhotoMessage(result.message || 'Profile picture removed.')
-    } catch (removeError) {
-      setPhotoMessage('')
-      setPhotoError(profileErrorMessage(removeError, 'Unable to remove the profile picture.'))
-    } finally {
-      setIsPhotoSaving(false)
-    }
   }
 
   async function submitProfile(event) {
@@ -187,13 +125,6 @@ export default function ProfilePage() {
   }
 
   const profileActions = [
-    {
-      label: payload?.identity?.profile_photo ? 'Change profile picture' : 'Upload profile picture',
-      icon: Camera,
-      onClick: () => photoInput.current?.click(),
-      disabled: !payload || isPhotoSaving,
-    },
-    ...(payload?.identity?.profile_photo ? [{ label: 'Remove profile picture', icon: Trash2, onClick: handleRemovePhoto, danger: true, disabled: isPhotoSaving }] : []),
     { label: 'Edit profile', icon: Pencil, onClick: openEditModal, disabled: !payload },
     { label: 'Change password', icon: KeyRound, onClick: openPasswordModal, disabled: !payload },
     { label: 'Delete account forever', icon: Trash2, onClick: openDeleteModal, danger: true, disabled: !payload },
@@ -204,8 +135,6 @@ export default function ProfilePage() {
       <PageHeader title="Profile" />
 
       {message && <div className="profile-page-message">{message}</div>}
-      {photoMessage && <div className="profile-page-message" role="status">{photoMessage}</div>}
-      {photoError && <div className="form-error" role="alert">{photoError}</div>}
       {isLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
@@ -225,14 +154,6 @@ export default function ProfilePage() {
           />
         </div>
       )}
-
-      <input
-        ref={photoInput}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        hidden
-        onChange={handlePhotoSelection}
-      />
 
       <ProfileEditModal
         isOpen={isEditOpen}
