@@ -315,7 +315,9 @@ GET the exact accepted `data.file.download_url`. The response is a binary file, 
 | Excel | `.xlsx` | Actual Excel workbook, not a CSV renamed to `.xlsx` |
 | CSV | `.csv` | UTF-8 with BOM and CSV quoting |
 
-Excel and CSV use three columns: **Section**, **Field**, **Value**. Population figures and sitio/purok metrics are individual labeled rows, rather than a normalized resident dataset. Formula-like CSV cells may be prefixed with an apostrophe for spreadsheet safety. Parse CSV with a CSV parser and handle its BOM; do not split rows on commas manually.
+Excel uses the supplied report layout: a formatted **Summary** sheet plus **Population**, **Timeline**, **Team Outcomes**, and **Resources** sheets as applicable to the requested sections. Population includes sitio/purok, household and person counts. Data sheets have typed values, filters and frozen headings; dates are Excel dates. Sections that were not requested do not create detail sheets.
+
+CSV follows the same report order in one rectangular file: report header, details and selected summary sections, then labeled detail tables with their own heading rows. CSV cannot carry workbook tabs, colors or merged cells. It no longer uses a single Section/Field/Value schema. Read its table labels and headers with a CSV parser, including quoted multiline fields and the UTF-8 BOM. Formula-like user text is prefixed with an apostrophe for spreadsheet safety.
 
 When a download expires, polling returns `data.file.expired: true` and `data.file.download_url: null`. The request remains accepted. Ask a RESQPERATION operator to **Renew download** in the request details, then poll the same status URL for the new link. Renewal is currently an authenticated operator action; there is no external API-key renewal endpoint. A deleted/missing file can return HTTP 404 even before its link expires.
 
@@ -496,7 +498,7 @@ Only authenticated RESQPERATION web accounts with Reports Documentation access c
 - HTTP 202 persists the request ID and status URL; Pending does not show a download.
 - Rejection displays the reason and stops polling; correction creates a new request.
 - Acceptance downloads only the requested sections and correct sitio scope.
-- PDF, Excel and CSV are handled as files; spreadsheets use the documented three-column layout.
+- PDF, Excel and CSV are handled as files; spreadsheets use the formatted summary and requested detail sheets; CSV uses labeled table blocks.
 - Expired downloads show a renewal state; returned signed URLs are kept intact.
 - Polling honors rate limits; repeated POSTs are not used as polling.
 - The deployment's API and returned download URLs work from the partner server, not only the developer's own machine.

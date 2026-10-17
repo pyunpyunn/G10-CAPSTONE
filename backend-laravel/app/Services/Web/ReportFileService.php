@@ -74,6 +74,21 @@ class ReportFileService
         }
     }
 
+    public function generateSituationSpreadsheet(array $summary, string $format): array
+    {
+        $format = $format === 'excel' ? 'xlsx' : $format;
+        if (!in_array($format, ['csv','xlsx'], true)) throw ValidationException::withMessages(['format'=>'Select CSV or Excel.']);
+        $filename = 'situation_'.now()->format('Ymd_His').'_'.Str::random(16).'.'.$format;
+        $path = tempnam(sys_get_temp_dir(), 'sitrep-');
+        try {
+            $document = app(\App\Presenters\SituationReportDocument::class)->data($summary);
+            $writer = app(SituationReportSpreadsheet::class);
+            if ($format === 'xlsx') $writer->writeXlsx($path, $document);
+            else $writer->writeCsv($path, $document);
+            return $this->persistReportFile($filename, $path, 'situation', $format);
+        } finally { if (file_exists($path)) unlink($path); }
+    }
+
     private function persistReportFile(string $filename, string $path, string $type, string $format): array
     {
         $disk = Storage::disk(config('reports.disk'));

@@ -70,8 +70,7 @@ class ReportGenerationService
             return response()->json($this->files->generateSituationPdf($summary));
         }
 
-        $rows = app(\App\Presenters\SituationReportExportPresenter::class)->rows($summary);
-        return response()->json($this->files->generate('situation', $data['format'], ['Section', 'Field', 'Value'], $rows));
+        return response()->json($this->files->generateSituationSpreadsheet($summary, $data['format']));
     }
 
 }
