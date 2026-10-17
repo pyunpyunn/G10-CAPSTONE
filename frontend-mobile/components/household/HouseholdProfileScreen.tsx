@@ -94,9 +94,11 @@ export function HouseholdProfileScreen({
             <Text style={styles.memberAvatarText}>{initials(deviceOwnerName)}</Text>
           </View>
           <View style={styles.panelText}>
-            <Text style={styles.panelLabel}>User</Text>
             <Text style={styles.panelTitle}>{deviceOwnerName}</Text>
-            <Text style={styles.panelMeta}>{memberRelationship(user)}</Text>
+            <View style={styles.userRelationshipRow}>
+              <Text style={styles.panelLabel}>User:</Text>
+              <Text style={[styles.panelMeta, styles.userRelationshipText]}>{memberRelationship(user)}</Text>
+            </View>
           </View>
           <View style={styles.statusCell}>
             <HouseholdBadge
@@ -359,6 +361,15 @@ const styles = StyleSheet.create({
     color: palette.textSoft,
     fontSize: 12,
     fontWeight: '800',
+  },
+  userRelationshipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: 3,
+  },
+  userRelationshipText: {
+    marginTop: 0,
   },
   infoRow: {
     flexDirection: 'row',
