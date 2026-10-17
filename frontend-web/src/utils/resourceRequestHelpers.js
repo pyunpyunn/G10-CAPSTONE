@@ -1,5 +1,4 @@
 export function emptyResourceRequestForm(payload = {}) {
-  const firstUrgency = payload.options?.urgencies?.find((item) => item.key === 'medium') || payload.options?.urgencies?.[0]
 
   return {
     request_source: 'hq_desk',
@@ -11,7 +10,6 @@ export function emptyResourceRequestForm(payload = {}) {
     unit: '',
     requested_by: '',
     evacuation_center_id: '',
-    urgency_id: firstUrgency?.urgency_id || '',
     description: '',
     validation_status: 'needs_validation',
     validation_notes: '',
@@ -32,7 +30,6 @@ export function formFromResourceRequest(request) {
     unit: request.need?.unit || '',
     requested_by: request.requested_by || '',
     evacuation_center_id: request.area?.evacuation_center_id || '',
-    urgency_id: request.urgency_id || '',
     description: request.description || '',
     validation_status: request.validation?.key || 'needs_validation',
     validation_notes: request.validation_notes || '',
@@ -53,7 +50,6 @@ export function buildCreatePayload(form) {
     unit: emptyToNull(form.unit),
     requested_by: form.requested_by,
     evacuation_center_id: emptyToNull(form.evacuation_center_id),
-    urgency_id: form.urgency_id ? Number(form.urgency_id) : null,
     description: emptyToNull(form.description),
   }
 }

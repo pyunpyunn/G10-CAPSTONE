@@ -42,7 +42,6 @@ export default function RequestWorkflowPage() {
   const [search, setSearch] = useState('')
   const [source, setSource] = useState('all')
   const [status, setStatus] = useState('all')
-  const [urgency, setUrgency] = useState('all')
 
   // Live Tracking Drawer & Action States
   const [inspectingRequest, setInspectingRequest] = useState(null)
@@ -138,20 +137,14 @@ export default function RequestWorkflowPage() {
   const rawRequests = data?.requests?.data
   const totalCount = data?.requests?.total ?? rawRequests?.length ?? 0
 
-  // Client-side urgency filtering
-  const filteredRequests = useMemo(() => {
-    const requests = rawRequests || []
-    if (urgency === 'all') return requests
-    return requests.filter((r) => r.urgency?.key === urgency)
-  }, [rawRequests, urgency])
+  const filteredRequests = rawRequests || []
 
-  const hasActiveFilters = search || source !== 'all' || status !== 'all' || urgency !== 'all'
+  const hasActiveFilters = search || source !== 'all' || status !== 'all'
 
   const handleResetFilters = () => {
     setSearch('')
     setSource('all')
     setStatus('all')
-    setUrgency('all')
     setPage(1)
   }
 
@@ -168,19 +161,6 @@ export default function RequestWorkflowPage() {
         { value: 'field_team', label: 'Field Teams' },
       ],
     }] : []),
-    {
-      id: 'priority',
-      label: 'Priority',
-      value: urgency,
-      onChange: (value) => { setUrgency(value); setPage(1) },
-      options: [
-        { value: 'all', label: 'All priorities' },
-        { value: 'critical', label: 'Critical' },
-        { value: 'high', label: 'High' },
-        { value: 'medium', label: 'Medium' },
-        { value: 'low', label: 'Low' },
-      ],
-    },
     ...(!external ? [{
       id: 'status',
       label: 'Status',
@@ -344,7 +324,6 @@ export default function RequestWorkflowPage() {
                 <th>Resource Need</th>
                 <th>Quantity</th>
                 <th>Evacuation Area</th>
-                <th>Priority</th>
                 <th>Status</th>
                 {!external && <th>Tracking Reference</th>}
                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -374,7 +353,6 @@ export default function RequestWorkflowPage() {
                 </tr>
               ) : (
                 filteredRequests.map((row) => {
-                  const urgencyKey = row.urgency?.key || 'medium'
                   const statusKey = row.validation?.key || 'needs_validation'
                   const isCompleted = statusKey === 'fulfilled'
 
@@ -432,13 +410,6 @@ export default function RequestWorkflowPage() {
                             </span>
                           </div>
                         )}
-                      </td>
-
-                      {/* Priority */}
-                      <td>
-                        <span className={`urgency-tag urgency-${urgencyKey}`}>
-                          {row.urgency?.label || 'Medium'}
-                        </span>
                       </td>
 
                       {/* Status */}

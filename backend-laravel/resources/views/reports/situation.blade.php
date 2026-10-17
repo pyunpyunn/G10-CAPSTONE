@@ -22,8 +22,8 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 <title>Situation Report - {{ $r['disaster_type'] }}</title>
 <style>
-    /* Page: A4, margins match the Word file (0.75in sides) */
-    @page { margin: 0.65in 0.75in 0.85in 0.75in; }
+    /* Page: A4, margins match the Word file (0.5in on every side) */
+    @page { margin: 0.5in; }
     * { box-sizing: border-box; }
     body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #222B36; margin: 0; padding: 0; }
     table { border-collapse: collapse; border-spacing: 0; }
@@ -80,7 +80,7 @@
     .sig td.line { border-top: 1px solid {{ $NAVY }}; padding-top: 3px; font-size: 7.5pt; font-weight: bold; color: #5F6B7A; text-transform: uppercase; }
 
     /* footer (fixed, repeats on every page) */
-    .footer { position: fixed; left: 0; right: 0; bottom: -0.5in; height: 0.3in; border-top: 1px solid #D5DCE5; font-size: 7.5pt; color: #5F6B7A; }
+    .footer { position: fixed; left: 0; right: 0; bottom: -0.35in; height: 0.25in; border-top: 1px solid #D5DCE5; font-size: 7.5pt; color: #5F6B7A; }
     .footer td { padding-top: 5px; font-size: 7.5pt; color: #5F6B7A; }
     .pn:before { content: counter(page); }
 

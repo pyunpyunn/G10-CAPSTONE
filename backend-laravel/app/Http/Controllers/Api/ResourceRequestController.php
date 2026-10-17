@@ -317,7 +317,7 @@ class ResourceRequestController extends Controller
         }
 
         try {
-            foreach (['resource_requests', 'resource_request_status', 'urgency_levels', 'request_validations', 'audit_logs'] as $table) {
+            foreach (['resource_requests', 'resource_request_status', 'request_validations', 'audit_logs'] as $table) {
                 if (! \Illuminate\Support\Facades\Schema::hasTable($table)) {
                     return response()->json(['message' => 'External request storage is not ready.'], 503);
                 }

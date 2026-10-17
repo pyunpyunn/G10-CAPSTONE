@@ -41,16 +41,14 @@ export default function RequestResourceModal({
 }) {
   const [quantity, setQuantity] = useState(1)
   const [evacuationCenterId, setEvacuationCenterId] = useState('')
-  const [urgencyId, setUrgencyId] = useState(2) // Default: Medium (urgency_id: 2)
   const [requestedBy, setRequestedBy] = useState('Disaster Response Admin')
   const [description, setDescription] = useState('')
   const [centers, setCenters] = useState([])
-  const [urgencies, setUrgencies] = useState([])
   const [loadingOptions, setLoadingOptions] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
-  // Load evacuation centers, urgencies & current user
+  // Load evacuation centers & current user
   useEffect(() => {
     if (!isOpen) return
 
@@ -69,14 +67,10 @@ export default function RequestResourceModal({
         if (workspace.status === 'fulfilled' && workspace.value?.options) {
           const opts = workspace.value.options
           setCenters(opts.evacuation_centers || [])
-          setUrgencies(opts.urgencies || [])
           if (opts.evacuation_centers?.length > 0) {
             setEvacuationCenterId(opts.evacuation_centers[0].evacuation_center_id)
           }
-          const medUrgency = opts.urgencies?.find((u) => u.key === 'medium')
-          if (medUrgency) {
-            setUrgencyId(medUrgency.urgency_id)
-          }
+
         }
 
         if (userRes.status === 'fulfilled' && userRes.value) {
@@ -101,16 +95,6 @@ export default function RequestResourceModal({
   }, [isOpen, item])
 
   const maxAvailable = Math.max(1, Number(item?.quantity) || 1)
-
-  const urgencyList = useMemo(() => {
-    if (urgencies.length > 0) return urgencies
-    return [
-      { urgency_id: 1, key: 'low', label: 'Low Priority' },
-      { urgency_id: 2, key: 'medium', label: 'Medium Priority' },
-      { urgency_id: 3, key: 'high', label: 'High Priority' },
-      { urgency_id: 4, key: 'critical', label: 'Critical Priority' },
-    ]
-  }, [urgencies])
 
   const selectedCenter = useMemo(() => {
     if (!centers || centers.length === 0) return null
@@ -194,7 +178,6 @@ export default function RequestResourceModal({
         unit: item.unit || 'units',
         requested_by: requestedBy.trim(),
         evacuation_center_id: evacuationCenterId || null,
-        urgency_id: urgencyId ? Number(urgencyId) : 2,
         description: description.trim() || `Disaster resource request for ${item.name || item.label} (${item.sku || ''})`,
         sku: item.sku || null,
         item_id: item.id || null,
@@ -361,31 +344,6 @@ export default function RequestResourceModal({
                   >
                     Max ({maxAvailable})
                   </button>
-                </div>
-              </div>
-
-              {/* Urgency Level Selector */}
-              <div className="form-field">
-                <label htmlFor="field-urgency">
-                  Urgency Level <span className="req-star">*</span>
-                </label>
-                <div className="urgency-selector-grid">
-                  {urgencyList.map((u) => {
-                    const isSelected = Number(urgencyId) === Number(u.urgency_id)
-                    const key = u.key || 'medium'
-                    const labelShort = u.label ? u.label.replace(/Priority/i, '').trim() : 'Medium'
-                    return (
-                      <button
-                        key={u.urgency_id}
-                        type="button"
-                        className={`urgency-choice-btn urgency-${key} ${isSelected ? 'selected' : ''}`}
-                        onClick={() => setUrgencyId(u.urgency_id)}
-                      >
-                        <span className={`urgency-status-dot dot-${key}`} />
-                        <span className="urgency-choice-label">{labelShort}</span>
-                      </button>
-                    )
-                  })}
                 </div>
               </div>
 

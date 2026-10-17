@@ -30,7 +30,6 @@ class RescuerMobileResourceRequestWorkflow
             'quantity' => ['required', 'integer', 'min:1', 'max:100000'],
             'unit' => ['required', 'string', 'min:2', 'max:50'],
             'description' => ['required', 'string', 'min:5', 'max:1000'],
-            'urgency_key' => ['required', Rule::in(['low', 'medium', 'high', 'urgent', 'critical'])],
         ], [
             'location.required' => 'Location is required.',
             'cluster.required' => 'Purok or cluster is required for personnel and vehicle requests.',
@@ -60,7 +59,6 @@ class RescuerMobileResourceRequestWorkflow
             'quantity' => $validated['quantity'],
             'unit' => $validated['unit'] ?? null,
             'description' => $this->description($validated),
-            'urgency_id' => $this->urgencyId($validated['urgency_key'] ?? 'medium'),
             'status_id' => $this->statusId('needs_validation'),
             'validation_status' => 'needs_validation',
             'created_at' => $now,
@@ -119,16 +117,6 @@ class RescuerMobileResourceRequestWorkflow
         } while (Schema::hasTable('resource_requests') && ResourceRequest::query()->where('request_id', $requestId)->exists());
 
         return $requestId;
-    }
-
-    private function urgencyId(string $urgencyKey): ?int
-    {
-        if (! Schema::hasTable('urgency_levels')) {
-            return null;
-        }
-
-        return DB::table('urgency_levels')->where('urgency_key', $urgencyKey)->value('urgency_id')
-            ?: DB::table('urgency_levels')->orderBy('urgency_id')->value('urgency_id');
     }
 
     private function statusId(string $statusKey): ?int
