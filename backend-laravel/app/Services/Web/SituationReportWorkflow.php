@@ -35,6 +35,9 @@ class SituationReportWorkflow
                 'included_sections' => $validated['included_sections'] ?? ['I', 'II', 'III', 'V', 'VI', 'VII', 'VIII'],
                 'generated_at' => $now->toDateTimeString(),
             ]);
+            $scope = app(SituationHouseholdScope::class)->apply($summary, $validated);
+            $summary['household_scope'] = $scope['household_scope'];
+            $summary['include_households'] = $scope['include_households'];
             DB::table('situation_reports')->insert([
                 'sit_rep_id' => $sitRepId, 'report_number' => $reportNumber, 'disaster_id' => $event->event_id,
                 'created_by_admin_id' => $request->user()?->user_id, 'household_id' => null,

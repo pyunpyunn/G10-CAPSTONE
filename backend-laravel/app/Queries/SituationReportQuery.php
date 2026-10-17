@@ -19,9 +19,14 @@ class SituationReportQuery
     public function sitioOptions()
     {
         $barangayId = app(\App\Services\Shared\BarangayProfileService::class)->current()['barangay_id'] ?? null;
+        $puroks = DB::table('puroks')->whereIn('sitio_id', DB::table('sitios')->where('barangay_id', $barangayId)->select('sitio_id'))->orderBy('purok_name')->get(['purok_id', 'purok_name', 'sitio_id'])->groupBy('sitio_id');
         return DB::table('sitios')->where('barangay_id', $barangayId)
             ->when($barangayId === null, fn ($q) => $q->whereRaw('1 = 0'))
-            ->orderBy('sitio_name')->orderBy('sitio_id')->get(['sitio_id', 'sitio_name']);
+            ->orderBy('sitio_name')->orderBy('sitio_id')->get(['sitio_id', 'sitio_name'])
+            ->map(function ($sitio) use ($puroks) {
+                $sitio->puroks = $puroks->get($sitio->sitio_id, collect())->values();
+                return $sitio;
+            });
     }
 
     public function eventOptions()
@@ -131,6 +136,7 @@ class SituationReportQuery
             ->orderByDesc('created_at')->get();
 
         return [
+            'household_details' => app(SituationHouseholdQuery::class)->rows(clone $base, $eventId),
             'household_total' => $households->count(), 'household_counts' => $counts,
             'household_reported' => $reported, 'purok_rows' => $puroks,
             'weather' => $weather, 'assignments' => $assignments,

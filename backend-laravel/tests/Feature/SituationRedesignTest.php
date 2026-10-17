@@ -148,15 +148,16 @@ class SituationRedesignTest extends TestCase
         $this->assertCount(0, $empty['assignments']);
     }
 
-    public function test_sitio_selection_is_forwarded_to_the_report_source_and_export(): void
+    public function test_sitio_selection_filters_household_lists_and_preserves_event_totals(): void
     {
+        $this->mock(\App\Queries\SituationReportQuery::class, fn ($mock) => $mock->shouldReceive('sitioOptions')->andReturn(collect([(object) ['sitio_id' => '12', 'sitio_name' => 'Sitio A', 'puroks' => collect()]])));
         $this->mock(SituationReportService::class, function ($mock): void {
-            $mock->shouldReceive('eventSummary')->once()->with('EV-1', '12')->andReturn(response()->json(['data' => ['summary' => [
-                'report' => [], 'event' => ['sitio_name' => 'Sitio A'], 'household' => ['total' => 5], 'actions_text' => '', 'included_sections' => [],
+            $mock->shouldReceive('eventSummary')->once()->with('EV-1')->andReturn(response()->json(['data' => ['summary' => [
+                'report' => [], 'event' => ['sitio_name' => 'Sitio A'], 'household' => ['total' => 5, 'details' => []], 'actions_text' => '', 'included_sections' => [],
             ]]]));
         });
         $this->mock(ReportFileService::class, function ($mock): void {
-            $mock->shouldReceive('generateSituationPdf')->once()->with(\Mockery::on(fn ($summary) => $summary['event']['sitio_name'] === 'Sitio A' && $summary['included_sections'] === ['II']))
+            $mock->shouldReceive('generateSituationPdf')->once()->with(\Mockery::on(fn ($summary) => $summary['household_scope']['sitio_id'] === '12' && $summary['household']['total'] === 5 && $summary['included_sections'] === ['II']))
                 ->andReturn(['status' => 'success']);
         });
         $response = app(ReportGenerationService::class)->generate(Request::create('/', 'POST', [
@@ -167,6 +168,7 @@ class SituationRedesignTest extends TestCase
 
     public function test_sitio_filter_cannot_silently_export_an_unfiltered_saved_snapshot(): void
     {
+        $this->mock(SituationReportService::class, fn ($mock) => $mock->shouldReceive('show')->with(9)->andReturn(response()->json(['data' => ['report' => ['summary' => ['included_sections' => ['II']]]]])));
         $this->expectException(\Illuminate\Validation\ValidationException::class);
         app(ReportGenerationService::class)->generate(Request::create('/', 'POST', [
             'report_type' => 'situation', 'sit_rep_id' => 9, 'sitio_id' => '12', 'format' => 'pdf', 'included_sections' => ['II'],

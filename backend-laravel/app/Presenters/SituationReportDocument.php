@@ -38,6 +38,9 @@ class SituationReportDocument
             'casualties' => array_replace(['deaths' => null, 'missing' => null, 'injured' => null, 'rescued' => null], $s['casualties'] ?? []),
             'damage' => array_replace(['partial' => null, 'total' => null, 'cost' => null], $s['damage'] ?? []),
             'actions' => $s['actions_text'] ?? null,
+            'household_details' => $h['details'] ?? [],
+            'include_households' => $s['include_households'] ?? true,
+            'household_scope' => $s['household_scope']['label'] ?? (isset($e['sitio_name']) ? $e['sitio_name'].' · all puroks' : 'All sitios · all puroks'),
             'puroks' => array_map(fn ($row) => ['name' => $row['purok'] ?? 'Not recorded', 'sitio' => $row['sitio'] ?? 'Not recorded',
                 'households' => $row['total'] ?? null, 'persons' => $row['persons'] ?? null, 'affected' => $row['affected'] ?? null,
                 'affected_persons' => $row['affected_persons'] ?? null, 'safe' => $row['safe'] ?? null, 'evacuated' => $row['evacuated'] ?? null,
@@ -98,6 +101,27 @@ class SituationReportDocument
                 array_map(fn ($x) => [$x['item'], $x['quantity'], $x['source'], $x['status']], $r['resources']), [26, 18, 20, 22]];
         }
 
+        if ($r['include_households'] ?? true) {
+            $households = $r['household_details'] ?? [];
+            if (in_array('II', $r['included_sections'])) {
+                $tables[] = ['Affected Households', ['Household', 'Sitio', 'Purok', 'Registered members', 'Affected members', 'Status'],
+                    array_map(fn ($h) => [$h['household'], $h['sitio'], $h['purok'], $h['registered_members'], $h['affected_members'], $h['status']], $households), [24, 24, 24, 20, 20, 18]];
+                $members = [];
+                foreach ($households as $h) foreach ($h['members'] ?? [] as $m) {
+                    $members[] = [$h['household'], $h['sitio'], $h['purok'], $m['name'], $m['age'], $m['sex'], $m['status']];
+                }
+                $tables[] = ['Affected Members', ['Household', 'Sitio', 'Purok', 'Member name', 'Age', 'Sex', 'Status'], $members, [24, 24, 24, 32, 10, 14, 18]];
+            }
+            if (in_array('III', $r['included_sections'])) {
+                $tables[] = ['Household Casualties', ['Household', 'Sitio', 'Purok', 'Affected members', 'Missing', 'Injured', 'Rescued', 'Immediate needs'],
+                    array_map(fn ($h) => [$h['household'], $h['sitio'], $h['purok'], $h['affected_members'], $h['missing'], $h['injured'], $h['rescued'], is_array($h['immediate_needs']) ? implode(', ', $h['immediate_needs']) : $h['immediate_needs']], $households), [24, 24, 24, 20, 12, 12, 12, 45]];
+            }
+            if (in_array('VI', $r['included_sections'])) {
+                $damaged = array_filter($households, fn ($h) => !empty($h['damage']) && !in_array($h['damage'], ['no_damage', 'not_yet_assessed'], true));
+                $tables[] = ['Household Damage', ['Household', 'Sitio', 'Purok', 'Initial damage', 'Affected members'],
+                    array_values(array_map(fn ($h) => [$h['household'], $h['sitio'], $h['purok'], ucwords(str_replace('_', ' ', $h['damage'])), $h['affected_members']], $damaged)), [24, 24, 24, 28, 20]];
+            }
+        }
         return $tables;
     }
 }

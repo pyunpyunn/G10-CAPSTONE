@@ -16,7 +16,7 @@ class ReportGenerationService
             'report_type' => 'required|in:archive,situation', 'format' => 'nullable|in:pdf,csv,xlsx,excel',
             'category' => 'required_if:report_type,archive|in:disaster-events,household-status-logs,dispatch-logs,radio-communication-logs,resource-requests,situation-reports',
             'event_id' => 'nullable|string|max:255', 'sit_rep_id' => 'nullable|integer|min:1',
-            'sitio_id' => 'nullable|string|max:120',
+            'sitio_id' => 'nullable|string|max:120', 'purok_id' => 'nullable|string|max:120', 'include_households' => 'sometimes|boolean',
             'included_sections' => 'sometimes|required|array|min:1', 'included_sections.*' => ['distinct', \Illuminate\Validation\Rule::in(array_keys(\App\Support\SituationReportSections::LABELS))],
             'actions_text' => 'nullable|string|max:20000', 'start_date' => 'nullable|date', 'end_date' => 'nullable|date|after_or_equal:start_date',
             'ids' => 'nullable|array', 'ids.*' => 'string|max:255',
@@ -38,17 +38,14 @@ class ReportGenerationService
             return response()->json($this->files->generate($data['category'], $data['format'], $headers, $rows));
         }
         abort_unless(!empty($data['sit_rep_id']) || !empty($data['event_id']), 422, 'Select an event or saved report.');
-        if (!empty($data['sit_rep_id']) && isset($data['sitio_id'])) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['sitio_id' => 'Select a disaster event to export current sitio data. Saved snapshots cannot be filtered by sitio.']);
-        }
-        $response = !empty($data['sit_rep_id']) ? $this->situation->show($data['sit_rep_id'])
-            : (isset($data['sitio_id']) ? $this->situation->eventSummary($data['event_id'], $data['sitio_id']) : $this->situation->eventSummary($data['event_id']));
+        $response = !empty($data['sit_rep_id']) ? $this->situation->show($data['sit_rep_id']) : $this->situation->eventSummary($data['event_id']);
         if ($response->getStatusCode() !== 200) return $response;
         $payload = $response->getData(true)['data'];
         $summary = $payload['report']['summary'] ?? $payload['summary'];
+        $summary = app(SituationHouseholdScope::class)->apply($summary, $data);
         // Locked reports always use their stored snapshot and metadata.
         if (empty($data['sit_rep_id'])) {
-            $summary['actions_text'] = $data['actions_text'] ?? $summary['actions_text'];
+            $summary['actions_text'] = $data['actions_text'] ?? $summary['actions_text'] ?? '';
             $summary['included_sections'] = $data['included_sections'] ?? $summary['included_sections'];
             foreach (['report_number', 'prepared_by', 'reviewed_by', 'period_start', 'period_end'] as $field) {
                 if (isset($data[$field])) $summary['report'][$field] = in_array($field, ['period_start', 'period_end'], true)
