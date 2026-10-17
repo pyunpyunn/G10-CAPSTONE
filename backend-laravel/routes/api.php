@@ -216,6 +216,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/rescuer/overview', [RescuerMobileController::class, 'overview']);
             Route::get('/rescuer/assignments', [RescuerMobileController::class, 'assignments']);
             Route::get('/rescuer/assignments/{assignmentId}', [RescuerMobileController::class, 'assignment']);
+            Route::get('/rescuer/assignments/{assignmentId}/household', [RescuerMobileController::class, 'assignmentHousehold']);
             Route::patch('/rescuer/assignments/{assignmentId}/status', [RescuerMobileController::class, 'updateAssignmentStatus']);
             Route::post('/rescuer/assignments/{assignmentId}/location', [RescuerMobileController::class, 'storeLocation']);
             Route::get('/rescuer/field-reports', [RescuerMobileController::class, 'fieldReports']);

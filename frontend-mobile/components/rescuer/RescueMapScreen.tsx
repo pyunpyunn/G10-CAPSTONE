@@ -12,6 +12,7 @@ type RescueMapProps = {
   assignments: any[];
   evacuationCenters?: any[];
   activeAssignment: any;
+  selectedAssignment?: any;
   onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
 };
 
@@ -22,7 +23,7 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
-export function RescueMapScreen({ assignments, activeAssignment, onSendLocation }: RescueMapProps) {
+export function RescueMapScreen({ assignments, activeAssignment, selectedAssignment, onSendLocation }: RescueMapProps) {
   const watcher = useRef<Location.LocationSubscription | null>(null);
   const autoStartedAssignment = useRef<number | null>(null);
   const [tracking, setTracking] = useState(false);
@@ -30,12 +31,13 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
   const [lastUpdated, setLastUpdated] = useState('');
   const [locError, setLocError] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const routeCoordinates = useMemo(() => normalizeRoute(activeAssignment?.route?.coordinates), [activeAssignment?.route?.coordinates]);
-  const trailCoordinates = useMemo(() => normalizeRoute(activeAssignment?.route?.trail_coordinates), [activeAssignment?.route?.trail_coordinates]);
-  const activeTarget = activeAssignment?.latitude && activeAssignment?.longitude
+  const mapAssignment = selectedAssignment || activeAssignment;
+  const routeCoordinates = useMemo(() => normalizeRoute(mapAssignment?.route?.coordinates), [mapAssignment?.route?.coordinates]);
+  const trailCoordinates = useMemo(() => normalizeRoute(mapAssignment?.route?.trail_coordinates), [mapAssignment?.route?.trail_coordinates]);
+  const activeTarget = mapAssignment?.latitude && mapAssignment?.longitude
     ? {
-        latitude: Number(activeAssignment.latitude),
-        longitude: Number(activeAssignment.longitude),
+        latitude: Number(mapAssignment.latitude),
+        longitude: Number(mapAssignment.longitude),
       }
     : null;
   const mapRegion = position
@@ -199,7 +201,7 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
             <Marker
               coordinate={activeTarget}
               title="Dispatch destination"
-              description={activeAssignment?.destination_label || activeAssignment?.assigned_area || activeAssignment?.household_id}
+              description={mapAssignment?.destination_label || mapAssignment?.assigned_area || mapAssignment?.household_id}
               pinColor={palette.unsafe}
             />
           ) : null}
@@ -221,12 +223,12 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
           <EmptyState icon="location-outline" title="No mapped assignments" />
         ) : null}
 
-        {activeAssignment ? (
+        {mapAssignment ? (
           <View style={styles.routeInfo}>
             <Ionicons name="navigate-outline" size={18} color={palette.evacuated} />
             <Text style={styles.routeInfoText}>
               {routeCoordinates.length >= 2
-                ? `${activeAssignment.route?.distance_km || '-'} km · ${activeAssignment.route?.duration_min || '-'} min road route`
+                ? `${mapAssignment.route?.distance_km || '-'} km · ${mapAssignment.route?.duration_min || '-'} min road route`
                 : activeTarget
                   ? 'Waiting for road route. Tap Track Me or Accept/En route with GPS enabled.'
                   : 'This assignment has no household geotag target yet.'}

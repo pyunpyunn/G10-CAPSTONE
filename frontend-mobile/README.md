@@ -219,6 +219,12 @@ Actual mobile login is DB-driven. Household accounts from SafeTrack work in RESQ
 - Household app loads `/api/v1/household/overview`
 - Rescuer login uses `/api/v1/auth/login`
 - Rescuer app loads `/api/v1/rescuer/overview`
+- Rescuer field reports load assigned household members from `/api/v1/rescuer/assignments/{assignmentId}/household`
+- Rescuer assignment completion requires a saved field report when the assignment has a household
+
+## Rescuer Field Reports
+
+Run `php artisan migrate` in `backend-laravel` before enabling assignment field reports on an existing database. The shared database must also have the `member_statuses` and `member_disaster_statuses` tables used by household mobile reporting. The report records incident type, damage, death/injury counts, and an assessment for every current household member. Submissions are idempotent per assignment; completing a household assignment is rejected until its report is saved.
 
 If login fails on the phone but works on the browser/laptop, check:
 

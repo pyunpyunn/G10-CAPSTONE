@@ -110,6 +110,10 @@ class RescuerMobileService
             'route' => $assignment->mobile_route,
         ];
     }
+    public function assignmentHousehold(Request $request, int $assignmentId): JsonResponse
+    {
+        return $this->fieldReportWorkflow->assignmentHousehold($request, $assignmentId);
+    }
 
     public function updateAssignmentStatus(Request $request, int $assignmentId): JsonResponse|array
     {

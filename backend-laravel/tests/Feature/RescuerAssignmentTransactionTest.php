@@ -20,6 +20,7 @@ class RescuerAssignmentTransactionTest extends TestCase
     {
         Schema::create('responder_assignments', function (Blueprint $table): void {
             $table->integer('assignment_id')->primary();
+            $table->integer('responder_id')->nullable();
             $table->string('status');
             $table->timestamp('accepted_at')->nullable();
             $table->timestamp('updated_at')->nullable();
@@ -29,11 +30,12 @@ class RescuerAssignmentTransactionTest extends TestCase
             $table->boolean('is_deployed')->default(false);
             $table->string('duty_status')->nullable();
         });
-        DB::table('responder_assignments')->insert(['assignment_id' => 7, 'status' => 'dispatched']);
+        DB::table('responder_assignments')->insert(['assignment_id' => 7, 'responder_id' => 5, 'status' => 'dispatched']);
         DB::table('responders')->insert(['responder_id' => 5, 'is_deployed' => 0, 'duty_status' => 'available']);
 
         $assignment = (object) [
-            'assignment_id' => 7, 'accepted_at' => null, 'en_route_at' => null,
+            'assignment_id' => 7, 'responder_id' => 5, 'route_notes' => null,
+            'accepted_at' => null, 'en_route_at' => null,
             'arrived_at' => null, 'completed_at' => null, 'outcome_notes' => null,
         ];
         $query = Mockery::mock(RescuerAssignmentQuery::class);

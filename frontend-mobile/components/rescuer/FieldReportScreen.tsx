@@ -1,97 +1,146 @@
 import { statusColor } from '@/constants/statusPalette';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getAssignedHousehold } from '@/api/rescuer';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
 import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
 
 type FieldReportProps = {
   reports: any[];
-  statusOptions: any[];
+  assignmentId: number;
+  householdId: string;
   onSubmitReport: (payload: any) => Promise<void>;
 };
 
-const defaultStatuses = [
-  { key: 'safe', label: 'Safe' },
-  { key: 'evacuated', label: 'Evacuated' },
-  { key: 'unsafe', label: 'Unsafe' },
+const incidentOptions = [
+  { key: 'flood', label: 'Flood' },
+  { key: 'fire', label: 'Fire' },
+  { key: 'earthquake', label: 'Earthquake' },
+  { key: 'landslide', label: 'Landslide' },
+  { key: 'typhoon_strong_winds', label: 'Typhoon / strong winds' },
+  { key: 'other', label: 'Other' },
 ];
 
-export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: FieldReportProps) {
-  const options = statusOptions?.length ? statusOptions : defaultStatuses;
-  const [householdId, setHouseholdId] = useState('');
-  const [householdHead, setHouseholdHead] = useState('');
-  const [address, setAddress] = useState('');
-  const [statusKey, setStatusKey] = useState(options[0]?.key || 'safe');
-  const [batteryLevel, setBatteryLevel] = useState('');
-  const [memberName, setMemberName] = useState('');
-  const [memberCondition, setMemberCondition] = useState('');
+const damageOptions = [
+  { key: 'no_damage', label: 'None' },
+  { key: 'minor_damage', label: 'Minor' },
+  { key: 'major_damage', label: 'Major' },
+  { key: 'completely_destroyed', label: 'Destroyed' },
+  { key: 'not_yet_assessed', label: 'Not assessed' },
+];
+
+const uncheckedStatuses = new Set(['unknown', 'unchecked', 'unreported']);
+
+export function FieldReportScreen({ reports, assignmentId, householdId, onSubmitReport }: FieldReportProps) {
+  const [household, setHousehold] = useState<any>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [memberStatusOptions, setMemberStatusOptions] = useState<any[]>([]);
+  const [loadingHousehold, setLoadingHousehold] = useState(Boolean(assignmentId));
+  const [householdError, setHouseholdError] = useState('');
+  const [incidentType, setIncidentType] = useState('');
+  const [otherIncidentType, setOtherIncidentType] = useState('');
+  const [propertyDamage, setPropertyDamage] = useState('');
+  const [deathCount, setDeathCount] = useState('');
+  const [injuredCount, setInjuredCount] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const idempotencyKey = useRef('');
+  const alreadySubmitted = reportSubmitted || reports.some((report) => String(report.assignment_id) === String(assignmentId));
+  const membersAssessed = members.length > 0 && members.every((member) => Boolean(member.statusKey) && !uncheckedStatuses.has(member.statusKey));
+
+  useEffect(() => {
+    let isCurrent = true;
+    setHousehold(null);
+    setMembers([]);
+    setMemberStatusOptions([]);
+    setHouseholdError('');
+    setSubmitError('');
+    setReportSubmitted(false);
+    setIncidentType('');
+    setOtherIncidentType('');
+    setPropertyDamage('');
+    setDeathCount('');
+    setInjuredCount('');
+    setNotes('');
+    idempotencyKey.current = `field-report-${assignmentId}`;
+
+    if (!assignmentId || !householdId) {
+      setHouseholdError('Select an active household assignment before opening a field report.');
+      setLoadingHousehold(false);
+      return () => { isCurrent = false; };
+    }
+
+    setLoadingHousehold(true);
+    getAssignedHousehold(assignmentId)
+      .then((data) => {
+        if (!isCurrent) return;
+        const statusOptions = data.member_status_options || [];
+        setHousehold(data.household);
+        setMemberStatusOptions(statusOptions);
+        setMembers((data.members || []).map((member: any) => {
+          const savedKey = member.member_status?.key || '';
+          const savedOption = statusOptions.find((option: any) => option.key === savedKey);
+          return {
+            id: String(member.member_id),
+            name: member.name || 'Unnamed member',
+            isHouseholdHead: member.is_household_head,
+            statusKey: savedOption && !uncheckedStatuses.has(savedKey) ? savedKey : '',
+          };
+        }));
+      })
+      .catch(() => {
+        if (isCurrent) setHouseholdError('Unable to load the assigned household and members. Refresh the assignment and try again.');
+      })
+      .finally(() => {
+        if (isCurrent) setLoadingHousehold(false);
+      });
+
+    return () => { isCurrent = false; };
+  }, [assignmentId, householdId]);
+
+  function updateMemberStatus(memberId: string, statusKey: string) {
+    setMembers((current) => current.map((member) => member.id === memberId ? { ...member, statusKey } : member));
+  }
 
   async function handleSubmit() {
-    const cleanHouseholdId = householdId.trim();
-    const cleanHouseholdHead = householdHead.trim();
-    const cleanAddress = address.trim();
-    const cleanMemberName = memberName.trim();
-    const cleanMemberCondition = memberCondition.trim();
-    const cleanNotes = notes.trim();
-    const batteryValue = batteryLevel.trim() ? Number(batteryLevel.trim()) : undefined;
-
-    if (!cleanHouseholdId) {
-      Alert.alert('Missing household ID', 'Enter the household ID before submitting.');
+    if (alreadySubmitted || submitting) return;
+    if (!membersAssessed || !incidentType || !propertyDamage) {
+      Alert.alert('Report details required', 'Assess every member, then select an incident type and property damage level.');
+      return;
+    }
+    const counts = [deathCount, injuredCount];
+    if (counts.some((value) => value.trim() === '' || !/^\d+$/.test(value.trim()))) {
+      Alert.alert('Counts required', 'Enter a non-negative whole number for deaths and injuries.');
+      return;
+    }
+    if (incidentType === 'other' && !otherIncidentType.trim()) {
+      Alert.alert('Incident type required', 'Describe the incident type.');
       return;
     }
 
-    if (!cleanHouseholdHead) {
-      Alert.alert('Missing household head', 'Enter the household head name before submitting.');
-      return;
-    }
-
-    if (!cleanAddress) {
-      Alert.alert('Missing location', 'Enter the purok, address, or landmark before submitting.');
-      return;
-    }
-
-    if (!cleanNotes || cleanNotes.length < 5) {
-      Alert.alert('Missing field notes', 'Enter a short note that explains the household situation.');
-      return;
-    }
-
-    if ((cleanMemberName && !cleanMemberCondition) || (!cleanMemberName && cleanMemberCondition)) {
-      Alert.alert('Incomplete member condition', 'Enter both member name and condition, or leave both blank.');
-      return;
-    }
-
-    if (batteryValue !== undefined && (Number.isNaN(batteryValue) || batteryValue < 0 || batteryValue > 100)) {
-      Alert.alert('Invalid battery level', 'Battery level must be from 0 to 100.');
-      return;
-    }
-
+    setSubmitError('');
     setSubmitting(true);
 
     try {
       await onSubmitReport({
-        household_id: cleanHouseholdId,
-        household_head: cleanHouseholdHead,
-        address: cleanAddress,
-        status_key: statusKey,
-        battery_level: batteryValue,
-        notes: cleanNotes,
-        members:
-          cleanMemberName || cleanMemberCondition
-            ? [{ name: cleanMemberName, condition: cleanMemberCondition }]
-            : [],
+        assignment_id: assignmentId,
+        household_id: String(household.household_id),
+        idempotency_key: idempotencyKey.current,
+        incident_type: incidentType,
+        incident_type_other: incidentType === 'other' ? otherIncidentType.trim() : undefined,
+        property_damage: propertyDamage,
+        death_count: Number(deathCount),
+        injured_count: Number(injuredCount),
+        notes: notes.trim() || undefined,
+        members: members.map((member) => ({ member_id: member.id, status_key: member.statusKey })),
       });
-
-      setHouseholdId('');
-      setHouseholdHead('');
-      setAddress('');
-      setBatteryLevel('');
-      setMemberName('');
-      setMemberCondition('');
-      setNotes('');
+      setReportSubmitted(true);
+    } catch (error: any) {
+      setSubmitError(error?.response?.data?.message || 'The field report could not be saved. Check your connection and retry.');
     } finally {
       setSubmitting(false);
     }
@@ -101,86 +150,68 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
     <View style={styles.stack}>
       <View style={styles.card}>
         <SectionHeader title="Household field report" />
+        {loadingHousehold ? <Text style={styles.helperText}>Loading assigned household…</Text> : null}
+        {householdError ? <Text style={styles.errorText}>{householdError}</Text> : null}
+        {household ? (
+          <View style={styles.householdSummary}>
+            <Text style={styles.householdName}>{household.household_name || household.household_code || household.household_id}</Text>
+            <Text style={styles.helperText}>{household.household_id} · {household.address || household.purok || 'Address unavailable'}</Text>
+          </View>
+        ) : null}
 
+        {members.map((member) => (
+          <View key={member.id} style={styles.memberCard}>
+            <Text style={styles.memberName}>{member.name}{member.isHouseholdHead ? ' · Head' : ''}</Text>
+            <View style={styles.statusRow}>
+              {memberStatusOptions.filter((option) => !uncheckedStatuses.has(option.key)).map((option) => (
+                <Pressable
+                  key={option.key}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: member.statusKey === option.key }}
+                  style={[styles.statusChip, { borderColor: statusColor(option.key) }, member.statusKey === option.key && { backgroundColor: statusColor(option.key) }]}
+                  onPress={() => updateMemberStatus(member.id, option.key)}
+                >
+                  <Text style={[styles.statusChipText, { color: statusColor(option.key) }, member.statusKey === option.key && styles.statusChipTextActive]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ))}
+
+        <Text style={styles.sectionLabel}>Incident type</Text>
         <View style={styles.statusRow}>
-          {options.map((status) => (
-            <Pressable
-              key={status.key}
-              style={[styles.statusChip, { borderColor: statusColor(status.key) }, statusKey === status.key && { backgroundColor: statusColor(status.key) }]}
-              onPress={() => setStatusKey(status.key)}
-            >
-              <Text style={[styles.statusChipText, { color: statusColor(status.key) }, statusKey === status.key && styles.statusChipTextActive]}>
-                {status.label}
-              </Text>
+          {incidentOptions.map((option) => (
+            <Pressable key={option.key} style={[styles.statusChip, incidentType === option.key && styles.selectedOption]} onPress={() => setIncidentType(option.key)}>
+              <Text style={[styles.statusChipText, incidentType === option.key && styles.statusChipTextActive]}>{option.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {incidentType === 'other' ? (
+          <TextInput style={styles.input} value={otherIncidentType} onChangeText={setOtherIncidentType} placeholder="Describe incident type" placeholderTextColor="#7d8da0" maxLength={255} />
+        ) : null}
+
+        <Text style={styles.sectionLabel}>Property damage</Text>
+        <View style={styles.statusRow}>
+          {damageOptions.map((option) => (
+            <Pressable key={option.key} style={[styles.statusChip, propertyDamage === option.key && styles.selectedOption]} onPress={() => setPropertyDamage(option.key)}>
+              <Text style={[styles.statusChipText, propertyDamage === option.key && styles.statusChipTextActive]}>{option.label}</Text>
             </Pressable>
           ))}
         </View>
 
-        <TextInput
-          style={styles.input}
-          value={householdId}
-          onChangeText={setHouseholdId}
-          placeholder="Household ID"
-          placeholderTextColor="#7d8da0"
-          autoCapitalize="characters"
-        />
-
-        <TextInput
-          style={styles.input}
-          value={householdHead}
-          onChangeText={setHouseholdHead}
-          placeholder="Household head"
-          placeholderTextColor="#7d8da0"
-        />
-
-        <TextInput
-          style={styles.input}
-          value={address}
-          onChangeText={setAddress}
-          placeholder="Location / purok / landmark"
-          placeholderTextColor="#7d8da0"
-        />
-
         <View style={styles.twoColumn}>
-          <TextInput
-            style={[styles.input, styles.flexInput]}
-            value={memberName}
-            onChangeText={setMemberName}
-            placeholder="Member name"
-            placeholderTextColor="#7d8da0"
-          />
-          <TextInput
-            style={[styles.input, styles.flexInput]}
-            value={batteryLevel}
-            onChangeText={setBatteryLevel}
-            placeholder="Battery %"
-            placeholderTextColor="#7d8da0"
-            keyboardType="number-pad"
-          />
+          <TextInput style={[styles.input, styles.flexInput]} value={deathCount} onChangeText={setDeathCount} placeholder="Deaths" placeholderTextColor="#7d8da0" keyboardType="number-pad" />
+          <TextInput style={[styles.input, styles.flexInput]} value={injuredCount} onChangeText={setInjuredCount} placeholder="Injured" placeholderTextColor="#7d8da0" keyboardType="number-pad" />
         </View>
-
-        <TextInput
-          style={styles.input}
-          value={memberCondition}
-          onChangeText={setMemberCondition}
-          placeholder="Member condition"
-          placeholderTextColor="#7d8da0"
-        />
-
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Notes for HQ"
-          placeholderTextColor="#7d8da0"
-          multiline
-          textAlignVertical="top"
-        />
-
+        <TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes} placeholder="Notes for HQ (optional)" placeholderTextColor="#7d8da0" multiline textAlignVertical="top" maxLength={2000} />
+        {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
+        {alreadySubmitted ? <Text style={styles.successText}>A field report is saved for this assignment.</Text> : null}
         <ActionButton
-          label={submitting ? 'Submitting...' : 'Submit to HQ'}
-          icon="send-outline"
-          disabled={submitting}
+          label={alreadySubmitted ? 'Report saved' : submitting ? 'Submitting…' : 'Submit to HQ'}
+          icon={alreadySubmitted ? 'checkmark-circle-outline' : 'send-outline'}
+          disabled={submitting || loadingHousehold || !household || alreadySubmitted || members.length === 0}
           onPress={handleSubmit}
         />
       </View>
@@ -191,7 +222,7 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
           <EmptyState icon="document-text-outline" title="No field reports yet" />
         ) : (
           reports.map((report) => (
-            <View key={report.status_log_id} style={styles.reportRow}>
+            <View key={report.report_id || report.status_log_id} style={styles.reportRow}>
               <View style={styles.reportIcon}>
                 <Ionicons name="document-text-outline" size={18} color={palette.navActive} />
               </View>
@@ -253,6 +284,52 @@ const styles = StyleSheet.create({
   },
   statusChipTextActive: {
     color: '#fff',
+  },
+  selectedOption: {
+    borderColor: palette.navActive,
+    backgroundColor: palette.navActive,
+  },
+  sectionLabel: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  helperText: {
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  errorText: {
+    color: palette.unsafe,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  successText: {
+    color: palette.safe,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  householdSummary: {
+    gap: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: palette.navActive,
+    paddingLeft: spacing.md,
+  },
+  householdName: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  memberCard: {
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    paddingTop: spacing.md,
+  },
+  memberName: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '900',
   },
   input: {
     minHeight: 46,

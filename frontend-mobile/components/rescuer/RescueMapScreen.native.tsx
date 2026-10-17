@@ -12,6 +12,7 @@ type RescueMapProps = {
   assignments: any[];
   evacuationCenters: any[];
   activeAssignment: any;
+  selectedAssignment?: any;
   onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
 };
 
@@ -22,7 +23,7 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
-export function RescueMapScreen({ assignments, evacuationCenters = [], activeAssignment, onSendLocation }: RescueMapProps) {
+export function RescueMapScreen({ assignments, evacuationCenters = [], activeAssignment, selectedAssignment, onSendLocation }: RescueMapProps) {
   const watcher = useRef<Location.LocationSubscription | null>(null);
   const [tracking, setTracking] = useState(false);
   const [position, setPosition] = useState<any>(null);
@@ -104,6 +105,7 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
   const activeAssignments = assignments.filter((item) =>
     ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(String(item.status_key || '').replaceAll('-', '_').toLowerCase())
   );
+  const focusedAssignment = selectedAssignment || activeAssignment;
   const mappedAssignments = activeAssignments.filter((item) => item.latitude && item.longitude);
   const visibleCenters = showEvacuationCenters
     ? evacuationCenters.filter((center) => center.latitude && center.longitude)
@@ -208,7 +210,13 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
           </View>
         ) : null}
 
-        <MobileLeafletMap markers={mapMarkers} routes={mapRoutes} center={position || defaultRegion} />
+        <MobileLeafletMap
+          markers={mapMarkers}
+          routes={mapRoutes}
+          center={position || (focusedAssignment?.latitude && focusedAssignment?.longitude
+            ? { latitude: Number(focusedAssignment.latitude), longitude: Number(focusedAssignment.longitude) }
+            : defaultRegion)}
+        />
 
         {mappedAssignments.length === 0 ? (
           <EmptyState
