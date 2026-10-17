@@ -55,12 +55,23 @@ export function HouseholdDashboardScreen({
       {activeEvent ? (
         <View style={styles.eventCard}>
           <View style={styles.eventTop}>
-            <HouseholdBadge label="Disaster active" tone="danger" />
-          <Text style={styles.eventDate}>{formatDate(activeEvent.started_at)}</Text>
+            <HouseholdBadge label="Disaster active" tone="danger" size="large" />
+            <Text style={styles.eventDate}>{formatDate(activeEvent.started_at)}</Text>
           </View>
-          <Text style={styles.eventTitle}>{activeEvent.name}</Text>
-          <Text style={styles.eventMeta}>{activeEvent.type} · {activeEvent.severity}</Text>
-          {activeEvent.message ? <Text style={styles.eventBody}>{activeEvent.message}</Text> : null}
+          <View style={styles.eventDetails}>
+            <View style={styles.eventIcon}>
+              <Ionicons name="warning-outline" size={25} color={palette.brandRed} />
+            </View>
+            <View style={styles.eventCopy}>
+              <Text style={styles.eventTitle}>{activeEvent.name}</Text>
+              <Text style={styles.eventMeta}>{activeEvent.type} · {activeEvent.severity}</Text>
+            </View>
+          </View>
+          {activeEvent.message ? (
+            <View style={styles.eventMessageBox}>
+              <Text style={styles.eventBody}>{activeEvent.message}</Text>
+            </View>
+          ) : null}
         </View>
       ) : (
         <View style={styles.standbyCard}>
@@ -656,12 +667,15 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   eventCard: {
-    gap: spacing.sm,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: palette.border,
     borderLeftWidth: 5,
     borderLeftColor: palette.brandRed,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    backgroundColor: `${palette.brandRed}12`,
+    backgroundColor: palette.card,
+    ...shadow,
   },
   eventTop: {
     flexDirection: 'row',
@@ -669,26 +683,57 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
   },
+  eventDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  eventIcon: {
+    width: 54,
+    height: 54,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: `${palette.brandRed}30`,
+    borderRadius: radius.md,
+    backgroundColor: `${palette.brandRed}12`,
+  },
+  eventCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
   eventDate: {
     color: palette.textSoft,
     fontSize: 12,
     fontWeight: '800',
+    textAlign: 'right',
   },
   eventTitle: {
     color: palette.text,
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: '900',
+    lineHeight: 27,
   },
   eventMeta: {
     color: palette.brandRed,
     fontSize: 13,
     fontWeight: '900',
   },
+  eventMessageBox: {
+    borderWidth: 1,
+    borderColor: `${palette.brandRed}20`,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: `${palette.brandRed}08`,
+  },
   eventBody: {
-    color: palette.text,
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: '800',
+    color: palette.textSoft,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '600',
   },
   card: {
     gap: spacing.md,
