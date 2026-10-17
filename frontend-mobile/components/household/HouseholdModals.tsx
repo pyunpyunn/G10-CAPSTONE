@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
   },
   error: {
-    color: palette.unsafe,
+    color: palette.brandRed,
     fontSize: 12,
     fontWeight: '900',
   },

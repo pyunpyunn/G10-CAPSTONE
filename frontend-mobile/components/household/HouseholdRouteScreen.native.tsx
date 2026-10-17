@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   originOptionActive: { backgroundColor: palette.card },
   originOptionText: { color: palette.textSoft, fontSize: 12, fontWeight: '800' },
   originOptionTextActive: { color: palette.nav, fontWeight: '900' },
-  routeError: { color: palette.unsafe, fontSize: 12, fontWeight: '800' },
+  routeError: { color: palette.brandRed, fontSize: 12, fontWeight: '800' },
   selectedBox: {
     flexDirection: 'row',
     alignItems: 'center',

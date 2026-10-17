@@ -1,7 +1,7 @@
 export const palette = {
   nav: '#0f1c2d',
-  navActive: '#1f3e5a',
-  navHover: '#2a4f72',
+  navActive: '#c72e32',
+  navHover: '#a5262b',
   navText: '#e8eef5',
   navMuted: '#a0b4c8',
   brandRed: '#c72e32',

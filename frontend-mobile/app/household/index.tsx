@@ -794,7 +794,7 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: palette.card,
     borderRadius: 29,
-    backgroundColor: palette.unsafe,
+    backgroundColor: palette.brandRed,
   },
   tabLabel: {
     color: palette.navMuted,

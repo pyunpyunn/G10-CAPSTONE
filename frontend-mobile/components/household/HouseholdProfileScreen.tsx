@@ -186,17 +186,17 @@ function HouseholdAccountIcon() {
     <Svg width={54} height={54} viewBox="0 0 64 64" fill="none">
       <Path
         d="M8 29L32 9L56 29M14 24V55H50V24M43 18V12H49V23"
-        stroke={palette.navActive}
+        stroke={palette.nav}
         strokeWidth={2.8}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <Circle cx={32} cy={31} r={4} stroke={palette.navActive} strokeWidth={2.6} />
-      <Circle cx={22} cy={36} r={3.2} stroke={palette.navActive} strokeWidth={2.4} />
-      <Circle cx={42} cy={36} r={3.2} stroke={palette.navActive} strokeWidth={2.4} />
+      <Circle cx={32} cy={31} r={4} stroke={palette.nav} strokeWidth={2.6} />
+      <Circle cx={22} cy={36} r={3.2} stroke={palette.nav} strokeWidth={2.4} />
+      <Circle cx={42} cy={36} r={3.2} stroke={palette.nav} strokeWidth={2.4} />
       <Path
         d="M23 51V47C23 42.6 26.6 39 31 39H33C37.4 39 41 42.6 41 47V51M15.5 51V48.5C15.5 45.2 18.2 42.5 21.5 42.5H23M41 42.5H42.5C45.8 42.5 48.5 45.2 48.5 48.5V51"
-        stroke={palette.navActive}
+        stroke={palette.nav}
         strokeWidth={2.6}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    backgroundColor: palette.navActive,
+    backgroundColor: palette.nav,
     ...shadow,
   },
   heroTop: {
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     borderRadius: radius.md,
     padding: spacing.md,
-    backgroundColor: '#f8fafc',
+    backgroundColor: palette.secondary,
   },
   memberRow: {
     flexDirection: 'row',

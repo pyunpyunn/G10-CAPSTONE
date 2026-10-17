@@ -1,5 +1,6 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ResQperationLogo from '@/components/ResQperationLogo';
 import { palette, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge } from './HouseholdUI';
 
@@ -8,18 +9,15 @@ export function HouseholdHeader({ isDisasterMode, notificationCount = 0, onOpenN
   notificationCount?: number;
   onOpenNotifications?: () => void;
 }) {
+  const { width: viewportWidth } = useWindowDimensions();
+
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
-        <Image
-          source={require('@/assets/images/resqperation-logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.brand}>RESQPERATION</Text>
+        <ResQperationLogo width={Math.min(180, Math.max(110, viewportWidth - 210))} />
         <View style={styles.actions}>
           <View style={styles.disasterStatusBadge}>
-            <HouseholdBadge label={isDisasterMode ? 'Disaster mode' : 'Standby'} tone={isDisasterMode ? 'danger' : 'safe'} />
+            <HouseholdBadge label={isDisasterMode ? 'Disaster mode' : 'Standby'} tone={isDisasterMode ? 'danger' : 'safe'} size="large" />
           </View>
           <Pressable
             style={styles.notificationButton}
@@ -48,15 +46,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  logo: {
-    width: 48,
-    height: 42,
-  },
-  brand: {
-    color: '#fff',
-    fontSize: 19,
-    fontWeight: '900',
-  },
   actions: {
     marginLeft: 'auto',
     flexDirection: 'row',
@@ -81,6 +70,6 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: palette.unsafe,
+    backgroundColor: palette.brandRed,
   },
 });

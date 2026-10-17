@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   originText: { color: palette.textSoft, fontSize: 12, fontWeight: '800' },
   originTextActive: { color: palette.nav, fontWeight: '900' },
   routeSummary: { color: palette.safe, fontSize: 12, fontWeight: '900' },
-  routeError: { color: palette.unsafe, fontSize: 12, fontWeight: '800' },
+  routeError: { color: palette.brandRed, fontSize: 12, fontWeight: '800' },
   centerRow: {
     flexDirection: 'row',
     alignItems: 'center',

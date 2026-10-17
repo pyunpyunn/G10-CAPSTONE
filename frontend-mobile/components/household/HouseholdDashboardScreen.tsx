@@ -658,10 +658,10 @@ const styles = StyleSheet.create({
   eventCard: {
     gap: spacing.sm,
     borderLeftWidth: 5,
-    borderLeftColor: palette.unsafe,
+    borderLeftColor: palette.brandRed,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    backgroundColor: '#fff5f5',
+    backgroundColor: `${palette.brandRed}12`,
   },
   eventTop: {
     flexDirection: 'row',
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   eventMeta: {
-    color: palette.unsafe,
+    color: palette.brandRed,
     fontSize: 13,
     fontWeight: '900',
   },

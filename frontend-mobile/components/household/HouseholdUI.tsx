@@ -24,12 +24,12 @@ export function HouseholdButton({ label, icon, tone = 'primary', disabled = fals
   );
 }
 
-export function HouseholdBadge({ label, tone = 'neutral' }: { label: string; tone?: string }) {
+export function HouseholdBadge({ label, tone = 'neutral', size = 'regular' }: { label: string; tone?: string; size?: 'regular' | 'large' }) {
   const color = statusColor(tone);
 
   return (
-    <View style={[styles.badge, { borderColor: `${color}55`, backgroundColor: `${color}18` }]}>
-      <Text style={[styles.badgeText, { color }]}>{label}</Text>
+    <View style={[styles.badge, size === 'large' && styles.badgeLarge, { borderColor: `${color}55`, backgroundColor: `${color}18` }]}>
+      <Text style={[styles.badgeText, size === 'large' && styles.badgeTextLarge, { color }]}>{label}</Text>
     </View>
   );
 }
@@ -65,8 +65,7 @@ export function HouseholdEmpty({ icon, title, body }: { icon: keyof typeof Ionic
 export function statusColor(tone: string) {
   if (['safe', 'validated', 'active'].includes(tone)) return palette.safe;
   if (['evacuated', 'info'].includes(tone)) return palette.evacuated;
-  if (tone === 'unsafe') return '#E85D3F';
-  if (['needs_help', 'critical', 'danger'].includes(tone)) return palette.unsafe;
+  if (['unsafe', 'needs_help', 'critical', 'danger'].includes(tone)) return palette.brandRed;
   if (['pending', 'warning'].includes(tone)) return palette.warning;
   return palette.textSoft;
 }
@@ -90,7 +89,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.card,
   },
   danger: {
-    backgroundColor: palette.unsafe,
+    backgroundColor: palette.brandRed,
   },
   gray: {
     backgroundColor: palette.secondary,
@@ -113,9 +112,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
   },
+  badgeLarge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
   badgeText: {
     fontSize: 11,
     fontWeight: '900',
+  },
+  badgeTextLarge: {
+    fontSize: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
