@@ -12,7 +12,14 @@ class EvaTrackReportsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['evatrack.reports_url' => 'http://evatrack.test', 'evatrack.reports_api_key' => 'private-test-key']);
+        config([
+            'evatrack.reports_url' => 'http://evatrack.test',
+            'evatrack.reports_api_key' => 'private-test-key',
+            'safetrack.base_url' => '',
+            'safetrack.api_key' => '',
+            'trackingaid_reports.reports_url' => '',
+            'trackingaid_reports.reports_api_key' => '',
+        ]);
         Http::preventStrayRequests();
     }
 
@@ -44,9 +51,12 @@ class EvaTrackReportsTest extends TestCase
             ->assertJsonPath('data.providers.0.implemented', true)
             ->assertJsonPath('data.providers.0.configured', true)
             ->assertJsonPath('data.providers.1.name', 'SafeTrack')
-            ->assertJsonPath('data.providers.1.implemented', false)
+            ->assertJsonPath('data.providers.1.implemented', true)
+            ->assertJsonPath('data.providers.1.configured', false)
             ->assertJsonPath('data.providers.2.name', 'TrackingAid')
-            ->assertJsonPath('data.providers.2.report_types', [])
+            ->assertJsonPath('data.providers.2.implemented', true)
+            ->assertJsonPath('data.providers.2.configured', false)
+            ->assertJsonPath('data.providers.2.report_types.0', 'demographics')
             ->assertDontSee('private-test-key');
         Http::assertNothingSent();
     }
@@ -143,5 +153,29 @@ class EvaTrackReportsTest extends TestCase
         $this->artisan('reports:verify-evatrack')->assertSuccessful();
         Storage::disk('local')->assertExists('evatrack-verification/general_test.csv');
         Http::assertSent(fn ($request) => str_contains($request->url(), '/download') && ! $request->hasHeader('X-API-KEY'));
+    }
+
+    public function test_trackingaid_uses_the_external_report_contract_with_independent_credentials(): void
+    {
+        config([
+            'trackingaid_reports.reports_url' => 'http://trackingaid.test',
+            'trackingaid_reports.reports_api_key' => 'private-trackingaid-key',
+        ]);
+        Http::fake(['trackingaid.test/*' => Http::response([
+            'status' => 'success',
+            'file_name' => 'general_test.csv',
+            'download_url' => 'http://trackingaid.test/download?signature=test',
+            'expires_at' => now()->addMinutes(30)->toIso8601String(),
+            'expires_in_minutes' => 30,
+        ])]);
+
+        $this->withoutMiddleware();
+        $this->postJson('/api/v1/reports/trackingaid/generate', [
+            'report_type' => 'general', 'format' => 'csv',
+        ])->assertOk()->assertJsonPath('source', 'TrackingAid')->assertDontSee('private-trackingaid-key');
+
+        Http::assertSent(fn ($request) => $request->url() === 'http://trackingaid.test/api/v1/external/reports/generate'
+            && $request->hasHeader('X-API-KEY', 'private-trackingaid-key')
+            && $request['report_type'] === 'general');
     }
 }

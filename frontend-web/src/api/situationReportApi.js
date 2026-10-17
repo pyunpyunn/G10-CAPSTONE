@@ -6,8 +6,13 @@ export async function getSituationWorkspace() {
   return response.data.data
 }
 
-export async function getSituationSummary(eventId) {
-  const response = await api.get(`/disaster-events/${eventId}/situation-summary`)
+export async function getSituationSitios() {
+  const { data } = await api.get('/reports/situation/sitios')
+  return data.data.sitios
+}
+
+export async function getSituationSummary(eventId, sitioId = null) {
+  const response = await api.get(`/disaster-events/${eventId}/situation-summary`, { params: sitioId && sitioId !== 'all' ? { sitio_id: sitioId } : undefined })
   return response.data.data
 }
 

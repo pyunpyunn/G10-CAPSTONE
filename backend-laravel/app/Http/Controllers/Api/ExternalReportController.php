@@ -16,6 +16,13 @@ class ExternalReportController extends Controller
             'source' => 'RESQPERATION',
             'generate_endpoint' => '/api/v1/external/reports/generate',
             'report_types' => ['archive', 'situation'],
+            'situation_sections' => \App\Support\SituationReportSections::LABELS,
+            'situation_requires_review' => true,
+            'request_endpoint' => '/api/v1/external/report-requests',
+            'options_endpoint' => '/api/v1/external/reports/options',
+            'request_fields' => ['source_system', 'event_id', 'sitio_id', 'included_sections', 'format', 'purpose', 'reference (optional)'],
+            'all_sitios_value' => 'all',
+            'api_version' => '2.0',
             'formats' => ['pdf', 'csv', 'xlsx'],
             'archive_categories' => ['disaster-events', 'household-status-logs', 'dispatch-logs', 'radio-communication-logs', 'resource-requests', 'situation-reports'],
             'expires_in_minutes' => (int) config('reports.expires_minutes', 30),
@@ -24,6 +31,9 @@ class ExternalReportController extends Controller
 
     public function generate(Request $request, \App\Services\Web\ReportGenerationService $reports)
     {
+        if (!$request->user() && $request->input('report_type') === 'situation') {
+            return app(ReportExchangeController::class)->store($request);
+        }
         return $reports->generate($request);
     }
 

@@ -28,11 +28,25 @@ class SituationReportService
         ]]);
     }
 
-    public function eventSummary(string $eventId): JsonResponse
+    public function sitios(): JsonResponse
+    {
+        return response()->json(['data' => ['sitios' => $this->query->sitioOptions()]]);
+    }
+
+    public function eventSummary(string $eventId, ?string $sitioId = null): JsonResponse
     {
         $event = $this->query->findEvent($eventId);
         if (! $event) return response()->json(['message' => 'Disaster event was not found.'], 404);
-        $summary = $this->presenter->buildSummary($event, $this->query->summarySources($eventId), $this->barangayProfile->current());
+        $sitio = $sitioId !== null ? $this->query->sitioOptions()->firstWhere('sitio_id', $sitioId) : null;
+        if ($sitioId !== null && !$sitio) throw ValidationException::withMessages(['sitio_id' => 'Select a registered sitio in this barangay.']);
+        $summary = $this->presenter->buildSummary($event, $this->query->summarySources($eventId, $sitioId), $this->barangayProfile->current());
+        if ($sitio) {
+            $summary['event']['sitio_id'] = $sitio->sitio_id;
+            $summary['event']['sitio_name'] = $sitio->sitio_name;
+            $summary['event']['scope'] = $sitio->sitio_name;
+            $summary['event']['coverage'] = $sitio->sitio_name.' · '.$summary['household']['total'].' households';
+            $summary['scope_note'] = 'Weather observations are barangay-wide. Resource requests and action notes without a sitio link are excluded.';
+        }
         return response()->json(['data' => ['summary' => $summary]]);
     }
 
