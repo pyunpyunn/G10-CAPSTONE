@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ResourceRequest;
 use App\Services\Web\ResourceRequestWriteWorkflow;
+use App\Queries\ResourceRequestQuery;
 use App\Services\Shared\TrackingAidForwardingService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
@@ -42,6 +43,45 @@ class ResourceRequestWriteWorkflowTest extends TestCase
         $this->assertSame('verified', DB::table('resource_requests')->where('request_id','RR-1')->value('validation_status'));
         $this->assertSame('Confirmed', DB::table('request_validations')->where('request_id','RR-1')->value('validation_notes'));
         $this->assertSame('validate', DB::table('audit_logs')->value('action'));
+    }
+
+    public function test_create_persists_selected_urgency_and_legacy_submissions_default_to_medium(): void
+    {
+        DB::table('urgency_levels')->insert(['urgency_id' => 3, 'urgency_key' => 'high', 'urgency_label' => 'High']);
+        $tracking = $this->createMock(TrackingAidForwardingService::class);
+        $tracking->expects($this->exactly(2))->method('deductStock');
+        $workflow = new ResourceRequestWriteWorkflow($tracking, app(ResourceRequestQuery::class), app(\App\Presenters\ResourceRequestPresenter::class));
+        $payload = [
+            'request_source' => 'hq_desk', 'request_category' => 'resource', 'requested_by' => 'Alex',
+            'resource_type' => 'Water', 'item_name' => 'Bottled water', 'quantity' => 4, 'unit' => 'boxes',
+            'urgency_id' => 3,
+        ];
+
+        $high = $workflow->create(Request::create('/api/v1/resource-requests', 'POST', $payload), $payload, null);
+        $legacyPayload = array_diff_key($payload, ['urgency_id' => true]);
+        $medium = $workflow->create(Request::create('/api/v1/resource-requests', 'POST', $legacyPayload), $legacyPayload, null);
+
+        $this->assertSame('high', $high['urgency']['key']);
+        $this->assertSame('medium', $medium['urgency']['key']);
+        $this->assertDatabaseHas('resource_requests', ['request_id' => $high['request_id'], 'urgency_id' => 3]);
+        $this->assertDatabaseHas('resource_requests', ['request_id' => $medium['request_id'], 'urgency_id' => 1]);
+    }
+
+    public function test_request_list_filters_by_urgency_on_the_server(): void
+    {
+        DB::table('urgency_levels')->insert([
+            ['urgency_id' => 2, 'urgency_key' => 'medium', 'urgency_label' => 'Medium'],
+            ['urgency_id' => 3, 'urgency_key' => 'high', 'urgency_label' => 'High'],
+        ]);
+        DB::table('resource_requests')->insert([
+            'request_id' => 'RR-HIGH', 'request_source' => 'hq_desk', 'request_category' => 'resource',
+            'requested_by' => 'Alex', 'resource_type' => 'Water', 'quantity' => 2, 'urgency_id' => 3,
+            'status_id' => 1, 'validation_status' => 'needs_validation',
+        ]);
+
+        [$requests] = app(ResourceRequestQuery::class)->list(Request::create('/api/v1/resource-requests', 'GET', ['urgency' => 'high']));
+
+        $this->assertSame(['RR-HIGH'], collect($requests->items())->pluck('request_id')->all());
     }
 
     public function test_external_handshake_and_intake_accept_the_same_key(): void
