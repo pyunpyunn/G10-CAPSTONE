@@ -1,5 +1,6 @@
 export function emptyResourceRequestForm(payload = {}) {
-
+  const urgencies = payload.options?.urgencies || []
+  const mediumUrgency = urgencies.find((urgency) => urgency.key === 'medium')
   return {
     request_source: 'hq_desk',
     source_reference: payload.active_event?.event_id || '',
@@ -8,6 +9,7 @@ export function emptyResourceRequestForm(payload = {}) {
     item_name: '',
     quantity: 1,
     unit: '',
+    urgency_id: Number(mediumUrgency?.urgency_id || 2),
     requested_by: '',
     evacuation_center_id: '',
     description: '',
@@ -28,6 +30,7 @@ export function formFromResourceRequest(request) {
     item_name: request.need?.item_name || '',
     quantity: request.need?.quantity || 1,
     unit: request.need?.unit || '',
+    urgency_id: Number(request.urgency?.urgency_id || 2),
     requested_by: request.requested_by || '',
     evacuation_center_id: request.area?.evacuation_center_id || '',
     description: request.description || '',
@@ -48,6 +51,7 @@ export function buildCreatePayload(form) {
     item_name: emptyToNull(form.item_name),
     quantity: Number(form.quantity) || 1,
     unit: emptyToNull(form.unit),
+    urgency_id: Number(form.urgency_id) || 2,
     requested_by: form.requested_by,
     evacuation_center_id: emptyToNull(form.evacuation_center_id),
     description: emptyToNull(form.description),

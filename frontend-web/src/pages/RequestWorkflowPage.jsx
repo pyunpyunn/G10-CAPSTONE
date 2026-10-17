@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import {
   CheckCircle2,
@@ -42,6 +42,7 @@ export default function RequestWorkflowPage() {
   const [search, setSearch] = useState('')
   const [source, setSource] = useState('all')
   const [status, setStatus] = useState('all')
+  const [urgency, setUrgency] = useState('all')
 
   // Live Tracking Drawer & Action States
   const [inspectingRequest, setInspectingRequest] = useState(null)
@@ -55,10 +56,11 @@ export default function RequestWorkflowPage() {
         per_page: 20,
         search,
         status,
+        urgency,
         source: source === 'all' ? undefined : source,
         workflow: external ? 'approval' : 'monitoring',
       }),
-    [page, search, status, source, external],
+    [page, search, status, urgency, source, external],
   )
 
   const { data, error, loading, refresh } = useModuleData(loader)
@@ -139,12 +141,13 @@ export default function RequestWorkflowPage() {
 
   const filteredRequests = rawRequests || []
 
-  const hasActiveFilters = search || source !== 'all' || status !== 'all'
+  const hasActiveFilters = search || source !== 'all' || status !== 'all' || urgency !== 'all'
 
   const handleResetFilters = () => {
     setSearch('')
     setSource('all')
     setStatus('all')
+    setUrgency('all')
     setPage(1)
   }
 
@@ -161,6 +164,19 @@ export default function RequestWorkflowPage() {
         { value: 'field_team', label: 'Field Teams' },
       ],
     }] : []),
+    {
+      id: 'priority',
+      label: 'Priority',
+      value: urgency,
+      onChange: (value) => { setUrgency(value); setPage(1) },
+      options: [
+        { value: 'all', label: 'All priorities' },
+        { value: 'critical', label: 'Critical' },
+        { value: 'high', label: 'High' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'low', label: 'Low' },
+      ],
+    },
     ...(!external ? [{
       id: 'status',
       label: 'Status',
@@ -324,6 +340,7 @@ export default function RequestWorkflowPage() {
                 <th>Resource Need</th>
                 <th>Quantity</th>
                 <th>Evacuation Area</th>
+                <th>Priority</th>
                 <th>Status</th>
                 {!external && <th>Tracking Reference</th>}
                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -332,13 +349,13 @@ export default function RequestWorkflowPage() {
             <tbody>
               {loading && filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={external ? 8 : 9} style={{ textAlign: 'center', padding: '36px 16px' }}>
+                  <td colSpan={external ? 9 : 10} style={{ textAlign: 'center', padding: '36px 16px' }}>
                     <LoadingState label="Loading requests..." />
                   </td>
                 </tr>
               ) : filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={external ? 8 : 9} style={{ textAlign: 'center', padding: '36px 16px' }}>
+                  <td colSpan={external ? 9 : 10} style={{ textAlign: 'center', padding: '36px 16px' }}>
                     <EmptyState
                       title="No resource requests found"
                       message={
@@ -353,6 +370,7 @@ export default function RequestWorkflowPage() {
                 </tr>
               ) : (
                 filteredRequests.map((row) => {
+                  const urgencyKey = row.urgency?.key || 'medium'
                   const statusKey = row.validation?.key || 'needs_validation'
                   const isCompleted = statusKey === 'fulfilled'
 
@@ -410,6 +428,13 @@ export default function RequestWorkflowPage() {
                             </span>
                           </div>
                         )}
+                      </td>
+
+                      {/* Priority */}
+                      <td>
+                        <span className={`urgency-tag urgency-${urgencyKey}`}>
+                          {row.urgency?.label || 'Medium'}
+                        </span>
                       </td>
 
                       {/* Status */}

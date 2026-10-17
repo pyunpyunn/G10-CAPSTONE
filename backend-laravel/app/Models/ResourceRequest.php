@@ -29,6 +29,7 @@ class ResourceRequest extends Model
         'quantity',
         'unit',
         'description',
+        'urgency_id',
         'status_id',
         'validation_status',
         'validation_notes',
@@ -42,6 +43,7 @@ class ResourceRequest extends Model
     {
         return [
             'quantity' => 'integer',
+            'urgency_id' => 'integer',
             'status_id' => 'integer',
             'validated_at' => 'datetime',
             'released_for_tracking_at' => 'datetime',

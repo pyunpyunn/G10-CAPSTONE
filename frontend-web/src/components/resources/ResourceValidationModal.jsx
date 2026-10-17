@@ -30,6 +30,7 @@ export default function ResourceValidationModal({
   const modalSub = modalSubFor(mode, selectedRequestId)
   const sourceOptions = options.sources || []
   const categoryOptions = options.categories || []
+  const urgencyOptions = options.urgencies || []
   const statusOptions = options.statuses || []
   const validationOptions = statusOptions.filter((status) => ['needs_validation', 'verified', 'cancelled'].includes(status.key))
   const displayedStatusOptions = statusOptionsForMode(mode, form.validation_status, statusOptions, validationOptions)
@@ -133,6 +134,14 @@ export default function ResourceValidationModal({
                   placeholder="Event ID, EvaTrack ref, or field ref"
                   onChange={(event) => setField('source_reference', event.target.value)}
                 />
+              </div>
+              <div>
+                <label className="rr-mini-label">Priority</label>
+                <select value={form.urgency_id} disabled={requestFieldsDisabled} onChange={(event) => setField('urgency_id', event.target.value)}>
+                  {urgencyOptions.map((urgency) => (
+                    <option value={urgency.urgency_id} key={urgency.urgency_id}>{urgency.label}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="full">
