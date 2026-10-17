@@ -45,13 +45,7 @@ export function HouseholdDashboardScreen({
 }: DashboardProps) {
   const activeEvent = overview.active_event;
   const currentStatus = overview.current_status;
-  const currentUser = overview.profile?.user || {};
-  const currentUserMemberIds = new Set(
-    [currentUser.member_id, currentUser.user_id].filter(Boolean).map(String)
-  );
-  const members = (overview.members || []).filter(
-    (member: any) => !currentUserMemberIds.has(String(member.member_id))
-  );
+  const members = overview.members || [];
   const statusOptions = overview.status_options?.length ? overview.status_options : defaultStatusOptions;
   const hasStatusChanged = !currentStatus || pendingStatus !== currentStatus.status_key;
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
