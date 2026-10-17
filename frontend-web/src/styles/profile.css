@@ -40,6 +40,10 @@
   font-weight: 650;
 }
 
+.profile-page-avatar-image {
+  object-fit: cover;
+}
+
 .profile-name {
   color: var(--color-text-1);
   font-size: 12px;

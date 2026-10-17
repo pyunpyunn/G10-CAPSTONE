@@ -18,6 +18,7 @@ class RescuerMobileUserResource extends JsonResource
             'display_username' => $this->username,
             'email' => $this->email,
             'contact_number' => $this->contact_number,
+            'profile_photo' => $this->profile_photo,
             'role' => $this->whenLoaded('role', fn ($role): array => [
                 'role_key' => $role?->role_key,
                 'role_name' => $role?->role_name,

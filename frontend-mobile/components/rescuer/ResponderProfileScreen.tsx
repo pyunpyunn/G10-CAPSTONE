@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { storageUrl } from '@/api/client';
+import { removeProfilePhoto, uploadProfilePhoto } from '@/api/profilePhoto';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { ActionButton, SectionHeader, StatusBadge } from './RescuerUI';
 
@@ -31,6 +34,8 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
   const initials = makeInitials(responder.full_name || user.full_name || user.username || 'R');
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState(user.profile_photo || null);
+  const [savingProfilePhoto, setSavingProfilePhoto] = useState(false);
   const [form, setForm] = useState<ProfileForm>(() => profileForm(user, responder));
 
   useEffect(() => {
@@ -38,7 +43,69 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
     const currentResponder = profile?.responder || {};
 
     setForm(profileForm(currentUser, currentResponder));
+    setProfilePhoto(currentUser.profile_photo || null);
   }, [profile]);
+
+  async function handleChangeProfilePhoto() {
+    let result;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+    } catch {
+      Alert.alert('Unable to open photos', 'Check photo library access and try again.');
+      return;
+    }
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const photo = result.assets[0];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (photo.mimeType && !allowedTypes.includes(photo.mimeType)) {
+      Alert.alert('Unsupported image', 'Choose a JPG, PNG, or WebP image.');
+      return;
+    }
+    if (photo.fileSize && photo.fileSize > 5 * 1024 * 1024) {
+      Alert.alert('Image is too large', 'Choose an image smaller than 5 MB.');
+      return;
+    }
+
+    setSavingProfilePhoto(true);
+    try {
+      const response = await uploadProfilePhoto(photo);
+      setProfilePhoto(response.profile_photo);
+      Alert.alert('Profile picture updated', 'Your picture is saved to your account.');
+    } catch (error: any) {
+      Alert.alert('Unable to update picture', error?.response?.data?.message || error?.userMessage || 'Please try again.');
+    } finally {
+      setSavingProfilePhoto(false);
+    }
+  }
+
+  function handleRemoveProfilePhoto() {
+    Alert.alert('Remove profile picture?', 'Your default initials avatar will be shown.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setSavingProfilePhoto(true);
+          try {
+            await removeProfilePhoto();
+            setProfilePhoto(null);
+            Alert.alert('Profile picture removed', 'Your default initials avatar is restored.');
+          } catch (error: any) {
+            Alert.alert('Unable to remove picture', error?.response?.data?.message || error?.userMessage || 'Please try again.');
+          } finally {
+            setSavingProfilePhoto(false);
+          }
+        },
+      },
+    ]);
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -54,8 +121,35 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
   return (
     <View style={styles.stack}>
       <View style={styles.hero}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
+        <View style={styles.profilePhotoColumn}>
+          <View style={styles.avatar}>
+            {profilePhoto ? (
+              <Image source={{ uri: storageUrl(profilePhoto) }} style={styles.avatarPhoto} />
+            ) : (
+              <Text style={styles.avatarText}>{initials}</Text>
+            )}
+          </View>
+          <View style={styles.photoActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={profilePhoto ? 'Change profile picture' : 'Add profile picture'}
+              disabled={savingProfilePhoto}
+              onPress={handleChangeProfilePhoto}
+            >
+              <Ionicons name="camera-outline" size={17} color={palette.navText} />
+            </Pressable>
+            {profilePhoto ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Remove profile picture"
+                disabled={savingProfilePhoto}
+                onPress={handleRemoveProfilePhoto}
+              >
+                <Ionicons name="trash-outline" size={16} color={palette.brandRed} />
+              </Pressable>
+            ) : null}
+          </View>
+          {savingProfilePhoto ? <Text style={styles.photoSavingText}>Saving...</Text> : null}
         </View>
         <View style={styles.heroText}>
           <Text style={styles.role}>Verified rescuer</Text>
@@ -265,6 +359,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 21,
     fontWeight: '900',
+  },
+  avatarPhoto: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+  },
+  profilePhotoColumn: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  photoSavingText: {
+    color: palette.navMuted,
+    fontSize: 10,
+    fontWeight: '700',
   },
   heroText: {
     flex: 1,

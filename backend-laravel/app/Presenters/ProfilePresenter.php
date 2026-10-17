@@ -39,6 +39,7 @@ class ProfilePresenter
             'last_name' => $user->last_name,
             'email' => $user->email ?: 'No email recorded',
             'contact_number' => $user->contact_number ?: 'No mobile recorded',
+            'profile_photo' => $user->profile_photo,
             'status' => $user->is_active ? 'Active and verified' : 'Inactive',
             'assigned_station' => $user->assigned_center_id ?: 'Command desk',
             'role_name' => $user->roleName() ?: 'Unassigned',
