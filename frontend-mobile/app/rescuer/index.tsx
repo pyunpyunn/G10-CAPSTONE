@@ -55,6 +55,7 @@ export default function RescuerHomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
   const [overview, setOverview] = useState<RescuerOverview | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -135,6 +136,23 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleStatusChange(assignmentId: number, status: string) {
+    if (status === 'completed') {
+      const assignment = assignments.find((item) => Number(item.assignment_id) === Number(assignmentId));
+      const hasReport = !assignment?.household_id || (overview?.field_reports || []).some((report: any) =>
+        String(report.assignment_id) === String(assignmentId)
+        && String(report.household_id) === String(assignment.household_id)
+        && String(report.event_id) === String(assignment.event_id)
+      );
+
+      if (!hasReport) {
+        Alert.alert('Field report required', 'Submit the household field report before completing this assignment.', [
+          { text: 'Open report', onPress: () => openReport(assignment) },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+        return;
+      }
+    }
+
     try {
       const payload = ['accepted', 'en_route'].includes(status)
         ? await currentLocationPayload()
@@ -185,18 +203,18 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleSubmitFieldReport(payload: any) {
-    if (!payload.household_id) {
-      Alert.alert('Missing household ID', 'Enter the household ID before submitting.');
-      return;
-    }
+    await createFieldReport(payload);
+    await loadOverview(true);
+  }
 
-    try {
-      await createFieldReport(payload);
-      Alert.alert('Report submitted', 'Your household field report was sent to HQ.');
-      await loadOverview(true);
-    } catch (error: any) {
-      Alert.alert('Unable to submit report', errorMessage(error));
-    }
+  function openMap(assignment?: any) {
+    setSelectedAssignment(assignment || activeAssignment || null);
+    setActiveTab('map');
+  }
+
+  function openReport(assignment?: any) {
+    setSelectedAssignment(assignment || activeAssignment || null);
+    setActiveTab('report');
   }
 
   async function handleSubmitResourceRequest(payload: any) {
@@ -243,8 +261,8 @@ export default function RescuerHomeScreen() {
       return (
         <RescuerDashboardScreen
           overview={overview}
-          onOpenMap={() => setActiveTab('map')}
-          onOpenReport={() => setActiveTab('report')}
+          onOpenMap={openMap}
+          onOpenReport={openReport}
           onStatusChange={handleStatusChange}
         />
       );
@@ -256,6 +274,7 @@ export default function RescuerHomeScreen() {
           assignments={assignments}
           evacuationCenters={overview.evacuation_centers || []}
           activeAssignment={activeAssignment}
+          selectedAssignment={selectedAssignment}
           onSendLocation={handleSendLocation}
         />
       );
@@ -265,7 +284,8 @@ export default function RescuerHomeScreen() {
       return (
         <FieldReportScreen
           reports={overview.field_reports || []}
-          statusOptions={overview.status_options || []}
+          assignmentId={Number(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || 0)}
+          householdId={String(selectedAssignment?.household_id || activeAssignment?.household_id || '')}
           onSubmitReport={handleSubmitFieldReport}
         />
       );

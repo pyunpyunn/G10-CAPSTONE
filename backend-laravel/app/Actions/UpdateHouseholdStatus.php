@@ -25,8 +25,9 @@ class UpdateHouseholdStatus
         ?int $deviceId,
         array $location = [],
         ?bool $dispatchOverride = null,
+        bool $withdrawSafeAssignments = true,
     ): void {
-        DB::transaction(function () use ($eventId, $householdId, $statusId, $statusKey, $source, $notes, $userId, $deviceId, $location, $dispatchOverride): void {
+        DB::transaction(function () use ($eventId, $householdId, $statusId, $statusKey, $source, $notes, $userId, $deviceId, $location, $dispatchOverride, $withdrawSafeAssignments): void {
             $now = now();
             $existing = DB::table('household_disasters')
                 ->where('disaster_id', $eventId)->where('household_id', $householdId)
@@ -67,7 +68,7 @@ class UpdateHouseholdStatus
                 ])));
             }
 
-            if ($reportedSafe) {
+            if ($reportedSafe && $withdrawSafeAssignments) {
                 $this->withdrawAssignments($eventId, $householdId, $now);
             }
         }, 3);

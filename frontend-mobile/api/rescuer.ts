@@ -29,6 +29,11 @@ export async function getRescuerOverview(refresh = false) {
   }, refresh);
 }
 
+export async function getAssignedHousehold(assignmentId: number) {
+  const response = await api.get(`/rescuer/assignments/${assignmentId}/household`);
+  return response.data.data;
+}
+
 export async function getRescuerProfile() {
   const response = await api.get('/rescuer/profile');
   return response.data.data;
