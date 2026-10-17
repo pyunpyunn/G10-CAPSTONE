@@ -3697,258 +3697,433 @@
 }
 
 /* ==========================================================================
-   Card Grid ("Available Request") - Simple, Balanced, Professional
+   Catalog Panel & View Modes (Matches External Requests Exactly)
+   ========================================================================== */
+
+.req-catalog-panel {
+  background: #ffffff;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.workflow-view-toggles {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 8px;
+  gap: 2px;
+}
+
+.wf-view-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wf-view-toggle-btn:hover {
+  color: #0f172a;
+}
+
+.wf-view-toggle-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.workflow-catalog-body {
+  padding: 20px;
+  background: #f8fafc;
+}
+
+/* Integrated Toolbar Filter Drawer Button */
+.workflow-filter-drawer-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workflow-filter-drawer-toggle:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.workflow-filter-drawer-toggle.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.wf-drawer-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+/* ==========================================================================
+   Humanized Catalog Cards (Clean, Bespoke, Restrained Product Design)
    ========================================================================== */
 
 .req-types-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
   gap: 16px;
 }
 
-/* Individual Request Type Card */
-.req-type-card {
+.human-catalog-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 16px;
   background: #ffffff;
-  border: 1px solid var(--color-border, #e2e8f0);
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  padding: 18px;
   cursor: pointer;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
-.req-type-card:hover {
+.human-catalog-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -2px rgba(15, 23, 42, 0.04);
   border-color: #cbd5e1;
 }
 
-.req-type-card:focus-visible {
+.human-catalog-card:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
 
-/* Priority 1st Card (Clean & Subtle, NOT Gaudy) */
-.req-type-card.is-first-priority {
-  border-color: #93c5fd;
-  background: linear-gradient(180deg, #f9fbff 0%, #ffffff 80px);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06);
+/* Card Header: Avatar, Category, Stock Status */
+.card-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
-.req-type-card.is-first-priority:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.1);
-  border-color: #60a5fa;
+.card-identity-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
-.card-priority-strip {
+.card-category-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+
+.card-category-avatar.cat-pill-food {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.card-category-avatar.cat-pill-medical {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.card-category-avatar.cat-pill-rescue {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.card-category-avatar.cat-pill-shelter {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.card-category-avatar.cat-pill-default {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.card-category-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.card-category-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.card-sku-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+/* Human Stock Pill */
+.human-stock-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 3px 8px;
-  border-radius: 5px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1d4ed8;
-  font-size: 10.5px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  width: fit-content;
-}
-
-/* Out of Stock Card Neutral Background */
-.req-type-card.is-out-of-stock {
-  background: #fbfcfd;
-}
-
-/* Card Top Row */
-.card-top-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.card-cat-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2.5px 7px;
-  border-radius: 5px;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.cat-pill-food { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
-.cat-pill-medical { background: #fff1f2; color: #be123c; border: 1px solid #ffe4e6; }
-.cat-pill-rescue { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
-.cat-pill-shelter { background: #f0fdf4; color: #15803d; border: 1px solid #dcfce7; }
-.cat-pill-default { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
-
-.card-sku-tag {
-  font-family: ui-monospace, monospace;
-  font-size: 10.5px;
-  color: #64748b;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  padding: 1.5px 5px;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Card Title Block */
-.card-title-block {
-  margin-bottom: 8px;
-}
-
-.card-item-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 2px;
-  line-height: 1.35;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.card-type-sub {
-  font-size: 11.5px;
-  color: #64748b;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 10px;
-}
-
-.dot-sep {
-  opacity: 0.5;
-}
-
-.exp-note {
-  color: #94a3b8;
-}
-
-/* Stock Status Pill ("pwede out of stock diri") */
-.card-stock-section {
-  margin-bottom: 10px;
-}
-
-.stock-pill {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
-  border-radius: 7px;
-  font-size: 12px;
+  border-radius: 9999px;
+  font-size: 11px;
   font-weight: 600;
-  transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
-.stock-pill.stock-pill-in {
+.human-stock-pill.pill-in {
   background: #f0fdf4;
+  color: #15803d;
   border: 1px solid #bbf7d0;
-  color: #166534;
 }
 
-.stock-pill.stock-pill-out {
+.human-stock-pill.pill-out {
   background: #fef2f2;
+  color: #b91c1c;
   border: 1px solid #fecaca;
-  color: #991b1b;
 }
 
-.stock-dot {
-  width: 6.5px;
-  height: 6.5px;
+.human-stock-pill.pill-low {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.human-stock-pill .stock-dot {
+  width: 5.5px;
+  height: 5.5px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.stock-dot.dot-in { background: #16a34a; }
-.stock-dot.dot-out { background: #ef4444; }
-
-.stock-label {
-  font-weight: 700;
+.human-stock-pill.pill-in .stock-dot {
+  background: #16a34a;
 }
 
-.stock-count {
-  margin-left: auto;
-  font-size: 11.5px;
-  font-weight: 600;
-  opacity: 0.9;
+.human-stock-pill.pill-low .stock-dot {
+  background: #f59e0b;
 }
 
-/* Card Depot Location */
-.card-location-row {
+.human-stock-pill.pill-out .stock-dot {
+  background: #ef4444;
+}
+
+/* Card Main Content */
+.card-main-content {
+  margin-bottom: 14px;
+}
+
+.human-card-title {
+  font-size: 15px;
+  font-weight: 650;
+  color: #0f172a;
+  margin: 0 0 5px;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.human-meta-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: #64748b;
-  margin-bottom: 12px;
+  line-height: 1.4;
 }
 
-.location-icon {
+.meta-bullet {
+  margin: 0 5px;
+  opacity: 0.45;
+}
+
+.meta-exp {
+  color: #b45309;
+}
+
+/* Natural Inventory Row (No bordered box) */
+.human-inventory-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-bottom: 12px;
+}
+
+.human-inventory-count {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.human-inventory-count .count-number {
+  font-size: 18px;
+  font-weight: 750;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.is-out-of-stock .human-inventory-count .count-number {
   color: #94a3b8;
-  flex-shrink: 0;
 }
 
-.location-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.human-inventory-count .count-unit {
+  font-size: 12px;
+  color: #64748b;
 }
 
-/* Standardized, Perfectly Balanced Card Footer */
-.card-footer {
+.human-new-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+/* Human Card Footer */
+.human-card-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  margin-top: auto;
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid #f1f5f9;
 }
 
+.btn-human-specs {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-human-specs:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.btn-human-request {
+  flex: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--chart-evacuated, #2a5a90);
+  border: 1px solid var(--chart-evacuated, #2a5a90);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-human-request:hover {
+  background: #1e4570;
+  border-color: #1e4570;
+}
+
+.btn-human-disabled {
+  flex: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  cursor: not-allowed;
+}
+
+/* Compatibility classes for table view inside catalog */
 .btn-card-specs {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 9px;
+  padding: 5px 10px;
   border-radius: 6px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
-  color: #475569;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-card-specs:hover {
-  background: #f1f5f9;
+  background: #f8fafc;
   color: #0f172a;
-  border-color: #cbd5e1;
+  border-color: #94a3b8;
 }
 
 .btn-card-request {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 11px;
+  padding: 5px 12px;
   border-radius: 6px;
-  font-size: 11.5px;
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 600;
   color: #ffffff;
   background: #2563eb;
   border: 1px solid #2563eb;
@@ -3958,80 +4133,20 @@
 
 .btn-card-request:hover {
   background: #1d4ed8;
-  border-color: #1d4ed8;
 }
 
 .btn-card-disabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 5px 10px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
   color: #94a3b8;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   cursor: not-allowed;
-}
-
-/* ==========================================================================
-   Bottom-Right Circular Floating Action Button (FAB) Overlay
-   Sketch: "button overlay at bottom right to filter request types"
-   ========================================================================== */
-
-.req-fab-overlay-container {
-  position: fixed;
-  bottom: 26px;
-  right: 28px;
-  z-index: 1000;
-  pointer-events: none;
-}
-
-.req-fab-btn {
-  pointer-events: auto;
-  position: relative;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  border: none;
-  background: #2563eb;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.38);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
-}
-
-.req-fab-btn:hover {
-  transform: scale(1.08);
-  background: #1d4ed8;
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.48);
-}
-
-.req-fab-btn:active {
-  transform: scale(0.96);
-}
-
-.fab-icon {
-  transition: transform 0.15s ease;
-}
-
-.fab-badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  min-width: 19px;
-  height: 19px;
-  padding: 0 5px;
-  border-radius: 9999px;
-  background: #ef4444;
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #ffffff;
 }
 
 /* ==========================================================================
@@ -5732,6 +5847,31 @@ select.form-control.with-icon {
 .btn-wf-manage:hover {
   background: #1d4ed8;
   border-color: #1d4ed8;
+}
+
+.btn-wf-approve {
+  background: #059669;
+  color: #ffffff;
+  border: 1px solid #059669;
+}
+
+.btn-wf-approve:hover {
+  background: #047857;
+  border-color: #047857;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(5, 150, 105, 0.25);
+}
+
+.btn-wf-return {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.btn-wf-return:hover {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
 }
 
 /* Responsive adjustments */

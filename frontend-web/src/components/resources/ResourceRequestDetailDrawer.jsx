@@ -1,11 +1,13 @@
 import {
   AlertTriangle,
   ArrowRight,
+  Boxes,
   CheckCircle2,
   Clock,
   ExternalLink,
   MapPin,
   Package,
+  RotateCw,
   Send,
   ShieldCheck,
   UserCheck,
@@ -26,6 +28,7 @@ export default function ResourceRequestDetailDrawer({
 
   const isDuplicateRisk = request.is_duplicate_risk || checkDuplicateRisk(request)
   const handoffStep = getHandoffStep(request)
+  const isAwaitingApproval = request.validation?.key === 'needs_validation'
 
   return (
     <div className="rr-drawer-backdrop" onClick={onClose}>
@@ -33,8 +36,13 @@ export default function ResourceRequestDetailDrawer({
         {/* Drawer Header */}
         <div className="rr-drawer-header">
           <div className="rr-drawer-title-group">
-            <span className="rr-drawer-kicker">Resource Request Inspection</span>
-            <h2 className="rr-drawer-title">Request #{request.request_id}</h2>
+            <span className="rr-drawer-kicker">
+              {isAwaitingApproval ? 'For Approval Request Inspection' : 'Status Tracking & Logistics Stream'}
+            </span>
+            <h2 className="rr-drawer-title">
+              Request #{request.request_id}
+              {request.need?.type ? ` · ${request.need.type}` : ''}
+            </h2>
           </div>
           <button className="rr-drawer-close" type="button" onClick={onClose} aria-label="Close drawer">
             <X size={20} />
@@ -86,6 +94,28 @@ export default function ResourceRequestDetailDrawer({
               </div>
             </div>
           </div>
+
+          {/* Depot Stock Pre-Check Banner for Approval */}
+          {isAwaitingApproval && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                marginBottom: '16px',
+              }}
+            >
+              <CheckCircle2 size={18} style={{ color: '#16a34a', flexShrink: 0 }} />
+              <div style={{ fontSize: '12px', color: '#166534', lineHeight: 1.4 }}>
+                <strong>Depot Inventory Pre-Check: Stock Available</strong>
+                <div>Requested supplies are verified in warehouse bays. Approving this request will immediately deduct stock and sync allocation to TrackingAid Shared DB.</div>
+              </div>
+            </div>
+          )}
 
           {/* Request Needs & Beneficiary Section */}
           <div className="rr-drawer-section">
@@ -240,36 +270,63 @@ export default function ResourceRequestDetailDrawer({
         </div>
 
         {/* Drawer Action Footer */}
-        <div className="rr-drawer-footer">
-          {request.validation?.key === 'needs_validation' && (
+        <div className="rr-drawer-footer" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isAwaitingApproval ? (
             <>
               <button
-                className="button primary"
+                className="button review"
                 type="button"
                 disabled={isProcessing}
                 onClick={() => onValidateAndForward(request)}
+                style={{ padding: '7px 16px', fontSize: '12px' }}
               >
-                <ShieldCheck size={16} />
-                Validate & Forward
+                <CheckCircle2 size={14} />
+                <span>Approve Request</span>
               </button>
               <button
                 className="button secondary danger-text"
                 type="button"
                 disabled={isProcessing}
                 onClick={() => onReturn(request)}
+                style={{ padding: '7px 14px', fontSize: '12px' }}
               >
-                Return Request
+                <span>Return Request</span>
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => onEdit(request)}
+                style={{ padding: '7px 14px', fontSize: '12px', marginLeft: 'auto' }}
+              >
+                <span>Full Editor</span>
+                <ArrowRight size={13} />
+              </button>
+            </>
+          ) : (
+            <>
+              {handoffStep >= 4 && (
+                <button
+                  className="button secondary danger-text"
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => onReturn(request)}
+                  style={{ padding: '7px 14px', fontSize: '12px' }}
+                >
+                  <RotateCw size={13} />
+                  <span>Return Assets to Depot</span>
+                </button>
+              )}
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => onEdit(request)}
+                style={{ padding: '7px 16px', fontSize: '12px', marginLeft: 'auto' }}
+              >
+                <span>View Full Record</span>
+                <ArrowRight size={13} />
               </button>
             </>
           )}
-
-          <button
-            className="button secondary"
-            type="button"
-            onClick={() => onEdit(request)}
-          >
-            Edit Full Record <ArrowRight size={14} />
-          </button>
         </div>
       </div>
     </div>

@@ -1,27 +1,14 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Activity,
-  AlertCircle,
-  Building2,
   CheckCircle2,
   Clock,
-  Clock3,
-  Edit3,
   Eye,
-  Flame,
-  Inbox,
-  Layers,
   MapPin,
-  PackageSearch,
-  Radio,
+  Plus,
   RotateCw,
-  Search,
-  ShieldCheck,
-  Smartphone,
   Truck,
   User,
-  X,
 } from 'lucide-react'
 import {
   getResourceRequests,
@@ -33,7 +20,12 @@ import {
   buildForwardPayload,
 } from '../utils/resourceRequestHelpers'
 import { useModuleData } from '../utils/useModuleData'
+import PageHeader from '../components/ui/PageHeader'
+import DataFilterBar from '../components/ui/DataFilterBar'
 import PaginationBar from '../components/ui/PaginationBar'
+import Badge from '../components/ui/Badge'
+import EmptyState from '../components/ui/EmptyState'
+import LoadingState from '../components/ui/LoadingState'
 import TrackingAidMirror from '../components/resources/TrackingAidMirror'
 import ResourceRequestDetailDrawer from '../components/resources/ResourceRequestDetailDrawer'
 
@@ -49,9 +41,10 @@ export default function RequestWorkflowPage() {
   const [status, setStatus] = useState('all')
   const [urgency, setUrgency] = useState('all')
 
-  // Live Tracking Drawer State (Option 1)
+  // Live Tracking Drawer & Action States
   const [inspectingRequest, setInspectingRequest] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [successToast, setSuccessToast] = useState(null)
 
   const loader = useCallback(
     () =>
@@ -74,22 +67,60 @@ export default function RequestWorkflowPage() {
       state: { returnTo: location.pathname },
     })
 
+  // Direct Approve Handler (Approve Request action from row)
+  const handleApproveRequest = async (req) => {
+    const itemDesc = req.need?.type || req.need?.item_name || 'Relief Supplies'
+    const qtyDesc = req.need?.quantity_text || `${req.need?.quantity || 1} units`
+    const confirmed = window.confirm(
+      `Approve and allocate Request #${req.request_id} (${qtyDesc} of ${itemDesc}) for ${req.area?.label || 'Evacuation Center'}? Supplies will be allocated from warehouse bays and synchronized to TrackingAid.`
+    )
+    if (!confirmed) return
+
+    setIsProcessing(true)
+    try {
+      await validateResourceRequest(
+        req.request_id,
+        buildValidationPayload({
+          validation_status: 'verified',
+          validation_notes: 'Approved from For Approval Request List',
+        })
+      )
+      await forwardResourceRequest(
+        req.request_id,
+        buildForwardPayload({
+          forward_notes: 'Forwarded to TrackingAid Shared DB via For Approval Request List',
+        })
+      )
+      setSuccessToast(`Request #${req.request_id} has been approved and forwarded to TrackingAid Shared DB!`)
+      setTimeout(() => setSuccessToast(null), 5000)
+      refresh()
+    } catch (err) {
+      console.error(err)
+      alert(err.message || 'Failed to approve request. Please verify warehouse stock.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   // Drawer Action Handlers (Validate & Forward to TrackingAid Shared DB)
   const handleValidateAndForwardFromDrawer = async (req) => {
     setIsProcessing(true)
     try {
       await validateResourceRequest(
         req.request_id,
-        buildValidationPayload({ validation_status: 'verified', validation_notes: 'Verified via Tracking Drawer' })
+        buildValidationPayload({ validation_status: 'verified', validation_notes: 'Verified via Inspection Drawer' })
       )
       await forwardResourceRequest(
         req.request_id,
-        buildForwardPayload({ forward_notes: 'Forwarded to TrackingAid via Tracking Drawer' })
+        buildForwardPayload({ forward_notes: 'Forwarded to TrackingAid via Inspection Drawer' })
       )
       setInspectingRequest(null)
+      setSuccessToast(`Request #${req.request_id} successfully approved and forwarded to TrackingAid Shared DB!`)
+      setTimeout(() => setSuccessToast(null), 5000)
       refresh()
     } catch (err) {
       console.error(err)
+      alert(err.message || 'Failed to approve request.')
     } finally {
       setIsProcessing(false)
     }
@@ -121,37 +152,54 @@ export default function RequestWorkflowPage() {
     setPage(1)
   }
 
+  const filtersConfig = [
+    ...(external ? [{
+      id: 'source',
+      label: 'Source',
+      value: source,
+      onChange: (value) => { setSource(value); setPage(1) },
+      options: [
+        { value: 'all', label: 'All sources' },
+        { value: 'evatrack', label: 'EvaTrack' },
+        { value: 'hq_desk', label: 'HQ Desk' },
+        { value: 'field_team', label: 'Field Teams' },
+      ],
+    }] : []),
+    {
+      id: 'priority',
+      label: 'Priority',
+      value: urgency,
+      onChange: (value) => { setUrgency(value); setPage(1) },
+      options: [
+        { value: 'all', label: 'All priorities' },
+        { value: 'critical', label: 'Critical' },
+        { value: 'high', label: 'High' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'low', label: 'Low' },
+      ],
+    },
+    ...(!external ? [{
+      id: 'status',
+      label: 'Status',
+      value: status,
+      onChange: (value) => { setStatus(value); setPage(1) },
+      options: [
+        { value: 'all', label: 'All approved' },
+        { value: 'verified', label: 'Validated / Staged' },
+        { value: 'forwarded', label: 'In Transit' },
+        { value: 'fulfilled', label: 'Completed' },
+      ],
+    }] : []),
+  ]
+
   return (
     <main className="ops-page resources-page">
-      <div className="workflow-page-wrap">
-        {/* Operations Hero Header */}
-        <header className="workflow-hero-header">
-          <div className="workflow-hero-left">
-            <div className="workflow-hero-icon-box">
-              {external ? <Inbox size={22} /> : <Activity size={22} />}
-            </div>
-            <div>
-              <div className="workflow-hero-kicker">
-                {external ? 'Relief Operations & Dispatch Intake' : 'Logistics Monitoring & Forwarding'}
-              </div>
-              <h1 className="workflow-hero-title">
-                {external ? 'External Requests' : 'Request Monitoring'}
-              </h1>
-              <p className="workflow-hero-desc">
-                {external
-                  ? 'Verify and review inbound resource requests from EvaTrack, field teams, and evacuation sites before approval.'
-                  : 'Track live fulfillment, TrackingAid warehouse handoffs, and distribution status for approved relief supplies.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="workflow-hero-actions">
-            {data?.active_event && (
-              <div className="workflow-event-pill">
-                <Flame size={13} />
-                <span>Event: {data.active_event.name}</span>
-              </div>
-            )}
+      {/* ResQperation Native Page Header */}
+      <PageHeader
+        title={external ? 'External Requests' : 'Request Monitoring'}
+        subtitle={data?.active_event?.name || (external ? 'Inbound relief requests for command review' : 'Active relief fulfillment and handoff tracking')}
+        actions={
+          <div className="pg-actions">
             <button
               type="button"
               className="btn btn-secondary"
@@ -162,474 +210,359 @@ export default function RequestWorkflowPage() {
               <RotateCw size={14} className={loading ? 'spin-icon' : ''} />
               <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
             </button>
-          </div>
-        </header>
-
-        {/* Executive KPI Stat Cards */}
-        <section className="workflow-kpi-grid" aria-label="Workflow Metrics">
-          {/* Card 1: Pending Verification */}
-          <div className="workflow-kpi-card kpi-amber">
-            <div className="workflow-kpi-icon">
-              <Clock3 size={19} />
-            </div>
-            <div className="workflow-kpi-info">
-              <span className="workflow-kpi-num">
-                {Number(summary.needs_validation ?? 0).toLocaleString()}
-              </span>
-              <span className="workflow-kpi-label">Pending Approval</span>
-              <span className="workflow-kpi-sub">Awaiting verification</span>
-            </div>
-          </div>
-
-          {/* Card 2: Approved / Validated */}
-          <div className="workflow-kpi-card kpi-emerald">
-            <div className="workflow-kpi-icon">
-              <CheckCircle2 size={19} />
-            </div>
-            <div className="workflow-kpi-info">
-              <span className="workflow-kpi-num">
-                {Number(summary.verified ?? 0).toLocaleString()}
-              </span>
-              <span className="workflow-kpi-label">Approved Requests</span>
-              <span className="workflow-kpi-sub">Ready for allocation</span>
-            </div>
-          </div>
-
-          {/* Card 3: Forwarded / Dispatched */}
-          <div className="workflow-kpi-card kpi-sky">
-            <div className="workflow-kpi-icon">
-              <Truck size={19} />
-            </div>
-            <div className="workflow-kpi-info">
-              <span className="workflow-kpi-num">
-                {Number(summary.forwarded_today ?? 0).toLocaleString()}
-              </span>
-              <span className="workflow-kpi-label">Forwarded Today</span>
-              <span className="workflow-kpi-sub">Active field handoffs</span>
-            </div>
-          </div>
-
-          {/* Card 4: Total Incident Intake */}
-          <div className="workflow-kpi-card kpi-indigo">
-            <div className="workflow-kpi-icon">
-              <Layers size={19} />
-            </div>
-            <div className="workflow-kpi-info">
-              <span className="workflow-kpi-num">
-                {Number(summary.total_requests ?? totalCount).toLocaleString()}
-              </span>
-              <span className="workflow-kpi-label">Total Volume</span>
-              <span className="workflow-kpi-sub">All logged requests</span>
-            </div>
-          </div>
-        </section>
-
-        {/* Unified Filter & Search Toolbar */}
-        <section className="workflow-toolbar-box" aria-label="Search and Filter Controls">
-          <div className="workflow-toolbar-top">
-            {/* Search Input */}
-            <div className="workflow-search-wrap">
-              <Search size={15} className="workflow-search-icon" />
-              <input
-                type="text"
-                className="workflow-search-input"
-                placeholder="Search by request ID, item, requester, or evacuation site..."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value)
-                  setPage(1)
-                }}
-              />
-              {search && (
-                <button
-                  type="button"
-                  className="workflow-search-clear"
-                  onClick={() => {
-                    setSearch('')
-                    setPage(1)
-                  }}
-                  aria-label="Clear search"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-
-            {/* Source Channel Pills */}
-            <div className="workflow-channel-pills">
+            {!external && (
               <button
                 type="button"
-                className={`wf-channel-btn ${source === 'all' ? 'active' : ''}`}
-                onClick={() => {
-                  setSource('all')
-                  setPage(1)
-                }}
+                className="button review"
+                onClick={() => navigate('/resources-requests/new')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
-                All Sources
-              </button>
-              <button
-                type="button"
-                className={`wf-channel-btn ${source === 'evatrack' || source === 'shared_db' ? 'active' : ''}`}
-                onClick={() => {
-                  setSource('evatrack')
-                  setPage(1)
-                }}
-              >
-                <Smartphone size={12} /> EvaTrack
-              </button>
-              <button
-                type="button"
-                className={`wf-channel-btn ${source === 'hq_desk' ? 'active' : ''}`}
-                onClick={() => {
-                  setSource('hq_desk')
-                  setPage(1)
-                }}
-              >
-                <Building2 size={12} /> HQ Desk
-              </button>
-              <button
-                type="button"
-                className={`wf-channel-btn ${source === 'field_team' ? 'active' : ''}`}
-                onClick={() => {
-                  setSource('field_team')
-                  setPage(1)
-                }}
-              >
-                <Radio size={12} /> Field Teams
-              </button>
-            </div>
-          </div>
-
-          {/* Secondary Controls Row */}
-          <div className="workflow-toolbar-bottom">
-            <div className="workflow-filter-selects">
-              {/* Urgency Filter */}
-              <label className="workflow-filter-label">
-                <span>Priority:</span>
-                <select
-                  className="workflow-filter-select"
-                  value={urgency}
-                  onChange={(e) => setUrgency(e.target.value)}
-                >
-                  <option value="all">All Priorities</option>
-                  <option value="critical">Critical</option>
-                  <option value="high">High Priority</option>
-                  <option value="medium">Medium Priority</option>
-                  <option value="low">Low Priority</option>
-                </select>
-              </label>
-
-              {/* Status Filter (especially on monitoring) */}
-              {!external && (
-                <label className="workflow-filter-label">
-                  <span>Status:</span>
-                  <select
-                    className="workflow-filter-select"
-                    value={status}
-                    onChange={(e) => {
-                      setStatus(e.target.value)
-                      setPage(1)
-                    }}
-                  >
-                    <option value="all">All Approved Records</option>
-                    <option value="verified">Validated</option>
-                    <option value="forwarded">In Progress</option>
-                    <option value="fulfilled">Completed</option>
-                  </select>
-                </label>
-              )}
-            </div>
-
-            {hasActiveFilters && (
-              <button
-                type="button"
-                className="workflow-reset-btn"
-                onClick={handleResetFilters}
-              >
-                <X size={12} /> Reset filters
+                <Plus size={15} />
+                <span>New Request</span>
               </button>
             )}
           </div>
-        </section>
+        }
+      />
 
-        {/* Modern Workflow Data Table Card */}
-        <section className="workflow-table-card" aria-label="Requests Table">
-          <div className="workflow-table-card-head">
-            <div className="workflow-table-title-wrap">
-              <h2 className="workflow-table-card-title">
-                {external ? 'Requests Awaiting Approval' : 'Active Request Fulfillment Stream'}
-              </h2>
-              <span className="workflow-count-badge">
-                {filteredRequests.length} of {totalCount} requests
-              </span>
-            </div>
+      {/* Standby strip if no active disaster event */}
+      {!loading && !error && !data?.active_event && (
+        <div className="standby-strip">
+          <strong>No active disaster event</strong>
+          <span>Requests will be tracked against general relief inventory and depot reserves.</span>
+        </div>
+      )}
+
+      {/* Success Notification Banner */}
+      {successToast && (
+        <div className="ra-success" role="status">
+          <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+          <span>{successToast}</span>
+        </div>
+      )}
+
+      {error && <div className="form-error" role="alert">{error}</div>}
+
+      {/* ResQperation Submodule Segmented Tabs (Native account-management-tabs) */}
+      {!external && (
+        <div className="account-management-tabs" role="tablist" aria-label="Request monitoring categories">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={status === 'all'}
+            className={status === 'all' ? 'active' : ''}
+            onClick={() => { setStatus('all'); setPage(1) }}
+          >
+            Approved Request List
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={status === 'forwarded'}
+            className={status === 'forwarded' ? 'active' : ''}
+            onClick={() => { setStatus('forwarded'); setPage(1) }}
+          >
+            Status Tracking of Requests
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={status === 'fulfilled'}
+            className={status === 'fulfilled' ? 'active' : ''}
+            onClick={() => { setStatus('fulfilled'); setPage(1) }}
+          >
+            Completed Requests
+          </button>
+        </div>
+      )}
+
+      {/* Native ResQperation KPI Stat Row (.rr-stat-row) */}
+      <div className="rr-stat-row">
+        <div className="rr-stat">
+          <div className="k">{external ? 'Pending Approval' : 'Approved Requests'}</div>
+          <div className="v">{Number(external ? summary.needs_validation ?? 0 : summary.verified ?? 0).toLocaleString()}</div>
+          <div className="n">{external ? 'awaiting verification' : 'ready for allocation'}</div>
+        </div>
+        <div className="rr-stat">
+          <div className="k">{external ? 'Approved Today' : 'In Transit'}</div>
+          <div className="v">{Number(external ? summary.verified ?? 0 : summary.forwarded_today ?? 0).toLocaleString()}</div>
+          <div className="n">{external ? 'validated by command' : 'active dispatch tracking'}</div>
+        </div>
+        <div className="rr-stat">
+          <div className="k">{external ? 'Forwarded to Depot' : 'Completed Requests'}</div>
+          <div className="v">
+            {Number(
+              external
+                ? summary.forwarded_today ?? 0
+                : summary.fulfilled ?? summary.delivered ?? 0
+            ).toLocaleString()}
           </div>
+          <div className="n">{external ? 'warehouse handoffs' : 'delivered to centers'}</div>
+        </div>
+        <div className="rr-stat">
+          <div className="k">{external ? 'Total Inbound' : 'Total Monitored'}</div>
+          <div className="v">{Number(summary.total_requests ?? totalCount).toLocaleString()}</div>
+          <div className="n">{external ? 'all logged intake requests' : 'active relief stream'}</div>
+        </div>
+      </div>
 
-          {error && (
-            <div className="form-error-banner" role="alert" style={{ margin: '14px 18px' }}>
-              <AlertCircle size={15} />
-              <span>{error}</span>
-            </div>
-          )}
+      {/* Shared TanStack DataFilterBar */}
+      <DataFilterBar
+        search={search}
+        onSearchChange={(value) => { setSearch(value); setPage(1) }}
+        searchPlaceholder={external ? "Search by request ID, item, requester or evacuation site..." : "Search by request ID, item, or center..."}
+        filters={filtersConfig}
+        onReset={handleResetFilters}
+      />
 
-          <div className="workflow-table-scroll">
-            <table className="workflow-table">
-              <thead>
+      {/* Main Content: Native ResQperation Panel with compact table */}
+      <section className="panel" aria-label={external ? 'For Approval Request List' : 'Requests Stream'}>
+        <div className="panel-head">
+          <span className="panel-title">
+            {external
+              ? 'For Approval Request List'
+              : status === 'forwarded'
+              ? 'Status Tracking of Requests'
+              : status === 'fulfilled'
+              ? 'Completed Requests'
+              : 'Approved Request List'}
+          </span>
+          <span className="rr-subtle">
+            {filteredRequests.length} of {totalCount} records
+          </span>
+        </div>
+
+        <div className="tbl-wrap compact-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Request</th>
+                <th>Origin</th>
+                <th>Resource Need</th>
+                <th>Quantity</th>
+                <th>Evacuation Area</th>
+                <th>Priority</th>
+                <th>Status</th>
+                {!external && <th>Tracking Reference</th>}
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && filteredRequests.length === 0 ? (
                 <tr>
-                  <th>Request ID</th>
-                  <th>Origin & Requester</th>
-                  <th>Resource Need</th>
-                  <th>Quantity</th>
-                  <th>Evacuation Area</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>Tracking</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <td colSpan={external ? 8 : 9} style={{ textAlign: 'center', padding: '36px 16px' }}>
+                    <LoadingState label="Loading requests..." />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {loading && filteredRequests.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '40px 16px' }}>
-                      <RotateCw size={24} className="spin-icon" style={{ margin: '0 auto 8px', color: '#3b82f6' }} />
-                      <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Loading requests...</div>
-                    </td>
-                  </tr>
-                ) : filteredRequests.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '48px 16px' }}>
-                      <PackageSearch size={36} style={{ margin: '0 auto 10px', color: '#94a3b8' }} />
-                      <div style={{ fontSize: '14.5px', fontWeight: 750, color: '#1e293b' }}>
-                        No matching requests found
-                      </div>
-                      <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 12px' }}>
-                        {hasActiveFilters
-                          ? 'Try adjusting your search keywords or resetting your active filters.'
-                          : 'No inbound requests are currently pending review.'}
-                      </p>
-                      {hasActiveFilters && (
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={handleResetFilters}
-                        >
-                          Clear active filters
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRequests.map((row) => {
-                    const srcKey = row.request_source?.key || 'shared_db'
-                    const urgencyKey = row.urgency?.key || 'medium'
-                    const statusKey = row.validation?.key || 'needs_validation'
-                    const isPending = statusKey === 'needs_validation'
-                    const isVerified = ['verified', 'validated'].includes(statusKey)
-                    const isForwarded = statusKey === 'forwarded'
-                    const isCompleted = statusKey === 'fulfilled'
+              ) : filteredRequests.length === 0 ? (
+                <tr>
+                  <td colSpan={external ? 8 : 9} style={{ textAlign: 'center', padding: '36px 16px' }}>
+                    <EmptyState
+                      title="No resource requests found"
+                      message={
+                        hasActiveFilters
+                          ? 'No requests match your current search and filter criteria.'
+                          : external
+                          ? 'No external requests currently require approval.'
+                          : 'No requests found in this monitoring status.'
+                      }
+                    />
+                  </td>
+                </tr>
+              ) : (
+                filteredRequests.map((row) => {
+                  const urgencyKey = row.urgency?.key || 'medium'
+                  const statusKey = row.validation?.key || 'needs_validation'
+                  const isCompleted = statusKey === 'fulfilled'
 
-                    return (
-                      <tr key={row.request_id}>
-                        {/* Request ID & Timestamp */}
-                        <td>
-                          <span className="workflow-id-badge">{row.request_id}</span>
-                          <div className="workflow-sub-meta">
-                            <Clock size={10} />
-                            <span>{row.created_at || 'Recently submitted'}</span>
+                  return (
+                    <tr key={row.request_id}>
+                      {/* Request ID & Timestamp */}
+                      <td>
+                        <strong style={{ color: 'var(--color-text-1)' }}>#{row.request_id}</strong>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-3)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                          <Clock size={10} />
+                          <span>{row.created_at || 'Recently submitted'}</span>
+                        </div>
+                      </td>
+
+                      {/* Origin & Requester */}
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--color-text-2)', fontSize: '12.5px' }}>
+                          {row.request_source?.label || 'EvaTrack'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-3)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                          <User size={10} />
+                          <span>{row.requested_by || 'Disaster Staff'}</span>
+                        </div>
+                      </td>
+
+                      {/* Resource Need */}
+                      <td>
+                        <div style={{ fontWeight: 650, color: 'var(--color-text-1)', fontSize: '13px' }}>
+                          {row.need?.item_name || row.need?.type || 'Supplies'}
+                        </div>
+                        {row.need?.type && row.need?.item_name && (
+                          <div style={{ fontSize: '11px', color: 'var(--color-text-3)' }}>
+                            {row.need.type}
                           </div>
-                        </td>
+                        )}
+                      </td>
 
-                        {/* Origin Source & Requester */}
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                            <span
-                              className={`channel-chip ${
-                                srcKey === 'evatrack' || srcKey === 'shared_db'
-                                  ? 'evatrack'
-                                  : srcKey === 'hq_desk'
-                                  ? 'hq'
-                                  : 'field'
-                              }`}
-                            >
-                              {srcKey === 'evatrack' || srcKey === 'shared_db' ? (
-                                <Smartphone size={10} />
-                              ) : srcKey === 'hq_desk' ? (
-                                <Building2 size={10} />
-                              ) : (
-                                <Radio size={10} />
-                              )}
-                              <span>{row.request_source?.label || 'EvaTrack'}</span>
+                      {/* Quantity */}
+                      <td>
+                        <span style={{ fontWeight: 700, color: 'var(--color-text-1)', fontSize: '13px' }}>
+                          {row.need?.quantity_text || `${row.need?.quantity || 1} units`}
+                        </span>
+                      </td>
+
+                      {/* Evacuation Area */}
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--color-text-2)', fontSize: '12.5px' }}>
+                          {row.area?.label || 'General Relief Hub'}
+                        </div>
+                        {row.area?.meta && (
+                          <div style={{ fontSize: '11px', color: 'var(--color-text-3)', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                            <MapPin size={10} style={{ flexShrink: 0 }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
+                              {row.area.meta}
                             </span>
-                            <div className="workflow-sub-meta">
-                              <User size={10} />
-                              <span>{row.requested_by || 'Disaster Staff'}</span>
-                            </div>
                           </div>
-                        </td>
+                        )}
+                      </td>
 
-                        {/* Resource Item Name */}
-                        <td>
-                          <div className="workflow-item-title">
-                            {row.need?.item_name || row.need?.type || 'Resource Request'}
-                          </div>
-                          {row.need?.item_name && row.need?.type && (
-                            <span style={{ fontSize: '11px', color: '#64748b' }}>
-                              {row.need.type}
-                            </span>
-                          )}
-                        </td>
+                      {/* Priority */}
+                      <td>
+                        <span className={`urgency-tag urgency-${urgencyKey}`}>
+                          {row.urgency?.label || 'Medium'}
+                        </span>
+                      </td>
 
-                        {/* Quantity Pill */}
-                        <td>
-                          <span className="workflow-qty-pill">
-                            {row.need?.quantity_text || `${row.need?.quantity || 1} units`}
-                          </span>
-                        </td>
+                      {/* Status */}
+                      <td>
+                        <Badge tone={row.validation?.tone || 'gray'}>
+                          {row.validation?.label || row.status?.label || 'Pending'}
+                        </Badge>
+                      </td>
 
-                        {/* Destination Evacuation Center */}
+                      {/* Tracking Reference (Monitoring only) */}
+                      {!external && (
                         <td>
                           <div
-                            className="workflow-center-name"
-                            style={{ cursor: 'pointer' }}
+                            style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-2)', cursor: 'pointer' }}
                             onClick={() => setInspectingRequest(row)}
-                            title="Click to track destination and handoff"
-                          >
-                            {row.area?.label || 'General Relief Hub'}
-                          </div>
-                          {row.area?.meta && (
-                            <div className="workflow-center-sub">
-                              <MapPin size={10} style={{ flexShrink: 0 }} />
-                              <span>
-                                {row.area.meta.length > 40
-                                  ? `${row.area.meta.slice(0, 38)}...`
-                                  : row.area.meta}
-                              </span>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Urgency Badge */}
-                        <td>
-                          <span className={`urgency-tag urgency-${urgencyKey}`}>
-                            {urgencyKey === 'critical' ? (
-                              <Flame size={11} />
-                            ) : urgencyKey === 'high' ? (
-                              <AlertCircle size={11} />
-                            ) : urgencyKey === 'low' ? (
-                              <ShieldCheck size={11} />
-                            ) : (
-                              <Clock size={11} />
-                            )}
-                            <span>{row.urgency?.label || 'Medium'}</span>
-                          </span>
-                        </td>
-
-                        {/* Status Badge */}
-                        <td>
-                          <span
-                            className={`wf-status-badge ${
-                              isPending
-                                ? 'wf-status-pending'
-                                : isVerified
-                                ? 'wf-status-approved'
-                                : isForwarded
-                                ? 'wf-status-forwarded'
-                                : 'wf-status-fulfilled'
-                            }`}
-                          >
-                            <span className={`wf-status-dot ${isPending ? 'pulse' : ''}`} />
-                            <span>
-                              {isPending
-                                ? 'Pending Approval'
-                                : isVerified
-                                ? 'Approved'
-                                : isForwarded
-                                ? 'In Progress'
-                                : isCompleted
-                                ? 'Fulfilled'
-                                : row.status?.label || 'Pending'}
-                            </span>
-                          </span>
-                        </td>
-
-                        {/* Tracking / Handoff */}
-                        <td>
-                          <div
-                            style={{ fontSize: '11.5px', fontWeight: 650, color: '#334155', cursor: 'pointer' }}
-                            onClick={() => setInspectingRequest(row)}
-                            title="Click to inspect live tracking and handoff status"
+                            title="Inspect live tracking"
                           >
                             {row.handoff?.label || 'Awaiting handoff'}
                           </div>
                           {row.handoff?.tracking_reference && (
-                            <div className="wf-tracking-sub">
+                            <div style={{ fontSize: '10.5px', color: '#0284c7', fontFamily: 'monospace' }}>
                               Ref: {row.handoff.tracking_reference}
                             </div>
                           )}
                         </td>
+                      )}
 
-                        {/* Action Buttons */}
-                        <td style={{ textAlign: 'right' }}>
-                          <div className="workflow-action-cell" style={{ justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              className="btn-wf-action btn-wf-track"
-                              onClick={() => setInspectingRequest(row)}
-                              title="Track destination and TrackingAid handoff status"
-                            >
-                              <Truck size={12} />
-                              <span>Track Handoff</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-wf-action btn-wf-view"
-                              onClick={() => open(row, 'view')}
-                              title="View request details"
-                            >
-                              <Eye size={12} />
-                              <span>View Request</span>
-                            </button>
-                            {external && (
+                      {/* Actions */}
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                          {external ? (
+                            <>
                               <button
                                 type="button"
-                                className="btn-wf-action btn-wf-edit"
-                                onClick={() => open(row, 'validate')}
-                                title="Review and approve request"
+                                className="button secondary"
+                                style={{ padding: '5px 10px', fontSize: '11.5px' }}
+                                onClick={() => setInspectingRequest(row)}
+                                title="View Request"
+                              >
+                                <Eye size={12} />
+                                <span>View Request</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="button review"
+                                style={{ padding: '5px 12px', fontSize: '11.5px' }}
+                                onClick={() => handleApproveRequest(row)}
+                                disabled={isProcessing}
+                                title="Approve Request"
                               >
                                 <CheckCircle2 size={12} />
-                                <span>Approve request</span>
+                                <span>Approve Request</span>
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                              <button
+                                type="button"
+                                className="button secondary danger-text"
+                                style={{ padding: '5px 8px', fontSize: '11px' }}
+                                onClick={() => open(row, 'return')}
+                                title="Return Request"
+                              >
+                                Return
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="button secondary"
+                                style={{ padding: '5px 10px', fontSize: '11.5px' }}
+                                onClick={() => setInspectingRequest(row)}
+                                title="Status Tracking of Requests"
+                              >
+                                <Truck size={12} />
+                                <span>Track Live</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="button secondary"
+                                style={{ padding: '5px 10px', fontSize: '11.5px' }}
+                                onClick={() => setInspectingRequest(row)}
+                                title="View Request"
+                              >
+                                <Eye size={12} />
+                                <span>View Request</span>
+                              </button>
+                              {isCompleted && (
+                                <button
+                                  type="button"
+                                  className="button secondary"
+                                  style={{ padding: '5px 9px', fontSize: '11px' }}
+                                  onClick={() => open(row, 'return')}
+                                  title="Return Assets"
+                                >
+                                  <RotateCw size={11} />
+                                  <span>Return Assets</span>
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-          {/* Pagination */}
-          <div style={{ padding: '8px 18px', borderTop: '1px solid #f1f5f9' }}>
-            <PaginationBar meta={data?.requests || {}} onPageChange={setPage} label="requests" />
-          </div>
-        </section>
+        <div style={{ padding: '8px 14px', borderTop: '1px solid var(--color-border)' }}>
+          <PaginationBar meta={data?.requests || {}} onPageChange={setPage} label="requests" />
+        </div>
+      </section>
 
-        {/* TrackingAid Mirror for Monitoring */}
-        {!external && <TrackingAidMirror items={data?.tracking_mirror || []} />}
+      {/* TrackingAid Mirror for Monitoring */}
+      {!external && <TrackingAidMirror items={data?.tracking_mirror || []} />}
 
-        {/* Live Tracking & Handoff Inspection Drawer (Option 1) */}
-        <ResourceRequestDetailDrawer
-          request={inspectingRequest}
-          isOpen={Boolean(inspectingRequest)}
-          onClose={() => setInspectingRequest(null)}
-          onValidateAndForward={handleValidateAndForwardFromDrawer}
-          onReturn={handleReturnFromDrawer}
-          onEdit={(req) => open(req, 'edit')}
-          isProcessing={isProcessing}
-        />
-      </div>
+      {/* Live Tracking & Handoff Inspection Drawer */}
+      <ResourceRequestDetailDrawer
+        request={inspectingRequest}
+        isOpen={Boolean(inspectingRequest)}
+        onClose={() => setInspectingRequest(null)}
+        onValidateAndForward={handleValidateAndForwardFromDrawer}
+        onReturn={handleReturnFromDrawer}
+        onEdit={(req) => open(req, 'edit')}
+        isProcessing={isProcessing}
+      />
     </main>
   )
 }

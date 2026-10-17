@@ -1,18 +1,11 @@
 import {
   Activity,
-  AlertCircle,
   ArrowRight,
   Boxes,
-  Calendar,
-  CheckCircle2,
-  Eye,
   LifeBuoy,
-  MapPin,
   Package,
   ShieldAlert,
   Sparkles,
-  Tag,
-  XCircle,
 } from 'lucide-react'
 
 // Helper to pick category visual styles & icons
@@ -60,15 +53,14 @@ export default function RequestTypeCard({
   onRequestNow,
 }) {
   const isOutOfStock = Boolean(item.is_out_of_stock || item.quantity <= 0)
+  const isLowStock = !isOutOfStock && Number(item.quantity) <= 20
   const isNew = Boolean(item.is_new)
   const categoryMeta = getCategoryMeta(item.category_key || item.category)
   const CategoryIcon = categoryMeta.icon
 
   return (
     <article
-      className={`req-type-card ${isFirst && isNew ? 'is-first-priority' : ''} ${
-        isOutOfStock ? 'is-out-of-stock' : 'is-in-stock'
-      }`}
+      className={`human-catalog-card ${isOutOfStock ? 'is-out-of-stock' : 'is-in-stock'}`}
       onClick={() => onSelect?.(item)}
       role="button"
       tabIndex={0}
@@ -78,106 +70,111 @@ export default function RequestTypeCard({
           onSelect?.(item)
         }
       }}
-      aria-label={`${item.name} - ${isOutOfStock ? 'Out of stock' : 'Available'}`}
+      aria-label={`${item.name || item.label} - ${isOutOfStock ? 'Out of stock' : `${item.quantity} available in stock`}`}
     >
-      {/* 1st Card Priority Strip (Only for newly declared item) */}
-      {isFirst && isNew && (
-        <div className="card-priority-strip" title="Prioritized 1st Card: Newly declared catalog item">
-          <Sparkles size={12} className="sparkle-icon" />
-          <span>Priority 1st Card • Newly Declared</span>
-        </div>
-      )}
-
-      {/* Top Meta Row: Category Badge & SKU */}
-      <div className="card-top-row">
-        <div className={`card-cat-pill ${categoryMeta.pillClass}`}>
-          <CategoryIcon size={12} className="cat-icon" />
-          <span>{item.category_label || categoryMeta.label}</span>
+      {/* Header Bar: Category Avatar & Live Stock Tag */}
+      <div className="card-header-bar">
+        <div className="card-identity-group">
+          <div className={`card-category-avatar ${categoryMeta.pillClass}`}>
+            <CategoryIcon size={18} />
+          </div>
+          <div className="card-category-text">
+            <span className="card-category-name">{item.category_label || categoryMeta.label}</span>
+            {item.sku && <span className="card-sku-text" title={`SKU: ${item.sku}`}>{item.sku}</span>}
+          </div>
         </div>
 
-        {item.sku && (
-          <code className="card-sku-tag" title={`SKU: ${item.sku}`}>
-            {item.sku}
-          </code>
-        )}
+        <div className="card-status-wrapper">
+          {isOutOfStock ? (
+            <span className="human-stock-pill pill-out">
+              <span className="stock-dot" />
+              <span>Out of stock</span>
+            </span>
+          ) : isLowStock ? (
+            <span className="human-stock-pill pill-low">
+              <span className="stock-dot" />
+              <span>Low stock ({item.quantity})</span>
+            </span>
+          ) : (
+            <span className="human-stock-pill pill-in">
+              <span className="stock-dot" />
+              <span>In stock</span>
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Title & Classification */}
-      <div className="card-title-block">
-        <h3 className="card-item-title" title={item.name || item.label}>
+      {/* Main Content: Title & Natural Human Metadata */}
+      <div className="card-main-content">
+        <h3 className="human-card-title" title={item.name || item.label}>
           {item.name || item.label}
         </h3>
-        <div className="card-type-sub">
+
+        {/* Clean, comma/dot separated metadata without pill fatigue */}
+        <div className="human-meta-line">
+          <span>{item.storage_location || 'Warehouse Depot'}</span>
+          <span className="meta-bullet">·</span>
           <span>{item.type || 'Consumable'}</span>
           {item.expiration_date && (
             <>
-              <span className="dot-sep">•</span>
-              <span className="exp-note">Exp: {item.expiration_date}</span>
+              <span className="meta-bullet">·</span>
+              <span className="meta-exp">Exp: {item.expiration_date}</span>
             </>
           )}
         </div>
       </div>
 
-      {/* Stock Availability Badge ("pwede out of stock diri") */}
-      <div className="card-stock-section">
-        {isOutOfStock ? (
-          <div className="stock-pill stock-pill-out" title="Currently out of stock in warehouse depot">
-            <span className="stock-dot dot-out" />
-            <span className="stock-label">Out of Stock</span>
-            <span className="stock-count">0 {item.unit || 'units'}</span>
-          </div>
-        ) : (
-          <div className="stock-pill stock-pill-in" title="In stock and available for dispatch">
-            <span className="stock-dot dot-in" />
-            <span className="stock-label">Available</span>
-            <span className="stock-count">
-              {Number(item.quantity).toLocaleString()} {item.unit || 'units'}
-            </span>
-          </div>
+      {/* Natural Inventory Availability (No inner bordered box!) */}
+      <div className="human-inventory-row">
+        <div className="human-inventory-count">
+          <span className="count-number">
+            {isOutOfStock ? 0 : Number(item.quantity).toLocaleString()}
+          </span>
+          <span className="count-unit">
+            {item.unit || 'units'} available
+          </span>
+        </div>
+
+        {isNew && (
+          <span className="human-new-badge" title="Newly registered catalog item">
+            <Sparkles size={11} /> New
+          </span>
         )}
       </div>
 
-      {/* Depot Location info */}
-      <div className="card-location-row">
-        <MapPin size={12} className="location-icon" />
-        <span className="location-text">{item.storage_location || 'Warehouse Depot'}</span>
-      </div>
-
-      {/* Standardized Card Actions Footer */}
-      <div className="card-footer">
+      {/* Card Actions Footer */}
+      <div className="human-card-footer">
         <button
           type="button"
-          className="btn-card-specs"
+          className="btn-human-specs"
           onClick={(e) => {
             e.stopPropagation()
             onSelect?.(item)
           }}
-          title="View detailed resource specifications"
+          title="View resource specifications"
         >
-          <Eye size={13} />
-          <span>View Specs</span>
+          View Specs
         </button>
 
         {isOutOfStock ? (
           <button
             type="button"
-            className="btn-card-disabled"
+            className="btn-human-disabled"
             disabled
-            title="Resource is currently out of stock"
           >
             Out of Stock
           </button>
         ) : (
           <button
             type="button"
-            className="btn-card-request"
+            className="btn-human-request"
             onClick={(e) => {
               e.stopPropagation()
               onRequestNow?.(item)
             }}
             title="Create a resource request for this item"
           >
-            <span>Request Item</span>
+            <span>Request</span>
             <ArrowRight size={13} />
           </button>
         )}

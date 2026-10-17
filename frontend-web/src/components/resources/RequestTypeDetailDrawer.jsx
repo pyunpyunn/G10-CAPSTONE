@@ -164,10 +164,10 @@ export default function RequestTypeDetailDrawer({
         </div>
 
         {/* Footer */}
-        <div className="rr-drawer-footer rtd-drawer-footer">
+        <div className="rr-drawer-footer rtd-drawer-footer" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             type="button"
-            className="btn btn-secondary"
+            className="button secondary"
             onClick={onClose}
           >
             Close
@@ -175,7 +175,7 @@ export default function RequestTypeDetailDrawer({
 
           <button
             type="button"
-            className={`btn btn-primary btn-request-action ${isOutOfStock ? 'btn-disabled' : ''}`}
+            className={`button review ${isOutOfStock ? 'disabled' : ''}`}
             disabled={isOutOfStock}
             onClick={() => {
               if (!isOutOfStock) {
@@ -183,8 +183,10 @@ export default function RequestTypeDetailDrawer({
                 onRequestNow?.(item)
               }
             }}
+            style={{ marginLeft: 'auto' }}
           >
-            {isOutOfStock ? 'Item Out of Stock' : 'Request This Resource'} {!isOutOfStock && <ArrowRight size={16} />}
+            <span>{isOutOfStock ? 'Item Out of Stock' : 'Request This Resource'}</span>
+            {!isOutOfStock && <ArrowRight size={14} />}
           </button>
         </div>
       </div>
