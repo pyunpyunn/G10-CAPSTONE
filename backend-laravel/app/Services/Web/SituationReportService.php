@@ -58,6 +58,7 @@ class SituationReportService
             'prepared_by' => ['nullable', 'string', 'max:150'], 'reviewed_by' => ['nullable', 'string', 'max:150'],
             'actions_text' => ['nullable', 'string'], 'included_sections' => ['nullable', 'array'],
             'included_sections.*' => ['string', 'in:I,II,III,IV,V,VI,VII,VIII'],
+            'sitio_id' => ['nullable', 'string', 'max:120'], 'purok_id' => ['nullable', 'string', 'max:120'], 'include_households' => ['sometimes', 'boolean'],
             'report_status' => ['nullable', 'string', 'in:draft,generated,reviewed,archived'],
         ], ['event_id.required' => 'Select a disaster event before generating a SitRep.', 'period_end.after_or_equal' => 'Period end must be after the period start.']);
         return $this->workflow->store($request, $validated);

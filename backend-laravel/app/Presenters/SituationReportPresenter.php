@@ -101,6 +101,7 @@ class SituationReportPresenter
             'safe_percent' => $this->percent($safeTotal, $total), 'evacuated_percent' => $this->percent($evacuated, $total),
             'unsafe_percent' => $this->percent($unsafe, $total), 'unchecked_percent' => $this->percent($unchecked, $total),
             'affected' => $unsafe + $evacuated,
+            'details' => $sources['household_details'] ?? [],
             'puroks' => $purokRows,
             'sitios' => collect($purokRows)->groupBy(fn ($row) => $row['sitio_id'] ?? $row['sitio'])->map(function ($rows): array {
                 $result = ['sitio' => $rows->first()['sitio']];

@@ -87,6 +87,7 @@
     .keep { page-break-inside: avoid; }
     .population { page-break-inside: auto; }
     .population .data td, .population .data th { font-size: 7pt; padding: 5px 3px; }
+.household-details td,.household-details th{font-size:7pt;padding:5px 3px;overflow-wrap:break-word}
 </style>
 </head>
 <body>
@@ -180,6 +181,7 @@
 </table>
 </div>
 
+@include('reports.partials.household-details', ['householdSection' => 'II'])
 @endif
 
 {{-- ============ III ============ --}}
@@ -194,6 +196,7 @@
 ]])
 </div>
 
+@include('reports.partials.household-details', ['householdSection' => 'III'])
 @endif
 
 {{-- ============ V ============ --}}
@@ -251,6 +254,7 @@
 ]])
 </div>
 
+@include('reports.partials.household-details', ['householdSection' => 'VI'])
 @endif
 
 {{-- ============ VII ============ --}}

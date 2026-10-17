@@ -34,6 +34,7 @@ class SituationReportSpreadsheet
             $this->pair('Date finished', $r['finished_at'], 'Period end', $r['period_end'], 10, 10),
             $this->pair('Prepared by', $r['prepared_by'], 'Reviewed by', $r['reviewed_by']),
             $this->pair('Area coverage', $r['coverage'], 'Alert level', $r['alert_level']),
+            $this->pair('Household list scope', $r['household_scope'], 'Include household lists', $r['include_households'] ? 'Yes' : 'No'),
         ];
         if ($r['scope_note']) {
             $rows[] = ['kind' => 'text', 'value' => $r['scope_note']];
