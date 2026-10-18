@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Presenters\ProfilePresenter;
 use Tests\TestCase;
 
@@ -9,19 +10,18 @@ class ProfilePresenterTest extends TestCase
 {
     public function test_profile_identity_and_permission_contract_is_preserved(): void
     {
-        $user = new class {
-            public string $username = 'admin.one'; public string $user_id = 'USR-1';
-            public string $first_name = 'Admin'; public string $last_name = 'One'; public string $name = 'Admin One';
-            public ?string $email = null; public ?string $contact_number = null; public bool $is_active = true;
-            public ?string $assigned_center_id = null;
-            public function roleName(): string { return 'Administrator'; }
-            public function roleKey(): string { return 'admin'; }
-        };
+        $user = new User([
+            'username' => 'personnel.one', 'user_id' => 'USR-1', 'first_name' => 'Personnel',
+            'last_name' => 'One', 'name' => 'Personnel One', 'is_active' => true, 'role' => 'hq_personnel',
+        ]);
         $presenter = app(ProfilePresenter::class);
-        $this->assertSame('admin.one', $presenter->identity($user)['account_id']);
+        $this->assertSame('personnel.one', $presenter->identity($user)['account_id']);
         $this->assertSame('No email recorded', $presenter->identity($user)['email']);
-        $this->assertSame('Enabled', $presenter->permissions('admin')[0]['status']);
-        $this->assertSame('Limited', $presenter->permissions('rescuer')[0]['status']);
+        $permissions = collect($presenter->permissions($user))->keyBy('key');
+        $this->assertSame('Enabled', $permissions['dashboard']['status']);
+        $this->assertSame('Enabled', $permissions['profile']['status']);
+        $this->assertSame('Enabled', $permissions['notifications']['status']);
+        $this->assertSame('Not granted', $permissions['resource_request_approval']['status']);
     }
 
     public function test_activity_projection_keeps_labels_and_recent_date_display(): void

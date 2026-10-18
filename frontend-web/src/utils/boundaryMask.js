@@ -7,6 +7,7 @@ const WORLD_RING = [
 ]
 
 export function outsideBoundaryMask(boundary) {
+  boundary = boundary?.type === 'Feature' ? boundary.geometry : boundary
   const polygons = boundary?.type === 'Polygon'
     ? [boundary.coordinates]
     : boundary?.type === 'MultiPolygon' ? boundary.coordinates : []

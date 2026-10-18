@@ -4,6 +4,7 @@ import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import { connectRealtimeNotifications } from '../../api/realtimeNotifications'
 import { topicsForPath } from '../../utils/realtimeTopics'
+import { hasAdminWebAccess } from '../../utils/personnelAccess'
 
 export default function AppShell({ user, pages, onLogout, onUserChange }) {
   const [isPinned, setIsPinned] = useState(false)
@@ -16,9 +17,15 @@ export default function AppShell({ user, pages, onLogout, onUserChange }) {
   const userId = user?.user_id || user?.id
   const location = useLocation()
   const topicKey = topicsForPath(location.pathname, user?.role?.role_key === 'super_admin').join(',')
-  useEffect(() => connectRealtimeNotifications(userId, topicKey.split(',')), [userId, topicKey])
+  const adminAccess = hasAdminWebAccess(user)
+  const notificationsAccess = user?.permissions?.web_modules?.includes('notifications') === true
+  useEffect(() => connectRealtimeNotifications(userId, topicKey.split(','), { adminAccess, notificationsAccess }), [userId, topicKey, adminAccess, notificationsAccess])
   const shellClass = [
     'app-shell',
+    ['/situation', '/archive'].includes(location.pathname) ? 'hide-page-scrollbar' : '',
+    location.pathname.startsWith('/situation') ? 'situation-shell' : '',
+    ['/mapping', '/weather'].includes(location.pathname) ? 'monitoring-shell' : '',
+    location.pathname === '/households' || location.pathname.startsWith('/households/') ? 'household-shell' : '',
     isPinned ? 'left-pinned' : 'left-hidden',
     isPeeking && !isPinned ? 'left-peeking' : '',
     isScrolled && !isTopbarHovered && !isTopEdgeHovered ? 'topbar-hidden' : '',

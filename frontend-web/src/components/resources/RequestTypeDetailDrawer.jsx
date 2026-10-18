@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import {
-  Activity,
-  AlertTriangle,
   ArrowRight,
   Boxes,
   Calendar,
@@ -9,11 +7,8 @@ import {
   CheckCircle2,
   Copy,
   Database,
-  ExternalLink,
-  LifeBuoy,
   MapPin,
   Package,
-  ShieldAlert,
   Sparkles,
   Tag,
   X,

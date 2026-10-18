@@ -13,7 +13,7 @@ class SelectDispatchResponders
     public function __construct(private DispatchDestinationQuery $destinations) {}
     private const ACTIVE = ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'];
 
-    public function select(int $teamId, string $eventId, int $requested, ?string $householdId, ?object $destination = null): array
+    public function select(int $teamId, string $eventId, int $requested, ?string $householdId, ?object $destination = null, ?array $requestedIds = null): array
     {
         $candidates = Responder::query()
             ->where('team_id', $teamId)
@@ -30,6 +30,17 @@ class SelectDispatchResponders
 
         if ($candidates->isEmpty()) {
             throw ValidationException::withMessages(['responder_count' => ['No available rescuer remains in this team.']]);
+        }
+
+        if ($requestedIds !== null) {
+            $ids = array_map('intval', $requestedIds);
+            $available = $candidates->keyBy('responder_id');
+            if (count($ids) !== $requested || count(array_unique($ids)) !== count($ids)
+                || count(array_intersect($ids, $available->keys()->all())) !== count($ids)) {
+                throw ValidationException::withMessages(['selected_responder_ids' => ['Select distinct available rescuers from the deployed team. Availability may have changed; refresh and try again.']]);
+            }
+            return ['ids'=>$ids, 'names'=>array_map(fn ($id) => $available[$id]->full_name, $ids),
+                'available_count'=>$candidates->count(),'requested_count'=>$requested,'assigned_count'=>count($ids)];
         }
 
         $destination ??= $householdId ? $this->destinations->forHousehold($householdId, $eventId) : null;

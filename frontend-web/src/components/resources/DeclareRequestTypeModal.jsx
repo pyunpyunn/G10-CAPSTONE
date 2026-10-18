@@ -1,15 +1,9 @@
 import { useState } from 'react'
 import {
-  Boxes,
-  Calendar,
-  CheckCircle2,
   Database,
   Loader2,
-  MapPin,
-  Package,
   Plus,
   Sparkles,
-  Tag,
   X,
 } from 'lucide-react'
 import { createResourceRequestType } from '../../api/resourceRequestApi'

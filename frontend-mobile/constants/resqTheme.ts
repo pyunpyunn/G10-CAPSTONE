@@ -15,6 +15,7 @@ export const palette = {
   safe: '#3a7d57',
   evacuated: '#2a5a90',
   unsafe: '#962020',
+  unchecked: '#6a7f94',
   warning: '#8f5c18',
   dispatch: '#240e6a',
 };

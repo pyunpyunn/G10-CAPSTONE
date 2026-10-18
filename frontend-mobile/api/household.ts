@@ -1,6 +1,4 @@
 import { api } from './client';
-import { submitReport } from './reportSubmission';
-import { cachedMobileRead, invalidateMobileReads } from '@/utils/mobileReadCache';
 
 export type HouseholdOverview = {
   profile: {
@@ -25,27 +23,18 @@ export type HouseholdOverview = {
     pin_configured: boolean;
     households: any[];
     incoming_requests: any[];
+    notifications?: any[];
   };
   qr: any;
 };
 
-export async function getHouseholdOverview(refresh = false) {
-  return cachedMobileRead('household/overview', async () => {
-    const response = await api.get<{ data: HouseholdOverview }>('/household/overview');
-    return response.data.data;
-  }, refresh);
+export async function getHouseholdOverview() {
+  const response = await api.get<{ data: HouseholdOverview }>('/household/overview');
+  return response.data.data;
 }
 
 export async function completeHouseholdSetup(payload: any) {
   const response = await api.post('/household/setup', payload);
-  return response.data;
-}
-
-export async function saveHouseholdGeotag(payload: {
-  latitude: number; longitude: number; accuracy_m?: number | null; address_label: string;
-}) {
-  const response = await api.put('/household/geotag', payload);
-  invalidateMobileReads();
   return response.data;
 }
 
@@ -60,17 +49,17 @@ export async function updateHouseholdMember(memberId: string, payload: any) {
 }
 
 export async function saveHouseholdMemberStatus(memberId: string, payload: any) {
-  const response = await submitReport('post', `/household/members/${memberId}/status`, payload);
+  const response = await api.post(`/household/members/${memberId}/status`, payload);
   return response.data.data;
 }
 
 export async function saveTrustedHouseholdMemberStatus(connectionId: string, memberId: string, payload: any) {
-  const response = await submitReport('post', `/household/trusted-households/${connectionId}/members/${memberId}/status`, payload);
+  const response = await api.post(`/household/trusted-households/${connectionId}/members/${memberId}/status`, payload);
   return response.data.data;
 }
 
 export async function saveHouseholdStatus(payload: any) {
-  const response = await submitReport('post', '/household/status', payload);
+  const response = await api.post('/household/status', payload);
   return response.data;
 }
 
@@ -99,7 +88,12 @@ export async function createTrustedHousehold(payload: any) {
   return response.data;
 }
 
-export async function respondToTrustedHouseholdRequest(connectionId: string, decision: 'accept' | 'reject') {
+export async function deleteTrustedHousehold(connectionId: string) {
+  const response = await api.delete(`/household/trusted-households/${connectionId}`);
+  return response.data;
+}
+
+export async function respondToTrustedHousehold(connectionId: string, decision: 'accept' | 'reject') {
   const response = await api.patch(`/household/trusted-households/${connectionId}`, { decision });
   return response.data;
 }

@@ -1,3 +1,4 @@
+import { statusColor } from '@/constants/statusPalette';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -105,10 +106,10 @@ export function FieldReportScreen({ reports, statusOptions, onSubmitReport }: Fi
           {options.map((status) => (
             <Pressable
               key={status.key}
-              style={[styles.statusChip, statusKey === status.key && styles.statusChipActive]}
+              style={[styles.statusChip, { borderColor: statusColor(status.key) }, statusKey === status.key && { backgroundColor: statusColor(status.key) }]}
               onPress={() => setStatusKey(status.key)}
             >
-              <Text style={[styles.statusChipText, statusKey === status.key && styles.statusChipTextActive]}>
+              <Text style={[styles.statusChipText, { color: statusColor(status.key) }, statusKey === status.key && styles.statusChipTextActive]}>
                 {status.label}
               </Text>
             </Pressable>

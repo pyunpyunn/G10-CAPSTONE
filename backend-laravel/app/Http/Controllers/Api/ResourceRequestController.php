@@ -309,6 +309,38 @@ class ResourceRequestController extends Controller
         return $this->service->storeExternal($request);
     }
 
+    public function externalHandshake(Request $request): JsonResponse
+    {
+        $error = app(\App\Services\Shared\ExternalRequestIntakeAuthorization::class)->error($request);
+        if ($error) {
+            return $error;
+        }
+
+        try {
+            foreach (['resource_requests', 'resource_request_status', 'urgency_levels', 'request_validations', 'audit_logs'] as $table) {
+                if (! \Illuminate\Support\Facades\Schema::hasTable($table)) {
+                    return response()->json(['message' => 'External request storage is not ready.'], 503);
+                }
+            }
+        } catch (\Throwable $error) {
+            report($error);
+            return response()->json(['message' => 'External request storage is unavailable.'], 503);
+        }
+
+        return response()->json([
+            'message' => 'External request handshake successful.',
+            'data' => [
+                'authenticated' => true,
+                'request_storage_ready' => true,
+                'api_version' => 'v1',
+                'intake_endpoint' => '/api/v1/external/resource-requests',
+                'intake_method' => 'POST',
+                'authentication' => 'integration_key_on_every_request',
+                'server_time' => now()->toIso8601String(),
+            ],
+        ])->header('Cache-Control', 'no-store');
+    }
+
     public function validateResource(Request $request, string $requestId): JsonResponse
     {
         return $this->service->validateResource($request, $requestId);

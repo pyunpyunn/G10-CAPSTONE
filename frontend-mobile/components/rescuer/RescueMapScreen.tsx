@@ -1,3 +1,4 @@
+import { statusColor } from '@/constants/statusPalette';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -190,7 +191,7 @@ export function RescueMapScreen({ assignments, activeAssignment, onSendLocation 
               }}
               title={assignment.assigned_area || assignment.household_id || 'Assignment'}
               description={assignment.destination_label || assignment.status_label}
-              pinColor={assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated}
+              pinColor={statusColor(assignment.status_key)}
             />
           ))}
 

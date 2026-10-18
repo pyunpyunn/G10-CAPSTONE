@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\WeatherWorkspaceResource;
 use App\Services\Shared\WeatherService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
+use UnexpectedValueException;
 
 class WeatherController extends Controller
 {
@@ -30,22 +32,32 @@ class WeatherController extends Controller
         return (new WeatherWorkspaceResource($this->service->index($eventId)))->response();
     }
 
-    public function refreshWorkspace(Request $request): JsonResponse
+    public function refreshWorkspace(): JsonResponse
     {
-        return (new WeatherWorkspaceResource($this->service->refreshWorkspace()))->additional([
-            'message' => 'Weather refresh queued. The latest snapshot will appear when processing finishes.',
-        ])->response()->setStatusCode(202);
+        return $this->refreshResponse(fn () => $this->service->refreshWorkspace());
     }
 
-    public function refreshEvent(Request $request, string $eventId): JsonResponse
+    public function refreshEvent(string $eventId): JsonResponse
     {
         if (! $this->service->eventExists($eventId)) {
             return response()->json(['message' => 'Disaster event record was not found.'], 404);
         }
-        return (new WeatherWorkspaceResource($this->service->refreshEvent($eventId)))->additional([
-            'message' => 'Weather refresh queued. The latest snapshot will appear when processing finishes.',
-        ])->response()->setStatusCode(202);
+        return $this->refreshResponse(fn () => $this->service->refreshEvent($eventId));
+    }
+
+    private function refreshResponse(callable $refresh): JsonResponse
+    {
+        try {
+            $result = $refresh();
+        } catch (ConnectionException|RequestException|UnexpectedValueException $exception) {
+            report($exception);
+            return response()->json([
+                'message' => 'Weather provider unavailable. The latest saved snapshot is still available. Please try again.',
+            ], 503);
+        }
+
+        return (new WeatherWorkspaceResource($result['data']))->additional([
+            'message' => $result['message'],
+        ])->response()->setStatusCode($result['status']);
     }
 }
-
-

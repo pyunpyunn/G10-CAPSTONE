@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import ResQperationLogo from './ResQperationLogo'
 import {
   Archive,
@@ -24,7 +24,7 @@ const navGroups = [
   { title: 'Response Operations', paths: ['/dispatch', '/rescue-management', '/field-reports'] },
   { title: 'Personnel Access Control', paths: ['/rescuers', '/rescuers/teams'] },
   { title: 'Resources & Requests', paths: ['/request-types', '/external-requests', '/resources-requests'] },
-  { title: 'Reports Documentation', paths: ['/situation', '/archive'] },
+  { title: 'Reports Documentation', paths: ['/situation', '/situation/external-reports', '/archive'] },
 ]
 
 const icons = {
@@ -43,21 +43,22 @@ const icons = {
   '/rescuers': ShieldUser,
   '/resources-requests': PackageCheck,
   '/situation': FileCheck2,
+  '/situation/external-reports': FileCheck2,
   '/archive': Database,
 }
 
 export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onPeekEnd, onLogout }) {
   const location = useLocation()
   const activeGroup = getActiveGroup(location.pathname, pages)
-  const [openGroups, setOpenGroups] = useState(() => new Set([activeGroup]))
-
-  useEffect(() => {
-    setOpenGroups((groups) => new Set(groups).add(activeGroup))
-  }, [activeGroup])
+  const [navigation, setNavigation] = useState(() => ({ activeGroup, openGroups: new Set([activeGroup]) }))
+  const openGroups = navigation.openGroups
+  if (navigation.activeGroup !== activeGroup) {
+    setNavigation({ activeGroup, openGroups: new Set(openGroups).add(activeGroup) })
+  }
 
   function toggleGroup(title) {
-    setOpenGroups((groups) => {
-      const nextGroups = new Set(groups)
+    setNavigation((current) => {
+      const nextGroups = new Set(current.openGroups)
 
       if (nextGroups.has(title)) {
         nextGroups.delete(title)
@@ -65,7 +66,7 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
         nextGroups.add(title)
       }
 
-      return nextGroups
+      return { ...current, openGroups: nextGroups }
     })
   }
 
@@ -100,15 +101,15 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
       </div>
 
       <nav className="left-nav">
-        <NavLink
+        {pages.some(page => page.path === '/dashboard') && <NavLink
           to="/dashboard"
           end
           className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
         >
           <LayoutDashboard size={17} />
           <span>Dashboard</span>
-        </NavLink>
-        {navGroups.map((group) => (
+        </NavLink>}
+        {navGroups.filter(group => group.paths.some(path => pages.some(page => page.path === path && !page.navHidden))).map((group) => (
           <NavGroup
             key={group.title}
             title={group.title}

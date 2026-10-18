@@ -11,6 +11,7 @@ class EnsureUserHasRole
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $user = $request->user();
+        if ($user) $user->refresh();
         $roleKey = $user && method_exists($user, 'roleKey')
             ? $user->roleKey()
             : $user?->role?->role_key;

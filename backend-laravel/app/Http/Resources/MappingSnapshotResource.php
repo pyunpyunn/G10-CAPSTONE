@@ -16,7 +16,7 @@ class MappingSnapshotResource extends JsonResource
             'active_event' => $snapshot->event ? $presenter->formatEvent($snapshot->event) : null,
             'barangay' => $snapshot->barangay,
             'summary' => $snapshot->summary,
-            'filters' => ['puroks' => $snapshot->puroks, 'statuses' => $presenter->mapStatusFilters()],
+            'filters' => ['puroks' => $snapshot->puroks, 'purok_options' => $snapshot->purokOptions, 'statuses' => $presenter->mapStatusFilters()],
         ];
         if ($snapshot->full) {
             $data['households'] = $snapshot->households;

@@ -87,6 +87,10 @@ class TrackingAidForwardingService
             return;
         }
 
+        if (static::$isUnreachable) {
+            return;
+        }
+
         $connection = (string) config('services.trackingaid.connection', 'trackingaid');
         $table = (string) config('services.trackingaid.forward_table', 'resqperation_forwarded_requests');
 

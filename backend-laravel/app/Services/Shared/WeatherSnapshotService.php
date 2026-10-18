@@ -10,7 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use App\Support\RequestSchema as Schema;
-use RuntimeException;
+use UnexpectedValueException;
 
 class WeatherSnapshotService
 {
@@ -60,6 +60,7 @@ class WeatherSnapshotService
         return $query
             ->orderByDesc('observed_at')
             ->orderByDesc('created_at')
+            ->orderByDesc('weather_log_id')
             ->limit(50)
             ->get()
             ->map(fn (object $log): array => $this->presenter->formatWeatherLog($log))
@@ -160,7 +161,7 @@ class WeatherSnapshotService
 
     private function fetchOpenMeteo(): array
     {
-        $request = Http::timeout(15)->retry(1, 300);
+        $request = Http::connectTimeout(3)->timeout(8);
 
         if (! $this->shouldVerifySsl()) {
             $request = $request->withoutVerifying();
@@ -199,11 +200,13 @@ class WeatherSnapshotService
                 'forecast_days' => 3,
             ]);
 
-        if ($response->failed()) {
-            throw new RuntimeException('Open-Meteo weather data cannot be fetched right now. The latest saved weather log is still available.');
+        $response->throw();
+        $weather = $response->json();
+        if (! is_array($weather) || ! isset($weather['current']['time'], $weather['current']['temperature_2m'])) {
+            throw new UnexpectedValueException('The weather provider returned an incomplete snapshot.');
         }
 
-        return $response->json();
+        return $weather;
     }
 
     private function latestAdvisory(string $eventId): ?object

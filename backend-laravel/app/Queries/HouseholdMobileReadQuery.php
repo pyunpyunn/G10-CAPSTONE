@@ -447,7 +447,7 @@ class HouseholdMobileReadQuery
         }
 
         if (Schema::hasColumn('household_status_logs', 'source')) {
-            $query->where('hsl.source', 'household_member_mobile');
+            $query->whereIn('hsl.source', ['household_member_mobile', 'trusted_household']);
         }
 
         $columns = [
@@ -657,7 +657,7 @@ class HouseholdMobileReadQuery
                     'member_relationships' => $this->decodeJson($row->member_relationships),
                     'current_status' => $isValidated ? $this->currentStatus($trustedHouseholdId, $activeEvent['event_id'] ?? null) : null,
                     'status_options' => $isValidated ? $this->statusOptions($trustedHouseholdId, $activeEvent['event_id'] ?? null) : [],
-                    'members' => $isValidated ? $this->members($trustedHouseholdId, $devices, null, $activeEvent['event_id'] ?? null)->values() : [],
+                    'members' => $isValidated ? $this->members($trustedHouseholdId, $devices, $activeEvent['event_id'] ?? null)->values() : [],
                     'devices' => $devices->values(),
                     'created_at' => $row->created_at,
                 ];

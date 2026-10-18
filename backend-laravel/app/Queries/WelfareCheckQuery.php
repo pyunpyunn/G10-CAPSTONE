@@ -21,7 +21,7 @@ class WelfareCheckQuery
 
     private function baseQuery(string $eventId): Builder
     {
-        return Household::query()
+        return Household::query()->whereIn('households.household_id', HouseholdEligibilityQuery::ids())
             ->whereDoesntHave('disasterSnapshots', fn (Builder $query) => $query
                 ->where('disaster_id', $eventId)->whereNotNull('current_status_id'))
             ->where(fn (Builder $query) => $query->whereNull('contact_number')->orWhere('contact_number', ''))

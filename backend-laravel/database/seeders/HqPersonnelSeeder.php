@@ -19,8 +19,8 @@ class HqPersonnelSeeder extends Seeder
         }
 
         $personnel = [
-            ['id' => 'BDRRM-HQCC-001', 'first_name' => 'Barangay', 'last_name' => 'Captain'],
-            ['id' => 'BDRRM-HQCC-002', 'first_name' => 'Operational', 'last_name' => 'Head'],
+            ['id' => 'BDRRM-HQCC-001', 'first_name' => 'Command Center', 'last_name' => 'Personnel 1'],
+            ['id' => 'BDRRM-HQCC-002', 'first_name' => 'Command Center', 'last_name' => 'Personnel 2'],
             ['id' => 'BDRRM-HQCC-003', 'first_name' => 'Command Center', 'last_name' => 'Personnel 1'],
             ['id' => 'BDRRM-HQCC-004', 'first_name' => 'Command Center', 'last_name' => 'Personnel 2'],
             ['id' => 'BDRRM-HQCC-005', 'first_name' => 'Command Center', 'last_name' => 'Personnel 3'],
@@ -40,24 +40,13 @@ class HqPersonnelSeeder extends Seeder
 
         $created = [];
         $skipped = [];
-        $createdAdminRole = false;
+        $createdPersonnelRole = false;
         $passwordHash = Hash::make($initialPassword);
 
-        DB::transaction(function () use ($personnel, $columns, $passwordHash, &$created, &$skipped, &$createdAdminRole): void {
-            $adminRoleId = DB::table('roles')->where('role_key', 'admin')->value('role_id');
-
-            if (! $adminRoleId) {
-                $role = ['role_key' => 'admin', 'role_name' => 'Admin'];
-
-                if (! DB::table('roles')->where('role_id', 4)->exists()) {
-                    DB::table('roles')->insert(['role_id' => 4, ...$role]);
-                    $adminRoleId = 4;
-                } else {
-                    $adminRoleId = DB::table('roles')->insertGetId($role, 'role_id');
-                }
-
-                $createdAdminRole = true;
-            }
+        DB::transaction(function () use ($personnel, $columns, $passwordHash, &$created, &$skipped, &$createdPersonnelRole): void {
+            $roles = app(\App\Services\Web\HeadquartersTeamSupport::class);
+            $createdPersonnelRole = ! DB::table('roles')->where('role_key', 'hq_personnel')->exists();
+            $personnelRoleId = $roles->personnelRoleId();
 
             foreach ($personnel as $member) {
                 $accountId = $member['id'];
@@ -74,7 +63,10 @@ class HqPersonnelSeeder extends Seeder
 
                     DB::table('users')->where('user_id', $userId)->update(array_intersect_key([
                         'password' => $passwordHash,
-                        'role_id' => $adminRoleId,
+                        'role_id' => $personnelRoleId,
+                        'first_name' => $member['first_name'],
+                        'last_name' => $member['last_name'],
+                        'name' => $member['first_name'].' '.$member['last_name'],
                         'is_active' => 1,
                         'must_change_password' => 1,
                         'updated_at' => now(),
@@ -94,7 +86,7 @@ class HqPersonnelSeeder extends Seeder
                     'login_id' => $accountId,
                     'email' => strtolower(str_replace('-', '', $accountId)).'@resqperation.local',
                     'password' => $passwordHash,
-                    'role_id' => $adminRoleId,
+                    'role_id' => $personnelRoleId,
                     'is_active' => 1,
                     'must_change_password' => 1,
                     'created_at' => now(),
@@ -106,8 +98,10 @@ class HqPersonnelSeeder extends Seeder
             }
         });
 
-        if ($createdAdminRole) {
-            $this->command?->info('Created the missing admin role.');
+        app(\App\Services\Web\HeadquartersTeamSupport::class)->backfill();
+
+        if ($createdPersonnelRole) {
+            $this->command?->info('Created the missing HQ Personnel role.');
         }
 
         foreach ($created as $account) {

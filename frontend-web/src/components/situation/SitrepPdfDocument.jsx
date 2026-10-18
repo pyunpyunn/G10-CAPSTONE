@@ -1,3 +1,4 @@
+import { statusColor } from '../../utils/statusPalette'
 import {
   Document,
   Page,
@@ -13,9 +14,9 @@ const colors = {
   border: '#cbd5df',
   surface: '#f5f8fb',
   white: '#ffffff',
-  safe: '#18794e',
-  warn: '#9a6700',
-  danger: '#b42318',
+  safe: statusColor('safe'),
+  warn: statusColor('warning'),
+  danger: statusColor('unsafe'),
 }
 
 const styles = StyleSheet.create({

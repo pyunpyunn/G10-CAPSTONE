@@ -35,6 +35,10 @@ class WeatherSnapshotPresenter
             'risk_tags' => $risk['tags'],
             'daily_forecast' => $daily,
             'observed_at' => $this->formatDateTime($log->observed_at),
+            'observed_at_iso' => $log->observed_at ? Carbon::parse($log->observed_at, 'Asia/Manila')->toIso8601String() : null,
+            'observed_age_minutes' => $log->observed_at ? max(0, (int) Carbon::parse($log->observed_at, 'Asia/Manila')->diffInMinutes(now('Asia/Manila'))) : null,
+            'is_stale' => ! $log->observed_at || Carbon::parse($log->observed_at, 'Asia/Manila')->lt(now('Asia/Manila')->subHours(3)),
+            'risk_label' => match ($risk['level']) { 'critical' => 'Critical', 'warning' => 'Moderate', default => 'Low' },
             'observed_time' => $this->formatTime($log->observed_at),
             'created_at' => $this->formatDateTime($log->created_at),
         ];
@@ -48,7 +52,8 @@ class WeatherSnapshotPresenter
             ->take(3)
             ->map(fn (string $date, int $index): array => [
                 'date' => Carbon::parse($date)->format('M d'),
-                'condition_name' => $this->conditionName((int) ($daily['weather_code'][$index] ?? 0)),
+                'date_iso' => Carbon::parse($date, 'Asia/Manila')->startOfDay()->toIso8601String(),
+                'condition_name' => isset($daily['weather_code'][$index]) ? $this->conditionName((int) $daily['weather_code'][$index]) : 'Not recorded',
                 'rain_probability' => $daily['precipitation_probability_max'][$index] ?? null,
                 'rainfall_sum' => $daily['precipitation_sum'][$index] ?? null,
                 'wind_max' => $daily['wind_speed_10m_max'][$index] ?? null,

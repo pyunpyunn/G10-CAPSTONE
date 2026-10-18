@@ -1,6 +1,4 @@
 import {
-  Check,
-  Filter,
   RotateCcw,
   Search,
   SlidersHorizontal,

@@ -17,10 +17,11 @@ class RescuerAccountWriteWorkflow
     {
         $validated = $this->support->validatePayload($request);
         $this->support->ensureUniqueLogin($validated['account_id'], null);
+        $this->support->ensureAccountTeamType($validated['account_id'], $validated);
 
         $rescuer = DB::transaction(function () use ($request, $validated): array {
             $now = now();
-            $teamId = $this->support->teamIdFromPayload($validated, $now);
+            $teamId = $this->support->teamIdFromPayload($validated);
             $teamCode = $this->support->teamCodeFromPayload($validated);
             $roleId = $this->support->roleIdForAccount($teamCode);
             $responderId = $this->support->nextResponderId();
@@ -102,14 +103,31 @@ class RescuerAccountWriteWorkflow
         }
 
         $validated = $this->support->validatePayload($request, true);
+        $this->support->ensureAccountTeamType((string) $existing->username, $validated);
 
         $rescuer = DB::transaction(function () use ($request, $validated, $existing, $responderId): array {
             $now = now();
-            $teamId = $this->support->teamIdFromPayload($validated, $now);
+            $teamId = $this->support->teamIdFromPayload($validated);
             $fullName = $this->support->fullNameFromPayload($validated);
+            if ((int) $existing->team_id !== (int) $teamId) {
+                DB::table('rescue_teams')->where('leader_responder_id', $responderId)
+                    ->update(['leader_responder_id' => null, 'updated_at' => $now]);
+            }
             $firstName = trim($validated['first_name']);
             $lastName = trim($validated['last_name']);
             $oldValues = $this->presenter->formatResponder($existing, true);
+
+            $isHqAccount = str_starts_with(strtoupper((string) $existing->username), 'BDRRM-HQCC-');
+            $hqLeader = $isHqAccount && $validated['account_status'] !== 'disabled'
+                && strtolower(trim($validated['title'])) === 'hq leader';
+            if ($hqLeader && ! $teamId) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['team_name' => ['Select an HQCC team before assigning its leader.']]);
+            }
+            if ($isHqAccount) {
+                $validated['title'] = $hqLeader ? 'HQ Leader' : 'HQ Personnel';
+                if (! $hqLeader) DB::table('rescue_teams')->where('leader_responder_id', $responderId)
+                    ->update(['leader_responder_id' => null, 'updated_at' => $now]);
+            }
 
             $userUpdate = [
                 'first_name' => $firstName,
@@ -120,6 +138,9 @@ class RescuerAccountWriteWorkflow
                 'is_active' => $validated['account_status'] === 'disabled' ? 0 : 1,
                 'updated_at' => $now,
             ];
+            if ($isHqAccount && $existing->role_key !== 'super_admin') {
+                $userUpdate['role_id'] = app(\App\Services\Web\HeadquartersTeamSupport::class)->personnelRoleId();
+            }
 
             if (! empty($validated['password'])) {
                 $passwordHash = Hash::make($validated['password']);
@@ -161,6 +182,21 @@ class RescuerAccountWriteWorkflow
                 ->where('responder_id', $responderId)
                 ->update($responderUpdate);
 
+            if ($isHqAccount && $teamId) {
+                if ($hqLeader) DB::table('rescue_teams')->where('team_id', $teamId)
+                    ->update(['leader_responder_id' => $responderId, 'updated_at' => $now]);
+                $leaderId = DB::table('rescue_teams')->where('team_id', $teamId)->value('leader_responder_id');
+                app(\App\Services\Web\HeadquartersTeamSupport::class)->synchronizeLeadership($teamId, $leaderId ? (int) $leaderId : null);
+            }
+            if ($isHqAccount && $existing->team_id && (int) $existing->team_id !== (int) $teamId) {
+                $oldTeamLeaderId = DB::table('rescue_teams')->where('team_id', $existing->team_id)->value('leader_responder_id');
+                app(\App\Services\Web\HeadquartersTeamSupport::class)->synchronizeLeadership(
+                    (int) $existing->team_id,
+                    $oldTeamLeaderId ? (int) $oldTeamLeaderId : null,
+                );
+            }
+            app(\App\Services\Web\PersonnelAccessNotifier::class)->notify([$existing->user_id]);
+
             $updated = $this->presenter->formatResponder($this->query->findResponder($responderId), true);
             $this->audit->writeAuditLog($request, 'update', $responderId, $oldValues, $updated);
 
@@ -186,6 +222,11 @@ class RescuerAccountWriteWorkflow
                 return response()->json(['message' => 'Finish the active dispatch for this rescuer before deleting the account.'], 422);
             }
             $now = now();
+            $teamId = $record->team_id ? (int) $record->team_id : null;
+            if ($teamId && (int) DB::table('rescue_teams')->where('team_id', $teamId)->value('leader_responder_id') === $responderId) {
+                DB::table('rescue_teams')->where('team_id', $teamId)->update(['leader_responder_id' => null, 'updated_at' => $now]);
+                app(\App\Services\Web\HeadquartersTeamSupport::class)->demoteLeader($record->user_id);
+            }
             DB::table('users')->where('user_id', $record->user_id)->update(['is_active' => 0, 'updated_at' => $now]);
             DB::table('responders')->where('responder_id', $responderId)->update([
                 'deleted_at' => $now, 'updated_at' => $now, 'is_validated' => 0,
@@ -193,6 +234,10 @@ class RescuerAccountWriteWorkflow
             ]);
             DB::table('rescue_teams')->where('leader_responder_id', $responderId)->update(['leader_responder_id' => null]);
             $this->audit->writeAuditLog($request, 'delete', $responderId, ['user_id' => $record->user_id], ['deleted_at' => $now->toDateTimeString()]);
+            if ($teamId) {
+                $leaderId = DB::table('rescue_teams')->where('team_id', $teamId)->value('leader_responder_id');
+                app(\App\Services\Web\HeadquartersTeamSupport::class)->synchronizeLeadership($teamId, $leaderId ? (int) $leaderId : null);
+            }
             return response()->json(['message' => 'Rescuer account deleted from the roster. Dispatch history is retained.', 'data' => ['responder_id' => $responderId]]);
         });
     }
@@ -210,6 +255,11 @@ class RescuerAccountWriteWorkflow
         DB::transaction(function () use ($request, $existing, $responderId): void {
             $now = now();
             $oldValues = $this->presenter->formatResponder($existing, true);
+            if ($existing->team_id && (int) DB::table('rescue_teams')->where('team_id', $existing->team_id)->value('leader_responder_id') === $responderId) {
+                DB::table('rescue_teams')->where('team_id', $existing->team_id)->update(['leader_responder_id' => null, 'updated_at' => $now]);
+                app(\App\Services\Web\HeadquartersTeamSupport::class)->demoteLeader($existing->user_id);
+                app(\App\Services\Web\HeadquartersTeamSupport::class)->synchronizeLeadership((int) $existing->team_id, null);
+            }
 
             DB::table('users')
                 ->where('user_id', $existing->user_id)

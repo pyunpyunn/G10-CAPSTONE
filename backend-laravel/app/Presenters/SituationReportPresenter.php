@@ -76,14 +76,15 @@ class SituationReportPresenter
         $counts = $sources['household_counts'];
         $total = (int) $sources['household_total'];
         $reported = (int) $sources['household_reported'];
-        $safeOnly = $this->sumStatusKeys($counts, ['active', 'returned', 'safe']);
+        $safeOnly = $this->sumStatusKeys($counts, \App\Queries\HouseholdEventStatusQuery::SAFE_KEYS);
         $evacuated = $this->sumStatusKeys($counts, ['evacuated', 'relocated']);
-        $unsafe = $this->sumStatusKeys($counts, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured']);
+        $unsafe = $this->sumStatusKeys($counts, \App\Queries\HouseholdEventStatusQuery::UNSAFE_KEYS);
         $safeTotal = $safeOnly + $evacuated;
         $unchecked = max($total - $reported, 0);
         $progress = $total > 0 ? round(($reported / $total) * 100) : 0;
         $purokRows = collect($sources['purok_rows'])->map(function (object $row): array {
-            return ['purok' => $row->purok, 'total' => (int) $row->total, 'safe' => (int) $row->safe,
+            return ['purok' => $row->purok.(isset($row->sitio_name) ? ', '.$row->sitio_name : ''),
+                'purok_id' => $row->purok_id ?? null, 'sitio_id' => $row->sitio_id ?? null, 'total' => (int) $row->total, 'safe' => (int) $row->safe,
                 'evacuated' => (int) $row->evacuated, 'unsafe' => (int) $row->unsafe,
                 'unchecked' => max((int) $row->total - (int) $row->reported, 0)];
         })->values()->all();
@@ -106,7 +107,7 @@ class SituationReportPresenter
             'condition' => $weather->condition_name ?: 'Weather monitoring',
             'wind' => $weather->wind_speed !== null ? $weather->wind_speed.' km/h '.$weather->wind_direction : 'For update',
             'rainfall' => $weather->rainfall_mm !== null ? $weather->rainfall_mm.' mm' : 'For update',
-            'temperature' => $weather->temperature !== null ? $weather->temperature.' C' : 'For update',
+            'temperature' => $weather->temperature !== null ? rtrim(rtrim(number_format((float) $weather->temperature, 2, '.', ''), '0'), '.').' C' : 'For update',
             'source' => trim($weather->source_name.' - '.$this->formatTime($weather->observed_at)),
             'advisory' => $weather->advisory_text ?: 'Confirm official warnings through PAGASA before broadcasting.',
         ];
@@ -174,7 +175,7 @@ class SituationReportPresenter
     private function reachedHouseholds(array $outcomes): int { return (int) ($outcomes['safe_count'] ?? 0) + (int) ($outcomes['evacuated_count'] ?? 0) + (int) ($outcomes['unsafe_count'] ?? 0) + (int) ($outcomes['injured_count'] ?? 0) + (int) ($outcomes['missing_count'] ?? 0); }
     private function outcomeText(array $outcomes): string { return implode(' / ', ['safe '.$this->countValue($outcomes, 'safe_count'), 'evac '.$this->countValue($outcomes, 'evacuated_count'), 'unsafe '.$this->countValue($outcomes, 'unsafe_count'), 'injured '.$this->countValue($outcomes, 'injured_count'), 'missing '.$this->countValue($outcomes, 'missing_count')]); }
     private function countValue(array $items, string $key): int { return (int) ($items[$key] ?? 0); }
-    private function statusTone(?string $status): string { return match (str_replace('-', '_', strtolower((string) $status))) { 'completed', 'verified', 'forwarded', 'sent', 'on_scene', 'onscene' => 'green', 'needs_validation', 'pending', 'dispatched', 'en_route' => 'amber', 'returned', 'cancelled', 'failed' => 'red', default => 'gray' }; }
+    private function statusTone(?string $status): string { return \App\Support\StatusPalette::tone($status); }
     private function label(?string $value): string { return ucwords(str_replace(['_', '-'], ' ', $value ?? 'Unknown')); }
     private function formatDateTime(?string $value): ?string { return $value ? Carbon::parse($value)->format('M d, Y g:i A') : null; }
     private function formatDate(?string $value): ?string { return $value ? Carbon::parse($value)->format('M Y') : null; }

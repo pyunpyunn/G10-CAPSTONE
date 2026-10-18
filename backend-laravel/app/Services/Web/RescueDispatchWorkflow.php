@@ -30,15 +30,25 @@ class RescueDispatchWorkflow
     {
         $selection = [];
         $id=DB::transaction(function()use($request,$validated,$event,&$selection):int{
+            if (!empty($validated['household_ids'])) $this->ensureAreaHouseholdsCanReceive($validated, (string) $event->event_id);
             $selection=$this->selector->select((int)$validated['team_id'], (string)$event->event_id,
-                (int)$validated['responder_count'], $validated['household_id']??null);
+                (int)$validated['responder_count'], $validated['household_id']??null, null, $validated['selected_responder_ids']??null);
             if (($validated['dispatch_type']??'rescue')==='welfare_check' && $selection['assigned_count']!==2) {
                 throw ValidationException::withMessages(['responder_count'=>['A welfare check requires two available rescuers from the selected team.']]);
+            }
+            if (isset($validated['household_groups']) && count($validated['household_groups']) !== $selection['assigned_count']) {
+                throw ValidationException::withMessages(['responder_count' => ['Available rescuers changed. Refresh before dispatching this area.']]);
             }
             $selected=$selection['ids'];
             $responderId=$selected[0];
             $validated['selected_responder_ids']=$selected;
             $validated['responder_count']=$selection['assigned_count'];
+            if (!empty($validated['household_ids']) && !isset($validated['household_groups'])) {
+                $validated['household_groups'] = array_fill(0, count($selected), []);
+                foreach (collect($validated['household_ids'])->shuffle()->values() as $index => $householdId) {
+                    $validated['household_groups'][$index % count($selected)][] = $householdId;
+                }
+            }
             $now=now();$id=$this->nextId('responder_assignments','assignment_id');$status=$this->statusKey($validated['status']??'dispatched');
             if(!empty($validated['household_id']))$this->ensureHouseholdCanReceive($validated['household_id'],$event->event_id);
             ResponderAssignment::query()->create(['assignment_id'=>$id,'assignment_code'=>'DSP-'.$now->format('Ymd').'-'.str_pad((string)$id,4,'0',STR_PAD_LEFT),'responder_id'=>$responderId,'responder_count'=>$selection['assigned_count'],'dispatch_type'=>$validated['dispatch_type']??'rescue','team_id'=>$validated['team_id']??null,'disaster_id'=>$event->event_id,'household_id'=>$validated['household_id']??null,'assigned_area'=>$validated['assigned_area'],'route_notes'=>$this->routeNotesJson($validated),'priority_level'=>$validated['priority_level'],'dispatch_notes'=>$validated['dispatch_notes']??null,'created_by_admin_id'=>$request->user()?->user_id,'status'=>$status,'assigned_at'=>$now,'accepted_at'=>null,'en_route_at'=>$status==='en_route'?$now:null,'arrived_at'=>$status==='on_scene'?$now:null,'completed_at'=>$status==='completed'?$now:null,'outcome_notes'=>$this->outcomesJson($validated),'updated_at'=>$now]);
@@ -128,12 +138,60 @@ class RescueDispatchWorkflow
         if($request->user()?->role?->role_key!=='rescuer')return;$r=Responder::query()->where('user_id',$request->user()?->user_id)->orWhere('username',$request->user()?->username)->first();if(!$r||!in_array((int)$r->responder_id,$this->responderIdsForDispatch($dispatch),true))abort(response()->json(['message'=>'This dispatch is not assigned to your responder account.'],403));
     }
 
+    private function ensureAreaHouseholdsCanReceive(array $validated, string $eventId): void
+    {
+        $ids = $validated['household_ids'];
+        if (count($ids) !== (int) ($validated['households_to_cover'] ?? 0)) {
+            throw ValidationException::withMessages(['household_ids' => ['Household coverage must match the selected household records.']]);
+        }
+        $areas = $this->query->riskAreas($eventId);
+        if (isset($validated['sitio_id'])) $areas = $areas->where('sitio_id', (int) $validated['sitio_id']);
+        if (isset($validated['purok_id'])) $areas = $areas->where('purok_id', (int) $validated['purok_id']);
+        $eligible = $areas->where('area_name', $validated['assigned_area'])->flatMap(fn ($area) => collect($area['households'])->where('is_available_for_dispatch', true)->pluck('household_id'))->all();
+        if (array_diff($ids, $eligible)) {
+            throw ValidationException::withMessages(['household_ids' => ['An area household is no longer available. Refresh before dispatching.']]);
+        }
+        if (isset($validated['household_groups'])) {
+            $grouped = array_merge([], ...$validated['household_groups']);
+            if (count($grouped) !== count(array_unique($grouped)) || array_diff($ids, $grouped) || array_diff($grouped, $ids)) {
+                throw ValidationException::withMessages(['household_groups' => ['Responder household groups must cover each selected household exactly once.']]);
+            }
+        }
+        // Lock the selected households so concurrent requests cannot assign the same area coverage.
+        Household::query()->whereIn('household_id', $ids)->orderBy('household_id')->lockForUpdate()->get();
+        $sitioLabels = [];
+        if (isset($validated['sitio_id'])) {
+            $sitioName = DB::table('sitios')->where('sitio_id', (int) $validated['sitio_id'])->value('sitio_name');
+            $sitioLabels = DB::table('puroks')->where('sitio_id', (int) $validated['sitio_id'])->pluck('purok_name')
+                ->map(fn ($name) => $name.', '.$sitioName)->push($sitioName)->filter()->all();
+        }
+        foreach (ResponderAssignment::query()->where('disaster_id', $eventId)->whereIn('status', $this->activeStatuses())->get(['household_id','route_notes','assigned_area']) as $assignment) {
+            $route = $this->presenter->decodeJson($assignment->route_notes);
+            $covered = array_filter(array_merge([$assignment->household_id], $route['household_ids'] ?? [], array_merge([], ...array_values($route['responder_households'] ?? []))));
+            if (! $covered && isset($validated['sitio_id'])
+                && ((string) ($route['sitio_id'] ?? '') === (string) $validated['sitio_id']
+                    || in_array($assignment->assigned_area, $sitioLabels, true))) {
+                throw ValidationException::withMessages(['household_ids' => ['An existing rescue assignment does not list its household coverage. Review it before adding another team.']]);
+            }
+            if (array_intersect($ids, $covered)) throw ValidationException::withMessages(['household_ids' => ['A selected household already has an active dispatch. Refresh before dispatching.']]);
+        }
+    }
+
     private function activeStatuses():array{return['dispatched','accepted','en_route','on_scene','onscene','returning'];}
-    private function ensureHouseholdCanReceive(?string $id,string $eventId):void{if(!$id)return;if(!Household::query()->where('household_id',$id)->exists())throw ValidationException::withMessages(['household_id'=>['Select a valid household from the affected area list.']]);if(!GeotaggedLocation::query()->where('household_id',$id)->whereNotNull('latitude')->whereNotNull('longitude')->exists())throw ValidationException::withMessages(['household_id'=>['Select a household with saved GPS coordinates. Routing cannot be generated for households without a geotag.']]);$active=ResponderAssignment::query()->where('household_id',$id)->where('disaster_id',$eventId)->whereIn('status',$this->activeStatuses())->orderByDesc('assigned_at')->first();if($active)throw ValidationException::withMessages(['household_id'=>['This household is already assigned to '.$active->assignment_code.'. Complete or cancel that dispatch before creating another one for the same household.']]);}
+    private function ensureHouseholdCanReceive(?string $id, string $eventId): void
+    {
+        if (!$id) return;
+        if (!Household::query()->where('household_id', $id)->lockForUpdate()->first()) throw ValidationException::withMessages(['household_id' => ['Select a valid household from the affected area list.']]);
+        if (!GeotaggedLocation::query()->where('household_id', $id)->whereNotNull('latitude')->whereNotNull('longitude')->exists()) throw ValidationException::withMessages(['household_id' => ['Select a household with saved GPS coordinates. Routing cannot be generated for households without a geotag.']]);
+        foreach (ResponderAssignment::query()->where('disaster_id', $eventId)->whereIn('status', $this->activeStatuses())->get(['household_id', 'route_notes', 'assignment_code']) as $assignment) {
+            $covered = array_merge([$assignment->household_id], $this->presenter->decodeJson($assignment->route_notes)['household_ids'] ?? []);
+            if (in_array($id, $covered, true)) throw ValidationException::withMessages(['household_id' => ['This household is already assigned to '.$assignment->assignment_code.'. Complete or cancel that dispatch before creating another one for the same household.']]);
+        }
+    }
     private function updateSelectedResponderDuty(array $ids,?int $teamId,string $status):void{$active=in_array($status,$this->activeStatuses(),true);foreach($ids as $id){$now=now();Responder::query()->where('responder_id',$id)->update(['is_deployed'=>$active,'duty_status'=>$active?'deployed':'available','last_active_at'=>$now,'updated_at'=>$now]);}if($teamId){$stillAvailable=Responder::query()->where('team_id',$teamId)->where('duty_status','available')->where('is_deployed',false)->exists();RescueTeam::query()->where('team_id',$teamId)->update(['duty_status'=>$stillAvailable?'available':($active?$status:'available'),'updated_at'=>now()]);}}
     private function responderIdsForDispatch(object $dispatch):array{$route=$this->presenter->decodeJson($dispatch->route_notes);return collect($route['selected_responder_ids']??[$dispatch->responder_id])->map(fn($id)=>(int)$id)->filter()->unique()->values()->all();}
     private function statusKey(?string $s):string{return match($s){'onscene','on-scene'=>'on_scene','en-route'=>'en_route','stand-by','standby',null,''=>'available',default=>str_replace('-','_',$s)};}
-    private function routeNotesJson(array $v,?string $existing=null):string{$current=$this->presenter->decodeJson($existing);$ids=collect($v['selected_responder_ids']??($current['selected_responder_ids']??[]))->map(fn($id)=>(int)$id)->filter()->unique()->values()->all();$names=empty($ids)?($current['selected_responders']??[]):Responder::query()->whereIn('responder_id',$ids)->orderBy('full_name')->pluck('full_name')->all();return json_encode(array_merge($current,['households_to_cover'=>(int)($v['households_to_cover']??($current['households_to_cover']??0)),'responder_count'=>(int)($v['responder_count']??($current['responder_count']??1)),'selected_responder_ids'=>$ids,'selected_responders'=>$names,'route_notes'=>$v['route_notes']??($current['route_notes']??null)]));}
+    private function routeNotesJson(array $v,?string $existing=null):string{$current=$this->presenter->decodeJson($existing);$ids=collect($v['selected_responder_ids']??($current['selected_responder_ids']??[]))->map(fn($id)=>(int)$id)->filter()->unique()->values()->all();$namesById=empty($ids)?collect():Responder::query()->whereIn('responder_id',$ids)->pluck('full_name','responder_id');$names=empty($ids)?($current['selected_responders']??[]):array_map(fn($id)=>$namesById[$id]??null,$ids);return json_encode(array_merge($current,['sitio_id'=>$v['sitio_id']??($current['sitio_id']??null),'purok_id'=>$v['purok_id']??($current['purok_id']??null),'households_to_cover'=>(int)($v['households_to_cover']??($current['households_to_cover']??0)),'responder_count'=>(int)($v['responder_count']??($current['responder_count']??1)),'selected_responder_ids'=>$ids,'selected_responders'=>$names,'household_ids'=>$v['household_ids']??($current['household_ids']??[]),'responder_households'=>isset($v['household_groups'])?array_combine($ids,$v['household_groups']):($current['responder_households']??[]),'route_notes'=>$v['route_notes']??($current['route_notes']??null)]));}
     private function outcomesJson(array $v,?string $existing=null):string{$c=$this->presenter->decodeJson($existing);return json_encode(array_merge($c,['safe_count'=>(int)($v['safe_count']??($c['safe_count']??0)),'evacuated_count'=>(int)($v['evacuated_count']??($c['evacuated_count']??0)),'unsafe_count'=>(int)($v['unsafe_count']??($c['unsafe_count']??0)),'injured_count'=>(int)($v['injured_count']??($c['injured_count']??0)),'missing_count'=>(int)($v['missing_count']??($c['missing_count']??0)),'pending_count'=>(int)($v['pending_count']??($c['pending_count']??0)),'outcome_notes'=>$v['outcome_notes']??($c['outcome_notes']??null)]));}
     private function saveHouseholdOutcome(Request $request, object $dispatch, array $validated, Carbon $now): void
     {

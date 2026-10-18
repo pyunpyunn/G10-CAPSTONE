@@ -57,12 +57,15 @@ class RescueDispatchService
         return [
             'active_event' => $event ? $this->presenter->activeEvent($event) : null,
             'logs' => app(\App\Queries\FieldCommunicationQuery::class)->paginate($request, $event?->event_id),
+            'responders' => $this->query->responders($event?->event_id),
             'teams' => $this->query->teamCards($event?->event_id)->filter(fn ($team) => $team['team_id'])->values(),
         ];
     }
 
     public function index(Request $request): JsonResponse
     {
+        $request->validate(['sitio_id' => ['sometimes', 'integer', 'min:1']]);
+        if ($request->has('sitio_id')) app(\App\Queries\HouseholdStatusQuery::class)->listScope($request);
         $activeEvent = $this->query->activeEvent();
         $eventId = $request->query('event_id') ?: $activeEvent?->event_id;
         $perPage = \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page'));
@@ -78,6 +81,8 @@ class RescueDispatchService
                     'teams' => $teamCards,
                     'responders' => $this->query->responders(null),
                     'risk_areas' => collect(),
+                    'active_dispatches' => [],
+                    'sitio_coverage' => [],
                     'dispatches' => [
                         'data' => [],
                         'meta' => [
@@ -96,6 +101,9 @@ class RescueDispatchService
         }
 
         $dispatches = $this->query->dispatches($request, (string) $eventId);
+        $riskAreas = $this->query->riskAreas($eventId);
+        $activeAssignments = $this->query->activeDispatches((string) $eventId);
+        $sitioCoverage = app(\App\Queries\SitioDispatchCoverageQuery::class)->forEvent((string) $eventId, $riskAreas, $activeAssignments);
 
         return response()->json([
             'data' => [
@@ -105,7 +113,9 @@ class RescueDispatchService
                 'team_coverage' => $this->query->teamCoverage($eventId),
                 'teams' => $teamCards,
                 'responders' => $this->query->responders($eventId),
-                'risk_areas' => $this->query->riskAreas($eventId),
+                'risk_areas' => $riskAreas,
+                'active_dispatches' => $activeAssignments,
+                'sitio_coverage' => $sitioCoverage,
                 'dispatches' => [
                     'data' => collect($dispatches->items())
                         ->map(fn (object $dispatch): array => $this->presenter->dispatch($dispatch))
@@ -127,6 +137,20 @@ class RescueDispatchService
 
     public function store(Request $request): JsonResponse
     {
+        if ($request->has('assignments')) {
+            $payload = $request->validate(['assignments' => ['required', 'array', 'min:1', 'max:20'], 'assignments.*' => ['required', 'array']]);
+            $responses = DB::transaction(function () use ($payload, $request): array {
+                return array_map(function (array $assignment) use ($request): array {
+                    if (array_key_exists('assignments', $assignment)) throw ValidationException::withMessages(['assignments' => ['Nested dispatch batches are not supported.']]);
+                    $child = Request::create($request->path(), 'POST', $assignment);
+                    $child->setUserResolver($request->getUserResolver());
+                    $response = $this->store($child);
+                    if ($response->getStatusCode() >= 400) abort($response);
+                    return $response->getData(true)['data'];
+                }, $payload['assignments']);
+            }, 3);
+            return response()->json(['message' => 'Dispatch assignments created.', 'data' => ['assignments' => $responses]], 201);
+        }
         $activeEvent = $this->query->activeEvent();
 
         if (! $activeEvent) {
@@ -177,6 +201,8 @@ class RescueDispatchService
         return response()->json([
             'data' => [
                 'dispatch' => $this->presenter->dispatch($dispatch),
+                'report_outcomes' => $this->query->reportOutcomes($dispatch),
+                'covered_households' => $this->query->coverageHouseholds($dispatch),
                 'route' => $this->query->route($assignmentId),
             ],
         ]);
@@ -265,9 +291,18 @@ class RescueDispatchService
     {
         $required = $isCreate ? 'required' : 'sometimes';
 
-        return $request->validate([
+        $validated = $request->validate([
             'team_id' => [$isCreate ? 'required' : 'sometimes', 'integer', 'exists:rescue_teams,team_id'],
+            'sitio_id' => ['sometimes', 'integer', 'min:1', 'exists:sitios,sitio_id'],
+            'purok_id' => ['sometimes', 'integer', 'min:1', 'exists:puroks,purok_id'],
             'household_id' => ['nullable', 'string', 'max:255'],
+            'household_ids' => [$isCreate ? 'required_with:household_groups' : 'prohibited', 'array', 'list', 'min:1', 'max:1000'],
+            'household_ids.*' => ['required', 'string', 'distinct', 'max:255'],
+            'household_groups' => [$isCreate ? 'sometimes' : 'prohibited', 'array', 'list', 'max:100'],
+            'household_groups.*' => ['present', 'array', 'list'],
+            'household_groups.*.*' => ['required', 'string', 'max:255'],
+            'selected_responder_ids' => [$isCreate ? 'sometimes' : 'prohibited', 'array', 'list', 'min:1', 'max:100'],
+            'selected_responder_ids.*' => ['required', 'integer', 'distinct', 'exists:responders,responder_id'],
             'assigned_area' => [$required, 'string', 'max:150'],
             'households_to_cover' => ['nullable', 'integer', 'min:0'],
             'responder_count' => [$isCreate ? 'required' : 'sometimes', 'integer', 'min:1', 'max:100'],
@@ -290,6 +325,13 @@ class RescueDispatchService
             'priority_level.required' => 'Priority level is required.',
             'status.required' => 'Dispatch status is required.',
         ]);
+        // Nested wildcard validation may insert empty groups before populated ones.
+        // Preserve the numeric positions that pair groups with selected responder IDs.
+        if (isset($validated['household_groups'])) {
+            ksort($validated['household_groups'], SORT_NUMERIC);
+            $validated['household_groups'] = array_values($validated['household_groups']);
+        }
+        return $validated;
     }
 
     private function getDispatchById(int $assignmentId): array { return $this->presenter->dispatch($this->query->dispatchRecord($assignmentId)); }

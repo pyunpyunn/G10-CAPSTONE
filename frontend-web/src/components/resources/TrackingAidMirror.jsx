@@ -1,15 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import PaginationBar from '../ui/PaginationBar'
 
 export default function TrackingAidMirror({ items = [] }) {
   const perPage = 5
   const [page, setPage] = useState(1)
   const lastPage = Math.max(1, Math.ceil(items.length / perPage))
-  const visibleItems = items.slice((page - 1) * perPage, page * perPage)
-
-  useEffect(() => {
-    setPage((current) => Math.min(current, lastPage))
-  }, [lastPage])
+  const currentPage = Math.min(page, lastPage)
+  const visibleItems = items.slice((currentPage - 1) * perPage, currentPage * perPage)
 
   return (
     <div className="rr-panel rr-mirror">
@@ -44,7 +41,7 @@ export default function TrackingAidMirror({ items = [] }) {
         </table>
       </div>
       <PaginationBar
-        meta={{ current_page: page, per_page: perPage, total: items.length, last_page: lastPage }}
+        meta={{ current_page: currentPage, per_page: perPage, total: items.length, last_page: lastPage }}
         onPageChange={setPage}
         label="mirror records"
       />

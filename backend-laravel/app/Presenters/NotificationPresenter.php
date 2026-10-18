@@ -6,6 +6,7 @@ use App\Models\HouseholdStatusLog;
 use App\Models\Notification;
 use App\Models\ResourceRequest;
 use App\Models\ResponderAssignment;
+use App\Models\User;
 use App\Models\WeatherLog;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -37,7 +38,7 @@ class NotificationPresenter
             ],
             'preview' => $allItems->take(5)->values()->all(),
             'status_filter' => $status,
-            'scope_note' => 'HQ/Admin notification actions hide or mark notices in the current web view only. Delivery logs stay unchanged for audit.',
+            'scope_note' => 'Notification actions affect only your role-scoped view. Delivery logs stay unchanged for audit.',
         ];
     }
 
@@ -54,6 +55,24 @@ class NotificationPresenter
             ->sortByDesc('sort_time')->values()->take(80);
     }
 
+    public function forUser(Collection $items, User $user): Collection
+    {
+        $modules = app(\App\Services\Web\WebAccessPolicy::class)->modulesFor($user);
+        $roleKey = $user->roleKey();
+
+        return $items->filter(function (array $item) use ($modules, $roleKey, $user): bool {
+            if ($roleKey === 'rescuer' && $item['type'] === 'Dispatch route') {
+                return in_array('dashboard', $modules, true)
+                    && (string) ($item['recipient_user_id'] ?? '') === (string) $user->user_id;
+            }
+
+            return in_array($item['access_module'], $modules, true);
+        })->map(function (array $item): array {
+            unset($item['access_module'], $item['recipient_user_id']);
+            return $item;
+        })->values();
+    }
+
     public function statusFilter(string $status): string
     {
         $status = strtolower(trim($status));
@@ -64,7 +83,7 @@ class NotificationPresenter
     {
         return $this->notice('notif-'.$row->notif_id, 'Broadcast', $this->priorityFromUrgency($row->urgency_level_id),
             $this->notificationTitle($row), $row->message ?: 'Notification message saved in shared DB.', $row->created_at,
-            false);
+            false, 'dashboard');
     }
 
     private function household(HouseholdStatusLog $row): array
@@ -73,7 +92,7 @@ class NotificationPresenter
         $name = $row->household?->household_name ?: 'Household';
         $status = $row->status?->status_label ?: 'Unsafe';
         return $this->notice('household-'.$row->status_log_id, 'Household status', 'Critical', $status.' household report from '.$purok,
-            $name.' reported '.$status.'. '.($row->notes ?: $row->location_label ?: 'HQ review is required.'), $row->submitted_at, false);
+            $name.' reported '.$status.'. '.($row->notes ?: $row->location_label ?: 'HQ review is required.'), $row->submitted_at, false, 'geospatial_analytics');
     }
 
     private function dispatch(ResponderAssignment $row): array
@@ -81,7 +100,8 @@ class NotificationPresenter
         $team = $row->team?->team_name ?: $row->responder?->full_name ?: 'Responder team';
         $priority = in_array($row->priority_level, ['high','critical','urgent'], true) ? 'High' : 'Medium';
         return $this->notice('dispatch-'.$row->assignment_id, 'Dispatch route', $priority, $team.' route updated',
-            $this->label($row->status ?: 'assigned').' to '.($row->assigned_area ?: 'assigned area').'.', $row->assigned_at, false);
+            $this->label($row->status ?: 'assigned').' to '.($row->assigned_area ?: 'assigned area').'.', $row->assigned_at, false,
+            'response_operations', $row->responder?->user_id);
     }
 
     private function request(ResourceRequest $row): array
@@ -89,7 +109,7 @@ class NotificationPresenter
         $priority = $row->validation_status === 'needs_validation' ? 'Medium' : 'Normal';
         $item = $row->item_name ?: $row->resource_type ?: 'Request';
         return $this->notice('request-'.$row->request_id, 'Resources', $priority, $item.' request '.$this->label($row->validation_status ?: 'needs_validation'),
-            ($row->requested_by ?: 'Requester').' requested '.trim(($row->quantity ?? '').' '.($row->unit ?? '')).'.', $row->created_at, false);
+            ($row->requested_by ?: 'Requester').' requested '.trim(($row->quantity ?? '').' '.($row->unit ?? '')).'.', $row->created_at, false, 'resources_requests');
     }
 
     private function weather(WeatherLog $row): array
@@ -99,7 +119,7 @@ class NotificationPresenter
         return $this->notice('weather-'.$row->weather_log_id, 'Weather', $critical ? 'High' : 'Normal',
             $row->advisory_title ?: ($row->condition_name ?: 'Weather snapshot saved'),
             $row->advisory_text ?: 'Weather data was saved from '.$row->source_name.'. Confirm official warnings through PAGASA before broadcasting.',
-            $row->created_at ?: $row->observed_at, false);
+            $row->created_at ?: $row->observed_at, false, 'geospatial_analytics');
     }
 
     private function broadcast($row): array
@@ -107,21 +127,36 @@ class NotificationPresenter
         $severity = $row->severity?->severity_key;
         $priority = in_array($severity, ['high','critical','severe'], true) ? 'Critical' : 'High';
         return $this->notice('broadcast-'.$row->broadcast_id, 'Broadcast', $priority, $row->broadcast_title ?: 'Disaster broadcast saved',
-            ($row->message ?: 'Broadcast message saved.').' Scope: '.$this->label($row->scope_type ?: 'barangay'), $row->sent_at, false);
+            ($row->message ?: 'Broadcast message saved.').' Scope: '.$this->label($row->scope_type ?: 'barangay'), $row->sent_at, false, 'dashboard');
     }
 
     private function audit($row): array
     {
         return $this->notice('audit-'.$row->audit_log_id, 'System activity', 'Normal', $this->label($row->module).' '.$this->label($row->action),
-            'Action recorded for '.$row->reference_table.' #'.$row->reference_id.'.', $row->created_at, false);
+            'Action recorded for '.$row->reference_table.' #'.$row->reference_id.'.', $row->created_at, false, $this->auditModule($row->module));
     }
 
-    private function notice(string $id,string $type,string $priority,string $title,string $body,mixed $time,bool $read): array
+    private function auditModule(?string $module): string
+    {
+        return match (strtolower(str_replace('-', '_', (string) $module))) {
+            'household_status', 'mapping', 'weather' => 'geospatial_analytics',
+            'dispatch', 'rescue_dispatch', 'field_reports', 'communications', 'disaster_broadcast', 'broadcast' => 'response_operations',
+            'resource_request', 'resources_requests', 'requests' => 'resources_requests',
+            'situation_report', 'reports', 'archive' => 'reports_documentation',
+            'inquiry', 'inquiries' => 'inquiries',
+            'profile' => 'profile',
+            'notifications' => 'notifications',
+            default => 'personnel_access',
+        };
+    }
+
+    private function notice(string $id,string $type,string $priority,string $title,string $body,mixed $time,bool $read,string $accessModule,?string $recipientUserId=null): array
     {
         $date = $time ? Carbon::parse($time) : now();
         return ['id'=>$id,'type'=>$type,'priority'=>$priority,'title'=>$title,'body'=>$body,'date'=>$this->dateLabel($date),
             'time'=>$date->format('g:i A'),'created_at'=>$date->toDateTimeString(),'sort_time'=>$date->timestamp,'read'=>$read,
-            'tone'=>$this->priorityTone($priority),'action_url'=>$this->actionUrlForType($type)];
+            'tone'=>$this->priorityTone($priority),'action_url'=>$this->actionUrlForType($type),
+            'access_module'=>$accessModule,'recipient_user_id'=>$recipientUserId];
     }
 
     private function actionUrlForType(string $type): string

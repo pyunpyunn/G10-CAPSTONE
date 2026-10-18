@@ -48,7 +48,6 @@ function getCategoryMeta(categoryKey = '') {
 
 export default function RequestTypeCard({
   item,
-  isFirst = false,
   onSelect,
   onRequestNow,
 }) {

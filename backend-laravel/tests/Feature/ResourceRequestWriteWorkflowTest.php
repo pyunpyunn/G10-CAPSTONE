@@ -44,6 +44,52 @@ class ResourceRequestWriteWorkflowTest extends TestCase
         $this->assertSame('validate', DB::table('audit_logs')->value('action'));
     }
 
+    public function test_external_handshake_and_intake_accept_the_same_key(): void
+    {
+        config(['services.external_request_intake.key' => 'test-request-secret']);
+        $headers = ['X-RESQPERATION-INTEGRATION-KEY' => 'test-request-secret'];
+
+        $this->postJson('/api/v1/external/resource-requests/handshake', [], $headers)
+            ->assertOk()->assertJsonPath('data.authenticated', true)
+            ->assertJsonPath('data.request_storage_ready', true)
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $this->assertSame(1, ResourceRequest::count());
+
+        $payload = ['external_request_id' => 'EVA-TEST-1', 'source_system' => 'evatrack',
+            'requested_item' => 'Water', 'quantity' => 5, 'requested_by' => 'EvaTrack operator'];
+        $this->postJson('/api/v1/external/resource-requests', $payload, $headers)->assertCreated();
+        $this->postJson('/api/v1/external/resource-requests', $payload, $headers)->assertOk();
+        $this->assertSame(1, ResourceRequest::where('source_reference', 'EVA-TEST-1')->count());
+        $this->assertSame('needs_validation', ResourceRequest::where('source_reference', 'EVA-TEST-1')->value('validation_status'));
+    }
+
+    public function test_external_handshake_does_not_bypass_authentication_on_later_submissions(): void
+    {
+        config(['services.external_request_intake.key' => 'test-request-secret']);
+        $this->postJson('/api/v1/external/resource-requests/handshake', [], [
+            'Authorization' => 'Bearer test-request-secret',
+        ])->assertOk();
+        foreach (['/api/v1/external/resource-requests/handshake', '/api/v1/external/resource-requests'] as $url) {
+            $this->postJson($url)->assertUnauthorized();
+            $this->postJson($url, [], ['X-RESQPERATION-INTEGRATION-KEY' => 'wrong'])->assertUnauthorized();
+            foreach (['', 'change-this-shared-request-key'] as $key) {
+                config(['services.external_request_intake.key' => $key]);
+                $this->postJson($url)->assertStatus(503);
+            }
+            config(['services.external_request_intake.key' => 'test-request-secret']);
+        }
+        $this->assertSame(1, ResourceRequest::count());
+    }
+
+    public function test_external_handshake_reports_unavailable_request_storage(): void
+    {
+        config(['services.external_request_intake.key' => 'test-request-secret']);
+        Schema::drop('resource_requests');
+        $this->postJson('/api/v1/external/resource-requests/handshake', [], [
+            'Authorization' => 'Bearer test-request-secret',
+        ])->assertStatus(503)->assertJsonPath('message', 'External request storage is not ready.');
+    }
+
     public function test_tracking_sync_is_queued_in_the_local_transaction_and_rolls_back_with_it(): void
     {
         $tracking = app(TrackingAidForwardingService::class);

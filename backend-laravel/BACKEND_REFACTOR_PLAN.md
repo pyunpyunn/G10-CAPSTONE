@@ -57,7 +57,7 @@ All service physical line counts are available in `REFACTOR_REPORT.md`.
 ### Database and API constraints
 
 - Never use the remote/shared database for automated tests, migrations, seeders, EXPLAIN, benchmark writes, or destructive checks.
-- Until there is an explicitly approved staging copy, use SQLite in-memory or a disposable local database only. User-directed local operational database access may be used for read-only schema inspection and query plans; do not read personal records or write operational data during refactors.
+- Until there is an explicitly approved staging copy, use SQLite in-memory or a disposable local database only.
 - `resq_local` is the operational store. `trackingaid` is a separate integration connection. No transaction may span them.
 - The checked-in Laravel migrations do not fully document all legacy operational tables. Build a sanitized schema inventory from a database copy or an approved schema-only export before removing runtime compatibility checks or authoring schema-dependent migrations.
 - Web, household mobile, and responder mobile depend on existing response structures. Save before/after JSON and CSV contract fixtures before each behavior-adjacent refactor.
@@ -98,7 +98,7 @@ Do not create one Resource/Presenter for every service as a goal. Create one whe
 
 Each phase is a bounded implementation slice. The implementation work should be done one phase at a time, with a report update and commit per phase. A phase cannot pass its gate by saying “the files are shorter”; it must preserve behavior and demonstrate the relevant safety/performance improvement.
 
-### Phase 0 — Protect the baseline and workspace — complete locally
+### Phase 0 — Protect the baseline and workspace
 
 **Tasks**
 
@@ -271,17 +271,13 @@ Each phase is a bounded implementation slice. The implementation work should be 
 
 Each package follows the same cycle: map → contract tests → one extraction → full suite → output comparison → commit/report.
 
-### 5.1 Rescuer mobile (`RescuerMobileService`, 2,213 physical lines at baseline)
+### 5.1 Rescuer mobile (`RescuerMobileService`, 2,213 physical lines)
 
 Map route methods to distinct operations: profile/setup, assignments/status, responder location/routes, field reports, check-ins, resource requests, and radio feed/transmission/clip/signal. Identify which data is owned by `RescueDispatchService` vs only exposed by mobile. Extract only cohesive use cases and read queries; keep responder authorization in the request boundary. Check radio/location feeds for bounds and ordering. Keep route generation outside DB transactions; persist route/state only after successful route policy is clear.
 
-**A1 status:** implemented locally as of 2026-09-30. The facade is 165 physical lines; extracted workflows and read queries are documented in `REFACTOR_REPORT.md`. Tests use SQLite in-memory. The broader service package and staging-client verification remain outstanding.
-
-### 5.2 Household mobile (`HouseholdMobileService`, 2,176 physical lines at baseline)
+### 5.2 Household mobile (`HouseholdMobileService`, 2,176)
 
 Separate overview/setup, household status report, per-member status report, member profile changes, device location/token, history, and trusted-household features. Map all status/log/device tables and event linkage. Prove household ownership authorization for every `householdId`/`memberId`. Treat JSON-encoded notes and member relationship payloads as distinct formats unless schema proves they share a castable JSON column.
-
-**A1 status:** implemented locally as of 2026-09-30. The service is a 62-line facade; the response Presenter and workflow/query classes are documented in `REFACTOR_REPORT.md`. The broader package remains in progress for the other large services.
 
 ### 5.3 Archive (`ArchiveService`, 1,713)
 
@@ -416,21 +412,3 @@ Use this safety preamble for future code turns:
 - [MySQL `EXPLAIN`](https://dev.mysql.com/doc/refman/8.4/en/using-explain.html)
 - [InnoDB deadlocks and safe retries](https://dev.mysql.com/doc/refman/8.4/en/innodb-deadlocks.html)
 - [The Twelve-Factor App: configuration](https://12factor.net/config) and [logs](https://12factor.net/logs)
-
-#### 5.3 Archive (`ArchiveService`, 1,713 physical lines at baseline)
-
-**A1 status:** implemented locally on 2026-09-30. `ArchiveService` is a 57-line facade. Category reads are in `ArchiveQuery`; event display shaping and detail reads are in `ArchiveEventPresenter` / `ArchiveEventDetailQuery`; saved group, deletion, and CSV export responsibilities are in their corresponding workflow classes. `ArchivePresenter` owns display transformations. The local suite passes (39 tests, 129 assertions), including saved-group payload characterization. Continue to the other four oversized services before calling the broader A1 work complete.
-
-**A1 status:** implemented locally on 2026-09-30. `RescueDispatchService` is 265 lines; query, presenter, and write workflow collaborators own the extracted responsibilities. Route/controller contracts remain unchanged. Full SQLite in-memory suite passes (41 tests, 137 assertions), including dispatch presenter characterization.
-
-#### 5.8 Oversized-service execution status — 2026-09-30
-
-The first-pass refactor of every service above 1,000 lines is complete locally. `RescuerMobileService` is a 199-line facade; `RescuerAccountService` is a 103-line facade with query, presenter, account/team workflows, support validation, and audit logger collaborators. `HouseholdStatusService` is now a 103-line facade with query, presenter, and report/confirmation workflow collaborators. See `REFACTOR_REPORT.md` for all seven facade sizes and extracted responsibilities. The full local SQLite in-memory suite passes: 47 tests, 166 assertions. Shared-database and deployment checks remain outside this local refactor task. The next group of services (all currently below 1,000 lines) is a separate follow-up, not part of this completed oversized-service batch.
-
-
-### Query objects, repositories, and service grouping
-
-Keep `app/Queries` for complex, page-specific reads; put small reusable predicates on model scopes. Repositories are reserved for the existing aggregate persistence boundaries and should not duplicate query-object responsibilities. Do not add model-by-model repositories without a concrete boundary need. Services coordinate use cases, write workflows/actions own transactions, and Resources/Presenters own response shaping. Laravel does not prescribe a `Queries` directory; this is a deliberate local convention consistent with the Query Object pattern. See [Fowler](https://martinfowler.com/eaaCatalog/queryObject.html) and [Laravel application structure](https://laravel.com/docs/13.x/structure).
-
-All service classes are grouped under `app/Services/Mobile`, `app/Services/Web`, or `app/Services/Shared`. Keep cross-channel integrations and capabilities in Shared; mobile endpoint workflows in Mobile; web/admin endpoint workflows in Web.
-

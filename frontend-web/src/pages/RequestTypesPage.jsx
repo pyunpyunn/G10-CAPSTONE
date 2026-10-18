@@ -1,5 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useState } from 'react'
 import {
   Activity,
   ArrowRight,
@@ -38,11 +37,9 @@ function getCategoryIcon(categoryKey = '') {
 }
 
 export default function RequestTypesPage() {
-  const navigate = useNavigate()
-
   // Pagination & Filter States
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(24)
+  const perPage = 24
   const [category, setCategory] = useState('all')
   const [status, setStatus] = useState('all')
   const [sort, setSort] = useState('newest')
@@ -522,7 +519,7 @@ export default function RequestTypesPage() {
       />
 
       {/* Interactive Resource Request Modal */}
-      <RequestResourceModal
+      {isRequestModalOpen && requestModalItem && <RequestResourceModal
         item={requestModalItem}
         isOpen={isRequestModalOpen}
         onClose={() => {
@@ -530,7 +527,7 @@ export default function RequestTypesPage() {
           setRequestModalItem(null)
         }}
         onSuccess={handleRequestSuccess}
-      />
+      />}
     </main>
   )
 }

@@ -373,15 +373,7 @@ class ArchivePresenter
 
     public function statusTone(?string $status): string
     {
-        $key = $this->statusKey($status);
-
-        return match ($key) {
-            'safe', 'evacuated', 'verified', 'forwarded', 'fulfilled', 'completed', 'on_scene', 'returned_home', 'generated' => 'green',
-            'active', 'dispatched', 'en_route', 'needs_validation', 'pending', 'assigned' => 'amber',
-            'unsafe', 'injured', 'missing', 'not_evacuated', 'displaced', 'returned', 'cancelled', 'failed', 'critical', 'ptt_start', 'ptt_heartbeat' => 'red',
-            'reviewed', 'archived' => 'purple',
-            default => 'gray',
-        };
+        return \App\Support\StatusPalette::tone($status);
     }
 
     public function radioDisplayMessage(string $type, array $message, string $responderName): string

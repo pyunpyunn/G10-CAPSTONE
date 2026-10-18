@@ -1,3 +1,4 @@
+import { statusColor } from '@/constants/statusPalette';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.web';
@@ -36,7 +37,7 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
       longitude: assignment.longitude,
       label: assignment.assigned_area || assignment.household_id || 'Dispatch destination',
       description: assignment.status_label || 'Active dispatch',
-      color: assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated,
+      color: statusColor(assignment.status_key),
     })) : []),
   ];
   const routes = showAssignedRoutes ? mappedAssignments.flatMap((assignment) => {
@@ -48,7 +49,7 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
         id: `dispatch-${assignment.assignment_id}`,
         label: `${assignment.assigned_area || assignment.household_id || 'Dispatch'} · planned route`,
         coordinates: planned,
-        color: assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated,
+        color: statusColor(assignment.status_key),
       }] : []),
       ...(trail.length > 1 ? [{
         id: `dispatch-trail-${assignment.assignment_id}`,

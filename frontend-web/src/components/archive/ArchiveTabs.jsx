@@ -1,7 +1,8 @@
 import { ARCHIVE_TABS } from '../../utils/archiveHelpers'
 import { Archive, Menu } from 'lucide-react'
 
-export default function ArchiveTabs({ activeCategory, onChange, isOpen, onToggle, counts = {} }) {
+export default function ArchiveTabs({ activeCategory, onChange, isOpen, onToggle, counts = {}, isSuperAdmin = false }) {
+  const tabs = [...ARCHIVE_TABS.filter(tab => isSuperAdmin || tab.key !== 'inquiry-logs'), { key: 'evatrack-reports', label: 'EvaTrack Reports' }]
   return (
     <aside className={`archive-category-rail ${isOpen ? 'is-open' : 'is-collapsed'}`}>
       <div className="archive-rail-head">
@@ -11,7 +12,7 @@ export default function ArchiveTabs({ activeCategory, onChange, isOpen, onToggle
         </button>
       </div>
       <nav className="archive-tabs" role="tablist" aria-label="Archive categories">
-        {ARCHIVE_TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             className={`archive-tab ${activeCategory === tab.key ? 'active' : ''}`}
             type="button"

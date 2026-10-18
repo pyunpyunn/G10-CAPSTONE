@@ -80,4 +80,23 @@ class SelectDispatchRespondersTest extends TestCase
 
         $this->assertSame([2], $selection['ids']);
     }
+
+    public function test_explicit_rescuers_are_selected_in_the_requested_order(): void
+    {
+        $selection = DB::transaction(fn () => app(SelectDispatchResponders::class)->select(4, 'EVT-1', 2, null, null, [2,1]));
+        $this->assertSame([2,1], $selection['ids']);
+        $this->assertSame(['Near','Far'], $selection['names']);
+    }
+
+    public function test_explicit_selection_rejects_busy_wrong_team_duplicate_and_mismatched_members(): void
+    {
+        foreach ([[1,3],[1,4],[1,1],[1]] as $ids) {
+            try {
+                DB::transaction(fn () => app(SelectDispatchResponders::class)->select(4, 'EVT-1', 2, null, null, $ids));
+                $this->fail('Invalid explicit members must not be replaced silently.');
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                $this->assertArrayHasKey('selected_responder_ids', $exception->errors());
+            }
+        }
+    }
 }

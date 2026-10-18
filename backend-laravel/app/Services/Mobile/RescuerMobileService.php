@@ -64,7 +64,7 @@ class RescuerMobileService
     {
         $user = $request->user()?->load('role');
         $responder = $this->support->responderForUser($user);
-        $assignments = $this->assignmentQuery->list($responder?->responder_id, 10);
+        $assignments = $this->personalizeAssignmentHouseholds($this->assignmentQuery->list($responder?->responder_id, 10), $responder?->responder_id);
         $activeEvent = $this->support->activeEvent();
 
         return [
@@ -88,7 +88,7 @@ class RescuerMobileService
     {
         $responder = $this->support->responderForUser($request->user());
 
-        return $this->assignmentQuery->list($responder?->responder_id, 30);
+        return $this->personalizeAssignmentHouseholds($this->assignmentQuery->list($responder?->responder_id, 30), $responder?->responder_id);
     }
 
     public function assignment(Request $request, int $assignmentId): JsonResponse|array
@@ -103,6 +103,7 @@ class RescuerMobileService
         }
 
         $assignment->mobile_route = $this->assignmentQuery->routeForAssignment($assignmentId);
+        $assignment = $this->personalizeAssignmentHouseholds(collect([$assignment]), $responder?->responder_id)->first();
 
         return [
             'assignment' => $assignment,
@@ -113,6 +114,33 @@ class RescuerMobileService
     public function updateAssignmentStatus(Request $request, int $assignmentId): JsonResponse|array
     {
         return $this->assignmentWorkflow->updateAssignmentStatus($request, $assignmentId);
+    }
+
+    private function personalizeAssignmentHouseholds(Collection $assignments, ?int $responderId): Collection
+    {
+        if (!$responderId || $assignments->isEmpty()) return $assignments;
+        $coverage = $assignments->mapWithKeys(function ($assignment) use ($responderId) {
+            $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
+            $ids = isset($notes['responder_households']) && array_key_exists($responderId, $notes['responder_households'])
+                ? $notes['responder_households'][$responderId] : ($assignment->household_id ? [$assignment->household_id] : []);
+            return [$assignment->assignment_id => $ids];
+        });
+        $ids = $coverage->flatten()->unique()->values()->all();
+        $households = $ids && \App\Support\RequestSchema::hasTable('households')
+            ? \App\Models\Household::query()->whereIn('household_id', $ids)->get()->keyBy('household_id') : collect();
+        return $assignments->map(function ($assignment) use ($coverage, $households) {
+            $assignment = clone $assignment;
+            $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
+            $notes['assigned_household_ids'] = $coverage[$assignment->assignment_id];
+            $notes['assigned_household_count'] = count($notes['assigned_household_ids']);
+            $notes['assigned_households'] = collect($notes['assigned_household_ids'])->map(function ($id) use ($households) {
+                $household = $households->get($id);
+                return ['household_id'=>$id, 'household_name'=>$household?->household_name ?? $household?->household_code ?? $id,
+                    'household_code'=>$household?->household_code, 'member_count'=>$household?->member_count];
+            })->values()->all();
+            $assignment->route_notes = json_encode($notes);
+            return $assignment;
+        });
     }
 
     public function storeLocation(Request $request, int $assignmentId): JsonResponse

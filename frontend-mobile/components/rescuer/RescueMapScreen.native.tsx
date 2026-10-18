@@ -1,3 +1,4 @@
+import { statusColor } from '@/constants/statusPalette';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -122,7 +123,7 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
       longitude: assignment.longitude,
       label: assignment.assigned_area || assignment.household_id || 'Dispatch destination',
       description: assignment.status_label || 'Active dispatch',
-      color: assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated,
+      color: statusColor(assignment.status_key),
     })) : []),
     ...(position ? [{ ...position, label: 'My live GPS', description: tracking ? 'Location tracking active' : '', color: palette.navActive }] : []),
   ];
@@ -136,7 +137,7 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
         id: `dispatch-${assignment.assignment_id}`,
         label: `${assignment.assigned_area || assignment.household_id || 'Dispatch'} · planned route`,
         coordinates: planned,
-        color: assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated,
+        color: statusColor(assignment.status_key),
       }] : []),
       ...(trail.length > 1 ? [{
         id: `dispatch-trail-${assignment.assignment_id}`,

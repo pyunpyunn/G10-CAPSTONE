@@ -1,67 +1,52 @@
+import { statusColor } from '../utils/statusPalette'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { ArrowRight } from 'lucide-react'
 import { getDispatchDashboard, getSitioPriorities } from '../api/dispatchApi'
 import DispatchSummary from '../components/dispatch/DispatchSummary'
+import DispatchStatusBadge from '../components/dispatch/DispatchStatusBadge'
 import DispatchSidePanel from '../components/dispatch/DispatchSidePanel'
 import FieldCommunicationPanel from '../components/dispatch/FieldCommunicationPanel'
-import EmptyState from '../components/ui/EmptyState'
-import PageHeader from '../components/ui/PageHeader'
-import LoadingState from '../components/ui/LoadingState'
+import { ResponseOperationsLayout } from '../components/ui/PageHeader'
 import { useModuleData } from '../utils/useModuleData'
 import { emptySummary } from '../utils/dispatchHelpers'
 
 export default function RescueDispatchPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [selectedSitioId, setSelectedSitioId] = useState(null)
+  const [open, setOpen] = useState(undefined)
   const loader = useCallback(async () => {
     const [workspace, priorities] = await Promise.allSettled([getDispatchDashboard({ per_page: 5 }), getSitioPriorities()])
     if (workspace.status === 'rejected') throw workspace.reason
-    return { ...workspace.value, priorities: priorities.status === 'fulfilled' ? priorities.value : [],
-      priorityError: priorities.status === 'rejected' ? 'Rescue priorities could not be loaded. Please refresh to try again.' : '' }
+    const sitioCoverage = new Map((workspace.value?.sitio_coverage || []).map((item) => [String(item.sitio_id), item]))
+    const rankedSitios = priorities.status === 'fulfilled' && Array.isArray(priorities.value) ? priorities.value : []
+    return { ...workspace.value, priorities: rankedSitios.map((row) => ({ ...row, activeDispatches: sitioCoverage.get(String(row.sitio_id))?.active_assignments || [] })), priorityError: priorities.status === 'rejected' ? 'Rescue priorities could not be loaded. Please refresh.' : '' }
   }, [])
-  const { data, error, loading, refresh } = useModuleData(loader)
-  useEffect(() => {
-    if (location.state?.selectedHousehold) navigate('/rescue-management/new', { replace: true, state: location.state })
-  }, [location.state, navigate])
-  return <main className="ops-page dispatch-page response-operations-page">
-    <PageHeader title="Dispatch Dashboard" subtitle={data?.active_event?.name || data?.area_label || 'Response Operations'}
-      actions={<div className="response-panel-actions"><button className="btn btn-secondary" type="button" onClick={refresh}>Refresh dashboard</button>
-        <Link className="button review" to="/rescue-management">Rescue Management</Link></div>} />
+  const { data, error, loading } = useModuleData(loader, ['dispatch', 'households', 'disasters', 'accounts'])
+  const selected = open === undefined ? data?.priorities?.[0]?.sitio_id : open
+  useEffect(() => { if (location.state?.selectedHousehold) navigate('/rescue-management/new', { replace: true, state: location.state }) }, [location.state, navigate])
+  return <ResponseOperationsLayout><section className="pg on">
     {error && <div className="form-error" role="alert">{error}</div>}
-    {loading && <LoadingState />}
+    {loading && <div className="empty-reference" role="status">Loading dashboard…</div>}
     {!loading && data && <>
-      {!data.active_event && <div className="standby-strip"><strong>No active disaster event</strong><span>Dispatch creation becomes available when a disaster event is declared.</span></div>}
-      <div className="dispatch-workspace-grid">
-        <div className="dispatch-main-panel">
-          <FieldCommunicationPanel compact recordingsOnly />
-          <section className="panel sitio-ranking-panel dispatch-priority-panel" aria-label="Rescue Priority Panel">
-            <div className="panel-head"><span className="panel-title">Rescue Priority</span></div>
-            {data.priorityError ? <div className="form-error" role="alert">{data.priorityError}</div> : !data.priorities.length ?
-              <EmptyState title="No sitio priorities yet" message="Sitio rankings appear when an active disaster event is available." /> :
-              <ol className="sitio-priority-list" aria-label="Sitio ranking list">
-                {data.priorities.map((row) => <li key={row.sitio_id} className={selectedSitioId === row.sitio_id ? 'is-selected' : ''}>
-                  <button className="sitio-priority-choice" type="button" aria-pressed={selectedSitioId === row.sitio_id}
-                    aria-describedby={`dispatch-sitio-${row.sitio_id}`} onClick={() => setSelectedSitioId(row.sitio_id)}>
-                    <span className="sitio-priority-rank">{row.rank}</span>
-                    <span className="sitio-priority-name">{row.sitio}</span>
-                    <span className={`sitio-priority-chip ${row.band?.key || 'low'}`}>{row.band?.label || 'Low'}</span>
-                    <strong>{Number(row.priority_score || 0).toFixed(1)}%</strong>
-                  </button>
-                  <span id={`dispatch-sitio-${row.sitio_id}`} className="sitio-priority-tooltip" role="tooltip">
-                    <b>{row.sitio} summary</b><span>{row.households} households</span>
-                    <span>{row.impacted_households} unsafe / affected</span><span>{row.unreported_members} unreported members</span>
-                    <span>{row.no_contact_households} no contact channel</span>
-                  </span>
-                </li>)}
-              </ol>}
-          </section>
-        </div>
-        <aside className="side-panel dispatch-side-panel" aria-label="Dispatch summary, progress and team coverage">
-          <DispatchSummary summary={data.summary || emptySummary()} />
-          <DispatchSidePanel teams={data.team_coverage || []} />
-        </aside>
-      </div>
+      {!data.active_event && <div className="nb">No active event · dispatch disabled</div>}
+      <div className="dash"><DispatchSummary summary={data.summary || emptySummary()} /><div className="r2">
+        <div className="cd pri"><div className="ch">Rescue Priority</div><div className="cb">
+          {data.priorityError ? <div className="form-error" role="alert">{data.priorityError}</div> : !data.priorities.length ? <div className="empty-reference">No rescue priorities</div> : [
+            { title:'Awaiting assignment', rows:data.priorities.filter((row) => !row.activeDispatches.length) },
+            { title:'Already assigned sitios', rows:data.priorities.filter((row) => row.activeDispatches.length) },
+          ].map((list) => <section className="sitio-priority-list" key={list.title} aria-label={list.title}><h3>{list.title}<span>{list.rows.length}</span></h3>{!list.rows.length ? <div className="mu sitio-list-empty">{list.title === 'Already assigned sitios' ? 'No sitios have active dispatches.' : 'No sitios are awaiting assignment.'}</div> : list.rows.map((row) => {
+            const color = statusColor(row.band?.key || 'low')
+            const statuses = [...new Map(row.activeDispatches.map((assignment) => [assignment.status.key, assignment.status])).values()]
+            const rescuerIds = new Set(row.activeDispatches.flatMap((assignment) => assignment.selected_responder_ids || (assignment.responder_id ? [assignment.responder_id] : [])).map(String))
+            return <div key={row.sitio_id} className={`pr${selected === row.sitio_id ? ' on' : ''}`}><button className="ph2" type="button" aria-expanded={selected === row.sitio_id} onClick={() => setOpen(selected === row.sitio_id ? null : row.sitio_id)}><span className="rk">{row.rank}</span><b>{row.sitio}</b><span className="sc"><i style={{ width: `${Math.max(0, Math.min(100, Number(row.priority_score) || 0))}%`, background: color }} /></span><em>{row.priority_score}%</em><span className="pl" style={{ '--c': color }}>{row.band?.label || 'Low'}</span></button>
+              {!!row.activeDispatches.length && <div className="sitio-deployment-status">{statuses.map((status) => <DispatchStatusBadge key={status.key} status={status} />)}<span className="mu">{rescuerIds.size} assigned rescuers · {row.activeDispatches.length} active assignments</span></div>}
+              <div className="px"><div className="sitio-priority-detail"><div className="xr"><div className="mts"><span>Households <b>{row.households}</b></span><span>Unsafe <b>{row.impacted_households}</b></span><span>Unreported <b>{row.unreported_members}</b></span><span>No contact <b>{row.no_contact_households}</b></span></div><button className="go" type="button" disabled={!data.active_event} onClick={() => navigate('/rescue-management/new', { state: { selectedSitio: row } })}>Dispatch <ArrowRight size={12} /></button></div>
+              {!!row.activeDispatches.length && <div className="sitio-assignment-list">{row.activeDispatches.map((assignment) => <Link key={assignment.assignment_id} to={`/rescue-management/${assignment.assignment_id}/edit`}><span><b>{assignment.assignment_code}</b> · {assignment.team_name}<small>{assignment.assigned_area}</small></span><DispatchStatusBadge status={assignment.status} /><ArrowRight size={12} /></Link>)}</div>}
+              </div></div></div>
+          })}</section>)}
+        </div></div><FieldCommunicationPanel compact recordingsOnly />
+      </div></div><DispatchSidePanel teams={data.team_coverage || []} responders={data.responders || []} />
     </>}
-  </main>
+  </section></ResponseOperationsLayout>
 }

@@ -3,6 +3,7 @@
 namespace App\Presenters;
 
 use Carbon\Carbon;
+use App\Models\User;
 use Illuminate\Support\Collection;
 
 class ProfilePresenter
@@ -13,8 +14,8 @@ class ProfilePresenter
         $roleName = $user->roleName();
         return [
             ['label' => 'Account ID', 'value' => $user->username ?: $user->user_id, 'note' => 'Credential role auto-detected'],
-            ['label' => 'Role', 'value' => $this->roleShortName($roleKey), 'note' => $roleName ?: 'HQ/Admin'],
-            ['label' => 'Access level', 'value' => $roleKey === 'super_admin' ? 'Full+' : 'Full', 'note' => 'Broadcast, SitRep, archive, dispatch'],
+            ['label' => 'Role', 'value' => $this->roleShortName($roleKey), 'note' => $roleName ?: 'Unassigned'],
+            ['label' => 'Access level', 'value' => $this->accessLevel($roleKey), 'note' => $this->accessSummary($roleKey)],
             ['label' => 'Last login', 'value' => $lastSeen ? Carbon::parse($lastSeen)->format('g:i A') : 'Current', 'note' => $lastSeen ? Carbon::parse($lastSeen)->format('M d, Y') : 'Current session'],
         ];
     }
@@ -40,43 +41,41 @@ class ProfilePresenter
             'contact_number' => $user->contact_number ?: 'No mobile recorded',
             'status' => $user->is_active ? 'Active and verified' : 'Inactive',
             'assigned_station' => $user->assigned_center_id ?: 'Command desk',
-            'role_name' => $user->roleName() ?: 'HQ/Admin',
-            'role_key' => $user->roleKey() ?: 'admin',
+            'role_name' => $user->roleName() ?: 'Unassigned',
+            'role_key' => $user->roleKey() ?: 'unassigned',
         ];
     }
 
-    public function permissions(?string $roleKey): array
+    public function permissions(User $user): array
     {
+        $modules = app(\App\Services\Web\WebAccessPolicy::class)->modulesFor($user);
         $items = [
-            [
-                'key' => 'broadcast',
-                'title' => 'Disaster broadcast control',
-                'description' => 'Declare, send, and close official disaster broadcasts.',
-            ],
-            [
-                'key' => 'dispatch',
-                'title' => 'Rescue dispatch coordination',
-                'description' => 'Open dispatch forms, assign teams, and review field route updates.',
-            ],
-            [
-                'key' => 'sitrep',
-                'title' => 'Situation reporting and archive',
-                'description' => 'Generate SitReps and view historical disaster event records.',
-            ],
-            [
-                'key' => 'accounts',
-                'title' => 'Responder account management',
-                'description' => 'Create verified rescuer accounts and maintain team rosters.',
-            ],
+            ['key' => 'dashboard', 'title' => 'Dashboard', 'description' => 'Operational overview and current status.'],
+            ['key' => 'geospatial_analytics', 'title' => 'Geospatial & analytics', 'description' => 'Maps, weather, and household status data.'],
+            ['key' => 'response_operations', 'title' => 'Response operations', 'description' => 'Disaster response, dispatch, and field coordination.'],
+            ['key' => 'resources_requests', 'title' => 'Resources & requests', 'description' => 'Resource request tracking and logistics workflow.'],
+            ['key' => 'reports_documentation', 'title' => 'Reports documentation', 'description' => 'Situation reports and operational archives.'],
+            ['key' => 'personnel_access', 'title' => 'Personnel access', 'description' => 'Manage HQ personnel, responders, and teams.'],
+            ['key' => 'profile', 'title' => 'Profile', 'description' => 'View and update your personal profile.'],
+            ['key' => 'notifications', 'title' => 'Notifications', 'description' => 'View notices allowed for your role.'],
+            ['key' => 'inquiries', 'title' => 'Inquiries', 'description' => 'Review public inquiries.'],
         ];
 
-        return collect($items)
-            ->map(fn (array $item): array => [
-                ...$item,
-                'status' => in_array($roleKey, ['super_admin', 'admin'], true) ? 'Enabled' : 'Limited',
-                'tone' => in_array($roleKey, ['super_admin', 'admin'], true) ? 'green' : 'amber',
-            ])
-            ->all();
+        $permissions = collect($items)->map(fn (array $item): array => [
+            ...$item,
+            'status' => in_array($item['key'], $modules, true) ? 'Enabled' : 'Not granted',
+            'tone' => in_array($item['key'], $modules, true) ? 'green' : 'gray',
+        ])->all();
+        $canApprove = app(\App\Services\Web\WebAccessPolicy::class)->allows($user, 'resources_requests', 'approve');
+        $permissions[] = [
+            'key' => 'resource_request_approval',
+            'title' => 'Logistics request approval',
+            'description' => 'Validate, return, and forward requests to the next logistics handoff.',
+            'status' => $canApprove ? 'Enabled' : 'Not granted',
+            'tone' => $canApprove ? 'green' : 'gray',
+        ];
+
+        return $permissions;
     }
 
     public function activityDate(?string $value): string
@@ -100,7 +99,35 @@ class ProfilePresenter
 
     public function roleShortName(?string $roleKey): string
     {
-        return $roleKey === 'super_admin' ? 'Super Admin' : 'HQ';
+        return match ($roleKey) {
+            'super_admin' => 'Super Admin',
+            'hq_leader' => 'HQ Leader',
+            'hq_personnel' => 'HQ Personnel',
+            'rescuer' => 'Rescuer Member',
+            default => 'Unassigned',
+        };
+    }
+
+    private function accessLevel(?string $roleKey): string
+    {
+        return match ($roleKey) {
+            'super_admin' => 'Platform',
+            'hq_leader' => 'Command',
+            'hq_personnel' => 'Operations',
+            'rescuer' => 'Field',
+            default => 'None',
+        };
+    }
+
+    private function accessSummary(?string $roleKey): string
+    {
+        return match ($roleKey) {
+            'super_admin' => 'All modules, including inquiries',
+            'hq_leader' => 'All modules except inquiries',
+            'hq_personnel' => 'Dashboard, geospatial, response, resources, reports',
+            'rescuer' => 'Dashboard, geospatial, profile',
+            default => 'No web modules',
+        };
     }
 
     public function label(?string $value): string

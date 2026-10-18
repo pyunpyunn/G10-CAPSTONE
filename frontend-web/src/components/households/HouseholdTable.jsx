@@ -1,3 +1,4 @@
+import { statusColor } from '../../utils/statusPalette'
 import { MapPin } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
 
@@ -73,7 +74,7 @@ export default function HouseholdTable({ households, meta, selectedPurok, onOpen
 export function StatusBadge({ status }) {
   const key = status?.key || 'unknown'
   const label = status?.label || 'Status unavailable'
-  return <span className={`status-badge ${key}`}>{label}</span>
+  return <span className={`status-badge ${key}`} style={{ '--status-color': statusColor(key) }}>{label}</span>
 }
 
 export function PriorityPill({ priority }) {

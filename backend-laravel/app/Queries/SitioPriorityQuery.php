@@ -27,17 +27,9 @@ class SitioPriorityQuery
             }
         }
         $sitios = Sitio::query()->where('barangay_id', $barangayId)->orderBy('sitio_name')->get(['sitio_id', 'sitio_name'])->keyBy('sitio_id');
-        $compositeName = DB::connection()->getDriverName() === 'sqlite'
-            ? "(p.purok_name || ', ' || s.sitio_name)"
-            : "CONCAT(p.purok_name, ', ', s.sitio_name)";
         $puroks = DB::table('puroks as p')
             ->join('sitios as s', 's.sitio_id', '=', 'p.sitio_id')
-            ->leftJoin('addresses as a', function ($join) use ($compositeName): void {
-                $join->on('a.purok_id', '=', 'p.purok_id')
-                    ->orWhereRaw("(a.purok_id IS NULL AND a.barangay_id = s.barangay_id AND
-                        ((a.sitio_id = p.sitio_id AND a.purok_sitio = p.purok_name)
-                        OR (a.sitio_id IS NULL AND a.purok_sitio = {$compositeName})))");
-            })
+            ->leftJoin('addresses as a', fn ($join) => $join->on('a.purok_id', '=', 'p.purok_id')->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId)))
             ->leftJoin('households as h', fn ($join) => $join->on('h.address_id', '=', 'a.address_id')->whereNull('h.deleted_at'))
             ->whereIn('p.sitio_id', $sitios->pluck('sitio_id'))
             ->groupBy('p.purok_id', 'p.sitio_id', 'p.purok_name')
@@ -49,7 +41,7 @@ class SitioPriorityQuery
             ->leftJoin('puroks as p', 'p.purok_id', '=', 'a.purok_id')
             ->leftJoin('household_disasters as hd', fn ($join) => $join->on('hd.household_id', '=', 'h.household_id')->where('hd.disaster_id', $eventId))
             ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
-            ->where('a.barangay_id', $barangayId)->whereNull('h.deleted_at')
+            ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId))->whereNull('h.deleted_at')
             ->groupBy('a.sitio_id', 'p.sitio_id', 'a.purok_id', 'a.purok_sitio')
             ->selectRaw('a.sitio_id as address_sitio_id, p.sitio_id as purok_sitio_id, a.purok_id as address_purok_id, a.purok_sitio as address_label')
             ->selectRaw('COUNT(DISTINCT h.household_id) as households')
@@ -70,7 +62,7 @@ class SitioPriorityQuery
             ->leftJoin('puroks as p', 'p.purok_id', '=', 'a.purok_id')
             ->leftJoin('member_disaster_statuses as report', fn ($join) => $join->on('report.member_id', '=', 'm.member_id')->where('report.disaster_id', $eventId))
             ->leftJoin('member_statuses as ms', 'ms.status_id', '=', 'report.status_id')
-            ->where('a.barangay_id', $barangayId)->whereNull('h.deleted_at')->whereNull('m.deleted_at')
+            ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId))->whereNull('h.deleted_at')->whereNull('m.deleted_at')
             ->groupBy('a.sitio_id', 'p.sitio_id', 'a.purok_id', 'a.purok_sitio')
             ->selectRaw('a.sitio_id as address_sitio_id, p.sitio_id as purok_sitio_id, a.purok_id as address_purok_id, a.purok_sitio as address_label')
             ->selectRaw('COUNT(DISTINCT m.member_id) as total_members')
@@ -83,34 +75,35 @@ class SitioPriorityQuery
                 THEN m.member_id END) as unresolved_vulnerable_members")
             ->get();
 
-        $normalize = fn (string $name): string => mb_strtolower(trim($name));
-        $labels = [];
-        foreach ($sitios as $sitio) {
-            $labels[$normalize($sitio->sitio_name)] = [(int) $sitio->sitio_id, null];
-        }
-        foreach ($puroks as $sitePuroks) {
-            foreach ($sitePuroks as $purok) {
-                $sitio = $sitios->get($purok->sitio_id);
-                if ($sitio) $labels[$normalize($purok->purok_name.', '.$sitio->sitio_name)] = [(int) $sitio->sitio_id, (int) $purok->purok_id];
-            }
-        }
-        $resolveSitio = function (object $row) use ($sitios, $labels, $normalize): ?array {
-            $sitioId = $row->address_sitio_id ?? $row->purok_sitio_id;
-            $purokId = $row->address_purok_id;
-            if ($sitioId === null) {
-                $match = $labels[$normalize((string) $row->address_label)] ?? null;
-                if ($match) [$sitioId, $purokId] = $match;
-            }
+        $resolveSitio = function (object $row) use ($sitios): ?array {
+            $sitioId = $row->purok_sitio_id ?? $row->address_sitio_id;
             return $sitioId !== null && $sitios->has($sitioId)
-                ? ['sitio_id' => (int) $sitioId, 'purok_id' => $purokId === null ? null : (int) $purokId]
+                ? ['sitio_id' => (int) $sitioId, 'purok_id' => $row->address_purok_id === null ? null : (int) $row->address_purok_id]
                 : null;
         };
+        // Only the latest valid report in this event contributes to the status stack.
+        $latestStatus = DB::table('household_status_logs as report')
+            ->join('household_statuses as status', 'status.status_id', '=', 'report.status_id')
+            ->whereColumn('report.household_id', 'h.household_id')
+            ->where('report.disaster_id', $eventId)
+            ->whereIn('status.status_key', HouseholdEventStatusQuery::VALID_KEYS)
+            ->orderByDesc('report.submitted_at')->orderByDesc('report.status_log_id')
+            ->select('status.status_key')->limit(1);
+        $statusRows = DB::table('households as h')
+            ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->leftJoin('puroks as p', 'p.purok_id', '=', 'a.purok_id')
+            ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId))->whereNull('h.deleted_at')
+            ->select('a.sitio_id as address_sitio_id', 'p.sitio_id as purok_sitio_id',
+                'a.purok_id as address_purok_id', 'a.purok_sitio as address_label')
+            ->selectSub($latestStatus, 'reported_status_key')->get();
+        $purokStatuses = [];
         $groups = $sitios->mapWithKeys(fn (Sitio $sitio): array => [(int) $sitio->sitio_id => [
                 'sitio_id' => (int) $sitio->sitio_id,
                 'sitio' => $sitio->sitio_name,
                 'is_catalogued' => true,
                 'address_labels' => [],
                 'households' => 0,
+                'status_counts' => ['unsafe' => 0, 'unchecked' => 0, 'evacuated' => 0, 'safe' => 0],
                 'impacted_households' => 0,
                 'urgent_households' => 0,
                 'total_members' => 0,
@@ -119,6 +112,16 @@ class SitioPriorityQuery
                 'unreported_members' => 0,
                 'no_contact_households' => 0,
             ]])->all();
+        foreach ($statusRows as $statusRow) {
+            $sitio = $resolveSitio($statusRow);
+            if (! $sitio) continue;
+            $key = HouseholdEventStatusQuery::category($statusRow->reported_status_key);
+            $groups[$sitio['sitio_id']]['status_counts'][$key]++;
+            if ($sitio['purok_id'] !== null) {
+                $purokStatuses[$sitio['purok_id']] ??= ['unsafe' => 0, 'unchecked' => 0, 'evacuated' => 0, 'safe' => 0];
+                $purokStatuses[$sitio['purok_id']][$key]++;
+            }
+        }
         foreach ($households as $householdRow) {
             $sitio = $resolveSitio($householdRow);
             if (! $sitio) continue;
@@ -149,7 +152,7 @@ class SitioPriorityQuery
             }
         }
 
-        return collect(array_values($groups))->map(function (array $group) use ($settings, $puroks): array {
+        return collect(array_values($groups))->map(function (array $group) use ($settings, $puroks, $purokStatuses): array {
             $householdTotal = $group['households'];
             $memberTotal = $group['total_members'];
             $shares = [
@@ -172,7 +175,9 @@ class SitioPriorityQuery
                     'purok_id' => (int) $purok->purok_id,
                     'purok_name' => $purok->purok_name,
                     'household_count' => (int) $purok->household_count,
+                    'status_counts' => $purokStatuses[$purok->purok_id] ?? ['unsafe' => 0, 'unchecked' => 0, 'evacuated' => 0, 'safe' => 0],
                 ])->values()->all(),
+                'status_counts' => $group['status_counts'],
                 'households' => $householdTotal, 'impacted_households' => $group['impacted_households'],
                 'urgent_households' => $group['urgent_households'],
                 'special_needs_members' => $group['special_needs_members'],

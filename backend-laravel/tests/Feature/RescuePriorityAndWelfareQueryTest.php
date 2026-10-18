@@ -170,8 +170,211 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
         DB::table('household_disasters')->insert(['household_disaster_id' => 1, 'household_id' => 'HH-2', 'disaster_id' => 'EVT-1', 'current_status_id' => 1, 'needs_dispatch' => 1]);
     }
 
+    public function test_status_stack_uses_latest_valid_event_reports_and_matches_purok_totals(): void
+    {
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
+        DB::table('sitios')->insert(['sitio_id' => 10, 'barangay_id' => 1, 'sitio_name' => 'Sitio A']);
+        DB::table('puroks')->insert(['purok_id' => 31, 'sitio_id' => 10, 'purok_name' => 'Purok A1']);
+        DB::table('addresses')->where('address_id', 1)->update(['sitio_id' => 10, 'purok_id' => 31]);
+        // A different barangay must never inflate this sitio's status stack.
+        DB::table('addresses')->where('address_id', 2)->update(['sitio_id' => 10]);
+        DB::table('household_statuses')->insert([
+            ['status_id' => 2, 'status_key' => 'safe'],
+            ['status_id' => 3, 'status_key' => 'evacuated'],
+            ['status_id' => 4, 'status_key' => 'unchecked'],
+        ]);
+        foreach (['HH-3', 'HH-4', 'HH-5', 'HH-deleted'] as $id) {
+            DB::table('households')->insert(['household_id' => $id, 'address_id' => 1,
+                'deleted_at' => $id === 'HH-deleted' ? '2026-10-01 00:00:00' : null]);
+        }
+        foreach ([
+            ['HH-1', 'EVT-1', 1, '2026-10-14 08:00:00'],
+            ['HH-1', 'EVT-1', 2, '2026-10-14 09:00:00'],
+            ['HH-1', 'EVT-1', 3, '2026-10-14 09:00:00'],
+            ['HH-1', 'EVT-1', 4, '2026-10-14 10:00:00'],
+            ['HH-3', 'EVT-1', 2, '2026-10-14 09:00:00'],
+            ['HH-4', 'EVT-1', 1, '2026-10-14 09:00:00'],
+            ['HH-5', 'EVT-old', 2, '2026-10-14 11:00:00'],
+            ['HH-deleted', 'EVT-1', 2, '2026-10-14 09:00:00'],
+            ['HH-2', 'EVT-1', 2, '2026-10-14 09:00:00'],
+        ] as [$id, $event, $status, $time]) {
+            DB::table('household_status_logs')->insert(['household_id' => $id,
+                'disaster_id' => $event, 'status_id' => $status, 'submitted_at' => $time]);
+        }
+        $row = app(SitioPriorityQuery::class)->ranked('EVT-1')[0];
+        $this->assertSame(4, $row['households']);
+        $expected = ['unsafe' => 1, 'unchecked' => 1, 'evacuated' => 1, 'safe' => 1];
+        $this->assertSame($expected, $row['status_counts']);
+        $this->assertSame($expected, $row['puroks'][0]['status_counts']);
+        $reports = \App\Queries\HouseholdEventStatusQuery::latestReports('EVT-1')->get()->keyBy('household_id');
+        $this->assertSame(3, (int) $reports['HH-1']->status_id);
+        $this->assertFalse($reports->has('HH-5'));
+        $this->assertTrue(\App\Queries\HouseholdEventStatusQuery::latestReports(null)->get()->isEmpty());
+    }
+
+    public function test_household_list_filters_the_latest_valid_report_in_the_current_barangay(): void
+    {
+        $this->registerFixturePuroks();
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
+        Schema::table('households', function (Blueprint $table): void {
+            $table->string('household_number')->nullable();
+            $table->string('emergency_contact')->nullable();
+        });
+        Schema::table('household_statuses', fn (Blueprint $table) => $table->string('status_label')->nullable());
+        Schema::table('household_disasters', fn (Blueprint $table) => $table->string('priority_level')->nullable());
+        Schema::table('household_status_logs', function (Blueprint $table): void {
+            foreach (['source', 'notes', 'submitted_by_user_id'] as $column) $table->string($column)->nullable();
+            foreach (['latitude', 'longitude', 'battery_level'] as $column) $table->float($column)->nullable();
+        });
+        Schema::table('device_tokens', function (Blueprint $table): void {
+            $table->integer('battery_level')->nullable();
+            foreach (['last_seen_at', 'logged_at', 'updated_at', 'created_at'] as $column) $table->timestamp($column)->nullable();
+        });
+        Schema::create('users', function (Blueprint $table): void {
+            $table->string('user_id')->primary();
+            foreach (['name', 'first_name', 'last_name'] as $column) $table->string($column)->nullable();
+        });
+        DB::table('household_statuses')->insert(['status_id' => 2, 'status_key' => 'safe']);
+        DB::table('household_status_logs')->insert([
+            ['household_id' => 'HH-1', 'disaster_id' => 'EVT-1', 'status_id' => 1, 'submitted_at' => '2026-10-14 08:00:00'],
+            ['household_id' => 'HH-1', 'disaster_id' => 'EVT-1', 'status_id' => 2, 'submitted_at' => '2026-10-14 09:00:00'],
+            ['household_id' => 'HH-1', 'disaster_id' => 'EVT-old', 'status_id' => 1, 'submitted_at' => '2026-10-14 10:00:00'],
+        ]);
+        $service = app(HouseholdStatusQuery::class);
+        $query = $service->householdListQuery('EVT-1');
+        $service->applyListFilters($query, \Illuminate\Http\Request::create('/households', 'GET', ['status' => 'safe_only']));
+        $rows = $query->get();
+        $this->assertSame(['HH-1'], $rows->pluck('household_id')->all());
+        $this->assertSame('safe', $rows[0]->status_key);
+        $this->assertSame('2026-10-14 09:00:00', $rows[0]->last_reported_at);
+        $query = $service->householdListQuery('EVT-1');
+        $service->applyListFilters($query, \Illuminate\Http\Request::create('/households', 'GET', ['status' => 'unsafe']));
+        $this->assertTrue($query->get()->isEmpty());
+        $this->assertNull($service->householdListQuery(null)->first()->current_status_id);
+    }
+
+    public function test_standby_has_no_status_history_or_latest_event_logs(): void
+    {
+        $query = app(HouseholdStatusQuery::class);
+        $this->assertTrue($query->statusLogs('HH-1', null)->isEmpty());
+        $this->assertTrue($query->getLatestLogs(collect(['HH-1']), null)->isEmpty());
+    }
+
+    public function test_sitio_filter_excludes_addresses_without_registered_sitio_or_purok_ids(): void
+    {
+        DB::table('sitios')->insert(['sitio_id' => 10, 'barangay_id' => 1, 'sitio_name' => 'Sitio A']);
+        DB::table('puroks')->insert(['purok_id' => 31, 'sitio_id' => 10, 'purok_name' => 'Purok A1']);
+        DB::table('addresses')->where('address_id', 1)->update(['purok_sitio' => 'Purok A1, Sitio A']);
+        $query = DB::table('households as h')->join('addresses as a', 'a.address_id', '=', 'h.address_id');
+        app(HouseholdStatusQuery::class)->applyListFilters($query,
+            \Illuminate\Http\Request::create('/households', 'GET', ['sitio_id' => 10]));
+        $this->assertSame([], $query->pluck('h.household_id')->all());
+    }
+
+    public function test_sitio_and_purok_ids_filter_only_their_registered_households(): void
+    {
+        DB::table('sitios')->insert([
+            ['sitio_id' => 10, 'barangay_id' => 1, 'sitio_name' => 'Sitio A'],
+            ['sitio_id' => 11, 'barangay_id' => 1, 'sitio_name' => 'Sitio B'],
+        ]);
+        DB::table('puroks')->insert([
+            ['purok_id' => 31, 'sitio_id' => 10, 'purok_name' => 'Purok 1'],
+            ['purok_id' => 32, 'sitio_id' => 11, 'purok_name' => 'Purok 1'],
+            ['purok_id' => 33, 'sitio_id' => 10, 'purok_name' => 'Purok 2'],
+        ]);
+        DB::table('addresses')->where('address_id', 1)->update(['sitio_id' => 10, 'purok_id' => 31]);
+        DB::table('addresses')->where('address_id', 2)->update(['sitio_id' => 11, 'purok_id' => 32, 'barangay_id' => 1]);
+        DB::table('addresses')->insert([
+            ['address_id' => 3, 'sitio_id' => 10, 'purok_id' => 33, 'barangay_id' => 1, 'purok_sitio' => 'Purok 2'],
+            ['address_id' => 4, 'sitio_id' => null, 'purok_id' => null, 'barangay_id' => 1, 'purok_sitio' => 'Purok 1, Sitio A'],
+        ]);
+        DB::table('households')->insert([
+            ['household_id' => 'HH-3', 'address_id' => 3],
+            ['household_id' => 'HH-4', 'address_id' => 4],
+        ]);
+        foreach ([
+            [['sitio_id' => 10], ['HH-1', 'HH-3']],
+            [['sitio_id' => 10, 'purok_id' => 31], ['HH-1']],
+            [['sitio_id' => 10, 'purok_id' => 33], ['HH-3']],
+            [['sitio_id' => 10, 'purok_id' => 32], []],
+            [['purok_id' => 32], ['HH-2']],
+            [['sitio_id' => 'invalid'], []],
+        ] as [$filters, $expected]) {
+            $query = DB::table('households as h')->join('addresses as a', 'a.address_id', '=', 'h.address_id');
+            app(HouseholdStatusQuery::class)->applyListFilters($query, \Illuminate\Http\Request::create('/', 'GET', $filters));
+            $this->assertSame($expected, $query->orderBy('h.household_id')->pluck('h.household_id')->all());
+        }
+    }
+
+    public function test_list_scope_returns_registry_names_and_puroks_without_an_active_event(): void
+    {
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
+        DB::table('sitios')->insert(['sitio_id' => 10, 'barangay_id' => 1, 'sitio_name' => 'Registered Sitio']);
+        DB::table('puroks')->insert(['purok_id' => 31, 'sitio_id' => 10, 'purok_name' => 'Registered Purok']);
+        $scope = app(HouseholdStatusQuery::class)->listScope(\Illuminate\Http\Request::create('/', 'GET', [
+            'sitio_id' => 10, 'purok_id' => 31, 'sitio' => 'Incorrect URL title',
+        ]));
+        $this->assertSame(['sitio_id' => 10, 'sitio_name' => 'Registered Sitio'], $scope['sitio']);
+        $this->assertSame(['purok_id' => 31, 'purok_name' => 'Registered Purok'], $scope['purok']);
+        $this->assertSame([$scope['purok']], $scope['puroks']);
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        app(HouseholdStatusQuery::class)->listScope(\Illuminate\Http\Request::create('/', 'GET', ['sitio_id' => 11, 'purok_id' => 31]));
+    }
+
+    public function test_dispatch_areas_keep_same_named_puroks_separate_and_use_the_current_barangay(): void
+    {
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
+        Schema::table('addresses', fn (Blueprint $table) => $table->string('house_number')->nullable());
+        Schema::table('household_statuses', fn (Blueprint $table) => $table->string('status_label')->nullable());
+        Schema::table('household_disasters', function (Blueprint $table): void {
+            $table->string('priority_level')->nullable();
+            $table->integer('last_battery_level')->nullable();
+        });
+        Schema::table('geotagged_locations', function (Blueprint $table): void {
+            $table->string('location_label')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('responder_assignments', function (Blueprint $table): void {
+            $table->integer('assignment_id')->primary();
+            foreach (['disaster_id', 'status', 'household_id', 'route_notes'] as $column) $table->string($column)->nullable();
+        });
+        DB::table('sitios')->insert([
+            ['sitio_id' => 10, 'barangay_id' => 1, 'sitio_name' => 'Sitio A'],
+            ['sitio_id' => 11, 'barangay_id' => 1, 'sitio_name' => 'Sitio B'],
+        ]);
+        DB::table('puroks')->insert([
+            ['purok_id' => 31, 'sitio_id' => 10, 'purok_name' => 'Purok 1'],
+            ['purok_id' => 32, 'sitio_id' => 11, 'purok_name' => 'Purok 1'],
+        ]);
+        DB::table('addresses')->where('address_id', 1)->update(['purok_id' => 31, 'sitio_id' => 10]);
+        DB::table('addresses')->insert(['address_id' => 3, 'barangay_id' => 1, 'purok_id' => 32, 'sitio_id' => 11, 'purok_sitio' => 'Purok 1']);
+        DB::table('households')->insert(['household_id' => 'HH-3', 'address_id' => 3]);
+        DB::table('household_status_logs')->insert(['household_id' => 'HH-1', 'disaster_id' => 'EVT-1', 'status_id' => 1, 'submitted_at' => '2026-10-14 09:00:00']);
+        $areas = app(\App\Queries\RescueDispatchQuery::class)->riskAreas('EVT-1')->keyBy('purok_id');
+        $this->assertCount(2, $areas);
+        $this->assertSame('Purok 1, Sitio A', $areas[31]['area_name']);
+        $this->assertSame('Purok 1, Sitio B', $areas[32]['area_name']);
+        $this->assertSame(['HH-1'], $areas[31]['households']->pluck('household_id')->all());
+        $this->assertSame(['HH-3'], $areas[32]['households']->pluck('household_id')->all());
+        $this->assertSame(1, $areas[31]['unsafe_households']);
+        $this->assertNotEquals($areas[31]['id'], $areas[32]['id']);
+    }
+
     public function test_welfare_list_is_derived_from_contact_and_active_event_reports(): void
     {
+        $this->registerFixturePuroks();
         $query = app(WelfareCheckQuery::class);
         $this->assertTrue($query->qualifies('HH-1', 'EVT-1'));
         $this->assertFalse($query->qualifies('HH-2', 'EVT-1'));
@@ -214,7 +417,8 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
             'unreported_weight' => 25, 'no_contact_weight' => 15,
         ]);
         DB::table('sitios')->insert(['sitio_id' => 10, 'barangay_id' => 1, 'sitio_name' => 'Sitio A']);
-        DB::table('addresses')->where('address_id', 1)->update(['sitio_id' => 10]);
+        DB::table('puroks')->insert(['purok_id' => 31, 'sitio_id' => 10, 'purok_name' => 'Purok A']);
+        DB::table('addresses')->where('address_id', 1)->update(['sitio_id' => 10, 'purok_id' => 31]);
         DB::table('households')->insert([
             'household_id' => 'HH-3', 'address_id' => 1, 'household_name' => 'Third', 'member_count' => 3,
         ]);
@@ -255,7 +459,7 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
         ], $row['contributions']);
     }
 
-    public function test_sitio_priority_uses_catalog_names_and_ignores_unmatched_address_labels(): void
+    public function test_sitio_priority_excludes_households_with_only_address_labels(): void
     {
         $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
             public function __construct() {}
@@ -281,10 +485,10 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
 
         $this->assertSame(['Sitio A'], $sitioNames);
         $this->assertSame(10, $rows[0]['sitio_id']);
-        $this->assertSame(1, $rows[0]['households']);
+        $this->assertSame(0, $rows[0]['households']);
     }
 
-    public function test_household_list_accepts_an_exact_purok_and_sitio_label_when_ids_are_missing(): void
+    public function test_household_list_excludes_name_only_addresses_when_purok_id_is_requested(): void
     {
         DB::table('sitios')->insert(['sitio_id' => 10, 'barangay_id' => 1, 'sitio_name' => 'Sitio A']);
         DB::table('puroks')->insert(['purok_id' => 31, 'sitio_id' => 10, 'purok_name' => 'Purok A1']);
@@ -294,11 +498,13 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
 
         app(HouseholdStatusQuery::class)->applyListFilters($query, $request);
 
-        $this->assertSame(['HH-1'], $query->pluck('h.household_id')->all());
+        $this->assertSame([], $query->pluck('h.household_id')->all());
     }
 
     public function test_urgent_reports_rank_ahead_of_area_and_contact_score(): void
     {
+        $this->registerFixturePuroks();
+        DB::table('sitios')->where('sitio_id', 902)->update(['barangay_id' => 1]);
         $rows = app(RescuePriorityQuery::class)->ranked('EVT-1')
             ->getCollection();
 
@@ -309,6 +515,7 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
 
     public function test_purok_ranking_and_timeline_use_the_configured_barangay_and_current_definition(): void
     {
+        $this->registerFixturePuroks();
         $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
             public function __construct() {}
             public function current(): array { return ['barangay_id' => 1]; }
@@ -336,6 +543,7 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
 
     public function test_purok_score_uses_member_weighted_unreported_rate_and_excludes_confirmed_safe_vulnerable_members(): void
     {
+        $this->registerFixturePuroks();
         $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
             public function __construct() {}
             public function current(): array { return ['barangay_id' => 1]; }
@@ -374,6 +582,7 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
 
     public function test_timeline_changes_at_recorded_report_times_and_extends_to_current_time(): void
     {
+        $this->registerFixturePuroks();
         $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
             public function __construct() {}
             public function current(): array { return ['barangay_id' => 1]; }
@@ -417,6 +626,7 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
 
     public function test_live_no_contact_share_uses_households_without_any_registered_contact_channel(): void
     {
+        $this->registerFixturePuroks();
         $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
             public function __construct() {}
             public function current(): array { return ['barangay_id' => 1]; }
@@ -442,6 +652,7 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
 
     public function test_event_keeps_its_weight_version_after_new_settings_are_created(): void
     {
+        $this->registerFixturePuroks();
         Schema::create('disaster_events', function (Blueprint $table): void {
             $table->string('event_id')->primary();
             $table->timestamp('started_at')->nullable();
@@ -477,6 +688,7 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
 
     public function test_live_timeline_saves_only_changed_measurements(): void
     {
+        $this->registerFixturePuroks();
         $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
             public function __construct() {}
             public function current(): array { return ['barangay_id' => 1]; }
@@ -559,6 +771,7 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
 
     public function test_live_partial_shares_and_updated_registered_vulnerability_are_not_truncated(): void
     {
+        $this->registerFixturePuroks();
         $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
             public function __construct() {}
             public function current(): array { return ['barangay_id' => 1]; }
@@ -579,5 +792,22 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
         $this->assertSame(0.0, $query->current('EVT-1', now()->subHour())['special_needs']);
         DB::table('household_members')->where('member_id', 'M-1')->update(['is_pregnant' => 1]);
         $this->assertSame(50.0, $query->current('EVT-1', now()->subHour())['special_needs']);
+    }
+    private function registerFixturePuroks(): void
+    {
+        DB::table('sitios')->insert([
+            ['sitio_id' => 901, 'barangay_id' => 1, 'sitio_name' => 'Registered A'],
+            ['sitio_id' => 902, 'barangay_id' => 2, 'sitio_name' => 'Registered B'],
+        ]);
+        DB::table('puroks')->insert([
+            ['purok_id' => 901, 'sitio_id' => 901, 'purok_name' => 'Purok A'],
+            ['purok_id' => 902, 'sitio_id' => 902, 'purok_name' => 'Purok B'],
+        ]);
+        DB::table('addresses')->where('address_id', 1)->update(['purok_id' => 901]);
+        DB::table('addresses')->where('address_id', 2)->update(['purok_id' => 902]);
+        $this->app->instance(BarangayProfileService::class, new class extends BarangayProfileService {
+            public function __construct() {}
+            public function current(): array { return ['barangay_id' => 1]; }
+        });
     }
 }

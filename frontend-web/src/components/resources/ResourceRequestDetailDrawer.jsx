@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   ArrowRight,
-  Boxes,
   CheckCircle2,
   Clock,
   ExternalLink,
@@ -22,6 +21,7 @@ export default function ResourceRequestDetailDrawer({
   onValidateAndForward,
   onReturn,
   onEdit,
+  canApprove = false,
   isProcessing = false,
 }) {
   if (!isOpen || !request) return null
@@ -273,7 +273,7 @@ export default function ResourceRequestDetailDrawer({
         <div className="rr-drawer-footer" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {isAwaitingApproval ? (
             <>
-              <button
+              {canApprove && <button
                 className="button review"
                 type="button"
                 disabled={isProcessing}
@@ -282,8 +282,8 @@ export default function ResourceRequestDetailDrawer({
               >
                 <CheckCircle2 size={14} />
                 <span>Approve Request</span>
-              </button>
-              <button
+              </button>}
+              {canApprove && <button
                 className="button secondary danger-text"
                 type="button"
                 disabled={isProcessing}
@@ -291,8 +291,8 @@ export default function ResourceRequestDetailDrawer({
                 style={{ padding: '7px 14px', fontSize: '12px' }}
               >
                 <span>Return Request</span>
-              </button>
-              <button
+              </button>}
+              {canApprove && <button
                 className="button secondary"
                 type="button"
                 onClick={() => onEdit(request)}
@@ -300,11 +300,11 @@ export default function ResourceRequestDetailDrawer({
               >
                 <span>Full Editor</span>
                 <ArrowRight size={13} />
-              </button>
+              </button>}
             </>
           ) : (
             <>
-              {handoffStep >= 4 && (
+              {canApprove && handoffStep >= 4 && (
                 <button
                   className="button secondary danger-text"
                   type="button"
@@ -316,7 +316,7 @@ export default function ResourceRequestDetailDrawer({
                   <span>Return Assets to Depot</span>
                 </button>
               )}
-              <button
+              {canApprove && <button
                 className="button secondary"
                 type="button"
                 onClick={() => onEdit(request)}
@@ -324,7 +324,7 @@ export default function ResourceRequestDetailDrawer({
               >
                 <span>View Full Record</span>
                 <ArrowRight size={13} />
-              </button>
+              </button>}
             </>
           )}
         </div>

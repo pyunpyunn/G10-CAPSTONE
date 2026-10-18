@@ -50,6 +50,12 @@ class ResourceRequestHandoffTest extends TestCase
             });
         }
 
+        if (! Schema::hasColumn('users', 'is_active')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->boolean('is_active')->default(true);
+            });
+        }
+
         if (! Schema::hasTable('disaster_types')) {
             Schema::create('disaster_types', function (Blueprint $table) {
                 $table->integer('type_id')->primary();
@@ -213,6 +219,7 @@ class ResourceRequestHandoffTest extends TestCase
             'email' => 'admin@resqperation.local',
             'password' => 'secret',
             'role_id' => 1,
+            'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

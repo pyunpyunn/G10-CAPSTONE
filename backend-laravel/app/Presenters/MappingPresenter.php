@@ -17,6 +17,8 @@ class MappingPresenter
             'household_id' => $row->household_id,
             'label' => $row->household_name ?: $row->household_code ?: 'Household',
             'household_code' => $row->household_code,
+            'purok_id' => $row->purok_id ?? null,
+            'sitio_id' => $row->sitio_id ?? null,
             'purok' => $row->purok_name ?: 'Unassigned',
             'status_key' => $statusKey ?: 'unchecked',
             'status_label' => $statusLabel ?: 'Unchecked',
@@ -86,7 +88,8 @@ class MappingPresenter
             'route_name' => $route->route_name ?: $route->team_name ?: 'Dispatch route',
             'team_name' => $route->team_name ?: $route->full_name ?: 'Responder team',
             'assigned_area' => $route->assigned_area ?: 'No assigned area',
-            'status' => $route->route_status ?? $route->status ?? 'planned',
+            'status' => $route->assignment_status ?? $route->route_status ?? $route->status ?? 'planned',
+            'route_status' => $route->route_status ?? null,
             'distance_km' => isset($route->estimated_distance_km) ? (float) $route->estimated_distance_km : null,
             'duration_min' => $route->estimated_duration_min ?? null,
             'coordinates' => $coordinates,
@@ -111,7 +114,8 @@ class MappingPresenter
     {
         return [
             ['key' => 'all', 'label' => 'All GPS-verified statuses'],
-            ['key' => 'green', 'label' => 'Green - safe / evacuated / checked'],
+            ['key' => 'green', 'label' => 'Green - safe / checked'],
+            ['key' => 'blue', 'label' => 'Blue - evacuated'],
             ['key' => 'red', 'label' => 'Red - unsafe / missing / injured'],
             ['key' => 'gray', 'label' => 'Grey - unchecked'],
         ];
@@ -120,7 +124,8 @@ class MappingPresenter
     public function mapRules(): array
     {
         return [
-            ['color' => 'green', 'title' => 'Green marker', 'text' => 'Safe, evacuated, or checked household with GPS coordinates.'],
+            ['color' => 'green', 'title' => 'Green marker', 'text' => 'Safe or checked household with GPS coordinates.'],
+            ['color' => 'blue', 'title' => 'Blue marker', 'text' => 'Evacuated household with GPS coordinates.'],
             ['color' => 'red', 'title' => 'Red marker', 'text' => 'Unsafe, missing, injured, or needs-help household with GPS coordinates.'],
             ['color' => 'gray', 'title' => 'Grey marker', 'text' => 'Unchecked household with GPS coordinates.'],
             ['color' => 'hidden', 'title' => 'No coordinates, no marker', 'text' => 'Households without latitude and longitude are kept out of the map layer.'],
@@ -131,7 +136,9 @@ class MappingPresenter
     {
         $key = str_replace('-', '_', strtolower((string) $statusKey));
 
-        if (in_array($key, ['safe', 'safe_at_home', 'evacuated', 'checked', 'active', 'returned', 'relocated', 'all_members_safe'], true)) {
+        if (in_array($key, ['evacuated', 'relocated'], true)) return 'blue';
+
+        if (in_array($key, ['safe', 'safe_at_home', 'checked', 'active', 'returned', 'all_members_safe'], true)) {
             return 'green';
         }
 
@@ -162,11 +169,7 @@ class MappingPresenter
 
     public function statusColor(string $group): string
     {
-        return match ($group) {
-            'green' => '#16a34a',
-            'red' => '#dc2626',
-            default => '#94a3b8',
-        };
+        return \App\Support\StatusPalette::color($group);
     }
 
     public function formatDateTime(?string $value): ?string

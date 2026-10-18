@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import {
   CheckCircle2,
   Clock,
@@ -27,9 +27,12 @@ import Badge from '../components/ui/Badge'
 import EmptyState from '../components/ui/EmptyState'
 import LoadingState from '../components/ui/LoadingState'
 import TrackingAidMirror from '../components/resources/TrackingAidMirror'
+import { canApproveRequests } from '../utils/personnelAccess'
 import ResourceRequestDetailDrawer from '../components/resources/ResourceRequestDetailDrawer'
 
 export default function RequestWorkflowPage() {
+  const { user } = useOutletContext()
+  const canApprove = canApproveRequests(user)
   const location = useLocation()
   const navigate = useNavigate()
   const external = location.pathname === '/external-requests'
@@ -60,7 +63,6 @@ export default function RequestWorkflowPage() {
   )
 
   const { data, error, loading, refresh } = useModuleData(loader)
-
   // Navigate to editor/viewer
   const open = (row, mode) =>
     navigate(`/resources-requests/${row.request_id}/${mode}`, {
@@ -133,13 +135,14 @@ export default function RequestWorkflowPage() {
 
   // Summary counts
   const summary = data?.summary || {}
-  const rawRequests = data?.requests?.data || []
-  const totalCount = data?.requests?.total || rawRequests.length
+  const rawRequests = data?.requests?.data
+  const totalCount = data?.requests?.total ?? rawRequests?.length ?? 0
 
   // Client-side urgency filtering
   const filteredRequests = useMemo(() => {
-    if (urgency === 'all') return rawRequests
-    return rawRequests.filter((r) => r.urgency?.key === urgency)
+    const requests = rawRequests || []
+    if (urgency === 'all') return requests
+    return requests.filter((r) => r.urgency?.key === urgency)
   }, [rawRequests, urgency])
 
   const hasActiveFilters = search || source !== 'all' || status !== 'all' || urgency !== 'all'
@@ -478,7 +481,7 @@ export default function RequestWorkflowPage() {
                                 <Eye size={12} />
                                 <span>View Request</span>
                               </button>
-                              <button
+                              {canApprove && <button
                                 type="button"
                                 className="button review"
                                 style={{ padding: '5px 12px', fontSize: '11.5px' }}
@@ -488,8 +491,8 @@ export default function RequestWorkflowPage() {
                               >
                                 <CheckCircle2 size={12} />
                                 <span>Approve Request</span>
-                              </button>
-                              <button
+                              </button>}
+                              {canApprove && <button
                                 type="button"
                                 className="button secondary danger-text"
                                 style={{ padding: '5px 8px', fontSize: '11px' }}
@@ -497,7 +500,7 @@ export default function RequestWorkflowPage() {
                                 title="Return Request"
                               >
                                 Return
-                              </button>
+                              </button>}
                             </>
                           ) : (
                             <>
@@ -521,7 +524,7 @@ export default function RequestWorkflowPage() {
                                 <Eye size={12} />
                                 <span>View Request</span>
                               </button>
-                              {isCompleted && (
+                              {canApprove && isCompleted && (
                                 <button
                                   type="button"
                                   className="button secondary"
@@ -561,6 +564,7 @@ export default function RequestWorkflowPage() {
         onValidateAndForward={handleValidateAndForwardFromDrawer}
         onReturn={handleReturnFromDrawer}
         onEdit={(req) => open(req, 'edit')}
+        canApprove={canApprove}
         isProcessing={isProcessing}
       />
     </main>
