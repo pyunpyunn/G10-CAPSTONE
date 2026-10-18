@@ -50,6 +50,7 @@ export default function RequestResourceModal({
   const [loadingOptions, setLoadingOptions] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
 
   // Load evacuation centers, urgencies & current user
   useEffect(() => {
@@ -98,6 +99,7 @@ export default function RequestResourceModal({
     setQuantity(1)
     setDescription('')
     setError(null)
+    setFieldErrors({})
     loadOptions()
 
     return () => {
@@ -106,16 +108,6 @@ export default function RequestResourceModal({
   }, [isOpen, item])
 
   const maxAvailable = Math.max(1, Number(item?.quantity) || 1)
-
-  const urgencyList = useMemo(() => {
-    if (urgencies.length > 0) return urgencies
-    return [
-      { urgency_id: 1, key: 'low', label: 'Low Priority' },
-      { urgency_id: 2, key: 'medium', label: 'Medium Priority' },
-      { urgency_id: 3, key: 'high', label: 'High Priority' },
-      { urgency_id: 4, key: 'critical', label: 'Critical Priority' },
-    ]
-  }, [urgencies])
 
   const selectedCenter = useMemo(() => {
     if (!centers || centers.length === 0) return null
@@ -135,56 +127,109 @@ export default function RequestResourceModal({
 
   if (!isOpen || !item) return null
 
-  const currentQtyNum = Math.min(maxAvailable, Math.max(1, parseInt(quantity, 10) || 1))
-  const percentStock = Math.min(100, Math.round((currentQtyNum / maxAvailable) * 100))
-  const remainingStock = Math.max(0, maxAvailable - currentQtyNum)
+  const rawQtyNum = parseInt(quantity, 10)
+  const isOverStock = !isNaN(rawQtyNum) && rawQtyNum > maxAvailable
+  const isUnderMin = !isNaN(rawQtyNum) && rawQtyNum < 1
+  const isInvalidQty = quantity === '' || isNaN(rawQtyNum) || isUnderMin || isOverStock
+  const excessQty = isOverStock ? rawQtyNum - maxAvailable : 0
+  const displayQty = isNaN(rawQtyNum) ? (quantity === '' ? 0 : 1) : rawQtyNum
+  const remainingStock = Math.max(0, maxAvailable - displayQty)
+  const percentStock = maxAvailable > 0
+    ? Math.min(100, Math.round((Math.min(displayQty, maxAvailable) / maxAvailable) * 100))
+    : 0
+
+  const handleClose = () => {
+    setFieldErrors({})
+    setError(null)
+    onClose()
+  }
 
   const stepQuantity = (delta) => {
+    if (error) setError(null)
     const cur = parseInt(quantity, 10) || 1
-    const next = Math.min(maxAvailable, Math.max(1, cur + delta))
+    const next = Math.max(1, cur + delta)
     setQuantity(next)
+
+    if (next > maxAvailable) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        quantity: `Exceeds available stock! Only ${maxAvailable} ${formatUnit(maxAvailable, item.unit)} remaining.`,
+      }))
+    } else {
+      setFieldErrors((prev) => ({
+        ...prev,
+        quantity: null,
+      }))
+    }
   }
 
   const handleQuantityChange = (val) => {
+    if (error) setError(null)
+    setQuantity(val)
+
     if (val === '') {
-      setQuantity('')
+      setFieldErrors((prev) => ({
+        ...prev,
+        quantity: 'Quantity is required (at least 1).',
+      }))
       return
     }
+
     const num = parseInt(val, 10)
     if (isNaN(num)) return
+
     if (num < 1) {
-      setQuantity(1)
+      setFieldErrors((prev) => ({
+        ...prev,
+        quantity: 'Quantity must be at least 1.',
+      }))
     } else if (num > maxAvailable) {
-      setQuantity(maxAvailable)
+      setFieldErrors((prev) => ({
+        ...prev,
+        quantity: `Exceeds available stock! Only ${maxAvailable} ${formatUnit(maxAvailable, item.unit)} remaining.`,
+      }))
     } else {
-      setQuantity(num)
+      setFieldErrors((prev) => ({
+        ...prev,
+        quantity: null,
+      }))
     }
   }
 
   const handleQuantityBlur = () => {
     if (quantity === '' || isNaN(parseInt(quantity, 10)) || parseInt(quantity, 10) < 1) {
       setQuantity(1)
+      setFieldErrors((prev) => ({ ...prev, quantity: null }))
+    } else if (parseInt(quantity, 10) > maxAvailable) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        quantity: `Exceeds available stock! Only ${maxAvailable} ${formatUnit(maxAvailable, item.unit)} remaining.`,
+      }))
     }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
+    const errors = {}
     const reqQty = parseInt(quantity, 10)
-    if (isNaN(reqQty) || reqQty < 1) {
-      setError('Please specify a valid quantity of at least 1.')
-      return
-    }
-
-    if (reqQty > maxAvailable) {
-      setError(`Requested quantity cannot exceed available stock (${maxAvailable} ${formatUnit(maxAvailable, item.unit)}).`)
-      return
+    if (quantity === '' || isNaN(reqQty) || reqQty < 1) {
+      errors.quantity = 'Please specify a valid quantity of at least 1.'
+    } else if (reqQty > maxAvailable) {
+      errors.quantity = `Requested quantity (${reqQty}) exceeds available stock! Only ${maxAvailable} ${formatUnit(maxAvailable, item.unit)} remaining.`
     }
 
     if (!requestedBy.trim()) {
-      setError('Please provide the requester name.')
+      errors.requestedBy = 'Please provide the requester name.'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      setError(errors.quantity || 'Please fill out the required fields.')
       return
     }
+
+    setFieldErrors({})
 
     try {
       setSubmitting(true)
@@ -207,7 +252,7 @@ export default function RequestResourceModal({
 
       const res = await createResourceRequest(payload)
       onSuccess?.(res, item, reqQty)
-      onClose()
+      handleClose()
     } catch (err) {
       console.error(err)
       setError(
@@ -221,7 +266,7 @@ export default function RequestResourceModal({
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="modal-backdrop" role="presentation" onClick={handleClose}>
       <section
         className="modal-panel request-resource-modal"
         role="dialog"
@@ -247,14 +292,14 @@ export default function RequestResourceModal({
             className="modal-close"
             type="button"
             aria-label="Close modal"
-            onClick={onClose}
+            onClick={handleClose}
           >
             <X size={17} />
           </button>
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="modal-form">
+        <form onSubmit={handleSubmit} className="modal-form" noValidate>
           <div className="modal-body">
             {error && (
               <div className="form-error-banner" role="alert">
@@ -287,18 +332,36 @@ export default function RequestResourceModal({
               <div className="req-stock-bar-wrap">
                 <div className="req-stock-bar-labels">
                   <span>
-                    Requesting <strong>{currentQtyNum}</strong> of {maxAvailable} {formatUnit(maxAvailable, item.unit)}
+                    Requesting <strong>{displayQty}</strong> of {maxAvailable} {formatUnit(maxAvailable, item.unit)}
                   </span>
-                  <span className="req-remaining-badge">
-                    {remainingStock} {formatUnit(remainingStock, item.unit)} remaining
-                  </span>
+                  {isOverStock ? (
+                    <span
+                      className="req-remaining-badge is-deficit"
+                      style={{
+                        backgroundColor: '#fef2f2',
+                        color: '#dc2626',
+                        borderColor: '#fca5a5',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <AlertCircle size={11} /> Over by {excessQty} {formatUnit(excessQty, item.unit)}
+                    </span>
+                  ) : (
+                    <span className="req-remaining-badge">
+                      {remainingStock} {formatUnit(remainingStock, item.unit)} remaining
+                    </span>
+                  )}
                 </div>
                 <div className="req-stock-progress-track">
                   <div
                     className="req-stock-progress-fill"
                     style={{
-                      width: `${percentStock}%`,
-                      backgroundColor: percentStock > 80 ? '#f59e0b' : '#3b82f6',
+                      width: isOverStock ? '100%' : `${percentStock}%`,
+                      backgroundColor: isOverStock ? '#dc2626' : percentStock > 80 ? '#f59e0b' : '#3b82f6',
+                      transition: 'width 200ms ease, background-color 200ms ease',
                     }}
                   />
                 </div>
@@ -308,11 +371,42 @@ export default function RequestResourceModal({
             {/* Form Fields */}
             <div className="form-grid-2">
               {/* Interactive Quantity Stepper */}
-              <div className="form-field">
-                <label htmlFor="field-request-quantity">
-                  Quantity Needed <span className="req-star">*</span>
-                </label>
-                <div className="req-stepper-control">
+              <div className="form-field full-width">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                  <label htmlFor="field-request-quantity">
+                    Quantity Needed <span className="req-star">*</span>
+                  </label>
+                  {/* Quick Presets */}
+                  <div className="req-preset-row" style={{ marginTop: 0 }}>
+                    {quickPresets.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        className={`preset-chip ${Number(quantity) === preset ? 'is-active' : ''}`}
+                        onClick={() => {
+                          setQuantity(preset)
+                          if (fieldErrors.quantity) setFieldErrors((prev) => ({ ...prev, quantity: null }))
+                          if (error) setError(null)
+                        }}
+                      >
+                        +{preset}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={`preset-chip preset-max ${Number(quantity) === maxAvailable ? 'is-active' : ''}`}
+                      onClick={() => {
+                        setQuantity(maxAvailable)
+                        if (fieldErrors.quantity) setFieldErrors((prev) => ({ ...prev, quantity: null }))
+                        if (error) setError(null)
+                      }}
+                    >
+                      Max ({maxAvailable})
+                    </button>
+                  </div>
+                </div>
+
+                <div className={`req-stepper-control ${fieldErrors.quantity ? 'is-invalid' : ''}`}>
                   <button
                     type="button"
                     className="stepper-step-btn"
@@ -327,11 +421,9 @@ export default function RequestResourceModal({
                       id="field-request-quantity"
                       type="number"
                       min="1"
-                      max={maxAvailable}
                       value={quantity}
                       onChange={(e) => handleQuantityChange(e.target.value)}
                       onBlur={handleQuantityBlur}
-                      required
                       className="stepper-num-field"
                     />
                     <span className="stepper-unit-tag">{formatUnit(quantity || 1, item.unit)}</span>
@@ -347,51 +439,44 @@ export default function RequestResourceModal({
                   </button>
                 </div>
 
-                {/* Quick Presets */}
-                <div className="req-preset-row">
-                  {quickPresets.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      className={`preset-chip ${Number(quantity) === preset ? 'is-active' : ''}`}
-                      onClick={() => setQuantity(preset)}
-                    >
-                      +{preset}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className={`preset-chip preset-max ${Number(quantity) === maxAvailable ? 'is-active' : ''}`}
-                    onClick={() => setQuantity(maxAvailable)}
+                {fieldErrors.quantity && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginTop: '4px',
+                      flexWrap: 'wrap',
+                      gap: '4px',
+                    }}
                   >
-                    Max ({maxAvailable})
-                  </button>
-                </div>
-              </div>
-
-              {/* Urgency Level Selector */}
-              <div className="form-field">
-                <label htmlFor="field-urgency">
-                  Urgency Level <span className="req-star">*</span>
-                </label>
-                <div className="urgency-selector-grid">
-                  {urgencyList.map((u) => {
-                    const isSelected = Number(urgencyId) === Number(u.urgency_id)
-                    const key = u.key || 'medium'
-                    const labelShort = u.label ? u.label.replace(/Priority/i, '').trim() : 'Medium'
-                    return (
+                    <span className="field-error-text" style={{ marginTop: 0 }}>
+                      <AlertCircle size={12} /> {fieldErrors.quantity}
+                    </span>
+                    {isOverStock && (
                       <button
-                        key={u.urgency_id}
                         type="button"
-                        className={`urgency-choice-btn urgency-${key} ${isSelected ? 'selected' : ''}`}
-                        onClick={() => setUrgencyId(u.urgency_id)}
+                        onClick={() => {
+                          setQuantity(maxAvailable)
+                          setFieldErrors((prev) => ({ ...prev, quantity: null }))
+                          if (error) setError(null)
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#2563eb',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                          textDecoration: 'underline',
+                        }}
                       >
-                        <span className={`urgency-status-dot dot-${key}`} />
-                        <span className="urgency-choice-label">{labelShort}</span>
+                        Set to max ({maxAvailable})
                       </button>
-                    )
-                  })}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Destination Evacuation Center */}
@@ -443,12 +528,22 @@ export default function RequestResourceModal({
                     id="field-requested-by"
                     type="text"
                     value={requestedBy}
-                    onChange={(e) => setRequestedBy(e.target.value)}
+                    onChange={(e) => {
+                      setRequestedBy(e.target.value)
+                      if (fieldErrors.requestedBy) {
+                        setFieldErrors((prev) => ({ ...prev, requestedBy: null }))
+                      }
+                      if (error) setError(null)
+                    }}
                     placeholder="e.g. Nina Kathleen (Disaster Operations)"
-                    required
-                    className="form-control with-icon"
+                    className={`form-control with-icon ${fieldErrors.requestedBy ? 'is-invalid' : ''}`}
                   />
                 </div>
+                {fieldErrors.requestedBy && (
+                  <span className="field-error-text">
+                    <AlertCircle size={12} /> {fieldErrors.requestedBy}
+                  </span>
+                )}
               </div>
 
               {/* Purpose / Notes */}
@@ -477,7 +572,7 @@ export default function RequestResourceModal({
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={submitting}
             >
               Cancel
@@ -485,15 +580,19 @@ export default function RequestResourceModal({
             <button
               type="submit"
               className="btn btn-primary btn-submit-request"
-              disabled={submitting || !quantity || Number(quantity) < 1}
+              disabled={submitting || isInvalidQty}
             >
               {submitting ? (
                 <>
                   <Loader2 size={15} className="spin-icon" /> Submitting Request...
                 </>
+              ) : isOverStock ? (
+                <>
+                  <AlertCircle size={15} /> Exceeds Stock Limit ({displayQty}/{maxAvailable})
+                </>
               ) : (
                 <>
-                  <Send size={15} /> Submit Request ({quantity || 0} {formatUnit(quantity || 0, item.unit)})
+                  <Send size={15} /> Submit Request ({displayQty || 0} {formatUnit(displayQty || 0, item.unit)})
                 </>
               )}
             </button>

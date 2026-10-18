@@ -26,7 +26,9 @@ function MapController({ workspace, selected, fullscreen, onReady }) {
     const boundaryBounds = focus.boundary ? L.geoJSON(focus.boundary).getBounds() : null
     if (boundaryBounds?.isValid()) map.fitBounds(boundaryBounds, { padding: [28, 28], animate: false })
     else if (Array.isArray(focus.bounds) && focus.bounds.length === 2) map.fitBounds(focus.bounds, { padding: [24, 24], maxZoom: focus.zoom || 17 })
-    else map.setView([Number(focus.center.latitude), Number(focus.center.longitude)], focus.zoom || 17)
+    else if (Number.isFinite(Number(focus.center?.latitude)) && Number.isFinite(Number(focus.center?.longitude))) {
+      map.setView([Number(focus.center.latitude), Number(focus.center.longitude)], focus.zoom || 17)
+    }
   // Keep the user's zoom when live GPS data refreshes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, fitKey])

@@ -20,8 +20,8 @@ export const defaultWorkspace = {
   barangay: {
     name: 'Shared database map',
     center: {
-      latitude: null,
-      longitude: null,
+      latitude: 14.599512,
+      longitude: 120.9842,
     },
     bounds: null,
     boundary: null,

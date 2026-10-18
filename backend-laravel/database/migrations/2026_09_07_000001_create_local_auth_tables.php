@@ -65,13 +65,17 @@ return new class extends Migration
         ];
 
         foreach ($roleSeed as $role) {
+            $data = ['role_name' => $role['role_name']];
+            if (Schema::hasColumn('roles', 'created_at')) {
+                $data['created_at'] = $now;
+            }
+            if (Schema::hasColumn('roles', 'updated_at')) {
+                $data['updated_at'] = $now;
+            }
+
             DB::table('roles')->updateOrInsert(
                 ['role_key' => $role['role_key']],
-                [
-                    'role_name' => $role['role_name'],
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]
+                $data
             );
         }
 

@@ -12,6 +12,10 @@ class WebAccessPolicy
             'dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests',
             'reports_documentation', 'personnel_access', 'profile', 'notifications', 'inquiries',
         ],
+        'admin' => [
+            'dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests',
+            'reports_documentation', 'personnel_access', 'profile', 'notifications',
+        ],
         'hq_leader' => [
             'dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests',
             'reports_documentation', 'personnel_access', 'profile', 'notifications',
@@ -25,7 +29,7 @@ class WebAccessPolicy
 
     public function modulesFor(User $user): array
     {
-        if (! $user->is_active || ($user->roleKey() === 'hq_leader' && ! $user->isHqccLeader())) {
+        if ($user->is_active === false || ($user->roleKey() === 'hq_leader' && ! $user->isHqccLeader())) {
             return [];
         }
 
@@ -34,7 +38,7 @@ class WebAccessPolicy
 
     public function allows(?User $user, string $module, string $action = 'view'): bool
     {
-        if (! $user || ! $user->is_active || ($user->attributes['deleted_at'] ?? null)) {
+        if (! $user || $user->is_active === false || ($user->attributes['deleted_at'] ?? null)) {
             return false;
         }
 
@@ -46,7 +50,7 @@ class WebAccessPolicy
             return false;
         }
 
-        return $action !== 'approve' || in_array($roleKey, ['super_admin', 'hq_leader'], true);
+        return $action !== 'approve' || in_array($roleKey, ['super_admin', 'admin', 'hq_leader'], true);
     }
 
     public function moduleForRequest(Request $request): ?string

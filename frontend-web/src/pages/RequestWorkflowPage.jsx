@@ -46,8 +46,19 @@ export default function RequestWorkflowPage() {
 
   // Live Tracking Drawer & Action States
   const [inspectingRequest, setInspectingRequest] = useState(null)
+  const [drawerMode, setDrawerMode] = useState('view') // 'view' | 'tracking'
   const [isProcessing, setIsProcessing] = useState(false)
   const [successToast, setSuccessToast] = useState(null)
+
+  const handleViewRequest = (row) => {
+    setDrawerMode('view')
+    setInspectingRequest(row)
+  }
+
+  const handleTrackLive = (row) => {
+    setDrawerMode('tracking')
+    setInspectingRequest(row)
+  }
 
   const loader = useCallback(
     () =>
@@ -453,7 +464,7 @@ export default function RequestWorkflowPage() {
                         <td>
                           <div
                             style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-2)', cursor: 'pointer' }}
-                            onClick={() => setInspectingRequest(row)}
+                            onClick={() => handleTrackLive(row)}
                             title="Inspect live tracking"
                           >
                             {row.handoff?.label || 'Awaiting handoff'}
@@ -475,7 +486,7 @@ export default function RequestWorkflowPage() {
                                 type="button"
                                 className="button secondary"
                                 style={{ padding: '5px 10px', fontSize: '11.5px' }}
-                                onClick={() => setInspectingRequest(row)}
+                                onClick={() => handleViewRequest(row)}
                                 title="View Request"
                               >
                                 <Eye size={12} />
@@ -508,7 +519,7 @@ export default function RequestWorkflowPage() {
                                 type="button"
                                 className="button secondary"
                                 style={{ padding: '5px 10px', fontSize: '11.5px' }}
-                                onClick={() => setInspectingRequest(row)}
+                                onClick={() => handleTrackLive(row)}
                                 title="Status Tracking of Requests"
                               >
                                 <Truck size={12} />
@@ -518,7 +529,7 @@ export default function RequestWorkflowPage() {
                                 type="button"
                                 className="button secondary"
                                 style={{ padding: '5px 10px', fontSize: '11.5px' }}
-                                onClick={() => setInspectingRequest(row)}
+                                onClick={() => handleViewRequest(row)}
                                 title="View Request"
                               >
                                 <Eye size={12} />
@@ -560,10 +571,11 @@ export default function RequestWorkflowPage() {
       <ResourceRequestDetailDrawer
         request={inspectingRequest}
         isOpen={Boolean(inspectingRequest)}
+        mode={drawerMode}
         onClose={() => setInspectingRequest(null)}
         onValidateAndForward={handleValidateAndForwardFromDrawer}
         onReturn={handleReturnFromDrawer}
-        onEdit={(req) => open(req, 'edit')}
+        onEdit={(req) => open(req, 'view')}
         canApprove={canApprove}
         isProcessing={isProcessing}
       />

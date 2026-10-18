@@ -96,10 +96,14 @@ function WeatherCard({ weatherState, latestSavedWeather, hasActiveEvent, onOpenW
 function DashboardMapCard({ hasActiveEvent, reportedHouseholds, onOpenMap }) {
   const { data, loading: isLoading } = useModuleData(getMappingOverview, ['mapping', 'households', 'dispatch', 'disasters'])
   const workspace = useMemo(() => data ? { ...defaultWorkspace, ...data } : defaultWorkspace, [data])
-  const mapCenter = useMemo(() => [
-    workspace.barangay.center.latitude,
-    workspace.barangay.center.longitude,
-  ], [workspace.barangay.center.latitude, workspace.barangay.center.longitude])
+  const mapCenter = useMemo(() => {
+    const lat = Number(workspace?.barangay?.center?.latitude)
+    const lng = Number(workspace?.barangay?.center?.longitude)
+    return [
+      Number.isFinite(lat) ? lat : 14.599512,
+      Number.isFinite(lng) ? lng : 120.9842,
+    ]
+  }, [workspace?.barangay?.center?.latitude, workspace?.barangay?.center?.longitude])
   const mapBounds = useMemo(() => workspace.barangay.bounds, [workspace.barangay.bounds])
   const boundaryMask = useMemo(() => outsideBoundaryMask(workspace.barangay.boundary), [workspace.barangay.boundary])
   const households = hasActiveEvent ? workspace.households : []
@@ -178,12 +182,14 @@ function FitBarangay({ center, bounds, zoom }) {
   const map = useMap()
 
   useEffect(() => {
-    if (bounds?.length === 2) {
+    if (bounds?.length === 2 && bounds.every((b) => Array.isArray(b) && b.length === 2 && b.every(Number.isFinite))) {
       map.fitBounds(bounds, { padding: [12, 12], maxZoom: zoom })
       return
     }
 
-    map.setView(center, zoom)
+    if (center && Number.isFinite(center[0]) && Number.isFinite(center[1])) {
+      map.setView(center, zoom || 17)
+    }
   }, [bounds, center, map, zoom])
 
   return null
