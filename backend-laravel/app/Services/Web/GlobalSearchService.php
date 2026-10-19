@@ -121,28 +121,47 @@ class GlobalSearchService
                 'households',
                 $household->household_name ?: $household->household_code ?: $household->household_id,
                 trim(($household->household_code ?? $household->household_id).' · '.($household->contact_number ?? 'Household')),
-                '/households?search='.rawurlencode((string) ($household->household_code ?: $household->household_id))
+                '/households/'.rawurlencode((string) $household->household_id)
             ))
             ->all();
     }
 
     private function searchResponders(string $term): array
     {
-        return $this->matches(Responder::query()->whereNull('deleted_at'), [
+        $accountColumns = Schema::hasTable('users')
+            ? array_values(array_filter(
+                ['username', 'login_id', 'email', 'first_name', 'last_name', 'name'],
+                fn (string $column): bool => Schema::hasColumn('users', $column)
+            ))
+            : [];
+        $query = Responder::query()->whereNull('deleted_at');
+        $columns = [
             'responder_code',
             'full_name',
             'username',
             'contact_number',
-        ], $term)
+        ];
+        $query = Schema::hasTable('users') && $accountColumns
+            ? $this->matches($query, $columns, $term, 'user', $accountColumns)
+            : $this->matches($query, $columns, $term);
+
+        return $query
             ->orderBy('full_name')
             ->limit(self::RESULT_LIMIT)
-            ->get(['responder_id', 'responder_code', 'full_name', 'contact_number', 'duty_status'])
-            ->map(fn (Responder $responder): array => $this->result(
-                'responders',
-                $responder->full_name ?: $responder->responder_code,
-                trim(($responder->responder_code ?? '').' · '.($responder->duty_status ?? $responder->contact_number ?? 'Responder')),
-                '/rescuers'
-            ))
+            ->get(['responder_id', 'responder_code', 'username', 'full_name', 'contact_number', 'duty_status'])
+            ->map(function (Responder $responder): array {
+                $accountId = $responder->username ?: $responder->responder_code;
+                $accountType = str_starts_with(strtoupper((string) $accountId), 'BDRRM-HQCC-')
+                    ? 'command_center'
+                    : 'responders';
+
+                return $this->result(
+                    'responders',
+                    $responder->full_name ?: $responder->responder_code,
+                    trim(($responder->responder_code ?? $accountId ?? '').' · '.($responder->duty_status ?? $responder->contact_number ?? 'Account')),
+                    '/rescuers?id='.rawurlencode((string) $responder->responder_id).'&type='.rawurlencode($accountType)
+                );
+            })
             ->all();
     }
 
@@ -162,7 +181,7 @@ class GlobalSearchService
                 'dispatches',
                 $assignment->assignment_code ?: $assignment->assigned_area ?: 'Rescue dispatch',
                 trim(($assignment->team?->team_name ?? $assignment->responder?->full_name ?? 'Response team').' · '.($assignment->status ?? 'Assigned')),
-                '/dispatch'
+                '/rescue-management/'.rawurlencode((string) $assignment->assignment_id).'/edit'
             ))
             ->all();
     }
@@ -184,7 +203,7 @@ class GlobalSearchService
                 'resources',
                 $request->item_name ?: $request->resource_type ?: $request->request_id,
                 trim(($request->request_id ?? '').' · '.($request->validation_status ?? 'Resource request')),
-                '/resources-requests'
+                '/resources-requests/'.rawurlencode((string) $request->request_id).'/view'
             ))
             ->all();
     }
@@ -203,19 +222,30 @@ class GlobalSearchService
                 'sitreps',
                 $report->report_number ?: 'Situation report '.$report->sit_rep_id,
                 trim(($report->disaster_id ?? 'No linked event').' · '.($report->report_status ?? 'SitRep')),
-                '/situation'
+                '/situation?report_id='.rawurlencode((string) $report->sit_rep_id)
             ))
             ->all();
     }
 
-    private function matches(Builder $query, array $columns, string $term): Builder
+    private function matches(Builder $query, array $columns, string $term, ?string $relation = null, array $relatedColumns = []): Builder
     {
         $pattern = '%'.$term.'%';
 
-        return $query->where(function (Builder $search) use ($columns, $pattern): void {
+        return $query->where(function (Builder $search) use ($columns, $pattern, $relation, $relatedColumns): void {
             foreach ($columns as $index => $column) {
                 $method = $index === 0 ? 'where' : 'orWhere';
                 $search->{$method}($column, 'like', $pattern);
+            }
+
+            if ($relation && $relatedColumns) {
+                $search->orWhereHas($relation, function (Builder $related) use ($relatedColumns, $pattern): void {
+                    $related->where(function (Builder $account) use ($relatedColumns, $pattern): void {
+                        foreach ($relatedColumns as $index => $column) {
+                            $method = $index === 0 ? 'where' : 'orWhere';
+                            $account->{$method}($column, 'like', $pattern);
+                        }
+                    });
+                });
             }
         });
     }

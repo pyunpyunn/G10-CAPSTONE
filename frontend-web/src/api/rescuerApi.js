@@ -49,3 +49,7 @@ export async function deleteRescuer(responderId) {
   const response = await api.delete(`/rescuers/${responderId}`)
   return response.data.data
 }
+
+export async function getPersonnelRoles() { return (await api.get('/rescuers/roles')).data.data }
+export async function savePersonnelRole(payload) { return (await (payload.role_id ? api.patch(`/rescuers/roles/${payload.role_id}`,payload) : api.post('/rescuers/roles',payload))).data.data }
+export async function deletePersonnelRole(roleId,replacementRoleId) { return (await api.delete(`/rescuers/roles/${roleId}`,{data:{replacement_role_id:replacementRoleId || null}})).data.data }

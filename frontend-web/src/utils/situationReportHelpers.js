@@ -1,7 +1,11 @@
-import { reportSections } from './situationSections'
+import { reportSections, operatorInputFields } from './situationSections'
 
 export function emptyGenerateForm(summary) {
   return {
+    ...Object.fromEntries(operatorInputFields.map(([key]) => [key, summary?.operator_inputs?.[key] || ''])),
+    supersedes_sit_rep_id: '',
+    sitrep_type: summary?.report?.report_type || 'progress',
+    approved_by: summary?.report?.approved_by || '',
     report_number: summary?.report?.report_number || '',
     period_start: toDateTimeInput(summary?.report?.period_start),
     period_end: toDateTimeInput(summary?.report?.period_end),
@@ -14,6 +18,10 @@ export function emptyGenerateForm(summary) {
 
 export function buildGeneratePayload(eventId, form) {
   return {
+    ...Object.fromEntries(operatorInputFields.map(([key]) => [key, emptyToNull(form[key])])),
+    supersedes_sit_rep_id: form.supersedes_sit_rep_id || null,
+    sitrep_type: form.sitrep_type,
+    approved_by: emptyToNull(form.approved_by),
     event_id: eventId,
     report_number: emptyToNull(form.report_number),
     period_start: emptyToNull(form.period_start),
@@ -56,4 +64,9 @@ function toDateTimeInput(value) {
   if (Number.isNaN(date.getTime())) return ''
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
   return local.toISOString().slice(0, 16)
+}
+
+export function situationReportTitle(summary, form = {}) {
+  const period = form.period_end || summary?.report?.period_end || 'Not recorded'
+  return `BDRRMC Situation Report No. ${form.report_number || summary?.report?.report_number || 'Not recorded'} on the ${summary?.event?.name || 'Not recorded'} as of ${period}`
 }

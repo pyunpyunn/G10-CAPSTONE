@@ -43,6 +43,10 @@ export async function updateHouseholdDeviceLocation(payload: any) {
   return response.data;
 }
 
+export async function saveHouseholdGeotag(payload: any) {
+  return (await api.put('/household/geotag', payload)).data;
+}
+
 export async function updateHouseholdMember(memberId: string, payload: any) {
   const response = await api.patch(`/household/members/${memberId}`, payload);
   return response.data.data;

@@ -15,12 +15,14 @@ use Illuminate\Validation\Rule;
 
 class ReportExchangeController extends Controller
 {
+    private const REPORT_PREPARER = 'Emergency Operations Center: ResQperation System';
     public function options(SituationReportQuery $query, \App\Presenters\SituationReportPresenter $presenter)
     {
         return response()->json(['data' => [
             'events' => $query->eventOptions()->map(fn ($event) => $presenter->formatEventOption($event))->values(),
             'sitios' => $query->sitioOptions(),
             'all_sitios_value' => 'all',
+            'api_version' => '4.0',
             'sections' => SituationReportSections::LABELS,
             'formats' => ['pdf', 'csv', 'xlsx'],
             'source_systems' => ['evatrack', 'safetrack', 'trackingaid'],
@@ -53,11 +55,15 @@ class ReportExchangeController extends Controller
 
     public function store(Request $request)
     {
+        $request->validate(['api_version'=>['required', Rule::in(['4.0'])]], [
+            'api_version.required'=>'Report contract v4.0 requires api_version: 4.0. Refresh report options and update the I–VII section meanings before resubmitting.',
+            'api_version.in'=>'Older report contracts are retired. Use api_version: 4.0 with the six-section meanings from options.',
+        ]);
         $data = $request->validate([
             'source_system' => ['required', Rule::in(['evatrack', 'safetrack', 'trackingaid'])],
             'reference' => 'nullable|string|max:120', 'event_id' => 'required|string|max:255',
             'sitio_id' => 'required|string|max:120',
-            'included_sections' => 'required|array|min:1|max:7',
+            'included_sections' => 'required|array|min:1|max:6',
             'included_sections.*' => ['required', 'distinct', Rule::in(array_keys(SituationReportSections::LABELS))],
             'format' => ['required', Rule::in(['pdf', 'csv', 'xlsx'])], 'purpose' => 'required|string|max:2000',
         ]);
@@ -70,13 +76,14 @@ class ReportExchangeController extends Controller
         }
         $id = (string) Str::uuid();
         DB::table('external_report_requests')->insert([
+            'api_version' => '4.0',
             'id' => $id, 'source_system' => $data['source_system'], 'reference' => $data['reference'] ?? null,
             'event_id' => $data['event_id'] ?? null, 'sections' => json_encode($data['included_sections']),
             'sitio_id' => $data['sitio_id'],
             'format' => $data['format'], 'purpose' => $data['purpose'], 'status' => 'pending',
             'created_at' => now(), 'updated_at' => now(),
         ]);
-        return response()->json(['status' => 'pending', 'request_id' => $id,
+        return response()->json(['status' => 'pending', 'request_id' => $id, 'prepared_by' => self::REPORT_PREPARER,
             'message' => 'Request received. A RESQPERATION operator must accept it before a file is released.',
             'status_url' => URL::signedRoute('external.report-requests.status', ['id' => $id]),
         ], 202)->header('Cache-Control', 'no-store');
@@ -91,12 +98,22 @@ class ReportExchangeController extends Controller
 
     public function decide(Request $request, string $id, SituationReportService $situations, ReportFileService $files)
     {
-        $data = $request->validate([
+        $rules = array_fill_keys(SituationReportSections::INPUTS, 'nullable|string|max:20000');
+        $data = $request->validate([...$rules,
+            'sitrep_type'=>'nullable|in:flash,initial,progress,final', 'actions_text'=>'nullable|string|max:20000',
             'decision' => ['required', Rule::in(['accepted', 'rejected'])],
             'note' => 'required_if:decision,rejected|nullable|string|max:2000',
             'event_id' => 'nullable|string|max:255',
         ]);
-        $result = DB::transaction(function () use ($request, $id, $data, $situations, $files) {
+        $sync=null;
+        if ($data['decision']==='accepted') {
+            $pending=DB::table('external_report_requests')->where('id',$id)->first();
+            abort_unless($pending,404);
+            abort_unless($pending->status==='pending',409,'This request has already been reviewed.');
+            abort_unless(($pending->api_version ?? '2.0')==='4.0',422,'Resubmit using api_version: 4.0 and the six-section options.');
+            $sync=app(\App\Services\Web\SituationReportSync::class)->requireReady($pending->event_id ?: ($data['event_id'] ?? ''));
+        }
+        $result = DB::transaction(function () use ($request, $id, $data, $situations, $files, $sync) {
             $row = DB::table('external_report_requests')->where('id', $id)->lockForUpdate()->first();
             abort_unless($row, 404);
             abort_unless($row->status === 'pending', 409, 'This request has already been reviewed. Refresh the inbox.');
@@ -104,14 +121,22 @@ class ReportExchangeController extends Controller
             $update = ['status' => $data['decision'], 'decision_note' => $data['note'] ?? null,
                 'decided_by' => $operator, 'decided_at' => now(), 'updated_at' => now()];
             if ($data['decision'] === 'accepted') {
+                abort_unless(($row->api_version ?? '2.0') === '4.0', 422, 'This pending request uses an older report template. Reject it and ask the partner to resubmit with api_version: 4.0 and current report options.');
                 $eventId = $row->event_id ?: ($data['event_id'] ?? null);
                 abort_unless($eventId, 422, 'Select the disaster event to include in this report.');
                 $sitioId = $row->sitio_id ?? 'all';
                 $response = $sitioId === 'all' ? $situations->eventSummary($eventId) : $situations->eventSummary($eventId, $sitioId);
                 abort_unless($response->getStatusCode() === 200, 422, 'The requested disaster event is unavailable.');
                 $summary = $response->getData(true)['data']['summary'];
+                $summary=app(\App\Services\Web\SituationReportSync::class)->apply($summary,$sync);
+                $summary['schema_version'] = '4.0';
+                $summary['operator_inputs'] = array_intersect_key($data, array_flip(SituationReportSections::INPUTS));
+                $summary['actions_text'] = $data['actions_text'] ?? '';
+                $summary['report']['report_type'] = $data['sitrep_type'] ?? $summary['report']['report_type'] ?? 'progress';
+                $summary['report']['approved_by'] = null;
                 $summary['included_sections'] = json_decode($row->sections, true);
-                $summary['report']['report_number'] = 'EXCHANGE-'.Str::upper(substr($id, 0, 8));
+                $summary['report']['report_number'] = app(SituationReportQuery::class)->nextReportNumber($eventId);
+                $summary['report']['prepared_by'] = self::REPORT_PREPARER;
                 $summary['report']['reviewed_by'] = $operator;
                 $update['event_id'] = $eventId;
                 $update['approved_summary'] = json_encode($summary);
@@ -153,7 +178,7 @@ class ReportExchangeController extends Controller
             $file['download_url'] = null;
             $file['expired'] = true;
         }
-        return ['id' => $row->id, 'source_system' => $row->source_system, 'reference' => $row->reference,
+        return ['api_version'=>$row->api_version ?? '2.0', 'id' => $row->id, 'prepared_by' => self::REPORT_PREPARER, 'source_system' => $row->source_system, 'reference' => $row->reference,
             'event_id' => $row->event_id, 'sitio_id' => $row->sitio_id ?? 'all', 'sections' => json_decode($row->sections, true), 'format' => $row->format,
             'purpose' => $row->purpose, 'status' => $row->status, 'decision_note' => $row->decision_note,
             'decided_by' => $row->decided_by, 'decided_at' => $row->decided_at, 'created_at' => $row->created_at, 'file' => $file];

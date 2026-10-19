@@ -43,6 +43,7 @@ class AuthApiTest extends TestCase
             Schema::create('responders', function (Blueprint $table) {
                 $table->unsignedBigInteger('responder_id')->primary();
                 $table->string('user_id');
+                $table->integer('team_id')->nullable();
                 $table->string('responder_code');
                 $table->string('username');
                 $table->string('password_hash');
@@ -64,6 +65,17 @@ class AuthApiTest extends TestCase
                 $table->text('abilities')->nullable();
                 $table->timestamp('last_used_at')->nullable();
                 $table->timestamp('expires_at')->nullable();
+                $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('devices')) {
+            Schema::create('devices', function (Blueprint $table): void {
+                $table->id();
+                $table->string('user_id');
+                $table->integer('team_id');
+                $table->string('device_uuid')->unique();
+                $table->timestamp('last_sync_at')->nullable();
                 $table->timestamps();
             });
         }
@@ -95,6 +107,7 @@ class AuthApiTest extends TestCase
             'responder_code' => 'BDRRM-SAR-001',
         ], [
             'responder_id' => 2024035502,
+            'team_id' => 1,
             'user_id' => 'USR-RESCUER-BDRRM-SAR-001',
             'username' => 'BDRRM-SAR-001',
             'password_hash' => Hash::make('password'),
@@ -131,6 +144,46 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('user.role.role_key', 'rescuer')
             ->assertJsonPath('user.user_id', 'USR-RESCUER-BDRRM-SAR-001')
             ->assertJsonPath('message', 'Login successful.');
+    }
+
+    public function test_device_bound_mobile_login_registers_team_and_issues_scoped_token(): void
+    {
+        $response = $this->postJson('/api/v1/mobile/login', [
+            'login' => 'BDRRM-SAR-001',
+            'password' => 'password',
+            'device_uuid' => 'device-rescuer-1',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('device_uuid', 'device-rescuer-1')
+            ->assertJsonPath('team_id', 1);
+        $this->assertDatabaseHas('devices', [
+            'device_uuid' => 'device-rescuer-1',
+            'user_id' => 'USR-RESCUER-BDRRM-SAR-001',
+            'team_id' => 1,
+        ]);
+
+        $token = \App\Models\User::findOrFail('USR-RESCUER-BDRRM-SAR-001')->tokens()->latest('id')->first();
+        $this->assertSame('mobile-device:device-rescuer-1', $token->name);
+        $this->assertContains('mobile:rescuer', $token->abilities);
+        $this->assertContains('team:1', $token->abilities);
+    }
+
+    public function test_device_bound_mobile_login_rejects_device_uuid_owned_by_another_user(): void
+    {
+        DB::table('devices')->insert([
+            'user_id' => 'OTHER-USER',
+            'team_id' => 1,
+            'device_uuid' => 'shared-device',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/mobile/login', [
+            'login' => 'BDRRM-SAR-001',
+            'password' => 'password',
+            'device_uuid' => 'shared-device',
+        ])->assertConflict();
     }
 
     private function passwordChangePayload(): array

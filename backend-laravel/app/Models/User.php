@@ -111,7 +111,7 @@ class User extends Authenticatable
         }
 
         $loadedRole = $this->relationLoaded('role') ? $this->getRelation('role') : null;
-        $roleKey = $loadedRole?->role_key ?? ($this->attributes['role'] ?? null);
+        $roleKey = $loadedRole?->base_role_key ?: ($loadedRole?->role_key ?? ($this->attributes['role'] ?? null));
 
         if (! $roleKey && isset($this->attributes['role_id'])) {
             $roleKey = match ((int) $this->attributes['role_id']) {
@@ -139,6 +139,7 @@ class User extends Authenticatable
         $loadedRole = $this->relationLoaded('role') ? $this->getRelation('role') : null;
         $roleName = $loadedRole?->role_name ?? ($this->attributes['role'] ?? null);
 
+        if ($loadedRole && ($loadedRole->base_role_key || $loadedRole->web_modules !== null)) return $loadedRole->role_name;
         return match ($this->roleKey()) {
             'super_admin' => 'Super Admin',
             'admin' => 'Admin',
@@ -161,7 +162,14 @@ class User extends Authenticatable
     {
         if ($this->is_active === false || ($this->attributes['deleted_at'] ?? null)) return false;
 
-        return $this->roleKey() === 'super_admin' || $this->isHqccLeader();
+        $key = $this->roleKey();
+        if ($key === 'super_admin') return true;
+        $role = $this->relationLoaded('role') ? $this->getRelation('role') : null;
+        if ($role?->can_manage_personnel !== null) {
+            $modules = app(\App\Services\Web\WebAccessPolicy::class)->modulesFor($this);
+            return (bool) $role->can_manage_personnel && in_array('personnel_access', $modules, true);
+        }
+        return $this->isHqccLeader();
     }
 }
 

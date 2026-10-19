@@ -15,12 +15,17 @@ class SituationReportPresenter
         $casualties = $this->casualtySummary($dispatch);
 
         return [
+            'schema_version' => \App\Support\SituationReportSections::VERSION,
+            'operator_inputs' => array_intersect_key($meta, array_flip(\App\Support\SituationReportSections::INPUTS)),
             'report' => [
+                'supersedes' => $meta['supersedes'] ?? null,
                 'report_number' => $meta['report_number'] ?? 'SITREP-DRAFT-'.now()->format('Ymd'),
                 'period_start' => $this->formatDateTime($meta['period_start'] ?? $event->started_at),
                 'period_end' => $this->formatDateTime($meta['period_end'] ?? now()->toDateTimeString()),
                 'prepared_by' => $meta['prepared_by'] ?? null,
                 'reviewed_by' => $meta['reviewed_by'] ?? null,
+                'approved_by' => $meta['approved_by'] ?? null,
+                'report_type' => $meta['sitrep_type'] ?? ($event->ended_at ? 'final' : 'progress'),
                 'generated_at' => $this->formatDateTime($meta['generated_at'] ?? now()->toDateTimeString()),
                 'next_report' => $event->ended_at ? 'Final report filed' : $this->formatDateTime(now()->addHours(2)->toDateTimeString()),
             ],
@@ -33,13 +38,14 @@ class SituationReportPresenter
                 'finished_at' => $event->ended_at ? $this->formatDateTime($event->ended_at) : 'Ongoing',
                 'status' => $event->ended_at ? 'Closed' : 'Active',
                 'situation_status' => $event->ended_at ? 'Final monitoring closed' : 'Active monitoring',
-                'scope' => 'All registered households in barangay scope', 'coverage' => $household['total'].' households in scope',
+                'scope' => 'All registered family units in barangay scope', 'coverage' => $household['total'].' registered family units in scope',
             ],
+            'population_tables' => app(SituationReportPopulation::class)->data(['household'=>$household,'evacuation'=>$sources['evacuation'] ?? []]),
             'weather' => $weather, 'household' => $household, 'casualties' => $casualties,
-            'dispatch' => $dispatch,
+            'dispatch' => $dispatch, 'evacuation' => $sources['evacuation'] ?? ['households' => [], 'members' => [], 'sites' => []],
             'damage' => ['partial' => null, 'total' => null, 'cost' => null],
             'resources' => $resources, 'actions_text' => $meta['actions_text'] ?? '',
-            'included_sections' => $meta['included_sections'] ?? [],
+            'included_sections' => $meta['included_sections'] ?? array_keys(\App\Support\SituationReportSections::LABELS),
         ];
     }
 
@@ -113,12 +119,12 @@ class SituationReportPresenter
 
     private function weatherSummary(?object $weather): array
     {
-        if (! $weather) return ['condition' => 'No weather snapshot yet', 'wind' => 'For update', 'rainfall' => 'For update', 'temperature' => 'For update', 'source' => 'Confirm through PAGASA', 'advisory' => 'Confirm official warnings through PAGASA before broadcasting.'];
+        if (! $weather) return array_fill_keys(['condition','wind','rainfall','temperature','source','advisory'], 'Not recorded');
         return [
             'condition' => $weather->condition_name ?: 'Weather monitoring',
-            'wind' => $weather->wind_speed !== null ? $weather->wind_speed.' km/h '.$weather->wind_direction : 'For update',
-            'rainfall' => $weather->rainfall_mm !== null ? $weather->rainfall_mm.' mm' : 'For update',
-            'temperature' => $weather->temperature !== null ? rtrim(rtrim(number_format((float) $weather->temperature, 2, '.', ''), '0'), '.').' C' : 'For update',
+            'wind' => $weather->wind_speed !== null ? $weather->wind_speed.' km/h '.$weather->wind_direction : 'Not recorded',
+            'rainfall' => $weather->rainfall_mm !== null ? $weather->rainfall_mm.' mm' : 'Not recorded',
+            'temperature' => $weather->temperature !== null ? rtrim(rtrim(number_format((float) $weather->temperature, 2, '.', ''), '0'), '.').' C' : 'Not recorded',
             'source' => trim($weather->source_name.' - '.$this->formatTime($weather->observed_at)),
             'advisory' => $weather->advisory_text ?: 'Confirm official warnings through PAGASA before broadcasting.',
         ];
@@ -139,14 +145,14 @@ class SituationReportPresenter
         foreach ($sources['broadcasts'] as $broadcast) $timeline->push(['time' => $this->formatDateTime($broadcast->sent_at), 'title' => 'Public broadcast', 'actor' => $broadcast->broadcast_title ?: 'HQ/Admin desk', 'detail' => $broadcast->scope_type ? $this->label($broadcast->scope_type).' alert sent' : 'Alert sent', 'status' => $this->label($broadcast->status ?: 'sent'), 'tone' => 'green']);
         foreach ($assignments as $assignment) $timeline->push(['time' => $this->formatDateTime($assignment->assigned_at), 'title' => 'Dispatch assignment', 'actor' => $assignment->team_name ?: $assignment->responder_name ?: 'Response team', 'detail' => $assignment->assigned_area ?: 'No area encoded', 'status' => $this->label($assignment->status ?: 'assigned'), 'tone' => $this->statusTone($assignment->status)]);
         $stats = ['total' => 0, 'dispatched' => 0, 'on_scene' => 0, 'completed' => 0];
-        $outcomes = ['safe_count' => 0, 'evacuated_count' => 0, 'unsafe_count' => 0, 'injured_count' => 0, 'missing_count' => 0];
+        $outcomes = array_fill_keys(['safe_count','evacuated_count','unsafe_count','injured_count','missing_count'], null);
         foreach ($sources['assignment_outcomes'] as $assignment) {
             $stats['total']++;
             if (in_array($assignment->status, ['dispatched', 'en_route', 'accepted'], true)) $stats['dispatched']++;
             if (in_array($assignment->status, ['on_scene', 'onscene'], true)) $stats['on_scene']++;
             if ($assignment->status === 'completed') $stats['completed']++;
             $detail = $this->decodeJson($assignment->outcome_notes);
-            foreach (array_keys($outcomes) as $key) $outcomes[$key] += (int) ($detail[$key] ?? 0);
+            foreach (array_keys($outcomes) as $key) if (isset($detail[$key])) $outcomes[$key] = ($outcomes[$key] ?? 0) + (int) $detail[$key];
         }
         return [...$stats, 'rows' => $rows,
             'timeline' => $timeline->sortBy('time')->values()->all(), 'raw_outcomes' => [$outcomes]];
@@ -154,9 +160,11 @@ class SituationReportPresenter
 
     private function casualtySummary(array $dispatch): array
     {
-        $safe = $evacuated = $unsafe = $injured = $missing = 0;
-        foreach ($dispatch['raw_outcomes'] as $outcomes) { $safe += (int) ($outcomes['safe_count'] ?? 0); $evacuated += (int) ($outcomes['evacuated_count'] ?? 0); $unsafe += (int) ($outcomes['unsafe_count'] ?? 0); $injured += (int) ($outcomes['injured_count'] ?? 0); $missing += (int) ($outcomes['missing_count'] ?? 0); }
-        return ['deaths' => null, 'missing' => $missing, 'injured' => $injured, 'rescued' => $safe + $evacuated, 'unsafe' => $unsafe];
+        $values = $dispatch['raw_outcomes'][0] ?? [];
+        $rescued = isset($values['safe_count']) || isset($values['evacuated_count'])
+            ? ($values['safe_count'] ?? 0) + ($values['evacuated_count'] ?? 0) : null;
+        return ['deaths' => null, 'missing' => $values['missing_count'] ?? null,
+            'injured' => $values['injured_count'] ?? null, 'rescued' => $rescued, 'unsafe' => $values['unsafe_count'] ?? null];
     }
 
     private function resourceSummary($requests): array
@@ -164,7 +172,7 @@ class SituationReportPresenter
         return ['needs_validation' => $requests->where('validation_status', 'needs_validation')->count(), 'verified' => $requests->where('validation_status', 'verified')->count(),
             'forwarded' => $requests->where('validation_status', 'forwarded')->count(), 'returned' => $requests->where('validation_status', 'returned')->count(),
             'rows' => $requests->map(fn (object $request): array => ['item' => $request->item_name ?: $request->resource_type ?: 'Request',
-                'quantity' => trim(($request->quantity ?? 0).' '.($request->unit ?? '')), 'source' => $request->request_source ? $this->label($request->request_source) : 'Shared DB',
+                'quantity' => trim(($request->quantity ?? 'Not recorded').' '.($request->unit ?? '')), 'source' => $request->request_source ? $this->label($request->request_source) : 'Shared DB',
                 'status' => $this->label($request->validation_status ?: 'needs_validation'), 'status_tone' => $this->statusTone($request->validation_status)])->values()->all()];
     }
 

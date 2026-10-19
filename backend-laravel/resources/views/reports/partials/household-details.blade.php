@@ -7,7 +7,7 @@
     };
 @endphp
 @if($r['include_households'])
-<div class="note">Household list scope: {{ $r['household_scope'] }} · Unsafe households only. Missing assessments are shown as not recorded.</div>
+<div class="note">Household list scope: {{ $r['household_scope'] }}</div>
 @foreach(app(\App\Presenters\SituationReportDocument::class)->tables($r) as [$name, $headings, $records])
 @if(in_array($name, $names, true))
 <h2 class="sub">{{ $name }}</h2>

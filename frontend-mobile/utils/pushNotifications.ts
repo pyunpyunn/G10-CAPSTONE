@@ -15,7 +15,6 @@ export type PushRegistration = {
 let oneSignalReady = false;
 let pushSyncContext: { deviceUuid: string; userId: string } | null = null;
 let syncingSubscription = false;
-let subscriptionSyncTimer: ReturnType<typeof setInterval> | null = null;
 let unsupportedNoticeShown = false;
 let settingsNoticeShown = false;
 
@@ -68,9 +67,6 @@ async function initializeOneSignal() {
     OneSignal.initialize(appId);
     OneSignal.User.pushSubscription.addEventListener('change', () => { void syncCurrentSubscription(); });
     AppState.addEventListener('change', (state) => { if (state === 'active') void syncCurrentSubscription(); });
-    if (!subscriptionSyncTimer) subscriptionSyncTimer = setInterval(() => {
-      if (AppState.currentState === 'active') void syncCurrentSubscription();
-    }, 30000);
     OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event: { notification: { additionalData?: { type?: string } } }) => {
       if (event.notification.additionalData?.type === 'disaster_broadcast') notifyDisasterBroadcast();
     });

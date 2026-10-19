@@ -1,7 +1,7 @@
 import api from './client'
 
 export async function downloadBackendReport(payload) {
-  let { data } = await api.post('/reports/generate', payload)
+  let { data } = await api.post('/reports/generate', payload, {timeout:payload.report_type === 'situation' ? 240000 : api.defaults.timeout})
   const statusUrl = data.status_url
   const deadline = Date.now() + 10 * 60 * 1000
   while (data.status === 'pending') {

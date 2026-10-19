@@ -33,6 +33,11 @@ class SituationReportController extends Controller
         return $this->service->sitios();
     }
 
+    public function sync(Request $request): JsonResponse
+    {
+        return $this->service->sync($request);
+    }
+
     public function store(Request $request): JsonResponse
     {
         return $this->service->store($request);
@@ -41,6 +46,11 @@ class SituationReportController extends Controller
     public function show(int $sitRepId): JsonResponse
     {
         return $this->service->show($sitRepId);
+    }
+
+    public function submission(Request $request, int $sitRepId): JsonResponse
+    {
+        return $this->service->recordSubmission($request, $sitRepId);
     }
 
     public function pdf(int $sitRepId): JsonResponse

@@ -63,7 +63,7 @@ class SituationHouseholdExportTest extends TestCase
                 for ($i=0; $i<$zip->numFiles; $i++) $text .= $zip->getFromIndex($i);
                 $zip->close(); unlink($path);
             } else $text = $bytes;
-            foreach (['HOUSEHOLD-ONE', 'Member One', 'Medical assistance', 'Major Damage'] as $value) $this->assertStringContainsString($value, $text, $format);
+            foreach (['HOUSEHOLD-ONE', 'Major Damage'] as $value) $this->assertStringContainsString($value, $text, $format);
             foreach (['OTHER-PUROK', 'OTHER-SITIO'] as $value) $this->assertStringNotContainsString($value, $text, $format);
         }
     }
@@ -88,9 +88,12 @@ class SituationHouseholdExportTest extends TestCase
     {
         $s = $this->summary(); $s['include_households'] = false;
         $document = app(SituationReportDocument::class);
-        $this->assertSame(['Population'], array_column($document->tables($document->data($s)), 0));
+        $this->assertSame([], array_column($document->tables($document->data($s)), 0));
         $s['include_households'] = true; $s['included_sections'] = ['VI'];
-        $this->assertSame(['Household Damage'], array_column($document->tables($document->data($s)), 0));
+        $r=$document->data($s);
+        $this->assertSame(['IV'],array_keys($r['sections']));
+        $this->assertStringContainsString('Major Damage',json_encode($r['sections']['IV']));
+        $this->assertSame([],array_column($document->tables($r),0));
     }
 
     public function test_saved_exports_filter_only_snapshot_data_and_keep_snapshot_unchanged(): void
@@ -109,4 +112,18 @@ class SituationHouseholdExportTest extends TestCase
         $this->assertStringNotContainsString('HOUSEHOLD-ONE', $csv);
         $this->assertCount(3, $s['household']['details']);
     }
+    public function test_evacuation_households_and_members_follow_scope_without_reducing_site_capacity(): void
+    {
+        $this->locations();
+        $s = $this->summary();
+        $s['evacuation'] = ['households' => $s['household']['details'], 'members' => $s['household']['details'],
+            'sites' => [['name' => 'School Shelter', 'capacity' => 20, 'occupancy' => 12, 'vacancy' => 8]]];
+        $filtered = app(SituationHouseholdScope::class)->apply($s, ['sitio_id' => 'S1', 'purok_id' => 'P1']);
+        $this->assertCount(1, $filtered['evacuation']['households']);
+        $this->assertCount(1, $filtered['evacuation']['members']);
+        $this->assertSame('HOUSEHOLD-ONE', $filtered['evacuation']['households'][0]['household']);
+        $this->assertSame($s['evacuation']['sites'], $filtered['evacuation']['sites']);
+        $this->assertCount(3, $s['evacuation']['members']);
+    }
+
 }

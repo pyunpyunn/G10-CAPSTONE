@@ -20,7 +20,7 @@ class SituationReportPresenterTest extends TestCase
                 (object) ['purok' => 'Sitio Uno', 'sitio_id' => 'S1', 'sitio_name' => 'Upper Sitio', 'persons' => 9, 'affected_persons' => 4, 'total' => 2, 'safe' => 1, 'evacuated' => 0, 'unsafe' => 1, 'reported' => 2],
                 (object) ['purok' => 'Unassigned', 'total' => 1, 'safe' => 0, 'evacuated' => 0, 'unsafe' => 0, 'reported' => 0],
             ]),
-            'weather' => null, 'evacuation' => collect(), 'assignments' => collect(),
+            'weather' => null, 'evacuation' => ['households' => [], 'members' => [], 'sites' => []], 'assignments' => collect(),
             'assignment_outcomes' => collect([
                 (object) ['status' => 'dispatched', 'outcome_notes' => '{"safe_count":2,"injured_count":1}'],
                 (object) ['status' => 'completed', 'outcome_notes' => '{"evacuated_count":3,"missing_count":1}'],
@@ -37,12 +37,12 @@ class SituationReportPresenterTest extends TestCase
         $this->assertSame(4, $summary['household']['puroks'][0]['affected_persons']);
         $this->assertSame(1, $summary['household']['sitios'][0]['affected']);
         $this->assertNull($summary['household']['puroks'][1]['persons']);
-        $this->assertArrayNotHasKey('evacuation', $summary);
+        $this->assertSame(['households' => [], 'members' => [], 'sites' => []], $summary['evacuation']);
         $this->assertSame(3, $summary['household']['reported']);
         $this->assertSame(1, $summary['household']['unchecked']);
         $this->assertSame(50, $summary['household']['safe_percent']);
         $this->assertSame('Sitio Uno', $summary['household']['puroks'][0]['purok']);
-        $this->assertSame('No weather snapshot yet', $summary['weather']['condition']);
+        $this->assertSame('Not recorded', $summary['weather']['condition']);
         $this->assertSame([], $summary['dispatch']['rows']);
         $this->assertSame(2, $summary['dispatch']['total']);
         $this->assertSame(1, $summary['dispatch']['dispatched']);

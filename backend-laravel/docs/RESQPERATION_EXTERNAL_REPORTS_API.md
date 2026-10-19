@@ -1,504 +1,167 @@
-# RESQPERATION Situation Report API — Partner Integration Guide
+# RESQPERATION External Situation Report API — 4.0
 
-**Contract version:** 2.0  
-**Updated:** October 17, 2026  
-**Audience:** EvaTrack, SafeTrack, TrackingAid and partner-system developers
+Updated 19 October 2026. Integration guide for SafeTrack, EvaTrack and TrackingAid. All three request the same six-finding BDRRMC Situation Report available to operators in PDF, CSV or Excel.
 
-## 1. Connection details
+## 1. API URL and credentials
 
-| Setting | Value |
+| Setting | Current value / requirement |
 | --- | --- |
-| Current Wi-Fi/LAN API base URL | `http://10.90.159.87:8000/api/v1` |
-| API key | `__RESQPERATION_API_KEY__` |
-| Authentication header | `X-API-KEY` |
-| Connection check | `POST /external/reports/handshake` |
-| Dropdown choices | `GET /external/reports/options` |
-| Submit situation report request | `POST /external/report-requests` |
-| RESQPERATION review page | `http://localhost:5175/situation/external-reports` |
-| File-link validity | 30 minutes by default; use the returned `expires_at` |
+| Verified local backend origin | `http://127.0.0.1:8000` |
+| Local API base URL | `http://127.0.0.1:8000/api/v1` |
+| Document contract version | `4.0` (the route prefix remains `/api/v1`) |
+| Authentication header | `X-API-KEY: <configured report integration key>` |
+| Backend secret setting | `EXTERNAL_SYSTEM_API_KEY` in backend `.env`, read through `config/reports.php` |
+| JSON headers | `Accept: application/json`; POST bodies also use `Content-Type: application/json` |
+| Download lifetime | Currently 30 minutes; configurable with `REPORT_URL_EXPIRES_MINUTES` |
 
-Paths in this document are relative to the API base URL unless shown as full URLs. For example, the submission URL is `http://10.90.159.87:8000/api/v1/external/report-requests`.
+The current configured key was accepted by the running local handshake and options endpoints on 19 October 2026. It has not been rotated or copied into this document. Obtain the existing key from the RESQPERATION administrator through a private channel and store it in the partner backend's secret configuration. A handshake does not issue a new key or session token. Send the key on every handshake, options and request submission call. These routes do not require a RESQPERATION operator login or Bearer token.
 
-The API runs on port **8000**. Port **5175** serves the operator website and is not the reports API port.
+`127.0.0.1`/`localhost` works only when the partner backend runs on the same computer. For another computer or deployment, the administrator must supply the reachable backend origin (LAN address or HTTPS hostname); no public production API URL has been verified. Port `5175` is the operator frontend, not the partner backend address. Configure the partner's API base URL with `/api/v1` exactly once.
 
-Machine addresses verified on October 17, 2026:
+All three partners currently share the configured report key; `source_system` is a required request label, not separate partner authentication. This is different from resource-request intake's `EXTERNAL_REQUEST_INTAKE_KEY` / `X-RESQPERATION-INTEGRATION-KEY`, and from credentials RESQPERATION uses to fetch reports from partners.
 
-| Connection | API base URL | Who can use it |
-| --- | --- | --- |
-| Current Wi-Fi/LAN | `http://10.90.159.87:8000/api/v1` | Partner servers that can reach this Wi-Fi/LAN address |
-| Tailscale | `http://100.121.155.55:8000/api/v1` | Partner servers connected to the permitted Tailscale network |
-| Same-machine testing | `http://127.0.0.1:8000/api/v1` | A client running directly on the RESQPERATION machine |
+For administrators changing the host or key: keep `APP_URL` consistent with the reachable backend origin and proxy configuration so absolute signed URLs are usable by partners. Reload configuration (`php artisan config:clear`, or rebuild the deployment configuration cache) and restart persistent workers/services as applicable. Coordinate an actual key rotation with all three partners. Updating this guide alone does not rotate credentials or reconfigure deployment.
 
-The earlier Wi-Fi address `10.189.234.87` is not currently assigned. Both current network addresses returned HTTP 200 with successful API-key authentication when tested from the RESQPERATION machine. Connectivity from a partner machine must also be tested there. The backend now listens on `0.0.0.0:8000`; `0.0.0.0` is a listening address, not a URL for partners.
+## 2. Available findings and selection identifiers
 
-Use the LAN URL in the examples below for partners on this network. For Tailscale partners, replace the host with `100.121.155.55`. `localhost` and `127.0.0.1` refer to the requesting machine, so they must not be used by a partner running on a different machine. Wi-Fi IPs can change after reconnecting or moving networks; this address records the machine's current assignment. No public production URL is assigned by this document. Preserve returned status and download URLs exactly, and ensure their hosts are reachable from the partner backend.
-
-Store the key in your backend environment, not browser JavaScript. Use it only for requests to RESQPERATION's authenticated API endpoints; signed status and download links need no API key. The Downloads copy of this guide contains the configured integration key. The repository template uses a placeholder. This credential belongs to RESQPERATION; EvaTrack's example credential does not authenticate here.
-
-## 2. Required partner interface
-
-Before submitting a request, the external system must provide:
-
-1. **Disaster event selection:** load `data.events` from the options endpoint; submit the selected `event_id`.
-2. **Sitio selection:** load `data.sitios`; submit the selected ID as a **string**, or the literal string `"all"` for an explicit **All sitios** choice.
-3. **Report section selection:** choose at least one section from `data.sections`. A single selected section produces a standalone report.
-4. **File format selection:** `pdf`, `xlsx` or `csv`.
-5. **Purpose:** a nonempty explanation of why the report is needed.
-6. **Request tracking:** store the returned `request_id` and exact `status_url`, show Pending / Accepted / Rejected, and offer a download after acceptance.
-
-The partner backend supplies its configured `source_system`. A partner reference is optional. Disable submission until the disaster, sitio scope, section, format and purpose are selected. IDs must come from RESQPERATION, rather than a partner's own database IDs. Do not hardcode the list of disaster events or sitios.
-
-Both an omitted sitio and an omitted disaster produce HTTP **422**. Null and empty strings do not count as selections. Selecting All sitios requires `"sitio_id": "all"`.
-
-## 3. Lifecycle
-
-```text
-Load options → Select disaster, sitio, section(s), format and purpose
-             → Submit request → HTTP 202 + request_id + signed status_url
-             → Poll status
-                 pending  → Wait for RESQPERATION operator review
-                 rejected → Display decision_note; correct and submit a new request
-                 accepted → Download data.file.download_url before it expires
-```
-
-Submission does **not** immediately release a file. RESQPERATION must accept or reject the request. Acceptance generates the selected sections from the selected disaster and sitio scope, then stores an approved snapshot. File-generation failure leaves the request pending. Accepted and rejected decisions cannot be overwritten.
-
-The snapshot reflects recorded data **at acceptance**, rather than at submission or download. Renewing a download uses the same approved snapshot. Request a new report when updated figures are needed.
-
-## 4. Authentication and endpoint summary
-
-For authenticated calls, send:
-
-```http
-X-API-KEY: <RESQPERATION_API_KEY>
-Accept: application/json
-Content-Type: application/json
-```
-
-`Content-Type` is needed for JSON POST bodies. No operator login, session cookie or Bearer token is needed for these external endpoints.
-
-| Method | Endpoint | Authentication | Result |
+| API selection key | Printed section | Heading | Recorded source |
 | --- | --- | --- | --- |
-| POST | `/external/reports/handshake` | API key | Contract and connection metadata |
-| GET | `/external/reports/options` | API key | Database-backed dropdown choices |
-| POST | `/external/report-requests` | API key | New request awaiting operator review |
-| GET | Exact returned `status_url` | Signed URL | Request state, reason and file metadata |
-| GET | Exact returned `data.file.download_url` | Signed URL | Binary report download |
+| `I` | I | Situation Overview | Event, hazard, alert and weather records |
+| `II` | II | Status of Affected Areas and Population | Event-linked household status reports; known member counts enriched with matching SafeTrack census records |
+| `IV` | III | Damage Assessment | Recorded household / responder property-damage assessments |
+| `V` | IV | Search, Rescue and Retrieval Operations | Command-center responder assignments, status and outcome notes |
+| `VI` | V | Status of Evacuation Centers | Recorded center status/capacity/occupancy and compatible EvaTrack reports |
+| `VII` | VI | Resources Status | Event-linked resource requests and compatible TrackingAid inventory/request reports |
 
-Authenticated handshake, options and submission routes each use `throttle:30,1`. Request-status polling uses `throttle:60,1`. Laravel may share throttle buckets across requests from the same client. Poll every **15–30 seconds** while pending and honor `Retry-After` on HTTP 429.
+Use API keys from options, not the printed Roman numerals. Keys retain their existing meanings; `III` is retired and rejected on new requests. Select 1–6 distinct keys. Do not hardcode a continuous I–VI range. Missing values remain `Not recorded`; known zeroes remain zero. Population tables pair Families and Persons, provisionally treating one registered household as one family unit.
 
-### Connection check
+Displaced Population, casualties, lifelines, assistance costs, needs/issues/planned actions, addenda and annexes are excluded. Damage uses the actual `minor_damage`, `major_damage` and `completely_destroyed` categories; it does not invent total/partial house-damage classifications. Counts describe recorded assessments, not a complete damage census. Do not infer displacement from household status or center occupancy, affected persons from total census, or available stock from requested quantities.
 
-```http
-POST /api/v1/external/reports/handshake
-```
+## 3. Required partner workflow
 
-Send the API key; no body is required. HTTP 200 includes:
+1. Configure a backend-to-backend connection using the API URL and privately supplied report key.
+2. Optionally check authentication with `POST /external/reports/handshake` and JSON `{}`. Expect HTTP 200 with `authenticated: true`, `api_version: "4.0"`, current `situation_sections`, endpoint paths and `expires_in_minutes`. No report is created by the handshake.
+3. Load `GET /external/reports/options`. Read `data.events`, `data.sitios`, `data.sections`, `data.formats`, `data.source_systems`, `data.api_version` and `data.all_sitios_value`. Use the returned event and sitio IDs; do not send event names or display labels.
+4. Submit `POST /external/report-requests` with the fields below. Expect HTTP 202 with `status: "pending"`, `request_id` and a signed `status_url`. Submission does not immediately return a report.
+5. Store the returned `request_id` and the complete `status_url`. Poll that exact URL with GET, for example every 10–15 seconds with backoff. Operator review is manual; there is no guaranteed approval time or webhook.
+6. Read `data.status`. While `pending`, keep waiting. If `rejected`, show `data.decision_note` and stop polling. If `accepted`, use `data.file.download_url` before `data.file.expires_at`.
+7. Download the file with GET and save its binary body. Use `format: "xlsx"` for Excel, not `"excel"`.
 
-```json
-{
-  "status": "success",
-  "authenticated": true,
-  "source": "RESQPERATION",
-  "api_version": "2.0",
-  "situation_requires_review": true,
-  "request_endpoint": "/api/v1/external/report-requests",
-  "options_endpoint": "/api/v1/external/reports/options",
-  "all_sitios_value": "all",
-  "formats": ["pdf", "csv", "xlsx"],
-  "expires_in_minutes": 30
-}
-```
+All endpoint paths above are relative to the API base URL. Status/download URLs are returned as absolute signed URLs: use them exactly as returned, without prepending the base URL, replacing the host, removing query parameters or constructing a signature. They use URL-signature authentication rather than `X-API-KEY`; do not forward the report key to a download host. Treat signed URLs as private access links.
 
-The actual response also includes report types, section labels, request fields and archive category metadata. This guide covers situation reports.
+The request status URL is currently signed without a time expiry; the report download expires after the configured lifetime. If `data.file.expired` is true, `download_url` is null. Ask a RESQPERATION operator to renew the file, then poll the same status URL again. Partners have no public renewal endpoint. Renewal uses the frozen accepted snapshot; it does not fetch current findings. Submit a new reviewed request when a fresh report is needed.
 
-## 5. Load disaster, sitio and section choices
+## 4. Request fields
 
-```http
-GET /api/v1/external/reports/options
-X-API-KEY: <RESQPERATION_API_KEY>
-```
-
-Example HTTP 200 response, abbreviated:
-
-```json
-{
-  "data": {
-    "events": [
-      {
-        "event_id": "<actual-event-id>",
-        "name": "Flood Response",
-        "label": "Flood Response - Oct 2026",
-        "type": "Flood",
-        "severity": "High",
-        "declared_at": "Oct 17, 2026 8:00 AM",
-        "finished_at": "Ongoing",
-        "status": "Active",
-        "scope": "All registered households"
-      }
-    ],
-    "sitios": [
-      {"sitio_id": 710, "sitio_name": "Sitio Alaska"},
-      {"sitio_id": 165, "sitio_name": "Sitio Zapatera"}
-    ],
-    "all_sitios_value": "all",
-    "sections": {
-      "I": "Situation Overview",
-      "II": "Affected Population",
-      "III": "Casualties and Immediate Needs",
-      "V": "Rescue Operations Timeline",
-      "VI": "Initial Damage Assessment",
-      "VII": "Resources Deployed and Requests",
-      "VIII": "Actions Taken and Recommendations"
-    },
-    "formats": ["pdf", "csv", "xlsx"],
-    "source_systems": ["evatrack", "safetrack", "trackingaid"]
-  }
-}
-```
-
-- The event list returns the latest **50** undeleted events, ordered by declaration date. Active and closed events can be selected. Older known, undeleted event IDs are also validated on submission, but are not necessarily in this dropdown list.
-- Sitios belong to RESQPERATION's configured barangay. The list includes registered sitios even when no households or event records are available for them.
-- Sitios apply across events; there is no separate event-to-sitio catalog restriction. The selected event and sitio jointly determine report records.
-- Convert numeric sitio option IDs to strings when constructing the request. Labels are for display; send IDs.
-- Empty lists should disable the relevant selection. An invalid selection is not replaced with all areas.
-- Refresh options when opening the request form and after a stale-ID validation error.
-
-## 6. Available reports and data meaning
-
-| Section key | Report | Shared content |
+| Field | Required | Validation / meaning |
 | --- | --- | --- |
-| `I` | Situation Overview | Event context, weather condition, wind, rainfall, temperature, observation source and advisory |
-| `II` | Affected Population | Household totals, reporting progress, safe / evacuated / unsafe / unchecked counts, sitio summaries, purok breakdowns and registered-person counts when available |
-| `III` | Casualties and Immediate Needs | Recorded dispatch outcome totals for missing, injured and rescued; deaths may be unrecorded |
-| `V` | Rescue Operations Timeline | Deployments, teams, dates/times, assigned areas, coverage, outcomes and geographically linked broadcast activity |
-| `VI` | Initial Damage Assessment | Partially / totally damaged houses and estimated cost, when recorded |
-| `VII` | Resources Deployed and Requests | Event-linked resource requests, quantities, sources and validation status |
-| `VIII` | Actions Taken and Recommendations | Action text available for the generated report |
+| `api_version` | Yes | String `"4.0"`. Unversioned, v2 and v3 submissions return 422. |
+| `source_system` | Yes | Exactly `safetrack`, `evatrack` or `trackingaid` (lowercase). |
+| `event_id` | Yes | String, maximum 255 characters; existing RESQPERATION event ID from options. |
+| `sitio_id` | Yes | String, maximum 120 characters; `"all"` or registered sitio ID from options converted to string. |
+| `included_sections` | Yes | Array of 1–6 distinct keys from `data.sections`: `I`, `II`, `IV`, `V`, `VI`, `VII`. |
+| `format` | Yes | Exactly `pdf`, `csv` or `xlsx`. |
+| `purpose` | Yes | Nonempty string, maximum 2,000 characters, explaining the request. |
+| `reference` | No | Nullable string, maximum 120 characters; partner reference for tracking. It is not an idempotency key. |
 
-`IV` (Evacuation Centers) is **not supported**. Keys retain their established identifiers; do not renumber them. Request only `['II']` for Affected Population alone. Request several keys to receive those sections in one file. To obtain separate files for different sections, submit separate requests.
+Partner scope is all sitios or one sitio; there is no partner purok filter. Operator exports may narrow internal details by sitio/purok. Unattributed external records are excluded from sitio-specific partner reports. Do not send operator identity, signatures, approval decisions, source-sync IDs or arbitrary report content as partner request fields.
 
-### Sitio filtering and data limitations
-
-- Household data uses registered household → address → purok → sitio relationships and the latest valid household status for the selected disaster.
-- Affected households mean **unsafe plus evacuated/relocated** households. All registered households are not automatically affected. Unchecked households remain unchecked.
-- Person totals describe registered members of the relevant households, not individually confirmed casualties. Missing member counts remain unrecorded; they are not inferred as zero.
-- Dispatch records are included when linked by household or affected area to the selected sitio. Broadcasts require a matching target purok or affected area. Free-text area names do not establish sitio ownership.
-- Weather observations are shared barangay context, rather than a sitio-specific sensor feed. The latest observation, capped at the event's end for a closed event, can be used; it is not necessarily a dedicated event observation.
-- Resource requests currently have no authoritative sitio ownership. They are excluded for a specific-sitio export. Choose All sitios for event-linked resource requests. Untagged action notes are also excluded from sitio-specific exports.
-- Dispatch outcome sums can include repeat visits. They are not a deduplicated individual casualty register. Deaths require separate verification.
-- Initial damage totals currently have no connected assessment source and may be unrecorded. The current event-summary API also does not aggregate saved reports' manually entered action notes; section VIII can be blank. The section title does not imply a complete needs assessment or deployed-inventory register.
-- Zero matching records can produce a valid report for an existing event/sitio. Empty tables and unrecorded values are not evidence that no disaster impact occurred.
-- PDF displays missing values as `Not recorded`; spreadsheet/CSV values use `Not recorded` for missing scalar fields. Some narrative/table sections have no rows when no linked records exist.
-
-Every export includes common report/event metadata. A one-section request excludes unrelated report sections, while retaining this header context. Specific-sitio exports identify the sitio in the area coverage and include a short data-scope note.
-
-## 7. Submit a report request
-
-```http
-POST /api/v1/external/report-requests
-```
-
-### Required JSON fields
-
-| Field | Type | Required | Rules |
-| --- | --- | --- | --- |
-| `source_system` | string | Yes | `evatrack`, `safetrack` or `trackingaid`; sender's declared system |
-| `event_id` | string | Yes | Existing undeleted RESQPERATION disaster ID; maximum 255 characters |
-| `sitio_id` | string | Yes | Registered sitio ID from options, or the exact lowercase string `all`; maximum 120 characters |
-| `included_sections` | array of strings | Yes | 1–7 distinct keys from `I`, `II`, `III`, `V`, `VI`, `VII`, `VIII` |
-| `format` | string | Yes | `pdf`, `csv`, `xlsx`; use `xlsx`, not `excel` |
-| `purpose` | string | Yes | Nonempty; maximum 2,000 characters |
-| `reference` | string | No | Partner tracking reference; maximum 120 characters |
-
-The shared API key authenticates the integration; `source_system` is a declared label, not a separate per-system credential. Additional systems require a RESQPERATION configuration/code change.
-
-### Example: Affected Population for one sitio
-
-Replace the event placeholder with an ID returned by options. The sitio ID below is an example; always use current options.
+Example submission (replace the event placeholder using options):
 
 ```json
 {
+  "api_version": "4.0",
   "source_system": "evatrack",
-  "reference": "EVA-2026-042",
-  "event_id": "<actual-event-id>",
-  "sitio_id": "710",
-  "included_sections": ["II"],
+  "event_id": "<event_id from data.events>",
+  "sitio_id": "all",
+  "included_sections": ["I", "II", "IV", "V", "VI", "VII"],
   "format": "pdf",
-  "purpose": "Plan relief distribution for Sitio Alaska by purok."
+  "purpose": "Review recorded post-disaster findings",
+  "reference": "EVA-SITREP-001"
 }
 ```
 
-For all sitios, change only `sitio_id` to `"all"`. For an Excel file, use `"format": "xlsx"`. For a combined overview and population report, use `"included_sections": ["I", "II"]`.
+There is no automatic deduplication by `reference`. After a timeout, check an already received status URL or coordinate with the operator before blindly resubmitting: a repeated POST can create another review request.
 
-### Submission response: HTTP 202
+## 5. PowerShell integration example
+
+Run this on the partner backend host. Supply `RESQPERATION_REPORT_API_KEY` privately in that process's environment; the variable below is a partner-side example, not a new RESQPERATION backend setting.
+
+```powershell
+$reportApiBase = 'http://127.0.0.1:8000/api/v1'
+if ([string]::IsNullOrWhiteSpace($env:RESQPERATION_REPORT_API_KEY)) {
+    throw 'Configure RESQPERATION_REPORT_API_KEY privately first.'
+}
+$reportHeaders = @{
+    Accept = 'application/json'
+    'X-API-KEY' = $env:RESQPERATION_REPORT_API_KEY
+}
+$handshake = Invoke-RestMethod -Method Post -Uri "$reportApiBase/external/reports/handshake" -Headers $reportHeaders -ContentType 'application/json' -Body '{}'
+$options = Invoke-RestMethod -Method Get -Uri "$reportApiBase/external/reports/options" -Headers $reportHeaders
+$options.data.events | Select-Object event_id, name
+
+# Replace this value with an event_id returned above before submitting.
+$selectedEventId = '<event_id from options>'
+$payload = @{
+    api_version = '4.0'
+    source_system = 'evatrack' # safetrack or trackingaid for the other partners
+    event_id = $selectedEventId
+    sitio_id = 'all'
+    included_sections = @($options.data.sections.PSObject.Properties.Name)
+    format = 'pdf'
+    purpose = 'Review recorded post-disaster findings'
+    reference = 'EVA-SITREP-001'
+} | ConvertTo-Json -Depth 5
+$submitted = Invoke-RestMethod -Method Post -Uri "$reportApiBase/external/report-requests" -Headers $reportHeaders -ContentType 'application/json' -Body $payload
+
+# Recheck with a delay/backoff while pending; do not resubmit the POST.
+$current = Invoke-RestMethod -Method Get -Uri $submitted.status_url -Headers @{ Accept = 'application/json' }
+if ($current.data.status -eq 'accepted' -and $current.data.file.download_url) {
+    Invoke-WebRequest -Uri $current.data.file.download_url -OutFile './BDRRMC-Situation-Report.pdf'
+}
+```
+
+## 6. Responses, errors and limits
+
+Submission response (illustrative placeholders):
 
 ```json
 {
   "status": "pending",
-  "request_id": "7d665570-58a8-4ee1-a903-c68745e0fe10",
+  "request_id": "<UUID>",
+  "prepared_by": "Emergency Operations Center: ResQperation System",
   "message": "Request received. A RESQPERATION operator must accept it before a file is released.",
-  "status_url": "http://10.90.159.87:8000/api/v1/external/report-requests/7d665570-58a8-4ee1-a903-c68745e0fe10?signature=<server-signature>"
+  "status_url": "<absolute signed status URL>"
 }
 ```
 
-`request_id` is RESQPERATION's identifier. `reference` is your own optional identifier; it is **not an idempotency key**. Repeating a POST creates another request, even with the same reference. Once HTTP 202 is received, poll the existing request rather than submitting again. A network timeout after submission is ambiguous: avoid automatic repeated POSTs without checking with the operator.
+Status responses wrap the record in `data`: `id`, `api_version`, `source_system`, `reference`, `event_id`, `sitio_id`, `sections`, `format`, `purpose`, `status`, `decision_note`, review timestamps and `file`. `file` is null before acceptance. An accepted file includes `file_name`, `format`, `download_url`, `expires_at` and `expires_in_minutes`; expired files also expose `expired: true`.
 
-`start_date`, `end_date`, `period_start`, `period_end`, custom location labels, callbacks, and partner-supplied data counts are **not supported filters** on this external submission endpoint. Unknown fields are not applied. The event selects the disaster; data is captured when the operator accepts.
+| HTTP status | Meaning / partner action |
+| --- | --- |
+| 200 | Handshake, options, status or successful file download. |
+| 202 | Report request queued for operator review. |
+| 401 | Missing/incorrect `X-API-KEY`; check the privately shared report key and backend configuration. |
+| 403 | Invalid/expired signed URL; preserve the original URL and request operator renewal for an expired file. |
+| 404 | Unknown request or missing report file. |
+| 422 | Invalid fields/version/event/sitio/section; inspect JSON `errors` and refresh options. Retired key `III` is invalid. |
+| 429 | Rate limit reached; respect `Retry-After` when returned and back off. |
+| 5xx | Server/integration failure; retain the request reference and coordinate with the operator before resubmitting. |
 
-### Compatibility endpoint
+Handshake, options and submission routes use a 30-per-minute throttle; request-status polling uses 60 per minute. There is no partner-facing accept/reject route: review and file renewal require an authenticated, authorized RESQPERATION operator. A 409 during operator acceptance can indicate unavailable/incompatible/stale source sync or an already reviewed request; source failures do not release a partial report.
 
-`POST /external/reports/generate` also accepts an external situation request with all fields above **plus** `"report_type": "situation"`. It returns the same HTTP 202 review workflow. Prefer `/external/report-requests` for new integrations. Do not send EvaTrack report types such as `demographics` or `dromic` to RESQPERATION; choose the applicable RESQPERATION section keys.
+## 7. Review, freshness and scope
 
-## 8. Track acceptance or rejection
+On acceptance, the backend requires fresh SafeTrack, EvaTrack and TrackingAid source data, reusing a complete preflight no older than 60 seconds or fetching again. Unconfigured, unavailable or incompatible sources prevent acceptance/file generation. A successful handshake checks report-key authentication; it does not prove source-sync readiness. The partner requesting a RESQPERATION report does not call the authenticated operator sync endpoint.
 
-GET the exact `status_url` from submission. Its signed query authenticates access to that request. Do not reconstruct the path, remove parameters, change the hostname, or append extra query fields.
+The accepted report freezes the recorded findings and metadata. Prepared by remains `Emergency Operations Center: ResQperation System`; reviewed by is the reviewing operator; approved by is blank for the Punong Barangay's wet signature. PDF uses A4; CSV has labeled rectangular blocks; XLSX has one Summary sheet. No annexes/addenda are produced. Metadata, report series, signatures and the Data Privacy notice remain.
 
-Example HTTP 200 while pending:
+Title: `BDRRMC Situation Report No. [number] on the [event] as of [date, time]`. Government reporting terminology is adapted to barangay data; this is not a DSWD-issued DROMIC report or a claim of local official-form approval. Downloaded reports can be handed over manually; no city/regional/national transmission channel exists.
 
-```json
-{
-  "data": {
-    "id": "7d665570-58a8-4ee1-a903-c68745e0fe10",
-    "source_system": "evatrack",
-    "reference": "EVA-2026-042",
-    "event_id": "<actual-event-id>",
-    "sitio_id": "710",
-    "sections": ["II"],
-    "format": "pdf",
-    "purpose": "Plan relief distribution for Sitio Alaska by purok.",
-    "status": "pending",
-    "decision_note": null,
-    "decided_by": null,
-    "decided_at": null,
-    "created_at": "2026-10-17 14:30:00",
-    "file": null
-  }
-}
-```
+The compatibility route `POST /external/reports/generate` with `report_type: "situation"` and all the same required fields delegates to this reviewed workflow. It does not bypass approval. Prefer `/external/report-requests` for SitReps; generic archive generation uses a separate flow.
 
-The status response uses **`data.sections`**, whereas submission uses **`included_sections`**.
+## 8. Verification and related documents
 
-### Accepted
+Local read-only checks on 19 October 2026: configured-key handshake returned 200/authenticated/API 4.0; options returned 200 with the six current identifiers and event/sitio choices; options without a key returned 401. No report request was submitted and no credentials were changed by this documentation update. Remote partner reachability and deployment URLs have not been verified.
 
-The same object changes to `data.status: "accepted"`, contains the reviewer/time and optional review note, and includes:
-
-```json
-{
-  "file": {
-    "status": "success",
-    "report_type": "situation",
-    "format": "pdf",
-    "file_name": "situation_20261017_150000_aB3dE5fG7hJ9kL2m.pdf",
-    "download_url": "http://10.90.159.87:8000/api/v1/external/reports/download/situation_20261017_150000_aB3dE5fG7hJ9kL2m.pdf?expires=<timestamp>&signature=<server-signature>",
-    "expires_at": "2026-10-17T15:30:00+08:00",
-    "expires_in_minutes": 30
-  }
-}
-```
-
-This excerpt is **inside `data`**, not a top-level generation response. Read `data.file.download_url`. `file.status: "success"` describes the prepared file; the request's state remains `data.status: "accepted"`.
-
-### Rejected
-
-`data.status` becomes `"rejected"`, `data.file` stays null, and `data.decision_note` contains the operator's reason. Display it to the requester, stop polling and let them submit a corrected request. Rejection is a normal HTTP 200 status result, not HTTP 403.
-
-The signed request-status link currently has **no time-based expiry**, but becomes unusable if its record is removed or the server signing key changes. Treat the complete URL as a private access token. No callback/webhook is sent and no automatic approval deadline is guaranteed.
-
-## 9. Download and expiration
-
-GET the exact accepted `data.file.download_url`. The response is a binary file, not JSON. Do not send the API key to an external storage host. Use a safe local filename, or the returned basename after validation.
-
-| Format | Extension | Content |
-| --- | --- | --- |
-| PDF | `.pdf` | A4 portrait report with selected sections |
-| Excel | `.xlsx` | Actual Excel workbook, not a CSV renamed to `.xlsx` |
-| CSV | `.csv` | UTF-8 with BOM and CSV quoting |
-
-Excel uses the supplied report layout: a formatted **Summary** sheet plus **Population**, **Timeline**, **Team Outcomes**, and **Resources** sheets as applicable to the requested sections. Population includes sitio/purok, household and person counts. Data sheets have typed values, filters and frozen headings; dates are Excel dates. Sections that were not requested do not create detail sheets.
-
-CSV follows the same report order in one rectangular file: report header, details and selected summary sections, then labeled detail tables with their own heading rows. CSV cannot carry workbook tabs, colors or merged cells. It no longer uses a single Section/Field/Value schema. Read its table labels and headers with a CSV parser, including quoted multiline fields and the UTF-8 BOM. Formula-like user text is prefixed with an apostrophe for spreadsheet safety.
-
-When a download expires, polling returns `data.file.expired: true` and `data.file.download_url: null`. The request remains accepted. Ask a RESQPERATION operator to **Renew download** in the request details, then poll the same status URL for the new link. Renewal is currently an authenticated operator action; there is no external API-key renewal endpoint. A deleted/missing file can return HTTP 404 even before its link expires.
-
-With local storage, Laravel serves a signed download URL. With configured S3 storage, the server can return an S3 pre-signed URL. Follow the returned URL instead of constructing a storage path. File availability does not imply a published deletion/retention schedule.
-
-## 10. Errors and retry behavior
-
-| HTTP status | Meaning | Partner action |
-| --- | --- | --- |
-| 200 | Successful handshake/options/status or binary download | Interpret the endpoint-specific response |
-| 202 | Request stored and awaiting review | Save request ID and status URL |
-| 401 | Missing/invalid API key | Check the key/header with RESQPERATION |
-| 403 | Invalid/tampered signed URL, or expired download link | Use the original status URL; request download renewal if expired |
-| 404 | Request record or report file unavailable | Check the request/link with RESQPERATION |
-| 422 | Invalid request fields, disaster or sitio | Show field errors, refresh options and correct input |
-| 429 | Rate limit reached | Honor `Retry-After`, reduce polling, retry GETs with backoff |
-| 500 / 503 | Server/storage problem or database unavailable | Back off on GETs; do not blindly duplicate submissions |
-
-Validation errors have this structure; exact wording can vary:
-
-```json
-{
-  "message": "The event id field is required. (and 1 more error)",
-  "errors": {
-    "event_id": ["The event id field is required."],
-    "sitio_id": ["The sitio id field is required."]
-  }
-}
-```
-
-Key failures return HTTP 401 with `{"status":"error","message":"Unauthorized: Invalid or missing X-API-KEY header."}`. A removed event or sitio after submission can prevent acceptance; the operator can reject the request so the partner can choose valid options and resubmit.
-
-Request timestamps without an offset, such as `created_at`, use the configured server timezone, currently Asia/Manila (UTC+08:00). File `expires_at` includes its offset and should be parsed as an instant. Event display labels are human-readable and should not be parsed as IDs or filters.
-
-## 11. Integration examples
-
-Configure your backend environment:
-
-```env
-RESQPERATION_API_BASE_URL=http://10.90.159.87:8000/api/v1
-RESQPERATION_API_KEY=<API key from section 1>
-```
-
-### cURL / Postman
-
-```bash
-# Connection check
-curl --fail-with-body -X POST "$RESQPERATION_API_BASE_URL/external/reports/handshake" \
-  -H "X-API-KEY: $RESQPERATION_API_KEY" -H 'Accept: application/json'
-
-# Populate your dropdowns from this response
-curl --fail-with-body "$RESQPERATION_API_BASE_URL/external/reports/options" \
-  -H "X-API-KEY: $RESQPERATION_API_KEY" -H 'Accept: application/json'
-
-# Replace the event ID and selected sitio using the options response
-curl --fail-with-body -X POST "$RESQPERATION_API_BASE_URL/external/report-requests" \
-  -H "X-API-KEY: $RESQPERATION_API_KEY" -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '{"source_system":"evatrack","event_id":"<actual-event-id>","sitio_id":"710","included_sections":["II"],"format":"pdf","purpose":"Relief planning","reference":"EVA-2026-042"}'
-```
-
-In Postman, create the same requests, put the key in Headers, and choose **raw → JSON** for submission. Copy the returned `status_url` into a GET request. After acceptance, open a GET for `data.file.download_url` and select **Send and Download**. Use Postman's Desktop Agent for a local API.
-
-### PowerShell
-
-```powershell
-$baseUrl = $env:RESQPERATION_API_BASE_URL.TrimEnd('/')
-$headers = @{ 'X-API-KEY' = $env:RESQPERATION_API_KEY; Accept = 'application/json' }
-$options = (Invoke-RestMethod -Uri "$baseUrl/external/reports/options" -Headers $headers).data
-
-# Bind options.events and options.sitios to dropdowns in your application.
-$selectedEventId = Read-Host 'Enter the event_id selected from options.events'
-$selectedSitioId = Read-Host 'Enter a sitio_id selected from options.sitios, or all'
-$payload = @{
-    source_system = 'evatrack'
-    event_id = $selectedEventId
-    sitio_id = $selectedSitioId
-    included_sections = @('II')
-    format = 'pdf'
-    purpose = 'Relief planning'
-} | ConvertTo-Json
-$submitted = Invoke-RestMethod -Uri "$baseUrl/external/report-requests" -Method Post `
-    -Headers $headers -ContentType 'application/json' -Body $payload
-
-# Save these for later; operator review may take longer than a script session.
-$submitted | Select-Object request_id, status_url
-$requestState = (Invoke-RestMethod -Uri $submitted.status_url -Headers @{ Accept = 'application/json' }).data
-if ($requestState.status -eq 'accepted' -and $requestState.file.download_url) {
-    $safeName = [IO.Path]::GetFileName($requestState.file.file_name)
-    Invoke-WebRequest -Uri $requestState.file.download_url -OutFile $safeName
-} elseif ($requestState.status -eq 'rejected') {
-    Write-Output $requestState.decision_note
-} else {
-    Write-Output 'Pending review, or download renewal needed. Check the saved status URL later.'
-}
-```
-
-### Partner backend: JavaScript / Node.js (native fetch)
-
-```javascript
-const base = process.env.RESQPERATION_API_BASE_URL.replace(/\/$/, '');
-const key = process.env.RESQPERATION_API_KEY;
-
-async function jsonResponse(response) {
-  const body = await response.json();
-  if (!response.ok) throw new Error(JSON.stringify({ status: response.status, body }));
-  return body;
-}
-
-export async function loadReportOptions() {
-  return (await jsonResponse(await fetch(`${base}/external/reports/options`, {
-    headers: { 'X-API-KEY': key, Accept: 'application/json' }
-  }))).data;
-}
-
-export async function requestPopulationReport(eventId, sitioId, reference) {
-  // Values come from your user's dropdown selections. Use 'all' explicitly.
-  if (!eventId || !sitioId) throw new Error('Select a disaster and sitio scope.');
-  return jsonResponse(await fetch(`${base}/external/report-requests`, {
-    method: 'POST',
-    headers: { 'X-API-KEY': key, Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      source_system: 'evatrack', event_id: String(eventId), sitio_id: String(sitioId),
-      included_sections: ['II'], format: 'pdf', purpose: 'Relief planning', reference
-    })
-  })); // HTTP 202: persist request_id and status_url in your database.
-}
-
-export async function checkReport(statusUrl) {
-  // statusUrl must be the unchanged URL previously issued by RESQPERATION.
-  return (await jsonResponse(await fetch(statusUrl, {
-    headers: { Accept: 'application/json' }
-  }))).data;
-}
-
-// Schedule checkReport every 15–30 seconds while pending, with bounded retries.
-// rejected: show decision_note. accepted + file.download_url: enable download.
-// accepted + file.expired: show 'Download renewal required'.
-```
-
-## 12. RESQPERATION administrator setup
-
-The external partner does not need to recreate RESQPERATION's controllers, report templates or database tables. On the RESQPERATION server, configure:
-
-```env
-APP_URL=http://10.90.159.87:8000
-EXTERNAL_SYSTEM_API_KEY=<RESQPERATION integration key>
-REPORT_DISK=local
-REPORT_URL_EXPIRES_MINUTES=30
-```
-
-For LAN/production, use the reachable server origin for `APP_URL` and the partner's base URL. Serve requests through that host so signed URLs use the correct origin; configure trusted proxy settings if deployed behind a proxy. Run `php artisan config:clear` after environment changes, or rebuild the deployment's config cache. API-key rotation requires updating partners' configured key.
-
-The report inbox migrations must be installed:
-
-```bash
-php artisan migrate --path=database/migrations/2026_10_17_000001_create_external_report_requests_table.php
-php artisan migrate --path=database/migrations/2026_10_17_000002_add_sitio_to_external_report_requests.php
-```
-
-To start the development API with network access:
-
-```bash
-php artisan serve --host=0.0.0.0 --port=8000
-```
-
-The backend needs its configured database, writable report storage and installed PHP dependencies. Situation request submission/approval does not require the archive export worker: the operator prepares the file during acceptance. Heavy archive exports use a separate queue workflow.
-
-Only authenticated RESQPERATION web accounts with Reports Documentation access can list the inbox, accept/reject, or renew files. An external API key does not grant operator access. Partners should use the signed status URL for their own request rather than the operator inbox API.
-
-## 13. Partner acceptance checklist
-
-- Handshake succeeds using the issued RESQPERATION key and reachable backend URL.
-- Disaster and sitio dropdowns load from options; ID values are passed as strings.
-- Request cannot submit without a disaster and explicit sitio/All sitios selection.
-- Invalid IDs, missing selections, unsupported section IV and duplicate sections show validation errors.
-- Affected Population alone sends `included_sections: ["II"]`.
-- HTTP 202 persists the request ID and status URL; Pending does not show a download.
-- Rejection displays the reason and stops polling; correction creates a new request.
-- Acceptance downloads only the requested sections and correct sitio scope.
-- PDF, Excel and CSV are handled as files; spreadsheets use the formatted summary and requested detail sheets; CSV uses labeled table blocks.
-- Expired downloads show a renewal state; returned signed URLs are kept intact.
-- Polling honors rate limits; repeated POSTs are not used as polling.
-- The deployment's API and returned download URLs work from the partner server, not only the developer's own machine.
+See [source-sync configuration and CSV requirements](situation-report-sync.md), [report implementation](situation-report-implementation.md) and [partner acceptance checklist](partner-report-checklist.md).

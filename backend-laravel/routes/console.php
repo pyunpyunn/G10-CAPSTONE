@@ -149,6 +149,10 @@ Schedule::command('rescue-criteria:capture')
     ->everyFifteenMinutes()
     ->withoutOverlapping();
 
+Schedule::command('navigation:refresh-routes')
+    ->dailyAt('02:30')
+    ->withoutOverlapping();
+
 Schedule::command('queue:work trackingaid_outbox --queue=trackingaid --stop-when-empty --max-time=50')
     ->everyMinute()
     ->withoutOverlapping();

@@ -47,7 +47,10 @@ class SituationHouseholdQuery
                     try { $age = (int) Carbon::parse($m->birth_date)->age; } catch (\Throwable) {}
                 }
                 return ['member_id' => $m->member_id, 'name' => trim(implode(' ', array_filter([$m->first_name ?? '', $m->middle_name ?? '', $m->last_name ?? '']))),
-                    'age' => $age, 'sex' => $m->gender_label ?? null, 'status' => $status];
+                    'age' => $age, 'sex' => $m->gender_label ?? null,
+                    'is_pwd' => isset($m->is_pwd) ? (bool) $m->is_pwd : null,
+                    'is_pregnant' => isset($m->is_pregnant) ? (bool) $m->is_pregnant : null,
+                    'is_lactating' => isset($m->is_lactating) ? (bool) $m->is_lactating : null, 'status' => $status];
             });
             $affected = $all->filter(fn ($m) => in_array($m['status'], [...HouseholdEventStatusQuery::UNSAFE_KEYS, ...HouseholdEventStatusQuery::EVACUATED_KEYS, 'rescued'], true))->values();
             $count = fn ($keys) => $all->filter(fn ($m) => in_array($m['status'], $keys, true))->count();

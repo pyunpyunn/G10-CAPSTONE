@@ -41,7 +41,7 @@ export default function RescueTeamConfigModal({ isOpen, workspace, isLoading, is
   async function submit(event) {
     event.preventDefault()
     setLocalError('')
-    if (!form.team_name.trim() || !form.team_code || !form.team_type || !form.duty_status) { setLocalError('Complete the team name, type, and duty status.'); return }
+    if (!form.team_name.trim() || !form.team_type || !form.duty_status) { setLocalError('Complete the team name, type, and duty status.'); return }
     if (form.leader_responder_id && !memberSet.has(Number(form.leader_responder_id))) { setLocalError('Select a leader from the team members.'); return }
     await onSave({ ...form, assigned_purok_id: form.assigned_purok_id || null, leader_responder_id: form.leader_responder_id || null })
   }

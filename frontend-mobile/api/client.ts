@@ -5,6 +5,37 @@ import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureSt
 import { invalidateMobileReads } from '@/utils/mobileReadCache';
 
 const tokenKey = 'resqperation_mobile_token';
+const rescuerDeviceUuidKey = 'resq_rescuer_device_uuid';
+const serverUrlKey = 'resqperation_server_url';
+
+export async function getApiServerUrl() {
+  return (await getStoredItem(serverUrlKey)) || getApiBaseUrl();
+}
+
+export async function setApiServerUrl(value: string) {
+  const parsed = new URL(value.trim());
+  if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new Error('Enter a server URL beginning with https://, without passwords or query parameters.');
+  }
+  let path = parsed.pathname.replace(/\/+$/, '');
+  if (!path) path = '/api/v1';
+  if (!path.endsWith('/api/v1')) throw new Error('The server address must end with /api/v1.');
+  const next = `${parsed.origin}${path}`;
+  if (next === await getApiServerUrl()) return next;
+  if (Platform.OS !== 'web') {
+    const navigation = await import('@/utils/navigationStore');
+    if (await navigation.activeLocalTrip() || await navigation.pendingEventCount()) {
+      throw new Error('End your trip and sync saved events before changing servers.');
+    }
+    await navigation.clearNavigationStorage();
+  }
+  const { logoutPushIdentity } = await import('@/utils/pushNotifications');
+  await logoutPushIdentity();
+  await clearToken();
+  await setStoredItem(serverUrlKey, next);
+  api.defaults.baseURL = next;
+  return next;
+}
 
 function getApiBaseUrl() {
   const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -16,6 +47,8 @@ function getApiBaseUrl() {
   if (configuredUrl && !isLocalhostUrl(configuredUrl)) {
     return configuredUrl;
   }
+
+  if (!__DEV__ && Platform.OS !== 'web') return '';
 
   const expoHost = getExpoHost();
 
@@ -49,10 +82,19 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
+  const serverUrl = await getApiServerUrl();
+  if (!serverUrl) throw new Error('Set the server address on the sign-in screen first.');
+  config.baseURL = serverUrl;
+  api.defaults.baseURL = serverUrl;
+  if (/\.ngrok(-free)?\.(dev|app|io)(\/|$)/.test(serverUrl)) config.headers['ngrok-skip-browser-warning'] = '1';
   const token = await getStoredItem(tokenKey);
+  const deviceUuid = await getStoredItem(rescuerDeviceUuidKey);
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (deviceUuid) {
+    config.headers['X-Device-UUID'] = deviceUuid;
   }
 
   return config;

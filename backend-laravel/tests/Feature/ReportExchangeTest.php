@@ -17,7 +17,9 @@ class ReportExchangeTest extends TestCase
         parent::setUp();
         (require database_path('migrations/2026_10_17_000001_create_external_report_requests_table.php'))->up();
         (require database_path('migrations/2026_10_17_000002_add_sitio_to_external_report_requests.php'))->up();
+        (require database_path('migrations/2026_10_18_000022_add_external_report_contract_version.php'))->up();
         $this->mock(\App\Queries\SituationReportQuery::class, function ($mock): void {
+            $mock->shouldReceive('nextReportNumber')->andReturn('1');
             $mock->shouldReceive('findEvent')->with('EV-1')->andReturn((object) ['event_id' => 'EV-1']);
             $mock->shouldReceive('findEvent')->with('UNKNOWN')->andReturn(null);
             $mock->shouldReceive('sitioOptions')->andReturn(collect([(object) ['sitio_id' => 710, 'sitio_name' => 'Sitio Alaska']]));
@@ -27,10 +29,64 @@ class ReportExchangeTest extends TestCase
         Storage::fake('local');
     }
 
+    public function test_partner_contract_declares_v4_and_rejects_unversioned_or_v2_requests(): void
+    {
+        $this->withHeader('X-API-KEY','exchange-secret')->postJson('/api/v1/external/reports/handshake')
+            ->assertOk()->assertJsonPath('api_version','4.0')->assertJsonMissingPath('situation_sections.III')->assertJsonPath('situation_sections.VI','Status of Evacuation Centers');
+        foreach ([[],['api_version'=>'2.0']] as $version) {
+            $this->withHeader('X-API-KEY','exchange-secret')->postJson('/api/v1/external/report-requests',$version+[
+                'source_system'=>'safetrack','event_id'=>'EV-1','sitio_id'=>'all','included_sections'=>['I'],
+                'format'=>'pdf','purpose'=>'Planning',
+            ])->assertUnprocessable()->assertJsonValidationErrors('api_version');
+        }
+    }
+
+    public function test_v4_accepts_six_sections_and_rejects_a_seventh(): void
+    {
+        $keys=array_keys(\App\Support\SituationReportSections::LABELS);
+        $result=$this->submit(['included_sections'=>$keys]);
+        $this->assertSame($keys,json_decode(DB::table('external_report_requests')->where('id',$result['request_id'])->value('sections'),true));
+        $this->assertSame('4.0',DB::table('external_report_requests')->where('id',$result['request_id'])->value('api_version'));
+        $this->withHeader('X-API-KEY','exchange-secret')->postJson('/api/v1/external/report-requests',[
+            'api_version'=>'4.0','source_system'=>'evatrack','event_id'=>'EV-1','sitio_id'=>'all','included_sections'=>[...$keys,'III'],
+            'format'=>'csv','purpose'=>'Planning',
+        ])->assertUnprocessable()->assertJsonValidationErrors('included_sections');
+    }
+
+    public function test_old_pending_requests_require_resubmission(): void
+    {
+        $result=$this->submit();
+        DB::table('external_report_requests')->where('id',$result['request_id'])->update(['api_version'=>'2.0']);
+        try { $this->decision($result['request_id'],['decision'=>'accepted']); $this->fail('Must reject retired section meanings.'); }
+        catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(422,$e->getStatusCode()); }
+        $this->assertSame('pending',DB::table('external_report_requests')->where('id',$result['request_id'])->value('status'));
+    }
+
+    public function test_acceptance_freezes_findings_entries_and_leaves_chair_signature_blank(): void
+    {
+        $result=$this->submit(['included_sections'=>array_keys(\App\Support\SituationReportSections::LABELS)]);
+        $this->mock(SituationReportService::class,fn ($mock)=>$mock->shouldReceive('eventSummary')->with('EV-1')->once()->andReturn(response()->json(['data'=>['summary'=>[
+            'schema_version'=>'4.0','event'=>['event_id'=>'EV-1','name'=>'Flood'],
+            'report'=>['approved_by'=>'Must not be copied'],
+        ]]])));
+        $this->decision($result['request_id'],['decision'=>'accepted','sitrep_type'=>'initial',
+            'resources_text'=>'Available: 40 water bottles','overview_text'=>'Flooding in Purok One','response_text'=>'Team deployed',
+            'approved_by'=>'Must not be accepted',
+        ]);
+        $snapshot=json_decode(DB::table('external_report_requests')->where('id',$result['request_id'])->value('approved_summary'),true);
+        $this->assertSame('4.0',$snapshot['schema_version']);
+        $this->assertSame('1',$snapshot['report']['report_number']);
+        $this->assertSame('initial',$snapshot['report']['report_type']);
+        $this->assertSame('Emergency Operations Center: ResQperation System',$snapshot['report']['prepared_by']);
+        $this->assertSame('Duty officer',$snapshot['report']['reviewed_by']);
+        $this->assertNull($snapshot['report']['approved_by']);
+        $this->assertSame('Available: 40 water bottles',$snapshot['operator_inputs']['resources_text']);
+    }
+
     private function submit(array $overrides = []): array
     {
         return $this->withHeader('X-API-KEY', 'exchange-secret')->postJson('/api/v1/external/report-requests', array_merge([
-            'source_system' => 'evatrack', 'included_sections' => ['II'], 'format' => 'csv',
+            'api_version'=>'4.0', 'source_system' => 'evatrack', 'included_sections' => ['II'], 'format' => 'csv',
             'purpose' => 'Plan relief distribution by sitio and purok.', 'event_id' => 'EV-1', 'reference' => 'EVA-42', 'sitio_id' => 'all',
         ], $overrides))->assertStatus(202)->json();
     }
@@ -48,12 +104,12 @@ class ReportExchangeTest extends TestCase
         $this->withHeader('X-API-KEY', 'exchange-secret')->getJson('/api/v1/external/reports/options')
             ->assertOk()->assertJsonPath('data.events.0.event_id', 'EV-1')
             ->assertJsonPath('data.sitios.0.sitio_id', 710)->assertJsonPath('data.all_sitios_value', 'all')
-            ->assertJsonPath('data.sections.II', 'Affected Population');
+            ->assertJsonPath('data.sections.II', 'Status of Affected Areas and Population');
     }
 
     public function test_external_submission_requires_disaster_and_explicit_sitio_choice(): void
     {
-        $payload = ['source_system'=>'evatrack', 'included_sections'=>['II'], 'format'=>'pdf', 'purpose'=>'Relief planning'];
+        $payload = ['api_version'=>'4.0', 'source_system'=>'evatrack', 'included_sections'=>['II'], 'format'=>'pdf', 'purpose'=>'Relief planning'];
         $this->withHeader('X-API-KEY', 'exchange-secret')->postJson('/api/v1/external/report-requests', $payload)
             ->assertUnprocessable()->assertJsonValidationErrors(['event_id', 'sitio_id']);
         $this->postJson('/api/v1/external/report-requests', $payload + ['event_id'=>'UNKNOWN', 'sitio_id'=>'all'])
@@ -84,10 +140,10 @@ class ReportExchangeTest extends TestCase
     {
         $this->postJson('/api/v1/external/report-requests', [])->assertUnauthorized();
         $this->withHeader('X-API-KEY', 'exchange-secret')->postJson('/api/v1/external/report-requests', [
-            'source_system' => 'evatrack', 'included_sections' => ['IV'], 'format' => 'csv', 'purpose' => 'Need data',
+            'api_version'=>'4.0', 'source_system' => 'evatrack', 'included_sections' => ['XIII'], 'format' => 'csv', 'purpose' => 'Need data',
         ])->assertUnprocessable()->assertJsonValidationErrors('included_sections.0');
         $this->withHeader('X-API-KEY', 'exchange-secret')->postJson('/api/v1/external/report-requests', [
-            'source_system' => 'evatrack', 'included_sections' => [], 'format' => 'csv', 'purpose' => 'Need data',
+            'api_version'=>'4.0', 'source_system' => 'evatrack', 'included_sections' => [], 'format' => 'csv', 'purpose' => 'Need data',
         ])->assertUnprocessable()->assertJsonValidationErrors('included_sections');
     }
 
@@ -103,7 +159,7 @@ class ReportExchangeTest extends TestCase
     public function test_old_external_situation_generate_endpoint_also_requires_review(): void
     {
         $this->withHeader('X-API-KEY', 'exchange-secret')->postJson('/api/v1/external/reports/generate', [
-            'report_type' => 'situation', 'source_system' => 'safetrack', 'event_id' => 'EV-1', 'sitio_id' => 'all',
+            'api_version'=>'4.0', 'report_type' => 'situation', 'source_system' => 'safetrack', 'event_id' => 'EV-1', 'sitio_id' => 'all',
             'included_sections' => ['II'], 'format' => 'pdf', 'purpose' => 'Population verification',
         ])->assertStatus(202)->assertJsonPath('status', 'pending')->assertJsonMissingPath('download_url');
         $this->assertSame(1, DB::table('external_report_requests')->where('status', 'pending')->count());
@@ -115,7 +171,7 @@ class ReportExchangeTest extends TestCase
         $this->mock(SituationReportService::class, function ($mock): void {
             $mock->shouldReceive('eventSummary')->once()->with('EV-1')->andReturn(response()->json(['data' => ['summary' => [
                 'event' => ['event_id' => 'EV-1', 'name' => 'Flood'], 'report' => [],
-                'household' => ['total' => 12, 'affected' => 4, 'puroks' => [['sitio' => 'Sitio A', 'purok' => 'Purok 1', 'total' => 12]]],
+                'household' => ['total' => 12, 'affected' => 4, 'puroks' => [['sitio' => 'Sitio A', 'purok' => 'Purok 1', 'total' => 12, 'affected'=>4, 'affected_persons'=>15]]],
                 'casualties' => ['injured' => 999], 'actions_text' => 'Private unrelated operations note', 'included_sections' => [],
             ]]]));
         });
@@ -123,7 +179,7 @@ class ReportExchangeTest extends TestCase
         $row = $response->getData(true)['data'];
         $this->assertSame('accepted', $row['status']);
         $bytes = Storage::disk('local')->get('reports/'.$row['file']['file_name']);
-        $this->assertStringContainsString('"Sitio A","Purok 1",12', $bytes);
+        $this->assertStringContainsString('"Sitio A","Purok 1",4,15', $bytes);
         $this->assertStringNotContainsString('Private unrelated operations note', $bytes);
         $this->assertStringNotContainsString('Injured', $bytes);
         $stored = DB::table('external_report_requests')->where('id', $row['id'])->first();
@@ -182,12 +238,12 @@ class ReportExchangeTest extends TestCase
         $this->assertSame($pending['request_id'], $response['requests'][0]['id']);
         $this->assertEquals(1, $response['counts']['pending']);
         $this->assertEquals(1, $response['counts']['rejected']);
-        $this->assertArrayNotHasKey('IV', $response['sections']);
+        $this->assertArrayHasKey('IV', $response['sections']);
         $controller = app(ReportExchangeController::class);
         $filtered = $controller->index(Request::create('/', 'GET', ['source_system' => 'trackingaid']))->getData(true)['data'];
         $this->assertCount(1, $filtered['requests']);
         $this->assertSame('trackingaid', $filtered['requests'][0]['source_system']);
-        $searched = $controller->index(Request::create('/', 'GET', ['search' => 'Affected Population']))->getData(true)['data'];
+        $searched = $controller->index(Request::create('/', 'GET', ['search' => 'Affected Areas and Population']))->getData(true)['data'];
         $this->assertCount(2, $searched['requests']);
     }
 
@@ -197,10 +253,57 @@ class ReportExchangeTest extends TestCase
             'included_sections' => ['II'], 'household' => ['total' => 10, 'puroks' => [['sitio' => 'Sitio A', 'purok' => 'Purok 1']]],
             'casualties' => ['injured' => 999], 'actions_text' => 'Unrelated action note',
         ]])->render();
-        $this->assertStringContainsString('Affected Population', $html);
+        $this->assertStringContainsString('Affected Areas and Population', $html);
         $this->assertStringContainsString('Sitio A', $html);
         $this->assertStringNotContainsString('Injured', $html);
         $this->assertStringNotContainsString('Unrelated action note', $html);
         $this->assertStringNotContainsString('Rescue Operations Timeline', $html);
     }
+    public function test_external_evacuation_section_can_be_requested_and_exported(): void
+    {
+        $result = $this->submit(['included_sections' => ['VI']]);
+        $this->mock(SituationReportService::class, function ($mock): void {
+            $mock->shouldReceive('eventSummary')->with('EV-1')->andReturn(response()->json(['data' => ['summary' => [
+                'report' => [], 'event' => ['name' => 'Flood'], 'evacuation' => ['households' => [], 'members' => [], 'sites' => [
+                    ['name' => 'School Shelter', 'status' => 'Open', 'capacity' => 20, 'occupancy' => 12, 'vacancy' => 8, 'assigned_members' => 2],
+                ]],
+            ]]]));
+        });
+        $response = $this->decision($result['request_id'], ['decision' => 'accepted'])->getData(true)['data'];
+        $csv = Storage::disk('local')->get('reports/'.$response['file']['file_name']);
+        $this->assertStringNotContainsString('Status of Displaced Population', $csv);
+        $this->assertStringContainsString('School Shelter', $csv);
+        $this->assertStringContainsString('Vacancy', $csv);
+    }
+
+    public function test_partner_reports_identify_resqperation_as_preparer_in_all_formats(): void
+    {
+        $preparer = 'Emergency Operations Center: ResQperation System';
+        $this->mock(SituationReportService::class, function ($mock): void {
+            $mock->shouldReceive('eventSummary')->with('EV-1')->times(3)->andReturn(response()->json(['data' => ['summary' => [
+                'report' => ['prepared_by' => 'Original preparer'], 'event' => ['name' => 'Flood'], 'household' => ['total' => 0],
+            ]]]));
+        });
+        foreach (['pdf', 'csv', 'xlsx'] as $format) {
+            $result = $this->submit(['format' => $format]);
+            $this->assertSame($preparer, $result['prepared_by']);
+            $this->getJson($result['status_url'])->assertJsonPath('data.prepared_by', $preparer);
+            $row = $this->decision($result['request_id'], ['decision' => 'accepted'])->getData(true)['data'];
+            $this->assertSame('evatrack', $row['source_system']);
+            $this->assertSame($preparer, $row['prepared_by']);
+            $summary = json_decode(DB::table('external_report_requests')->where('id', $row['id'])->value('approved_summary'), true);
+            $this->assertSame($preparer, $summary['report']['prepared_by']);
+            $this->assertSame('Duty officer', $summary['report']['reviewed_by']);
+            $bytes = Storage::disk('local')->get('reports/'.$row['file']['file_name']);
+            if ($format === 'pdf') {
+                $this->assertStringStartsWith('%PDF', $bytes);
+                $bytes = view('reports.situation', ['summary' => $summary])->render();
+            } elseif ($format === 'xlsx') {
+                $path = tempnam(sys_get_temp_dir(), 'source-test'); file_put_contents($path, $bytes);
+                $zip = new \ZipArchive; $zip->open($path); $bytes = $zip->getFromName('xl/worksheets/sheet1.xml'); $zip->close(); unlink($path);
+            }
+            $this->assertStringContainsString($preparer, $bytes);
+        }
+    }
+
 }

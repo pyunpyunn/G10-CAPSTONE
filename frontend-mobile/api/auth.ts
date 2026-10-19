@@ -1,5 +1,9 @@
 import { api, clearToken, saveToken } from './client';
 import { logoutPushIdentity } from '@/utils/pushNotifications';
+import { getMobileDeviceUuid } from '@/utils/mobileDeviceRegistration';
+import axios from 'axios';
+import { Platform } from 'react-native';
+import { clearNavigationStorage, navigationMetadata, pendingEventCount, activeLocalTrip } from '@/utils/navigationStore';
 
 type Role = {
   role_key: string;
@@ -25,12 +29,43 @@ export async function loginMobile(login: string, password: string) {
     device_name: 'resqperation-mobile',
   });
 
-  await saveToken(response.data.token);
+  let token = response.data.token;
+
+  if (response.data.user.role?.role_key === 'rescuer') {
+    const deviceUuid = await getMobileDeviceUuid('rescuer');
+    const mobileResponse = await api.post<{ token: string }>('/mobile/login', {
+      login,
+      password,
+      device_uuid: deviceUuid,
+    });
+    token = mobileResponse.data.token;
+    try {
+      await axios.post(`${api.defaults.baseURL}/auth/logout`, {}, {
+        headers: { Authorization: `Bearer ${response.data.token}` },
+        timeout: 5000,
+      });
+    } catch {
+      // The device-bound token is still valid if cleanup of the temporary login token fails.
+    }
+  }
+
+  if (Platform.OS !== 'web') {
+    const owner = await navigationMetadata('owner');
+    if (owner && owner !== response.data.user.user_id && (await activeLocalTrip() || await pendingEventCount())) {
+      throw new Error('Sign in to the previous account and sync its saved trip events before switching accounts.');
+    }
+    if (owner !== response.data.user.user_id) await clearNavigationStorage();
+    await navigationMetadata('owner', response.data.user.user_id);
+  }
+  await saveToken(token);
 
   return response.data.user;
 }
 
 export async function logoutMobile() {
+  if (Platform.OS !== 'web' && (await activeLocalTrip() || await pendingEventCount())) {
+    throw new Error('End the active trip and sync saved trip events before logging out.');
+  }
   try {
     await api.post('/auth/logout');
   } finally {

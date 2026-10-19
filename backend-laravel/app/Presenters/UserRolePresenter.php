@@ -6,7 +6,7 @@ class UserRolePresenter
 {
     public function key(?object $role, array $attributes): ?string
     {
-        $key = $role?->role_key ?? ($attributes['role'] ?? null);
+        $key = $role?->base_role_key ?: ($role?->role_key ?? ($attributes['role'] ?? null));
         if (! $key && isset($attributes['role_id'])) {
             $key = match ((int) $attributes['role_id']) {
                 1 => 'super_admin', 2, 4 => 'admin', 3, 5 => 'rescuer',
@@ -26,6 +26,7 @@ class UserRolePresenter
 
     public function name(?object $role, array $attributes, ?string $key): ?string
     {
+        if ($role && ($role->base_role_key || $role->web_modules !== null)) return $role->role_name;
         $name = $role?->role_name ?? ($attributes['role'] ?? null);
         return match ($key) {
             'super_admin' => 'Super Admin', 'admin' => 'Admin',

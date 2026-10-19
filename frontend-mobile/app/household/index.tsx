@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
@@ -601,6 +601,11 @@ export default function HouseholdHomeScreen() {
           onOpenTrusted={openTrusted}
           onDeleteTrusted={handleDeleteTrusted}
           onBackFamily={() => setViewingTrusted(null)}
+          respondingConnectionId={notificationBusyId || null}
+          onRespondToIncomingRequest={(request, decision) => {
+            if (decision === 'accept') void handleAcceptTrustedRequest(request);
+            else handleRejectTrustedRequest(request);
+          }}
           onSaveTrustedMemberStatus={handleSaveTrustedMemberStatus}
         />
       );

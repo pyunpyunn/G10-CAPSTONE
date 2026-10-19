@@ -192,6 +192,7 @@ class RescuerTeamWorkflow
                 ]);
         }
         app(\App\Services\Web\HeadquartersTeamSupport::class)->synchronizeLeadership($teamId, $leaderId);
+        app(\App\Services\Web\PersonnelRoleService::class)->synchronizeRescueLeadership($teamId, $leaderId);
         app(\App\Services\Web\PersonnelAccessNotifier::class)->notify($affected->pluck('user_id')->all());
     }
 }

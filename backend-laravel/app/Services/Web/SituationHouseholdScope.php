@@ -30,10 +30,17 @@ class SituationHouseholdScope
                 $label = $sitio->sitio_name.' · '.$purok->purok_name;
             }
         }
+        if (($summary['schema_version'] ?? '2.0') === \App\Support\SituationReportSections::VERSION && !isset($summary['population_tables'])) $summary['population_tables'] = app(\App\Presenters\SituationReportPopulation::class)->data($summary);
         $summary['household_scope'] = ['sitio_id' => $sitioId, 'purok_id' => $purokId, 'label' => $label];
         $summary['include_households'] = (bool) ($data['include_households'] ?? true);
         $summary['household']['details'] = array_values(array_filter($summary['household']['details'] ?? [], fn ($h) =>
             ($sitioId === null || (string) $h['sitio_id'] === (string) $sitioId) && ($purokId === null || (string) $h['purok_id'] === (string) $purokId)));
+        if (isset($summary['evacuation'])) {
+            foreach (['households', 'members'] as $key) {
+                $summary['evacuation'][$key] = array_values(array_filter($summary['evacuation'][$key] ?? [], fn ($row) =>
+                    ($sitioId === null || (string) $row['sitio_id'] === (string) $sitioId) && ($purokId === null || (string) $row['purok_id'] === (string) $purokId)));
+            }
+        }
         return $summary;
     }
 }

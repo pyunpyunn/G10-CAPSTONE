@@ -17,7 +17,7 @@ export async function getSituationSummary(eventId, sitioId = null) {
 }
 
 export async function createSituationReport(payload) {
-  const response = await api.post('/situation-reports', payload)
+  const response = await api.post('/situation-reports', payload, {timeout:240000})
   return response.data.data
 }
 
@@ -33,4 +33,14 @@ export async function requestSituationPdf(sitRepId) {
 
 export async function exportSituationReport(payload) {
   return downloadBackendReport({ ...payload, report_type: 'situation' })
+}
+
+export async function recordSituationSubmission(sitRepId, payload) {
+  const response = await api.post(`/situation-reports/${sitRepId}/submissions`, payload)
+  return response.data.data
+}
+
+export async function syncSituationReports(eventId) {
+  const {data} = await api.post('/situation-reports/sync',{event_id:eventId},{timeout:240000})
+  return data.data
 }

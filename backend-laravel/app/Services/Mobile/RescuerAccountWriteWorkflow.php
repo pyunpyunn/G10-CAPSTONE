@@ -18,8 +18,10 @@ class RescuerAccountWriteWorkflow
         $validated = $this->support->validatePayload($request);
         $this->support->ensureUniqueLogin($validated['account_id'], null);
         $this->support->ensureAccountTeamType($validated['account_id'], $validated);
+        $selectedRole = app(\App\Services\Web\PersonnelRoleService::class)->selected($validated, str_starts_with($validated['account_id'], 'BDRRM-HQCC-'));
+        if ($selectedRole && ($selectedRole->base_role_key ?: $selectedRole->role_key) === 'hq_leader') $validated['title'] = 'HQ Leader';
 
-        $rescuer = DB::transaction(function () use ($request, $validated): array {
+        $rescuer = DB::transaction(function () use ($request, $validated, $selectedRole): array {
             $now = now();
             $teamId = $this->support->teamIdFromPayload($validated);
             $teamCode = $this->support->teamCodeFromPayload($validated);
@@ -43,7 +45,7 @@ class RescuerAccountWriteWorkflow
                 'password' => $passwordHash,
                 'role_id' => $roleId,
                 'contact_number' => $validated['contact_number'],
-                'is_active' => 1,
+                'is_active' => $validated['account_status'] === 'disabled' ? 0 : 1,
                 'must_change_password' => ! empty($validated['password']) ? 0 : 1,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -72,13 +74,27 @@ class RescuerAccountWriteWorkflow
                 'training_notes' => $validated['training_notes'] ?? null,
                 'certification_reference' => $validated['certification_reference'] ?? null,
                 'equipment_notes' => $validated['equipment_notes'] ?? null,
-                'is_validated' => 1,
+                'is_validated' => $validated['account_status'] === 'active' ? 1 : 0,
                 'is_deployed' => in_array($validated['duty_status'], ['dispatched', 'on_scene'], true) ? 1 : 0,
-                'duty_status' => $validated['duty_status'],
+                'duty_status' => $validated['account_status'] === 'disabled' ? 'disabled' : $validated['duty_status'],
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
 
+            if ($teamCode === 'HQCC' && $teamId) {
+                if ($validated['account_status'] !== 'disabled' && strtolower($validated['title']) === 'hq leader') DB::table('rescue_teams')->where('team_id', $teamId)->update(['leader_responder_id' => $responderId]);
+                $leader = DB::table('rescue_teams')->where('team_id', $teamId)->value('leader_responder_id');
+                app(\App\Services\Web\HeadquartersTeamSupport::class)->synchronizeLeadership($teamId, $leader ? (int) $leader : null);
+            }
+            if ($teamId && !str_starts_with(strtoupper((string) ($validated['account_id'] ?? $existing->username ?? '')), 'BDRRM-HQCC-')) {
+                $team = DB::table('rescue_teams')->where('team_id', $teamId)->first();
+                $leaderTitle = strtolower(trim($selectedRole?->role_name ?? $validated['title']));
+                if ($validated['account_status'] !== 'disabled' && ($leaderTitle === 'team leader' || app(\App\Services\Web\PersonnelRoleService::class)->isRescueLeader($selectedRole))) DB::table('rescue_teams')->where('team_id', $teamId)->update(['leader_responder_id' => $responderId]);
+                elseif ((int) $team->leader_responder_id === $responderId) DB::table('rescue_teams')->where('team_id', $teamId)->update(['leader_responder_id' => null]);
+                $leaderId = DB::table('rescue_teams')->where('team_id', $teamId)->value('leader_responder_id');
+                app(\App\Services\Web\PersonnelRoleService::class)->synchronizeRescueLeadership($teamId, $leaderId ? (int) $leaderId : null);
+            }
+            app(\App\Services\Web\PersonnelRoleService::class)->apply($responderId, $selectedRole);
             $this->audit->writeAuditLog($request, 'create', $responderId, null, $validated);
 
             return $this->presenter->formatResponder($this->query->findResponder($responderId), true);
@@ -102,10 +118,14 @@ class RescuerAccountWriteWorkflow
             ], 404);
         }
 
+        abort_if($existing->role_key === 'super_admin' && $request->user()?->roleKey() !== 'super_admin', 403, 'Only Super Admin can edit this account.');
         $validated = $this->support->validatePayload($request, true);
         $this->support->ensureAccountTeamType((string) $existing->username, $validated);
+        $isHq = str_starts_with(strtoupper((string) $existing->username), 'BDRRM-HQCC-');
+        $selectedRole = app(\App\Services\Web\PersonnelRoleService::class)->selected($validated, $isHq, (int) ($existing->access_role_id ?? 0));
+        if ($selectedRole && $isHq && ($selectedRole->base_role_key ?: $selectedRole->role_key) !== 'super_admin') $validated['title'] = ($selectedRole->base_role_key ?: $selectedRole->role_key) === 'hq_leader' ? 'HQ Leader' : 'HQ Personnel';
 
-        $rescuer = DB::transaction(function () use ($request, $validated, $existing, $responderId): array {
+        $rescuer = DB::transaction(function () use ($request, $validated, $existing, $responderId, $selectedRole): array {
             $now = now();
             $teamId = $this->support->teamIdFromPayload($validated);
             $fullName = $this->support->fullNameFromPayload($validated);
@@ -168,7 +188,7 @@ class RescuerAccountWriteWorkflow
                 'training_notes' => $validated['training_notes'] ?? null,
                 'certification_reference' => $validated['certification_reference'] ?? null,
                 'equipment_notes' => $validated['equipment_notes'] ?? null,
-                'is_validated' => $validated['account_status'] === 'disabled' ? 0 : 1,
+                'is_validated' => $validated['account_status'] === 'active' ? 1 : 0,
                 'is_deployed' => in_array($validated['duty_status'], ['dispatched', 'on_scene'], true) ? 1 : 0,
                 'duty_status' => $validated['account_status'] === 'disabled' ? 'disabled' : $validated['duty_status'],
                 'updated_at' => $now,
@@ -197,6 +217,15 @@ class RescuerAccountWriteWorkflow
             }
             app(\App\Services\Web\PersonnelAccessNotifier::class)->notify([$existing->user_id]);
 
+            if ($teamId && !str_starts_with(strtoupper((string) ($validated['account_id'] ?? $existing->username ?? '')), 'BDRRM-HQCC-')) {
+                $team = DB::table('rescue_teams')->where('team_id', $teamId)->first();
+                $leaderTitle = strtolower(trim($selectedRole?->role_name ?? $validated['title']));
+                if ($validated['account_status'] !== 'disabled' && ($leaderTitle === 'team leader' || app(\App\Services\Web\PersonnelRoleService::class)->isRescueLeader($selectedRole))) DB::table('rescue_teams')->where('team_id', $teamId)->update(['leader_responder_id' => $responderId]);
+                elseif ((int) $team->leader_responder_id === $responderId) DB::table('rescue_teams')->where('team_id', $teamId)->update(['leader_responder_id' => null]);
+                $leaderId = DB::table('rescue_teams')->where('team_id', $teamId)->value('leader_responder_id');
+                app(\App\Services\Web\PersonnelRoleService::class)->synchronizeRescueLeadership($teamId, $leaderId ? (int) $leaderId : null);
+            }
+            app(\App\Services\Web\PersonnelRoleService::class)->apply($responderId, $selectedRole);
             $updated = $this->presenter->formatResponder($this->query->findResponder($responderId), true);
             $this->audit->writeAuditLog($request, 'update', $responderId, $oldValues, $updated);
 
@@ -216,6 +245,7 @@ class RescuerAccountWriteWorkflow
         return DB::transaction(function () use ($request, $responderId): JsonResponse {
             $record = DB::table('responders')->where('responder_id', $responderId)->whereNull('deleted_at')->lockForUpdate()->first();
             if (! $record) return response()->json(['message' => 'Rescuer account was not found.'], 404);
+            abort_if(\App\Models\User::query()->find($record->user_id)?->roleKey() === 'super_admin', 422, 'The Super Admin account cannot be deleted here.');
             $activeAssignment = DB::table('responder_assignments')->where('responder_id', $responderId)
                 ->whereNotIn('status', ['completed', 'cancelled'])->exists();
             if ($record->is_deployed || $activeAssignment) {
@@ -233,6 +263,7 @@ class RescuerAccountWriteWorkflow
                 'duty_status' => 'disabled', 'team_id' => null,
             ]);
             DB::table('rescue_teams')->where('leader_responder_id', $responderId)->update(['leader_responder_id' => null]);
+            app(\App\Services\Web\PersonnelAccessNotifier::class)->notify([$record->user_id]);
             $this->audit->writeAuditLog($request, 'delete', $responderId, ['user_id' => $record->user_id], ['deleted_at' => $now->toDateTimeString()]);
             if ($teamId) {
                 $leaderId = DB::table('rescue_teams')->where('team_id', $teamId)->value('leader_responder_id');
@@ -252,6 +283,7 @@ class RescuerAccountWriteWorkflow
             ], 404);
         }
 
+        abort_if($existing->role_key === 'super_admin', 422, 'The Super Admin account cannot be deactivated here.');
         DB::transaction(function () use ($request, $existing, $responderId): void {
             $now = now();
             $oldValues = $this->presenter->formatResponder($existing, true);
@@ -277,6 +309,7 @@ class RescuerAccountWriteWorkflow
                     'updated_at' => $now,
                 ]);
 
+            app(\App\Services\Web\PersonnelAccessNotifier::class)->notify([$existing->user_id]);
             $this->audit->writeAuditLog($request, 'deactivate', $responderId, $oldValues, [
                 'account_status' => 'disabled',
                 'duty_status' => 'disabled',
