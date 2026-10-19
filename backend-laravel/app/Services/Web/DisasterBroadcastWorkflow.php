@@ -263,10 +263,18 @@ class DisasterBroadcastWorkflow
             : [];
 
         $roles = $scope === 'selected_puroks' ? ['household'] : ['household', 'rescuer'];
+        $statusOptions = $metadata['status_options'] ?? $this->selectedStatusOptions($validated['allowed_statuses']);
+        $reportPrompt = 'Please report status now';
+        $statusLines = array_map(
+            fn (array $option, int $index): string => ($index + 1).'. '.$option['label'],
+            array_values($statusOptions),
+            array_keys(array_values($statusOptions))
+        );
+        $pushMessage = $validated['message']."\n\n".$reportPrompt."\n".implode("\n", $statusLines);
 
         return $this->oneSignal->sendToMobileDevices(
             $validated['broadcast_title'],
-            $validated['message'],
+            $pushMessage,
             [
                 'platforms' => ['android'],
                 'roles' => $roles,
@@ -278,7 +286,8 @@ class DisasterBroadcastWorkflow
                     'broadcast_id' => (string) $broadcastId,
                     'scope_type' => $scope,
                     'allowed_statuses' => array_values($validated['allowed_statuses']),
-                    'status_options' => $metadata['status_options'] ?? $this->selectedStatusOptions($validated['allowed_statuses']),
+                    'status_options' => $statusOptions,
+                    'report_status_prompt' => $reportPrompt,
                 ],
             ]
         );

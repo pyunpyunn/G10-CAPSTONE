@@ -3,6 +3,11 @@
 Use the existing standalone APK for household and rescuer accounts. Expo Go,
 QR scanning, Metro, and an APK rebuild are not required.
 
+**Use Tailscale or LAN for this setup.** The old `127.0.0.1` + ngrok commands
+are not needed. `127.0.0.1` alone is reachable only from the server computer.
+There is no frontend command to run for the installed APK: open the app itself.
+`npm start` is for development and is not part of this installation flow.
+
 ## 1. Start MySQL
 
 Open **PowerShell as Administrator**:
@@ -190,6 +195,7 @@ Use plain LAN HTTP only on a trusted local network.
 | APK still uses ngrok | Save the Tailscale or LAN address in **Server settings**. |
 | Notifications do not arrive | Check Android permission, internet access, OneSignal/FCM configuration, worker and scheduler. |
 | API stops working when the computer sleeps | Keep the computer awake while it acts as the server. |
+| Starting Laravel says port 8000 is already in use | Check the existing listener in step 4. If it is already listening on `0.0.0.0`, use that server instead of launching another copy. |
 
 ## Each time you use the system
 

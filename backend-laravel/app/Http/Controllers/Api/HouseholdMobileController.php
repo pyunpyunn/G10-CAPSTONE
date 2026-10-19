@@ -43,7 +43,7 @@ class HouseholdMobileController extends Controller
 
     public function storeMemberStatus(Request $request, string $memberId): JsonResponse
     {
-        return $this->service->storeMemberStatus($request, $memberId);
+        return app(\App\Services\Mobile\HouseholdMobileStatusWorkflow::class)->storeMemberStatus($request, $memberId);
     }
 
     public function storeTrustedMemberStatus(Request $request, string $connectionId, string $memberId): JsonResponse
@@ -53,7 +53,7 @@ class HouseholdMobileController extends Controller
 
     public function storeStatus(Request $request): JsonResponse
     {
-        return $this->service->storeStatus($request);
+        return app(\App\Services\Mobile\HouseholdMobileStatusWorkflow::class)->storeStatus($request);
     }
 
     public function statusHistory(Request $request): JsonResponse

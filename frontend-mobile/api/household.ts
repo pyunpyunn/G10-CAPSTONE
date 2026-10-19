@@ -11,6 +11,7 @@ export type HouseholdOverview = {
     has_device: boolean;
   };
   active_event: any;
+  recent_alerts?: { broadcast_id: number | string; title: string; message: string; sent_at: string | null }[];
   current_status: any;
   status_options: any[];
   status_history: any[];

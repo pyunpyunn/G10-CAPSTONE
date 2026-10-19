@@ -1,5 +1,17 @@
 # Standalone Android APK
 
+## Additional size reduction — build 9
+
+Release builds now also enable `enableBundleCompression`. Code shrinking,
+resource shrinking, compressed native libraries and arm64-only packaging remain
+enabled. No mobile features or OneSignal components were removed.
+
+For the verified build 6 APK, the embedded app bundle occupied 3,571,080 bytes
+without compression. A local deflate measurement produced 1,679,386 bytes,
+indicating about 1.9 MB of potential download savings. This is not a measured
+build 9 APK size; verify the completed artifact before reporting its size.
+Bundle compression can slightly increase startup time.
+
 ## Verified release — version 1.0.0, build 6
 
 [Download the signed APK from GitHub](https://github.com/pyunpyunn/G10-CAPSTONE/releases/download/v1.0.0-build6/RESQPERATION.apk)
