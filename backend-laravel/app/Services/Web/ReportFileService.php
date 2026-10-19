@@ -61,12 +61,15 @@ class ReportFileService
         $path = tempnam(sys_get_temp_dir(), 'report-');
 
         try {
-            Pdf::loadHTML(view('reports.situation', [
+            $pdf = Pdf::loadHTML(view('reports.situation', [
                 'summary' => $summary,
                 'generatedAt' => now()->toDateTimeString(),
-            ])->render())
-                ->setPaper('a4', 'portrait')
-                ->save($path);
+            ])->render())->setPaper('a4', 'portrait');
+            {
+                $pdf->render();
+                $pdf->getDomPDF()->getCanvas()->page_text(460, 815, 'Page {PAGE_NUM} of {PAGE_COUNT}', null, 8);
+            }
+            $pdf->save($path);
 
             return $this->persistReportFile($filename, $path, 'situation', 'pdf');
         } finally {

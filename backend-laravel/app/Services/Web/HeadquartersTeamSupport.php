@@ -24,7 +24,8 @@ class HeadquartersTeamSupport
     {
         $roleKey = DB::table('users as u')->join('roles as r', 'r.role_id', '=', 'u.role_id')
             ->where('u.user_id', $userId)->value('r.role_key');
-        if ($roleKey !== 'hq_leader') return;
+        $user = \App\Models\User::query()->find($userId);
+        if ($user?->roleKey() !== 'hq_leader') return;
 
         DB::table('users')->where('user_id', $userId)->update([
             'role_id' => $this->personnelRoleId(),
@@ -55,8 +56,13 @@ class HeadquartersTeamSupport
             DB::table('responders')->where('responder_id', $profile->responder_id)
                 ->update(['title' => $isLeader ? 'HQ Leader' : 'HQ Personnel', 'updated_at' => now()]);
             $user = DB::table('users')->where('user_id', $profile->user_id)->first(['role_id']);
-            $currentRole = $user ? DB::table('roles')->where('role_id', $user->role_id)->value('role_key') : null;
+            $accessRole = $user ? \App\Models\Role::query()->find($user->role_id) : null;
+            $currentRole = $accessRole?->base_role_key ?: $accessRole?->role_key;
             if ($user && $currentRole !== 'super_admin') {
+                if ($accessRole?->base_role_key && $currentRole === ($isLeader ? 'hq_leader' : 'hq_personnel')) {
+                    DB::table('responders')->where('responder_id', $profile->responder_id)->update(['title' => $accessRole->role_name]);
+                    continue;
+                }
                 DB::table('users')->where('user_id', $profile->user_id)
                     ->update(['role_id' => $isLeader ? $leaderRoleId : $personnelRoleId, 'updated_at' => now()]);
             }

@@ -2,126 +2,53 @@
 
 namespace App\Presenters;
 
-use App\Support\SituationReportSections;
-use Carbon\Carbon;
+use App\Support\SituationReportSections as Sections;
+use App\Support\SituationReportSnapshot;
 
-/** Shared data contract for the sample-based PDF, workbook and sectioned CSV. */
-class SituationReportDocument
+class SituationReportDocument extends SituationReportData
 {
     public function data(array $s): array
     {
-        $e = $s['event'] ?? [];
-        $m = $s['report'] ?? [];
-        $h = $s['household'] ?? [];
-        $w = $s['weather'] ?? [];
-        $number = fn ($value) => preg_match('/^-?\d+(?:\.\d+)?/', trim((string) $value), $match) ? (float) $match[0] : null;
-        $sections = array_values(array_intersect($s['included_sections'] ?? array_keys(SituationReportSections::LABELS), array_keys(SituationReportSections::LABELS)));
-        $document = [
-            'included_sections' => $sections, 'barangay' => $s['barangay_profile']['name'] ?? 'Not recorded',
-            'disaster_name' => $e['name'] ?? 'Not recorded', 'disaster_type' => $e['type'] ?? 'Not recorded',
-            'status' => $e['status'] ?? 'Not recorded', 'alert_level' => $e['severity'] ?? 'Not recorded',
-            'situation_status' => $e['situation_status'] ?? 'Not recorded', 'coverage' => $e['coverage'] ?? (isset($e['sitio_name']) ? $e['sitio_name'].' · ' : '').(($h['total'] ?? 0).' households in scope'),
-            'scope_note' => $s['scope_note'] ?? '', 'report_number' => $m['report_number'] ?? 'Not recorded',
-            'prepared_by' => $m['prepared_by'] ?? null, 'reviewed_by' => $m['reviewed_by'] ?? null,
-            'declared_at' => $this->date($e['declared_at'] ?? null), 'finished_at' => $this->date($e['finished_at'] ?? null),
-            'period_start' => $this->date($m['period_start'] ?? null), 'period_end' => $this->date($m['period_end'] ?? null),
-            'generated_at' => $this->date($m['generated_at'] ?? null),
-            'weather' => [
-                'condition' => $w['condition'] ?? null, 'wind_kmh' => $number($w['wind'] ?? null),
-                'wind_dir' => preg_replace('/^-?[\d.]+\s*km\/h\s*/i', '', $w['wind'] ?? ''),
-                'rain_mm' => $number($w['rainfall'] ?? null), 'temp_c' => $number($w['temperature'] ?? null),
-                'wind_display' => $w['wind'] ?? 'Not recorded', 'rain_display' => $w['rainfall'] ?? 'Not recorded',
-                'temp_display' => $w['temperature'] ?? 'Not recorded', 'source' => $w['source'] ?? null, 'advisory' => $w['advisory'] ?? null,
-            ],
-            'population' => ['in_scope' => $h['total'] ?? null, 'reported' => $h['reported'] ?? null, 'affected' => $h['affected'] ?? (isset($h['unsafe'],$h['evacuated']) ? $h['unsafe'] + $h['evacuated'] : null),
-                'safe' => $h['safe_total'] ?? null, 'evacuated' => $h['evacuated'] ?? null, 'unsafe' => $h['unsafe'] ?? null, 'unchecked' => $h['unchecked'] ?? null],
-            'casualties' => array_replace(['deaths' => null, 'missing' => null, 'injured' => null, 'rescued' => null], $s['casualties'] ?? []),
-            'damage' => array_replace(['partial' => null, 'total' => null, 'cost' => null], $s['damage'] ?? []),
-            'actions' => $s['actions_text'] ?? null,
-            'household_details' => $h['details'] ?? [],
-            'include_households' => $s['include_households'] ?? true,
-            'household_scope' => $s['household_scope']['label'] ?? (isset($e['sitio_name']) ? $e['sitio_name'].' · all puroks' : 'All sitios · all puroks'),
-            'puroks' => array_map(fn ($row) => ['name' => $row['purok'] ?? 'Not recorded', 'sitio' => $row['sitio'] ?? 'Not recorded',
-                'households' => $row['total'] ?? null, 'persons' => $row['persons'] ?? null, 'affected' => $row['affected'] ?? null,
-                'affected_persons' => $row['affected_persons'] ?? null, 'safe' => $row['safe'] ?? null, 'evacuated' => $row['evacuated'] ?? null,
-                'unsafe' => $row['unsafe'] ?? null, 'unchecked' => $row['unchecked'] ?? null], $h['puroks'] ?? []),
-            'timeline' => array_map(fn ($row) => ['category' => $row['title'] ?? '', 'title' => $row['actor'] ?? '',
-                'actor' => $row['actor'] ?? '', 'detail' => $row['detail'] ?? '', 'logged_at' => $this->date($row['time'] ?? null), 'status' => $row['status'] ?? ''], $s['dispatch']['timeline'] ?? []),
-            'teams' => array_map(function ($row) {
-                $c = $row['outcome_counts'] ?? [];
-
-                return ['team' => $row['team'] ?? '', 'area' => $row['area'] ?? '', 'deployed_at' => $this->date($row['deployed_at'] ?? null),
-                    'safe' => $c['safe_count'] ?? null, 'evacuated' => $c['evacuated_count'] ?? null, 'unsafe' => $c['unsafe_count'] ?? null,
-                    'injured' => $c['injured_count'] ?? null, 'missing' => $c['missing_count'] ?? null];
-            }, $s['dispatch']['rows'] ?? []),
-            'resources' => array_map(fn ($row) => ['item' => $row['item'] ?? null, 'quantity' => $row['quantity'] ?? null,
-                'source' => $row['source'] ?? null, 'status' => $row['status'] ?? null], $s['resources']['rows'] ?? []),
-        ];
-        foreach (['timeline' => 'logged_at', 'teams' => 'deployed_at'] as $key => $dateKey) {
-            usort($document[$key], fn ($a, $b) => ($a[$dateKey] instanceof \DateTimeInterface ? $a[$dateKey]->getTimestamp() : PHP_INT_MAX)
-                <=> ($b[$dateKey] instanceof \DateTimeInterface ? $b[$dateKey]->getTimestamp() : PHP_INT_MAX));
+        $s=SituationReportSnapshot::forRendering($s);
+        $r=parent::data($s);
+        $r['schema_version']=Sections::VERSION;
+        $r['included_sections']=array_values(array_intersect(array_keys(Sections::LABELS),$s['included_sections'] ?? array_keys(Sections::LABELS)));
+        $r['letterhead']=Sections::LETTERHEAD; $r['notice']=Sections::NOTICE;
+        $r['approved_by']=$s['report']['approved_by'] ?? null;
+        $r['report_type']=$s['report']['report_type'] ?? null;
+        $r['event_id']=$s['event']['event_id'] ?? null;
+        $r['supersedes']=$s['report']['supersedes']['report_number'] ?? null;
+        $asOf=$r['period_end'] instanceof \DateTimeInterface ? $r['period_end']->format('d F Y, g:i A') : ($r['period_end'] ?: 'Not recorded');
+        $r['title']='BDRRMC Situation Report No. '.$r['report_number'].' on the '.$r['disaster_name'].' as of '.$asOf;
+        $population=$s['population_tables'] ?? app(SituationReportPopulation::class)->data($s);
+        $r['population_tables']=$population;
+        $table=fn ($name,$headings,$rows)=>['name'=>$name,'headers'=>$headings,'rows'=>$rows ?: [array_fill(0,count($headings),null)]];
+        $areaRows=fn ($rows)=>array_map(fn ($p)=>[$p['sitio'],$p['purok'],$p['families'],$p['persons']],$rows);
+        $damageCategories=['minor_damage'=>'Minor damage','major_damage'=>'Major damage','completely_destroyed'=>'Completely destroyed'];
+        $damageRows=array_map(fn ($code,$label)=>[$label,array_filter($r['household_details'] ?? [],fn ($h)=>in_array($h['damage'] ?? null,['minor_damage','major_damage','completely_destroyed','no_damage'],true)) ? count(array_filter($r['household_details'],fn ($h)=>($h['damage'] ?? null)===$code)) : null],array_keys($damageCategories),array_values($damageCategories));
+        $r['sections']=[];
+        foreach ($r['included_sections'] as $key) {
+            $tables=match ($key) {
+                'I'=>[$table('', ['Finding','Recorded value'],[
+                    ['Event',$r['disaster_name']],['Hazard',$r['disaster_type']],['Alert level',$r['alert_level']],
+                    ['Area coverage',$s['event']['coverage'] ?? null],['Weather',$r['weather']['condition']],['Advisory',$r['weather']['advisory']],
+                ])],
+                'II'=>[$table('Affected families and persons',['Sitio','Purok','Families','Persons'],$areaRows($population['affected']))],
+                'IV'=>[$table('Recorded damage assessments',['Recorded category','Recorded assessments'],$damageRows)],
+                'V'=>[$table('Dispatch activities',['Team','Assigned area','Deployed at','Results'],array_map(fn ($x)=>[$x['team'],$x['area'],$x['deployed_at'],$x['outcomes'] ?? null],$s['dispatch']['rows'] ?? [])),
+                    $table('Dispatch log',['Date/time','Team / responder','Assigned area','Status'],array_values(array_map(fn ($x)=>[$x['logged_at'],$x['actor'],$x['detail'],$x['status']],array_filter($r['timeline'],fn ($x)=>$x['category']==='Dispatch assignment'))))],
+                'VI'=>[$table('Evacuation centers',['Center','Status','Capacity (persons)','Occupancy (persons)','Vacancy (persons)'],array_map(fn ($x)=>[$x['name'],$x['status'],$x['capacity'],$x['occupancy'],$x['vacancy']],$r['evacuation']['sites'] ?? []))],
+                'VII'=>[$table('Resources',['Resource','Available quantity','Unit','Status'],array_map(fn ($x)=>[$x['item'] ?? null,$x['quantity'] ?? null,$x['unit'] ?? null,$x['status'] ?? null],$s['inventory']['rows'] ?? [])),
+                    $table('Resource requests',['Item','Quantity','Source','Status'],array_map(fn ($x)=>[$x['item'],$x['quantity'],$x['source'],$x['status']],$r['resources']))],
+            };
+            $field=['I'=>'overview_text','IV'=>'damage_text','V'=>'response_text','VII'=>'resources_text'][$key] ?? null;
+            if ($key==='IV' && $r['include_households']) $tables[]=$table('Recorded house assessments',['Family reference','Sitio','Purok','Damage'],
+                array_values(array_map(fn ($h)=>[$h['household'],$h['sitio'],$h['purok'],ucwords(str_replace('_',' ',$h['damage']))],array_filter($r['household_details'],fn ($h)=>!empty($h['damage']) && !in_array($h['damage'],['no_damage','not_yet_assessed'],true)))));
+            $r['sections'][$key]=['number'=>Sections::NUMBERS[$key],'title'=>Sections::LABELS[$key],'group'=>null,'tables'=>$tables,'text'=>$field ? ($s['operator_inputs'][$field] ?? null) : null];
         }
-
-        return $document;
+        $r['annexes']=[];
+        return $r;
     }
 
-    private function date(mixed $value): mixed
-    {
-        if (! $value || $value instanceof \DateTimeInterface) {
-            return $value;
-        }
-        if (! preg_match('/\b\d{4}\b/', (string) $value)) {
-            return $value;
-        }
-        try {
-            return Carbon::parse($value);
-        } catch (\Throwable) {
-            return $value;
-        }
-    }
-
-    public function tables(array $r): array
-    {
-        $tables = [];
-        if (in_array('II', $r['included_sections'])) {
-            $tables[] = [
-                'Population', ['Sitio', 'Purok', 'Households', 'Persons', 'Affected households', 'Affected persons', 'Safe', 'Evacuated', 'Unsafe', 'Unchecked'],
-                array_map(fn ($p) => [$p['sitio'], $p['name'], $p['households'], $p['persons'], $p['affected'], $p['affected_persons'], $p['safe'], $p['evacuated'], $p['unsafe'], $p['unchecked']], $r['puroks']),
-                [24, 24, 14, 14, 20, 20, 12, 14, 12, 14],
-            ];
-        }
-        if (in_array('V', $r['included_sections'])) {
-            $tables[] = ['Timeline', ['Category', 'Title / Team', 'Detail', 'Logged at'],
-                array_map(fn ($t) => [$t['category'], $t['title'], $t['detail'], $t['logged_at']], $r['timeline']), [24, 24, 40, 24]];
-            $tables[] = ['Team Outcomes', ['Team', 'Area', 'Safe', 'Evacuated', 'Unsafe', 'Injured', 'Missing'],
-                array_map(fn ($t) => [$t['team'], $t['area'], $t['safe'], $t['evacuated'], $t['unsafe'], $t['injured'], $t['missing']], $r['teams']), [20, 30, 11, 13, 11, 11, 11]];
-        }
-        if (in_array('VII', $r['included_sections'])) {
-            $tables[] = ['Resources', ['Item', 'Quantity', 'Source', 'Status'],
-                array_map(fn ($x) => [$x['item'], $x['quantity'], $x['source'], $x['status']], $r['resources']), [26, 18, 20, 22]];
-        }
-
-        if ($r['include_households'] ?? true) {
-            $households = $r['household_details'] ?? [];
-            if (in_array('II', $r['included_sections'])) {
-                $tables[] = ['Affected Households', ['Household', 'Sitio', 'Purok', 'Registered members', 'Affected members', 'Status'],
-                    array_map(fn ($h) => [$h['household'], $h['sitio'], $h['purok'], $h['registered_members'], $h['affected_members'], $h['status']], $households), [24, 24, 24, 20, 20, 18]];
-                $members = [];
-                foreach ($households as $h) foreach ($h['members'] ?? [] as $m) {
-                    $members[] = [$h['household'], $h['sitio'], $h['purok'], $m['name'], $m['age'], $m['sex'], $m['status']];
-                }
-                $tables[] = ['Affected Members', ['Household', 'Sitio', 'Purok', 'Member name', 'Age', 'Sex', 'Status'], $members, [24, 24, 24, 32, 10, 14, 18]];
-            }
-            if (in_array('III', $r['included_sections'])) {
-                $tables[] = ['Household Casualties', ['Household', 'Sitio', 'Purok', 'Affected members', 'Missing', 'Injured', 'Rescued', 'Immediate needs'],
-                    array_map(fn ($h) => [$h['household'], $h['sitio'], $h['purok'], $h['affected_members'], $h['missing'], $h['injured'], $h['rescued'], is_array($h['immediate_needs']) ? implode(', ', $h['immediate_needs']) : $h['immediate_needs']], $households), [24, 24, 24, 20, 12, 12, 12, 45]];
-            }
-            if (in_array('VI', $r['included_sections'])) {
-                $damaged = array_filter($households, fn ($h) => !empty($h['damage']) && !in_array($h['damage'], ['no_damage', 'not_yet_assessed'], true));
-                $tables[] = ['Household Damage', ['Household', 'Sitio', 'Purok', 'Initial damage', 'Affected members'],
-                    array_values(array_map(fn ($h) => [$h['household'], $h['sitio'], $h['purok'], ucwords(str_replace('_', ' ', $h['damage'])), $h['affected_members']], $damaged)), [24, 24, 24, 28, 20]];
-            }
-        }
-        return $tables;
-    }
+    public function tables(array $r): array { return []; }
 }

@@ -3,6 +3,7 @@
 namespace App\Services\Shared;
 
 use App\Http\Requests\LoginRequest;
+use App\Http\Requests\MobileLoginRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Models\Responder;
@@ -32,6 +33,16 @@ class AuthService
 
     public function login(LoginRequest $request): JsonResponse
     {
+        return $this->authenticate($request, false);
+    }
+
+    public function mobileLogin(MobileLoginRequest $request): JsonResponse
+    {
+        return $this->authenticate($request, true);
+    }
+
+    private function authenticate(LoginRequest $request, bool $deviceBound): JsonResponse
+    {
         $login = trim($request->string('login')->toString());
 
         if ($response = $this->databaseUnavailableResponse()) {
@@ -60,14 +71,65 @@ class AuthService
             return response()->json(['message' => 'This household account is not linked to a registered household record. Please contact SafeTrack or HQ/Admin.'], 409);
         }
 
+        $deviceUuid = null;
+        $responder = null;
+        if ($deviceBound) {
+            if ($user->roleKey() !== 'rescuer') {
+                return response()->json(['message' => 'Device-bound navigation login is only available to rescuer accounts.'], 403);
+            }
+            if (! Schema::hasTable('devices') || ! Schema::hasTable('responders')) {
+                return response()->json(['message' => 'Mobile device registration is not available in the current database.'], 503);
+            }
+
+            $deviceUuid = (string) $request->input('device_uuid');
+            $responder = Responder::query()->where('user_id', $user->user_id)->first();
+            if (! $responder || ! $responder->team_id) {
+                return response()->json(['message' => 'This rescuer account is not assigned to a rescue team.'], 409);
+            }
+
+            $existingDevice = DB::table('devices')->where('device_uuid', $deviceUuid)->first();
+            if ($existingDevice && (string) $existingDevice->user_id !== (string) $user->user_id) {
+                return response()->json(['message' => 'This device is already registered to another account.'], 409);
+            }
+        }
+
         $token = null;
         if (Schema::hasTable('personal_access_tokens')) {
-            $token = $user->createToken($request->input('device_name', 'resqperation-client'))->plainTextToken;
+            $tokenName = $deviceBound ? 'mobile-device:'.$deviceUuid : $request->input('device_name', 'resqperation-client');
+            if ($deviceBound) {
+                DB::transaction(function () use ($user, $responder, $deviceUuid, $tokenName, &$token): void {
+                    $user->tokens()->where('name', $tokenName)->delete();
+                    $token = $user->createToken($tokenName, ['mobile:rescuer', 'team:'.(int) $responder->team_id])->plainTextToken;
+                    $device = DB::table('devices')->where('device_uuid', $deviceUuid)->first();
+                    $deviceData = [
+                        'user_id' => $user->user_id,
+                        'team_id' => $responder->team_id,
+                        'updated_at' => now(),
+                    ];
+                    if ($device) {
+                        DB::table('devices')->where('id', $device->id)->update($deviceData);
+                    } else {
+                        DB::table('devices')->insert(array_merge($deviceData, [
+                            'device_uuid' => $deviceUuid,
+                            'last_sync_at' => null,
+                            'created_at' => now(),
+                        ]));
+                    }
+                }, 3);
+            } else {
+                $token = $user->createToken($tokenName)->plainTextToken;
+            }
         } elseif (app()->environment('local', 'testing')) {
             Log::warning('Sanctum personal_access_tokens table is missing; login has no token to issue.', ['user_id' => $user->user_id]);
         }
 
-        return response()->json(['message' => 'Login successful.', 'token' => $token, 'user' => new UserResource($user)]);
+        $data = ['message' => 'Login successful.', 'token' => $token, 'user' => new UserResource($user)];
+        if ($deviceBound) {
+            $data['device_uuid'] = $deviceUuid;
+            $data['team_id'] = (int) $responder->team_id;
+        }
+
+        return response()->json($data);
     }
 
     public function me(Request $request): UserResource

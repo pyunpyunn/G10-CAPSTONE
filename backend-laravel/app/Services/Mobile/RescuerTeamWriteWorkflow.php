@@ -2,7 +2,9 @@
 
 namespace App\Services\Mobile;
 
+use App\Jobs\PrecomputeRoutesForTeam;
 use App\Queries\RescuerAccountQuery;
+use App\Support\RequestSchema as Schema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +48,8 @@ class RescuerTeamWriteWorkflow
 
             return $teamId;
         });
+
+        $this->queueRoutePrecompute($teamId);
 
         return response()->json([
             'message' => 'Rescue team configured.',
@@ -94,6 +98,8 @@ class RescuerTeamWriteWorkflow
             $this->audit->writeTeamAuditLog($request, 'update_team', $teamId, $existing, $validated);
         });
 
+        $this->queueRoutePrecompute($teamId);
+
         return response()->json([
             'message' => 'Rescue team updated.',
             'data' => $this->query->teamConfigWorkspace($teamId),
@@ -126,6 +132,7 @@ class RescuerTeamWriteWorkflow
         DB::transaction(function () use ($request, $teamId, $existing): void {
             $now = now();
             app(\App\Services\Web\HeadquartersTeamSupport::class)->synchronizeLeadership($teamId, null);
+            app(\App\Services\Web\PersonnelRoleService::class)->synchronizeRescueLeadership($teamId, null);
 
             DB::table('responders')
                 ->where('team_id', $teamId)
@@ -148,6 +155,13 @@ class RescuerTeamWriteWorkflow
             'message' => 'Rescue team deleted. Members were moved to Unassigned.',
             'data' => $this->query->teamConfigWorkspace(),
         ]);
+    }
+
+    private function queueRoutePrecompute(int $teamId): void
+    {
+        if (Schema::hasTable('cached_routes')) {
+            PrecomputeRoutesForTeam::dispatch($teamId)->afterCommit();
+        }
     }
 }
 

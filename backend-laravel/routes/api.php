@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\HouseholdMobileController;
 use App\Http\Controllers\Api\HouseholdStatusController;
 use App\Http\Controllers\Api\InquiryController;
 use App\Http\Controllers\Api\MappingController;
+use App\Http\Controllers\Api\MobileNavigationController;
 use App\Http\Controllers\Api\MobileDeviceController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
@@ -53,6 +54,19 @@ Route::prefix('v1')->group(function () {
 
     Route::post('/auth/login', [AuthController::class, 'login'])
         ->middleware('throttle:5,1');
+    Route::post('/mobile/login', [MobileNavigationController::class, 'login'])
+        ->middleware('throttle:5,1');
+    Route::get('/mobile/packs/{version}/download', [MobileNavigationController::class, 'downloadPack'])
+        ->middleware(['signed', 'throttle:20,1'])
+        ->name('mobile.packs.download');
+
+    Route::middleware(['auth:sanctum', 'mobile.device', 'role:rescuer', 'throttle:120,1'])->prefix('mobile')->group(function (): void {
+        Route::get('/bootstrap', [MobileNavigationController::class, 'bootstrap']);
+        Route::post('/sync', [MobileNavigationController::class, 'sync']);
+        Route::get('/packs/{version}', [MobileNavigationController::class, 'packManifest']);
+    });
+    Route::post('/dispatches/{id}/route', [MobileNavigationController::class, 'freshRoute'])
+        ->middleware(['auth:sanctum', 'mobile.device', 'role:rescuer', 'throttle:6,1']);
     Route::get('/auth/password-recovery/questions', [AuthController::class, 'recoveryQuestions'])
         ->middleware('throttle:10,1');
     Route::post('/auth/password-recovery/verify', [AuthController::class, 'verifyPasswordChange'])
@@ -131,6 +145,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/resource-requests/{requestId}/complete', [ResourceRequestController::class, 'complete']);
             Route::get('/situation-reports', [SituationReportController::class, 'index']);
             Route::post('/situation-reports', [SituationReportController::class, 'store']);
+            Route::post('/situation-reports/sync', [SituationReportController::class, 'sync']);
+            Route::post('/situation-reports/{sitRepId}/submissions', [SituationReportController::class, 'submission']);
             Route::get('/situation-reports/{sitRepId}', [SituationReportController::class, 'show']);
             Route::get('/situation-reports/{sitRepId}/pdf', [SituationReportController::class, 'pdf']);
             Route::get('/disaster-events/{eventId}/situation-summary', [SituationReportController::class, 'eventSummary']);
@@ -172,6 +188,10 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::middleware('personnel.access')->group(function () {
+            Route::get('/rescuers/roles', [\App\Http\Controllers\Api\PersonnelRoleController::class, 'index']);
+            Route::post('/rescuers/roles', [\App\Http\Controllers\Api\PersonnelRoleController::class, 'store']);
+            Route::patch('/rescuers/roles/{roleId}', [\App\Http\Controllers\Api\PersonnelRoleController::class, 'update']);
+            Route::delete('/rescuers/roles/{roleId}', [\App\Http\Controllers\Api\PersonnelRoleController::class, 'destroy']);
             Route::get('/rescuers', [RescuerAccountController::class, 'index']);
             Route::get('/headquarters-accounts', [RescuerAccountController::class, 'headquartersAccounts']);
             Route::post('/headquarters-accounts', [RescuerAccountController::class, 'storeHeadquartersAccount']);

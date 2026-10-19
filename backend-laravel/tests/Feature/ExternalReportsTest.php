@@ -95,9 +95,9 @@ class ExternalReportsTest extends TestCase
         $this->assertStringStartsWith('%PDF', $bytes);
         // PDF content streams are compressed; inspect the rendered source for layout/data.
         $html = view('reports.situation', ['summary' => $summary])->render();
-        $this->assertStringContainsString('SITUATION REPORT', $html);
+        $this->assertStringContainsString('BDRRMC Situation Report', $html);
         $this->assertStringContainsString('Flooding Response', $html);
-        $this->assertStringContainsString('Barangay Sample', $html);
+        $this->assertStringContainsString('Barangay Mambaling', $html);
     }
 
     public function test_pdf_limit_rejects_instead_of_truncating_records(): void

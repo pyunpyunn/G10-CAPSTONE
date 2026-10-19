@@ -16,6 +16,7 @@ class RescuerAccountPresenter
 
         $data = [
             'responder_id' => $row->responder_id,
+            'role_id' => $row->access_role_id ?? null, 'role_name' => $row->access_role_name ?? null,
             'user_id' => $row->user_id,
             'account_id' => $row->username,
             'username' => $row->user_username,

@@ -42,6 +42,13 @@ class HeadquartersAccountWorkflow
             'last_name' => ['required', 'string', 'max:100'],
             'email' => ['nullable', 'email', 'max:255'],
             'contact_number' => ['nullable', 'string', 'max:50'],
+            'role_id' => ['nullable', 'integer', 'exists:roles,role_id'],
+            'title' => ['nullable', 'string', 'max:100'],
+            'account_status' => ['nullable', \Illuminate\Validation\Rule::in(array_keys(config('rescuers.account_statuses')))],
+            'duty_status' => ['nullable', \Illuminate\Validation\Rule::in(array_keys(config('rescuers.duty_statuses')))],
+            'gender' => ['nullable', 'string', 'max:20'], 'blood_type' => ['nullable', 'string', 'max:10'],
+            'address' => ['nullable', 'string', 'max:1000'], 'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:150'], 'emergency_contact_number' => ['nullable', 'string', 'max:30'],
             'password' => ['nullable', 'string', 'min:8', 'max:100'],
         ]);
 
@@ -77,7 +84,7 @@ class HeadquartersAccountWorkflow
                 'email' => $validated['email'] ?? null,
                 'contact_number' => $validated['contact_number'] ?? null,
                 'role_id' => app(HeadquartersTeamSupport::class)->personnelRoleId(),
-                'is_active' => 1,
+                'is_active' => ($validated['account_status'] ?? 'active') !== 'disabled' ? 1 : 0,
                 'updated_at' => $now,
             ];
             $values['created_at'] = $now;
@@ -87,7 +94,22 @@ class HeadquartersAccountWorkflow
             $columns = array_flip(Schema::getColumnListing('users'));
             $values = array_intersect_key($values, $columns);
             DB::table('users')->insert($values);
-            app(HeadquartersTeamSupport::class)->syncUser(DB::table('users')->where('user_id', $userId)->first());
+            $responderId = app(HeadquartersTeamSupport::class)->syncUser(DB::table('users')->where('user_id', $userId)->first());
+            $role = app(PersonnelRoleService::class)->selected($validated, true);
+            if ($responderId) {
+                $profile = array_intersect_key($validated, array_flip(['gender', 'blood_type', 'address', 'date_of_birth', 'emergency_contact_name', 'emergency_contact_number']));
+                $profile['duty_status'] = ($validated['account_status'] ?? 'active') === 'disabled' ? 'disabled' : ($validated['duty_status'] ?? 'on_duty');
+                $profile['is_validated'] = ($validated['account_status'] ?? 'active') === 'active' ? 1 : 0;
+                $profile = array_intersect_key($profile, array_flip(Schema::getColumnListing('responders')));
+                DB::table('responders')->where('responder_id', $responderId)->update($profile);
+                $leader = $role ? ($role->base_role_key ?: $role->role_key) === 'hq_leader' : ($validated['title'] ?? '') === 'HQ Leader';
+                if ($leader && $values['is_active']) {
+                    $teamId = DB::table('responders')->where('responder_id', $responderId)->value('team_id');
+                    DB::table('rescue_teams')->where('team_id', $teamId)->update(['leader_responder_id' => $responderId]);
+                    app(HeadquartersTeamSupport::class)->synchronizeLeadership((int) $teamId, $responderId);
+                }
+                app(PersonnelRoleService::class)->apply($responderId, $role);
+            }
             app(PersonnelAccessNotifier::class)->notify([$values['user_id']]);
 
             return [
@@ -98,7 +120,8 @@ class HeadquartersAccountWorkflow
                 'last_name' => trim($validated['last_name']),
                 'email' => $validated['email'] ?? null,
                 'contact_number' => $validated['contact_number'] ?? null,
-                'is_active' => true,
+                'is_active' => (bool) $values['is_active'],
+                'responder_id' => $responderId,
             ];
         });
 

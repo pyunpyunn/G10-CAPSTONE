@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
@@ -39,6 +39,7 @@ import { LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
+import { mountNavigationSync } from '@/utils/navigationRuntime';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 const deviceUuidKey = 'resq_rescuer_device_uuid';
@@ -58,6 +59,7 @@ export default function RescuerHomeScreen() {
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => Platform.OS === 'web' ? undefined : mountNavigationSync(), []);
 
   const loadOverview = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -131,8 +133,10 @@ export default function RescuerHomeScreen() {
   );
 
   async function handleLogout() {
-    await logoutMobile();
-    router.replace('/' as Href);
+    try {
+      await logoutMobile();
+      router.replace('/' as Href);
+    } catch (error: any) { Alert.alert('Unable to log out', errorMessage(error)); }
   }
 
   async function handleStatusChange(assignmentId: number, status: string) {
@@ -320,6 +324,11 @@ export default function RescuerHomeScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
+        {Platform.OS !== 'web' && <Pressable style={{ padding: 16, backgroundColor: '#e8f1ff', borderRadius: 12 }}
+          onPress={() => router.push({ pathname: '/rescuer/navigation' as any,
+            params: { dispatchId: String(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || '') } })}>
+          <Text style={{ color: '#1358a4', fontWeight: '700' }}>View directions / Offline navigation</Text>
+        </Pressable>}
         {renderContent()}
       </ScrollView>
 

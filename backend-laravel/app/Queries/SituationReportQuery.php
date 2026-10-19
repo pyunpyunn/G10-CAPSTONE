@@ -136,6 +136,7 @@ class SituationReportQuery
             ->orderByDesc('created_at')->get();
 
         return [
+            'evacuation' => app(SituationEvacuationQuery::class)->summary(clone $base, $eventId),
             'household_details' => app(SituationHouseholdQuery::class)->rows(clone $base, $eventId),
             'household_total' => $households->count(), 'household_counts' => $counts,
             'household_reported' => $reported, 'purok_rows' => $puroks,
@@ -167,11 +168,22 @@ class SituationReportQuery
         });
     }
 
-    public function nextReportNumber(): string
+    public function nextReportNumber(?string $eventId = null): string
     {
-        $prefix = 'SITREP-'.now()->format('Y').'-';
-        $count = SituationReport::query()->where('report_number', 'like', $prefix.'%')->count() + 1;
-        return $prefix.str_pad((string) $count, 3, '0', STR_PAD_LEFT);
+        if ($eventId === null) throw new \InvalidArgumentException('An event is required for SitRep numbering.');
+        return DB::transaction(function () use ($eventId) {
+            $key = 'sitrep-series:'.hash('sha256', $eventId);
+            $existing=SituationReport::query()->where('disaster_id',$eventId)->pluck('report_number');
+            $seed=max($existing->count(), (int) $existing->filter(fn ($v) => ctype_digit((string) $v))->map(fn ($v) => (int) $v)->max())+1;
+            DB::table('operational_sequences')->insertOrIgnore([
+                'sequence_key'=>$key,
+                'next_value'=>$seed,
+            ]);
+            $sequence=DB::table('operational_sequences')->where('sequence_key',$key)->lockForUpdate()->first();
+            $number=(int) $sequence->next_value;
+            DB::table('operational_sequences')->where('sequence_key',$key)->update(['next_value'=>$number+1]);
+            return (string) $number;
+        }, 3);
     }
 
     public function nextId(string $table, string $column): int

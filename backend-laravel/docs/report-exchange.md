@@ -1,7 +1,11 @@
-# External report exchange
+# Six-Finding BDRRMC Situation Report
 
-The complete version 2.0 partner contract is in [RESQPERATION_EXTERNAL_REPORTS_API.md](RESQPERATION_EXTERNAL_REPORTS_API.md).
+Operator and partner exports share six sections: overview, affected population, damaged houses, rescue/dispatch operations, evacuation centers and resources. No other sections or annexes are emitted.
 
-External systems must select a valid disaster and explicitly select a registered sitio ID or `all` before submitting a request. The API-key-protected `GET /api/v1/external/reports/options` endpoint provides the database-backed choices. `POST /api/v1/external/report-requests` records the requested scope for operator acceptance or rejection. Approved files use the stored event, sitio and section selection.
+Contract 4.0 requires explicit api_version and 1–7 section selections. Incoming partner requests retain operator review, fixed preparer, locked snapshots and signed files. New generation automatically syncs SafeTrack, EvaTrack and TrackingAid first. Saved reports export their frozen data.
 
-The complete guide includes endpoints, authentication, payload requirements, report sections, scope limitations, polling, downloads, errors, integration examples and server setup. Its repository copy is a reusable template; the user-requested Downloads copy includes the configured API key.
+- [API guide](RESQPERATION_EXTERNAL_REPORTS_API.md)
+- [Source sync](situation-report-sync.md)
+- [Implementation](situation-report-implementation.md)
+- [Partner checklist](partner-report-checklist.md)
+- [Terminology and sources](report-terminology-and-sources.md)

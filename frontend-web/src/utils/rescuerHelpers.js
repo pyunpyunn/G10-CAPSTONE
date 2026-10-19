@@ -33,6 +33,7 @@ export function formFromRescuer(rescuer) {
 
   return {
     account_id: rescuer.account_id || '',
+    role_id: rescuer.role_id || '',
     responder_code: rescuer.responder_code || '',
     account_status: rescuer.account_status || '',
     account_status_display: rescuer.account_status_display,
@@ -84,6 +85,7 @@ export function buildRescuerPayload(form, mode) {
     team_code: form.team_code,
     team_type: form.team_type,
     title: form.title,
+    role_id: form.role_id || null,
     duty_status: form.duty_status,
     skills: form.skills,
     training_notes: form.training_notes,

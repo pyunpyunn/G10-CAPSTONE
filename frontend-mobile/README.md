@@ -1,234 +1,51 @@
 # RESQPERATION Mobile App
 
-Expo React Native app for the household and rescuer mobile roles.
+One standalone Android APK contains the household and rescuer systems. Sign in
+with either account role to open its console. The release APK includes its code
+and UI assets; it does not need Expo Go, a QR scan, or a running Metro server.
 
-## Android OneSignal development
+See [ANDROID_RELEASE.md](./ANDROID_RELEASE.md) for installation, hosting,
+OneSignal configuration, device requirements, and measured build sizes.
 
-`npm start` now opens the development client for OneSignal. Install a RESQPERATION
-Android development APK on your phone first. No iOS setup is needed for this workflow.
-
-One-time dependency installation and APK build:
+## Build the downloadable APK
 
 ```powershell
 cd C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile
 npm ci
-npx eas-cli login
-npm run build:dev:android
+npm run check
+npm run build:android
 ```
 
-Open the APK download link returned by EAS on your Android phone and install it.
-The development profile explicitly builds an installable APK. Keep the configured
-OneSignal App ID, or override it with `EXPO_PUBLIC_ONESIGNAL_APP_ID` in `.env`.
-In that OneSignal app, Android / Google (FCM) credentials must be configured.
-The phone needs Google Play Services. Log in and allow notifications, then check
-OneSignal's subscriptions and send a test push to the phone.
+EAS returns the signed APK download link. The default production profile builds
+an APK; `npm run build:android:store` builds an AAB for Google Play.
 
-Run Laravel in one terminal and Metro in another:
+## Server connection
 
-```powershell
-cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
-php artisan serve --host=0.0.0.0 --port=8000
-```
+**Current setup:** use [Tailscale or LAN](./TAILSCALE_LAN.md). The ngrok tunnel
+below is historical; it has been stopped. Future builds default to Tailscale.
 
-```powershell
-cd C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile
-npm run start:dev
-```
+The current HTTPS API is
+`https://sturdily-morse-sitter.ngrok-free.dev/api/v1`. It uses an ngrok tunnel to
+the development computer, so Laravel, MySQL, ngrok and the computer must stay
+online. This is not permanent cloud hosting.
 
-Keep both devices on the same Wi-Fi and open the QR in the installed RESQPERATION
-development app. Use `npm run start:dev:clear` to clear Metro's cache.
-For tunnel mode (`npm run start:dev:tunnel`), set `EXPO_PUBLIC_API_BASE_URL` to a
-phone-reachable Laravel URL ending in `/api/v1`; Metro's tunnel does not expose Laravel.
+Open **Server settings** on sign-in to save another HTTPS API address without
+rebuilding. The mobile app connects to Laravel, which connects to MySQL. It
+never connects directly to the database.
 
-For screen previews only, download [Expo Go for SDK 54 on Android](https://expo.dev/go?device=true&platform=android&sdkVersion=54)
-and run `npm run start:go`. Expo Go cannot run OneSignal.
+## Push notifications
 
-The mobile app does not connect directly to MySQL. It connects to Laravel through the API, and Laravel connects to the shared MySQL database.
+The APK includes native OneSignal. Allow Android notifications after login;
+Google Play Services and valid FCM credentials in OneSignal are required.
+Keep the backend queues/scheduler running for queued pushes and reminders.
 
-## Current API Connection
+## Developer screen previews
 
-`frontend-mobile/.env`
+`npm start` runs Metro for code development. Expo Go can preview compatible
+screens, but native OneSignal and MapLibre features require the installed native
+application. These development tools are not required by release APK users.
 
-```env
-EXPO_PUBLIC_API_BASE_URL=
-```
+## Reference screens
 
-Leave this blank for Expo Go: the app derives the API host from the LAN address Expo is using, so changing Wi-Fi IPs will not leave a stale API URL. If you set it manually, use the laptop's current Wi-Fi IPv4 address from `ipconfig`, not `localhost`, `127.0.0.1`, a WSL address, or a VPN address, and restart Expo afterward.
-
-## Start Both Servers For Phone Login
-
-Expo Go and Laravel must both be running. Start Laravel in one PowerShell terminal, from the backend folder:
-
-```powershell
-cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
-php artisan serve --host=0.0.0.0 --port=8000
-```
-
-Keep that terminal open. Binding to `0.0.0.0` lets the phone reach Laravel through the laptop's Wi-Fi IP.
-
-In a second PowerShell terminal, start Expo:
-
-```powershell
-cd C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile
-npm run start:go
-```
-
-Keep both terminals open, connect the phone and laptop to the same Wi-Fi, then scan the Expo Go QR code. Verify the API from the phone's browser at `http://<laptop-wi-fi-ip>:8000/api/v1/health/ready`; get the current Wi-Fi IP with `ipconfig`. It should return `{"status":"ready"}`. If it does not load, allow PHP/Laravel through Windows Firewall on the private network.
-
-Open the QR code in Expo Go.
-
-No emulator is required. Keep the phone and laptop on the same Wi-Fi, then scan the QR code from the terminal or Expo browser page.
-
-## OneSignal Push Testing
-
-Expo Go can run the app for normal QR testing, but it cannot load the native OneSignal SDK. To test real OneSignal Player IDs and create OneSignal subscription records, install a development build on the actual phone first.
-
-### Option A: Install The Latest Finished Android Development APK
-
-If EAS says the monthly build credits are already used, do not keep running
-`npm run build:dev:android`. Install the latest already-finished APK instead.
-
-Android map fix: build number 2 includes WebView and OneSignal. The build is
-finished; download and install its APK:
-
-```text
-https://expo.dev/artifacts/eas/HCBPTw9RYYWDW_Toc8Ga-RhDgl-AeUFWqr1_1DsPyGM.apk
-```
-
-Open that link on the Android phone, download the APK, allow install from the
-browser if Android asks, then install RESQPERATION.
-
-After the app is installed, run Metro in development-client mode:
-
-```bash
-npm run start:dev
-```
-
-Open the project using the installed RESQPERATION app, not Expo Go.
-
-If the map reports `RNCWebViewModule` missing, the installed APK lacks the native
-module used by the current screens. Install build number 2 above. Metro reloads
-JavaScript only; it cannot install native libraries. Older APKs now show a map
-fallback instead of throwing when WebView is missing. Full embedded maps require
-an APK with WebView. Verify the guard with `npm run test:map`.
-
-If the phone shows `failed to connect to /192.168... port 8082`, the phone
-cannot reach the laptop over LAN. Use tunnel mode instead:
-
-```bash
-npm run start:dev:tunnel
-```
-
-Tunnel mode is slower, but it avoids Wi-Fi isolation and Windows Firewall issues.
-
-### Option B: Create A New EAS Android Development Build
-
-```bash
-npm run build:dev:android
-```
-
-Download and install the generated APK from EAS on the phone. After it is installed, run:
-
-```bash
-npm run start:dev
-```
-
-Scan/open the QR with the installed RESQPERATION development app, not Expo Go.
-
-If the phone camera says the QR has no usable data, open the installed RESQPERATION development app and enter the Metro URL manually. The terminal prints it in this format:
-
-```text
-Metro waiting on exp+frontend-mobile://expo-development-client/?url=http%3A%2F%2FYOUR-LAPTOP-IP%3APORT
-```
-
-Use the decoded Metro URL part:
-
-```text
-http://YOUR-LAPTOP-IP:PORT
-```
-
-Example:
-
-```text
-http://192.168.112.130:8082
-```
-
-Use this only in the installed development build. Expo Go cannot create OneSignal subscription records.
-
-If the app still opens stale code, restart Metro with:
-
-```bash
-npm run start:dev:clear
-```
-
-Do not use `expo run:android` for this project workflow. It can open an
-emulator/device selector. Install the APK on the physical phone instead.
-
-## Android Real Map Setup
-
-OneSignal is only for notifications. It does not provide maps.
-
-The final Android app uses `react-native-maps`, which uses Google Maps on
-Android. The installed APK must include a Google Maps Android API key before the
-real native map can display.
-
-Add this to `frontend-mobile/.env`, then build and install a new development APK:
-
-```env
-EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY=your_google_maps_android_key
-EXPO_PUBLIC_ENABLE_NATIVE_ANDROID_MAPS=true
-```
-
-Google Cloud setup:
-
-1. Open Google Cloud Console.
-2. Enable **Maps SDK for Android**.
-3. Create an API key.
-4. Restrict the key to Android apps.
-5. Use package name `com.kathlnbarro.resqperationmobile`.
-6. Add the app signing SHA-1 fingerprint if Google Cloud asks for it.
-
-After changing `.env`, rebuild and install the APK. Metro reload alone is not
-enough because the Google Maps key is native Android configuration.
-
-## Temporary Mobile Accounts
-
-| Role | Account ID | Password |
-| --- | --- | --- |
-| Household Resident | `2024035501` | `password` |
-| Household Resident Setup Test | `2024035503` | `password` |
-| Rescuer Temp SAR Test | `BDRRM-SAR-001` | `password` |
-| Rescuer Medical Test | `BDRRM-MED-001` | `password` |
-| Rescuer SAR Test | `BDRRM-SAR-002` | `password` |
-
-Rescuer mobile login uses the BDRRM account ID format. The sequence is counted per team code:
-
-```text
-BDRRM-SAR-001
-BDRRM-MED-001
-BDRRM-SAR-002
-```
-
-The rescuer profile also has a separate editable username, such as `vinzon.arellano` or `vince.pacillan`.
-
-Actual mobile login is DB-driven. Household accounts from SafeTrack work in RESQPERATION when they are already saved in the shared `users` table with a `household_resident` role, a valid password hash, and a linked `household_id`. The login field can accept the household `username`, `email`, `user_id`, or `household_id`.
-
-## Verified API Flow
-
-- Household login uses `/api/v1/auth/login`
-- Household app loads `/api/v1/household/overview`
-- Rescuer login uses `/api/v1/auth/login`
-- Rescuer app loads `/api/v1/rescuer/overview`
-- Rescuer field reports load assigned household members from `/api/v1/rescuer/assignments/{assignmentId}/household`
-- Rescuer assignment completion requires a saved field report when the assignment has a household
-
-## Rescuer Field Reports
-
-Run `php artisan migrate` in `backend-laravel` before enabling assignment field reports on an existing database. The shared database must also have the `member_statuses` and `member_disaster_statuses` tables used by household mobile reporting. The report records incident type, damage, death/injury counts, and an assessment for every current household member. Submissions are idempotent per assignment; completing a household assignment is rejected until its report is saved.
-
-If login fails on the phone but works on the browser/laptop, check:
-
-- phone and laptop are on the same Wi-Fi
-- Laravel is running with `--host=0.0.0.0`
-- Windows Firewall allows port `8000`
-- `EXPO_PUBLIC_API_BASE_URL` uses the current laptop Wi-Fi IP
+- [Household reference](./ResQperation-Household-Mobile-Reference.md)
+- [Rescuer reference](./ResQperation-Rescuer-Mobile-Reference.md)

@@ -1,3 +1,5 @@
+> SitRep update (19 October 2026): only six I–VII findings are generated; prior twelve-section/annex instructions are superseded. Contract 4.0 requires explicit api_version. Draft generation automatically syncs the three source systems. See [implementation](situation-report-implementation.md), [source sync](situation-report-sync.md) and [partner API](RESQPERATION_EXTERNAL_REPORTS_API.md).
+
  Archive and Situation reports
 
 The implementation adapts `EXTERNAL_REPORTS_API.md` to ResQperation's existing
@@ -70,7 +72,7 @@ Situation request:
   "report_type": "situation",
   "event_id": "<database event ID>",
   "format": "pdf",
-  "included_sections": ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
+  "included_sections": ["I", "II", "IV", "V", "VI", "VII", "VIII"]
 }
 ```
 

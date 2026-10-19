@@ -1,196 +1,157 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
-import { createRescueTeam, createRescuer, deleteRescueTeam, deactivateRescuer, deleteRescuer, getRescueTeamConfig, getRescuer, getRescuers, updateRescueTeam, updateRescuer } from '../api/rescuerApi'
-import { getHeadquartersAccounts } from '../api/headquartersAccountsApi'
+import { createRescueTeam,createRescuer,deleteRescueTeam,deactivateRescuer,deleteRescuer,getRescueTeamConfig,getRescuer,getRescuers,updateRescueTeam,updateRescuer,getPersonnelRoles,savePersonnelRole,deletePersonnelRole } from '../api/rescuerApi'
+import { getHeadquartersAccounts,saveHeadquartersAccount } from '../api/headquartersAccountsApi'
 import { getCurrentUser } from '../api/authApi'
-import RescuerAccountModal, { AccountProfile } from '../components/rescuers/RescuerAccountModal'
-import HeadquartersPersonnelPanel from '../components/rescuers/HeadquartersPersonnelPanel'
-import RescuerRosterTable from '../components/rescuers/RescuerRosterTable'
-import RescueTeamConfigModal from '../components/rescuers/RescueTeamConfigModal'
-import { buildRescuerPayload, emptyRescuerForm, formFromRescuer, rescuerErrorMessage } from '../utils/rescuerHelpers'
+import { buildRescuerPayload,formFromRescuer,rescuerErrorMessage } from '../utils/rescuerHelpers'
+import { AccountDialog,AccountEditor,RoleEditor } from '../components/rescuers/AccountReferenceForms'
+import AccountReferenceTeamEditor from '../components/rescuers/AccountReferenceTeamEditor'
+import LegacyTeamManagementPage from './LegacyTeamManagementPage'
+import '../styles/account-html.css'
 
 export default function RescuerAccountsPage() {
-  const location = useLocation()
-  return <RescuerAccountsWorkspace key={`${location.pathname}${location.search}`} />
+  const location=useLocation()
+  if (location.pathname === '/rescuers/teams') return <LegacyTeamManagementPage />
+  return <AccountsWorkspace key={`${location.pathname}${location.search}`} />
 }
-
-function RescuerAccountsWorkspace() {
-  const { onUserChange } = useOutletContext()
-  const location = useLocation()
-  const navigate = useNavigate()
-  const route = location.pathname.split('/').pop()
-  const isRoster = route === 'rescuers'
-  const isTeams = route === 'teams'
-  const isNew = route === 'new'
-  const params = new URLSearchParams(location.search)
-  const requestedId = params.get('id') || location.state?.rescuer?.responder_id
-  const [payload, setPayload] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState(location.state?.notice || '')
-  const [page, setPage] = useState(1)
-  const [teamFilter, setTeamFilter] = useState('')
-  const [selectedId, setSelectedId] = useState(requestedId || null)
-  const [detail, setDetail] = useState(null)
-  const [detailId, setDetailId] = useState(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [detailError, setDetailError] = useState('')
-  const [detailVersion, setDetailVersion] = useState(0)
-  const [form, setForm] = useState(() => emptyRescuerForm())
-  const [original, setOriginal] = useState(null)
-  const [formError, setFormError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [teamConfig, setTeamConfig] = useState(null)
-  const [teamVersion, setTeamVersion] = useState(0)
-  const [teamLoading, setTeamLoading] = useState(isTeams)
-  const [teamError, setTeamError] = useState('')
-  const [category, setCategory] = useState(location.state?.category || 'responders')
-  const [accountType, setAccountType] = useState(params.get('type') || 'rescuer')
-  const [hq, setHq] = useState(null)
-  const [confirmation, setConfirmation] = useState(null)
-  const returnPath = location.state?.fromDispatchAssignment ? '/rescue-management' : '/rescuers'
-
+function AccountsWorkspace() {
+  const {onUserChange}=useOutletContext(),location=useLocation(),navigate=useNavigate()
+  const route=location.pathname.split('/').pop(),params=new URLSearchParams(location.search)
+  const requestedId=params.get('id') || location.state?.rescuer?.responder_id
+  const view=route==='teams' ? 'teams' : params.get('manage')==='roles' ? 'roles' : 'accounts'
+  const [category,setCategory]=useState(location.state?.category==='headquarters' || params.get('type')==='command_center' ? 'command_center' : 'rescuer')
+  const [page,setPage]=useState(1),[teamFilter,setTeamFilter]=useState('all'),[selectedId,setSelectedId]=useState(requestedId || null)
+  const [payload,setPayload]=useState(null),[teams,setTeams]=useState(null),[roleWorkspace,setRoleWorkspace]=useState(null),[hq,setHq]=useState(null)
+  const [detail,setDetail]=useState(null),[loading,setLoading]=useState(true),[detailLoading,setDetailLoading]=useState(false)
+  const [error,setError]=useState(''),[notice,setNotice]=useState(location.state?.notice || ''),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0)
+  const [modal,setModal]=useState(null),[newTeam,setNewTeam]=useState(''),[newRole,setNewRole]=useState('')
+  const detailVersion=useRef(0),savedSelection=useRef(null)
   useEffect(() => {
-    if (isTeams) return
-    let ignore = false
-    getRescuers({ page, per_page: 8, team: teamFilter, account_type: 'rescuer' }).then(data => {
-      if (ignore) return
-      setPayload(data)
-      if (isNew) setForm(emptyRescuerForm(data.form_options?.defaults))
-      if (isRoster) setSelectedId(current => data.rescuers?.data?.some(r => String(r.responder_id) === String(current)) ? current : data.rescuers?.data?.[0]?.responder_id || null)
-    }).catch(loadError => { if (!ignore) setError(rescuerErrorMessage(loadError, 'Accounts could not be loaded. Check the backend connection.')) }).finally(() => { if (!ignore) setLoading(false) })
-    return () => { ignore = true }
-  }, [page, teamFilter, isNew, isRoster, isTeams])
-
-  useEffect(() => {
-    if (isTeams || isNew || !selectedId) return
-    let ignore = false
-    getRescuer(selectedId).then(data => {
-      if (ignore) return
-      const nextForm = formFromRescuer(data.rescuer)
-      setDetail(nextForm); setDetailId(selectedId); setForm(nextForm); setOriginal(nextForm)
-    }).catch(loadError => { if (!ignore) setDetailError(rescuerErrorMessage(loadError, 'The selected account could not be loaded.')) }).finally(() => { if (!ignore) setDetailLoading(false) })
-    return () => { ignore = true }
-  }, [selectedId, isTeams, isNew, detailVersion])
-
-  useEffect(() => {
-    if (!isNew && !isRoster) return
-    let ignore = false
-    getHeadquartersAccounts().then(data => { if (!ignore) setHq(data) }).catch(() => { /* The HQ panel handles its own loading errors. */ })
-    return () => { ignore = true }
-  }, [isNew, isRoster])
-
-  useEffect(() => {
-    if (!isTeams) return
-    loadTeamConfig()
-    const refresh = () => loadTeamConfig()
-    window.addEventListener('personnel-access:changed', refresh)
-    window.addEventListener('rescue-criteria:changed', refresh)
-    window.addEventListener('focus', refresh)
-    return () => {
-      window.removeEventListener('personnel-access:changed', refresh)
-      window.removeEventListener('rescue-criteria:changed', refresh)
-      window.removeEventListener('focus', refresh)
+    let active=true
+    async function load() {
+      setLoading(true);setError('')
+      const results=await Promise.allSettled([getRescuers({page,per_page:8,team:teamFilter,account_type:category}),getRescueTeamConfig(),getPersonnelRoles(),getHeadquartersAccounts()])
+      if(!active) return
+      const setters=[setPayload,setTeams,setRoleWorkspace,setHq],failures=[]
+      results.forEach((result,index) => {if(result.status==='fulfilled') setters[index](result.value);else failures.push(rescuerErrorMessage(result.reason,'Account settings could not be loaded.'))})
+      if(results[0].status==='fulfilled') {
+        const roster=results[0].value.rescuers
+        if(page>1 && !roster.data.length) setPage(Math.max(1,roster.last_page))
+        else { const savedId=savedSelection.current; savedSelection.current=null; setSelectedId(current => requestedId || savedId || (roster.data.some(r => String(r.responder_id)===String(current)) ? current : roster.data[0]?.responder_id || null)) }
+      }
+      setError([...new Set(failures)].join(' '));setLoading(false)
     }
-  }, [isTeams])
-
-  async function loadTeamConfig() {
-    setTeamLoading(true); setTeamError('')
-    try { setTeamConfig(await getRescueTeamConfig()); setTeamVersion(current => current + 1) }
-    catch (loadError) { setTeamError(rescuerErrorMessage(loadError, 'Teams could not be loaded.')) }
-    finally { setTeamLoading(false) }
+    load();return () => {active=false}
+  },[page,teamFilter,category,revision,requestedId])
+  useEffect(() => {
+    if(!selectedId) return
+    const version=++detailVersion.current
+    let active=true
+    async function loadDetail() {
+      setDetailLoading(true)
+      try {const result=await getRescuer(selectedId);if(active && version===detailVersion.current) setDetail(result.rescuer)}
+      catch(failure) {if(active) {setDetail(null);setError(rescuerErrorMessage(failure,'Account details could not be loaded.'))}}
+      finally {if(active) setDetailLoading(false)}
+    }
+    loadDetail();return () => {active=false}
+  },[selectedId,revision])
+  useEffect(() => {
+    const update=() => {if(!document.hidden && !busy && !modal) setRevision(current => current+1)}
+    window.addEventListener('personnel-access:changed',update)
+    return () => window.removeEventListener('personnel-access:changed',update)
+  },[busy,modal])
+  useEffect(() => {if(!notice) return;const timer=setTimeout(() => setNotice(''),4500);return () => clearTimeout(timer)},[notice])
+  async function refreshAccess() {try{onUserChange?.(await getCurrentUser())}catch{/* The API checks access again on every request. */}}
+  function closeModal() {
+    if(busy) return
+    setModal(null)
+    if(['new','edit'].includes(route)) navigate('/rescuers',{state:{category:category==='command_center' ? 'headquarters' : 'responders'}})
   }
-  async function reloadRoster() {
-    setLoading(true)
+  function completed(message) {setModal(null);setNotice(message);setRevision(current => current+1)}
+  async function saveAccount(body,type,account) {
+    setBusy(true)
     try {
-      const data = await getRescuers({ page, per_page: 8, team: teamFilter, account_type: 'rescuer' })
-      setPayload(data)
-      if (!data.rescuers?.data?.length && page > 1) setPage(page - 1)
-      else setSelectedId(current => data.rescuers?.data?.some(r => String(r.responder_id) === String(current)) ? current : data.rescuers?.data?.[0]?.responder_id || null)
-      setDetailVersion(current => current + 1)
-    } catch (loadError) { setError(rescuerErrorMessage(loadError, 'Accounts could not be refreshed.')) }
-    finally { setLoading(false) }
+      const result=account ? await updateRescuer(account.responder_id,body) : type==='command_center' ? await saveHeadquartersAccount({...body,account_type:'command_center'}) : await createRescuer(body)
+      const saved=account?.responder_id || result.rescuer?.responder_id || result.data?.account?.responder_id
+      if(saved) {savedSelection.current=saved;setSelectedId(saved)}
+      setCategory(type);setPage(1);setTeamFilter('all')
+      if(['new','edit'].includes(route)) navigate('/rescuers',{state:{category:type==='command_center' ? 'headquarters' : 'responders',notice:account ? 'Profile updated.' : 'Account created.'}})
+      else completed(account ? 'Profile updated.' : 'Account created.')
+      await refreshAccess()
+    } finally {setBusy(false)}
   }
-  async function submitAccount(event) {
-    event.preventDefault(); setSaving(true); setFormError('')
+  async function saveDutyStatus(account,status) {
+    setBusy(true);setError('')
     try {
-      const body = buildRescuerPayload(form, isNew ? 'create' : 'edit')
-      const result = isNew ? await createRescuer(body) : await updateRescuer(selectedId, body)
-      navigate('/rescuers', { state: { notice: result.message } })
-    } catch (saveError) { setFormError(rescuerErrorMessage(saveError)) }
-    finally { setSaving(false) }
+      await updateRescuer(account.responder_id,buildRescuerPayload({...formFromRescuer(account),duty_status:status},'edit'))
+      completed('Duty status updated.')
+    } catch(failure) {setError(rescuerErrorMessage(failure))}
+    finally {setBusy(false)}
   }
   async function saveTeam(body) {
-    setSaving(true); setTeamError('')
+    setBusy(true)
+    try {setTeams(body.team_id ? await updateRescueTeam(body.team_id,body) : await createRescueTeam(body));setNewTeam('');completed('Team saved.');await refreshAccess()}
+    finally {setBusy(false)}
+  }
+  async function saveRole(body) {
+    setBusy(true)
+    try {setRoleWorkspace(await savePersonnelRole(body));setNewRole('');completed('Role and account access updated.');await refreshAccess()}
+    finally {setBusy(false)}
+  }
+  async function confirmAction(replacement) {
+    if(!modal || busy) return
+    setBusy(true)
     try {
-      setTeamConfig(body.team_id ? await updateRescueTeam(body.team_id, body) : await createRescueTeam(body))
-      setTeamVersion(current => current + 1); setNotice('Team saved.')
+      if(modal.action==='team') setTeams(await deleteRescueTeam(modal.record.team_id))
+      else if(modal.action==='role') setRoleWorkspace(await deletePersonnelRole(modal.record.role_id,replacement))
+      else if(modal.action==='delete') await deleteRescuer(modal.record.responder_id)
+      else if(modal.action==='deactivate') await deactivateRescuer(modal.record.responder_id)
+      else await updateRescuer(modal.record.responder_id,buildRescuerPayload({...formFromRescuer(modal.record),account_status:'active',duty_status:modal.record.duty_status?.key==='disabled' ? 'available' : modal.record.duty_status?.key},'edit'))
+      completed(modal.action==='role' ? 'Role deleted and assigned accounts updated.' : modal.action==='team' ? 'Team deleted.' : modal.action==='delete' ? 'Account deleted.' : modal.action==='deactivate' ? 'Account deactivated.' : 'Account reactivated.')
       await refreshAccess()
-    } catch (saveError) { setTeamError(rescuerErrorMessage(saveError, 'Unable to save the team.')) }
-    finally { setSaving(false) }
+    } finally {setBusy(false)}
   }
-  async function confirmAction() {
-    if (!confirmation || saving) return
-    setSaving(true); setError(''); setTeamError('')
-    try {
-      if (confirmation.type === 'team') {
-        setTeamConfig(await deleteRescueTeam(confirmation.id)); setTeamVersion(current => current + 1)
-      } else {
-        if (confirmation.type === 'delete') await deleteRescuer(selectedId)
-        else if (confirmation.type === 'deactivate') await deactivateRescuer(selectedId)
-        else await updateRescuer(selectedId, buildRescuerPayload({ ...detail, account_status: 'active', duty_status: detail.duty_status === 'disabled' ? payload?.form_options?.defaults?.duty_status || 'available' : detail.duty_status, password: '' }, 'edit'))
-        await reloadRoster()
-      }
-      setNotice(`${confirmation.title} completed.`); setConfirmation(null)
-      await refreshAccess()
-    } catch (actionError) {
-      const message = rescuerErrorMessage(actionError, 'The action could not be completed.')
-      if (confirmation.type === 'team') setTeamError(message); else setError(message)
-      setConfirmation(null)
-    } finally { setSaving(false) }
-  }
-  async function refreshAccess() {
-    try { onUserChange?.(await getCurrentUser()) } catch { /* API authorization remains authoritative if session refresh is unavailable. */ }
-  }
-  const detailPending = detailLoading || (selectedId && String(detailId) !== String(selectedId) && !detailError)
-  function changePage(nextPage) { setLoading(true); setError(''); setDetailError(''); setPage(nextPage) }
-  function selectRescuer(rescuer) {
-    if (String(selectedId) === String(rescuer.responder_id)) return
-    setDetailError(''); setSelectedId(rescuer.responder_id)
-  }
-  const roleSelector = <div className="rc" aria-label="Account type">{[['rescuer', 'Rescuer', 'R'], ['command_center', 'HQ Personnel', 'H']].map(([type, label, initial]) => <button key={type} className={accountType === type ? 'on' : ''} type="button" disabled={saving} aria-pressed={accountType === type} onClick={() => { setAccountType(type); setFormError('') }}><span className="av s" style={{ '--c': '#3b82f6' }}>{initial}</span>{label}</button>)}</div>
-  const askAccount = type => setConfirmation({ type, title: type === 'delete' ? 'Delete user' : type === 'deactivate' ? 'Deactivate account' : 'Reactivate account', name: detail?.full_name || '', rows: type === 'delete' ? [['Login', 'Disabled'], ['Roster record', 'Removed'], ['Dispatch history', 'Kept']] : [['Login', type === 'deactivate' ? 'Disabled' : 'Enabled'], ['Record', 'Kept'], ['Dispatch history', 'Kept']] })
-
-  return <main className="tm-page" aria-label={isTeams ? 'Team Management' : 'Account Management'}>
-    <div className="pg on">{!isTeams && <div className="hd">{isRoster ? <><div className="sg2 tm-category"><button type="button" className={category === 'responders' ? 'on' : ''} onClick={() => setCategory('responders')}>Rescuers</button><button type="button" className={category === 'headquarters' ? 'on' : ''} onClick={() => setCategory('headquarters')}>Headquarters</button></div><span className="sp" /><button className="bt" type="button" onClick={() => navigate('/rescuers/teams')}>Manage teams</button><button className="bt p pl2" type="button" onClick={() => navigate('/rescuers/new')}>Create account<i>+</i></button></> : <><span className="tm-page-title">{route === 'view' ? 'User details' : route === 'edit' ? 'Edit account' : 'Add new user'}</span><span className="sp" /><button className="bt" type="button" disabled={saving} onClick={() => navigate(returnPath)}>Back to {returnPath === '/rescue-management' ? 'rescue management' : 'accounts'}</button></>}</div>}
-      {error && <div className="tm-feedback" role="alert">{error}<button className="bt sm" type="button" onClick={reloadRoster}>Retry</button></div>}
-      {notice && <div className="tm-feedback tm-success" role="status">{notice}<button className="x" aria-label="Dismiss notification" type="button" onClick={() => setNotice('')}>×</button></div>}
-      {isTeams && <RescueTeamConfigModal key={teamVersion} embedded isOpen workspace={teamConfig} isLoading={teamLoading} isSaving={saving} error={teamError} onRetry={loadTeamConfig} onClose={() => navigate('/rescuers')} onSave={saveTeam} onDelete={(id, name) => setConfirmation({ type: 'team', id, title: 'Delete team', name, rows: [['Accounts', 'Kept'], ['Members', 'Moved to Unassigned'], ['Dispatch history', 'Kept']] })} />}
-      {isRoster && category === 'headquarters' && <HeadquartersPersonnelPanel onManagePersonnel={account => navigate(`/rescuers/edit?id=${account.responder_id}`)} />}
-      {isRoster && category === 'responders' && <div className="acc">{detailPending ? <div className="cd emp" role="status">Loading user details…</div> : detailError ? <div className="cd emp" role="alert">{detailError}<button className="bt" onClick={() => { setDetailError(''); setDetailLoading(true); setDetailVersion(current => current + 1) }}>Retry</button></div> : detail && selectedId ? <AccountProfile key={selectedId} form={detail} onEdit={() => navigate(`/rescuers/edit?id=${selectedId}`)} onDeactivate={saving ? undefined : () => askAccount('deactivate')} onReactivate={saving ? undefined : () => askAccount('reactivate')} onDelete={saving ? undefined : () => askAccount('delete')} /> : <div className="cd emp" role="status">{loading ? 'Loading accounts…' : 'Select a rescuer to view their profile.'}</div>}<RescuerRosterTable rescuers={payload?.rescuers?.data || []} pagination={payload?.rescuers} onPageChange={changePage} selectedId={selectedId} onView={selectRescuer} teamOptions={payload?.team_options || []} teamFilter={teamFilter} onTeamFilter={value => { setLoading(true); setError(''); setDetailError(''); setTeamFilter(value); setPage(1) }} /></div>}
-      {isNew && accountType !== 'rescuer' && <HeadquartersPersonnelPanel key={accountType} editor onBusyChange={setSaving} roleSelector={roleSelector} onClose={() => navigate('/rescuers')} onSaved={message => navigate('/rescuers', { state: { notice: message, category: 'headquarters' } })} />}
-      {((isNew && accountType === 'rescuer') || route === 'edit' || route === 'view') && <>{(loading && !payload) || detailPending ? <div className="cd emp" role="status">Loading account…</div> : (isNew ? payload?.form_options : detail) && <RescuerAccountModal embedded isOpen mode={isNew ? 'create' : route} form={form} setForm={setForm} formError={formError} isSaving={saving} teamOptions={payload?.team_options || []} accountIdOptions={payload?.account_id_options || []} fallbackAccountId={payload?.next_account_id || ''} formOptions={payload?.form_options} onClose={() => navigate(returnPath)} onReset={() => { setForm(isNew ? emptyRescuerForm(payload?.form_options?.defaults) : { ...original }); setFormError('') }} onSubmit={submitAccount} onEdit={() => navigate(`/rescuers/edit?id=${selectedId}`)} roleSelector={isNew ? roleSelector : undefined} />}{detailError && <div className="tm-feedback" role="alert">{detailError}</div>}{!isNew && !requestedId && <div className="cd emp">Select a user from the account list first.</div>}</>}
-    </div>
-    {confirmation && <ConfirmDialog action={confirmation} busy={saving} onCancel={() => { if (!saving) setConfirmation(null) }} onConfirm={confirmAction} />}
-  </main>
+  const rows=payload?.rescuers?.data || [],pager=payload?.rescuers || {},roles=roleWorkspace?.roles || []
+  const editor=modal?.kind==='account' ? modal : route==='new' ? {kind:'account',account:null} : route==='edit' && detail ? {kind:'account',account:detail} : null
+  const hqCategory=category==='command_center',selectedDetail=detail && String(detail.responder_id)===String(selectedId) ? detail : null
+  const ask=(action,record) => setModal({kind:'confirm',action,record})
+  const closeManagement=() => navigate('/rescuers')
+  return <section className="account-html" aria-label="Account Management"><div className="bar">{view==='accounts' ? <><div className="seg" role="tablist" aria-label="Account category">{[['rescuer','Rescuers'],['command_center','Headquarters']].map(([key,label]) => <button key={key} role="tab" aria-selected={category===key} disabled={busy} onClick={() => {setCategory(key);setPage(1);setTeamFilter('all');setSelectedId(null);setDetail(null)}}>{label} <small>{teams?.responders?.filter(r => r.account_type===key).length || 0}</small></button>)}</div><span className="sp" /><button className="btn" disabled={busy} onClick={() => navigate('/rescuers?manage=roles')}>Manage roles</button><button className="btn" disabled={busy} onClick={() => navigate('/rescuers/teams')}>Manage teams</button><button className="btn p" disabled={busy || !payload || !roleWorkspace} onClick={() => setModal({kind:'account',account:null})}>+ Create account</button></> : <><button className="btn" onClick={closeManagement}>‹ Back to accounts</button><h2 className="vt">Manage {view}</h2></>}</div>{error && <div className="notices"><div className="err" role="alert">{error} <button className="btn" disabled={busy} onClick={() => setRevision(current => current+1)}>Retry</button></div></div>}
+    {view==='accounts' && <div className="grid"><aside className="ros"><div className="rh"><b>{hqCategory ? 'Headquarters' : 'Rescuers'}</b><span className="chip">{pager.total || 0} total</span></div>{!hqCategory && <><label className="l" htmlFor="account-team-filter">Team</label><select id="account-team-filter" value={teamFilter} disabled={busy} onChange={event => {setTeamFilter(event.target.value);setPage(1)}}><option value="all">All teams</option>{(payload?.team_options || []).filter(t => String(t.team_code).toUpperCase()!=='HQCC').map(t => <option key={t.team_id} value={String(t.team_id)}>{t.team_name}</option>)}</select></>}<div className="rl">{loading ? Array.from({length:4},(_,i) => <div className="skl" key={i} role={i===0 ? 'status' : undefined} aria-label={i===0 ? 'Loading accounts' : undefined} />) : rows.length ? rows.map(r => <button key={r.responder_id} type="button" className={`row ${String(selectedId)===String(r.responder_id) ? 'sel' : ''}`} aria-pressed={String(selectedId)===String(r.responder_id)} onClick={() => setSelectedId(r.responder_id)}><span className="av s">{initials(r.full_name)}</span><span className="rt"><b>{r.full_name}</b><small>{r.title}{r.is_active===false ? ' · Inactive' : ''}</small></span></button>) : <div className="empty">No accounts{teamFilter!=='all' ? ' in this team' : ''}.{teamFilter!=='all' && <p><button className="btn" onClick={() => {setTeamFilter('all');setPage(1)}}>Show all teams</button></p>}</div>}</div><div className="pgn"><span>{pager.total ? `${pager.from}–${pager.to} of ${pager.total}` : '0 of 0'}</span><span><button type="button" className="btn" disabled={loading || page<=1} aria-label="Previous page" onClick={() => setPage(p => p-1)}>‹</button> <button type="button" className="btn" disabled={loading || page>=(pager.last_page || 1)} aria-label="Next page" onClick={() => setPage(p => p+1)}>›</button></span></div></aside><div>{loading || detailLoading ? <div className="card"><div className="skl" /><div className="skl" /></div> : selectedDetail ? <Profile key={selectedDetail.responder_id} account={selectedDetail} dutyStatuses={payload?.form_options?.duty_statuses || []} onDutyChange={saveDutyStatus} onEdit={() => setModal({kind:'account',account:selectedDetail})} onAction={action => ask(action,selectedDetail)} busy={busy} /> : <div className="card empty">Select an account to view its profile.</div>}</div></div>}
+    {view==='teams' && <div className="grid management-grid"><div className="card"><label className="l" htmlFor="new-team-name">New team</label><form style={{display:'flex',gap:8,maxWidth:420}} onSubmit={event => {event.preventDefault();setModal({kind:'team',record:{...teams.form_defaults,team_name:newTeam,member_ids:[]},creating:true})}}><input id="new-team-name" required placeholder="Team name" value={newTeam} onChange={event => setNewTeam(event.target.value)} /><button type="submit" className="btn p" disabled={loading || !teams}>Add team</button></form><div className="tbl"><table><thead><tr><th>Team</th><th className="n">Members</th><th>Leader</th><th className="n">Actions</th></tr></thead><tbody>{(teams?.teams || []).map(t => <tr key={t.team_id}><td><b>{t.team_name}</b></td><td className="n">{t.member_count}</td><td>{t.leader_name || 'Not recorded'}</td><td className="n"><button className="btn" onClick={() => setModal({kind:'team',record:t})}>Edit</button> <button className="btn dg" disabled={!t.can_delete} onClick={() => ask('team',t)}>Delete</button></td></tr>)}</tbody></table></div><p className="note">Renaming a team updates its members. Deleting a team leaves its members unassigned and preserves past dispatch records.</p></div></div>}
+    {view==='roles' && <div className="grid management-grid"><div className="card"><label className="l" htmlFor="new-role-name">New role</label><form style={{display:'flex',gap:8,maxWidth:420}} onSubmit={event => {event.preventDefault();setModal({kind:'role',record:{role_name:newRole,base_role_key:'rescuer',web_modules:['dashboard','geospatial_analytics','profile','notifications'],can_manage_personnel:false,can_approve_requests:false},creating:true})}}><input id="new-role-name" required placeholder="Role name" value={newRole} onChange={event => setNewRole(event.target.value)} /><button className="btn p" type="submit" disabled={loading || !roleWorkspace}>Add role</button></form><div className="tbl"><table><thead><tr><th>Role</th><th>Account type</th><th>Access</th><th className="n">Accounts</th><th className="n">Actions</th></tr></thead><tbody>{roles.map(r => <tr key={r.role_id}><td><b>{r.role_name}</b></td><td>{r.base_role_key.replaceAll('_',' ')}</td><td>{r.web_modules.map(key => key.replaceAll('_',' ')).join(', ') || 'No web access'}</td><td className="n">{r.member_count}</td><td className="n">{r.can_edit ? <button className="btn" onClick={() => setModal({kind:'role',record:r})}>Edit</button> : <span className="nr">System role</span>} {r.can_delete && <button className="btn dg" onClick={() => ask('role',r)}>Delete</button>}</td></tr>)}</tbody></table></div></div></div>}
+    {editor && payload && roleWorkspace && <AccountEditor key={editor.account?.responder_id || 'new-account'} account={editor.account} category={editor.account ? (/^BDRRM-HQCC-/i.test(editor.account.account_id) ? 'command_center' : 'rescuer') : category} payload={payload} roles={roles} hqNextId={hq?.next_account_id} busy={busy} onClose={closeModal} onSave={saveAccount} />}
+    {modal?.kind==='team' && <AccountReferenceTeamEditor key={modal.record?.team_id || 'new-team'} team={modal.record} workspace={teams} busy={busy} onClose={closeModal} onSave={saveTeam} />}
+    {modal?.kind==='role' && <RoleEditor key={modal.record?.role_id || 'new-role'} role={modal.record} workspace={roleWorkspace} busy={busy} onClose={closeModal} onSave={saveRole} />}
+    {modal?.kind==='confirm' && <Confirmation action={modal.action} record={modal.record} roles={roles} busy={busy} onClose={closeModal} onConfirm={confirmAction} />}
+    {notice && <div className="toast" role="status">{notice}</div>}
+  </section>
 }
-
-function ConfirmDialog({ action, busy, onCancel, onConfirm }) {
-  const cancel = useRef(null)
-  const dialog = useRef(null)
-  useEffect(() => {
-    const previous = document.activeElement
-    cancel.current?.focus()
-    return () => previous?.focus()
-  }, [])
-  return createPortal(<div className="tm-page ov on" onClick={e => { if (e.target === e.currentTarget && !busy) onCancel() }} onKeyDown={e => {
-    if (e.key === 'Escape' && !busy) onCancel()
-    if (e.key === 'Tab') {
-      const buttons = [...dialog.current.querySelectorAll('button:not(:disabled)')]
-      const first = buttons[0], last = buttons[buttons.length - 1]
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus() }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus() }
-    }
-  }}><div className="mb" ref={dialog} role="dialog" aria-modal="true" aria-labelledby="tm-confirm-title"><h3 id="tm-confirm-title">{action.title}</h3><div>{action.name}</div><div>{action.rows.map(([key, value]) => <div className="kr" key={key}><span>{key}</span><b>{value}</b></div>)}</div><div className="tm-team-actions"><button ref={cancel} className="bt" type="button" disabled={busy} onClick={onCancel}>Cancel</button><button className={`bt ${action.type === 'delete' || action.type === 'team' ? 'd' : 'p nx'}`} type="button" disabled={busy} onClick={onConfirm}>{busy ? 'Saving…' : action.title}</button></div></div></div>, document.body)
+function Profile({account:p,dutyStatuses,onDutyChange,onEdit,onAction,busy}) {
+  const hq=/^BDRRM-HQCC-/i.test(p.account_id),active=p.is_active!==false
+  const skills=Array.isArray(p.skills) ? p.skills : String(p.skills || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean)
+  const field=(label,value,link) => <div className="dr" key={label}><dt>{label}</dt><dd>{value ? link ? <a href={`${link}${String(value).replace(/\s/g,'')}`}>{value}</a> : value : <span className="nr">Not recorded</span>}</dd></div>
+  return <><div className="card hd"><div className="hdr"><span className="av">{initials(p.full_name)}</span><div className="who"><span className="l" style={{margin:0}}>{hq ? 'Headquarters account' : 'Rescuer account'}</span><h1>{p.full_name}</h1><div className="sub">{p.account_id} · {p.title}</div><div className="chs"><Chip tone={active ? 'green' : 'gray'}>Account {active ? 'active' : 'inactive'}</Chip></div></div><div className="acts"><DutyStatusControl key={p.duty_status?.key} account={p} options={dutyStatuses} busy={busy} onSave={onDutyChange} /><button className="btn p" disabled={busy} onClick={onEdit}>Edit profile</button><details className="mw"><summary className="btn">Actions ▾</summary><div className="menu"><button disabled={busy} onClick={() => onAction(active ? 'deactivate' : 'reactivate')}>{active ? 'Deactivate account' : 'Reactivate account'}</button><hr /><button className="dg" disabled={busy} onClick={() => onAction('delete')}>Delete account…</button></div></details></div></div></div><div className="kp">{[['Team',p.team_name],['Role',p.title],['Blood type',p.blood_type]].map(([label,value]) => <div className="k" key={label}><small>{label}</small><b>{value || <span className="nr">Not recorded</span>}</b></div>)}</div><div className="cols"><div className="card"><h3>About</h3><dl>{field('Mobile',p.contact_number,'tel:')}{field('Email',p.email,'mailto:')}{field('Address',p.address)}{field('Gender',p.gender)}</dl></div><div className="card"><h3>Emergency contact</h3><dl>{field('Name',p.emergency_contact_name)}{field('Phone',p.emergency_contact_number,'tel:')}</dl></div></div>{!hq && <div className="card"><h3>Qualifications</h3><div className="chs" style={{margin:'0 0 6px'}}>{skills.length ? skills.map(skill => <span className="chip" key={skill}>{skill}</span>) : <span className="nr">Skills: Not recorded</span>}</div><dl>{field('Training notes',p.training_notes)}{field('Certification ref.',p.certification_reference)}{field('Equipment',p.equipment_notes)}</dl></div>}</>
 }
+function DutyStatusControl({account,options,busy,onSave}) {
+  const current=account.duty_status?.key || ''
+  const [value,setValue]=useState(current)
+  return <form className="duty-status-control" onSubmit={event => {event.preventDefault();onSave(account,value)}}>
+    <label htmlFor="profile-duty-status">Duty status</label>
+    <Chip tone={account.duty_status?.tone || 'gray'}>{account.duty_status?.label || 'Not recorded'}</Chip>
+    <div className="duty-status-actions"><select id="profile-duty-status" value={value} disabled={busy} onChange={event => setValue(event.target.value)}>
+      {!options.some(option => option.key===current) && <option value={current}>{account.duty_status?.label || 'Select status'}</option>}
+      {options.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
+    </select><button className="btn p" type="submit" disabled={busy || !value || value===current}>{busy ? 'Saving…' : 'Update status'}</button></div>
+  </form>
+}
+function Confirmation({action,record,roles,busy,onClose,onConfirm}) {
+  const [replacement,setReplacement]=useState(''),[error,setError]=useState('')
+  const titles={team:'Delete this team?',role:'Delete this role?',delete:'Delete this account?',deactivate:'Deactivate this account?',reactivate:'Reactivate this account?'}
+  const options=roles.filter(r => r.role_id!==record.role_id && r.base_role_key===record.base_role_key)
+  const rows=action==='team' ? [['Account assignments',`${record.member_count} members become Unassigned.`],['Roster records','Accounts stay on the roster.'],['Dispatch history','Past records are retained.']] : action==='role' ? [['Assigned accounts','Move to the selected replacement role.'],['Access','Updates to the replacement role’s permissions.']] : [['Login access',action==='reactivate' ? 'Sign-in is restored.' : 'The person can no longer sign in.'],['Roster record',action==='delete' ? 'Removed from the roster.' : action==='deactivate' ? 'Stays on the roster, marked Inactive.' : 'Marked Active again.'],['Dispatch history','Kept unchanged.']]
+  async function submit(event) {event.preventDefault();setError('');try{await onConfirm(replacement)}catch(failure){setError(rescuerErrorMessage(failure))}}
+  return <AccountDialog title={titles[action]} small busy={busy} onClose={onClose}><form onSubmit={submit}><div className="mb"><b>{record.full_name || record.team_name || record.role_name}</b><ul className="eff">{rows.map(([label,value]) => <li key={label}><b>{label}</b>{value}</li>)}</ul>{action==='role' && record.member_count>0 && <label className="fld">Replacement role<select required value={replacement} disabled={busy} onChange={event => setReplacement(event.target.value)}><option value="">Select…</option>{options.map(r => <option key={r.role_id} value={r.role_id}>{r.role_name}</option>)}</select></label>}{error && <div className="err" role="alert">{error}</div>}</div><div className="mf"><button className="btn" type="button" disabled={busy} onClick={onClose}>Cancel</button><button className={`btn ${['team','role','delete'].includes(action) ? 'dg2' : 'p'}`} type="submit" disabled={busy}>{busy ? 'Working…' : action==='reactivate' ? 'Reactivate' : action==='deactivate' ? 'Deactivate' : 'Delete'}</button></div></form></AccountDialog>
+}
+function Chip({tone,children}) {return <span className="chip"><i style={{background:`var(--${tone})`}} />{children}</span>}
+function initials(name='') {return name.trim().split(/\s+/).filter(Boolean).slice(0,2).map(s => s[0]).join('') || '?'}

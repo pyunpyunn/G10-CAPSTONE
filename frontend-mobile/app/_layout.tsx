@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import '@/utils/navigationRuntime';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { configureNotificationHandler } from '@/utils/pushNotifications';

@@ -60,7 +60,7 @@ class RescuerAccountQuery
             ->whereNull('r.deleted_at')
             ->select(['r.*', 'u.email', 'u.first_name as user_first_name', 'u.last_name as user_last_name',
                 'u.name as user_full_name', 'u.username as user_username', 'u.is_active', 'u.must_change_password',
-                'role.role_key', 'rt.team_name', 'rt.team_code', 'rt.team_type']);
+                'role.role_key', 'role.role_id as access_role_id', 'role.role_name as access_role_name', 'rt.team_name', 'rt.team_code', 'rt.team_type']);
     }
 
     public function findResponder(int $responderId): ?object

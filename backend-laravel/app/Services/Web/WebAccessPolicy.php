@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 
 class WebAccessPolicy
 {
-    private const MODULES = [
+    public const MODULES = [
         'super_admin' => [
             'dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests',
             'reports_documentation', 'personnel_access', 'profile', 'notifications', 'inquiries',
@@ -29,6 +29,9 @@ class WebAccessPolicy
             return [];
         }
 
+        if ($user->roleKey() === 'super_admin') return self::MODULES['super_admin'];
+        $role = $user->relationLoaded('role') ? $user->getRelation('role') : null;
+        if ($role?->web_modules !== null) return array_values(array_intersect((array) $role->web_modules, self::MODULES['super_admin']));
         return self::MODULES[$user->roleKey()] ?? [];
     }
 
@@ -42,11 +45,17 @@ class WebAccessPolicy
         if ($roleKey === 'hq_leader' && ! $user->isHqccLeader()) {
             return false;
         }
-        if (! in_array($module, self::MODULES[$roleKey] ?? [], true)) {
+        $modules = $this->modulesFor($user);
+        if ($module === 'global_search') {
+            return $modules !== [];
+        }
+        if (! in_array($module, $modules, true)) {
             return false;
         }
 
-        return $action !== 'approve' || in_array($roleKey, ['super_admin', 'hq_leader'], true);
+        if ($action !== 'approve' || $roleKey === 'super_admin') return true;
+        $role = $user->relationLoaded('role') ? $user->getRelation('role') : null;
+        return $role?->can_approve_requests !== null ? (bool) $role->can_approve_requests : $roleKey === 'hq_leader';
     }
 
     public function moduleForRequest(Request $request): ?string
@@ -59,7 +68,7 @@ class WebAccessPolicy
         if ($path === 'profile') return 'profile';
         if (str_starts_with($path, 'notifications')) return 'notifications';
         if (str_starts_with($path, 'rescuers') || str_starts_with($path, 'headquarters-accounts')) return 'personnel_access';
-        if ($path === 'global-search') return 'personnel_access';
+        if ($path === 'global-search') return 'global_search';
         if (str_starts_with($path, 'dashboard')) {
             return str_starts_with($path, 'dashboard/active-event') ? 'response_operations' : 'dashboard';
         }

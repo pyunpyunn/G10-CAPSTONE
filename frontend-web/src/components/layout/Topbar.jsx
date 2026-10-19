@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { searchGlobalRecords } from '../../api/globalSearchApi'
 import { markNotificationsRead, subscribeNotifications } from '../../api/notificationApi'
 import { notificationErrorMessage } from '../../utils/notificationHelpers'
-import { canOpenWebPage, hasAdminWebAccess } from '../../utils/personnelAccess'
+import { canOpenWebPage, hasAdminWebAccess, hasWebAccess } from '../../utils/personnelAccess'
 
 const searchTypes = [
   { id: 'pages', label: 'Pages' },
@@ -60,7 +60,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   const query = searchTerm.trim()
   const recordTypes = selectedTypes.filter((type) => type !== 'pages')
   const recordSearchKey = `${query}::${recordTypes.join('|')}`
-  const canSearchRecords = hasAdminWebAccess(user) && query.length >= 2 && recordTypes.length > 0
+  const canSearchRecords = hasWebAccess(user) && query.length >= 2 && recordTypes.length > 0
   const currentRecordSearch = canSearchRecords && recordSearch.key === recordSearchKey ? recordSearch : null
   const isSearching = currentRecordSearch?.status === 'loading'
   const searchError = currentRecordSearch?.error || ''

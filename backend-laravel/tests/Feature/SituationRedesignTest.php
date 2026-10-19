@@ -12,7 +12,7 @@ class SituationRedesignTest extends TestCase
 {
     public function test_draft_pdf_receives_preparer_reviewer_period_and_section_selection(): void
     {
-        $summary = ['report' => ['report_number' => 'DRAFT'], 'actions_text' => '', 'included_sections' => []];
+        $summary = ['schema_version'=>'4.0','report' => ['report_number' => 'DRAFT'], 'actions_text' => '', 'included_sections' => []];
         $this->mock(SituationReportService::class, function ($mock) use ($summary): void {
             $mock->shouldReceive('eventSummary')->once()->with('EV-1')->andReturn(response()->json(['data' => ['summary' => $summary]]));
         });
@@ -23,7 +23,7 @@ class SituationRedesignTest extends TestCase
                 $this->assertSame('CUSTOM-1', $summary['report']['report_number']);
                 $this->assertSame('Oct 16, 2026 8:00 AM', $summary['report']['period_start']);
                 $this->assertSame('Oct 16, 2026 6:00 PM', $summary['report']['period_end']);
-                $this->assertSame(['II', 'VIII'], $summary['included_sections']);
+                $this->assertSame(['II', 'VII'], $summary['included_sections']);
                 $this->assertSame('Recorded actions', $summary['actions_text']);
                 return true;
             }))->andReturn(['status' => 'success']);
@@ -32,14 +32,14 @@ class SituationRedesignTest extends TestCase
             'report_type' => 'situation', 'event_id' => 'EV-1', 'format' => 'pdf',
             'report_number' => 'CUSTOM-1', 'prepared_by' => 'Duty preparer', 'reviewed_by' => 'Duty reviewer',
             'period_start' => '2026-10-16T08:00', 'period_end' => '2026-10-16T18:00',
-            'included_sections' => ['II', 'VIII'], 'actions_text' => 'Recorded actions',
+            'included_sections' => ['II', 'VII'], 'actions_text' => 'Recorded actions',
         ]));
         $this->assertSame(200, $response->getStatusCode());
     }
 
     public function test_saved_snapshot_export_ignores_client_metadata_changes(): void
     {
-        $summary = ['report' => ['report_number' => 'SAVED', 'prepared_by' => 'Original'], 'actions_text' => 'Original actions', 'included_sections' => ['I']];
+        $summary = ['schema_version'=>'4.0','report' => ['report_number' => 'SAVED', 'prepared_by' => 'Original'], 'actions_text' => 'Original actions', 'included_sections' => ['I']];
         $this->mock(SituationReportService::class, function ($mock) use ($summary): void {
             $mock->shouldReceive('show')->once()->with(9)->andReturn(response()->json(['data' => ['report' => ['summary' => $summary]]]));
         });
@@ -54,7 +54,7 @@ class SituationRedesignTest extends TestCase
 
     public function test_saved_report_can_export_population_only_without_changing_its_metadata(): void
     {
-        $summary = ['report' => ['report_number' => 'SAVED', 'prepared_by' => 'Original'], 'actions_text' => 'Original actions', 'included_sections' => ['I', 'II', 'VIII']];
+        $summary = ['schema_version'=>'4.0','report' => ['report_number' => 'SAVED', 'prepared_by' => 'Original'], 'actions_text' => 'Original actions', 'included_sections' => ['I', 'II', 'VII']];
         $this->mock(SituationReportService::class, function ($mock) use ($summary): void {
             $mock->shouldReceive('show')->once()->with(9)->andReturn(response()->json(['data' => ['report' => ['summary' => $summary]]]));
         });

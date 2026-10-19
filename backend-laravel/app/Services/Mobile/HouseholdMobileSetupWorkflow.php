@@ -2,6 +2,7 @@
 
 namespace App\Services\Mobile;
 
+use App\Jobs\RecomputeRoutesForHousehold;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class HouseholdMobileSetupWorkflow
             $this->saveGeotag($householdId, $request->user()?->user_id, $validated, now());
             $this->support->writeAuditLog($request, 'mobile_household_geotag', 'households', $householdId, $validated);
         });
+        $this->queueRouteRecompute($householdId);
 
         return response()->json(['message' => 'Household geotag saved.', 'data' => ['geographic_classification' => app(\App\Services\Shared\HouseholdGeographicClassifier::class)->resolve((float) $validated['latitude'], (float) $validated['longitude'])]]);
     }
@@ -80,6 +82,7 @@ class HouseholdMobileSetupWorkflow
             $this->saveTrackingLog($householdId, $deviceId, $validated, 'setup_pin', $now);
             $this->support->writeAuditLog(request(), 'mobile_household_setup', 'households', $householdId, $validated);
         });
+        $this->queueRouteRecompute($householdId);
 
         return response()->json([
             'message' => 'Household mobile setup saved.',
@@ -158,6 +161,13 @@ class HouseholdMobileSetupWorkflow
             $data,
             $this->support->nextId('geotagged_locations', 'location_id')
         ));
+    }
+
+    private function queueRouteRecompute(string $householdId): void
+    {
+        if (Schema::hasTable('cached_routes')) {
+            RecomputeRoutesForHousehold::dispatch($householdId)->afterCommit();
+        }
     }
 
     private function saveDevice(string $householdId, ?string $userId, array $validated, $now): int

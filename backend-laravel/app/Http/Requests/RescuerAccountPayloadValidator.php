@@ -51,6 +51,7 @@ class RescuerAccountPayloadValidator
             'team_name' => [$isUpdate ? 'nullable' : 'required', 'string', 'max:100'],
             'team_code' => ['nullable', 'string', 'max:20'],
             'team_type' => ['nullable', 'string', 'max:80'],
+            'role_id' => ['nullable', 'integer', 'exists:roles,role_id'],
             'title' => ['required', 'string', 'max:100'],
             'duty_status' => ['required', Rule::in(array_keys(config('rescuers.duty_statuses')))],
             'skills' => ['nullable', 'string', 'max:1000'],
