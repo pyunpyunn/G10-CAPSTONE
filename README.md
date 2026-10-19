@@ -145,6 +145,8 @@ Important development rule:
 
 ## Key Documentation
 
+- [System use cases](docs/USE_CASES.md) — actors, household/rescuer/HQ workflows, partner exchange, and must-haves traceability.
+- [Must-haves implementation audit](docs/MUST_HAVES_IMPLEMENTATION_AUDIT.md) — implementation evidence and remaining gaps.
 - `docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md`
 - `docs/RESQPERATION_G10_DB_READINESS_CHECK.md`
 - `docs/RESQPERATION_G10_SAFE_SAMPLE_SEED_PLAN.md`

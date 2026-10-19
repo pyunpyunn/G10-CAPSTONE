@@ -2,7 +2,7 @@ import { statusColor } from '@/constants/statusPalette';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as Location from 'expo-location';
+import { useMapGps } from '@/hooks/useMapGps';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineTime } from '@/utils/time';
@@ -24,9 +24,11 @@ const defaultRegion = {
 };
 
 export function RescueMapScreen({ assignments, evacuationCenters = [], activeAssignment, selectedAssignment, onSendLocation }: RescueMapProps) {
-  const watcher = useRef<Location.LocationSubscription | null>(null);
   const [tracking, setTracking] = useState(false);
-  const [position, setPosition] = useState<any>(null);
+  const { position, error: gpsError } = useMapGps(tracking);
+  const sendLocation = useRef(onSendLocation);
+  sendLocation.current = onSendLocation;
+  const sending = useRef(false);
   const [lastUpdated, setLastUpdated] = useState('');
   const [locError, setLocError] = useState('');
   const [syncing, setSyncing] = useState(false);
@@ -34,58 +36,19 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
   const [showAssignedRoutes, setShowAssignedRoutes] = useState(true);
 
   useEffect(() => {
-    return () => {
-      watcher.current?.remove();
-    };
-  }, []);
-
-  async function startTracking() {
-    const permission = await Location.requestForegroundPermissionsAsync();
-
-    if (permission.status !== 'granted') {
-      setLocError('Location permission denied. Enable location access to sync your field position.');
-      return;
-    }
-
-    setLocError('');
-    setTracking(true);
-
-    watcher.current = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.High,
-        timeInterval: 5000,
-        distanceInterval: 3,
-      },
-      async (location) => {
-        const nextPosition = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          accuracy_m: location.coords.accuracy,
-        };
-
-        setPosition(nextPosition);
-        setLastUpdated(formatPhilippineTime());
-
-        if (activeAssignment?.assignment_id) {
-          try {
-            setSyncing(true);
-            await onSendLocation(activeAssignment.assignment_id, nextPosition);
-            setLocError('');
-          } catch {
-            setLocError('GPS is active, but the latest location could not be saved to the backend.');
-          } finally {
-            setSyncing(false);
-          }
-        }
-      }
-    );
-  }
+    if (!tracking || !position) return;
+    setLastUpdated(formatPhilippineTime());
+    if (!activeAssignment?.assignment_id || sending.current) return;
+    sending.current = true;
+    setSyncing(true);
+    void sendLocation.current(activeAssignment.assignment_id, position)
+      .then(() => setLocError(''))
+      .catch(() => setLocError('GPS is active, but the latest location could not be saved to the backend.'))
+      .finally(() => { sending.current = false; setSyncing(false); });
+  }, [position, tracking, activeAssignment?.assignment_id]);
 
   function stopTracking() {
-    watcher.current?.remove();
-    watcher.current = null;
     setTracking(false);
-    setPosition(null);
     setLastUpdated('');
   }
 
@@ -99,7 +62,7 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
       Alert.alert('No active assignment', 'You can open the map, but location sync needs an active dispatch assignment.');
     }
 
-    startTracking();
+    setTracking(true);
   }
 
   const activeAssignments = assignments.filter((item) =>
@@ -127,7 +90,6 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
       description: assignment.status_label || 'Active dispatch',
       color: statusColor(assignment.status_key),
     })) : []),
-    ...(position ? [{ ...position, label: 'My live GPS', description: tracking ? 'Location tracking active' : '', color: palette.navActive }] : []),
   ];
   const mapRoutes = showAssignedRoutes ? mappedAssignments.flatMap((assignment) => {
     const route = assignment.route || {};
@@ -194,10 +156,10 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
           </Pressable>
         </View>
 
-        {locError ? (
+        {locError || gpsError ? (
           <View style={styles.errorStrip}>
             <Ionicons name="alert-circle-outline" size={18} color={palette.unsafe} />
-            <Text style={styles.errorText}>{locError}</Text>
+            <Text style={styles.errorText}>{gpsError || locError}</Text>
           </View>
         ) : null}
 
@@ -213,7 +175,8 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
         <MobileLeafletMap
           markers={mapMarkers}
           routes={mapRoutes}
-          center={position || (focusedAssignment?.latitude && focusedAssignment?.longitude
+          followPosition={tracking ? position : null}
+          center={(focusedAssignment?.latitude && focusedAssignment?.longitude
             ? { latitude: Number(focusedAssignment.latitude), longitude: Number(focusedAssignment.longitude) }
             : defaultRegion)}
         />

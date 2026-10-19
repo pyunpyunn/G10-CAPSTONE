@@ -74,6 +74,42 @@ function loadMapHtml() {
   return exported.mobileLeafletHtml;
 }
 
+test('GPS zooms once, moves one marker, permits panning and recenters on demand', () => {
+  const script = loadMapHtml()({ markers: [], routes: [] }).match(/<script>\s*([\s\S]*?)<\/script>/)[1];
+  const views = [], mapEvents = {}, buttonEvents = {};
+  let markers = 0, moves = 0, removed = 0, zoom = 14;
+  const button = { style: {}, setAttribute() {} };
+  const map = { setView(point, level) { views.push({ point, level }); zoom = level; return this; },
+    on: (name, fn) => { mapEvents[name] = fn; }, getZoom: () => zoom,
+    removeLayer() { removed++; } };
+  const window = {};
+  vm.runInNewContext(script, { window, L: {
+    map: () => map, tileLayer: () => ({ addTo() {} }),
+    latLngBounds: () => ({ isValid: () => false }),
+    control: () => ({ addTo() { this.onAdd(); } }),
+    DomUtil: { create: (tag) => tag === 'button' ? button : {} },
+    DomEvent: { disableClickPropagation() {}, on: (_, name, fn) => { buttonEvents[name] = fn; } },
+    circleMarker: () => { markers++; return { addTo() { return this; }, setLatLng() { moves++; } }; },
+  } });
+  window.setGpsPosition([10.29, 123.88]);
+  assert.equal(views.at(-1).level, 17);
+  zoom = 18;
+  window.setGpsPosition([10.291, 123.88]);
+  assert.equal(views.at(-1).level, 18, 'preserve manual zoom after initial GPS fix');
+  assert.equal(markers, 1);
+  assert.equal(moves, 1);
+  mapEvents.dragstart();
+  const before = views.length;
+  window.setGpsPosition([10.292, 123.88]);
+  assert.equal(views.length, before, 'panning pauses camera follow but marker still moves');
+  buttonEvents.click();
+  assert.equal(views.length, before + 1);
+  assert.equal(views.at(-1).level, 17);
+  window.setGpsPosition(null);
+  assert.equal(removed, 1);
+  assert.equal(button.disabled, true);
+});
+
 test('household picker fits Mambaling borders and publishes the draggable pin on release', () => {
   const html = loadMapHtml()({ markers: [], routes: [], geotagPicker: true });
   const script = html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
