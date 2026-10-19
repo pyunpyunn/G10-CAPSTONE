@@ -118,6 +118,7 @@ class OneSignalNotificationService
                     'include_subscription_ids' => array_values($playerIds),
                     'headings' => ['en' => $title],
                     'contents' => ['en' => $message],
+                    'priority' => 10,
                     'data' => $data,
                 ]);
 

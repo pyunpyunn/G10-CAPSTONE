@@ -85,6 +85,7 @@ class DisasterBroadcastPushTest extends TestCase
         }
         Http::assertSentCount(2);
         Http::assertSent(fn ($request) => $request['idempotency_key'] === $plan['keys'][0]
+            && $request['priority'] === 10
             && $request['include_subscription_ids'] === ['subscription-0']
             && $request->header('Authorization') === ['Key test-key']);
     }
@@ -144,6 +145,27 @@ class DisasterBroadcastPushTest extends TestCase
             && $request['data']['broadcast_id'] === '42');
         Http::assertSent(fn ($request) => array_column($request['data']['status_options'], 'key') === ['safe', 'unsafe']
             && array_column($request['data']['status_options'], 'safety_basis') === ['safe', 'unsafe']);
+    }
+
+    public function test_visible_push_contains_report_prompt_and_all_four_exact_configured_status_labels_in_order(): void
+    {
+        Http::fake(['*' => Http::response(['id' => 'notification-id'], 200)]);
+        $options = [
+            ['key' => 'all_clear', 'label' => 'All Clear Here', 'safety_basis' => 'safe'],
+            ['key' => 'needs_supplies', 'label' => 'Need Food & Water', 'safety_basis' => 'unsafe'],
+            ['key' => 'evacuated', 'label' => 'At Evacuation Site', 'safety_basis' => 'safe'],
+            ['key' => 'need_help', 'label' => 'Rescue Us Now', 'safety_basis' => 'unsafe'],
+        ];
+        $result = app(\App\Services\Web\DisasterBroadcastWorkflow::class)->sendBroadcastPush(43, [
+            'broadcast_title' => 'Signal No. 4', 'message' => 'Please evacuate to nearest site',
+            'scope_type' => 'barangay_wide', 'allowed_statuses' => array_column($options, 'key'),
+        ], ['puroks' => [], 'status_options' => $options], (object) ['event_id' => 'EVT-TEST']);
+        $this->assertSame('sent', $result['status']);
+        Http::assertSent(fn ($request) => $request['headings']['en'] === 'Signal No. 4'
+            && $request['contents']['en'] === "Please evacuate to nearest site\n\nPlease report status now\n1. All Clear Here\n2. Need Food & Water\n3. At Evacuation Site\n4. Rescue Us Now"
+            && $request['data']['status_options'] === $options
+            && $request['data']['allowed_statuses'] === array_column($options, 'key')
+            && $request['data']['report_status_prompt'] === 'Please report status now');
     }
 
     public function test_permanent_http_errors_are_not_retried_inline(): void

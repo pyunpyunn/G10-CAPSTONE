@@ -3,6 +3,7 @@ import { Alert, AppState, Platform } from 'react-native';
 import { notifyDisasterBroadcast } from '@/utils/mobileReadCache';
 import { api } from '@/api/client';
 import { savePushRegistration } from '@/api/device';
+import { handleForegroundNotification } from './foregroundNotification';
 
 export type PushRegistration = {
   playerId: string | null;
@@ -67,9 +68,7 @@ async function initializeOneSignal() {
     OneSignal.initialize(appId);
     OneSignal.User.pushSubscription.addEventListener('change', () => { void syncCurrentSubscription(); });
     AppState.addEventListener('change', (state) => { if (state === 'active') void syncCurrentSubscription(); });
-    OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event: { notification: { additionalData?: { type?: string } } }) => {
-      if (event.notification.additionalData?.type === 'disaster_broadcast') notifyDisasterBroadcast();
-    });
+    OneSignal.Notifications.addEventListener('foregroundWillDisplay', handleForegroundNotification);
     OneSignal.Notifications.addEventListener('click', (event: { notification: { additionalData?: { type?: string } } }) => {
       if (event.notification.additionalData?.type === 'disaster_broadcast') notifyDisasterBroadcast();
     });

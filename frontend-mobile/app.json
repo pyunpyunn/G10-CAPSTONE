@@ -87,6 +87,7 @@
             ],
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
+            "enableBundleCompression": true,
             "useLegacyPackaging": true
           }
         }
