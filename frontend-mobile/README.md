@@ -7,6 +7,12 @@ and UI assets; it does not need Expo Go, a QR scan, or a running Metro server.
 See [ANDROID_RELEASE.md](./ANDROID_RELEASE.md) for installation, hosting,
 OneSignal configuration, device requirements, and measured build sizes.
 
+[**Download Android APK — 24.3 MB (version 1.0.0, build 6)**](https://github.com/pyunpyunn/G10-CAPSTONE/releases/download/v1.0.0-build6/RESQPERATION.apk)
+
+For 64-bit Android 7.0+. Follow [FIRST_RUN_SETUP.md](./FIRST_RUN_SETUP.md) and
+save your Tailscale/LAN address in **Server settings** before signing in. The
+original default in this APK uses the retired ngrok tunnel.
+
 ## Build the downloadable APK
 
 ```powershell

@@ -2,7 +2,7 @@
 
 ## Verified release — version 1.0.0, build 6
 
-[Download the signed APK](https://expo.dev/artifacts/eas/Mzha_mGjzpZvzzOu8Mptwscg49NLoZm3IiWkyy_mhwI.apk)
+[Download the signed APK from GitHub](https://github.com/pyunpyunn/G10-CAPSTONE/releases/download/v1.0.0-build6/RESQPERATION.apk)
 
 Local copy: `releases/RESQPERATION.apk`.
 
@@ -19,8 +19,7 @@ Local copy: `releases/RESQPERATION.apk`.
   `ac968ae871baf84e84066c658b8e28a2b18b2658c09918cb66f99167d3dcc91c`.
 - [EAS build record](https://expo.dev/accounts/kathlnbarro/projects/frontend-mobile/builds/baa938bc-c3a4-48a5-9b40-62a5c5442969).
 
-The EAS artifact record lists expiry on 1 November 2026. Keep the local APK for
-redistribution after the hosted link expires.
+The GitHub Release hosts the APK independently of the Expo artifact's expiry.
 
 One installed RESQPERATION app supports both household and rescuer accounts.
 The account role selects the existing console after login. The production build
