@@ -58,6 +58,8 @@ export function mobileLeafletHtml({
     const map = L.map('map', { zoomControl: true }).setView([data.center.latitude, data.center.longitude], 14);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
+      keepBuffer: 1,
+      updateWhenIdle: true,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
     const bounds = L.latLngBounds([]);
@@ -132,6 +134,52 @@ export function mobileLeafletHtml({
       coordinates.forEach((point) => bounds.extend(point));
     });
     if (!data.geotagPicker && bounds.isValid()) map.fitBounds(bounds.pad(0.18), { maxZoom: 16 });
+    let gpsMarker = null;
+    let gpsPosition = null;
+    let followGps = true;
+    let initialGpsZoom = true;
+    if (!data.geotagPicker) {
+      const followControl = L.control({ position: 'topright' });
+      let followButton;
+      followControl.onAdd = () => {
+        const container = L.DomUtil.create('div', 'leaflet-bar');
+        followButton = L.DomUtil.create('button', '', container);
+        followButton.textContent = 'Follow GPS';
+        followButton.setAttribute('aria-label', 'Follow GPS position');
+        followButton.style.cssText = 'background:white;border:0;padding:9px;font:13px system-ui;min-height:40px';
+        followButton.disabled = true;
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(followButton, 'click', () => {
+          if (!gpsPosition) return;
+          followGps = true;
+          initialGpsZoom = true;
+          window.setGpsPosition(gpsPosition);
+        });
+        return container;
+      };
+      followControl.addTo(map);
+      map.on('dragstart', () => { followGps = false; if (followButton) followButton.textContent = 'Follow GPS'; });
+      window.setGpsPosition = (point) => {
+        if (!point) {
+          if (gpsMarker) { map.removeLayer(gpsMarker); gpsMarker = null; }
+          gpsPosition = null;
+          followGps = true;
+          if (followButton) { followButton.disabled = true; followButton.textContent = 'Follow GPS'; }
+          initialGpsZoom = true;
+          return;
+        }
+        if (!Array.isArray(point) || !Number.isFinite(point[0]) || !Number.isFinite(point[1])
+          || Math.abs(point[0]) > 90 || Math.abs(point[1]) > 180) return;
+        gpsPosition = point;
+        if (!gpsMarker) gpsMarker = L.circleMarker(point, { radius: 8, color: '#fff', weight: 3, fillColor: '#1479ed', fillOpacity: 1 }).addTo(map);
+        else gpsMarker.setLatLng(point);
+        if (followButton) { followButton.disabled = false; followButton.textContent = followGps ? 'Following GPS' : 'Follow GPS'; }
+        if (followGps) {
+          map.setView(point, initialGpsZoom ? 17 : map.getZoom(), { animate: false });
+          initialGpsZoom = false;
+        }
+      };
+    }
   </script>
 </body>
 </html>`;

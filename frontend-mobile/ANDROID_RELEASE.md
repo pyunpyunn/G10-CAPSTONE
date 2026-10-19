@@ -795,6 +795,12 @@ Stay logged in for push identity registration.
 
 ### Maps/offline navigation
 
+For the lightweight GPS-follow controls and the current offline-verification
+gates, see [GPS follow and offline checks](../docs/GPS_FOLLOW_AND_OFFLINE_CHECKS.md).
+Household users tap **Use live GPS**; rescuers tap **Track Me**. Both can drag
+to pause camera following and tap **Follow GPS** to recenter. This change needs
+an updated APK; it does not make the existing online household map fully offline.
+
 Online maps/routes need their configured providers/network. For a Google Maps
 build, `app.config.js` reads `EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY` when supplied.
 Use an appropriately restricted valid key and test maps on the signed APK.

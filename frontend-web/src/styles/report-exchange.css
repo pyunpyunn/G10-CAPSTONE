@@ -15,3 +15,221 @@
 @media(prefers-reduced-motion:reduce){.exchange-dialog{animation:none}.exchange-page *{transition:none!important;animation:none!important}}
 
 .household-export-scope .g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.household-export-scope .household-scope-note{font-size:11px;color:#64748b}
+
+/* Match the dashboard's page gutters, compact panels and shared theme tokens.
+   Presentation only: the report page's copy and workflows stay in its JSX. */
+.exchange-page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 26px 22px 104px;
+  align-self: stretch;
+  color: var(--color-text-2);
+  font: var(--font-size-base)/1.5 var(--font-sans);
+}
+
+.exchange-toolbar {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 13px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.exchange-toolbar > .ex-button { margin: 0; }
+.exchange-tabs { flex-wrap: wrap; align-items: center; gap: 4px; }
+.exchange-tabs > button {
+  min-height: 40px;
+  gap: 7px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.exchange-tabs > button:hover { background: var(--color-bg-secondary); }
+.exchange-tabs > button.active {
+  border-color: var(--line);
+  background: var(--color-bg-secondary);
+  color: var(--nav-strong);
+}
+.exchange-tabs > button > span { border-radius: 999px; padding: 1px 6px; }
+
+.exchange-page .ex-button,
+.exchange-dialog .ex-button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: var(--font-weight-strong);
+}
+.exchange-page .ex-button.icon,
+.exchange-dialog .ex-button.icon { width: 40px; min-width: 40px; padding: 8px; }
+.exchange-page .ex-button.primary,
+.exchange-dialog .ex-button.primary { background: var(--nav-strong); border-color: var(--nav-strong); }
+.exchange-page .ex-button.primary:hover:not(:disabled),
+.exchange-dialog .ex-button.primary:hover:not(:disabled) { background: var(--color-nav-hover); }
+
+.exchange-inbox,
+.exchange-workflow-panel {
+  min-width: 0;
+  border-color: var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: none;
+}
+.exchange-inbox-tools {
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+  border-color: var(--line);
+}
+.exchange-filter {
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--color-bg-page);
+}
+.exchange-filter button { min-height: 32px; padding: 6px 10px; }
+.exchange-filter button.active { background: var(--card); color: var(--nav-strong); }
+.exchange-tools-right { flex-wrap: wrap; justify-content: flex-end; gap: 8px; min-width: 0; }
+.exchange-search { min-height: 40px; padding: 8px 11px; border-radius: 8px; }
+.exchange-search input { width: 180px; font-size: 12px; }
+.exchange-system-filter { min-height: 40px; border-radius: 8px; font-size: 12px; }
+
+.exchange-list-heading,
+.exchange-request-card {
+  grid-template-columns: minmax(145px, 1.1fr) minmax(180px, 1.7fr) 80px 145px 70px;
+  gap: 16px;
+  padding-right: 16px;
+  padding-left: 16px;
+}
+.exchange-list-heading {
+  padding-top: 11px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--line);
+  background: var(--color-bg-secondary);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-strong);
+}
+.exchange-request-card { min-height: 82px; padding-top: 16px; padding-bottom: 16px; border-color: var(--line); }
+.exchange-request-card:hover { background: var(--color-bg-page); }
+.exchange-request-origin,
+.exchange-request-origin > span:last-child,
+.exchange-request-body { min-width: 0; }
+.exchange-request-origin strong,
+.exchange-request-subject { color: var(--color-text-2); font-size: 12px; font-weight: var(--font-weight-strong); }
+.exchange-request-origin small,
+.exchange-request-date { color: var(--muted); font-size: 11px; }
+.exchange-request-subject { overflow-wrap: anywhere; }
+.exchange-system-avatar { border-radius: 8px; }
+.exchange-review-action { color: var(--nav-strong); font-weight: var(--font-weight-strong); }
+.exchange-badge { border-radius: 999px; padding: 3px 8px; }
+.exchange-pagination { flex-wrap: wrap; gap: 12px; padding: 12px 16px; border-color: var(--line); background: var(--card); }
+.exchange-empty { min-height: 250px; padding: 48px 20px; color: var(--muted); }
+.exchange-empty h3 { color: var(--color-text-2); font-size: 15px; font-weight: var(--font-weight-strong); }
+.exchange-empty p { font-size: 12px; }
+.exchange-alert { margin-bottom: 13px; border-radius: var(--radius); }
+
+.exchange-panel-heading {
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 58px;
+  padding: 12px 16px;
+  border-color: var(--line);
+  background: var(--card);
+}
+.exchange-panel-heading h2 { margin: 0; color: var(--color-text-2); font-size: 13px; font-weight: var(--font-weight-strong); }
+.exchange-provider-grid { gap: 13px; padding: 16px; }
+.exchange-provider-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: none;
+  transition: border-color .15s, background .15s;
+}
+.exchange-provider-card:hover { transform: none; border-color: var(--color-border-strong); background: var(--color-bg-page); box-shadow: none; }
+.exchange-provider-card h3 { color: var(--color-text-2); font-size: 17px; font-weight: var(--font-weight-strong); }
+.exchange-provider-bottom { color: var(--nav-strong); border-color: var(--line); font-size: 12px; }
+.exchange-section-list { padding: 0 16px; }
+.exchange-section-card { min-height: 76px; gap: 14px; padding: 14px 0; border-color: var(--line); }
+.exchange-section-card:hover { background: var(--color-bg-page); }
+.exchange-section-name { min-width: 0; }
+.exchange-section-name strong { color: var(--color-text-2); font-size: 12px; font-weight: var(--font-weight-strong); overflow-wrap: anywhere; }
+.exchange-section-name small { color: var(--muted); font-size: 10px; }
+.exchange-icon { border: 1px solid var(--line); border-radius: 8px; background: var(--color-bg-secondary); color: var(--nav-strong); }
+.exchange-section-action { color: var(--nav-strong); }
+
+.exchange-dialog {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--color-text-2);
+  box-shadow: 0 20px 60px rgb(15 28 45 / 20%);
+}
+.exchange-dialog > header { padding: 16px 20px; border-color: var(--line); background: var(--color-bg-page); }
+.exchange-dialog > header h2 { color: var(--color-text-2); font-size: 18px; font-weight: var(--font-weight-strong); }
+.exchange-dialog .exchange-eyebrow { color: var(--muted); }
+.exchange-dialog .exchange-field input,
+.exchange-dialog .exchange-field select,
+.exchange-dialog .exchange-field textarea { min-height: 40px; border-color: var(--line); border-radius: 8px; font-size: 12px; }
+.exchange-dialog .exchange-formats label { border-radius: 8px; }
+.exchange-dialog .external-report-reference .external-options { border: 1px solid var(--line); border-radius: var(--radius); background: var(--color-bg-page); }
+.exchange-dialog .external-report-reference .report-types .bt { border-color: var(--line); border-radius: var(--radius); box-shadow: none; }
+
+@media (max-width: 1100px) {
+  .exchange-list-heading,
+  .exchange-request-card { grid-template-columns: minmax(130px, 1fr) minmax(160px, 1.4fr) 65px 125px 65px; gap: 12px; }
+  .exchange-tools-right { flex: 1 1 auto; }
+  .exchange-search { flex: 1 1 160px; }
+  .exchange-search input { width: 100%; }
+}
+
+@media (max-width: 800px) {
+  .exchange-page { padding: 18px 16px 90px; }
+  .exchange-toolbar { align-items: center; }
+  .exchange-toolbar > .ex-button { min-width: 0; padding: 8px 12px; gap: 8px; font-size: 12px; }
+  .exchange-list-heading { display: none; }
+  .exchange-request-card { grid-template-columns: minmax(130px, 1fr) minmax(140px, 1.4fr) 65px; gap: 8px 12px; }
+  .exchange-request-date { grid-column: 1; padding-left: 46px; }
+  .exchange-review-action { grid-column: 3; grid-row: 1 / 3; }
+  .exchange-file-type { grid-column: 2; grid-row: 2; }
+  .exchange-provider-grid { padding: 14px; }
+  .exchange-provider-card { padding: 16px; }
+}
+
+@media (max-width: 560px) {
+  .exchange-page { padding: 14px 12px 80px; }
+  .exchange-toolbar { gap: 10px; }
+  .exchange-tabs { width: 100%; display: grid; grid-template-columns: 1fr; }
+  .exchange-tabs > button { justify-content: flex-start; white-space: normal; }
+  .exchange-toolbar > .ex-button { width: 100%; }
+  .exchange-inbox-tools { padding: 12px; }
+  .exchange-filter { width: 100%; justify-content: space-between; }
+  .exchange-filter button { gap: 4px; padding: 6px 8px; }
+  .exchange-tools-right { width: 100%; }
+  .exchange-search { flex-basis: 100%; }
+  .exchange-system-filter { flex: 1; min-width: 0; }
+  .exchange-request-card { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 14px 12px; }
+  .exchange-request-origin { grid-column: 1; grid-row: 1; }
+  .exchange-request-body { grid-column: 1 / -1; grid-row: 2; }
+  .exchange-file-type { grid-column: 1; grid-row: 3; }
+  .exchange-request-date { grid-column: 1; grid-row: 4; padding: 0; }
+  .exchange-review-action { grid-column: 2; grid-row: 1; }
+  .exchange-provider-card { grid-template-columns: 43px minmax(0, 1fr); }
+  .exchange-provider-bottom { grid-column: 1 / -1; grid-row: auto; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .exchange-section-list { padding: 0 12px; }
+  .exchange-section-card { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 8px 12px; }
+  .exchange-section-formats { grid-column: 2; margin: 0; }
+  .exchange-section-action { grid-column: 2; }
+  .exchange-panel-heading { padding: 12px; }
+  .exchange-dialog > header { padding: 14px 16px; }
+}

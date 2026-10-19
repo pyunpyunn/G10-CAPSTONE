@@ -19,6 +19,7 @@ export function MobileLeafletMap({
   geotagPicker = false,
   selectedPoint,
   onPinMoving,
+  followPosition,
 }: {
   markers: LeafletPoint[];
   routes: LeafletRoute[];
@@ -28,6 +29,7 @@ export function MobileLeafletMap({
   geotagPicker?: boolean;
   selectedPoint?: { latitude: number; longitude: number } | null;
   onPinMoving?: () => void;
+  followPosition?: { latitude: number; longitude: number } | null;
 }) {
   const webView = useRef<import('react-native-webview').WebView>(null);
   const html = geotagPicker
@@ -42,6 +44,14 @@ export function MobileLeafletMap({
     }
   }, [latitude, longitude]);
   useEffect(updatePin, [updatePin]);
+  const gpsLatitude = followPosition?.latitude;
+  const gpsLongitude = followPosition?.longitude;
+  const updateGps = useCallback(() => {
+    const point = Number.isFinite(gpsLatitude) && Number.isFinite(gpsLongitude)
+      ? `[${gpsLatitude},${gpsLongitude}]` : 'null';
+    webView.current?.injectJavaScript(`window.setGpsPosition?.(${point}); true;`);
+  }, [gpsLatitude, gpsLongitude]);
+  useEffect(updateGps, [updateGps]);
   if (!WebView) {
     return (
       <View style={[styles.frame, styles.updatePrompt, { height }]}>
@@ -66,7 +76,7 @@ export function MobileLeafletMap({
         ref={webView}
         originWhitelist={['*']}
         source={source}
-        onLoadEnd={updatePin}
+        onLoadEnd={() => { updatePin(); updateGps(); }}
         onMessage={(event) => {
           try {
             const point = JSON.parse(event.nativeEvent.data);
