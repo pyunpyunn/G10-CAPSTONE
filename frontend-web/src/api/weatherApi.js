@@ -21,3 +21,7 @@ export async function refreshEventWeather(eventId) {
   const response = await api.post(`/disaster-events/${eventId}/weather-logs/refresh`, null, { timeout: 20000 })
   return response.data.data
 }
+
+export async function getOfficialWeatherAdvisories() {
+  return (await api.get('/weather/official-advisories', { timeout:18000 })).data.data
+}

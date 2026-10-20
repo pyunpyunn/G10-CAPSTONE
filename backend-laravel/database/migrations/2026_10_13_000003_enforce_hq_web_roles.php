@@ -3,7 +3,6 @@
 use App\Services\Web\HeadquartersTeamSupport;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -32,15 +31,6 @@ return new class extends Migration
                 $teams->synchronizeLeadership((int) $team->team_id, $team->leader_responder_id ? (int) $team->leader_responder_id : null);
             }
 
-            if (Schema::hasColumn('users', 'first_name') && Schema::hasColumn('users', 'last_name') && Schema::hasColumn('users', 'name')) {
-                DB::table('users')->where('username', 'BDRRM-HQCC-001')
-                    ->update([
-                        'first_name' => 'Command Center',
-                        'last_name' => 'Personnel 1',
-                        'name' => 'Command Center Personnel 1',
-                        'updated_at' => now(),
-                    ]);
-            }
         });
     }
 

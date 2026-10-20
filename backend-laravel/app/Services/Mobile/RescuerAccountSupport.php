@@ -10,9 +10,11 @@ use Illuminate\Validation\ValidationException;
 
 class RescuerAccountSupport
 {
-    private const ACCOUNT_PREFIX = 'BDRRM';
-    private const ACCOUNT_START_SEQUENCE = 0;
-    private const ACCOUNT_SEQUENCE_LENGTH = 3;
+    private const TEAM_ID_BASES = [
+        'SRR' => 1000, 'ECM' => 2000, 'HFAPS' => 3000, 'BHERT' => 3500,
+        'SST' => 4000, 'FMT' => 5000, 'RDT' => 6000, 'TRT' => 7000,
+        'CLT' => 8000, 'RDANA' => 9000, 'PDANA' => 10000,
+    ];
     public function validatePayload(Request $request, bool $isUpdate = false): array
     {
         $validated = app(\App\Http\Requests\RescuerAccountPayloadValidator::class)->validate($request, $isUpdate);
@@ -27,6 +29,12 @@ class RescuerAccountSupport
         }
 
         $teamCode = $this->teamCodeFromPayload($validated);
+
+        if (! $isUpdate && $teamCode !== 'HQCC' && ! $this->isSupportedMobileTeamCode($teamCode)) {
+            throw ValidationException::withMessages([
+                'team_name' => ['Mobile rescuer accounts are limited to Annex H field teams: SRR, ECM, HFAPS, BHERT, SST, FMT, RDT, TRT, CLT, RDANA, and PDANA.'],
+            ]);
+        }
 
         if (! $isUpdate && empty($validated['account_id'])) {
             $validated['account_id'] = $this->nextAccountId($teamCode);
@@ -73,9 +81,11 @@ class RescuerAccountSupport
         }
         $hqTeam = strtoupper($team->team_code) === 'HQCC'
             || in_array(strtoupper($team->team_type), ['HQ', 'HQCC', 'HEADQUARTERS'], true);
-        $hqAccount = str_starts_with(strtoupper($accountId), 'BDRRM-HQCC-');
+        $role = ! empty($validated['role_id']) ? DB::table('roles')->where('role_id', $validated['role_id'])->first() : null;
+        $baseRole = strtolower((string) ($role->base_role_key ?? $role->role_key ?? ''));
+        $hqAccount = in_array($baseRole, ['chair', 'operations_admin', 'mitigation_prevention', 'preparedness', 'response', 'recovery_rehabilitation'], true);
         if ($hqAccount !== $hqTeam) {
-            throw ValidationException::withMessages(['team_name' => ['HQ personnel belong to HQCC teams; rescuers belong to rescue teams.']]);
+            throw ValidationException::withMessages(['team_name' => ['Web roles do not belong to field teams; TL/TM accounts must be assigned to a field team.']]);
         }
     }
 
@@ -91,7 +101,7 @@ class RescuerAccountSupport
     public function rescuerRoleId(): int
     {
         $roleId = DB::table('roles')
-            ->where('role_key', 'rescuer')
+            ->where('role_key', 'tm')
             ->value('role_id');
 
         if (! $roleId) {
@@ -106,12 +116,12 @@ class RescuerAccountSupport
     public function adminRoleId(): int
     {
         $roleId = DB::table('roles')
-            ->whereIn('role_key', ['admin', 'hq_admin'])
+            ->where('role_key', 'operations_admin')
             ->value('role_id');
 
         if (! $roleId) {
             throw ValidationException::withMessages([
-                'role' => ['The admin role is missing in the roles table. Ask the DB member to check roles.'],
+                'role' => ['The Operations/Admin role is missing in the roles table.'],
             ]);
         }
 
@@ -188,7 +198,8 @@ class RescuerAccountSupport
     public function nextAccountId(?string $teamCode = null): string
     {
         $teamCode = $this->normalizeTeamCode($teamCode ?: 'SAR');
-        $pattern = '^'.self::ACCOUNT_PREFIX.'-'.$teamCode.'-[0-9]{'.self::ACCOUNT_SEQUENCE_LENGTH.'}$';
+        $base = self::TEAM_ID_BASES[$teamCode] ?? 11000;
+        $pattern = '^'.$teamCode.'-[0-9]{4,}$';
 
         $usernames = DB::table('users')
             ->where('username', 'regexp', $pattern)
@@ -206,14 +217,14 @@ class RescuerAccountSupport
             ->merge($responderUsernames)
             ->merge($responderCodes)
             ->map(fn (?string $value): int => $this->accountSequence($value, $teamCode))
-            ->max() ?: self::ACCOUNT_START_SEQUENCE;
+            ->max() ?: ($base - 1);
 
-        return self::ACCOUNT_PREFIX.'-'.$teamCode.'-'.str_pad((string) ($maxSequence + 1), self::ACCOUNT_SEQUENCE_LENGTH, '0', STR_PAD_LEFT);
+        return $teamCode.'-'.str_pad((string) ($maxSequence + 1), 4, '0', STR_PAD_LEFT);
     }
 
     public function accountSequence(?string $accountId, string $teamCode): int
     {
-        if (! $accountId || ! preg_match('/^BDRRM-'.preg_quote($teamCode, '/').'-([0-9]{3})$/i', $accountId, $matches)) {
+        if (! $accountId || ! preg_match('/^'.preg_quote($teamCode, '/').'-([0-9]{4,})$/i', $accountId, $matches)) {
             return 0;
         }
 
@@ -222,7 +233,9 @@ class RescuerAccountSupport
 
     public function accountIdMatchesTeam(string $accountId, string $teamCode): bool
     {
-        return preg_match('/^BDRRM-'.preg_quote($teamCode, '/').'-[0-9]{3}$/i', $accountId) === 1;
+        $base = self::TEAM_ID_BASES[$teamCode] ?? 11000;
+        return preg_match('/^'.preg_quote($teamCode, '/').'-([0-9]{4,})$/i', $accountId, $matches) === 1
+            && (int) $matches[1] >= $base;
     }
 
     public function nextResponderId(): int
@@ -249,7 +262,28 @@ class RescuerAccountSupport
 
     public function teamCode(string $teamName): string
     {
-        return $this->normalizeTeamCode(substr(preg_replace('/[^A-Za-z0-9]/', '', $teamName), 0, 5) ?: 'TEAM');
+        $name = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $teamName));
+        $knownCode = match ($name) {
+            'SEARCHRESCUEANDRETRIEVAL', 'SEARCHRESCUEANDRETRIEVALTEAM' => 'SRR',
+            'EVACUATIONANDCAMPMANAGEMENT', 'EVACUATIONANDCAMPMANAGEMENTTEAM' => 'ECM',
+            'HEALTHFIRSTAIDANDPSYCHOSOCIALSUPPORT', 'HEALTHFIRSTAIDANDPSYCHOSOCIALSUPPORTTEAM' => 'HFAPS',
+            'BARANGAYHEALTHEMERGENCYRESPONSE', 'BARANGAYHEALTHEMERGENCYRESPONSETEAM', 'BHERT' => 'BHERT',
+            'SECURITYANDSAFETY', 'SECURITYANDSAFETYTEAM' => 'SST',
+            'FIREMANAGEMENT', 'FIREMANAGEMENTTEAM' => 'FMT',
+            'RELIEFDISTRIBUTION', 'RELIEFDISTRIBUTIONTEAM' => 'RDT',
+            'TRANSPORTATION', 'TRANSPORTATIONTEAM' => 'TRT',
+            'CLEARINGOPERATIONS', 'CLEARINGOPERATIONSTEAM' => 'CLT',
+            'COMMUNICATIONANDWARNING', 'COMMUNICATIONANDWARNINGTEAM' => 'CWT',
+            'RAPIDDAMAGEASSESSMENTANDNEEDSANALYSIS', 'RAPIDDAMAGEASSESSMENTANDNEEDSANALYSISTEAM' => 'RDANA',
+            'POSTDISASTERASSESSMENTANDNEEDSANALYSIS', 'POSTDISASTERASSESSMENTANDNEEDSANALYSISTEAM' => 'PDANA',
+            'RESEARCHANDPLANNING', 'RESEARCHANDPLANNINGTEAM' => 'RPT',
+            'LIVELIHOOD', 'LIVELIHOODTEAM' => 'LHT',
+            'INFRASTRUCTUREANDSHELTER', 'INFRASTRUCTUREANDSHELTERTEAM' => 'ISH',
+            default => null,
+        };
+
+        return $knownCode
+            ?? $this->normalizeTeamCode(substr(preg_replace('/[^A-Za-z0-9]/', '', $teamName), 0, 5) ?: 'TEAM');
     }
 
     public function teamCodeFromPayload(array $validated): string
@@ -272,13 +306,22 @@ class RescuerAccountSupport
     {
         $code = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $teamCode));
 
-        return substr($code ?: 'TEAM', 0, 8);
+        return match ($code) {
+            'SAR' => 'SRR',
+            'MED' => 'HFAPS',
+            'EVC' => 'ECM',
+            'LOG' => 'RDT',
+            'COM' => 'CWT',
+            'FIR' => 'FMT',
+            'DANA' => 'RDANA',
+            'SEC' => 'SST',
+            default => substr($code ?: 'TEAM', 0, 8),
+        };
+    }
+
+    public function isSupportedMobileTeamCode(string $teamCode): bool
+    {
+        return array_key_exists($this->normalizeTeamCode($teamCode), self::TEAM_ID_BASES);
     }
 }
-
-
-
-
-
-
 

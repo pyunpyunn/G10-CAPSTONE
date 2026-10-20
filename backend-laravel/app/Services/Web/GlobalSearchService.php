@@ -135,6 +135,13 @@ class GlobalSearchService
             ))
             : [];
         $query = Responder::query()->whereNull('deleted_at');
+        $hasRoleSchema = Schema::hasTable('roles')
+            && Schema::hasColumn('users', 'role_id')
+            && Schema::hasColumn('roles', 'role_id')
+            && Schema::hasColumn('roles', 'role_key');
+        if ($hasRoleSchema) {
+            $query->with('user.role');
+        }
         $columns = [
             'responder_code',
             'full_name',
@@ -148,10 +155,20 @@ class GlobalSearchService
         return $query
             ->orderBy('full_name')
             ->limit(self::RESULT_LIMIT)
-            ->get(['responder_id', 'responder_code', 'username', 'full_name', 'contact_number', 'duty_status'])
+            ->get(['responder_id', 'user_id', 'responder_code', 'username', 'full_name', 'contact_number', 'duty_status'])
             ->map(function (Responder $responder): array {
                 $accountId = $responder->username ?: $responder->responder_code;
-                $accountType = str_starts_with(strtoupper((string) $accountId), 'BDRRM-HQCC-')
+                $roleKey = $responder->user?->roleKey();
+                $isCommitteeAccount = in_array($roleKey, [
+                    'chair',
+                    'operations_admin',
+                    'mitigation_prevention',
+                    'preparedness',
+                    'response',
+                    'recovery_rehabilitation',
+                ], true);
+                $accountType = $isCommitteeAccount
+                    || str_starts_with(strtoupper((string) $accountId), 'BDRRM-HQCC-')
                     ? 'command_center'
                     : 'responders';
 
@@ -255,8 +272,6 @@ class GlobalSearchService
         return compact('type', 'title', 'subtitle', 'href');
     }
 }
-
-
 
 
 

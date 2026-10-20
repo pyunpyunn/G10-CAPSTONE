@@ -131,7 +131,7 @@ class TrackingAidForwardingService
 
             return DB::connection($connection)
                 ->table($table)
-                ->whereIn(DB::raw('LOWER(resqperation_status)'), ['acknowledged', 'received', 'received_by_trackingaid'])
+                ->whereIn(DB::raw('LOWER(resqperation_status)'), ['acknowledged', 'received', 'received_by_trackingaid', 'approved'])
                 ->orderByDesc('updated_at')
                 ->orderByDesc('forwarded_at')
                 ->limit(100)
@@ -144,6 +144,7 @@ class TrackingAidForwardingService
                     'resource_type',
                     'quantity',
                     'unit',
+                    'urgency',
                     'area_label',
                     'area_note',
                     'requested_by',
@@ -194,7 +195,7 @@ class TrackingAidForwardingService
             }
 
             return DB::connection($connection)->table($table)
-                ->whereIn(DB::raw('LOWER(resqperation_status)'), ['acknowledged', 'received', 'received_by_trackingaid'])
+                ->whereIn(DB::raw('LOWER(resqperation_status)'), ['acknowledged', 'received', 'received_by_trackingaid', 'approved'])
                 ->count();
         } catch (Throwable $exception) {
             static::$isUnreachable = true;

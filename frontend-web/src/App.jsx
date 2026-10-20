@@ -43,6 +43,7 @@ import './styles/weather-reference.css'
 import './styles/status-colors.css'
 import './styles/situation-reference.css'
 import './styles/situation-workspace.css'
+import './styles/annex-h.css'
 
 const pageComponents = {
   '/super-admin': lazy(() => import('./pages/SuperAdminPage')),
@@ -78,8 +79,8 @@ const modulePages = [
   {
     path: '/super-admin',
     title: 'Inquiries',
-    kicker: 'Super Admin',
-    summary: 'Review landing page inquiries and manage command-level account access.',
+    kicker: 'Operations/Admin',
+    summary: 'Review public inquiries and manage technical account access.',
     superOnly: true,
     navHidden: true,
   },
@@ -130,7 +131,7 @@ const modulePages = [
     path: '/rescuers',
     title: 'Account Management',
     kicker: 'Verified accounts',
-    summary: 'Create and manage rescuer and HQ Personnel accounts.',
+    summary: 'Manage field-team and BDRRMC committee accounts.',
   },
   {
     path: '/rescuers/teams',
@@ -397,7 +398,7 @@ function isWebUser(user) {
 function pagesForUser(user) {
   const roleKey = user?.role?.role_key
 
-  return modulePages.filter((page) => canOpenWebPage(user, page.path) && (!page.superOnly || roleKey === 'super_admin'))
+  return modulePages.filter((page) => canOpenWebPage(user, page.path) && (!page.superOnly || roleKey === 'operations_admin'))
 }
 
 function getLoginMessage(error) {

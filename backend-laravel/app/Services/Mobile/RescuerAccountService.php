@@ -59,7 +59,7 @@ class RescuerAccountService
             'team_options' => $teamOptions,
             'account_id_options' => $accountIds['options'],
             'next_account_id' => $accountIds['default'],
-            'account_id_format' => 'BDRRM-{TEAM_CODE}-###',
+            'account_id_format' => '{TEAM_CODE}-####',
             'form_options' => [
                 ...$formOptions,
                 'constraints' => [
@@ -73,7 +73,7 @@ class RescuerAccountService
                 'roles' => $this->presenter->responderRoles(),
                 'blood_types' => $this->presenter->bloodTypes(),
             ],
-            'note' => 'HQ/Admin creates verified rescuer accounts manually. There is no public self-registration or pending verification queue.',
+            'note' => 'Operations/Admin manages verified field-team accounts. There is no public self-registration or pending verification queue.',
         ]]);
     }
 
@@ -127,7 +127,6 @@ class RescuerAccountService
         return $this->teamWriteWorkflow->deleteTeam($request, $teamId);
     }
 }
-
 
 
 

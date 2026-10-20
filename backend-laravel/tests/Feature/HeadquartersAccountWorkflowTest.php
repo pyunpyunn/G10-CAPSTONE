@@ -17,6 +17,10 @@ class HeadquartersAccountWorkflowTest extends TestCase
             $table->integer('role_id')->primary();
             $table->string('role_key');
             $table->string('role_name');
+            $table->string('base_role_key')->nullable();
+            $table->json('web_modules')->nullable();
+            $table->boolean('can_manage_personnel')->nullable();
+            $table->boolean('can_approve_requests')->nullable();
         });
         Schema::create('users', function (Blueprint $table): void {
             $table->string('user_id')->primary();
@@ -60,8 +64,12 @@ class HeadquartersAccountWorkflowTest extends TestCase
 
         DB::table('roles')->insert([
             'role_id' => 1,
-            'role_key' => 'admin',
-            'role_name' => 'Admin',
+            'role_key' => 'operations_admin',
+            'role_name' => 'Operations/Admin',
+            'base_role_key' => 'operations_admin',
+            'web_modules' => json_encode(['personnel_access', 'profile', 'notifications', 'inquiries']),
+            'can_manage_personnel' => true,
+            'can_approve_requests' => false,
         ]);
     }
 
@@ -85,11 +93,12 @@ class HeadquartersAccountWorkflowTest extends TestCase
             'email' => 'mara@example.test',
             'contact_number' => '09171111111',
             'password' => 'temporary-password',
-        ])->assertCreated()->assertJsonPath('data.account.account_id', 'BDRRM-HQCC-001');
+            'role_id' => 1,
+        ])->assertCreated()->assertJsonPath('data.account.account_id', 'OPS-0001');
 
-        $this->assertSame('hq_personnel', DB::table('users as u')->join('roles as r', 'r.role_id', '=', 'u.role_id')
-            ->where('u.username', 'BDRRM-HQCC-001')->value('r.role_key'));
-        $this->assertSame(1, DB::table('responders')->where('username', 'BDRRM-HQCC-001')->count());
+        $this->assertSame('operations_admin', DB::table('users as u')->join('roles as r', 'r.role_id', '=', 'u.role_id')
+            ->where('u.username', 'OPS-0001')->value('r.role_key'));
+        $this->assertSame(1, DB::table('responders')->where('username', 'OPS-0001')->count());
         $this->assertSame(1, DB::table('rescue_teams')->where('team_code', 'HQCC')->count());
     }
 }

@@ -1,7 +1,11 @@
+import L from 'leaflet'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
-import { getMappingOverview, getHouseholdRoute } from '../api/mappingApi'
+import { getMappingOverview, getHouseholdRoute, getEvacuationRoute } from '../api/mappingApi'
+import HazardMapControls from '../components/mapping/HazardMapControls'
+import HazardPlanning from '../components/mapping/HazardPlanning'
+import { hazardFeatures } from '../utils/hazardMapping'
 import MappingScene from '../components/mapping/MappingScene'
 import { pointReady, siteColor } from '../utils/mappingDisplay'
 import { useModuleData } from '../utils/useModuleData'
@@ -16,9 +20,10 @@ export default function MappingPage() {
   const navigate = useNavigate()
   const { user } = useOutletContext()
   const [purokId, setPurokId] = useState('')
+  const [hazardType, setHazardType] = useState('Flood')
   const loader = useCallback(async () => normalizeWorkspaceData(await getMappingOverview(purokId ? { purok_id:purokId } : {})), [purokId])
-  const { data: workspace, error, loading, refresh } = useModuleData(loader, ['mapping','households','dispatch','disasters'])
-  const [layers, setLayers] = useState({ households:true, evacuation:true, office:true, routes:true, labels:true, teams:true })
+  const { data: workspace, error, loading, refresh } = useModuleData(loader, ['mapping','households','dispatch','disasters'], { keepPreviousData:true })
+  const [layers, setLayers] = useState({ hazards:true, households:true, evacuation:true, office:true, routes:true, teams:true })
   const [visibleStatuses, setVisibleStatuses] = useState(Object.fromEntries(filters.map(f => [f.key,true])))
   const [layersOpen, setLayersOpen] = useState(true)
   const [tab, setTab] = useState('households')
@@ -27,6 +32,7 @@ export default function MappingPage() {
   const [fullscreen, setFullscreen] = useState(false)
   const [selection, setSelection] = useState(null)
   const [preview, setPreview] = useState(null)
+  const [siteRoute, setSiteRoute] = useState(null)
   const [routeState, setRouteState] = useState(null)
   const map = useRef(null), requestVersion = useRef(0)
   const onMapReady = useCallback(value => { map.current = value }, [])
@@ -62,6 +68,7 @@ export default function MappingPage() {
   }, [selection, workspace, mapWorkspace, households, active, layers])
   const eventId = workspace?.active_event?.event_id
   const selectedPreview = selected?.kind === 'household' && preview?.householdId === selected.row.household_id && preview?.eventId === eventId ? preview.route : null
+  const selectedSiteRoute = selected?.kind === 'site' && String(siteRoute?.siteId) === String(selected.row.id) && siteRoute?.eventId === eventId ? siteRoute : null
   const selectedRouteState = selected?.kind === 'household' && routeState?.householdId === selected.row.household_id && routeState?.eventId === eventId ? routeState : null
   useEffect(() => {
     const onKey = event => { if (event.key === 'Escape') { setFullscreen(false); setSelection(null); requestVersion.current++ } }
@@ -69,8 +76,18 @@ export default function MappingPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const select = useCallback(async (kind, row) => {
-    setSelection({ kind, id:row.route_id ?? row.id }); setPreview(null)
+    setSelection({ kind, id:row.route_id ?? row.id }); setPreview(null); setSiteRoute(null)
     const version = ++requestVersion.current
+    if (kind === 'site' && pointReady(row)) {
+      setSiteRoute({ siteId:row.id, eventId, loading:true })
+      try {
+        const route = await getEvacuationRoute(row.id)
+        if (requestVersion.current === version) setSiteRoute({ siteId:row.id, eventId, route })
+      } catch (failure) {
+        if (requestVersion.current === version) setSiteRoute({ siteId:row.id, eventId, error:failure.response?.data?.message || 'A route to this center cannot be generated right now.' })
+      }
+      return
+    }
     if (kind !== 'household' || !active || !pointReady(row)) return
     setRouteState({ householdId:row.household_id, eventId, loading:true })
     try {
@@ -80,14 +97,20 @@ export default function MappingPage() {
   }, [active, eventId])
   const liveLayers = { ...layers, households:active && layers.households, evacuation:active && layers.evacuation, routes:active && layers.routes, teams:active && layers.teams }
   const plottedRoutes = selectedPreview ? [...routes, { ...selectedPreview, route_id:'household-preview', status:'on_demand', route_name:`Route to ${selected.row.label}` }] : routes
-  function changePurok(value) { requestVersion.current++; setSelection(null); setPreview(null); setPurokId(value) }
-  function clear() { requestVersion.current++; setSelection(null); setPreview(null); setRouteState(null) }
-  const layerItems = [['households','Households'],['evacuation','Evacuation'],['office','Rescue office'],['routes','Routes'],['labels','Labels'],['teams','Rescue teams']]
+  function changePurok(value) { requestVersion.current++; setSelection(null); setPreview(null); setSiteRoute(null); setPurokId(value) }
+  function clear() { requestVersion.current++; setSelection(null); setPreview(null); setSiteRoute(null); setRouteState(null) }
+  const layerItems = [['hazards','Hazard areas'],['households','Households'],['evacuation','Evacuation'],['office','Rescue office'],['routes','Routes'],['teams','Rescue teams']]
+  const planningFeatures = hazardFeatures(workspace?.hazard_layers, purokId, hazardType).filter(feature => feature.properties.kind === 'hazard')
+  function fitHazards() {
+    const bounds = L.geoJSON(planningFeatures.length ? { type:'FeatureCollection', features:planningFeatures } : workspace.barangay.boundary).getBounds()
+    if (bounds.isValid()) map.current?.fitBounds(bounds, { padding:[40,40], maxZoom:18, animate:false })
+  }
   const row = selected?.row
   const content = <section className={`mapping-reference ${fullscreen ? 'mapping-fullscreen' : ''}`} aria-label="Mapping">
+    {workspace && <HazardPlanning workspace={workspace} purokId={purokId} hazardType={hazardType} user={user} refresh={refresh} />}
     {loading && !workspace ? <div className="empty" role="status">Loading map…</div> : error && !workspace ? <div className="form-error" role="alert">{error}<button type="button" onClick={refresh}>Retry</button></div> : workspace && <div className={`mapw ${fullscreen ? 'full' : ''}`}>
-      <MappingScene workspace={mapWorkspace} households={households} sites={sites} routes={plottedRoutes} layers={liveLayers} basemap={basemap} selected={selected} onSelect={select} onReady={onMapReady} fullscreen={fullscreen} />
-      <div className={`fl lay ${layersOpen ? '' : 'min'}`}><button type="button" className="lh" onClick={() => setLayersOpen(!layersOpen)} aria-expanded={layersOpen}>Layers<i>⌃</i></button>{layerItems.map(([key,label]) => <div className={`ly ${liveLayers[key] ? 'on' : ''} ${!active && !['office','labels'].includes(key) ? 'dis' : ''}`} key={key}><button type="button" className="layer-toggle" aria-pressed={liveLayers[key]} disabled={!active && !['office','labels'].includes(key)} onClick={() => { setLayers(current => ({ ...current, [key]:!current[key] })); clear() }}><span className="sw"><i /></span>{label}</button>{key === 'households' && active && layers.households && <span className="sd">{filters.map(filter => <button type="button" className={`filter-dot ${visibleStatuses[filter.key] ? '' : 'off'}`} key={filter.key} style={{ '--c':statusColor(filter.key) }} title={filter.label} aria-label={`Show ${filter.label.toLowerCase()} households`} aria-pressed={visibleStatuses[filter.key]} onClick={() => setVisibleStatuses(current => ({ ...current,[filter.key]:!current[filter.key] }))} />)}</span>}</div>)}</div>
+      <MappingScene workspace={mapWorkspace} planningFeatures={planningFeatures} hazardType={hazardType} households={households} sites={sites} routes={plottedRoutes} siteRoute={selectedSiteRoute?.route} layers={liveLayers} basemap={basemap} selected={selected} onSelect={select} onReady={onMapReady} fullscreen={fullscreen} />
+      <div className={`fl lay ${layersOpen ? '' : 'min'}`}><button type="button" className="lh" onClick={() => setLayersOpen(!layersOpen)} aria-expanded={layersOpen}>Layers<i>⌃</i></button>{layerItems.map(([key,label]) => <div className={`ly ${liveLayers[key] ? 'on' : ''} ${!active && !['office','hazards'].includes(key) ? 'dis' : ''}`} key={key}><button type="button" className="layer-toggle" aria-pressed={liveLayers[key]} disabled={!active && !['office','hazards'].includes(key)} onClick={() => { setLayers(current => ({ ...current, [key]:!current[key] })); clear() }}><span className="sw"><i /></span>{label}</button>{key === 'households' && active && layers.households && <span className="sd">{filters.map(filter => <button type="button" className={`filter-dot ${visibleStatuses[filter.key] ? '' : 'off'}`} key={filter.key} style={{ '--c':statusColor(filter.key) }} title={filter.label} aria-label={`Show ${filter.label.toLowerCase()} households`} aria-pressed={visibleStatuses[filter.key]} onClick={() => setVisibleStatuses(current => ({ ...current,[filter.key]:!current[filter.key] }))} />)}</span>}</div>)}{layers.hazards && <HazardMapControls workspace={workspace} hazardType={hazardType} onHazardType={setHazardType} onFitHazards={fitHazards} />}</div>
       <div className="fl tr"><span className={`ev ${active ? '' : 'off'}`}><i />{workspace.active_event?.name || 'No active event'}</span><select value={purokId} onChange={event => changePurok(event.target.value)} aria-label="Filter map by purok"><option value="">All puroks</option>{workspace.filters.purok_options?.map(purok => <option key={purok.purok_id} value={purok.purok_id}>{purok.sitio_name} · {purok.purok_name}</option>)}</select><button type="button" className="ib" onClick={() => setFullscreen(!fullscreen)} aria-label={fullscreen ? 'Exit full map' : 'Full map'}>⤢</button></div>
       {active && <aside className={`fl sheet ${panel === 'wide' ? 'wide' : panel === 'hidden' ? 'hide' : ''}`} aria-label="Map records"><div className="sh1"><div className="sg2">{[['households','Households'],['sites','Evacuation'],['routes','Routes']].map(([key,label]) => <button type="button" key={key} className={tab === key ? 'on' : ''} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</button>)}</div><button type="button" className="ib" onClick={() => setPanel(panel === 'wide' ? 'normal' : 'wide')} aria-label={panel === 'wide' ? 'Collapse records' : 'Expand records'}>⇤</button><button type="button" className="ib" onClick={() => setPanel('hidden')} aria-label="Hide records">›</button></div><div className="lst">
         {tab === 'households' && <><div className="un">Barangay total: {shown(workspace.summary.total_households)} households · {shown(workspace.summary.no_verified_geotag)} unlocated</div>{!households.length && <div className="empty">No households match this filter.</div>}{households.map(h => <button type="button" className={`it ${selected?.kind === 'household' && String(row.id) === String(h.id) ? 'on' : ''}`} key={h.id} onClick={() => select('household',h)}><i className="dt" style={{ '--c':statusColor(h.status_key) }} /><span>{h.label} <em>{h.purok}</em></span><em className="xt">{h.status_label}</em><em>{h.accuracy_m == null ? '—' : `±${h.accuracy_m} m`}</em></button>)}</>}
@@ -99,7 +122,7 @@ export default function MappingPage() {
       <button type="button" className={`bm ${basemap === 'street' ? 's2' : ''}`} disabled={!workspace.barangay.basemaps?.satellite?.tile_url} onClick={() => setBasemap(basemap === 'street' ? 'satellite' : 'street')} aria-label={basemap === 'street' ? 'Satellite basemap' : 'Street basemap'}><i /><span>{basemap === 'street' ? 'Satellite' : 'Map'}</span></button>
       {selected && <div className="fl det on" aria-label="Map details"><div className="dh"><b>{row.label || row.name || row.route_name || row.team_name}</b>{selected.kind === 'household' && <span className="bg" style={{ '--c':statusColor(row.status_key) }}>{row.status_label}</span>}{['route','team'].includes(selected.kind) && <span className="bg" style={{ '--c':statusColor(row.status) }}>{labelize(row.status)}</span>}<button type="button" className="x" onClick={clear} aria-label="Close map details">✕</button></div>
         {selected.kind === 'household' && <><Fact label="Purok" value={row.purok} /><Fact label="Accuracy" value={row.accuracy_m == null ? null : `±${row.accuracy_m} m`} />{selectedRouteState?.loading ? <div role="status">Finding route…</div> : selectedRouteState?.error ? <div role="alert">{selectedRouteState.error}</div> : <><Fact label="Distance" value={selectedPreview?.distance_km == null ? null : `${selectedPreview.distance_km} km`} /><Fact label="Duration" value={selectedPreview?.duration_min == null ? null : `${selectedPreview.duration_min} min`} /></>}<button type="button" className="bt" disabled={!isHouseholdRouteAllowed(row) || !canOpenWebPage(user,'/rescue-management/new')} onClick={() => navigate('/rescue-management/new',{ state:{ selectedHousehold:row } })}>Route dispatch</button></>}
-        {selected.kind === 'site' && <><Fact label="Type" value={row.center_type} /><Fact label="Vacant" value={`${shown(row.vacancy)} / ${shown(row.capacity)}`} /><Fact label="Status" value={row.status} /></>}
+        {selected.kind === 'site' && <><Fact label="Type" value={row.center_type} /><Fact label="Vacant" value={`${shown(row.vacancy)} / ${shown(row.capacity)}`} /><Fact label="Status" value={row.status} />{selectedSiteRoute?.loading ? <div role="status">Finding route from barangay hall…</div> : selectedSiteRoute?.error ? <div role="alert">{selectedSiteRoute.error}</div> : selectedSiteRoute?.route && <><Fact label="From" value={selectedSiteRoute.route.origin_name} /><Fact label="Distance" value={`${Number(selectedSiteRoute.route.distance_km).toFixed(2)} km`} /><Fact label="Duration" value={`${selectedSiteRoute.route.duration_min} min`} /></>}</>}
         {selected.kind === 'route' && <><Fact label="Team" value={row.team_name} /><Fact label="Area" value={row.assigned_area} /><Fact label="Distance" value={row.distance_km == null ? null : `${row.distance_km} km`} /><Fact label="Duration" value={row.duration_min == null ? null : `${row.duration_min} min`} /><button type="button" className="bt l" onClick={clear}>Show all</button></>}
         {selected.kind === 'office' && <Fact label="Role" value="Dispatch origin" />}{selected.kind === 'team' && <><Fact label="Responder" value={row.responder_name} /><Fact label="Area" value={row.assigned_area} /><Fact label="Last seen" value={row.logged_at} /></>}
       </div>}

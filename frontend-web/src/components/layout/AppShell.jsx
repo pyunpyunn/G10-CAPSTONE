@@ -16,7 +16,7 @@ export default function AppShell({ user, pages, onLogout, onUserChange }) {
   const revealTimeoutRef = useRef(null)
   const userId = user?.user_id || user?.id
   const location = useLocation()
-  const topicKey = topicsForPath(location.pathname, user?.role?.role_key === 'super_admin').join(',')
+  const topicKey = topicsForPath(location.pathname, user?.role?.role_key === 'operations_admin').join(',')
   const adminAccess = hasAdminWebAccess(user)
   const notificationsAccess = user?.permissions?.web_modules?.includes('notifications') === true
   useEffect(() => connectRealtimeNotifications(userId, topicKey.split(','), { adminAccess, notificationsAccess }), [userId, topicKey, adminAccess, notificationsAccess])
@@ -26,6 +26,7 @@ export default function AppShell({ user, pages, onLogout, onUserChange }) {
     ['/situation', '/archive'].includes(location.pathname) ? 'hide-page-scrollbar' : '',
     location.pathname.startsWith('/situation') ? 'situation-shell' : '',
     ['/mapping', '/weather'].includes(location.pathname) ? 'monitoring-shell' : '',
+    location.pathname === '/mapping' ? 'mapping-shell' : '',
     location.pathname === '/households' || location.pathname.startsWith('/households/') ? 'household-shell' : '',
     isPinned ? 'left-pinned' : 'left-hidden',
     isPeeking && !isPinned ? 'left-peeking' : '',

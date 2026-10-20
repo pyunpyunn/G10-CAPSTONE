@@ -20,10 +20,10 @@ class InquiryPresenter
 
     public function accounts(Collection $rows): array
     {
-        $eligible = $rows->filter(fn (User $user): bool => in_array($user->roleKey(), ['super_admin', 'admin', 'rescuer'], true));
+        $eligible = $rows->filter(fn (User $user): bool => in_array($user->roleKey(), ['operations_admin', 'chair', 'rescuer'], true));
         return [
             'summary' => [
-                'hq_web' => $eligible->filter(fn (User $user): bool => in_array($user->roleKey(), ['super_admin', 'admin'], true))->count(),
+                'hq_web' => $eligible->filter(fn (User $user): bool => in_array($user->roleKey(), ['operations_admin', 'chair'], true))->count(),
                 'rescuer_mobile' => $eligible->filter(fn (User $user): bool => $user->roleKey() === 'rescuer')->count(),
             ],
             'latest' => $eligible->map(fn (User $user): array => [
@@ -52,5 +52,3 @@ class InquiryPresenter
         ];
     }
 }
-
-

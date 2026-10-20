@@ -17,9 +17,13 @@ return new class extends Migration
         });
         foreach (['Team Leader', 'Medic', 'Driver', 'Boat Operator', 'Radio Operator', 'Logistics Officer', 'Site Coordinator'] as $name) {
             $key = 'personnel_'.strtolower(str_replace(' ', '_', $name));
-            if (!DB::table('roles')->where('role_key', $key)->exists()) DB::table('roles')->insert([
-                'role_id' => (int) DB::table('roles')->max('role_id') + 1, 'role_key' => $key, 'role_name' => $name, 'base_role_key' => 'rescuer',
-            ]);
+            if (!DB::table('roles')->where('role_key', $key)->exists()) DB::table('roles')->insert(array_intersect_key([
+                'role_id' => (int) DB::table('roles')->max('role_id') + 1,
+                'role_key' => $key,
+                'role_name' => $name,
+                'name' => $name,
+                'base_role_key' => 'rescuer',
+            ], array_flip(Schema::getColumnListing('roles'))));
         }
     }
     public function down(): void

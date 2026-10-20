@@ -12,26 +12,17 @@ class HeadquartersTeamSupport
 
     public function personnelRoleId(): int
     {
-        return $this->ensureRole('hq_personnel', 'HQ Personnel');
+        return $this->ensureRole('operations_admin', 'Operations/Admin');
     }
 
     public function leaderRoleId(): int
     {
-        return $this->ensureRole('hq_leader', 'HQ Leader');
+        return $this->ensureRole('operations_admin', 'Operations/Admin');
     }
 
     public function demoteLeader(string $userId): void
     {
-        $roleKey = DB::table('users as u')->join('roles as r', 'r.role_id', '=', 'u.role_id')
-            ->where('u.user_id', $userId)->value('r.role_key');
-        $user = \App\Models\User::query()->find($userId);
-        if ($user?->roleKey() !== 'hq_leader') return;
-
-        DB::table('users')->where('user_id', $userId)->update([
-            'role_id' => $this->personnelRoleId(),
-            'updated_at' => now(),
-        ]);
-        app(PersonnelAccessNotifier::class)->notify([$userId]);
+        // Team leadership is no longer an authorization grant for web users.
     }
 
     private function ensureRole(string $key, string $name): int
@@ -48,24 +39,12 @@ class HeadquartersTeamSupport
     {
         $team = DB::table('rescue_teams')->where('team_id', $teamId)->first();
         if (! $team || (strtoupper($team->team_code) !== 'HQCC' && ! in_array(strtoupper($team->team_type), ['HQ', 'HQCC', 'HEADQUARTERS'], true))) return;
-        $personnelRoleId = $this->personnelRoleId();
-        $leaderRoleId = $this->leaderRoleId();
         $profiles = DB::table('responders')->where('team_id', $teamId)->whereNull('deleted_at')->get(['responder_id', 'user_id']);
         foreach ($profiles as $profile) {
-            $isLeader = (int) $profile->responder_id === $leaderId;
-            DB::table('responders')->where('responder_id', $profile->responder_id)
-                ->update(['title' => $isLeader ? 'HQ Leader' : 'HQ Personnel', 'updated_at' => now()]);
             $user = DB::table('users')->where('user_id', $profile->user_id)->first(['role_id']);
             $accessRole = $user ? \App\Models\Role::query()->find($user->role_id) : null;
-            $currentRole = $accessRole?->base_role_key ?: $accessRole?->role_key;
-            if ($user && $currentRole !== 'super_admin') {
-                if ($accessRole?->base_role_key && $currentRole === ($isLeader ? 'hq_leader' : 'hq_personnel')) {
-                    DB::table('responders')->where('responder_id', $profile->responder_id)->update(['title' => $accessRole->role_name]);
-                    continue;
-                }
-                DB::table('users')->where('user_id', $profile->user_id)
-                    ->update(['role_id' => $isLeader ? $leaderRoleId : $personnelRoleId, 'updated_at' => now()]);
-            }
+            if ($accessRole) DB::table('responders')->where('responder_id', $profile->responder_id)
+                ->update(['title' => $accessRole->role_name, 'updated_at' => now()]);
         }
         app(PersonnelAccessNotifier::class)->notify($profiles->pluck('user_id')->all());
     }
@@ -94,10 +73,12 @@ class HeadquartersTeamSupport
     /** Link an HQ account without changing its login, password, role, or existing assignment. */
     public function syncUser(object $user, ?int $teamId = null): ?int
     {
-        $accountId = strtoupper((string) ($user->username ?? ''));
-        if (! preg_match('/^BDRRM-HQCC-\d{3}$/', $accountId)) {
+        $role = \App\Models\Role::query()->find($user->role_id ?? null);
+        $base = strtolower((string) ($role?->base_role_key ?: $role?->role_key));
+        if (! in_array($base, ['chair', 'operations_admin', 'mitigation_prevention', 'preparedness', 'response', 'recovery_rehabilitation'], true)) {
             return null;
         }
+        $accountId = strtoupper((string) ($user->username ?? ''));
 
         $existing = DB::table('responders')->where('user_id', $user->user_id)->lockForUpdate()->first();
         if ($existing) {
@@ -105,6 +86,7 @@ class HeadquartersTeamSupport
             if ($existing->deleted_at ?? null) return null;
             DB::table('responders')->where('responder_id', $existing->responder_id)->update($this->columns('responders', [
                 'full_name' => ($user->name ?? '') ?: trim(($user->first_name ?? '').' '.($user->last_name ?? '')),
+                'title' => $role->role_name,
                 'contact_number' => $user->contact_number ?? null,
                 'updated_at' => now(),
             ]));
@@ -119,7 +101,7 @@ class HeadquartersTeamSupport
             'username' => $user->username, 'responder_code' => $accountId,
             'password_hash' => $user->password,
             'full_name' => ($user->name ?? '') ?: trim(($user->first_name ?? '').' '.($user->last_name ?? '')),
-            'title' => 'HQ Personnel',
+            'title' => $role->role_name,
             'contact_number' => $user->contact_number ?? null,
             'is_validated' => 1, 'is_deployed' => 0,
             'duty_status' => ($user->is_active ?? true) ? 'on_duty' : 'disabled',
@@ -133,9 +115,11 @@ class HeadquartersTeamSupport
     {
         DB::transaction(function (): void {
             $teamId = $this->ensureTeam();
-            $accounts = DB::table('users')->where('username', 'like', 'BDRRM-HQCC-%')
+            $accounts = DB::table('users as u')
+                ->join('roles as r', 'r.role_id', '=', 'u.role_id')
+                ->whereIn('r.role_key', ['chair', 'operations_admin', 'mitigation_prevention', 'preparedness', 'response', 'recovery_rehabilitation'])
                 ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
-                ->orderBy('username')->lockForUpdate()->get();
+                ->orderBy('u.username')->lockForUpdate()->get('u.*');
 
             foreach ($accounts as $account) {
                 $this->syncUser($account, $teamId);
