@@ -30,7 +30,7 @@ import {
 
 export default function ArchivePage() {
   const { user } = useOutletContext()
-  const isSuperAdmin = user?.role?.role_key === 'super_admin'
+  const isSuperAdmin = user?.role?.role_key === 'operations_admin'
   const [isExporting, setIsExporting] = useState(false)
   const [activeCategory, setActiveCategory] = useState('disaster-events')
   const [payload, setPayload] = useState(null)

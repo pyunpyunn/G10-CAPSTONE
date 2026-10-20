@@ -55,12 +55,12 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   const displayName = user?.full_name || user?.name || user?.username || 'Account'
   const initials = getInitials(user?.full_name)
   const unreadLabel = unreadCount > 99 ? '99+' : String(unreadCount)
-  const canViewInquiries = user?.role?.role_key === 'super_admin'
+  const canViewInquiries = user?.role?.role_key === 'operations_admin'
   const pageTitle = getPageTitle(location.pathname, location.state)
   const query = searchTerm.trim()
   const recordTypes = selectedTypes.filter((type) => type !== 'pages')
   const recordSearchKey = `${query}::${recordTypes.join('|')}`
-  const canSearchRecords = hasWebAccess(user) && query.length >= 2 && recordTypes.length > 0
+  const canSearchRecords = hasWebAccess(user) && user?.role?.role_key !== 'operations_admin' && query.length >= 2 && recordTypes.length > 0
   const currentRecordSearch = canSearchRecords && recordSearch.key === recordSearchKey ? recordSearch : null
   const isSearching = currentRecordSearch?.status === 'loading'
   const searchError = currentRecordSearch?.error || ''
@@ -76,7 +76,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   useEffect(() => {
     const currentQuery = searchTerm.trim()
     const types = selectedTypes.filter((type) => type !== 'pages')
-    if (!hasAdminWebAccess(user) || currentQuery.length < 2 || types.length === 0) return undefined
+    if (!hasWebAccess(user) || user?.role?.role_key === 'operations_admin' || currentQuery.length < 2 || types.length === 0) return undefined
 
     const key = `${currentQuery}::${types.join('|')}`
     let ignore = false

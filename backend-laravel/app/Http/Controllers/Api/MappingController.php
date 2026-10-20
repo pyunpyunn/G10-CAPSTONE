@@ -50,6 +50,11 @@ class MappingController extends Controller
         return response()->json(['data' => $this->service->householdRoute($householdId)]);
     }
 
+    public function evacuationRoute(string $siteId): JsonResponse
+    {
+        return $this->safeResponse(fn () => response()->json(['data' => $this->service->evacuationRoute($siteId)]));
+    }
+
     private function safeResponse(callable $callback): JsonResponse
     {
         try {

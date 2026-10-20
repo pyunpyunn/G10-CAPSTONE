@@ -19,6 +19,11 @@ class GlobalSearchTest extends TestCase
     {
         parent::setUp();
 
+        Schema::create('roles', function (Blueprint $table): void {
+            $table->integer('role_id')->primary();
+            $table->string('role_key');
+            $table->string('role_name');
+        });
         Schema::create('users', function (Blueprint $table): void {
             $table->string('user_id')->primary();
             $table->string('username')->nullable();
@@ -27,6 +32,7 @@ class GlobalSearchTest extends TestCase
             $table->string('first_name')->nullable();
             $table->string('last_name')->nullable();
             $table->string('name')->nullable();
+            $table->integer('role_id')->nullable();
         });
         Schema::create('responders', function (Blueprint $table): void {
             $table->increments('responder_id');
@@ -39,25 +45,31 @@ class GlobalSearchTest extends TestCase
             $table->softDeletes();
         });
 
+        DB::table('roles')->insert([
+            'role_id' => 8,
+            'role_key' => 'operations_admin',
+            'role_name' => 'Operations/Admin',
+        ]);
         DB::table('users')->insert([
-            'user_id' => 'USR-HQ-1',
-            'username' => 'BDRRM-HQCC-006',
-            'login_id' => 'BDRRM-HQCC-006',
+            'user_id' => 'USR-2024035500',
+            'username' => '2024035500',
+            'login_id' => '2024035500',
             'email' => 'mara@example.test',
             'first_name' => 'Mara',
             'last_name' => 'Santos',
+            'role_id' => 8,
         ]);
         DB::table('responders')->insert([
             'responder_id' => 6,
-            'user_id' => 'USR-HQ-1',
-            'username' => 'BDRRM-HQCC-006',
-            'responder_code' => 'BDRRM-HQCC-006',
+            'user_id' => 'USR-2024035500',
+            'username' => '2024035500',
+            'responder_code' => '2024035500',
             'full_name' => 'Mara Santos',
             'duty_status' => 'on_duty',
         ]);
     }
 
-    public function test_account_login_fields_find_and_open_the_exact_hq_account(): void
+    public function test_account_login_fields_find_and_open_committee_accounts_by_role(): void
     {
         $results = app(GlobalSearchService::class)->search('mara@example.test', ['responders']);
 
@@ -73,7 +85,7 @@ class GlobalSearchTest extends TestCase
         $user = new User();
         $user->setAttribute('is_active', true);
         $user->setRelation('role', new Role([
-            'base_role_key' => 'hq_personnel',
+            'base_role_key' => 'response',
             'web_modules' => ['resources_requests'],
         ]));
 
@@ -89,7 +101,7 @@ class GlobalSearchTest extends TestCase
         $user = new User();
         $user->setAttribute('is_active', true);
         $user->setRelation('role', new Role([
-            'base_role_key' => 'hq_personnel',
+            'base_role_key' => 'response',
             'web_modules' => ['dashboard', 'resources_requests'],
         ]));
         $request = Request::create('/api/v1/global-search', 'GET', [

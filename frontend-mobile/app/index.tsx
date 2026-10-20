@@ -126,7 +126,7 @@ export default function MobileLoginScreen() {
     try {
       const user = await loginMobile(login.trim(), password);
       const role = user.role?.role_key;
-      if (role === 'household_resident' || role === 'rescuer') {
+      if (role === 'household_resident' || role === 'rescuer' || role === 'tl' || role === 'tm') {
         try { await saveRememberedCredentials(login, password, rememberPassword); }
         catch { Alert.alert('Signed in', 'Your password could not be remembered on this device. You can still continue.'); }
       }
@@ -137,7 +137,7 @@ export default function MobileLoginScreen() {
         return;
       }
 
-      if (role === 'rescuer') {
+      if (role === 'rescuer' || role === 'tl' || role === 'tm') {
         await askStandardMobilePermissions('rescuer');
         router.replace('/rescuer' as Href);
         return;

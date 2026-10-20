@@ -31,6 +31,7 @@ class MappingSnapshotResource extends JsonResource
                 ? [['id' => 'rescue-office', 'name' => $office['name'], 'address' => $office['address'],
                     'latitude' => (float) $latitude, 'longitude' => (float) $longitude]] : [];
         }
+        $data['hazard_layers'] = app(\App\Services\Web\HazardLayerService::class)->layers();
         $data['map_rules'] = $presenter->mapRules();
         return $data;
     }

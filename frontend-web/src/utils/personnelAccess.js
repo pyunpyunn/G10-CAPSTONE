@@ -1,5 +1,5 @@
 export function hasAdminWebAccess(user) {
-  return user?.is_active !== false && (user?.permissions?.can_manage_personnel ?? ['super_admin', 'hq_leader'].includes(user?.role?.role_key))
+  return user?.is_active !== false && (user?.permissions?.can_manage_personnel ?? user?.role?.role_key === 'operations_admin')
 }
 
 export function hasWebAccess(user) {
@@ -33,5 +33,5 @@ export function canOpenWebPage(user, path) {
 }
 
 export function canApproveRequests(user) {
-  return user?.is_active !== false && (user?.permissions?.can_approve_requests ?? ['super_admin', 'hq_leader'].includes(user?.role?.role_key))
+  return user?.is_active !== false && (user?.permissions?.can_approve_requests ?? user?.role?.role_key === 'chair')
 }

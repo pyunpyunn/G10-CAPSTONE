@@ -10,7 +10,7 @@ class ProfilePresenter
 {
     public function summaryCards(object $user, mixed $lastSeen): array
     {
-        $roleKey = $user->roleKey();
+        $roleKey = $user->assignedRoleKey() ?: $user->roleKey();
         $roleName = $user->roleName();
         return [
             ['label' => 'Account ID', 'value' => $user->username ?: $user->user_id, 'note' => 'Credential role auto-detected'],
@@ -42,7 +42,7 @@ class ProfilePresenter
             'status' => $user->is_active ? 'Active and verified' : 'Inactive',
             'assigned_station' => $user->assigned_center_id ?: 'Command desk',
             'role_name' => $user->roleName() ?: 'Unassigned',
-            'role_key' => $user->roleKey() ?: 'unassigned',
+            'role_key' => $user->assignedRoleKey() ?: $user->roleKey() ?: 'unassigned',
         ];
     }
 
@@ -100,10 +100,15 @@ class ProfilePresenter
     public function roleShortName(?string $roleKey): string
     {
         return match ($roleKey) {
-            'super_admin' => 'Super Admin',
-            'hq_leader' => 'HQ Leader',
-            'hq_personnel' => 'HQ Personnel',
-            'rescuer' => 'Rescuer Member',
+            'operations_admin' => 'Operations/Admin',
+            'chair' => 'BDRRM Committee Chairperson',
+            'mitigation_prevention' => 'Mitigation and Prevention Sub-committee',
+            'preparedness' => 'Preparedness Sub-committee',
+            'response' => 'Response Sub-committee',
+            'recovery_rehabilitation' => 'Recovery and Rehabilitation Sub-committee',
+            'tl' => 'Team Leader',
+            'tm' => 'Team Member',
+            'rescuer' => 'Team Member',
             default => 'Unassigned',
         };
     }
@@ -111,9 +116,13 @@ class ProfilePresenter
     private function accessLevel(?string $roleKey): string
     {
         return match ($roleKey) {
-            'super_admin' => 'Platform',
-            'hq_leader' => 'Command',
-            'hq_personnel' => 'Operations',
+            'operations_admin' => 'Technical administration',
+            'chair' => 'Committee leadership',
+            'mitigation_prevention' => 'Mitigation and prevention',
+            'preparedness' => 'Preparedness',
+            'response' => 'Response coordination',
+            'recovery_rehabilitation' => 'Recovery and rehabilitation',
+            'tl', 'tm' => 'Field',
             'rescuer' => 'Field',
             default => 'None',
         };
@@ -122,10 +131,15 @@ class ProfilePresenter
     private function accessSummary(?string $roleKey): string
     {
         return match ($roleKey) {
-            'super_admin' => 'All modules, including inquiries',
-            'hq_leader' => 'All modules except inquiries',
-            'hq_personnel' => 'Dashboard, geospatial, response, resources, reports',
-            'rescuer' => 'Dashboard, geospatial, profile',
+            'operations_admin' => 'Technical account and role administration; no incident-command actions',
+            'chair' => 'Committee oversight and final approval actions',
+            'mitigation_prevention' => 'Mitigation, prevention, mapping, and reports',
+            'preparedness' => 'Preparedness planning, mapping, and reports',
+            'response' => 'Response operations, dispatch, resources, and reports',
+            'recovery_rehabilitation' => 'Recovery planning, resources, and reports',
+            'tl' => 'Leads assigned missions for the team',
+            'tm' => 'Handles assigned field missions',
+            'rescuer' => 'Field role; access depends on TL/TM assignment',
             default => 'No web modules',
         };
     }
@@ -135,5 +149,3 @@ class ProfilePresenter
         return ucwords(str_replace(['_', '-'], ' ', $value ?? 'Unknown'));
     }
 }
-
-

@@ -30,6 +30,7 @@ class UserResource extends JsonResource
             'is_active' => (bool) $this->is_active,
             'is_hqcc_leader' => $this->resource->isHqccLeader(),
             'permissions' => [
+                'can_manage_hazard_maps' => app(\App\Services\Web\WebAccessPolicy::class)->allows($this->resource, 'geospatial_analytics', 'manage_hazards'),
                 'can_approve_requests' => app(\App\Services\Web\WebAccessPolicy::class)->allows($this->resource, 'resources_requests', 'approve'),
                 'can_manage_personnel' => $this->resource->canManagePersonnel(),
                 'web_modules' => app(\App\Services\Web\WebAccessPolicy::class)->modulesFor($this->resource),
@@ -37,11 +38,11 @@ class UserResource extends JsonResource
             'role' => [
                 'role_id' => $loadedRole?->role_id ?? $roleKey,
                 'role_key' => $roleKey,
-                'assigned_role_key' => $loadedRole?->role_key,
+                'assigned_role_key' => $this->resource->assignedRoleKey(),
                 'role_name' => $roleName,
+                'base_role_key' => $loadedRole?->base_role_key,
             ],
         ];
     }
 }
-
 

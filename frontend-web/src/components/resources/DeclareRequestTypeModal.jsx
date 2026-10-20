@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  AlertCircle,
   Database,
   Loader2,
   Plus,
@@ -22,6 +23,7 @@ export default function DeclareRequestTypeModal({
     storage_location: 'Warehouse A',
     expiration_date: '',
   })
+  const [fieldErrors, setFieldErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -30,14 +32,29 @@ export default function DeclareRequestTypeModal({
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: null }))
+    }
+    if (error) setError(null)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const errors = {}
     if (!formData.name.trim()) {
-      setError('Please provide a resource name.')
+      errors.name = 'Please provide a resource name.'
+    }
+    if (formData.quantity === '' || isNaN(Number(formData.quantity)) || Number(formData.quantity) < 0) {
+      errors.quantity = 'Stock quantity must be 0 or greater.'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      setError('Please fill out the required fields.')
       return
     }
+
+    setFieldErrors({})
 
     try {
       setSubmitting(true)
@@ -72,8 +89,14 @@ export default function DeclareRequestTypeModal({
     }
   }
 
+  const handleClose = () => {
+    setFieldErrors({})
+    setError(null)
+    onClose()
+  }
+
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="modal-backdrop" role="presentation" onClick={handleClose}>
       <section
         className="modal-panel declare-type-modal"
         role="dialog"
@@ -94,17 +117,18 @@ export default function DeclareRequestTypeModal({
             className="modal-close"
             type="button"
             aria-label="Close modal"
-            onClick={onClose}
+            onClick={handleClose}
           >
             <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
+        <form onSubmit={handleSubmit} className="modal-form" noValidate>
           <div className="modal-body">
             {error && (
-              <div className="form-error-banner" role="alert">
-                {error}
+              <div className="form-error-banner" role="alert" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                <span>{error}</span>
               </div>
             )}
 
@@ -124,12 +148,17 @@ export default function DeclareRequestTypeModal({
                   id="field-name"
                   name="name"
                   type="text"
-                  required
                   placeholder="e.g. Hygiene Kits (Family), Heavy Duty Tarps"
                   value={formData.name}
                   onChange={handleChange}
-                  className="form-control"
+                  className={`form-control ${fieldErrors.name ? 'is-invalid' : ''}`}
+                  autoFocus
                 />
+                {fieldErrors.name && (
+                  <span className="field-error-text">
+                    <AlertCircle size={12} /> {fieldErrors.name}
+                  </span>
+                )}
               </div>
 
               <div className="form-field">
@@ -189,8 +218,13 @@ export default function DeclareRequestTypeModal({
                   placeholder="0"
                   value={formData.quantity}
                   onChange={handleChange}
-                  className="form-control"
+                  className={`form-control ${fieldErrors.quantity ? 'is-invalid' : ''}`}
                 />
+                {fieldErrors.quantity && (
+                  <span className="field-error-text">
+                    <AlertCircle size={12} /> {fieldErrors.quantity}
+                  </span>
+                )}
               </div>
 
               <div className="form-field">
@@ -224,7 +258,7 @@ export default function DeclareRequestTypeModal({
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={submitting}
             >
               Cancel

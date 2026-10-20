@@ -8,31 +8,27 @@ use Illuminate\Http\Request;
 class WebAccessPolicy
 {
     public const MODULES = [
-        'super_admin' => [
-            'dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests',
-            'reports_documentation', 'personnel_access', 'profile', 'notifications', 'inquiries',
-        ],
-        'hq_leader' => [
-            'dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests',
-            'reports_documentation', 'personnel_access', 'profile', 'notifications',
-        ],
-        'hq_personnel' => [
-            'dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests',
-            'reports_documentation', 'profile', 'notifications',
-        ],
-        'rescuer' => ['dashboard', 'geospatial_analytics', 'profile', 'notifications'],
+        'chair' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
+        'operations_admin' => ['personnel_access', 'profile', 'notifications', 'inquiries'],
+        'mitigation_prevention' => ['dashboard', 'geospatial_analytics', 'reports_documentation', 'profile', 'notifications'],
+        'preparedness' => ['dashboard', 'geospatial_analytics', 'reports_documentation', 'profile', 'notifications'],
+        'response' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
+        'recovery_rehabilitation' => ['dashboard', 'geospatial_analytics', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
+        'rescuer' => [],
+        'household_resident' => [],
     ];
 
     public function modulesFor(User $user): array
     {
-        if (! $user->is_active || ($user->roleKey() === 'hq_leader' && ! $user->isHqccLeader())) {
+        if (! $user->is_active || ($user->attributes['deleted_at'] ?? null)) {
             return [];
         }
 
-        if ($user->roleKey() === 'super_admin') return self::MODULES['super_admin'];
+        $roleKey = $user->roleKey();
         $role = $user->relationLoaded('role') ? $user->getRelation('role') : null;
-        if ($role?->web_modules !== null) return array_values(array_intersect((array) $role->web_modules, self::MODULES['super_admin']));
-        return self::MODULES[$user->roleKey()] ?? [];
+        $allowedModules = self::MODULES[$roleKey] ?? [];
+        if ($role?->web_modules !== null) return array_values(array_intersect((array) $role->web_modules, $allowedModules));
+        return $allowedModules;
     }
 
     public function allows(?User $user, string $module, string $action = 'view'): bool
@@ -42,20 +38,24 @@ class WebAccessPolicy
         }
 
         $roleKey = $user->roleKey();
-        if ($roleKey === 'hq_leader' && ! $user->isHqccLeader()) {
-            return false;
-        }
         $modules = $this->modulesFor($user);
         if ($module === 'global_search') {
-            return $modules !== [];
+            return $modules !== [] && $roleKey !== 'operations_admin';
         }
         if (! in_array($module, $modules, true)) {
             return false;
         }
 
-        if ($action !== 'approve' || $roleKey === 'super_admin') return true;
+        if ($action === 'manage_hazards' && $module === 'geospatial_analytics') return in_array($roleKey, ['chair', 'mitigation_prevention', 'preparedness'], true);
+
+        if ($action === 'approve' && $module === 'resources_requests') return $roleKey === 'chair';
+        if ($action === 'approve' && $module === 'response_operations') return $roleKey === 'chair';
+        if ($action === 'publish_alert' && $module === 'response_operations') return $roleKey === 'chair';
+        if ($action === 'create_dispatch' && $module === 'response_operations') return in_array($roleKey, ['chair', 'response'], true);
+        if ($action !== 'approve') return true;
+
         $role = $user->relationLoaded('role') ? $user->getRelation('role') : null;
-        return $role?->can_approve_requests !== null ? (bool) $role->can_approve_requests : $roleKey === 'hq_leader';
+        return $role?->can_approve_requests !== null && (bool) $role->can_approve_requests;
     }
 
     public function moduleForRequest(Request $request): ?string
@@ -95,9 +95,13 @@ class WebAccessPolicy
     public function actionForRequest(Request $request): string
     {
         $path = trim(preg_replace('#^api/v\d+/#', '', $request->path()), '/');
+        $method = strtoupper($request->method());
 
-        return preg_match('#^resource-requests/[^/]+/(validate|forward|return|complete)$#', $path)
-            ? 'approve'
-            : 'view';
+        if (preg_match('#^resource-requests/[^/]+/(validate|forward|return|complete)$#', $path)) return 'approve';
+        if (preg_match('#^dispatches(?:/[^/]+)?$#', $path) && $method === 'POST') return 'create_dispatch';
+        if (preg_match('#^disaster-events(?:/[^/]+/broadcasts)?$#', $path) && $method === 'POST') return 'publish_alert';
+        if (preg_match('#^dispatches/[^/]+/complete$#', $path) && $method === 'POST') return 'approve';
+
+        return 'view';
     }
 }

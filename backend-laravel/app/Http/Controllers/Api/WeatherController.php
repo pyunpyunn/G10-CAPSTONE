@@ -45,6 +45,11 @@ class WeatherController extends Controller
         return $this->refreshResponse(fn () => $this->service->refreshEvent($eventId));
     }
 
+    public function officialAdvisories(\App\Services\Shared\OfficialWeatherAdvisoryService $advisories): JsonResponse
+    {
+        return response()->json(['data' => $advisories->overview()]);
+    }
+
     private function refreshResponse(callable $refresh): JsonResponse
     {
         try {

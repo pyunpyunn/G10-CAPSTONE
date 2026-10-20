@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import {
   CheckCircle2,
@@ -46,8 +46,19 @@ export default function RequestWorkflowPage() {
 
   // Live Tracking Drawer & Action States
   const [inspectingRequest, setInspectingRequest] = useState(null)
+  const [drawerMode, setDrawerMode] = useState('view') // 'view' | 'tracking'
   const [isProcessing, setIsProcessing] = useState(false)
   const [successToast, setSuccessToast] = useState(null)
+
+  const handleViewRequest = (row) => {
+    setDrawerMode('view')
+    setInspectingRequest(row)
+  }
+
+  const handleTrackLive = (row) => {
+    setDrawerMode('tracking')
+    setInspectingRequest(row)
+  }
 
   const loader = useCallback(
     () =>
@@ -56,11 +67,10 @@ export default function RequestWorkflowPage() {
         per_page: 20,
         search,
         status,
-        urgency,
         source: source === 'all' ? undefined : source,
         workflow: external ? 'approval' : 'monitoring',
       }),
-    [page, search, status, urgency, source, external],
+    [page, search, status, source, external],
   )
 
   const { data, error, loading, refresh } = useModuleData(loader)
@@ -139,7 +149,12 @@ export default function RequestWorkflowPage() {
   const rawRequests = data?.requests?.data
   const totalCount = data?.requests?.total ?? rawRequests?.length ?? 0
 
-  const filteredRequests = rawRequests || []
+  // Client-side urgency filtering
+  const filteredRequests = useMemo(() => {
+    const requests = rawRequests || []
+    if (urgency === 'all') return requests
+    return requests.filter((r) => r.urgency?.key === urgency)
+  }, [rawRequests, urgency])
 
   const hasActiveFilters = search || source !== 'all' || status !== 'all' || urgency !== 'all'
 
@@ -349,13 +364,13 @@ export default function RequestWorkflowPage() {
             <tbody>
               {loading && filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={external ? 9 : 10} style={{ textAlign: 'center', padding: '36px 16px' }}>
+                  <td colSpan={external ? 8 : 9} style={{ textAlign: 'center', padding: '36px 16px' }}>
                     <LoadingState label="Loading requests..." />
                   </td>
                 </tr>
               ) : filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={external ? 9 : 10} style={{ textAlign: 'center', padding: '36px 16px' }}>
+                  <td colSpan={external ? 8 : 9} style={{ textAlign: 'center', padding: '36px 16px' }}>
                     <EmptyState
                       title="No resource requests found"
                       message={
@@ -449,7 +464,7 @@ export default function RequestWorkflowPage() {
                         <td>
                           <div
                             style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-2)', cursor: 'pointer' }}
-                            onClick={() => setInspectingRequest(row)}
+                            onClick={() => handleTrackLive(row)}
                             title="Inspect live tracking"
                           >
                             {row.handoff?.label || 'Awaiting handoff'}
@@ -471,7 +486,7 @@ export default function RequestWorkflowPage() {
                                 type="button"
                                 className="button secondary"
                                 style={{ padding: '5px 10px', fontSize: '11.5px' }}
-                                onClick={() => setInspectingRequest(row)}
+                                onClick={() => handleViewRequest(row)}
                                 title="View Request"
                               >
                                 <Eye size={12} />
@@ -504,7 +519,7 @@ export default function RequestWorkflowPage() {
                                 type="button"
                                 className="button secondary"
                                 style={{ padding: '5px 10px', fontSize: '11.5px' }}
-                                onClick={() => setInspectingRequest(row)}
+                                onClick={() => handleTrackLive(row)}
                                 title="Status Tracking of Requests"
                               >
                                 <Truck size={12} />
@@ -514,7 +529,7 @@ export default function RequestWorkflowPage() {
                                 type="button"
                                 className="button secondary"
                                 style={{ padding: '5px 10px', fontSize: '11.5px' }}
-                                onClick={() => setInspectingRequest(row)}
+                                onClick={() => handleViewRequest(row)}
                                 title="View Request"
                               >
                                 <Eye size={12} />
@@ -556,10 +571,11 @@ export default function RequestWorkflowPage() {
       <ResourceRequestDetailDrawer
         request={inspectingRequest}
         isOpen={Boolean(inspectingRequest)}
+        mode={drawerMode}
         onClose={() => setInspectingRequest(null)}
         onValidateAndForward={handleValidateAndForwardFromDrawer}
         onReturn={handleReturnFromDrawer}
-        onEdit={(req) => open(req, 'edit')}
+        onEdit={(req) => open(req, 'view')}
         canApprove={canApprove}
         isProcessing={isProcessing}
       />
