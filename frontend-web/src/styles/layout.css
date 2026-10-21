@@ -171,47 +171,40 @@
   margin: 0 12px 8px;
   padding: 4px 6px;
   overflow: hidden;
-  color: #ffffff;
-  background: var(--nav);
-  border-radius: 2px;
-  line-height: 1;
-  letter-spacing: 0;
-  white-space: nowrap;
   transition: margin 220ms cubic-bezier(0.19, 1, 0.22, 1);
 }
 
-.left-sidebar-wordmark {
+.left-sidebar-brand-img {
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(10, 16, 27, 0.4));
+  transition: all 220ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.left-sidebar-brand-full {
   display: block;
-  width: 100%;
-  max-width: 220px;
-  max-height: 46px;
-  height: auto;
-  aspect-ratio: 1756 / 368;
-  flex: 0 1 220px;
+  height: 38px;
+  max-height: 42px;
 }
 
-.left-sidebar-wordmark .text-logo-pin {
-  fill: #c72e32;
-}
-
-.left-sidebar-pin-mark {
+.left-sidebar-brand-icon {
   display: none;
-  width: 27px;
-  height: 39px;
-  flex: 0 0 auto;
-  color: #c72e32;
+  height: 34px;
+  max-height: 36px;
 }
 
 .app-shell.left-hidden .left-sidebar-brand {
-  margin-right: 8px;
-  margin-left: 8px;
+  margin-right: 6px;
+  margin-left: 6px;
+  padding: 4px 2px;
 }
 
-.app-shell.left-hidden:not(.left-peeking):not(.left-pinned) .left-sidebar-wordmark {
+.app-shell.left-hidden:not(.left-peeking):not(.left-pinned) .left-sidebar-brand-full {
   display: none;
 }
 
-.app-shell.left-hidden:not(.left-peeking):not(.left-pinned) .left-sidebar-pin-mark {
+.app-shell.left-hidden:not(.left-peeking):not(.left-pinned) .left-sidebar-brand-icon {
   display: block;
 }
 

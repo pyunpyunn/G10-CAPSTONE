@@ -76,9 +76,14 @@ class TrackingAidForwardingService
 
     public function syncRequestStatus(string $requestId, string $status, ?Carbon $updatedAt = null): void
     {
-        if (DB::transactionLevel() > 0) {
-            SyncTrackingAidRequest::dispatch($requestId)->onConnection('trackingaid_outbox');
+        if (static::$isUnreachable) {
+            return;
+        }
 
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit(function () use ($requestId, $status, $updatedAt): void {
+                $this->syncRequestStatus($requestId, $status, $updatedAt);
+            });
             return;
         }
 

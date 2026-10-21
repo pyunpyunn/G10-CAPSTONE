@@ -506,7 +506,9 @@ function FitBarangay({ center, bounds, zoom }) {
       return
     }
 
-    map.setView(center, zoom)
+    if (center && Number.isFinite(center[0]) && Number.isFinite(center[1])) {
+      map.setView(center, zoom)
+    }
   }, [bounds, center, map, zoom])
 
   return null

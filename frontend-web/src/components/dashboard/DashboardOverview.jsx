@@ -10,14 +10,13 @@ import {
 } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
+  ArrowUpRight,
   CloudSun,
   Map,
   PackageCheck,
   Thermometer,
   Wind,
 } from 'lucide-react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import { getMappingOverview } from '../../api/mappingApi'
 import { getWeatherWorkspace } from '../../api/weatherApi'
 import {
@@ -32,7 +31,8 @@ import EmptyState from '../ui/EmptyState'
 import LoadingState from '../ui/LoadingState'
 
 export default function DashboardOverview({
-  dashboard,
+  weatherState,
+  requestsState,
   hasActiveEvent,
   onOpenModule,
   disasterAction,
@@ -42,19 +42,17 @@ export default function DashboardOverview({
 
   return (
     <aside className="dashboard-overview" aria-label="Dashboard side information">
-      <div className="dashboard-layout-actions">{disasterAction}</div>
-      <WeatherCard weather={latestSavedWeather || dashboard.weather} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
-      <DashboardMapCard
-        hasActiveEvent={hasActiveEvent}
-        reportedHouseholds={dashboard.households.reported}
-        onOpenMap={() => onOpenModule('/mapping')}
-      />
-      <RequestCard requests={dashboard.requests} onOpenRequests={() => onOpenModule('/resources-requests')} />
+      {disasterAction && <div className="dashboard-layout-actions">{disasterAction}</div>}
+      <WeatherCard weatherState={weatherState} latestSavedWeather={latestSavedWeather} hasActiveEvent={hasActiveEvent} onOpenWeather={() => onOpenModule('/weather')} />
+      <DashboardMapCard hasActiveEvent={hasActiveEvent} onOpenMap={() => onOpenModule('/mapping')} />
+      <RequestCard requestsState={requestsState} onOpenRequests={() => onOpenModule('/resources-requests')} />
     </aside>
   )
 }
 
-function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
+function WeatherCard({ weatherState, latestSavedWeather, hasActiveEvent, onOpenWeather }) {
+  const weather = weatherState?.data || latestSavedWeather
+  const isLoading = weatherState?.isLoading && !weather
   const hasWeather = Boolean(weather)
 
   return (
@@ -62,11 +60,13 @@ function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
       <div className="panel-head">
         <span className="panel-title"><CloudSun size={15} />Weather update</span>
         <button className="panel-link" type="button" onClick={onOpenWeather}>
-          Full view <FontAwesomeIcon icon={faArrowRight} />
+          Full view <ArrowUpRight size={14} />
         </button>
       </div>
 
-      {hasWeather ? (
+      {isLoading ? (
+        <LoadingState inline />
+      ) : hasWeather ? (
         <div className="dashboard-weather-compact">
           <div className="dashboard-weather-icon">
             <CloudSun size={30} />
@@ -96,10 +96,14 @@ function WeatherCard({ weather, hasActiveEvent, onOpenWeather }) {
 function DashboardMapCard({ hasActiveEvent, reportedHouseholds, onOpenMap }) {
   const { data, loading: isLoading } = useModuleData(getMappingOverview, ['mapping', 'households', 'dispatch', 'disasters'])
   const workspace = useMemo(() => data ? { ...defaultWorkspace, ...data } : defaultWorkspace, [data])
-  const mapCenter = useMemo(() => [
-    workspace.barangay.center.latitude,
-    workspace.barangay.center.longitude,
-  ], [workspace.barangay.center.latitude, workspace.barangay.center.longitude])
+  const mapCenter = useMemo(() => {
+    const lat = Number(workspace?.barangay?.center?.latitude)
+    const lng = Number(workspace?.barangay?.center?.longitude)
+    return [
+      Number.isFinite(lat) ? lat : 14.599512,
+      Number.isFinite(lng) ? lng : 120.9842,
+    ]
+  }, [workspace?.barangay?.center?.latitude, workspace?.barangay?.center?.longitude])
   const mapBounds = useMemo(() => workspace.barangay.bounds, [workspace.barangay.bounds])
   const boundaryMask = useMemo(() => outsideBoundaryMask(workspace.barangay.boundary), [workspace.barangay.boundary])
   const households = hasActiveEvent ? workspace.households : []
@@ -109,7 +113,7 @@ function DashboardMapCard({ hasActiveEvent, reportedHouseholds, onOpenMap }) {
       <div className="panel-head">
         <span className="panel-title"><Map size={15} />Household map</span>
         <button className="panel-link" type="button" onClick={onOpenMap}>
-          Full view <FontAwesomeIcon icon={faArrowRight} />
+          Full view <ArrowUpRight size={14} />
         </button>
       </div>
 
@@ -178,48 +182,65 @@ function FitBarangay({ center, bounds, zoom }) {
   const map = useMap()
 
   useEffect(() => {
-    if (bounds?.length === 2) {
+    if (bounds?.length === 2 && bounds.every((b) => Array.isArray(b) && b.length === 2 && b.every(Number.isFinite))) {
       map.fitBounds(bounds, { padding: [12, 12], maxZoom: zoom })
       return
     }
 
-    map.setView(center, zoom)
+    if (center && Number.isFinite(center[0]) && Number.isFinite(center[1])) {
+      map.setView(center, zoom || 17)
+    }
   }, [bounds, center, map, zoom])
 
   return null
 }
 
-function RequestCard({ requests, onOpenRequests }) {
+function RequestCard({ requestsState, onOpenRequests }) {
+  const requests = requestsState?.data || {
+    needs_validation: 0,
+    validated: 0,
+    released: 0,
+    latest: [],
+  }
+  const isLoading = requestsState?.isLoading
+
   return (
     <section className="overview-card">
       <div className="panel-head">
         <span className="panel-title"><PackageCheck size={15} />Requests</span>
         <button className="panel-link" type="button" onClick={onOpenRequests}>
-          Full view <FontAwesomeIcon icon={faArrowRight} />
+          Full view <ArrowUpRight size={14} />
         </button>
       </div>
-      <div className="dashboard-side-metrics">
-        <div><strong>{requests.needs_validation}</strong><span>Needs validation</span></div>
-        <div><strong>{requests.validated}</strong><span>Validated</span></div>
-        <div><strong>{requests.released}</strong><span>Released</span></div>
-      </div>
-      {requests.latest.length > 0 ? (
-        <div className="overview-request-table">
-          <table>
-            <thead><tr><th>Request from</th><th>Request</th><th>Status</th></tr></thead>
-            <tbody>
-              {requests.latest.map((request) => (
-                <tr key={request.request_id}>
-                  <td>{request.requested_by}</td>
-                  <td>{request.item_name}</td>
-                  <td><Badge tone={statusTone(request.status_key)}>{request.validation_status}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+      {isLoading ? (
+        <LoadingState inline />
       ) : (
-        <EmptyState title="No requests yet" message="Requests will appear after records are received for validation." />
+        <>
+          <div className="dashboard-side-metrics">
+            <div><strong>{requests.needs_validation}</strong><span>Needs validation</span></div>
+            <div><strong>{requests.validated}</strong><span>Validated</span></div>
+            <div><strong>{requests.released}</strong><span>Released</span></div>
+          </div>
+          {requests.latest.length > 0 ? (
+            <div className="overview-request-table">
+              <table>
+                <thead><tr><th>Request from</th><th>Request</th><th>Status</th></tr></thead>
+                <tbody>
+                  {requests.latest.map((request) => (
+                    <tr key={request.request_id}>
+                      <td>{request.requested_by}</td>
+                      <td>{request.item_name}</td>
+                      <td><Badge tone={statusTone(request.status_key)}>{request.validation_status}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="No requests yet" message="Requests will appear after records are received for validation." />
+          )}
+        </>
       )}
     </section>
   )

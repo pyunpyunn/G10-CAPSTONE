@@ -33,7 +33,7 @@ class WebAccessPolicy
 
     public function allows(?User $user, string $module, string $action = 'view'): bool
     {
-        if (! $user || ! $user->is_active || ($user->attributes['deleted_at'] ?? null)) {
+        if (! $user || $user->is_active === false || ($user->attributes['deleted_at'] ?? null)) {
             return false;
         }
 
