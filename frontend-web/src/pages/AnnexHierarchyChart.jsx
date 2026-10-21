@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { annexHTeamCode, annexHTeamName, roleAccountsForCommittee, teamsForCommittee } from '../utils/annexHTeamHierarchy'
 import '../styles/annex-chart.css'
 const cs=[166,304,442,580,718,856,994],C='Sub-committee';
@@ -27,13 +28,20 @@ const codes={liv:'LHT',inf:'ISH',pda:'PDANA',rda:'RDANA',sar:'SRR',evc:'ECM',rel
 const committeeKeys={mit:'mitigation_prevention',pre:'preparedness',rec:'recovery_rehabilitation',res:'response'}
 const initials=name=>name.split(/\s+/).map(s=>s[0]).join('').slice(0,2)
 export default function AnnexHierarchyChart({workspace,onAccounts,onTeams}) {
- const [selection,setSelection]=useState('sar'),[query,setQuery]=useState(''),[closed,setClosed]=useState(false),[wide,setWide]=useState(false)
+ const [params]=useSearchParams()
+ const [selection,setSelection]=useState(()=>params.get('team_id')?'record:'+params.get('team_id'):'sar'),[query,setQuery]=useState(''),[closed,setClosed]=useState(false),[wide,setWide]=useState(false)
  const teams=workspace.teams||[], responders=workspace.responders||[]
  const nodes=layout.map(n=>({...n,teams:teams.filter(t=>annexHTeamCode(t)===codes[n.id])}))
  const used=new Set(nodes.flatMap(n=>n.teams.map(t=>String(t.team_id))))
  const extra=teams.filter(t=>t.team_code!=='HQCC'&&!used.has(String(t.team_id)))
  extra.forEach((t,i)=>nodes.push({id:'team-'+t.team_id,label:annexHTeamName(t),tag:'Team',k:'unc',p:'root',x:10+(i%5)*226,y:610+Math.floor(i/5)*76,w:210,h:60,teams:[t]}))
- const selected=nodes.find(n=>n.id===selection)||nodes[0]
+ const normalize=value=>String(value||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim()
+ const tokens=normalize(query).split(/\s+/).filter(Boolean)
+ const matches=values=>tokens.every(token=>normalize(values.join(' ')).includes(token))
+ const matchingPeople=tokens.length?responders.filter(r=>matches([r.full_name,r.username,r.responder_code,r.role_name,r.title])):[]
+ const matchingNodes=tokens.length?nodes.filter(n=>matches([n.label,n.tag,codes[n.id],...n.teams.flatMap(t=>[t.team_name,t.team_code,t.team_type,annexHTeamName(t)])])):[]
+ const matchingNodeIds=new Set([...matchingNodes.map(n=>n.id),...nodes.filter(n=>n.teams.some(t=>matchingPeople.some(r=>String(r.team_id)===String(t.team_id)))||matchingPeople.some(r=>r.role_key===(committeeKeys[n.id]||({root:'chair',ops:'operations_admin'})[n.id]))).map(n=>n.id)])
+ const selected=nodes.find(n=>n.id===selection||n.teams.some(t=>'record:'+t.team_id===selection))||nodes[0]
  const chain=[]; let current=selected
  while(current){chain.unshift(current);current=nodes.find(n=>n.id===current.p)}
  const branch=committeeKeys[selected.id]
@@ -47,12 +55,13 @@ export default function AnnexHierarchyChart({workspace,onAccounts,onTeams}) {
  const fact=(label,value)=><div className="row" key={label}><span>{label}</span><span>{value}</span></div>
  return <div className="annex-chart-page"><div className="wrap">
  <header className="top"><h1>BDRRMC Organizational Structure (Annex H)</h1><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><div className="seg" role="group" aria-label="View"><button type="button" onClick={onTeams}>Team management</button><button type="button" aria-current="page">Annex H hierarchy</button></div><button className="btn" onClick={onAccounts}>Back to accounts</button></div></header>
- <div className="bar"><input className="search" type="search" placeholder="Find a team or committee…" aria-label="Find a team or committee" value={query} onChange={e=>setQuery(e.target.value)}/></div>
+ <div className="bar"><input className="search" type="search" placeholder="Find a person, team or committee…" aria-label="Find a person, team or committee" value={query} onChange={e=>setQuery(e.target.value)}/></div>
+ {tokens.length>0&&<section className="hierarchy-search-results" aria-label="Search results"><div role="status">{matchingPeople.length+matchingNodes.length} result{matchingPeople.length+matchingNodes.length===1?'':'s'} for “{query.trim()}”</div>{matchingPeople.map(r=><button type="button" className="link" key={'person-'+r.responder_id} onClick={()=>onAccounts(r)}><span><b>{r.full_name}</b><small>{r.role_name||r.title||'Personnel'}</small></span><span>View profile ›</span></button>)}{matchingNodes.map(n=><button type="button" className="link" key={n.id} onClick={()=>choose(n.id)}><span><b>{n.label}</b><small>{n.teams.map(t=>t.team_code).join(', ')||n.tag}</small></span><span>View details ›</span></button>)}{!matchingPeople.length&&!matchingNodes.length&&<p className="note">No matching person, team or committee.</p>}</section>}
  <div className={'work'+(closed?' closed':'')+(wide?' wide':'')}>
  <div className="canvaswrap"><div className="chead"><strong style={{fontSize:13}}>Organizational chart</strong><div className="legend"><span><i style={{background:'var(--navy)'}}/>Chairperson</span><span><i style={{background:'var(--blue)'}}/>Sub-committee</span><span><i style={{border:'1px solid var(--border2)',background:'var(--surface)'}}/>Team</span><span><i style={{border:'1px dashed var(--amber)'}}/>Technical role or unclassified</span></div></div>
  <div className="notice">{extra.length?`${extra.length} additional team${extra.length===1?'':'s'} shown below the reference structure. `:''}Select a team or committee to view its recorded leaders and roster.</div>
  <div className="scroll" tabIndex={0} aria-label="Scrollable chart area"><div className="chart" style={{height}}><svg width="1140" height={height} aria-hidden="true">{S.map((s,i)=><line key={i} x1={s[0]} y1={s[1]} x2={s[2]} y2={s[3]} stroke={s[4].split(' ').some(id=>chain.some(n=>n.id===id))?'var(--ring)':'var(--line)'} strokeWidth={s[4].split(' ').some(id=>chain.some(n=>n.id===id))?3:2}/>)}{extra.map((t,i)=><path key={t.team_id} d={`M580 470 V590 H${115+(i%5)*226} V${610+Math.floor(i/5)*76}`} fill="none" stroke="var(--line)" strokeWidth="2"/>)}</svg>
- {nodes.map(n=><button type="button" key={n.id} className={'nd '+(n.k||'')+(selected.id===n.id?' on':'')+(!query||[n.label,...n.teams.map(t=>t.team_name)].join(' ').toLowerCase().includes(query.toLowerCase().trim())?'':' dim')} style={{left:n.x,top:n.y,width:n.w,height:n.h}} onClick={()=>choose(n.id)} aria-pressed={selected.id===n.id}><small>{n.tag}{selected.id===n.id?' · Selected':''}</small><span>{n.label}</span></button>)}</div></div></div>
+ {nodes.map(n=><button type="button" key={n.id} className={'nd '+(n.k||'')+(selected.id===n.id?' on':'')+(!tokens.length||matchingNodeIds.has(n.id)?'':' dim')} style={{left:n.x,top:n.y,width:n.w,height:n.h}} onClick={()=>choose(n.id)} aria-pressed={selected.id===n.id}><small>{n.tag}{selected.id===n.id?' · Selected':''}</small><span>{n.label}</span></button>)}</div></div></div>
  {closed && <button type="button" className="panel-tab" aria-label="Expand details panel" aria-expanded={false} aria-controls="annex-details" onClick={()=>setClosed(false)}>Panel</button>}
  <aside className="panel" hidden={closed} aria-label="Selected details" aria-live="polite"><div className="phead"><div className="ptitle"><div className="t">{selected.tag}</div><h2>{selected.label}</h2></div><div style={{display:'flex',gap:6}}><button className="ib" id="wide" aria-label="Widen panel" onClick={()=>{setWide(!wide);setClosed(false)}}>↔</button><button className="ib" id="close" aria-label={closed?'Expand details panel':'Collapse details panel'} aria-expanded={!closed} aria-controls="annex-details" onClick={()=>setClosed(!closed)}><span className="ch">»</span></button></div></div>
  <div className="pbody" id="annex-details" inert={closed}><div className="crumb">{chain.map(n=>n.label).join(' › ')}</div>
