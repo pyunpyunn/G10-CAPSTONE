@@ -1,3 +1,4 @@
+import PlanningModal from '../ui/PlanningModal'
 import { useState } from 'react'
 import { importHazardLayer, deleteHazardLayer } from '../../api/mappingApi'
 import './hazard-planning.css'
@@ -33,9 +34,13 @@ export default function HazardPlanning({ workspace, purokId, hazardType, user, r
     setBusy(true); setError('')
     try { await deleteHazardLayer(id); setSuccess('Hazard map removed.'); refresh() } catch (failure) { setError(failure.response?.data?.message || 'Removal failed.') } finally { setBusy(false) }
   }
-  return <div className="hazard-planning">
-    <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>Hazard planning · {layers.length} maps {open ? '▴' : '▾'}</button>
-    {open && <div className="hazard-planning-body">
+  return <>
+    <div className="hazard-planning">
+    <button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>Hazard planning · {layers.length} maps <span aria-hidden="true">↗</span></button>
+    </div>
+    <PlanningModal title="Hazard planning" isOpen={open} onClose={() => setOpen(false)}>
+    <div className="hazard-planning hazard-planning-modal">
+    <div className="hazard-planning-body">
       <p><b>Mambaling, Cebu City hazard map</b> · Government hazard data is loaded automatically and clipped to the barangay boundary.</p>
       {government.length > 0 && <p>Shaded areas show the source agency’s susceptibility classes. These are published hazard maps, not live flood observations. Purok filters apply to local assessments; government coverage remains barangay-wide.</p>}
       {!layers.length && <p>No official hazard maps imported. Request maps from C/MPDO or C/MDRRMO, or obtain GeoRisk data. Unmapped areas have unknown risk.</p>}
@@ -49,6 +54,8 @@ export default function HazardPlanning({ workspace, purokId, hazardType, user, r
       </details>
       {success && <p role="status">{success}</p>}
       {error && <p role="alert">{error}</p>}
-    </div>}
-  </div>
+    </div>
+    </div>
+    </PlanningModal>
+  </>
 }

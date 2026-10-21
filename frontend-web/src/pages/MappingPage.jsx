@@ -107,7 +107,6 @@ export default function MappingPage() {
   }
   const row = selected?.row
   const content = <section className={`mapping-reference ${fullscreen ? 'mapping-fullscreen' : ''}`} aria-label="Mapping">
-    {workspace && <HazardPlanning workspace={workspace} purokId={purokId} hazardType={hazardType} user={user} refresh={refresh} />}
     {loading && !workspace ? <div className="empty" role="status">Loading map…</div> : error && !workspace ? <div className="form-error" role="alert">{error}<button type="button" onClick={refresh}>Retry</button></div> : workspace && <div className={`mapw ${fullscreen ? 'full' : ''}`}>
       <MappingScene workspace={mapWorkspace} planningFeatures={planningFeatures} hazardType={hazardType} households={households} sites={sites} routes={plottedRoutes} siteRoute={selectedSiteRoute?.route} layers={liveLayers} basemap={basemap} selected={selected} onSelect={select} onReady={onMapReady} fullscreen={fullscreen} />
       <div className={`fl lay ${layersOpen ? '' : 'min'}`}><button type="button" className="lh" onClick={() => setLayersOpen(!layersOpen)} aria-expanded={layersOpen}>Layers<i>⌃</i></button>{layerItems.map(([key,label]) => <div className={`ly ${liveLayers[key] ? 'on' : ''} ${!active && !['office','hazards'].includes(key) ? 'dis' : ''}`} key={key}><button type="button" className="layer-toggle" aria-pressed={liveLayers[key]} disabled={!active && !['office','hazards'].includes(key)} onClick={() => { setLayers(current => ({ ...current, [key]:!current[key] })); clear() }}><span className="sw"><i /></span>{label}</button>{key === 'households' && active && layers.households && <span className="sd">{filters.map(filter => <button type="button" className={`filter-dot ${visibleStatuses[filter.key] ? '' : 'off'}`} key={filter.key} style={{ '--c':statusColor(filter.key) }} title={filter.label} aria-label={`Show ${filter.label.toLowerCase()} households`} aria-pressed={visibleStatuses[filter.key]} onClick={() => setVisibleStatuses(current => ({ ...current,[filter.key]:!current[filter.key] }))} />)}</span>}</div>)}{layers.hazards && <HazardMapControls workspace={workspace} hazardType={hazardType} onHazardType={setHazardType} onFitHazards={fitHazards} />}</div>
@@ -127,6 +126,7 @@ export default function MappingPage() {
         {selected.kind === 'office' && <Fact label="Role" value="Dispatch origin" />}{selected.kind === 'team' && <><Fact label="Responder" value={row.responder_name} /><Fact label="Area" value={row.assigned_area} /><Fact label="Last seen" value={row.logged_at} /></>}
       </div>}
     </div>}
+    {workspace && <HazardPlanning workspace={workspace} purokId={purokId} hazardType={hazardType} user={user} refresh={refresh} />}
   </section>
   return fullscreen ? createPortal(content, document.body) : content
 }

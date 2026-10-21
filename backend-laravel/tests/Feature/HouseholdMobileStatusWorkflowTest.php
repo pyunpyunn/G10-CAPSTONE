@@ -105,6 +105,16 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
 
         $this->assertSame(['Sitio A Alert', 'Barangay Alert'], array_column($query->recentAlerts('EVT-1', 'HH-1'), 'title'));
         $this->assertSame(['Sitio B Alert', 'Barangay Alert'], array_column($query->recentAlerts('EVT-1', 'HH-2'), 'title'));
+        DB::table('disaster_broadcasts')->where('broadcast_id', 2)->update([
+            'allowed_statuses' => json_encode(['statuses' => ['safe'], 'duration' => '12 hours']),
+        ]);
+        $alerts = $query->recentAlerts('EVT-1', 'HH-1');
+        $this->assertSame('12 hours', $alerts[0]['estimated_duration']);
+        $this->assertSame('A only', $alerts[0]['message']);
+        $this->assertNull($alerts[1]['estimated_duration']);
+        DB::table('disaster_broadcasts')->where('broadcast_id', 2)->update(['allowed_statuses' => '{invalid']);
+        $this->assertNull($query->recentAlerts('EVT-1', 'HH-1')[0]['estimated_duration']);
+
     }
 
     public function test_help_status_classification_controls_the_recorded_status(): void
