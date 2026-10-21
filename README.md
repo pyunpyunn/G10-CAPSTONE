@@ -43,6 +43,15 @@ During emergencies, household safety information, responder assignments, resourc
 | Rescuers | Receive assignments, update field status and location, and request support. |
 | Super Admin | Use system-wide administration features where enabled. |
 
+## Project Team
+
+| Role | Team member |
+| --- | --- |
+| Project Manager & Web-Mobile Developer | Niña Kathleen B. Barro |
+| Web Developer | Vinzon Arellano |
+| Rescuer Mobile Developer | Erece Joy Eria |
+| Household Mobile Developer | Vince Pacillan |
+
 ## Mambaling at a Glance
 
 The target barangay is **Mambaling, Cebu City**. These are dated reference figures, not live system counts.
@@ -164,6 +173,12 @@ npm run start:go
 ```
 
 For mobile devices, configure `EXPO_PUBLIC_API_BASE_URL` with a backend address reachable from the device. OneSignal and some native map functionality require an Expo development or production build; Expo Go is for ordinary UI testing.
+
+## Revision History
+
+| Version | Date | Description | Author(s) |
+| --- | --- | --- | --- |
+| README v1.0 | 2026-10-21 | Redesigned README with project overview, team roles, Mambaling reference data, system architecture, integrations, progress, and source attributions. | RESQPERATION project team |
 
 ## Copyright, Attribution, and Third-Party Terms
 
