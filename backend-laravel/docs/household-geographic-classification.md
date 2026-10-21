@@ -4,6 +4,8 @@ Current eligibility: a non-deleted household must link through `households.addre
 
 Saving a household home pin during setup or `PUT /api/v1/household/geotag` calls the backend geographic classifier in the same transaction. Device heartbeat locations do not change the household home address. A unique purok polygon match saves its registered `purok_id`, parent `sitio_id`, barangay ID, and registry label. Shared addresses are copied before updating a single household. A moved pin that no longer matches clears its previous automatic area assignment. Responses include `data.geographic_classification`.
 
+The mobile profile map is hidden until opened. Its pin stays fixed at the map center while the user pans, then the map center is sent to the server when panning stops. The backend validates the coordinates against the Mambaling boundary before saving and returns any validation message; the client does not use a separate polygon approximation that could disagree with that authoritative check. The map offers street/satellite basemaps. Automatic sitio/purok assignment requires verified purok polygons; without them the geotag is saved but the response reports `purok_boundaries_missing` and neither `sitio_id` nor `purok_id` can be inferred.
+
 ## Required boundary data
 
 The existing database has the Mambaling barangay boundary, sitio names, and 52 registered puroks, but no purok polygons. The barangay polygon alone cannot identify an exact sitio/purok. Obtain verified polygons covering the registered puroks; each polygon implies its parent sitio through the existing registry. Do not substitute nearest household, a name lookup, or generated regions.

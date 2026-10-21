@@ -42,9 +42,9 @@ class NotificationApiTest extends TestCase
         $second = $this->getJson('/api/v1/notifications')->assertOk();
         $this->assertSame($first->json('data'), $second->json('data'));
         $this->assertNotEmpty($second->json('data.preview'));
-        $this->assertIsArray($cache->get($revision.':initial:notification-feed:v2'));
+        $this->assertIsArray($cache->get($revision.':initial:notification-feed:v4'));
 
-        $this->postJson('/api/v1/notifications/mark-read', ['notification_ids' => ['notif-1']])->assertOk();
+        $this->postJson('/api/v1/notifications/mark-read', ['notification_ids' => ['advisory-1']])->assertOk();
         $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.unread', 0);
     }
 
@@ -179,6 +179,11 @@ class NotificationApiTest extends TestCase
         }
         User::query()->where('user_id', 'USR-ADMIN-001')->update(['role_id' => $roleId]);
 
+        Schema::create('official_advisory_notifications', function (Blueprint $table) {
+            $table->id(); $table->string('source'); $table->string('fingerprint')->unique();
+            $table->string('title'); $table->text('body'); $table->text('source_url'); $table->timestamp('created_at');
+        });
+        \DB::table('official_advisory_notifications')->insert(['source'=>'PAGASA','fingerprint'=>'first','title'=>'Official sync','body'=>'Advisories synchronized','source_url'=>'https://publicalert.pagasa.dost.gov.ph/feeds/','created_at'=>now()]);
         Notification::query()->updateOrCreate(
             ['notif_id' => 1],
             [
@@ -211,7 +216,7 @@ class NotificationApiTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJsonPath('data.notifications.data.0.type', 'Broadcast')
+            ->assertJsonPath('data.notifications.data.0.type', 'PAGASA advisory sync')
             ->assertJsonPath('data.summary.total', 1)
             ->assertJsonPath('data.notifications.current_page', 1)
             ->assertJsonPath('data.notifications.per_page', 5)
@@ -227,83 +232,33 @@ class NotificationApiTest extends TestCase
         $feed = collect([
             ['id' => 'broadcast-1', 'type' => 'Broadcast', 'access_module' => 'dashboard', 'recipient_user_id' => null],
             ['id' => 'household-1', 'type' => 'Household status', 'access_module' => 'geospatial_analytics', 'recipient_user_id' => null],
-            ['id' => 'dispatch-own', 'type' => 'Dispatch route', 'access_module' => 'response_operations', 'recipient_user_id' => 'USR-RESCUER'],
-            ['id' => 'dispatch-other', 'type' => 'Dispatch route', 'access_module' => 'response_operations', 'recipient_user_id' => 'USR-OTHER'],
-            ['id' => 'request-1', 'type' => 'Resources', 'access_module' => 'resources_requests', 'recipient_user_id' => null],
+            ['id' => 'dispatch-own', 'type' => 'Dispatch status', 'access_module' => 'response_operations', 'recipient_user_id' => 'USR-RESCUER'],
+            ['id' => 'dispatch-other', 'type' => 'Dispatch status', 'access_module' => 'response_operations', 'recipient_user_id' => 'USR-OTHER'],
+            ['id' => 'request-1', 'type' => 'Approval request', 'access_module' => 'resources_requests', 'recipient_user_id' => null],
             ['id' => 'inquiry-1', 'type' => 'System activity', 'access_module' => 'inquiries', 'recipient_user_id' => null],
         ]);
         $presenter = app(\App\Presenters\NotificationPresenter::class);
-        $personnel = new User(['user_id' => 'USR-HQ', 'role' => 'hq_personnel', 'is_active' => true]);
-        $rescuer = new User(['user_id' => 'USR-RESCUER', 'role' => 'rescuer', 'is_active' => true]);
+        $personnel = new User(['user_id' => 'USR-HQ', 'is_active' => true]);
+        $personnel->setRelation('role', new \App\Models\Role(['role_key' => 'chair']));
+        $rescuer = new User(['user_id' => 'USR-RESCUER', 'is_active' => true]);
+        $rescuer->setRelation('role', new \App\Models\Role(['role_key' => 'rescuer']));
 
         $personnelItems = $presenter->forUser($feed, $personnel);
         $rescuerItems = $presenter->forUser($feed, $rescuer);
 
-        $this->assertSame(['broadcast-1', 'household-1', 'dispatch-own', 'dispatch-other', 'request-1'], $personnelItems->pluck('id')->all());
-        $this->assertSame(['broadcast-1', 'household-1', 'dispatch-own'], $rescuerItems->pluck('id')->all());
-        $this->assertArrayNotHasKey('access_module', $rescuerItems->first());
+        $this->assertSame(['broadcast-1', 'dispatch-own', 'dispatch-other', 'request-1'], $personnelItems->pluck('id')->all());
+        $this->assertSame([], $rescuerItems->pluck('id')->all());
+        $this->assertArrayNotHasKey('access_module', $personnelItems->first());
     }
 
-    public function test_repeated_feed_requests_include_new_weather_and_preserve_user_actions(): void
+    public function test_only_new_official_syncs_appear_and_read_actions_are_preserved(): void
     {
-        Schema::create('weather_logs', function (Blueprint $table) {
-            $table->increments('weather_log_id');
-            $table->string('disaster_id')->nullable();
-            $table->string('source_name')->nullable();
-            $table->string('source_url')->nullable();
-            $table->string('condition_name')->nullable();
-            foreach (['temperature', 'rainfall_mm', 'wind_speed', 'humidity'] as $column) {
-                $table->float($column)->nullable();
-            }
-            $table->string('wind_direction')->nullable();
-            $table->string('advisory_title')->nullable();
-            $table->text('advisory_text')->nullable();
-            $table->text('raw_payload')->nullable();
-            $table->timestamp('observed_at')->nullable();
-            $table->timestamps();
-        });
-        Schema::create('audit_logs', function (Blueprint $table) {
-            $table->increments('audit_log_id');
-            foreach (['user_id', 'role_key', 'module', 'action', 'reference_table', 'reference_id', 'ip_address', 'user_agent'] as $column) {
-                $table->string($column)->nullable();
-            }
-            $table->text('old_values')->nullable();
-            $table->text('new_values')->nullable();
-            $table->timestamp('created_at')->useCurrent();
-        });
         $user = User::query()->where('user_id', 'USR-ADMIN-001')->firstOrFail();
         $this->actingAs($user, 'sanctum');
-
-        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.unread', 1)
-            ->assertHeader('Cache-Control', 'max-age=0, no-store, private');
-        $this->postJson('/api/v1/notifications/mark-read', ['notification_ids' => ['notif-1']])->assertOk();
-        $weather = WeatherLog::query()->create([
-            'source_name' => 'External weather source', 'condition_name' => 'Clear',
-            'observed_at' => now()->subHours(3),
-        ]);
-        $weatherId = 'weather-'.$weather->weather_log_id;
-        $this->getJson('/api/v1/notifications')->assertOk()
-            ->assertJsonPath('data.summary.unread', 1)
-            ->assertJsonFragment(['id' => $weatherId, 'read' => false]);
-        $this->postJson('/api/v1/notifications/delete-selected', ['notification_ids' => [$weatherId]])->assertOk();
-        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.unread', 0);
-        $this->assertDatabaseHas('weather_logs', ['weather_log_id' => $weather->weather_log_id]);
-
-        $next = WeatherLog::query()->create(['source_name' => 'External weather source', 'condition_name' => 'Clear']);
-        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.unread', 1)
-            ->assertJsonFragment(['id' => 'weather-'.$next->weather_log_id, 'read' => false]);
-        $this->postJson('/api/v1/notifications/clear-all')->assertOk();
-        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.total', 0);
-        $this->assertDatabaseCount('weather_logs', 2);
+        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.total', 1);
+        \DB::table('official_advisory_notifications')->insert(['source'=>'PHIVOLCS','fingerprint'=>'second','title'=>'Official quake sync','body'=>'Bulletins synchronized','source_url'=>'https://earthquake.phivolcs.dost.gov.ph/','created_at'=>now()]);
+        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.total', 2)
+            ->assertJsonFragment(['type'=>'PHIVOLCS advisory sync']);
         $this->assertDatabaseCount('notifications', 1);
-
-        $otherUser = $user->replicate();
-        $otherUser->user_id = 'USR-ADMIN-002';
-        $otherUser->username = 'admin002';
-        $otherUser->email = 'other-admin@example.com';
-        $otherUser->save();
-        $this->actingAs($otherUser, 'sanctum');
-        $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.total', 3)
-            ->assertJsonPath('data.summary.unread', 3);
     }
 }

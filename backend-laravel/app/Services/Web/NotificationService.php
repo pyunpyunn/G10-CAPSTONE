@@ -48,7 +48,7 @@ class NotificationService
     private function items(Request $request)
     {
         // Cache only presented arrays; apply each user's read/hidden state after the shared read.
-        $rows = app(RealtimeReadCache::class)->remember('notification-feed:v2',
+        $rows = app(RealtimeReadCache::class)->remember('notification-feed:v4',
             fn () => $this->presenter->feed($this->query->feedSources())->all());
         $items = $request->user()
             ? $this->presenter->forUser(collect($rows), $request->user())

@@ -55,9 +55,6 @@ class RescueDispatchWorkflow
             ResponderAssignment::query()->create(['assignment_id'=>$id,'assignment_code'=>'DSP-'.$now->format('Ymd').'-'.str_pad((string)$id,4,'0',STR_PAD_LEFT),'responder_id'=>$responderId,'responder_count'=>$selection['assigned_count'],'dispatch_type'=>$validated['dispatch_type']??'rescue','team_id'=>$validated['team_id']??null,'disaster_id'=>$event->event_id,'household_id'=>$validated['household_id']??null,'assigned_area'=>$validated['assigned_area'],'route_notes'=>$this->routeNotesJson($validated),'priority_level'=>$validated['priority_level'],'dispatch_notes'=>$validated['dispatch_notes']??null,'created_by_admin_id'=>$request->user()?->user_id,'status'=>$status,'assigned_at'=>$now,'accepted_at'=>null,'en_route_at'=>$status==='en_route'?$now:null,'arrived_at'=>$status==='on_scene'?$now:null,'completed_at'=>$status==='completed'?$now:null,'outcome_notes'=>$this->outcomesJson($validated),'updated_at'=>$now]);
             $this->updateSelectedResponderDuty($selected,$validated['team_id']??null,$status);$this->audit($request,'create_dispatch','responder_assignments',(string)$id,null,$validated);return $id;
         });
-        if (! empty($validated['team_id']) && \App\Support\RequestSchema::hasTable('cached_routes')) {
-            PrecomputeRoutesForTeam::dispatch((int) $validated['team_id'])->afterCommit();
-        }
         $dispatch=$this->presenter->dispatch($this->query->dispatchRecord($id));
         return ['dispatch'=>$dispatch,'responder_ids'=>$selection['ids'],
             'requested_count'=>$selection['requested_count'],'available_count'=>$selection['available_count'],

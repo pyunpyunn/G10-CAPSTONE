@@ -1,6 +1,6 @@
 # RESQPERATION Android APK — Complete Group Setup Guide
 
-Updated: **20 October 2026 (Asia/Manila)**.
+Updated: **21 October 2026 (Asia/Manila)**.
 
 Use this guide to install the standalone household/rescuer APK, connect phones
 to the Windows server, run Laravel/MySQL and the HQ website, configure OneSignal,
@@ -99,6 +99,8 @@ show success before their APK is ready; this guide does not assert live status.
 
 | Build | Purpose/link |
 | --- | --- |
+| 12 | Latest verified APK: household GPS/map, notification reminders and broadcast history, plus map-first rescuer navigation: [build/download](https://expo.dev/accounts/kathlnbarro/projects/frontend-mobile/builds/a3155460-6262-44ee-9e94-da430bea9484) |
+| 11 | Completed: persistent notification reminders, Settings shortcut, rescuer broadcasts/dispatch navigation, and native Android dispatch alarm: [build/download](https://expo.dev/accounts/kathlnbarro/projects/frontend-mobile/builds/4aefd191-5e41-4521-a8b2-c2815f30157b) |
 | 9 | App-code compression plus latest household fixes: [build/download](https://expo.dev/accounts/kathlnbarro/projects/frontend-mobile/builds/3363c586-fdab-455b-9500-3d185e0c686f) |
 | 8 | Latest-alert/history modal and household refresh: [build/download](https://expo.dev/accounts/kathlnbarro/projects/frontend-mobile/builds/90ef47cd-4756-4d57-aaa9-a87703e9803d) |
 | 7 | Foreground OneSignal fix: [build/download](https://expo.dev/accounts/kathlnbarro/projects/frontend-mobile/builds/c57f9990-8c30-4e35-99c1-a8268382b84d) |
@@ -120,6 +122,22 @@ Build 6 measured **24,303,289 bytes (24.3 MB / 23.18 MiB)**. The final build 9
 size was not verified when compression was submitted. Installed storage is
 larger than download size because of native extraction, caches/data and maps.
 A filename alone does not identify a build: verify versionCode/size/hash.
+
+Build 11 is verified as version **1.0.0 (11)**, **22,390,321 bytes** (22.4 MB),
+Android 7.0+ / arm64-v8a, with a valid APK v2 signature. Local file:
+`releases/RESQPERATION-build11.apk`. SHA-256:
+`63c5eb8a998a3b1a4928616c500938b9c225bbba50a677c8eb2e4c3cb908ed63`.
+Its manifest includes notification permission and the native dispatch alarm
+service. Physical-device notification/alarm playback still needs testing.
+
+Build 12 is verified as version **1.0.0 (12)**, **22,394,257 bytes** (22.4 MB),
+Android 7.0+ / arm64-v8a, signed with the existing update-compatible certificate.
+Both `releases/RESQPERATION-build12.apk` and `releases/RESQPERATION.apk` contain
+this latest build. SHA-256:
+`1231a15165d4cee7fa24c3ec219a856f0508e30d7b80d60b3ed9f0ab3fe650a4`.
+The embedded app code was checked for household GPS follow, notification reminders,
+broadcast history and the new map-first rescuer navigation. TypeScript and all
+33 mobile tests pass; physical-device testing remains required.
 
 ### Join the authorized Tailscale network
 
@@ -780,6 +798,15 @@ network; optional offline maps add download/storage. Measure RAM/startup/battery
 on the actual low-spec phones.
 
 ## 13. Permissions and optional services
+
+The app shows a persistent **Turn on notifications** notice while notifications
+are disabled. Tap **Enable** to show Android's permission dialog. If Android
+has stopped allowing permission requests, this button opens the app's system
+settings. Turn on **Notifications → Allow notifications**, then return to the
+app; it rechecks permission and refreshes the signed-in device registration.
+The sign-in notification reminder also has an **Open Settings** action.
+Household and rescuer users receive these prompts. Users retain control over
+permission; dismissing a prompt does not prevent them from signing in.
 
 ### Android permissions
 

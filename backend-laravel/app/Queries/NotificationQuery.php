@@ -4,11 +4,7 @@ namespace App\Queries;
 
 use App\Models\AuditLog;
 use App\Models\DisasterBroadcast;
-use App\Models\HouseholdStatusLog;
-use App\Models\Notification;
 use App\Models\ResourceRequest;
-use App\Models\ResponderAssignment;
-use App\Models\WeatherLog;
 use App\Support\RequestSchema as Schema;
 use Illuminate\Http\Request;
 use Illuminate\Support\LazyCollection;
@@ -24,13 +20,10 @@ class NotificationQuery
     private function uncachedFeedSources(): array
     {
         return [
-            'outgoing' => Schema::hasTable('notifications') ? Notification::query()->select(['notif_id', 'message', 'sent_by', 'evacuation_event_id', 'evacuation_center_id', 'urgency_level_id', 'scheduled_at', 'is_recurring', 'recurrence_type_id', 'recurrence_end_at', 'last_sent_at', 'created_at', 'channel', 'status', 'target_filter'])->orderByDesc('created_at')->limit(20)->get() : collect(),
-            'household' => Schema::hasTable('household_status_logs') ? HouseholdStatusLog::query()->with(['household.address', 'status'])->whereHas('status', fn ($q) => $q->whereIn('status_key', ['unsafe', 'injured', 'missing', 'not_evacuated', 'displaced']))->orderByDesc('submitted_at')->limit(20)->get() : collect(),
-            'dispatch' => Schema::hasTable('responder_assignments') ? ResponderAssignment::query()->with(['team', 'responder'])->orderByDesc('assigned_at')->limit(20)->get() : collect(),
-            'requests' => Schema::hasTable('resource_requests') ? ResourceRequest::query()->select(['request_id', 'request_source', 'source_reference', 'request_category', 'evacuation_center_id', 'requested_by', 'handled_by', 'resource_type', 'item_name', 'quantity', 'unit', 'description', 'status_id', 'validation_status', 'validation_notes', 'validated_by_user_id', 'validated_at', 'released_for_tracking_at', 'tracking_reference', 'created_at', 'updated_at'])->orderByDesc('created_at')->limit(20)->get() : collect(),
-            'weather' => Schema::hasTable('weather_logs') ? WeatherLog::query()->select(['weather_log_id', 'disaster_id', 'source_name', 'source_url', 'condition_name', 'temperature', 'rainfall_mm', 'wind_speed', 'wind_direction', 'humidity', 'advisory_title', 'advisory_text', 'raw_payload', 'observed_at', 'created_at', 'updated_at'])->orderByDesc('created_at')->orderByDesc('observed_at')->limit(10)->get() : collect(),
-            'broadcasts' => Schema::hasTable('disaster_broadcasts') ? DisasterBroadcast::query()->with('severity')->orderByDesc('sent_at')->limit(20)->get() : collect(),
-            'audit' => Schema::hasTable('audit_logs') ? AuditLog::query()->where('module', '<>', 'notifications')->orderByDesc('created_at')->limit(12)->get() : collect(),
+            'advisories' => Schema::hasTable('official_advisory_notifications') ? \Illuminate\Support\Facades\DB::table('official_advisory_notifications')->whereNotNull('created_at')->orderByDesc('created_at')->limit(100)->get() : collect(),
+            'requests' => Schema::hasTable('resource_requests') ? ResourceRequest::query()->whereNotNull('created_at')->where(fn ($q) => $q->whereNull('validation_status')->orWhereIn('validation_status', ['needs_validation', 'pending']))->select(['request_id', 'request_source', 'source_reference', 'request_category', 'evacuation_center_id', 'requested_by', 'handled_by', 'resource_type', 'item_name', 'quantity', 'unit', 'description', 'status_id', 'validation_status', 'validation_notes', 'validated_by_user_id', 'validated_at', 'released_for_tracking_at', 'tracking_reference', 'created_at', 'updated_at'])->orderByDesc('created_at')->get() : collect(),
+            'broadcasts' => Schema::hasTable('disaster_broadcasts') ? DisasterBroadcast::query()->with('severity')->whereNotNull('sent_at')->orderByDesc('sent_at')->limit(200)->get() : collect(),
+            'audit' => Schema::hasTable('audit_logs') ? AuditLog::query()->whereNotNull('created_at')->where('reference_table', 'responder_assignments')->whereIn('module', ['rescue_dispatch', 'rescuer_mobile'])->whereIn('action', ['create_dispatch', 'update_dispatch', 'complete_dispatch', 'mobile_update_assignment'])->orderByDesc('created_at')->limit(200)->get() : collect(),
         ];
     }
 

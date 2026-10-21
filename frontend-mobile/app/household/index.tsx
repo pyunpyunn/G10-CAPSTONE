@@ -24,6 +24,7 @@ import {
   getHouseholdOverview,
   lookupTrustedHousehold,
   saveHouseholdMemberStatus,
+  saveHouseholdGeotag,
   saveTrustedHouseholdMemberStatus,
   saveHouseholdStatus,
   saveTrustedPin,
@@ -292,14 +293,9 @@ export default function HouseholdHomeScreen() {
 
   async function handleUpdateGeotag(payload: any) {
     try {
-      await completeHouseholdSetup({
-        ...payload,
-        device_uuid: deviceUuid,
-        device_name: 'Household mobile',
-        platform: 'expo',
-        photo_uri: null,
-      });
+      const response = await saveHouseholdGeotag(payload);
       await loadOverview(true);
+      return response;
     } catch (error: any) {
       Alert.alert('Unable to update geotag', errorMessage(error));
       throw error;

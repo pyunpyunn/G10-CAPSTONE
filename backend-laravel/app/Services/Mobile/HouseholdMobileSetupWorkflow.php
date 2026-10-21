@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Support\RequestSchema as Schema;
+use Illuminate\Validation\Rule;
 
 class HouseholdMobileSetupWorkflow
 {
@@ -23,14 +24,51 @@ class HouseholdMobileSetupWorkflow
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy_m' => ['nullable', 'numeric', 'min:0'],
             'address_label' => ['required', 'string', 'max:255'],
+            'sitio_id' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
-        DB::transaction(function () use ($request, $householdId, $validated): void {
-            $this->saveGeotag($householdId, $request->user()?->user_id, $validated, now());
+        $profileService = app(\App\Services\Shared\BarangayProfileService::class);
+        $profile = $profileService->current();
+        if (! $profileService->isMambalingProfile($profile)) {
+            return response()->json(['message' => 'Household geotags can only be updated within Mambaling.'], 422);
+        }
+        $barangayId = (int) ($profile['barangay_id'] ?? 0);
+        if (isset($validated['sitio_id']) && $barangayId < 1) {
+            return response()->json(['message' => 'The registered Mambaling barangay ID is unavailable.'], 503);
+        }
+        if (isset($validated['sitio_id'])) {
+            foreach (['sitios' => ['sitio_id', 'sitio_name', 'barangay_id'], 'addresses' => ['address_id', 'sitio_id', 'barangay_id'], 'households' => ['address_id']] as $table => $columns) {
+                if (! Schema::hasTable($table) || collect($columns)->contains(fn (string $column): bool => ! Schema::hasColumn($table, $column))) {
+                    return response()->json(['message' => 'The registered Mambaling sitio and household address schema is unavailable.'], 503);
+                }
+            }
+            $validated = array_merge($validated, $request->validate([
+                'sitio_id' => [Rule::exists('sitios', 'sitio_id')->where(fn ($query) => $query->where('barangay_id', $barangayId))],
+            ]));
+        }
+        $classifier = app(\App\Services\Shared\HouseholdGeographicClassifier::class);
+        $classification = $classifier->resolve((float) $validated['latitude'], (float) $validated['longitude']);
+        if ($classification['status'] === 'barangay_boundary_missing') {
+            return response()->json(['message' => 'The Mambaling boundary is unavailable, so this location cannot be validated.'], 503);
+        }
+        if ($classification['status'] === 'outside_barangay') {
+            return response()->json(['message' => 'Choose a household location inside the Mambaling boundary.'], 422);
+        }
+        $confirmedSitio = isset($validated['sitio_id'])
+            ? DB::table('sitios')->where('sitio_id', (int) $validated['sitio_id'])->where('barangay_id', $barangayId)->first(['sitio_id', 'sitio_name'])
+            : null;
+        if (isset($validated['sitio_id']) && ! $confirmedSitio) {
+            return response()->json(['message' => 'Choose a sitio registered in Mambaling.'], 422);
+        }
+        if ($confirmedSitio && $classification['status'] === 'matched' && (int) $classification['sitio_id'] !== (int) $confirmedSitio->sitio_id) {
+            return response()->json(['message' => 'The selected sitio does not match the verified boundary at this pin.'], 422);
+        }
+        DB::transaction(function () use ($request, $householdId, $validated, $confirmedSitio, $barangayId, &$classification): void {
+            $classification = $this->saveGeotag($householdId, $request->user()?->user_id, $validated, now(), $confirmedSitio, $barangayId);
             $this->support->writeAuditLog($request, 'mobile_household_geotag', 'households', $householdId, $validated);
         });
         $this->queueRouteRecompute($householdId);
 
-        return response()->json(['message' => 'Household geotag saved.', 'data' => ['geographic_classification' => app(\App\Services\Shared\HouseholdGeographicClassifier::class)->resolve((float) $validated['latitude'], (float) $validated['longitude'])]]);
+        return response()->json(['message' => 'Household geotag saved.', 'data' => ['geographic_classification' => $classification]]);
     }
 
     public function completeSetup(Request $request): JsonResponse
@@ -132,9 +170,15 @@ class HouseholdMobileSetupWorkflow
         ]);
     }
 
-    private function saveGeotag(string $householdId, ?string $userId, array $validated, $now): void
+    private function saveGeotag(string $householdId, ?string $userId, array $validated, $now, ?object $confirmedSitio = null, ?int $barangayId = null): array
     {
-        app(\App\Services\Shared\HouseholdGeographicClassifier::class)->classify($householdId, (float) $validated['latitude'], (float) $validated['longitude']);
+        $classification = app(\App\Services\Shared\HouseholdGeographicClassifier::class)->classify(
+            $householdId,
+            (float) $validated['latitude'],
+            (float) $validated['longitude'],
+            $confirmedSitio ? (int) $confirmedSitio->sitio_id : null,
+            $barangayId
+        );
         $data = $this->support->filterColumns('geotagged_locations', [
             'household_id' => $householdId,
             'latitude' => $validated['latitude'],
@@ -152,7 +196,7 @@ class HouseholdMobileSetupWorkflow
 
         if ($existing) {
             DB::table('geotagged_locations')->where('household_id', $householdId)->update($data);
-            return;
+            return $classification;
         }
 
         DB::table('geotagged_locations')->insert($this->support->withGeneratedKey(
@@ -161,6 +205,7 @@ class HouseholdMobileSetupWorkflow
             $data,
             $this->support->nextId('geotagged_locations', 'location_id')
         ));
+        return $classification;
     }
 
     private function queueRouteRecompute(string $householdId): void
@@ -271,10 +316,5 @@ class HouseholdMobileSetupWorkflow
         ], $trackingId));
     }
 }
-
-
-
-
-
 
 

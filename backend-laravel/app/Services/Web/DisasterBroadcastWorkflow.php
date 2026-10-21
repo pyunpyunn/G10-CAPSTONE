@@ -124,7 +124,7 @@ class DisasterBroadcastWorkflow
         $validated = $this->validator->validateBroadcast($request);
         $metadata = $this->broadcastMetadata($validated);
 
-        $broadcastId = DB::transaction(function () use ($request, $validated, $metadata, $event): int {
+        $broadcastId = DB::transaction(function () use ($request, $validated, &$metadata, $event): int {
             $lockedEvent = DisasterEvent::query()->where('event_id', $event->event_id)->lockForUpdate()->first();
             abort_if(! $lockedEvent || $lockedEvent->ended_at || $lockedEvent->deleted_at, 409, 'The disaster event is no longer active.');
             $now = now();
@@ -178,10 +178,11 @@ class DisasterBroadcastWorkflow
             // Queue retries must reuse exactly the same provider request.
             $metadata['push_plan'] = $this->oneSignal->prepareDelivery([
                 'platforms' => ['android'],
-                'roles' => $validated['scope_type'] === 'selected_puroks' ? ['household'] : ['household', 'rescuer'],
+                'roles' => ['household'],
                 'household_puroks' => $validated['scope_type'] === 'selected_puroks'
                     ? collect($metadata['puroks'])->pluck('name')->filter()->values()->all() : [],
             ]);
+            $metadata['rescuer_push_plan'] = $this->oneSignal->prepareDelivery(['roles' => ['rescuer'], 'platforms' => ['android']]);
             DeliverDisasterBroadcast::dispatch($broadcastId, $validated, $metadata, (string) $event->event_id)
                 ->onConnection('operations_outbox')->onQueue('broadcasts');
 
@@ -262,7 +263,7 @@ class DisasterBroadcastWorkflow
             ? collect($metadata['puroks'])->pluck('name')->filter()->values()->all()
             : [];
 
-        $roles = $scope === 'selected_puroks' ? ['household'] : ['household', 'rescuer'];
+        $roles = ['household'];
         $statusOptions = $metadata['status_options'] ?? $this->selectedStatusOptions($validated['allowed_statuses']);
         $reportPrompt = 'Please report status now';
         $statusLines = array_map(
@@ -272,7 +273,7 @@ class DisasterBroadcastWorkflow
         );
         $pushMessage = $validated['message']."\n\n".$reportPrompt."\n".implode("\n", $statusLines);
 
-        return $this->oneSignal->sendToMobileDevices(
+        $householdResult = $this->oneSignal->sendToMobileDevices(
             $validated['broadcast_title'],
             $pushMessage,
             [
@@ -291,6 +292,26 @@ class DisasterBroadcastWorkflow
                 ],
             ]
         );
+        $rescuerResult = $this->oneSignal->sendToMobileDevices($validated['broadcast_title'], $validated['message'], [
+            'platforms' => ['android'],
+            'roles' => ['rescuer'],
+            ...(isset($metadata['rescuer_push_plan']) ? ['delivery_plan' => $metadata['rescuer_push_plan']] : []),
+            'data' => [
+                'type' => 'rescuer_broadcast', 'event_id' => $event->event_id,
+                'broadcast_id' => (string) $broadcastId, 'scope_type' => $scope,
+                'target_puroks' => $purokNames,
+            ],
+        ]);
+        $results = [$householdResult, $rescuerResult];
+        $sent = array_sum(array_column($results, 'sent_count'));
+        $errors = array_merge(...array_column($results, 'errors'));
+        $unsuccessful = array_filter($results, fn ($result) => ! in_array($result['status'], ['sent', 'no_recipients'], true));
+        return [
+            'status' => $sent > 0 ? ($unsuccessful ? 'partial' : 'sent') : ($unsuccessful ? $unsuccessful[array_key_first($unsuccessful)]['status'] : 'no_recipients'),
+            'recipient_count' => array_sum(array_column($results, 'recipient_count')),
+            'sent_count' => $sent, 'provider_ids' => array_merge(...array_column($results, 'provider_ids')),
+            'errors' => $errors, 'message' => 'Household and rescuer broadcast delivery submitted.',
+        ];
     }
 
     public function updateBroadcastPushStatus(int $broadcastId, array $pushResult): void

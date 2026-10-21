@@ -17,6 +17,7 @@ export function MobileLeafletMap({
   height = 340,
   onMapPress,
   geotagPicker = false,
+  geotagMode = 'drag',
   selectedPoint,
   onPinMoving,
   followPosition,
@@ -27,13 +28,14 @@ export function MobileLeafletMap({
   height?: number;
   onMapPress?: (point: { latitude: number; longitude: number }) => void;
   geotagPicker?: boolean;
+  geotagMode?: 'drag' | 'center';
   selectedPoint?: { latitude: number; longitude: number } | null;
   onPinMoving?: () => void;
   followPosition?: { latitude: number; longitude: number } | null;
 }) {
   const webView = useRef<import('react-native-webview').WebView>(null);
   const html = geotagPicker
-    ? mobileLeafletHtml({ markers: [], routes: [], geotagPicker: true })
+    ? mobileLeafletHtml({ markers: [], routes: [], geotagPicker: true, geotagMode })
     : mobileLeafletHtml({ markers, routes, center, interactive: !!onMapPress });
   const source = useMemo(() => ({ html }), [html]);
   const latitude = selectedPoint?.latitude;

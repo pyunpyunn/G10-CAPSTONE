@@ -51,6 +51,7 @@ class HouseholdMobileReadWorkflow
             'members' => $members,
             'devices' => $devices,
             'geotag' => $geotag,
+            'sitio_options' => $this->query->mambalingSitioOptions(),
             'evacuation_centers' => $this->query->evacuationCenters($activeEvent['event_id'] ?? null, $geotag['latitude'] ?? null, $geotag['longitude'] ?? null),
             'recent_alerts' => $this->query->recentAlerts($activeEvent['event_id'] ?? null, $householdId),
             'trusted' => [
@@ -80,7 +81,6 @@ class HouseholdMobileReadWorkflow
         return response()->json(['data' => ['qr' => $this->presenter->qrPayload($household, $this->query->activeEvent())]]);
     }
 }
-
 
 
 

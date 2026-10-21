@@ -26,9 +26,23 @@
 
 .account-html .field-label{display:block;font-weight:650;margin-bottom:3px}.account-html .mw>summary{display:flex;align-items:center;list-style:none}.account-html .mw>summary::-webkit-details-marker{display:none}
 
-.account-html .duty-status-control{flex-basis:100%;display:grid;grid-template-columns:1fr auto;gap:8px;padding:12px;border:1px solid #b7cbe5;border-radius:10px;background:#eff6ff;min-width:240px}
-.account-html .duty-status-control>label{font-weight:750;color:var(--tx);align-self:center}
-.account-html .duty-status-control>.chip{font-size:13px;font-weight:700}
-.account-html .duty-status-actions{grid-column:1/-1;display:flex;gap:8px;align-items:center}
-.account-html .duty-status-actions select{min-width:0;flex:1}
-@media(max-width:600px){.account-html .duty-status-control{min-width:0;width:100%}.account-html .duty-status-actions{flex-wrap:wrap}}
+/* Compact status control inside the profile header card. */
+.account-html .profile-duty-footer{display:flex;justify-content:flex-end;margin-top:10px}
+.account-html .hd .duty-status-control>label{color:#c9d6e6}
+.account-html .duty-status-control{--duty-color:#475569;--duty-bg:#f1f5f9;--duty-border:#cbd5e1;display:flex;align-items:center;gap:10px}
+.account-html .duty-status-control[data-tone=green]{--duty-color:#24613f;--duty-bg:#edf7f0;--duty-border:#a7cfb5}
+.account-html .duty-status-control[data-tone=blue]{--duty-color:#244f80;--duty-bg:#edf4fc;--duty-border:#aec6e3}
+.account-html .duty-status-control[data-tone=amber]{--duty-color:#805015;--duty-bg:#fff7e8;--duty-border:#e5c78f}
+.account-html .duty-status-control[data-tone=red]{--duty-color:#922f35;--duty-bg:#fff0f1;--duty-border:#e5b3b7}
+.account-html .duty-status-control>label{font-size:11px;font-weight:600;color:var(--mu)}
+.account-html .duty-status-select{position:relative}
+.account-html .duty-status-dot{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:7px;height:7px;border-radius:50%;background:var(--duty-color);pointer-events:none}
+.account-html .duty-status-select select{width:150px;height:32px;padding:0 28px 0 26px;border-radius:18px;border-color:var(--duty-border);background-color:var(--duty-bg);color:var(--duty-color);font-size:11px;font-weight:650;cursor:pointer}
+.account-html .duty-status-select select:hover{border-color:var(--duty-color)}
+.account-html .duty-status-select select:disabled{opacity:.65;cursor:wait}
+.account-html .duty-status-select option{background:#fff;color:var(--tx)}
+
+.account-html .hd .hdr>.acts{align-self:flex-start;justify-content:flex-end;margin-left:auto}
+
+.account-html .mod.hide-scrollbar{scrollbar-width:none;-ms-overflow-style:none}
+.account-html .mod.hide-scrollbar::-webkit-scrollbar{display:none}

@@ -15,7 +15,7 @@ class NotificationSavedView
         $keep = static fn (array $ids): array => $visible === null ? $ids : array_values(array_filter($ids, static fn (string $id): bool => isset($visible[$id])));
         $readIds=[]; $hiddenIds=[]; $markAllReadTime=null; $clearAllTime=null;
         foreach ($rows as $row) {
-            $values=$this->decode($row->new_values ?? null); $time=Carbon::parse($row->created_at)->timestamp;
+            $values=$this->decode($row->new_values ?? null); $time=$row->created_at ? Carbon::parse($row->created_at)->timestamp : 0;
             if ($row->action === 'mark_read') { $ids=$this->idList($values['selected_ids'] ?? []); if (!$ids) $markAllReadTime=max($markAllReadTime ?? 0, $time); else $readIds=array_values(array_unique([...$readIds,...$keep($ids)])); }
             if ($row->action === 'delete_selected') { $ids=$this->idList($values['selected_ids'] ?? []); $hiddenIds=array_values(array_unique([...$hiddenIds,...$keep($ids)])); }
             if ($row->action === 'clear_all') { $ids=$this->idList($values['hidden_ids'] ?? []); $hiddenIds=array_values(array_unique([...$hiddenIds,...$keep($ids)])); if (!$ids) $clearAllTime=max($clearAllTime ?? 0, $time); }

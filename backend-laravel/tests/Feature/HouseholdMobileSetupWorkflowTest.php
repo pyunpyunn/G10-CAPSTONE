@@ -8,6 +8,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class HouseholdMobileSetupWorkflowTest extends TestCase
@@ -34,6 +35,94 @@ class HouseholdMobileSetupWorkflowTest extends TestCase
         $this->assertDatabaseHas('geotagged_locations', ['household_id' => 'HH-OTHER', 'latitude' => 10.1]);
         $this->assertDatabaseCount('geotagged_locations', 2);
         $this->assertDatabaseCount('device_tokens', 0);
+    }
+
+    public function test_geotag_pin_outside_mambaling_is_rejected_without_saving(): void
+    {
+        $response = app(HouseholdMobileSetupWorkflow::class)->updateGeotag(
+            $this->householdRequest('/api/v1/household/geotag', 'PUT', [
+                'latitude' => 10.5,
+                'longitude' => 123.88,
+                'address_label' => 'Outside Mambaling',
+            ])
+        );
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame('Choose a household location inside the Mambaling boundary.', $response->getData(true)['message']);
+        $this->assertDatabaseCount('geotagged_locations', 0);
+    }
+
+    public function test_confirmed_sitio_is_saved_from_the_registered_mambaling_list(): void
+    {
+        $feature = json_decode(file_get_contents(database_path('boundaries/0730600049.geojson')), true);
+        $this->mock(\App\Services\Shared\BarangayProfileService::class, function ($mock) use ($feature): void {
+            $mock->shouldReceive('current')->andReturn(['barangay_id' => 1, 'name' => 'Mambaling', 'barangay_code' => '072217049']);
+            $mock->shouldReceive('isMambalingProfile')->andReturn(true);
+            $mock->shouldReceive('mapFocus')->andReturn([
+                'barangay_id' => 1,
+                'name' => 'Mambaling',
+                'boundary' => $feature['geometry'],
+            ]);
+        });
+        $barangayId = 1;
+        $this->assertGreaterThan(0, $barangayId);
+        Schema::table('households', fn (Blueprint $table) => $table->integer('address_id')->nullable());
+        Schema::create('addresses', function (Blueprint $table): void {
+            $table->integer('address_id')->primary();
+            $table->integer('sitio_id')->nullable();
+            $table->integer('purok_id')->nullable();
+            $table->integer('barangay_id')->nullable();
+            $table->string('purok_sitio')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('sitios', function (Blueprint $table): void {
+            $table->integer('sitio_id')->primary();
+            $table->integer('barangay_id');
+            $table->string('sitio_name');
+        });
+        DB::table('households')->insert(['household_id' => 'HH-1', 'address_id' => 1]);
+        DB::table('addresses')->insert(['address_id' => 1, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('sitios')->insert([
+            ['sitio_id' => 901, 'barangay_id' => $barangayId, 'sitio_name' => 'Registered Sitio'],
+            ['sitio_id' => 902, 'barangay_id' => $barangayId + 1, 'sitio_name' => 'Other Barangay'],
+        ]);
+        $this->assertSame(
+            [['sitio_id' => 901, 'sitio_name' => 'Registered Sitio']],
+            app(\App\Queries\HouseholdMobileReadQuery::class)->mambalingSitioOptions()
+        );
+
+        $response = app(HouseholdMobileSetupWorkflow::class)->updateGeotag(
+            $this->householdRequest('/api/v1/household/geotag', 'PUT', [
+                'latitude' => 10.287,
+                'longitude' => 123.88,
+                'address_label' => 'Household in Mambaling',
+                'sitio_id' => 901,
+            ])
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(901, $response->getData(true)['data']['geographic_classification']['assigned_sitio_id']);
+        $this->assertDatabaseHas('addresses', [
+            'address_id' => 1,
+            'sitio_id' => 901,
+            'barangay_id' => $barangayId,
+            'purok_id' => null,
+            'purok_sitio' => 'Registered Sitio',
+        ]);
+
+        try {
+            app(HouseholdMobileSetupWorkflow::class)->updateGeotag(
+                $this->householdRequest('/api/v1/household/geotag', 'PUT', [
+                    'latitude' => 10.287,
+                    'longitude' => 123.88,
+                    'address_label' => 'Invalid sitio',
+                    'sitio_id' => 902,
+                ])
+            );
+            $this->fail('A sitio from another barangay must not be accepted.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('sitio_id', $error->errors());
+        }
     }
 
     protected function setUp(): void
@@ -184,6 +273,3 @@ class HouseholdMobileSetupWorkflowTest extends TestCase
         return $request;
     }
 }
-
-
-

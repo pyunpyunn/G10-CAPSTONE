@@ -115,7 +115,7 @@ class RescuerAssignmentWorkflow
             foreach ($ids as $selectedId) {
                 $this->updateResponderDuty($selectedId, $current->team_id ?? $responder?->team_id, $status);
             }
-            $this->support->writeAuditLog($request, 'mobile_update_assignment', 'responder_assignments', (string) $assignmentId, $updates);
+            $this->support->writeAuditLog($request, 'mobile_update_assignment', 'responder_assignments', (string) $assignmentId, $updates + ['previous_status' => $current->status]);
         }, 3);
 
         $updatedAssignment = $this->assignmentQuery->find($assignmentId, $responder?->responder_id);

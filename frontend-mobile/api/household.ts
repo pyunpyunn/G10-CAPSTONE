@@ -18,6 +18,7 @@ export type HouseholdOverview = {
   members: any[];
   devices: any[];
   geotag: any;
+  sitio_options: { sitio_id: number; sitio_name: string }[];
   evacuation_centers: any[];
   trusted: {
     is_available: boolean;

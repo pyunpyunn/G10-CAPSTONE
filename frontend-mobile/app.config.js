@@ -20,6 +20,7 @@ module.exports = {
     }
     return plugin;
   }).concat([
+    './plugins/withDispatchAlarm',
     '@maplibre/maplibre-react-native',
     'expo-sqlite',
     'expo-task-manager',

@@ -20,6 +20,7 @@ class ValhallaRoutingService
         }
 
         $response = Http::acceptJson()
+            ->connectTimeout(5)
             ->timeout((int) config('navigation.timeout_seconds', 30))
             ->post($baseUrl.'/route', [
                 'locations' => [

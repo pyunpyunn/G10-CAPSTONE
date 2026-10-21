@@ -1,254 +1,179 @@
-# RESQPERATION: Barangay Rescue Operations and Disaster Response Management System
+<p align="center">
+  <img src="frontend-web/public/resqperation-readme-logo.svg" alt="RESQPERATION logo" width="320">
+</p>
 
-RESQPERATION is a capstone project for barangay disaster response operations. The system helps HQ/Admin users monitor disaster events, broadcast alerts, review household safety reports, monitor rescue dispatch, validate resource requests, and keep situation reports and archives. It also includes Expo mobile access for household residents and rescuers through the same Laravel API.
+<h1 align="center">RESQPERATION</h1>
 
-## Android APK download
+<p align="center">
+  Barangay Rescue Operations and Disaster Response Management System<br>
+  A capstone project focused on disaster coordination in Mambaling, Cebu City.
+</p>
 
-[**Download RESQPERATION APK — 24.3 MB**](https://github.com/pyunpyunn/G10-CAPSTONE/releases/download/v1.0.0-build6/RESQPERATION.apk)
+<p align="center">
+  <a href="../docs/DOCUMENTATION_INDEX.md">Documentation</a> ·
+  <a href="docs/USE_CASES.md">Use cases</a> ·
+  <a href="docs/MUST_HAVES_IMPLEMENTATION_AUDIT.md">Implementation audit</a> ·
+  <a href="https://github.com/pyunpyunn/G10-CAPSTONE/releases">Releases</a>
+</p>
 
-Version 1.0.0, build 6 supports household and rescuer accounts on 64-bit Android
-7.0+. It opens directly without Expo Go, Metro, or a QR scan and includes
-OneSignal support. Allow notifications after signing in.
+---
 
-Follow the [first-run setup](frontend-mobile/FIRST_RUN_SETUP.md) and save the
-Tailscale or LAN API address in **Server settings** before signing in. This
-build's original default points to the retired ngrok tunnel.
+## About the Project
 
-## Team Members
+RESQPERATION is a disaster-response coordination system with a web dashboard for barangay HQ/Admin operations and a mobile app for household residents and rescuers. It brings disaster alerts, household status reports, rescue dispatch, resource requests, weather context, and situation records into one workflow.
 
-- Barro, Nina Kathleen
-- Eria, Ereca Joy
-- Arellano, Vinzon
-- Pacillan, Vince
+### Problem
 
-## Tech Stack
+During emergencies, household safety information, responder assignments, resource requests, and incident updates can be scattered across separate channels. This makes it harder for local coordinators to maintain a shared operational picture and act on current information.
 
-- Backend: Laravel API
-- Authentication: Laravel Sanctum token authentication
-- Database: MySQL
-- Web Frontend: React + Vite
-- Mobile Frontend: Expo React Native
-- HTTP Client: Axios
-- UI Icons: Lucide React
-- Mapping: Leaflet / React Leaflet for web maps, React Native Maps / external map links for mobile maps
-- Push Notifications: OneSignal
-- Testing: PHPUnit for Laravel, ESLint and Vite build checks for React
+### Objectives
 
-## Main Roles or Users
+- Give HQ/Admin a shared view of disaster events, household reports, resources, and dispatch activity.
+- Let residents submit household status and location information through mobile.
+- Help rescuers receive assignments and report field updates.
+- Support reviewable resource-request handoffs, situation reports, and operational records.
+- Present weather and hazard information with clear source attribution and limitations.
 
-- HQ/Admin: Uses the web dashboard to manage operations, review reports, create rescuer/HQ accounts, validate requests, and generate reports.
-- Super Admin: Uses the web dashboard to access system-wide administration and inquiries where enabled.
-- Rescuer: Uses the mobile app to receive assignments, update route/status, submit field reports, request resources, and use radio/PTT voice clips.
-- Household Resident: Uses the mobile app to complete first-time geotag setup, update household status, manage family/trusted household views, and access evacuation QR.
-- Shared Database Modules:
-  - Household account records may come from the shared SafeTrack tables.
-  - Resource/personnel requests may be read from shared request tables.
-  - EvaTrack can send resource/personnel requests into RESQPERATION through the external request intake endpoint.
-  - Validated requests are forwarded to TrackingAid through the configured second database handoff table.
-  - Weather providers such as PAGASA/OpenMeteo are treated as data sources, not separate capstone systems.
-  - OneSignal is the active mobile push notification provider.
+### Intended Users
 
-## Default Login Credentials
+| User | Primary use |
+| --- | --- |
+| Barangay HQ / Admin | Monitor events, review household reports, broadcast updates, coordinate dispatch, validate requests, and prepare reports. |
+| Household residents | Complete household setup, report safety status, and access household/evacuation features. |
+| Rescuers | Receive assignments, update field status and location, and request support. |
+| Super Admin | Use system-wide administration features where enabled. |
 
-For local development testing:
+## Mambaling at a Glance
 
-| Role | Account ID | Password | App |
-| --- | --- | --- | --- |
-| HQ/Admin | `2024035500` | `password` | Web |
-| Household Resident | `2024035501` | `password` | Mobile |
-| Household Resident Setup Test | `2024035503` | `password` | Mobile |
-| Rescuer Temp SAR Test | `BDRRM-SAR-001` | `password` | Mobile |
-| Rescuer Medical Test | `BDRRM-MED-001` | `password` | Mobile |
-| Rescuer SAR Test | `BDRRM-SAR-002` | `password` | Mobile |
+The target barangay is **Mambaling, Cebu City**. These are dated reference figures, not live system counts.
 
-ID note:
+| Reference | Figure |
+| --- | ---: |
+| Population (2020 Census) | **30,459** |
+| Share of Cebu City's population (2020) | **3.16%** |
+| Households (2015 Census) | **7,583** |
+| Household population / average household size (2015) | **31,469 / 4.15** |
+| Approximate map reference | **10.2922° N, 123.8763° E** |
+| Elevation at that reference point | **8.3 m** above mean sea level |
 
-- Login credentials are not hardcoded in the app. The backend checks the shared MySQL `users` table password hash, then falls back to the linked `responders` account ID for rescuer login.
-- Shared SafeTrack household accounts can log in when their account exists in `users` with `role_key = household_resident`, a valid `password`, and a linked `household_id`.
-- The login field accepts DB-backed identifiers: `username`, `email`, `user_id`, linked `household_id`, or rescuer `BDRRM` account ID.
-- Household and HQ/Admin temporary test accounts still use the old 10-digit numeric `username` pattern.
-- Rescuer accounts follow one shared DB format only: `BDRRM-{TEAM_CODE}-###`, such as `BDRRM-SAR-001`.
-- The sequence is per team code. Example: the first Medical / First Aid account is `BDRRM-MED-001`; the second SAR account is `BDRRM-SAR-002`.
-- Rescuer mobile profile usernames are human-readable handles, such as `vinzon.arellano`. The BDRRM account ID remains the official account/login ID.
-- New rescuer internal `user_id` values use the shared readable prefix:
-  - `USR-RESCUER-BDRRM-SAR-001`
-- Rescuer mobile login uses the BDRRM account ID:
-  - `BDRRM-SAR-001`
-  - `BDRRM-MED-001`
-  - `BDRRM-SAR-002`
-- Older temporary internal `user_id` values remain valid for development testing:
-  - `USR-HQ-2024035500`
-  - `USR-HH-2024035501`
-  - `USR-HH-2024035503`
-- Temporary mobile account SQL proposal: `docs/sql_proposals/2026_06_02_g10_temporary_mobile_login_accounts.sql`
+Population and household statistics are from the Philippine Statistics Authority censuses, as reported by [PhilAtlas' Mambaling profile](https://www.philatlas.com/visayas/r07/cebu-city/mambaling.html). Coordinates and elevation are approximate reference-point values; they do not describe the barangay's full boundary or elevation range.
 
-## Set Up Feature Checklist
+## Scope and Limitations
 
-- [x] Laravel backend folder created
-- [x] React web frontend folder created
-- [x] Expo mobile frontend folder created
-- [x] Root Git repository connected to GitHub
-- [x] Private folders ignored from GitHub
-- [x] Laravel API authentication created
-- [x] Role-based login response created
-- [x] HQ/Admin web login connected to backend
-- [x] Mobile login created for household and rescuer roles
-- [x] Web dashboard shell aligned with the HTML prototype header and sidebar behavior
-- [x] API unauthenticated errors return JSON
-- [x] Latest additive DB update proposal reviewed by DB member
-- [x] Shared DB gap review approved for current version 1 scope
-- [x] Additive DB update applied to the shared database
-- [x] Laravel migrations adjusted to the existing shared DB structure
-- [x] Temporary HQ/Admin, household, and rescuer login accounts seeded
-- [x] Shared React web components created
-- [x] HQ/Admin dashboard API connected to live database data
-- [x] Barangay Profile foundation for shared dashboard/weather/map focus
-- [x] Disaster Broadcasting module backend and frontend
-- [x] Weather Updates module with Open-Meteo auto snapshots and PAGASA advisory links
-- [x] Mapping module with actual map and geotagged records
-- [x] Household Status module backend and frontend
-- [x] Rescue Dispatch module backend and frontend
-- [x] Rescuer Accounts module backend and frontend
-- [x] Resources & Requests module backend and frontend
-- [x] Situation Reporting module backend and frontend
-- [x] Archive module backend and frontend
-- [x] Push notification sending and receiving foundation through OneSignal
+**In scope:** HQ/Admin web operations; household and rescuer mobile workflows; role-based access; disaster and household status monitoring; dispatch; resource-request review and partner handoff; mapping; weather/advisory context; notifications; situation reporting and archives.
 
-Checklist note: checked module items mean the backend routes, frontend pages, and current build/lint/test checks are present. OneSignal is implemented for device registration and Laravel push sending; final push QA still requires a real Android/iOS development or production build with real OneSignal credentials.
+**Limitations:** The initial operational focus is Mambaling. Availability depends on device connectivity, configured services, and current data. Weather forecasts and hazard maps are decision-support information, not guarantees, official local declarations, or a substitute for PAGASA, PHIVOLCS, barangay authorities, and emergency services. External partner connections require reachable partner systems and credentials; local endpoint verification does not prove a live partner connection. Public map/routing services have their own availability and usage limits. This capstone is not a replacement for official dispatch or emergency communications.
 
-## Current Structure Notes
+## Sustainable Development Goals
 
-```text
-resqperation-system/
-  backend-laravel/      Laravel API backend
-  frontend-web/         React web app for HQ/Admin users
-  frontend-mobile/      Expo mobile app with household and rescuer login routes
-  docs/                 Development plans, DB readiness notes, and SQL proposals
+- **SDG 11 — Sustainable Cities and Communities:** supports local disaster preparedness, community safety information, and more coordinated response.
+- **SDG 13 — Climate Action:** supports preparedness and risk communication by making weather and hazard context available to operators.
+- **SDG 3 — Good Health and Well-being:** contributes indirectly by helping coordinate rescue and household assistance.
+
+These are project alignments, not UN certification or a claim that software alone achieves the goals.
+
+## System Architecture
+
+```mermaid
+flowchart LR
+    HQ[HQ / Admin] --> WEB[React + Vite Web App]
+    RES[Households and Rescuers] --> MOB[Expo Mobile App]
+    WEB --> API[Laravel JSON API]
+    MOB --> API
+    API --> DB[(MySQL Shared Database)]
+    API --> WEATHER[Open-Meteo]
+    API --> ALERTS[PAGASA / PHIVOLCS advisories]
+    WEB --> MAPS[Leaflet + OpenStreetMap]
+    WEB --> ROUTE[OSRM routing service]
+    API --> PUSH[OneSignal / Web Push]
+    API --> PARTNERS[SafeTrack · EvaTrack · TrackingAid]
 ```
 
-Local-only reference folders are intentionally ignored from GitHub:
+### Main Components
+
+| Layer | Technology |
+| --- | --- |
+| Backend API | Laravel 13, PHP 8.3+, Laravel Sanctum |
+| HQ/Admin web | React 19, Vite 8, React Router |
+| Household/rescuer mobile | Expo SDK 54, React Native |
+| Data | MySQL shared operational database |
+| Maps | Leaflet / React Leaflet on web; native/mobile map options |
+| Quality checks | PHPUnit, ESLint, Vite build, and focused frontend tests |
+
+## External Sources, Services, and Tools
+
+| Service / source | How the project uses it | Status / notes |
+| --- | --- | --- |
+| [Open-Meteo](https://open-meteo.com/en/docs) | Forecast data fetched by Laravel and saved as weather snapshots. | Implemented. Free API terms are for non-commercial use and require CC BY 4.0 attribution; review current limits and terms before deployment. |
+| [DOST-PAGASA public alerts](https://publicalert.pagasa.dost.gov.ph/feeds/) | Official weather alerts and source links for operator review. | Feed declares CC BY 4.0; an advisory is not automatically a local barangay warning. |
+| [PHIVOLCS](https://earthquake.phivolcs.dost.gov.ph/) | Official earthquake bulletin source and advisory context. | Source material remains PHIVOLCS'; verify the source before acting. |
+| [GeoRisk Philippines](https://georisk.gov.ph/) — MGB / DOST-PHIVOLCS layers | Mambaling flood and liquefaction susceptibility map snapshots. | Source layers are attributed in the [hazard source notes](docs/MAMBALING_HAZARD_SOURCES.md); these are susceptibility maps, not live hazard measurements. |
+| [OpenStreetMap](https://www.openstreetmap.org/) | Web map tiles and geographic context. | © OpenStreetMap contributors, [ODbL](https://www.openstreetmap.org/copyright); comply with the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/). |
+| [OSRM public demo](https://router.project-osrm.org/) | On-demand web route geometry. | Public demo only; not a guaranteed or mission-critical service. |
+| [OneSignal](https://documentation.onesignal.com/docs/en/react-native-expo-sdk-setup) | Mobile push registration and delivery. | Provider service; configure credentials privately and follow current provider terms. |
+| Browser Push API / VAPID | Browser notifications for supported secure web origins. | Browser/OS support and permission settings affect delivery. |
+| SMS Gateway for Android | Optional local SMS gateway transport. | Requires a configured Android gateway phone, network reachability, and carrier service. |
+| SafeTrack, EvaTrack, TrackingAid | Shared household identity/data and external report/request handoffs. | Separate systems; live availability and partner verification are not implied. |
+| [PhilAtlas / PSA census references](https://www.philatlas.com/visayas/r07/cebu-city/mambaling.html) | Background Mambaling demographics in this README. | Census data belongs to its source; the linked profile identifies PSA as the census source. |
+
+## Development Progress
+
+The project checklist currently records **182 of 225 checkboxes complete (81%)**. This is a count of checked items in the [development checklist](../docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md), not a measured production-readiness or feature-completeness score.
+
+| Work area | Checklist / verification summary |
+| --- | --- |
+| Project foundation and database alignment | Core repositories, framework setup, and shared-database alignment are checked off in the checklist. |
+| HQ/Admin web modules | Core dashboard, broadcast, weather, mapping, household status, dispatch, requests, reports, archive, and notifications have v1 implementation entries. |
+| Mobile applications | Household/rescuer workflows and native-device behaviors still need checklist reconciliation and end-to-end device acceptance. |
+| External partner reports | Local flows have been checked; live partner URL, credentials, and end-to-end verification remain open. |
+| Final QA and deployment | Remaining checklist items include environment-specific end-to-end checks, exports, permissions, and deployment verification. |
+
+**Progress caveat:** The checklist was last marked updated **October 14, 2026** and contains older/overlapping entries. Some implementation work may be newer than its checkboxes. Consult the linked checklist and module-specific docs for current evidence before treating any item as complete.
+
+## Repository Guide
 
 ```text
-FOR DEV/
-prototype/
-.sixth/
-.dist/
-.claude/
+backend-laravel/   Laravel API, services, jobs, and tests
+frontend-web/      React/Vite HQ/Admin web application
+frontend-mobile/   Expo household and rescuer application
+docs/              Module implementation and feature documentation
+../docs/           Maintained project documentation and diagrams
 ```
 
-Important development rule:
+Start with the [documentation index](../docs/DOCUMENTATION_INDEX.md). API and integration notes that change with implementation are kept in [backend-laravel/docs](backend-laravel/docs/).
 
-- Do not use HTML files as the backend.
-- The HTML prototype is only a UI/UX reference.
-- Real development should use Laravel API routes, React pages/components, Expo screens, proper request validation, and JSON responses.
-- Do not restore default Laravel migrations that conflict with the shared DB structure.
+## Run Locally
 
-## Key Documentation
+Install dependencies in the relevant module first. Keep API keys, database credentials, push keys, and other secrets in local environment files; never place them in this README or commit them.
 
-- [System use cases](docs/USE_CASES.md) — actors, household/rescuer/HQ workflows, partner exchange, and must-haves traceability.
-- [Must-haves implementation audit](docs/MUST_HAVES_IMPLEMENTATION_AUDIT.md) — implementation evidence and remaining gaps.
-- `docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md`
-- `docs/RESQPERATION_G10_DB_READINESS_CHECK.md`
-- `docs/RESQPERATION_G10_SAFE_SAMPLE_SEED_PLAN.md`
-- `docs/RESQPERATION_G10_DEVELOPMENT_READINESS_AUDIT.md`
-- `docs/RESQPERATION_SYSTEM_TEST_AND_IMPROVEMENT_NOTES.md`
-- `docs/RESQPERATION_G10_BEGINNER_MODULE_PROMPTS.md`
-- `docs/RESQPERATION_BARANGAY_PROFILE_SCOPE.md`
-- `docs/sql_proposals/2026_06_01_g10_all_sql_additive_update.sql`
-- `docs/sql_proposals/2026_06_01_g10_existing_db_gap_review.sql` - superseded historical proposal
-- `docs/sql_proposals/initial/2026_06_03_g10_barangay_profile_review.sql` - review-only Barangay Profile proposal
-
-- `docs/DOCUMENTATION_INDEX.md` - start here for all project documentation.
-- `docs/RESQPERATION_FINAL_DEFENSE_STUDY_GUIDE_AND_DIAGRAMS.md` - final-defense study guide and system diagrams.
-- `docs/RESQPERATION_EXTERNAL_SYSTEM_INTEGRATION_DRAFT.md` - SafeTrack, EvaTrack, and TrackingAid/MappingAid integration draft.
-- `docs/RESQPERATION_TRACKINGAID_REQUEST_INTEGRATION_GUIDE.md` - complete EvaTrack intake and TrackingAid request handoff guide.
-- `docs/RESQPERATION_ONESIGNAL_MOBILE_SETUP.md` - OneSignal mobile setup and token registration flow.
-- `docs/RESQPERATION_MOBILE_INSTALL_DEV_BUILD_ONESIGNAL_GUIDE.md` - groupmate guide for installing the mobile APK, running Expo Go/dev build, and verifying OneSignal subscriptions.
-- `docs/RESQPERATION_SYSTEM_CLEANUP_AND_CURRENT_STATE.md` - latest cleanup notes and current system status.
-- `docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md` - current build checklist.
-- `docs/RESQPERATION_DB_CONNECTION_SWITCH_GUIDE.md` - shared MySQL connection guide using only `backend-laravel/.env`.
-- `docs/sql_proposals/` - review-only SQL proposals.
-
-Private local references:
-
-- `FOR DEV/RESQPERATION_UPDATED_STEP_GUIDE.md`
-- `FOR DEV/RESQPERATION_REQUIREMENTS_BREAKDOWN.md`
-- `FOR DEV/RESQPERATION_ACTUAL_DEVELOPMENT_PLAN.md`
-- `FOR DEV/API_REFERENCE.md`
-- `FOR DEV/RESQPERATION_PROTOTYPE_MODULES/README.md`
-
-## Useful Commands
-
-Backend:
-
-```bash
+```powershell
+# Backend
 cd backend-laravel
+composer install
 php artisan serve --host=0.0.0.0 --port=8000
-php artisan test
-php artisan route:list
-php artisan config:clear
-php artisan weather:refresh
-php artisan schedule:list
-php artisan schedule:run
-```
 
-Weather update note:
-
-- `weather:refresh` saves the latest Open-Meteo snapshot to `weather_logs`.
-- Laravel Scheduler runs `weather:refresh` every 3 hours.
-- On a real deployment machine, configure the server scheduler or Windows Task Scheduler to run `php artisan schedule:run` every minute.
-- PAGASA remains the official warning confirmation source before HQ/Admin broadcasts.
-
-Web frontend:
-
-```bash
+# Web app (in a separate terminal)
 cd frontend-web
 npm install
-npm run dev
-npm run build
-npm run lint
-```
+npm run dev -- --port 5175
 
-Mobile frontend:
-
-```bash
+# Mobile app (in a separate terminal)
 cd frontend-mobile
 npm install
 npm run start:go
-npm run start:dev
-npx tsc --noEmit
-npm run lint
 ```
 
-Mobile command notes:
+For mobile devices, configure `EXPO_PUBLIC_API_BASE_URL` with a backend address reachable from the device. OneSignal and some native map functionality require an Expo development or production build; Expo Go is for ordinary UI testing.
 
-- `npm run start:go` runs ordinary Expo Go UI testing.
-- `npm run start:dev` runs Metro for an installed development build.
-- OneSignal and native maps require a development or production build, not plain Expo Go.
+## Copyright, Attribution, and Third-Party Terms
 
-Mobile API connection:
+© 2026 RESQPERATION capstone project team for original project materials and logo. No ownership is claimed over third-party software, data, maps, APIs, service names, or marks. Their respective owners retain their copyrights and applicable licenses/terms; using or attributing a source here does not transfer rights.
 
-```env
-EXPO_PUBLIC_API_BASE_URL=http://192.168.112.109:8000/api/v1
-```
+- **Weather:** Open-Meteo API data is offered under [CC BY 4.0](https://open-meteo.com/en/licence) for use subject to its [terms](https://open-meteo.com/en/terms). Credit Open-Meteo and review the current non-commercial API limits.
+- **Official alerts:** The PAGASA Atom feed identifies its content as © Philippine Atmospheric, Geophysical and Astronomical Services Administration and licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Credit DOST-PAGASA and link to original alerts.
+- **Maps:** © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), data available under ODbL. The standard tile service has separate [usage requirements](https://operations.osmfoundation.org/policies/tiles/).
+- **Hazard layers:** Credit the originating agencies and preserve source dates and layer details as recorded in [MAMBALING_HAZARD_SOURCES.md](docs/MAMBALING_HAZARD_SOURCES.md).
+- **Mambaling statistics:** Census figures are attributed to PSA through the linked PhilAtlas profile. The profile's text and presentation remain subject to its own rights and terms.
+- **Frameworks and services:** Laravel, React, Expo, Leaflet, OneSignal, OSRM, and all other dependencies/services retain their respective licenses, trademarks, and API terms. See the module dependency manifests and official service documentation before redistribution or production use.
 
-For Expo Go on Android/iPhone, the Laravel backend must run with `--host=0.0.0.0` so the phone can reach the API through the laptop Wi-Fi IP.
-
-Use the QR code shown by `npm start` and scan it with Expo Go on the actual phone. Emulator commands are optional and are not required for normal mobile testing.
-
-Local development URLs:
-
-```text
-Web app: http://127.0.0.1:5175/login
-Backend API: http://127.0.0.1:8000/api/v1
-Mobile API: http://192.168.112.109:8000/api/v1
-```
-
-
-Local:   http://localhost:5175/
-Local:   http://127.0.0.1:5175/
-Network: http://192.168.112.109:5175/
-VPN:     http://100.113.172.151:5175/
-
-Local:   http://localhost:5175/login
-Network: http://192.168.112.109:5175/login
+For detailed source links and technical references, see [RESQPERATION_SYSTEM_STACK_RESOURCES_AND_REFERENCES.md](../docs/RESQPERATION_SYSTEM_STACK_RESOURCES_AND_REFERENCES.md).

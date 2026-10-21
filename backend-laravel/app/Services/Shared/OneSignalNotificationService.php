@@ -100,6 +100,12 @@ class OneSignalNotificationService
 
     private function sendChunk(array $playerIds, string $title, string $message, array $data, string $idempotencyKey): array
     {
+        if (($data['type'] ?? '') === 'rescue_dispatch' && ! empty($data['assignment_id'])) {
+            $ids = $playerIds;
+            sort($ids);
+            $hash = hash('sha256', $this->appId().'|dispatch|'.$data['assignment_id'].'|'.implode(',', $ids));
+            $idempotencyKey = substr($hash, 0, 8).'-'.substr($hash, 8, 4).'-5'.substr($hash, 13, 3).'-8'.substr($hash, 17, 3).'-'.substr($hash, 20, 12);
+        }
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Key '.$this->apiKey(),

@@ -7,6 +7,7 @@ import '@/utils/navigationRuntime';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { configureNotificationHandler } from '@/utils/pushNotifications';
+import { NotificationPermissionNotice } from '@/components/NotificationPermissionNotice';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -21,6 +22,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <NotificationPermissionNotice />
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="household/index" options={{ headerShown: false }} />

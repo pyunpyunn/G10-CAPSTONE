@@ -1,15 +1,16 @@
 import { createElement, useCallback, useEffect, useRef } from 'react';
 import { mobileLeafletHtml, type LeafletPoint, type LeafletRoute } from '@/utils/mobileLeafletHtml';
 
-export function MobileLeafletMap({ markers, routes, center, height = 340, geotagPicker = false, selectedPoint, onMapPress, onPinMoving }: {
+export function MobileLeafletMap({ markers, routes, center, height = 340, geotagPicker = false, geotagMode = 'drag', selectedPoint, onMapPress, onPinMoving }: {
   markers: LeafletPoint[]; routes: LeafletRoute[];
   center?: { latitude: number; longitude: number }; height?: number;
   geotagPicker?: boolean; selectedPoint?: { latitude: number; longitude: number } | null;
+  geotagMode?: 'drag' | 'center';
   onMapPress?: (point: { latitude: number; longitude: number }) => void;
   onPinMoving?: () => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const html = geotagPicker ? mobileLeafletHtml({ markers: [], routes: [], geotagPicker: true }) : mobileLeafletHtml({ markers, routes, center });
+  const html = geotagPicker ? mobileLeafletHtml({ markers: [], routes: [], geotagPicker: true, geotagMode }) : mobileLeafletHtml({ markers, routes, center });
   const latitude = selectedPoint?.latitude, longitude = selectedPoint?.longitude;
   const updatePin = useCallback(() => {
     if (Number.isFinite(latitude) && Number.isFinite(longitude)) {

@@ -51,6 +51,8 @@ class HouseholdMobilePresenter
             'emergency_contact' => $household->emergency_contact ?? null,
             'member_count' => $actualMemberCount,
             'address' => $household->full_address ?? 'No address recorded',
+            'sitio_id' => $household->sitio_id ?? null,
+            'sitio_name' => $household->sitio_name ?? null,
             'purok' => $household->purok_sitio ?? 'Not recorded',
             'barangay' => $household->barangay_name ?? 'Not recorded',
             'city' => $household->city_municipality ?? 'Not recorded',
@@ -151,5 +153,4 @@ class HouseholdMobilePresenter
         ];
     }
 }
-
 
