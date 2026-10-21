@@ -126,7 +126,7 @@ export default function MappingPage() {
         {selected.kind === 'office' && <Fact label="Role" value="Dispatch origin" />}{selected.kind === 'team' && <><Fact label="Responder" value={row.responder_name} /><Fact label="Area" value={row.assigned_area} /><Fact label="Last seen" value={row.logged_at} /></>}
       </div>}
     </div>}
-    {workspace && <HazardPlanning workspace={workspace} purokId={purokId} hazardType={hazardType} user={user} refresh={refresh} />}
+    {workspace && !fullscreen && <HazardPlanning workspace={workspace} purokId={purokId} hazardType={hazardType} user={user} refresh={refresh} />}
   </section>
   return fullscreen ? createPortal(content, document.body) : content
 }
