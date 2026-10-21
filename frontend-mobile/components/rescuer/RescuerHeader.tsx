@@ -1,4 +1,6 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ResQperationLogo from '@/components/ResQperationLogo';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 
@@ -8,14 +10,11 @@ type HeaderProps = {
 
 export function RescuerHeader({ onOpenRadio }: HeaderProps) {
   return (
-    <View style={styles.header}>
+    <SafeAreaView edges={['top']} style={styles.header}>
       <View style={styles.brandRow}>
-        <Image
-          source={require('@/assets/images/resqperation-logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.brand}>RESQPERATION</Text>
+        <View style={styles.wordmark}>
+          <ResQperationLogo width="100%" height={44} />
+        </View>
         <View style={styles.actions}>
           {onOpenRadio ? (
             <Pressable style={styles.iconButton} onPress={onOpenRadio}>
@@ -24,7 +23,7 @@ export function RescuerHeader({ onOpenRadio }: HeaderProps) {
           ) : null}
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -41,17 +40,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  logo: {
-    width: 48,
-    height: 42,
-  },
-  brand: {
-    color: '#fff',
-    fontSize: 19,
-    fontWeight: '900',
-    letterSpacing: 0,
+  wordmark: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: 220,
+    height: 44,
   },
   actions: {
+    flexShrink: 0,
     marginLeft: 'auto',
     flexDirection: 'row',
     gap: spacing.sm,
