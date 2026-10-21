@@ -16,6 +16,7 @@ class GlobalSearchController extends Controller
         'broadcasts' => 'response_operations',
         'households' => 'geospatial_analytics',
         'responders' => 'personnel_access',
+        'teams' => 'personnel_access',
         'dispatches' => 'response_operations',
         'resources' => 'resources_requests',
         'sitreps' => 'reports_documentation',
@@ -27,7 +28,7 @@ class GlobalSearchController extends Controller
     {
         $validated = $request->validate([
             'q' => ['required', 'string', 'min:2', 'max:100'],
-            'types' => ['nullable', 'array', 'max:7'],
+            'types' => ['nullable', 'array', 'max:8'],
             'types.*' => ['required', 'string', Rule::in(GlobalSearchService::TYPES)],
         ]);
 

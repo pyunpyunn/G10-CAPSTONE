@@ -6,6 +6,7 @@ use App\Models\DisasterBroadcast;
 use App\Models\DisasterEvent;
 use App\Models\Household;
 use App\Models\Responder;
+use App\Models\RescueTeam;
 use App\Models\ResponderAssignment;
 use App\Models\ResourceRequest;
 use App\Models\SituationReport;
@@ -19,6 +20,7 @@ class GlobalSearchService
         'broadcasts',
         'households',
         'responders',
+        'teams',
         'dispatches',
         'resources',
         'sitreps',
@@ -47,6 +49,10 @@ class GlobalSearchService
             $results = array_merge($results, $this->searchResponders($term));
         }
 
+        if (in_array('teams', $types, true) && Schema::hasTable('rescue_teams')) {
+            $results = array_merge($results, $this->searchTeams($term));
+        }
+
         if (in_array('dispatches', $types, true) && Schema::hasTable('responder_assignments')) {
             $results = array_merge($results, $this->searchDispatches($term));
         }
@@ -59,6 +65,9 @@ class GlobalSearchService
             $results = array_merge($results, $this->searchSituationReports($term));
         }
 
+        usort($results, fn (array $a, array $b): int =>
+            (int) (strcasecmp($b['title'], $term) === 0) <=> (int) (strcasecmp($a['title'], $term) === 0)
+        );
         return $results;
     }
 
@@ -182,6 +191,20 @@ class GlobalSearchService
             ->all();
     }
 
+    private function searchTeams(string $term): array
+    {
+        return $this->matches(RescueTeam::query(), ['team_name', 'team_code', 'team_type'], $term)
+            ->orderBy('team_name')
+            ->limit(self::RESULT_LIMIT)
+            ->get()
+            ->map(fn (RescueTeam $team): array => $this->result(
+                'teams',
+                $team->team_name ?: $team->team_code,
+                trim($team->team_code.' · '.$team->team_type),
+                '/rescuers/teams?team_id='.rawurlencode((string) $team->team_id)
+            ))->all();
+    }
+
     private function searchDispatches(string $term): array
     {
         return $this->matches(ResponderAssignment::query()->with(['responder', 'team']), [
@@ -246,25 +269,27 @@ class GlobalSearchService
 
     private function matches(Builder $query, array $columns, string $term, ?string $relation = null, array $relatedColumns = []): Builder
     {
-        $pattern = '%'.$term.'%';
-
-        return $query->where(function (Builder $search) use ($columns, $pattern, $relation, $relatedColumns): void {
-            foreach ($columns as $index => $column) {
-                $method = $index === 0 ? 'where' : 'orWhere';
-                $search->{$method}($column, 'like', $pattern);
-            }
-
-            if ($relation && $relatedColumns) {
-                $search->orWhereHas($relation, function (Builder $related) use ($relatedColumns, $pattern): void {
-                    $related->where(function (Builder $account) use ($relatedColumns, $pattern): void {
-                        foreach ($relatedColumns as $index => $column) {
-                            $method = $index === 0 ? 'where' : 'orWhere';
-                            $account->{$method}($column, 'like', $pattern);
-                        }
+        $tokens = preg_split('/\s+/u', trim($term), -1, PREG_SPLIT_NO_EMPTY);
+        foreach ($tokens as $token) {
+            $pattern = '%'.mb_strtolower($token).'%';
+            $query->where(function (Builder $search) use ($columns, $pattern, $relation, $relatedColumns): void {
+                $grammar = $search->getQuery()->getGrammar();
+                foreach ($columns as $column) {
+                    $search->orWhereRaw('LOWER('.$grammar->wrap($column).') LIKE ?', [$pattern]);
+                }
+                if ($relation && $relatedColumns) {
+                    $search->orWhereHas($relation, function (Builder $related) use ($relatedColumns, $pattern): void {
+                        $related->where(function (Builder $account) use ($relatedColumns, $pattern): void {
+                            $grammar = $account->getQuery()->getGrammar();
+                            foreach ($relatedColumns as $column) {
+                                $account->orWhereRaw('LOWER('.$grammar->wrap($column).') LIKE ?', [$pattern]);
+                            }
+                        });
                     });
-                });
-            }
-        });
+                }
+            });
+        }
+        return $query;
     }
 
     private function result(string $type, string $title, string $subtitle, string $href): array

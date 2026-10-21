@@ -73,6 +73,42 @@ class BarangayProfileService
         ];
     }
 
+    public function mambalingMapFocus(): array
+    {
+        $record = Schema::hasTable('barangay_boundaries')
+            ? DB::table('barangay_boundaries')->where('psgc_code', '0730600049')->first()
+            : null;
+        $geoJsonPath = database_path('boundaries/0730600049.geojson');
+        $geoJson = is_file($geoJsonPath) ? json_decode(file_get_contents($geoJsonPath), true) : null;
+        $geometry = is_array($geoJson) && ($geoJson['properties']['psgc_10d'] ?? null) === '0730600049'
+            ? ($geoJson['geometry'] ?? null)
+            : null;
+        $source = 'Bundled Mambaling barangay boundary.';
+        if (! is_array($geometry) && $record) {
+            $geometry = json_decode($record->geometry_json, true);
+            $source = $record->source_note;
+        }
+
+        $barangayId = $record->barangay_id ?? null;
+        if ($barangayId === null && Schema::hasTable('barangays') && Schema::hasTable('cities')) {
+            $barangayId = DB::table('barangays as b')
+                ->join('cities as c', 'c.city_id', '=', 'b.city_id')
+                ->whereRaw('LOWER(b.barangay_name) = ?', ['mambaling'])
+                ->whereIn('c.city_name', ['Cebu City', 'City of Cebu'])
+                ->value('b.barangay_id');
+        }
+
+        if (! is_array($geometry) || ! in_array($geometry['type'] ?? null, ['Polygon', 'MultiPolygon'], true)) {
+            $geometry = null;
+        }
+
+        return [
+            'barangay_id' => $barangayId,
+            'boundary' => $geometry,
+            'boundary_source' => $source,
+        ];
+    }
+
     private function activeProfile(): ?object
     {
         if (! Schema::hasTable('barangay_profiles')) {
@@ -288,8 +324,6 @@ class BarangayProfileService
         return $this->sharedGeometry;
     }
 }
-
-
 
 
 

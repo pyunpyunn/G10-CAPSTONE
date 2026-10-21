@@ -40,7 +40,7 @@ class WebAccessPolicy
         $roleKey = $user->roleKey();
         $modules = $this->modulesFor($user);
         if ($module === 'global_search') {
-            return $modules !== [] && $roleKey !== 'operations_admin';
+            return $modules !== [];
         }
         if (! in_array($module, $modules, true)) {
             return false;

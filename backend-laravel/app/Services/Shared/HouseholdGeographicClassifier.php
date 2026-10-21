@@ -10,9 +10,9 @@ class HouseholdGeographicClassifier
 {
     public function __construct(private BarangayProfileService $profile, private BarangayBoundaryService $boundaries) {}
 
-    public function resolve(float $latitude, float $longitude): array
+    public function resolve(float $latitude, float $longitude, ?array $focus = null): array
     {
-        $focus = $this->profile->mapFocus();
+        $focus ??= $this->profile->mapFocus();
         if (! $focus['boundary']) return ['status' => 'barangay_boundary_missing'];
         if (! $this->boundaries->contains($focus['boundary'], $latitude, $longitude)) return ['status' => 'outside_barangay'];
         if (! Schema::hasTable('purok_boundaries')) return ['status' => 'purok_boundaries_missing'];
@@ -37,9 +37,9 @@ class HouseholdGeographicClassifier
             'sitio_name' => $area->sitio_name, 'purok_name' => $area->purok_name];
     }
 
-    public function classify(string $householdId, float $latitude, float $longitude, ?int $confirmedSitioId = null, ?int $barangayId = null): array
+    public function classify(string $householdId, float $latitude, float $longitude, ?int $confirmedSitioId = null, ?int $barangayId = null, ?array $focus = null): array
     {
-        $result = $this->resolve($latitude, $longitude);
+        $result = $this->resolve($latitude, $longitude, $focus);
         // Preserve a usable geotag even when the required official area data is unavailable.
         if (! Schema::hasTable('household_geographic_classifications') && $confirmedSitioId === null) return $result;
         return DB::transaction(function () use ($householdId, $latitude, $longitude, $result, $confirmedSitioId, $barangayId): array {

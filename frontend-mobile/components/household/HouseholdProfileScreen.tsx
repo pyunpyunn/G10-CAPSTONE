@@ -201,7 +201,6 @@ export function HouseholdProfileScreen({
         ) : (
           <HouseholdEmpty icon="location-outline" title="No geotag saved yet" />
         )}
-        <Text style={styles.mapHint}>Use GPS or open the map to move the center pin over your home. The location is saved when you stop moving the map.</Text>
         <View style={styles.mapActions}>
           <View style={styles.gpsButton}>
             <HouseholdButton
@@ -227,7 +226,6 @@ export function HouseholdProfileScreen({
         </View>
         {geotagMapVisible ? (
           <>
-            <Text style={styles.mapHint}>Map opens on Mambaling. Keep the pin at the center and pan the map; satellite imagery is available in the map controls. The server validates the point before saving.</Text>
             <MobileLeafletMap
               markers={[]}
               routes={[]}
