@@ -1,0 +1,262 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-resqperation}
+      MYSQL_USER: ${MYSQL_USER:-resqperation}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in resqperation-system/.env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in resqperation-system/.env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    mem_limit: ${MYSQL_MEMORY_LIMIT:-1g}
+
+  redis:
+    image: redis:7.2.16-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: ${REDIS_MEMORY_LIMIT:-256m}
+
+  app:
+    build:
+      context: .
+      dockerfile: deploy/php/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_KEY: ${APP_KEY:?Set APP_KEY in resqperation-system/.env}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_CONNECTION: resq_local
+      RESQ_LOCAL_DB_CONNECTION: mysql
+      RESQ_LOCAL_DB_HOST: mysql
+      RESQ_LOCAL_DB_PORT: 3306
+      RESQ_LOCAL_DB_DATABASE: ${MYSQL_DATABASE:-resqperation}
+      RESQ_LOCAL_DB_USERNAME: ${MYSQL_USER:-resqperation}
+      RESQ_LOCAL_DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in resqperation-system/.env}
+      QUEUE_CONNECTION: database
+      DB_QUEUE_CONNECTION: resq_local
+      CACHE_STORE: redis
+      REDIS_HOST: redis
+      SESSION_DRIVER: file
+      VALHALLA_URL: http://valhalla:8002
+      NAVIGATION_PACK_ROOT: /navigation-packs
+      TILESERVER_PUBLIC_URL: ${TILESERVER_PUBLIC_URL:-http://localhost:8080}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app_storage:/var/www/html/storage
+      - ./data/tiles/offline-packs:/navigation-packs:ro
+    networks:
+      - backend
+    mem_limit: ${APP_MEMORY_LIMIT:-1g}
+
+  queue-worker:
+    build:
+      context: .
+      dockerfile: deploy/php/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_KEY: ${APP_KEY:?Set APP_KEY in resqperation-system/.env}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_CONNECTION: resq_local
+      RESQ_LOCAL_DB_CONNECTION: mysql
+      RESQ_LOCAL_DB_HOST: mysql
+      RESQ_LOCAL_DB_PORT: 3306
+      RESQ_LOCAL_DB_DATABASE: ${MYSQL_DATABASE:-resqperation}
+      RESQ_LOCAL_DB_USERNAME: ${MYSQL_USER:-resqperation}
+      RESQ_LOCAL_DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in resqperation-system/.env}
+      QUEUE_CONNECTION: database
+      DB_QUEUE_CONNECTION: resq_local
+      CACHE_STORE: redis
+      REDIS_HOST: redis
+      SESSION_DRIVER: file
+      VALHALLA_URL: http://valhalla:8002
+    command: ["php", "artisan", "queue:work", "--sleep=1", "--tries=3", "--timeout=120", "--max-time=3600"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app_storage:/var/www/html/storage
+    networks:
+      - backend
+    mem_limit: ${WORKER_MEMORY_LIMIT:-512m}
+
+  navigation-worker:
+    build:
+      context: .
+      dockerfile: deploy/php/Dockerfile
+    restart: unless-stopped
+    profiles: [navigation]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_KEY: ${APP_KEY:?Set APP_KEY in resqperation-system/.env}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_CONNECTION: resq_local
+      RESQ_LOCAL_DB_CONNECTION: mysql
+      RESQ_LOCAL_DB_HOST: mysql
+      RESQ_LOCAL_DB_PORT: 3306
+      RESQ_LOCAL_DB_DATABASE: ${MYSQL_DATABASE:-resqperation}
+      RESQ_LOCAL_DB_USERNAME: ${MYSQL_USER:-resqperation}
+      RESQ_LOCAL_DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in resqperation-system/.env}
+      QUEUE_CONNECTION: database
+      DB_QUEUE_CONNECTION: resq_local
+      CACHE_STORE: redis
+      REDIS_HOST: redis
+      SESSION_DRIVER: file
+      VALHALLA_URL: http://valhalla:8002
+    command: ["php", "artisan", "queue:work", "database", "--queue=navigation", "--sleep=2", "--tries=2", "--timeout=120", "--max-time=3600", "--max-jobs=20"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      valhalla:
+        condition: service_healthy
+    networks:
+      - backend
+    mem_limit: ${NAVIGATION_WORKER_MEMORY_LIMIT:-512m}
+    cpus: ${NAVIGATION_WORKER_CPUS:-1}
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: deploy/php/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_KEY: ${APP_KEY:?Set APP_KEY in resqperation-system/.env}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_CONNECTION: resq_local
+      RESQ_LOCAL_DB_CONNECTION: mysql
+      RESQ_LOCAL_DB_HOST: mysql
+      RESQ_LOCAL_DB_PORT: 3306
+      RESQ_LOCAL_DB_DATABASE: ${MYSQL_DATABASE:-resqperation}
+      RESQ_LOCAL_DB_USERNAME: ${MYSQL_USER:-resqperation}
+      RESQ_LOCAL_DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in resqperation-system/.env}
+      QUEUE_CONNECTION: database
+      DB_QUEUE_CONNECTION: resq_local
+      CACHE_STORE: redis
+      REDIS_HOST: redis
+      SESSION_DRIVER: file
+      VALHALLA_URL: http://valhalla:8002
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app_storage:/var/www/html/storage
+    networks:
+      - backend
+    mem_limit: ${SCHEDULER_MEMORY_LIMIT:-256m}
+
+  nginx:
+    image: nginx:1.30-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_BIND_ADDRESS:-0.0.0.0}:${HTTP_PORT:-8000}:80"
+    depends_on:
+      - app
+    volumes:
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - app_storage:/var/www/html/storage:ro
+    networks:
+      - backend
+
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    restart: unless-stopped
+    profiles: [navigation]
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - "cp /input/cebu-city-buffer.osm.pbf /custom_files/cebu-city-buffer.osm.pbf && exec /valhalla/scripts/docker-entrypoint.sh build_tiles"
+    environment:
+      build_elevation: "False"
+      build_transit: "False"
+      build_time_zones: "False"
+      server_threads: ${VALHALLA_SERVER_THREADS:-2}
+    volumes:
+      - valhalla_data:/custom_files
+      - ./data/valhalla:/input:ro
+    ports:
+      - "127.0.0.1:${VALHALLA_PORT:-8002}:8002"
+    expose:
+      - "8002"
+    networks:
+      - backend
+    mem_limit: ${VALHALLA_MEMORY_LIMIT:-4g}
+    cpus: ${VALHALLA_CPUS:-2}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/status', timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+
+  tileserver:
+    image: maptiler/tileserver-gl:v5.6.0
+    restart: unless-stopped
+    profiles: [navigation]
+    command:
+      - --config
+      - /data/config.json
+      - --public_url
+      - ${TILESERVER_PUBLIC_URL:-http://localhost:8080}
+    ports:
+      - "${TILESERVER_BIND_ADDRESS:-0.0.0.0}:${TILESERVER_PORT:-8080}:8080"
+    volumes:
+      - ./data/tiles:/data:ro
+    networks:
+      - backend
+    mem_limit: ${TILESERVER_MEMORY_LIMIT:-768m}
+    cpus: ${TILESERVER_CPUS:-1}
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  app_storage:
+  valhalla_data:

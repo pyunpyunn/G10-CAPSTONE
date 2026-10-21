@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  AppState,
   Platform,
   Pressable,
   RefreshControl,
@@ -9,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
@@ -47,6 +48,7 @@ import { HouseholdLoading } from '@/components/household/HouseholdUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
+import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 
 const deviceUuidKey = 'resq_household_device_uuid';
 type TabKey = 'home' | 'route' | 'trusted' | 'profile';
@@ -86,6 +88,14 @@ export default function HouseholdHomeScreen() {
   const [trustedLoading, setTrustedLoading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationBusyId, setNotificationBusyId] = useState('');
+  const statusOptionsSignature = JSON.stringify(overview?.status_options || []);
+
+  useEffect(() => {
+    const options: { key: string }[] = JSON.parse(statusOptionsSignature);
+    if (!options.length) return;
+    setPendingStatus((current) => options.some((option) => option.key === current) ? current : options[0].key);
+    setEditingStatus(true);
+  }, [statusOptionsSignature]);
 
   const loadLocalKeys = useCallback(async () => {
     const existingDeviceUuid = await getStoredItem(deviceUuidKey);
@@ -99,8 +109,10 @@ export default function HouseholdHomeScreen() {
 
   }, []);
 
-  const loadOverview = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
+  const loadOverview = useCallback(async (isRefresh = false, silent = false) => {
+    if (silent) {
+      // Incoming alerts must not interrupt an unfinished household status edit.
+    } else if (isRefresh) {
       setRefreshing(true);
     } else {
       setLoading(true);
@@ -119,15 +131,41 @@ export default function HouseholdHomeScreen() {
           : null
       );
       const savedStatus = data.current_status?.status_key || data.status_options?.[0]?.key || 'safe';
-      setPendingStatus(savedStatus);
-      setEditingStatus(true);
+      if (!silent) {
+        setPendingStatus(savedStatus);
+        setEditingStatus(true);
+      }
     } catch (error: any) {
-      Alert.alert('Unable to load household data', errorMessage(error));
+      if (!silent) Alert.alert('Unable to load household data', errorMessage(error));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!silent) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
+
+  useEffect(() => {
+    let pending = false;
+    let disposed = false;
+    const refreshAlerts = async () => {
+      if (disposed || pending || AppState.currentState !== 'active') return;
+      pending = true;
+      try { await loadOverview(true, true); } finally { pending = false; }
+    };
+    const unsubscribe = onDisasterBroadcast(() => { void refreshAlerts(); });
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshAlerts();
+    });
+    // Small foreground-only fallback when Android push delivery is delayed.
+    const timer = setInterval(() => { void refreshAlerts(); }, 30000);
+    return () => {
+      disposed = true;
+      unsubscribe();
+      subscription.remove();
+      clearInterval(timer);
+    };
+  }, [loadOverview]);
 
   const refreshDeviceSensors = useCallback(async () => {
     try {
@@ -601,6 +639,11 @@ export default function HouseholdHomeScreen() {
           onOpenTrusted={openTrusted}
           onDeleteTrusted={handleDeleteTrusted}
           onBackFamily={() => setViewingTrusted(null)}
+          respondingConnectionId={notificationBusyId || null}
+          onRespondToIncomingRequest={(request, decision) => {
+            if (decision === 'accept') void handleAcceptTrustedRequest(request);
+            else handleRejectTrustedRequest(request);
+          }}
           onSaveTrustedMemberStatus={handleSaveTrustedMemberStatus}
         />
       );

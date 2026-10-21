@@ -93,9 +93,11 @@ class ExternalReportsTest extends TestCase
         $bytes = Storage::disk('local')->get('reports/'.$result['file_name']);
 
         $this->assertStringStartsWith('%PDF', $bytes);
-        $this->assertStringContainsString('Situation Report', $bytes);
-        $this->assertStringContainsString('Flooding Response', $bytes);
-        $this->assertStringContainsString('Barangay Sample', $bytes);
+        // PDF content streams are compressed; inspect the rendered source for layout/data.
+        $html = view('reports.situation', ['summary' => $summary])->render();
+        $this->assertStringContainsString('BDRRMC Situation Report', $html);
+        $this->assertStringContainsString('Flooding Response', $html);
+        $this->assertStringContainsString('Barangay Mambaling', $html);
     }
 
     public function test_pdf_limit_rejects_instead_of_truncating_records(): void

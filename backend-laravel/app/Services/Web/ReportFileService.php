@@ -61,17 +61,35 @@ class ReportFileService
         $path = tempnam(sys_get_temp_dir(), 'report-');
 
         try {
-            Pdf::loadHTML(view('reports.situation', [
+            $pdf = Pdf::loadHTML(view('reports.situation', [
                 'summary' => $summary,
                 'generatedAt' => now()->toDateTimeString(),
-            ])->render())
-                ->setPaper('a4', 'portrait')
-                ->save($path);
+            ])->render())->setPaper('a4', 'portrait');
+            {
+                $pdf->render();
+                $pdf->getDomPDF()->getCanvas()->page_text(460, 815, 'Page {PAGE_NUM} of {PAGE_COUNT}', null, 8);
+            }
+            $pdf->save($path);
 
             return $this->persistReportFile($filename, $path, 'situation', 'pdf');
         } finally {
             if (file_exists($path)) unlink($path);
         }
+    }
+
+    public function generateSituationSpreadsheet(array $summary, string $format): array
+    {
+        $format = $format === 'excel' ? 'xlsx' : $format;
+        if (!in_array($format, ['csv','xlsx'], true)) throw ValidationException::withMessages(['format'=>'Select CSV or Excel.']);
+        $filename = 'situation_'.now()->format('Ymd_His').'_'.Str::random(16).'.'.$format;
+        $path = tempnam(sys_get_temp_dir(), 'sitrep-');
+        try {
+            $document = app(\App\Presenters\SituationReportDocument::class)->data($summary);
+            $writer = app(SituationReportSpreadsheet::class);
+            if ($format === 'xlsx') $writer->writeXlsx($path, $document);
+            else $writer->writeCsv($path, $document);
+            return $this->persistReportFile($filename, $path, 'situation', $format);
+        } finally { if (file_exists($path)) unlink($path); }
     }
 
     private function persistReportFile(string $filename, string $path, string $type, string $format): array

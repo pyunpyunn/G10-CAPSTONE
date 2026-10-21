@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
@@ -39,6 +39,7 @@ import { LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
+import { mountNavigationSync } from '@/utils/navigationRuntime';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 const deviceUuidKey = 'resq_rescuer_device_uuid';
@@ -55,8 +56,10 @@ export default function RescuerHomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
   const [overview, setOverview] = useState<RescuerOverview | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => Platform.OS === 'web' ? undefined : mountNavigationSync(), []);
 
   const loadOverview = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -130,11 +133,30 @@ export default function RescuerHomeScreen() {
   );
 
   async function handleLogout() {
-    await logoutMobile();
-    router.replace('/' as Href);
+    try {
+      await logoutMobile();
+      router.replace('/' as Href);
+    } catch (error: any) { Alert.alert('Unable to log out', errorMessage(error)); }
   }
 
   async function handleStatusChange(assignmentId: number, status: string) {
+    if (status === 'completed') {
+      const assignment = assignments.find((item) => Number(item.assignment_id) === Number(assignmentId));
+      const hasReport = !assignment?.household_id || (overview?.field_reports || []).some((report: any) =>
+        String(report.assignment_id) === String(assignmentId)
+        && String(report.household_id) === String(assignment.household_id)
+        && String(report.event_id) === String(assignment.event_id)
+      );
+
+      if (!hasReport) {
+        Alert.alert('Field report required', 'Submit the household field report before completing this assignment.', [
+          { text: 'Open report', onPress: () => openReport(assignment) },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+        return;
+      }
+    }
+
     try {
       const payload = ['accepted', 'en_route'].includes(status)
         ? await currentLocationPayload()
@@ -185,18 +207,18 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleSubmitFieldReport(payload: any) {
-    if (!payload.household_id) {
-      Alert.alert('Missing household ID', 'Enter the household ID before submitting.');
-      return;
-    }
+    await createFieldReport(payload);
+    await loadOverview(true);
+  }
 
-    try {
-      await createFieldReport(payload);
-      Alert.alert('Report submitted', 'Your household field report was sent to HQ.');
-      await loadOverview(true);
-    } catch (error: any) {
-      Alert.alert('Unable to submit report', errorMessage(error));
-    }
+  function openMap(assignment?: any) {
+    setSelectedAssignment(assignment || activeAssignment || null);
+    setActiveTab('map');
+  }
+
+  function openReport(assignment?: any) {
+    setSelectedAssignment(assignment || activeAssignment || null);
+    setActiveTab('report');
   }
 
   async function handleSubmitResourceRequest(payload: any) {
@@ -243,8 +265,8 @@ export default function RescuerHomeScreen() {
       return (
         <RescuerDashboardScreen
           overview={overview}
-          onOpenMap={() => setActiveTab('map')}
-          onOpenReport={() => setActiveTab('report')}
+          onOpenMap={openMap}
+          onOpenReport={openReport}
           onStatusChange={handleStatusChange}
         />
       );
@@ -256,6 +278,7 @@ export default function RescuerHomeScreen() {
           assignments={assignments}
           evacuationCenters={overview.evacuation_centers || []}
           activeAssignment={activeAssignment}
+          selectedAssignment={selectedAssignment}
           onSendLocation={handleSendLocation}
         />
       );
@@ -265,7 +288,8 @@ export default function RescuerHomeScreen() {
       return (
         <FieldReportScreen
           reports={overview.field_reports || []}
-          statusOptions={overview.status_options || []}
+          assignmentId={Number(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || 0)}
+          householdId={String(selectedAssignment?.household_id || activeAssignment?.household_id || '')}
           onSubmitReport={handleSubmitFieldReport}
         />
       );
@@ -300,6 +324,11 @@ export default function RescuerHomeScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
+        {Platform.OS !== 'web' && <Pressable style={{ padding: 16, backgroundColor: '#e8f1ff', borderRadius: 12 }}
+          onPress={() => router.push({ pathname: '/rescuer/navigation' as any,
+            params: { dispatchId: String(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || '') } })}>
+          <Text style={{ color: '#1358a4', fontWeight: '700' }}>View directions / Offline navigation</Text>
+        </Pressable>}
         {renderContent()}
       </ScrollView>
 

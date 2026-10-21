@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class UrgencyLevel extends Model
 {
@@ -13,10 +12,6 @@ class UrgencyLevel extends Model
     public $timestamps = false;
     protected $fillable = ['urgency_key', 'urgency_label'];
 
-    public function requests(): HasMany
-    {
-        return $this->hasMany(ResourceRequest::class, 'urgency_id', 'urgency_id');
-    }
 }
 
 

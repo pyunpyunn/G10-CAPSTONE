@@ -1,37 +1,29 @@
-import { CloudRain, Users, HeartPulse, MapPinHouse, Route, House, Package, ClipboardList, Thermometer, Wind, Droplets } from 'lucide-react'
-import { displayValue } from '../../utils/situationReportHelpers'
-import { statusColor } from '../../utils/statusPalette'
-import { reportSections } from '../../utils/situationSections'
+import { situationReportTitle } from '../../utils/situationReportHelpers'
+import { situationPopulation } from '../../utils/situationPopulation'
+import { reportSections, reportSectionNumbers, operatorSectionFields } from '../../utils/situationSections'
 
-export default function SituationReferenceSections({ summary, included, collapsed, onCollapse, onToggle, actions, onActions, locked }) {
-  return reportSections.map(([number, title], index) => {
-    const Icon = [CloudRain,Users,HeartPulse,MapPinHouse,Route,House,Package,ClipboardList][index]
-    const enabled = included.includes(number), open = !collapsed.includes(number)
-    return <section className={`sx ${open ? 'open' : ''} ${enabled ? '' : 'off'}`} key={number}>
-      <div className="reference-section-heading"><button type="button" className="sxh" aria-label={title} onClick={() => onCollapse(number)} aria-expanded={open} aria-controls={`sitrep-section-${number}`}><i aria-hidden="true">›</i><span className="section-visual"><Icon size={19} /></span><span className="t">{title}</span></button><label className="include-section"><input type="checkbox" checked={enabled} aria-label={`Include ${title}`} disabled={locked} onChange={() => onToggle(number)} /><span className="sr-only">Include in report</span></label></div>
-      <div className="sxb" id={`sitrep-section-${number}`} hidden={!open}><div><SectionContent number={number} data={summary} actions={actions} onActions={onActions} locked={locked} /></div></div>
-    </section>
-  })
+const value = v => v == null || v === '' ? 'Not recorded' : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)
+function Table({ headings, rows = [] }) {
+  return <div className="tw"><table><thead><tr>{headings.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row,i) => <tr key={i}>{row.map((v,j) => <td key={j}>{value(v)}</td>)}</tr>) : <tr><td colSpan={headings.length}>Not recorded</td></tr>}</tbody></table></div>
 }
-function SectionContent({ number, data, actions, onActions, locked }) {
-  const weather = data.weather || {}, household = data.household || {}, casualties = data.casualties || {}, dispatch = data.dispatch || {}, damage = data.damage || {}
-  switch (number) {
-    case 'I': return <><VisualReadings items={[[CloudRain,'Condition',weather.condition],[Thermometer,'Temperature',weather.temperature],[Wind,'Wind',weather.wind],[Droplets,'Rainfall',weather.rainfall]]} /><details className="weather-source"><summary>Source &amp; advisory</summary><div><b>{displayValue(weather.source)}</b>{weather.advisory && <p>{weather.advisory}</p>}</div></details></>
-    case 'II': return <><div className="population-totals" aria-label="Affected population summary"><span>Total HH affected <b>{displayValue(household.total)}</b></span><span>Safe total <b>{displayValue(household.safe_total)}</b></span></div><ReportTable headings={['Purok', 'Households in scope', 'Safe', 'Evacuated', 'Unsafe', 'Unchecked']} numeric={[1,2,3,4,5]} rows={(household.puroks || []).map(row => [row.purok, row.total, row.safe, row.evacuated, row.unsafe, row.unchecked])} total={['Total HH affected', household.total, household.safe_only, household.evacuated, household.unsafe, household.unchecked]} /></>
-    case 'III': return <ReportTable headings={['Item', 'Count']} numeric={[1]} rows={[[ 'Deaths', casualties.deaths ], [ 'Missing', casualties.missing ], [ 'Injured', casualties.injured ], [ 'Rescued', casualties.rescued ]]} />
-    case 'IV': return <ReportTable headings={['Site', 'Type', 'Capacity', 'Status']} rows={(data.evacuation || []).map(row => [row.name, row.type, <Status key="capacity" value={row.capacity_status} tone={row.capacity_tone} />, <Status key="status" value={row.status} />])} empty="No evacuation center records are linked to this event yet." />
-    case 'V': return <><ReportTable headings={['Team', 'Deployed at', 'Area', 'HH reached', 'Outcomes']} rows={(dispatch.rows || []).map(row => [row.team, row.deployed_at, row.area, row.households_reached, row.outcomes])} empty="No dispatch rows yet." />{Boolean(dispatch.timeline?.length) && <ReportTable headings={['Time', 'Team dispatch, route, coverage, and field outcome summary.', 'Team', 'Area', 'Status']} rows={dispatch.timeline.map(row => [row.time, row.title, row.actor, row.detail, <Status key="status" value={row.status} tone={row.tone} />])} />}</>
-    case 'VI': return <ReportTable headings={['Item', 'Houses']} numeric={[1]} rows={[[ 'Partially damaged houses', damage.partial ], [ 'Totally damaged houses', damage.total ]]} />
-    case 'VII': return <ReportTable headings={['Item / request', 'Quantity', 'Status']} rows={(data.resources?.rows || []).map(row => [row.item, row.quantity, <Status key="status" value={row.status} tone={row.status_tone} />])} empty="No resource requests are linked to this event yet." />
-    case 'VIII': return <textarea value={actions} onChange={event => onActions(event.target.value)} readOnly={locked} placeholder="Type actions taken and recommendations..." aria-label="Actions taken and recommendations" />
+export default function SituationReferenceSections({summary,included,collapsed,onCollapse,onToggle,locked,form,onField}) {
+  return <><header style={{textAlign:'center',padding:16}}>Republic of the Philippines<br />City of Cebu · Barangay Mambaling<br /><b>Barangay Disaster Risk Reduction and Management Committee</b><br /><b>{situationReportTitle(summary,form)}</b></header>{reportSections.map(([key,title]) => {
+    const open = !collapsed.includes(key)
+    return <section key={key} id={`sitrep-section-${key}`} className={`sec ${open ? 'o' : ''} ${included.includes(key) ? '' : 'x'}`}><div className="sh"><button type="button" className="tg" onClick={() => onCollapse(key)} aria-expanded={open}><span className="num">{reportSectionNumbers[key]}</span>{title}<span className="chev" /></button><label className="inc"><input type="checkbox" checked={included.includes(key)} disabled={locked} onChange={() => onToggle(key)} aria-label={`Include ${title}`} /> Include</label></div>{open && <div className="body"><Content section={key} summary={summary} />{(operatorSectionFields[key] || []).map(([field,label]) => { const text=form?.[field] ?? summary.operator_inputs?.[field] ?? ''; return <label key={field}>{label}{locked ? <p style={{whiteSpace:'pre-wrap'}}>{value(text)}</p> : <textarea aria-label={label} maxLength={20000} value={text} placeholder="Not recorded" onChange={e => onField?.(field,e.target.value)} />}</label> })}</div>}</section>
+  })}</>
+}
+function Content({section,summary:s}) {
+  const population=situationPopulation(s), h=s.household || {}, w=s.weather || {}
+  const damageDetails=(h.details || []).filter(r => ['minor_damage','major_damage','completely_destroyed','no_damage'].includes(r.damage))
+  const damageRows=[['minor_damage','Minor damage'],['major_damage','Major damage'],['completely_destroyed','Completely destroyed']].map(([code,label]) => [label,damageDetails.length ? damageDetails.filter(r => r.damage === code).length : null])
+  const areaRows=items => items.map(p => [p.sitio,p.purok,p.families,p.persons])
+  switch(section) {
+    case 'I': return <Table headings={['Finding','Recorded value']} rows={[["Event",s.event?.name],["Hazard",s.event?.type],["Alert level",s.event?.severity],["Area coverage",s.event?.coverage],["Weather",w.condition],["Advisory",w.advisory]]} />
+    case 'II': return <Table headings={['Sitio','Purok','Families','Persons']} rows={areaRows(population.affected)} />
+    case 'IV': return <><Table headings={['Recorded category','Recorded assessments']} rows={damageRows} /><Table headings={['Family reference','Sitio','Purok','Recorded damage']} rows={(h.details || []).filter(r => r.damage && !['no_damage','not_yet_assessed'].includes(r.damage)).map(r => [r.household,r.sitio,r.purok,r.damage.replaceAll('_',' ')])} /></>
+    case 'V': return <><Table headings={['Team','Assigned area','Deployed at','Results']} rows={(s.dispatch?.rows || []).map(r => [r.team,r.area,r.deployed_at,r.outcomes])} /><Table headings={['Date/time','Team / responder','Assigned area','Status']} rows={(s.dispatch?.timeline || []).filter(r => r.title === 'Dispatch assignment').map(r => [r.time,r.actor,r.detail,r.status])} /></>
+    case 'VI': return <Table headings={['Center','Status','Capacity (persons)','Occupancy (persons)','Vacancy (persons)']} rows={(s.evacuation?.sites || []).map(r => [r.name,r.status,r.capacity,r.occupancy,r.vacancy])} />
+    case 'VII': return <><Table headings={['Resource','Available quantity','Unit','Status']} rows={(s.inventory?.rows || []).map(r => [r.item,r.quantity,r.unit,r.status])} /><h3>Resource requests</h3><Table headings={['Item','Quantity','Source','Status']} rows={(s.resources?.rows || []).map(r => [r.item,r.quantity,r.source,r.status])} /></>
     default: return null
   }
-}
-function Status({ value, tone }) { return <span className="bg" style={{ '--c': statusColor(tone || value) }}>{displayValue(value)}</span> }
-function ReportTable({ headings, rows, numeric = [], total, note, empty = 'No records found' }) {
-  return <>{note && <p className="section-note">{note}</p>}<div className="tw"><table><thead><tr>{headings.map((heading, index) => <th key={heading} className={numeric.includes(index) ? 'n' : ''}>{heading}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row, index) => <tr key={index}>{row.map((cell, column) => <td key={column} className={numeric.includes(column) ? 'n' : ''}>{displayValue(cell)}</td>)}</tr>) : <tr><td colSpan={headings.length} className="empty-row">{empty}</td></tr>}{total && <tr className="tot">{total.map((cell, column) => <td key={column} className={numeric.includes(column) ? 'n' : ''}>{displayValue(cell)}</td>)}</tr>}</tbody></table></div></>
-}
-
-function VisualReadings({ items }) {
-  return <div className="visual-readings">{items.map(([Icon, label, value]) => <div key={label}><Icon size={19} /><span>{label}</span><b>{displayValue(value)}</b></div>)}</div>
 }

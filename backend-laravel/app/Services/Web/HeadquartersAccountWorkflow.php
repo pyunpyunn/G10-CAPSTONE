@@ -12,7 +12,15 @@ use Illuminate\Validation\ValidationException;
 
 class HeadquartersAccountWorkflow
 {
-    private const ACCOUNT_PREFIX = 'BDRRM-HQCC-';
+    private const WEB_ROLE_KEYS = ['chair', 'operations_admin', 'mitigation_prevention', 'preparedness', 'response', 'recovery_rehabilitation'];
+    private const ACCOUNT_PREFIXES = [
+        'chair' => 'CHAIR',
+        'operations_admin' => 'OPS',
+        'mitigation_prevention' => 'MITPREV',
+        'preparedness' => 'PREP',
+        'response' => 'RESP',
+        'recovery_rehabilitation' => 'RECOVERY',
+    ];
 
     public function __construct(private RescuerAccountSupport $support) {}
 
@@ -22,7 +30,7 @@ class HeadquartersAccountWorkflow
             ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
             ->leftJoin('responders as p', fn ($join) => $join->on('p.user_id', '=', 'u.user_id')->whereNull('p.deleted_at'))
             ->leftJoin('rescue_teams as t', 't.team_id', '=', 'p.team_id')
-            ->where('u.username', 'like', self::ACCOUNT_PREFIX.'%')
+            ->whereIn('r.role_key', self::WEB_ROLE_KEYS)
             ->orderBy('u.username')
             ->get(['u.user_id', 'u.username', 'u.first_name', 'u.last_name', 'u.name', 'u.email',
                 'u.contact_number', 'u.is_active', 'u.must_change_password', 'r.role_name', 'r.role_key',
@@ -30,7 +38,8 @@ class HeadquartersAccountWorkflow
 
         return response()->json(['data' => [
             'accounts' => $accounts->map(fn (object $account): array => $this->present($account))->values()->all(),
-            'next_account_id' => $this->nextAccountId(),
+            'next_account_id' => $this->nextAccountId('operations_admin'),
+            'next_account_ids' => collect(self::WEB_ROLE_KEYS)->mapWithKeys(fn (string $key): array => [$key => $this->nextAccountId($key)])->all(),
         ]]);
     }
 
@@ -42,12 +51,24 @@ class HeadquartersAccountWorkflow
             'last_name' => ['required', 'string', 'max:100'],
             'email' => ['nullable', 'email', 'max:255'],
             'contact_number' => ['nullable', 'string', 'max:50'],
+            'role_id' => ['required', 'integer', 'exists:roles,role_id'],
+            'title' => ['nullable', 'string', 'max:100'],
+            'account_status' => ['nullable', \Illuminate\Validation\Rule::in(array_keys(config('rescuers.account_statuses')))],
+            'duty_status' => ['nullable', \Illuminate\Validation\Rule::in(array_keys(config('rescuers.duty_statuses')))],
+            'gender' => ['nullable', 'string', 'max:20'], 'blood_type' => ['nullable', 'string', 'max:10'],
+            'address' => ['nullable', 'string', 'max:1000'], 'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:150'], 'emergency_contact_number' => ['nullable', 'string', 'max:30'],
             'password' => ['nullable', 'string', 'min:8', 'max:100'],
         ]);
 
-        $account = DB::transaction(function () use ($validated): array {
-            $accountId = $this->nextAccountId(true);
-            $userId = 'USR-HQCC-'.$accountId;
+        $role = app(PersonnelRoleService::class)->selected($validated, true);
+        if (! $role) {
+            throw ValidationException::withMessages(['role_id' => ['Choose a web role for this account.']]);
+        }
+
+        $account = DB::transaction(function () use ($validated, $role): array {
+            $accountId = $this->nextAccountId(strtolower($role->role_key), true);
+            $userId = 'USR-'.$accountId;
 
             if (empty($validated['password'])) {
                 throw ValidationException::withMessages([
@@ -71,13 +92,14 @@ class HeadquartersAccountWorkflow
             $values = [
                 'user_id' => $userId,
                 'username' => $accountId,
+                'login_id' => $accountId,
                 'first_name' => trim($validated['first_name']),
                 'last_name' => trim($validated['last_name']),
                 'name' => trim($validated['first_name'].' '.$validated['last_name']),
                 'email' => $validated['email'] ?? null,
                 'contact_number' => $validated['contact_number'] ?? null,
-                'role_id' => app(HeadquartersTeamSupport::class)->personnelRoleId(),
-                'is_active' => 1,
+                'role_id' => $role->role_id,
+                'is_active' => ($validated['account_status'] ?? 'active') !== 'disabled' ? 1 : 0,
                 'updated_at' => $now,
             ];
             $values['created_at'] = $now;
@@ -87,7 +109,15 @@ class HeadquartersAccountWorkflow
             $columns = array_flip(Schema::getColumnListing('users'));
             $values = array_intersect_key($values, $columns);
             DB::table('users')->insert($values);
-            app(HeadquartersTeamSupport::class)->syncUser(DB::table('users')->where('user_id', $userId)->first());
+            $responderId = app(HeadquartersTeamSupport::class)->syncUser(DB::table('users')->where('user_id', $userId)->first());
+            if ($responderId) {
+                $profile = array_intersect_key($validated, array_flip(['gender', 'blood_type', 'address', 'date_of_birth', 'emergency_contact_name', 'emergency_contact_number']));
+                $profile['duty_status'] = ($validated['account_status'] ?? 'active') === 'disabled' ? 'disabled' : ($validated['duty_status'] ?? 'on_duty');
+                $profile['is_validated'] = ($validated['account_status'] ?? 'active') === 'active' ? 1 : 0;
+                $profile = array_intersect_key($profile, array_flip(Schema::getColumnListing('responders')));
+                DB::table('responders')->where('responder_id', $responderId)->update($profile);
+                app(PersonnelRoleService::class)->apply($responderId, $role);
+            }
             app(PersonnelAccessNotifier::class)->notify([$values['user_id']]);
 
             return [
@@ -98,31 +128,33 @@ class HeadquartersAccountWorkflow
                 'last_name' => trim($validated['last_name']),
                 'email' => $validated['email'] ?? null,
                 'contact_number' => $validated['contact_number'] ?? null,
-                'is_active' => true,
+                'is_active' => (bool) $values['is_active'],
+                'responder_id' => $responderId,
             ];
         });
 
         return response()->json([
-            'message' => 'HQ Personnel account created.',
+            'message' => 'BDRRMC committee account created.',
             'data' => ['account' => $account],
         ], 201);
     }
 
-    private function nextAccountId(bool $lock = false): string
+    private function nextAccountId(string $roleKey, bool $lock = false): string
     {
-        $query = DB::table('users')->where('username', 'like', self::ACCOUNT_PREFIX.'%');
+        $prefix = (self::ACCOUNT_PREFIXES[$roleKey] ?? strtoupper($roleKey)).'-';
+        $query = DB::table('users')->where('username', 'like', $prefix.'%');
         if ($lock) $query->lockForUpdate();
         $next = 1;
         foreach ($query->pluck('username') as $username) {
-            if (preg_match('/^BDRRM-HQCC-(\d{3})$/i', (string) $username, $matches)) {
+            if (preg_match('/^'.preg_quote($prefix, '/').'(\d{4,})$/i', (string) $username, $matches)) {
                 $next = max($next, (int) $matches[1] + 1);
             }
         }
-        if ($next > 999) {
-            throw ValidationException::withMessages(['account_type' => ['No HQ account identifiers remain.']]);
+        if ($next > 9999) {
+            throw ValidationException::withMessages(['role_id' => ['No account identifiers remain for this role.']]);
         }
 
-        return self::ACCOUNT_PREFIX.sprintf('%03d', $next);
+        return $prefix.sprintf('%04d', $next);
     }
 
     private function present(object $account): array
@@ -132,7 +164,7 @@ class HeadquartersAccountWorkflow
             'account_id' => $account->username,
             'user_id' => $account->user_id,
             'account_type' => 'command_center',
-            'account_type_label' => $account->role_key === 'hq_leader' || $isTeamLeader ? 'HQ Leader' : 'HQ Personnel',
+            'account_type_label' => $account->role_name ?: 'Web account',
             'name' => trim((string) ($account->name ?: trim(($account->first_name ?? '').' '.($account->last_name ?? '')))),
             'first_name' => $account->first_name,
             'last_name' => $account->last_name,

@@ -14,8 +14,8 @@ class RescuerAccountPayloadValidator
         }
 
         $messages = [
-            'account_id.regex' => 'Rescuer Account ID must follow the DB format BDRRM-SAR-001.',
-            'responder_code.regex' => 'Responder code must follow the DB format BDRRM-SAR-001.',
+            'account_id.regex' => 'Field account ID must use the team acronym and a team sequence, for example SRR-1000.',
+            'responder_code.regex' => 'Responder code must use the team acronym and a team sequence, for example SRR-1000.',
             'first_name.required' => 'First name is required.',
             'last_name.required' => 'Last name is required.',
             'team_name.required' => 'Team is required before creating a rescuer account.',
@@ -31,8 +31,8 @@ class RescuerAccountPayloadValidator
     public function rules(bool $isUpdate = false): array
     {
         return [
-            'account_id' => ['nullable', 'string', 'max:30', 'regex:/^BDRRM-[A-Z0-9]{2,8}-[0-9]{3}$/i'],
-            'responder_code' => ['nullable', 'string', 'max:80', 'regex:/^BDRRM-[A-Z0-9]{2,8}-[0-9]{3}$/i'],
+            'account_id' => ['nullable', 'string', 'max:30', 'regex:/^[A-Z0-9]{2,8}-[0-9]{4,}$/i'],
+            'responder_code' => ['nullable', 'string', 'max:80', 'regex:/^[A-Z0-9]{2,8}-[0-9]{4,}$/i'],
             'account_status' => ['nullable', Rule::in(array_keys(config('rescuers.account_statuses')))],
             'first_name' => ['required', 'string', 'max:100'],
             'middle_initial' => ['nullable', 'string', 'max:5'],
@@ -51,6 +51,7 @@ class RescuerAccountPayloadValidator
             'team_name' => [$isUpdate ? 'nullable' : 'required', 'string', 'max:100'],
             'team_code' => ['nullable', 'string', 'max:20'],
             'team_type' => ['nullable', 'string', 'max:80'],
+            'role_id' => ['nullable', 'integer', 'exists:roles,role_id'],
             'title' => ['required', 'string', 'max:100'],
             'duty_status' => ['required', Rule::in(array_keys(config('rescuers.duty_statuses')))],
             'skills' => ['nullable', 'string', 'max:1000'],

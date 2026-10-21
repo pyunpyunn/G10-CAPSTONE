@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\HouseholdMobileController;
 use App\Http\Controllers\Api\HouseholdStatusController;
 use App\Http\Controllers\Api\InquiryController;
 use App\Http\Controllers\Api\MappingController;
+use App\Http\Controllers\Api\MobileNavigationController;
 use App\Http\Controllers\Api\MobileDeviceController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
@@ -24,6 +25,9 @@ use App\Http\Controllers\Api\WeatherController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::get('/external/reports/options', [\App\Http\Controllers\Api\ReportExchangeController::class, 'options'])->middleware([\App\Http\Middleware\ValidateExternalApiKey::class, 'throttle:30,1']);
+    Route::post('/external/report-requests', [\App\Http\Controllers\Api\ReportExchangeController::class, 'store'])->middleware([\App\Http\Middleware\ValidateExternalApiKey::class, 'throttle:30,1']);
+    Route::get('/external/report-requests/{id}', [\App\Http\Controllers\Api\ReportExchangeController::class, 'externalStatus'])->middleware(['signed', 'throttle:60,1'])->name('external.report-requests.status');
     Route::post('/external/reports/handshake', [\App\Http\Controllers\Api\ExternalReportController::class, 'handshake'])->middleware([\App\Http\Middleware\ValidateExternalApiKey::class, 'throttle:30,1']);
     Route::post('/external/reports/generate', [\App\Http\Controllers\Api\ExternalReportController::class, 'generate'])->middleware([\App\Http\Middleware\ValidateExternalApiKey::class, 'throttle:30,1']);
     Route::get('/external/reports/status/{token}', [\App\Http\Controllers\Api\ExternalReportController::class, 'status'])->middleware('signed')->name('external.reports.status');
@@ -50,6 +54,19 @@ Route::prefix('v1')->group(function () {
 
     Route::post('/auth/login', [AuthController::class, 'login'])
         ->middleware('throttle:5,1');
+    Route::post('/mobile/login', [MobileNavigationController::class, 'login'])
+        ->middleware('throttle:5,1');
+    Route::get('/mobile/packs/{version}/download', [MobileNavigationController::class, 'downloadPack'])
+        ->middleware(['signed', 'throttle:20,1'])
+        ->name('mobile.packs.download');
+
+    Route::middleware(['auth:sanctum', 'mobile.device', 'role:rescuer', 'throttle:120,1'])->prefix('mobile')->group(function (): void {
+        Route::get('/bootstrap', [MobileNavigationController::class, 'bootstrap']);
+        Route::post('/sync', [MobileNavigationController::class, 'sync']);
+        Route::get('/packs/{version}', [MobileNavigationController::class, 'packManifest']);
+    });
+    Route::post('/dispatches/{id}/route', [MobileNavigationController::class, 'freshRoute'])
+        ->middleware(['auth:sanctum', 'mobile.device', 'role:rescuer', 'throttle:6,1']);
     Route::get('/auth/password-recovery/questions', [AuthController::class, 'recoveryQuestions'])
         ->middleware('throttle:10,1');
     Route::post('/auth/password-recovery/verify', [AuthController::class, 'verifyPasswordChange'])
@@ -58,14 +75,14 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:5,1,password-change');
 
     Route::middleware(['auth:sanctum', 'throttle:300,1', 'realtime.atomic'])->group(function () {
-        Route::get('/realtime/health', \App\Http\Controllers\Api\RealtimeHealthController::class)->middleware('role:super_admin');
+        Route::get('/realtime/health', \App\Http\Controllers\Api\RealtimeHealthController::class)->middleware('role:operations_admin');
         Route::patch('/profile/password', [ProfileController::class, 'changePassword'])->middleware('throttle:5,1,password-change');
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/security-questions', [AuthController::class, 'recoveryQuestions']);
         Route::put('/auth/security-questions', [AuthController::class, 'saveRecoveryQuestions']);
 
-        Route::middleware('role:super_admin')->group(function () {
+        Route::middleware('role:operations_admin')->group(function () {
             Route::get('/inquiries', [InquiryController::class, 'index']);
             Route::patch('/inquiries/{inquiryId}', [InquiryController::class, 'updateStatus']);
             Route::get('/archive/inquiry-logs', [ArchiveController::class, 'inquiryLogs']);
@@ -98,13 +115,17 @@ Route::prefix('v1')->group(function () {
             Route::delete('/status-types/{statusKey}', [DisasterBroadcastController::class, 'destroyStatusType']);
             Route::post('/disaster-types', [DisasterBroadcastController::class, 'storeDisasterType']);
             Route::delete('/disaster-types/{typeId}', [DisasterBroadcastController::class, 'destroyDisasterType']);
+            Route::get('/weather/official-advisories', [WeatherController::class, 'officialAdvisories']);
             Route::get('/weather', [WeatherController::class, 'workspace']);
             Route::post('/weather/refresh', [WeatherController::class, 'refreshWorkspace']);
             Route::get('/disaster-events/{eventId}/weather-logs', [WeatherController::class, 'index']);
             Route::post('/disaster-events/{eventId}/weather-logs/refresh', [WeatherController::class, 'refreshEvent']);
+            Route::post('/map/hazard-layers', [\App\Http\Controllers\Api\HazardLayerController::class, 'store'])->middleware('web.access:geospatial_analytics,manage_hazards');
+            Route::delete('/map/hazard-layers/{id}', [\App\Http\Controllers\Api\HazardLayerController::class, 'destroy'])->middleware('web.access:geospatial_analytics,manage_hazards');
             Route::get('/map/overview', [MappingController::class, 'overview']);
             Route::get('/map/workspace', [MappingController::class, 'workspace']);
             Route::get('/map/household-geotags', [MappingController::class, 'householdGeotags']);
+            Route::get('/map/evacuation-sites/{siteId}/route', [MappingController::class, 'evacuationRoute']);
             Route::get('/map/evacuation-sites', [MappingController::class, 'evacuationSites']);
             Route::get('/map/dispatch-routes', [MappingController::class, 'dispatchRoutes']);
             Route::get('/map/households/{householdId}/route', [MappingController::class, 'householdRoute']);
@@ -128,6 +149,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/resource-requests/{requestId}/complete', [ResourceRequestController::class, 'complete']);
             Route::get('/situation-reports', [SituationReportController::class, 'index']);
             Route::post('/situation-reports', [SituationReportController::class, 'store']);
+            Route::post('/situation-reports/sync', [SituationReportController::class, 'sync']);
+            Route::post('/situation-reports/{sitRepId}/submissions', [SituationReportController::class, 'submission']);
             Route::get('/situation-reports/{sitRepId}', [SituationReportController::class, 'show']);
             Route::get('/situation-reports/{sitRepId}/pdf', [SituationReportController::class, 'pdf']);
             Route::get('/disaster-events/{eventId}/situation-summary', [SituationReportController::class, 'eventSummary']);
@@ -139,8 +162,14 @@ Route::prefix('v1')->group(function () {
             Route::get('/archive/situation-reports', [ArchiveController::class, 'situationReports']);
             Route::post('/reports/generate', [\App\Http\Controllers\Api\ExternalReportController::class, 'generate'])->middleware('throttle:30,1');
             Route::get('/reports/external/providers', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'providers']);
+            Route::get('/reports/situation/sitios', [SituationReportController::class, 'sitios']);
+            Route::get('/reports/external/requests', [\App\Http\Controllers\Api\ReportExchangeController::class, 'index']);
+            Route::post('/reports/external/requests/{id}/decision', [\App\Http\Controllers\Api\ReportExchangeController::class, 'decide'])->middleware('throttle:10,1');
+            Route::post('/reports/external/requests/{id}/file', [\App\Http\Controllers\Api\ReportExchangeController::class, 'refreshFile'])->middleware('throttle:10,1');
             Route::get('/reports/evatrack/configuration', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'configuration']);
             Route::post('/reports/evatrack/generate', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'generate'])->middleware('throttle:30,1');
+            Route::post('/reports/safetrack/generate', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'generateSafeTrack'])->middleware('throttle:10,1');
+            Route::post('/reports/trackingaid/generate', [\App\Http\Controllers\Api\EvaTrackReportController::class, 'generateTrackingAid'])->middleware('throttle:30,1');
             Route::get('/archive/export', [ArchiveController::class, 'export']);
             Route::get('/archive/saved-groups', [ArchiveController::class, 'savedGroups']);
             Route::post('/archive/saved-groups', [ArchiveController::class, 'storeSavedGroup']);
@@ -163,6 +192,10 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::middleware('personnel.access')->group(function () {
+            Route::get('/rescuers/roles', [\App\Http\Controllers\Api\PersonnelRoleController::class, 'index']);
+            Route::post('/rescuers/roles', [\App\Http\Controllers\Api\PersonnelRoleController::class, 'store']);
+            Route::patch('/rescuers/roles/{roleId}', [\App\Http\Controllers\Api\PersonnelRoleController::class, 'update']);
+            Route::delete('/rescuers/roles/{roleId}', [\App\Http\Controllers\Api\PersonnelRoleController::class, 'destroy']);
             Route::get('/rescuers', [RescuerAccountController::class, 'index']);
             Route::get('/headquarters-accounts', [RescuerAccountController::class, 'headquartersAccounts']);
             Route::post('/headquarters-accounts', [RescuerAccountController::class, 'storeHeadquartersAccount']);
@@ -202,7 +235,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('/household/trusted-households/{connectionId}', [HouseholdMobileController::class, 'respondToTrustedHousehold']);
         });
 
-        Route::middleware('role:super_admin,hq_leader,hq_personnel,rescuer')->group(function () {
+        Route::middleware('role:operations_admin,chair,mitigation_prevention,preparedness,response,recovery_rehabilitation,rescuer')->group(function () {
             Route::patch('/dispatches/{assignmentId}', [RescueDispatchController::class, 'update']);
             Route::post('/evacuation/check-in', [EvacuationCheckInController::class, 'store']);
             Route::post('/evacuation/verify-qr', [EvacuationCheckInController::class, 'verifyQr']);
@@ -216,14 +249,13 @@ Route::prefix('v1')->group(function () {
             Route::get('/rescuer/overview', [RescuerMobileController::class, 'overview']);
             Route::get('/rescuer/assignments', [RescuerMobileController::class, 'assignments']);
             Route::get('/rescuer/assignments/{assignmentId}', [RescuerMobileController::class, 'assignment']);
+            Route::get('/rescuer/assignments/{assignmentId}/household', [RescuerMobileController::class, 'assignmentHousehold']);
             Route::patch('/rescuer/assignments/{assignmentId}/status', [RescuerMobileController::class, 'updateAssignmentStatus']);
             Route::post('/rescuer/assignments/{assignmentId}/location', [RescuerMobileController::class, 'storeLocation']);
             Route::get('/rescuer/field-reports', [RescuerMobileController::class, 'fieldReports']);
-            Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport']);
             Route::get('/rescuer/check-ins', [RescuerMobileController::class, 'checkIns']);
             Route::post('/rescuer/check-ins', [RescuerMobileController::class, 'storeCheckIn']);
             Route::get('/rescuer/resource-requests', [RescuerMobileController::class, 'resourceRequests']);
-            Route::post('/rescuer/resource-requests', [RescuerMobileController::class, 'storeResourceRequest']);
             Route::patch('/rescuer/resource-requests/{requestId}/cancel', [RescuerMobileController::class, 'cancelResourceRequest']);
             Route::get('/rescuer/radio', [RescuerMobileController::class, 'radioFeed']);
             Route::post('/rescuer/radio/start', [RescuerMobileController::class, 'startRadioTransmission']);
@@ -232,5 +264,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/rescuer/radio/clip', [RescuerMobileController::class, 'storeRadioClip']);
             Route::post('/rescuer/radio/signal', [RescuerMobileController::class, 'storeRadioSignal']);
         });
+        Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport'])->middleware('role:tl');
+        Route::post('/rescuer/resource-requests', [RescuerMobileController::class, 'storeResourceRequest'])->middleware('role:tl');
     });
 });

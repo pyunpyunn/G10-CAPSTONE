@@ -11,6 +11,26 @@ use Tests\TestCase;
 
 class RequestSchemaTest extends TestCase
 {
+    public function test_persistent_schema_cache_refreshes_after_its_ttl(): void
+    {
+        Schema::create('schema_ttl_fixture', fn (Blueprint $table) => $table->id());
+        $originalEnvironment = $this->app->environment();
+        $this->app->detectEnvironment(fn () => 'local');
+        config(['app.schema_capability_cache_enabled' => true,
+            'app.schema_capability_cache_store' => 'array',
+            'app.schema_capability_cache_ttl' => 300]);
+        try {
+            $this->assertFalse(RequestSchema::hasColumn('schema_ttl_fixture', 'new_column'));
+            Schema::table('schema_ttl_fixture', fn (Blueprint $table) => $table->string('new_column')->nullable());
+            $this->assertFalse(RequestSchema::hasColumn('schema_ttl_fixture', 'new_column'));
+            $this->travel(301)->seconds();
+            $this->assertTrue(RequestSchema::hasColumn('schema_ttl_fixture', 'new_column'));
+        } finally {
+            $this->travelBack();
+            $this->app->detectEnvironment(fn () => $originalEnvironment);
+        }
+    }
+
     public function test_schema_capabilities_are_cached_for_only_one_request(): void
     {
         Schema::create('schema_cache_fixture', fn (Blueprint $table) => $table->id());

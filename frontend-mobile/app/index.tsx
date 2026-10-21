@@ -14,11 +14,12 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { type Href, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { clearToken } from '@/api/client';
-import { getRememberedCredentials, saveRememberedCredentials } from '@/utils/secureStorage';
+import { clearToken, getApiServerUrl, setApiServerUrl } from '@/api/client';
+import { getRememberedCredentials, saveRememberedCredentials, getStoredItem } from '@/utils/secureStorage';
+import { navigationMetadata } from '@/utils/navigationStore';
 import { loginMobile, changePasswordWithOldPassword, verifyPasswordChange } from '@/api/auth';
 import { palette, spacing } from '@/constants/resqTheme';
 import { askStandardMobilePermissions } from '@/utils/mobilePermissions';
@@ -31,6 +32,14 @@ export default function MobileLoginScreen() {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [rememberPassword, setRememberPassword] = useState(false);
+  const [offlineSession, setOfflineSession] = useState(false);
+  const [serverUrl, setServerUrl] = useState('');
+  const [editingServer, setEditingServer] = useState(false);
+  useEffect(() => { void getApiServerUrl().then((url) => { setServerUrl(url); if (!url) setEditingServer(true); }); }, []);
+  useEffect(() => {
+    if (Platform.OS !== 'web') void Promise.all([getStoredItem('resqperation_mobile_token'), navigationMetadata('team')])
+      .then(([token, team]) => setOfflineSession(Boolean(token && team && team !== 'null'))).catch(() => {});
+  }, []);
   const edited = useRef(false);
   useEffect(() => {
     let active = true;
@@ -117,7 +126,7 @@ export default function MobileLoginScreen() {
     try {
       const user = await loginMobile(login.trim(), password);
       const role = user.role?.role_key;
-      if (role === 'household_resident' || role === 'rescuer') {
+      if (role === 'household_resident' || role === 'rescuer' || role === 'tl' || role === 'tm') {
         try { await saveRememberedCredentials(login, password, rememberPassword); }
         catch { Alert.alert('Signed in', 'Your password could not be remembered on this device. You can still continue.'); }
       }
@@ -128,7 +137,7 @@ export default function MobileLoginScreen() {
         return;
       }
 
-      if (role === 'rescuer') {
+      if (role === 'rescuer' || role === 'tl' || role === 'tm') {
         await askStandardMobilePermissions('rescuer');
         router.replace('/rescuer' as Href);
         return;
@@ -163,6 +172,19 @@ export default function MobileLoginScreen() {
           </Animated.View>
 
           <View style={styles.card}>
+            <Pressable onPress={() => setEditingServer(!editingServer)} style={{ paddingVertical: 8 }}>
+              <Text style={{ color: palette.navMuted }}>Server settings</Text>
+            </Pressable>
+            {editingServer && <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Server API address</Text>
+              <TextInput style={[styles.input, { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 12 }]}
+                value={serverUrl} onChangeText={setServerUrl} autoCapitalize="none" autoCorrect={false}
+                keyboardType="url" placeholder="https://your-server/api/v1" />
+              <Pressable style={{ paddingVertical: 10 }} onPress={() => {
+                void setApiServerUrl(serverUrl).then((url) => { setServerUrl(url); setEditingServer(false); setOfflineSession(false); Alert.alert('Server saved', 'You can now sign in.'); })
+                  .catch((error) => Alert.alert('Server address', error.message));
+              }}><Text style={{ color: '#1358a4', fontWeight: '700' }}>Save server address</Text></Pressable>
+            </View>}
             <View style={styles.headerBlock}>
               <Text style={styles.title}>{changing ? 'Change password' : 'Sign in'}</Text>
               {changing && <Text style={styles.help}>Verify your old password, then choose a different password of at least 8 characters. All devices will be signed out.</Text>}
@@ -227,6 +249,9 @@ export default function MobileLoginScreen() {
               <View style={styles.fieldGroup}><Text style={styles.label}>Confirm new password</Text><View style={styles.inputShell}><TextInput style={styles.input} value={confirmation} onChangeText={setConfirmation} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" maxLength={128} editable={!loading} /></View></View>
             </>}
             {!!notice && <Text accessibilityLiveRegion="polite" style={styles.help}>{notice}</Text>}
+            {offlineSession && !changing && <Pressable style={{ paddingVertical: 14 }} onPress={() => router.push('/rescuer/navigation' as Href)}>
+              <Text style={{ color: '#1358a4', fontWeight: '700' }}>Open saved offline navigation</Text>
+            </Pressable>}
             <Pressable style={({ pressed }) => [styles.button, pressed && !loading && styles.buttonPressed, loading && styles.buttonDisabled]} onPress={changing ? handlePasswordChange : handleLogin} disabled={loading}>
               {loading ? (
                 <ActivityIndicator color="#fff" />

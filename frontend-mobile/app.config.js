@@ -15,11 +15,23 @@ module.exports = {
     if (Array.isArray(plugin) && plugin[0] === 'onesignal-expo-plugin') {
       return [plugin[0], {
         ...plugin[1],
-        mode: process.env.EAS_BUILD_PROFILE === 'production' ? 'production' : 'development',
+        mode: 'production',
       }];
     }
     return plugin;
-  }),
+  }).concat([
+    '@maplibre/maplibre-react-native',
+    'expo-sqlite',
+    'expo-task-manager',
+    ['expo-location', {
+      locationWhenInUsePermission: 'Allow location access while following an active rescue dispatch.',
+      locationAlwaysAndWhenInUsePermission: 'Allow location access while recording an active rescue dispatch.',
+      isAndroidBackgroundLocationEnabled: true,
+      isAndroidForegroundServiceEnabled: true,
+      isIosBackgroundLocationEnabled: true,
+      androidForegroundServiceIcon: './assets/images/android-icon-foreground.png',
+    }],
+  ]),
   android: {
     ...base.expo.android,
     ...(Object.keys(androidConfig).length ? { config: androidConfig } : {}),

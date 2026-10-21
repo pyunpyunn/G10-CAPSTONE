@@ -30,6 +30,7 @@ export default function ResourceValidationModal({
   const modalSub = modalSubFor(mode, selectedRequestId)
   const sourceOptions = options.sources || []
   const categoryOptions = options.categories || []
+  const urgencyOptions = options.urgencies || []
   const statusOptions = options.statuses || []
   const validationOptions = statusOptions.filter((status) => ['needs_validation', 'verified', 'cancelled'].includes(status.key))
   const displayedStatusOptions = statusOptionsForMode(mode, form.validation_status, statusOptions, validationOptions)
@@ -135,14 +136,14 @@ export default function ResourceValidationModal({
                 />
               </div>
               <div>
-                <label className="rr-mini-label">Urgency</label>
+                <label className="rr-mini-label">Priority</label>
                 <select value={form.urgency_id} disabled={requestFieldsDisabled} onChange={(event) => setField('urgency_id', event.target.value)}>
-                  <option value="">Select urgency</option>
-                  {(options.urgencies || []).map((urgency) => (
+                  {urgencyOptions.map((urgency) => (
                     <option value={urgency.urgency_id} key={urgency.urgency_id}>{urgency.label}</option>
                   ))}
                 </select>
               </div>
+
               <div className="full">
                 <label className="rr-mini-label">Area / beneficiaries</label>
                 <select value={form.evacuation_center_id} disabled={requestFieldsDisabled} onChange={(event) => setField('evacuation_center_id', event.target.value)}>
@@ -159,7 +160,7 @@ export default function ResourceValidationModal({
                 <textarea
                   value={form.description}
                   readOnly={requestFieldsDisabled}
-                  placeholder="Incident link, urgency, vulnerability, beneficiary count, or evacuation site note..."
+                  placeholder="Incident link, vulnerability, beneficiary count, or evacuation site note..."
                   onChange={(event) => setField('description', event.target.value)}
                 />
               </div>

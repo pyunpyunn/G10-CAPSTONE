@@ -1,6 +1,4 @@
-import { createElement } from 'react'
-import { pdf } from '@react-pdf/renderer'
-import SitrepPdfDocument from '../components/situation/SitrepPdfDocument'
+import { exportSituationReport } from '../api/situationReportApi'
 
 export function downloadBlob(fileName, blob) {
   const url = window.URL.createObjectURL(blob)
@@ -132,16 +130,15 @@ export function downloadPdfReport(fileName, title, rows) {
 }
 
 export async function downloadSitrepPdf(fileName, summary, includedSections, actionsText) {
-  if (!summary) {
-    return
-  }
-
-  const report = createElement(
-    SitrepPdfDocument,
-    { summary, includedSections, actionsText },
-  )
-  const blob = await pdf(report).toBlob()
-  downloadBlob(forceExtension(fileName, 'pdf'), blob)
+  if (!summary) return
+  // The server owns the print-ready template and locked snapshot export.
+  return exportSituationReport({
+    event_id: summary.event?.event_id,
+    sit_rep_id: summary.sit_rep_id || summary.report?.sit_rep_id,
+    included_sections: includedSections,
+    actions_text: actionsText,
+    format: 'pdf',
+  })
 }
 
 export function detailsToRows(details = []) {

@@ -3,6 +3,7 @@ import { Alert, AppState, Platform } from 'react-native';
 import { notifyDisasterBroadcast } from '@/utils/mobileReadCache';
 import { api } from '@/api/client';
 import { savePushRegistration } from '@/api/device';
+import { handleForegroundNotification } from './foregroundNotification';
 
 export type PushRegistration = {
   playerId: string | null;
@@ -15,7 +16,6 @@ export type PushRegistration = {
 let oneSignalReady = false;
 let pushSyncContext: { deviceUuid: string; userId: string } | null = null;
 let syncingSubscription = false;
-let subscriptionSyncTimer: ReturnType<typeof setInterval> | null = null;
 let unsupportedNoticeShown = false;
 let settingsNoticeShown = false;
 
@@ -68,12 +68,7 @@ async function initializeOneSignal() {
     OneSignal.initialize(appId);
     OneSignal.User.pushSubscription.addEventListener('change', () => { void syncCurrentSubscription(); });
     AppState.addEventListener('change', (state) => { if (state === 'active') void syncCurrentSubscription(); });
-    if (!subscriptionSyncTimer) subscriptionSyncTimer = setInterval(() => {
-      if (AppState.currentState === 'active') void syncCurrentSubscription();
-    }, 30000);
-    OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event: { notification: { additionalData?: { type?: string } } }) => {
-      if (event.notification.additionalData?.type === 'disaster_broadcast') notifyDisasterBroadcast();
-    });
+    OneSignal.Notifications.addEventListener('foregroundWillDisplay', handleForegroundNotification);
     OneSignal.Notifications.addEventListener('click', (event: { notification: { additionalData?: { type?: string } } }) => {
       if (event.notification.additionalData?.type === 'disaster_broadcast') notifyDisasterBroadcast();
     });

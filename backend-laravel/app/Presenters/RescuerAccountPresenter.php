@@ -16,6 +16,8 @@ class RescuerAccountPresenter
 
         $data = [
             'responder_id' => $row->responder_id,
+            'role_id' => $row->access_role_id ?? null, 'role_name' => $row->access_role_name ?? null,
+            'role_key' => $row->role_key ?? null,
             'user_id' => $row->user_id,
             'account_id' => $row->username,
             'username' => $row->user_username,
@@ -195,5 +197,4 @@ class RescuerAccountPresenter
         return $value ? Carbon::parse($value)->format('M d, Y g:i A') : null;
     }
 }
-
 

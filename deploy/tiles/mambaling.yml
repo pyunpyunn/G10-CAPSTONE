@@ -1,0 +1,53 @@
+schema_name: RESQPERATION Mambaling Minimal Vector Map
+schema_description: Minimal road, path, and water vector map for offline rescue navigation.
+version: 1
+attribution: '<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>'
+args:
+  minzoom: 12
+  maxzoom: 16
+  threads: 2
+  download_threads: 2
+sources:
+  osm:
+    type: osm
+    local_path: /data/build/mambaling-buffer.osm.pbf
+layers:
+  - id: roads
+    features:
+      - source: osm
+        geometry: line
+        include_when:
+          highway: __any__
+        min_zoom:
+          default_value: 13
+          overrides:
+            12:
+              highway: [motorway, trunk, primary, secondary]
+        attributes:
+          - key: class
+            tag_value: highway
+          - key: name
+            tag_value: name
+  - id: water
+    features:
+      - source: osm
+        geometry: polygon
+        include_when:
+          __any__:
+            natural: water
+            landuse: reservoir
+            waterway: riverbank
+        attributes:
+          - key: name
+            tag_value: name
+  - id: waterway
+    features:
+      - source: osm
+        geometry: line
+        include_when:
+          waterway: [river, canal, stream, drain]
+        attributes:
+          - key: class
+            tag_value: waterway
+          - key: name
+            tag_value: name

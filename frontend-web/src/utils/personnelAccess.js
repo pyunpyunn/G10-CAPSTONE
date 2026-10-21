@@ -1,5 +1,9 @@
 export function hasAdminWebAccess(user) {
-  return user?.is_active !== false && ['super_admin', 'admin', 'hq_leader'].includes(user?.role?.role_key)
+  return (
+    user?.is_active !== false &&
+    (user?.permissions?.can_manage_personnel ??
+      ['operations_admin', 'super_admin', 'admin', 'hq_leader'].includes(user?.role?.role_key))
+  )
 }
 
 export function hasWebAccess(user) {
@@ -11,7 +15,8 @@ export function canManagePersonnel(user) {
 }
 
 export function webHomeForUser(user) {
-  return hasWebAccess(user) ? '/dashboard' : '/login'
+  const homes=[['dashboard','/dashboard'],['geospatial_analytics','/mapping'],['response_operations','/rescue-management'],['resources_requests','/resources-requests'],['reports_documentation','/situation'],['personnel_access','/rescuers'],['profile','/profile'],['notifications','/notifications']]
+  return user?.is_active===false ? '/login' : homes.find(([key]) => user?.permissions?.web_modules?.includes(key))?.[1] || '/login'
 }
 
 export function canOpenWebPage(user, path) {
@@ -32,5 +37,9 @@ export function canOpenWebPage(user, path) {
 }
 
 export function canApproveRequests(user) {
-  return user?.is_active !== false && ['super_admin', 'admin', 'hq_leader'].includes(user?.role?.role_key)
+  return (
+    user?.is_active !== false &&
+    (user?.permissions?.can_approve_requests ??
+      ['chair', 'super_admin', 'admin', 'hq_leader'].includes(user?.role?.role_key))
+  )
 }

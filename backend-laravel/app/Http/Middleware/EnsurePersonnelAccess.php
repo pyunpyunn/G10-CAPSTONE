@@ -13,7 +13,7 @@ class EnsurePersonnelAccess
         $user = $request->user();
         if ($user) $user->refresh();
         if (! $user?->canManagePersonnel()) {
-            return response()->json(['message' => 'Personnel Access Control is available to Super Admin and the selected HQ Leader.'], 403);
+            return response()->json(['message' => 'Personnel Access Control is available to Operations/Admin.'], 403);
         }
 
         return $next($request);

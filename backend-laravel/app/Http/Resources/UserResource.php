@@ -10,7 +10,8 @@ class UserResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $this->resource->loadMissing('role');
+        if (!$this->resource->exists && !$this->resource->relationLoaded('role')) $this->resource->setRelation('role', null);
+        else $this->resource->loadMissing('role');
         $loadedRole = $this->resource->relationLoaded('role') ? $this->resource->getRelation('role') : null;
         $roles = app(UserRolePresenter::class);
         $roleKey = $roles->key($loadedRole, $this->resource->getAttributes());
@@ -29,16 +30,19 @@ class UserResource extends JsonResource
             'is_active' => (bool) $this->is_active,
             'is_hqcc_leader' => $this->resource->isHqccLeader(),
             'permissions' => [
+                'can_manage_hazard_maps' => app(\App\Services\Web\WebAccessPolicy::class)->allows($this->resource, 'geospatial_analytics', 'manage_hazards'),
+                'can_approve_requests' => app(\App\Services\Web\WebAccessPolicy::class)->allows($this->resource, 'resources_requests', 'approve'),
                 'can_manage_personnel' => $this->resource->canManagePersonnel(),
                 'web_modules' => app(\App\Services\Web\WebAccessPolicy::class)->modulesFor($this->resource),
             ],
             'role' => [
                 'role_id' => $loadedRole?->role_id ?? $roleKey,
                 'role_key' => $roleKey,
+                'assigned_role_key' => $this->resource->assignedRoleKey(),
                 'role_name' => $roleName,
+                'base_role_key' => $loadedRole?->base_role_key,
             ],
         ];
     }
 }
-
 

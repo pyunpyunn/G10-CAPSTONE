@@ -2,6 +2,18 @@
 
 RESQPERATION is a capstone project for barangay disaster response operations. The system helps HQ/Admin users monitor disaster events, broadcast alerts, review household safety reports, monitor rescue dispatch, validate resource requests, and keep situation reports and archives. It also includes Expo mobile access for household residents and rescuers through the same Laravel API.
 
+## Android APK download
+
+[**Download RESQPERATION APK — 24.3 MB**](https://github.com/pyunpyunn/G10-CAPSTONE/releases/download/v1.0.0-build6/RESQPERATION.apk)
+
+Version 1.0.0, build 6 supports household and rescuer accounts on 64-bit Android
+7.0+. It opens directly without Expo Go, Metro, or a QR scan and includes
+OneSignal support. Allow notifications after signing in.
+
+Follow the [first-run setup](frontend-mobile/FIRST_RUN_SETUP.md) and save the
+Tailscale or LAN API address in **Server settings** before signing in. This
+build's original default points to the retired ngrok tunnel.
+
 ## Team Members
 
 - Barro, Nina Kathleen
@@ -133,6 +145,8 @@ Important development rule:
 
 ## Key Documentation
 
+- [System use cases](docs/USE_CASES.md) — actors, household/rescuer/HQ workflows, partner exchange, and must-haves traceability.
+- [Must-haves implementation audit](docs/MUST_HAVES_IMPLEMENTATION_AUDIT.md) — implementation evidence and remaining gaps.
 - `docs/RESQPERATION_G10_STEP_BY_STEP_CHECKLIST.md`
 - `docs/RESQPERATION_G10_DB_READINESS_CHECK.md`
 - `docs/RESQPERATION_G10_SAFE_SAMPLE_SEED_PLAN.md`

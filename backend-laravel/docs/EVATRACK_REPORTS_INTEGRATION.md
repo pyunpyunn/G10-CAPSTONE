@@ -4,7 +4,7 @@ Contract reference: https://github.com/klint-droid/EvaTrack/blob/main/docs/EXTER
 
 ## View and request EvaTrack reports
 
-Sign in to the web app as Super Admin, HQ Leader, or HQ Personnel. Open **Archive → EvaTrack Reports**, select demographics, DROMIC, utilization, vulnerable, or general; select PDF or CSV and optional dates; click **Generate EvaTrack report**, then **View / download report**. A successful result verifies the remote connection and displays the signed link expiration. Expired links require generating again.
+Sign in to the web app with a role that has report/documentation access (Chair, Mitigation/Prevention, Preparedness, Response, or Recovery/Rehabilitation). Operations/Admin is technical and does not have operational report access. Open **Archive → EvaTrack Reports**, select demographics, DROMIC, utilization, vulnerable, or general; select PDF or CSV and optional dates; click **Generate EvaTrack report**, then **View / download report**. A successful result verifies the remote connection and displays the signed link expiration. Expired links require generating again.
 
 The browser calls authenticated local routes `/api/v1/reports/evatrack/configuration` and `/api/v1/reports/evatrack/generate`. The backend calls EvaTrack's `POST /api/v1/external/reports/generate` using `X-API-KEY`; the key is never returned to the browser. Signed download URLs work without that key and support EvaTrack's local or S3 storage. Configuration status does not claim the remote server is reachable.
 

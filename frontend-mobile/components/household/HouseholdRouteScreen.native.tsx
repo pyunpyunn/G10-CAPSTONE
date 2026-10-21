@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Location from 'expo-location';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
+import { useMapGps } from '@/hooks/useMapGps';
 
 type RouteProps = {
   geotag: any;
@@ -34,6 +35,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
   const [roadRoute, setRoadRoute] = useState<{ coordinates: { latitude: number; longitude: number }[]; distance_km: number; duration_min: number } | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
+  const gps = useMapGps(originMode === 'live');
 
   useEffect(() => {
     if (!centers.some((center) => String(center.evacuation_center_id) === selectedId)) {
@@ -172,7 +174,8 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
           </Pressable>
         </View>
 
-        <MobileLeafletMap markers={mapMarkers} routes={mapRoutes} center={originPoint || selectedPoint || defaultRegion} />
+        <MobileLeafletMap markers={mapMarkers} routes={mapRoutes} center={originPoint || selectedPoint || defaultRegion} followPosition={originMode === 'live' ? gps.position || livePoint : null} />
+        {gps.error ? <Text style={styles.routeError}>{gps.error}</Text> : null}
         {routeError ? <Text style={styles.routeError}>{routeError}</Text> : null}
 
         {!householdPoint ? (

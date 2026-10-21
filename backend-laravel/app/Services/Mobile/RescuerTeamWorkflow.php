@@ -65,12 +65,16 @@ class RescuerTeamWorkflow
         if (! $ids) return;
         $isHq = $validated['team_code'] === 'HQCC'
             || in_array(strtoupper($validated['team_type']), ['HQ', 'HQCC', 'HEADQUARTERS'], true);
-        $invalid = DB::table('responders')->whereIn('responder_id', $ids)->get(['username', 'full_name', 'deleted_at'])
+        $invalid = DB::table('responders as responder')
+            ->leftJoin('users as user', 'user.user_id', '=', 'responder.user_id')
+            ->leftJoin('roles as role', 'role.role_id', '=', 'user.role_id')
+            ->whereIn('responder.responder_id', $ids)
+            ->get(['responder.full_name', 'responder.deleted_at', 'role.role_key', 'role.base_role_key'])
             ->filter(function ($member) use ($isHq): bool {
-                $code = strtoupper((string) $member->username);
-                $hqMember = str_starts_with($code, 'BDRRM-HQCC-');
+                $roleKey = strtolower((string) ($member->base_role_key ?: $member->role_key));
+                $isWebRole = in_array($roleKey, ['chair', 'operations_admin', 'mitigation_prevention', 'preparedness', 'response', 'recovery_rehabilitation'], true);
 
-                return $member->deleted_at !== null || $hqMember !== $isHq;
+                return $member->deleted_at !== null || $isWebRole !== $isHq;
             });
         if ($invalid->isNotEmpty()) {
             throw ValidationException::withMessages(['member_ids' => [
@@ -163,9 +167,6 @@ class RescuerTeamWorkflow
             DB::table('rescue_teams')->where('team_id', '<>', $teamId)->whereIn('leader_responder_id', $memberIds)
                 ->update(['leader_responder_id' => null, 'updated_at' => $now]);
         }
-        DB::table('responders')->where('team_id', $teamId)->where('username', 'like', 'BDRRM-HQCC-%')
-            ->when($memberIds, fn ($query) => $query->whereNotIn('responder_id', $memberIds))
-            ->update(['title' => 'HQ Personnel', 'updated_at' => $now]);
         DB::table('responders')
             ->where('team_id', $teamId)
             ->when(! empty($memberIds), fn ($query) => $query->whereNotIn('responder_id', $memberIds))
@@ -192,11 +193,10 @@ class RescuerTeamWorkflow
                 ]);
         }
         app(\App\Services\Web\HeadquartersTeamSupport::class)->synchronizeLeadership($teamId, $leaderId);
+        app(\App\Services\Web\PersonnelRoleService::class)->synchronizeRescueLeadership($teamId, $leaderId);
         app(\App\Services\Web\PersonnelAccessNotifier::class)->notify($affected->pluck('user_id')->all());
     }
 }
-
-
 
 
 

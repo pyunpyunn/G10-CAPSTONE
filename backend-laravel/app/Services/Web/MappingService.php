@@ -87,6 +87,25 @@ class MappingService
             'coordinates' => array_map(fn ($point) => [$point['lat'], $point['lng']], $route['coordinates'])];
     }
 
+    public function evacuationRoute(string $siteId): array
+    {
+        $event = $this->query->getActiveEvent();
+        $focus = $this->barangayProfile->mapFocus();
+        $sites = $this->insideBoundary($this->query->getEvacuationSites($event?->event_id), $focus);
+        $site = collect($sites)->first(fn (array $row): bool => (string) $row['id'] === $siteId);
+        abort_unless($site, 404, 'This evacuation center is not available in the current barangay.');
+        $office = config('rescue_office');
+        abort_unless(is_numeric($office['latitude'] ?? null) && is_numeric($office['longitude'] ?? null)
+            && abs((float) $office['latitude']) <= 90 && abs((float) $office['longitude']) <= 180,
+            422, 'Barangay hall coordinates are not configured.');
+        $route = app(\App\Services\Shared\RoutingService::class)->drivingRoute(
+            (float) $office['latitude'], (float) $office['longitude'], (float) $site['latitude'], (float) $site['longitude']);
+        abort_unless($route, 503, 'A road route to this evacuation center cannot be generated right now. Please try again.');
+        return ['site_id' => $site['id'], 'origin_name' => $office['name'] ?? 'Barangay hall',
+            'destination_name' => $site['name'], 'distance_km' => $route['distance_km'], 'duration_min' => $route['duration_min'],
+            'coordinates' => array_map(fn ($point) => [$point['lat'], $point['lng']], $route['coordinates'])];
+    }
+
     private function insideBoundary(array $points, array $focus): array
     {
         if (! $focus['boundary']) return $focus['barangay_id'] === null ? [] : $points;

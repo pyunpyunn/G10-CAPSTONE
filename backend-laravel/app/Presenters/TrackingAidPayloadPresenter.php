@@ -25,7 +25,6 @@ class TrackingAidPayloadPresenter
             'item_name' => $resourceRequest->item_name,
             'quantity' => $quantity,
             'unit' => $resourceRequest->unit,
-            'urgency' => $resourceRequest->urgency_label ?? $resourceRequest->urgency_key ?? 'Medium',
             'area_label' => $areaLabel,
             'area_note' => $resourceRequest->evacuation_center_address ?: $resourceRequest->description,
             'requested_by' => $resourceRequest->requested_by,

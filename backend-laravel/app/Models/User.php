@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use App\Support\RequestSchema as Schema;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -111,7 +112,7 @@ class User extends Authenticatable
         }
 
         $loadedRole = $this->relationLoaded('role') ? $this->getRelation('role') : null;
-        $roleKey = $loadedRole?->role_key ?? ($this->attributes['role'] ?? null);
+        $roleKey = $loadedRole?->base_role_key ?: ($loadedRole?->role_key ?? ($this->attributes['role'] ?? null));
 
         if (! $roleKey && isset($this->attributes['role_id'])) {
             $roleKey = match ((int) $this->attributes['role_id']) {
@@ -123,14 +124,36 @@ class User extends Authenticatable
             };
         }
 
+        return $this->normalizeRoleKey($roleKey);
+    }
+
+    public function assignedRoleKey(): ?string
+    {
+        if (! $this->relationLoaded('role') && ! empty($this->attributes['role_id'])) {
+            $this->loadMissing('role');
+        }
+
+        $loadedRole = $this->relationLoaded('role') ? $this->getRelation('role') : null;
+
+        return $this->normalizeRoleKey($loadedRole?->role_key ?? ($this->attributes['role'] ?? null));
+    }
+
+    private function normalizeRoleKey(mixed $roleKey): ?string
+    {
         return match (strtolower((string) $roleKey)) {
-            'superadmin', 'super_admin', 'super admin' => 'super_admin',
-            'admin', 'hq_admin', 'hq admin' => 'admin',
-            'hq_leader', 'hq leader', 'hqcc_leader' => 'hq_leader',
-            'hq_personnel', 'hq personnel' => 'hq_personnel',
+            'superadmin', 'super_admin', 'super admin', 'admin', 'operations_admin' => 'operations_admin',
+            'hq_admin', 'hq admin', 'pb', 'chair' => 'chair',
+            'hq_leader', 'hq leader', 'hqcc_leader', 'owh', 'dsp', 'leo', 'ech', 'response' => 'response',
+            'hq_personnel', 'hq personnel' => 'operations_admin',
+            'pao' => 'mitigation_prevention',
+            'mitigation_prevention' => 'mitigation_prevention',
+            'preparedness' => 'preparedness',
+            'recovery_rehabilitation' => 'recovery_rehabilitation',
+            'tl' => 'tl',
+            'tm' => 'tm',
             'rescuer', 'responder' => 'rescuer',
             'household', 'household_resident', 'resident' => 'household_resident',
-            default => $roleKey,
+            default => $roleKey ? strtolower((string) $roleKey) : null,
         };
     }
 
@@ -139,12 +162,19 @@ class User extends Authenticatable
         $loadedRole = $this->relationLoaded('role') ? $this->getRelation('role') : null;
         $roleName = $loadedRole?->role_name ?? ($this->attributes['role'] ?? null);
 
-        return match ($this->roleKey()) {
-            'super_admin' => 'Super Admin',
-            'admin' => 'Admin',
-            'hq_leader' => 'HQ Leader',
-            'hq_personnel' => 'HQ Personnel',
-            'rescuer' => 'Rescuer Member',
+        if ($loadedRole && ($loadedRole->base_role_key || $loadedRole->web_modules !== null)) return $loadedRole->role_name;
+        return match ($this->assignedRoleKey() ?: $this->roleKey()) {
+            'operations_admin' => 'Operations/Admin',
+            'chair' => 'BDRRM Committee Chairperson',
+            'pb' => 'BDRRM Committee Chairperson',
+            'mitigation_prevention' => 'Mitigation and Prevention Sub-committee',
+            'preparedness' => 'Preparedness Sub-committee',
+            'response' => 'Response Sub-committee',
+            'owh', 'dsp', 'leo', 'ech', 'hq_leader' => 'Response Sub-committee',
+            'pao' => 'Mitigation and Prevention Sub-committee',
+            'recovery_rehabilitation' => 'Recovery and Rehabilitation Sub-committee',
+            'tl' => 'Team Leader',
+            'tm', 'rescuer' => 'Team Member',
             'household_resident' => 'Household Resident',
             default => $roleName,
         };
@@ -152,17 +182,29 @@ class User extends Authenticatable
 
     public function isHqccLeader(): bool
     {
-        return $this->is_active !== false
-            && ! ($this->attributes['deleted_at'] ?? null)
-            && $this->roleKey() === 'hq_leader';
+        if ($this->is_active === false || ($this->attributes['deleted_at'] ?? null)
+            || ! Schema::hasTable('responders') || ! Schema::hasTable('rescue_teams')) {
+            return false;
+        }
+
+        return DB::table('responders as responder')
+            ->join('rescue_teams as team', 'team.team_id', '=', 'responder.team_id')
+            ->where('responder.user_id', $this->getKey())
+            ->whereColumn('team.leader_responder_id', 'responder.responder_id')
+            ->exists();
     }
 
     public function canManagePersonnel(): bool
     {
         if ($this->is_active === false || ($this->attributes['deleted_at'] ?? null)) return false;
 
-        return $this->roleKey() === 'super_admin' || $this->isHqccLeader();
+        $key = $this->roleKey();
+        if ($key === 'operations_admin') return true;
+        $role = $this->relationLoaded('role') ? $this->getRelation('role') : null;
+        if ($role?->can_manage_personnel !== null) {
+            $modules = app(\App\Services\Web\WebAccessPolicy::class)->modulesFor($this);
+            return (bool) $role->can_manage_personnel && in_array('personnel_access', $modules, true);
+        }
+        return false;
     }
 }
-
-

@@ -14,7 +14,7 @@ class SituationReport extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'report_number',
+        'report_number', 'schema_version', 'sitrep_type', 'approved_by', 'operator_inputs',
         'disaster_id',
         'created_by_admin_id',
         'household_id',
@@ -31,7 +31,7 @@ class SituationReport extends Model
     protected function casts(): array
     {
         return [
-            'is_archived' => 'boolean',
+            'is_archived' => 'boolean', 'operator_inputs' => 'array',
             'reviewed_at' => 'datetime',
             'generated_at' => 'datetime',
             'archived_at' => 'datetime',

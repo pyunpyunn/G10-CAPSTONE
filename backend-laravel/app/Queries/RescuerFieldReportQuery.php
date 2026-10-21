@@ -64,6 +64,21 @@ class RescuerFieldReportQuery
         } else {
             array_push($columns, DB::raw('NULL as household_code'), DB::raw('NULL as household_head_name'));
         }
+        if (Schema::hasTable('responder_field_reports')
+            && Schema::hasColumn('responder_field_reports', 'status_log_id')
+            && Schema::hasColumn('responder_field_reports', 'assignment_id')) {
+            $query->leftJoin('responder_field_reports as rfr', 'rfr.status_log_id', '=', 'hsl.status_log_id');
+            $columns[] = 'rfr.assignment_id';
+            $columns[] = $this->optional('responder_field_reports', 'incident_type', 'incident_type', 'rfr');
+            $columns[] = $this->optional('responder_field_reports', 'incident_type_other', 'incident_type_other', 'rfr');
+            $columns[] = $this->optional('responder_field_reports', 'property_damage', 'property_damage', 'rfr');
+            $columns[] = $this->optional('responder_field_reports', 'death_count', 'death_count', 'rfr');
+            $columns[] = $this->optional('responder_field_reports', 'injured_count', 'injured_count', 'rfr');
+        } else {
+            array_push($columns, DB::raw('NULL as assignment_id'), DB::raw('NULL as incident_type'),
+                DB::raw('NULL as incident_type_other'), DB::raw('NULL as property_damage'),
+                DB::raw('NULL as death_count'), DB::raw('NULL as injured_count'));
+        }
         if ($responderId && Schema::hasColumn('household_status_logs', 'responder_id')) $query->where('hsl.responder_id', $responderId);
         elseif ($userId && Schema::hasColumn('household_status_logs', 'submitted_by_user_id')) $query->where('hsl.submitted_by_user_id', $userId);
         if ($eventId !== '' && $eventId !== 'all' && Schema::hasColumn('household_status_logs', 'disaster_id')) $query->where('hsl.disaster_id', $eventId);

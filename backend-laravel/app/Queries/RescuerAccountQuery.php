@@ -19,9 +19,9 @@ class RescuerAccountQuery
         $dutyStatus = $filters['duty_status'];
         $purok = $filters['purok'];
         if (($filters['account_type'] ?? 'all') === 'rescuer') {
-            $query->where('r.username', 'not like', 'BDRRM-HQCC-%');
+            $query->where('rt.team_code', '<>', 'HQCC');
         } elseif (($filters['account_type'] ?? 'all') === 'command_center') {
-            $query->where('r.username', 'like', 'BDRRM-HQCC-%');
+            $query->where('rt.team_code', 'HQCC');
         }
         if ($search !== '') {
             $query->where(function ($inner) use ($search): void {
@@ -60,7 +60,7 @@ class RescuerAccountQuery
             ->whereNull('r.deleted_at')
             ->select(['r.*', 'u.email', 'u.first_name as user_first_name', 'u.last_name as user_last_name',
                 'u.name as user_full_name', 'u.username as user_username', 'u.is_active', 'u.must_change_password',
-                'role.role_key', 'rt.team_name', 'rt.team_code', 'rt.team_type']);
+                'role.role_key', 'role.role_id as access_role_id', 'role.role_name as access_role_name', 'rt.team_name', 'rt.team_code', 'rt.team_type']);
     }
 
     public function findResponder(int $responderId): ?object
@@ -155,6 +155,8 @@ class RescuerAccountQuery
     public function teamConfigResponders(): array
     {
         return DB::table('responders as r')
+            ->leftJoin('users as u', 'u.user_id', '=', 'r.user_id')
+            ->leftJoin('roles as role', 'role.role_id', '=', 'u.role_id')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'r.team_id')
             ->whereNull('r.deleted_at')
             ->orderBy('r.full_name')
@@ -168,19 +170,37 @@ class RescuerAccountQuery
                 'r.is_deployed',
                 'rt.team_name',
                 'rt.team_code',
+                'role.role_key',
+                'role.role_name',
             ])
-            ->map(fn (object $responder): array => [
-                'responder_id' => (int) $responder->responder_id,
-                'full_name' => $responder->full_name ?: 'Unnamed rescuer',
-                'title' => $responder->title ?: 'Responder',
-                'account_type' => str_starts_with(strtoupper((string) $responder->username), 'BDRRM-HQCC-') ? 'command_center' : 'rescuer',
-                'team_id' => $responder->team_id ? (int) $responder->team_id : null,
-                'team_name' => $responder->team_name ?: 'Unassigned',
-                'team_code' => $responder->team_code,
-                'duty_status' => $responder->duty_status,
-                'is_deployed' => (bool) $responder->is_deployed,
-                ...$this->presenter->membershipPresentation($responder),
-            ])
+            ->map(function (object $responder): array {
+                $roleKey = strtolower((string) $responder->role_key);
+                $isCommitteeRole = in_array($roleKey, [
+                    'chair',
+                    'operations_admin',
+                    'mitigation_prevention',
+                    'preparedness',
+                    'response',
+                    'recovery_rehabilitation',
+                ], true);
+
+                return [
+                    'responder_id' => (int) $responder->responder_id,
+                    'full_name' => $responder->full_name ?: 'Unnamed rescuer',
+                    'title' => $responder->role_name ?: ($responder->title ?: 'Team Member'),
+                    'role_key' => $roleKey ?: null,
+                    'role_name' => $responder->role_name,
+                    'account_type' => $isCommitteeRole || strtoupper((string) $responder->team_code) === 'HQCC'
+                        ? 'command_center'
+                        : 'rescuer',
+                    'team_id' => $responder->team_id ? (int) $responder->team_id : null,
+                    'team_name' => $responder->team_name ?: 'Unassigned',
+                    'team_code' => $responder->team_code,
+                    'duty_status' => $responder->duty_status,
+                    'is_deployed' => (bool) $responder->is_deployed,
+                    ...$this->presenter->membershipPresentation($responder),
+                ];
+            })
             ->values()
             ->all();
     }
@@ -214,6 +234,10 @@ class RescuerAccountQuery
 
         return $databaseTypes
             ->push('HQCC')
+            ->push('Mitigation and Prevention Sub-committee')
+            ->push('Preparedness Sub-committee')
+            ->push('Response Sub-committee')
+            ->push('Recovery and Rehabilitation Sub-committee')
             ->unique()
             ->sort()
             ->values()
@@ -311,23 +335,7 @@ class RescuerAccountQuery
 
     public function accountIdChoices(array $teamOptions): array
     {
-        $maxByCode = [];
-        $usernames = DB::table('users')->where('username', 'like', 'BDRRM-%')
-            ->limit(100001)->pluck('username');
-        $responderNames = DB::table('responders')
-            ->where('username', 'like', 'BDRRM-%')
-            ->orWhere('responder_code', 'like', 'BDRRM-%')
-            ->limit(100001)->get(['username', 'responder_code']);
-        if ($usernames->count() > 100000 || $responderNames->count() > 100000) {
-            throw new \RuntimeException('Too many rescuer account identifiers to generate account options.');
-        }
-        foreach ($usernames->concat($responderNames->flatMap(fn (object $row): array => [$row->username, $row->responder_code])) as $value) {
-            if (preg_match('/^BDRRM-([A-Z0-9]{1,8})-([0-9]{3})$/i', (string) $value, $matches)) {
-                $code = strtoupper($matches[1]);
-                $maxByCode[$code] = max($maxByCode[$code] ?? 0, (int) $matches[2]);
-            }
-        }
-        $next = fn (string $code): string => 'BDRRM-'.$code.'-'.str_pad((string) (($maxByCode[$code] ?? 0) + 1), 3, '0', STR_PAD_LEFT);
+        $next = fn (string $code): string => $this->support->nextAccountId($code);
         $options = collect($teamOptions)->map(function (array $team) use ($next): array {
             $code = $this->support->normalizeTeamCode($team['team_code'] ?? $this->support->teamCode($team['team_name']));
             return ['team_name' => $team['team_name'], 'team_code' => $code, 'account_id' => $next($code)];
@@ -337,6 +345,3 @@ class RescuerAccountQuery
 
 
 }
-
-
-

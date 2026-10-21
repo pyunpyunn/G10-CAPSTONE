@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
 import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection, statusColor } from './HouseholdUI';
@@ -47,16 +47,13 @@ export function HouseholdDashboardScreen({
 }: DashboardProps) {
   const activeEvent = overview.active_event;
   const currentStatus = overview.current_status;
-  const currentUser = overview.profile?.user || {};
-  const currentUserMemberIds = new Set(
-    [currentUser.member_id, currentUser.user_id].filter(Boolean).map(String)
-  );
-  const members = (overview.members || []).filter(
-    (member: any) => !currentUserMemberIds.has(String(member.member_id))
-  );
+  const members = overview.members || [];
   const statusOptions = overview.status_options?.length ? overview.status_options : defaultStatusOptions;
   const hasStatusChanged = !currentStatus || pendingStatus !== currentStatus.status_key;
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [showBroadcastHistory, setShowBroadcastHistory] = useState(false);
+  const alerts = overview.recent_alerts || [];
+  const latestAlert = alerts[0];
 
   return (
     <View style={styles.stack}>
@@ -75,6 +72,43 @@ export function HouseholdDashboardScreen({
           <HouseholdBadge label="No current disaster" tone="safe" />
         </View>
       )}
+
+      {latestAlert ? (
+        <View style={styles.card}>
+          <HouseholdSection title="Latest disaster alert" action={
+            <Pressable accessibilityRole="button" accessibilityLabel="Recent broadcasts" style={styles.historyButton} onPress={() => setShowBroadcastHistory(true)}>
+              <Ionicons name="time-outline" size={18} color={palette.navActive} />
+            </Pressable>
+          } />
+          <View style={styles.lastSaved} accessibilityRole="alert">
+            <Text style={styles.lastSavedValue}>{latestAlert.title}</Text>
+            <Text style={styles.muted}>{latestAlert.message}</Text>
+            {latestAlert.sent_at ? <Text style={styles.muted}>{latestAlert.sent_at}</Text> : null}
+          </View>
+        </View>
+      ) : null}
+
+      <Modal visible={showBroadcastHistory} transparent animationType="fade" onRequestClose={() => setShowBroadcastHistory(false)}>
+        <View style={styles.broadcastBackdrop}>
+          <View style={[styles.card, styles.broadcastModal]}>
+            <HouseholdSection title="Recent broadcasts" action={
+              <Pressable accessibilityRole="button" accessibilityLabel="Close recent broadcasts" style={styles.historyButton} onPress={() => setShowBroadcastHistory(false)}>
+                <Ionicons name="close" size={20} color={palette.navActive} />
+              </Pressable>
+            } />
+            <ScrollView contentContainerStyle={styles.stack}>
+              {alerts.slice(1).map((alert: any) => (
+                <View key={alert.broadcast_id} style={styles.lastSaved}>
+                  <Text style={styles.lastSavedValue}>{alert.title}</Text>
+                  <Text style={styles.muted}>{alert.message}</Text>
+                  {alert.sent_at ? <Text style={styles.muted}>{alert.sent_at}</Text> : null}
+                </View>
+              ))}
+              {alerts.length < 2 ? <Text style={styles.muted}>No earlier broadcasts.</Text> : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {activeEvent ? (
         <View style={styles.card}>
@@ -789,6 +823,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: palette.card,
+  },
+  broadcastBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.lg,
+  },
+  broadcastModal: {
+    maxHeight: '80%',
   },
   historyButton: {
     width: 38,

@@ -22,9 +22,20 @@ class SituationReportController extends Controller
         return $this->service->index();
     }
 
-    public function eventSummary(string $eventId): JsonResponse
+    public function eventSummary(string $eventId, Request $request): JsonResponse
     {
-        return $this->service->eventSummary($eventId);
+        $data = $request->validate(['sitio_id' => 'nullable|string|max:120']);
+        return $this->service->eventSummary($eventId, $data['sitio_id'] ?? null);
+    }
+
+    public function sitios(): JsonResponse
+    {
+        return $this->service->sitios();
+    }
+
+    public function sync(Request $request): JsonResponse
+    {
+        return $this->service->sync($request);
     }
 
     public function store(Request $request): JsonResponse
@@ -35,6 +46,11 @@ class SituationReportController extends Controller
     public function show(int $sitRepId): JsonResponse
     {
         return $this->service->show($sitRepId);
+    }
+
+    public function submission(Request $request, int $sitRepId): JsonResponse
+    {
+        return $this->service->recordSubmission($request, $sitRepId);
     }
 
     public function pdf(int $sitRepId): JsonResponse

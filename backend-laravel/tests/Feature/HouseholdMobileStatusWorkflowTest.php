@@ -34,7 +34,7 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
     public function test_custom_safe_status_is_recorded_as_safe_and_keeps_its_selected_name(): void
     {
         $this->configureBroadcastStatuses();
-        app(HouseholdMobileStatusWorkflow::class)->storeStatus($this->householdRequest(['status_key' => 'all_clear']));
+        app(\App\Http\Controllers\Api\HouseholdMobileController::class)->storeStatus($this->householdRequest(['status_key' => 'all_clear']));
         $this->assertDatabaseHas('household_status_logs', ['status_id' => 1]);
         $this->assertDatabaseHas('household_disasters', ['current_status_id' => 1, 'needs_dispatch' => 0]);
         $notes = json_decode(DB::table('household_disasters')->value('last_status_notes'), true);

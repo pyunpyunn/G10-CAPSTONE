@@ -43,6 +43,14 @@ class RescuerAssignmentWorkflow
         }
 
         $status = $validated['status'];
+        if ($status === 'completed' && ! empty($assignment->household_id)
+            && (! Schema::hasTable('responder_field_reports')
+                || ! Schema::hasColumn('responder_field_reports', 'assignment_id'))) {
+            return response()->json([
+                'message' => 'The field report schema is unavailable. Apply the latest Laravel migrations before completing household assignments.',
+            ], 503);
+        }
+
         $now = now();
         $updates = [
             'status' => $status,
@@ -73,11 +81,26 @@ class RescuerAssignmentWorkflow
 
         DB::transaction(function () use ($assignmentId, $validated, $responder, $status, $now, $updates, $request): void {
             $current = DB::table('responder_assignments')->where('assignment_id', $assignmentId)->lockForUpdate()->first();
-            if (! $current || in_array($current->status, ['cancelled', 'completed'], true)) {
+            if (! $current || ! $this->assignmentBelongsToResponder($current, (int) $responder?->responder_id)
+                || in_array($current->status, ['cancelled', 'completed'], true)) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'status' => ['This assignment is already closed. Refresh your dispatch list before updating it.'],
                 ]);
             }
+
+            if ($status === 'completed' && ! empty($current->household_id)) {
+                $hasFieldReport = DB::table('responder_field_reports')
+                    ->where('assignment_id', $assignmentId)
+                    ->where('responder_id', $responder?->responder_id)
+                    ->where('disaster_id', $current->disaster_id)
+                    ->where('household_id', $current->household_id)
+                    ->exists();
+
+                if (! $hasFieldReport) {
+                    abort(409, 'Submit the household field report before completing this assignment.');
+                }
+            }
+
             DB::table('responder_assignments')->where('assignment_id', $assignmentId)->update($updates);
             if ($this->hasPoint($validated)) {
                 $this->saveResponderLocation($responder, $validated, $now);
@@ -178,6 +201,18 @@ class RescuerAssignmentWorkflow
             && array_key_exists('longitude', $data)
             && $data['latitude'] !== null
             && $data['longitude'] !== null;
+    }
+
+    private function assignmentBelongsToResponder(object $assignment, int $responderId): bool
+    {
+        if ((int) ($assignment->responder_id ?? 0) === $responderId) {
+            return true;
+        }
+
+        $routeNotes = json_decode((string) ($assignment->route_notes ?? ''), true);
+        $selectedIds = is_array($routeNotes) ? ($routeNotes['selected_responder_ids'] ?? []) : [];
+
+        return in_array($responderId, array_map('intval', $selectedIds), true);
     }
 
     public function refreshPlannedRoadRoute(int $assignmentId, array $start): void

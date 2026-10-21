@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Application;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\EnsureBoundMobileDevice;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\ProfileLocalQueries;
 use Illuminate\Database\QueryException;
@@ -35,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'web.access' => \App\Http\Middleware\EnsureWebModuleAccess::class,
             'web.module' => \App\Http\Middleware\EnsureWebModuleAccess::class,
             'personnel.access' => \App\Http\Middleware\EnsurePersonnelAccess::class,
+            'mobile.device' => EnsureBoundMobileDevice::class,
             'realtime.atomic' => \App\Http\Middleware\AtomicRealtimeWrite::class,
         ]);
     })

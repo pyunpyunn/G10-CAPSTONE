@@ -15,8 +15,13 @@ class EnsureUserHasRole
         $roleKey = $user && method_exists($user, 'roleKey')
             ? $user->roleKey()
             : $user?->role?->role_key;
+        $assignedRoleKey = $user && method_exists($user, 'assignedRoleKey')
+            ? $user->assignedRoleKey()
+            : $roleKey;
 
-        if (! $user || ! in_array($roleKey, $roles, true)) {
+        $roleMatches = in_array($roleKey, $roles, true)
+            || in_array($assignedRoleKey, array_intersect($roles, ['tl', 'tm']), true);
+        if (! $user || ! $roleMatches) {
             return response()->json([
                 'message' => 'You are not allowed to access this resource.',
             ], 403);
@@ -25,5 +30,4 @@ class EnsureUserHasRole
         return $next($request);
     }
 }
-
 

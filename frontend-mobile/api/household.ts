@@ -11,6 +11,7 @@ export type HouseholdOverview = {
     has_device: boolean;
   };
   active_event: any;
+  recent_alerts?: { broadcast_id: number | string; title: string; message: string; sent_at: string | null }[];
   current_status: any;
   status_options: any[];
   status_history: any[];
@@ -41,6 +42,10 @@ export async function completeHouseholdSetup(payload: any) {
 export async function updateHouseholdDeviceLocation(payload: any) {
   const response = await api.post('/household/device-location', payload);
   return response.data;
+}
+
+export async function saveHouseholdGeotag(payload: any) {
+  return (await api.put('/household/geotag', payload)).data;
 }
 
 export async function updateHouseholdMember(memberId: string, payload: any) {
