@@ -3,7 +3,7 @@ import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { enableNotifications, readNotificationPermission } from '@/utils/pushNotifications';
 
-export function NotificationPermissionNotice() {
+export function NotificationPermissionNotice({ statusBarBackgroundColor }: { statusBarBackgroundColor?: string }) {
   const [permission, setPermission] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -16,7 +16,7 @@ export function NotificationPermissionNotice() {
   }, [refresh]);
 
   if (permission !== false) return null;
-  return <SafeAreaView edges={['top']} style={styles.container}>
+  return <SafeAreaView edges={['top']} style={[styles.container, statusBarBackgroundColor ? { backgroundColor: statusBarBackgroundColor } : undefined]}>
     <View style={styles.notice} accessibilityRole="alert">
       <View style={styles.copy}>
         <Text style={styles.title}>Turn on notifications</Text>
@@ -38,7 +38,7 @@ export function NotificationPermissionNotice() {
 
 const styles = StyleSheet.create({
   container: { backgroundColor: '#fff3ce' },
-  notice: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
+  notice: { backgroundColor: '#fff3ce', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
   copy: { flex: 1 },
   title: { color: '#473600', fontSize: 14, fontWeight: '700' },
   body: { color: '#473600', fontSize: 12, marginTop: 3 },

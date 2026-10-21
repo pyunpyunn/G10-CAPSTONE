@@ -681,7 +681,7 @@ export default function HouseholdHomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
       <HouseholdHeader
         isDisasterMode={Boolean(overview.active_event)}
         notificationCount={(overview.trusted?.incoming_requests?.length || 0) + (overview.trusted?.notifications?.length || 0)}
