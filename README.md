@@ -178,7 +178,14 @@ For mobile devices, configure `EXPO_PUBLIC_API_BASE_URL` with a backend address 
 
 | Version | Date | Description | Author(s) |
 | --- | --- | --- | --- |
-| README v1.0 | 2026-10-21 | Redesigned README with project overview, team roles, Mambaling reference data, system architecture, integrations, progress, and source attributions. | RESQPERATION project team |
+| 0.1 | 2026-06-01 | Initial project structure and repository setup for the Laravel backend, React web frontend, Expo mobile frontend, and development checklist. | All proponents |
+| 0.2 | 2026-06-01 – 2026-06-02 | Authentication foundation, role-based login shells, initial shared-database alignment, and temporary development account planning. | All proponents |
+| 0.3 | 2026-06-05 – 2026-06-16 | Early web and mobile development, household profile/status work, mapping and routing, dispatch, and archive improvements. | All proponents |
+| 0.4 | 2026-06-20 – 2026-07-13 | Continued mapping work, SSDLC documentation, and initial OneSignal integration. | All proponents |
+| 0.5 | 2026-08-19 – 2026-09-29 | Web/mobile updates and fixes; database-backed login, mapping, household status, dispatch, rescuer accounts, and resource-request foundations. | All proponents |
+| 0.6 | 2026-10-03 | Backend architecture refactor across authentication, household, dispatch, resources, rescuer, broadcast, weather, reports, archive, mapping, notifications, and shared services. | All proponents |
+| 0.7 | 2026-10-06 – 2026-10-17 | Integrated-system refinements, trusted-household flows, OneSignal push updates, resource and field-report workflows, and situation-report improvements. | All proponents |
+| 0.8 | 2026-10-19 – 2026-10-21 | Mobile APK and map updates, Mambaling hazard layers, weather/advisory updates, and release bug fixes. | All proponents |
 
 ## Copyright, Attribution, and Third-Party Terms
 
