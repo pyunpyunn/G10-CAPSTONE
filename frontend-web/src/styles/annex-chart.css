@@ -45,3 +45,6 @@
     padding: 8px 14px;
   }
 }
+
+.annex-chart-page .hierarchy-search-results{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;max-height:320px;overflow:auto}
+.annex-chart-page .hierarchy-search-results small{display:block;color:var(--muted)}

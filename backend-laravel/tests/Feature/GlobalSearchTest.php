@@ -69,6 +69,40 @@ class GlobalSearchTest extends TestCase
         ]);
     }
 
+    public function test_personnel_names_match_case_insensitively_with_middle_names_and_reordered_tokens(): void
+    {
+        DB::table('responders')->where('responder_id', 6)->update(['full_name' => 'Mara A. Santos']);
+        foreach (['mara santos', 'SANTOS MARA', '  Mara   Santos  '] as $query) {
+            $results = app(GlobalSearchService::class)->search($query, ['responders']);
+            $this->assertCount(1, $results);
+            $this->assertSame('/rescuers?id=6&type=command_center', $results[0]['href']);
+        }
+        $this->assertSame([], app(GlobalSearchService::class)->search('Mara Missing', ['responders']));
+    }
+
+    public function test_operations_admin_can_search_within_its_existing_modules(): void
+    {
+        $user = new User();
+        $user->setAttribute('is_active', true);
+        $user->setRelation('role', new Role(['role_key' => 'operations_admin']));
+        $this->assertTrue(app(WebAccessPolicy::class)->allows($user, 'global_search'));
+        $this->assertFalse(app(WebAccessPolicy::class)->allows($user, 'geospatial_analytics'));
+    }
+
+    public function test_team_search_links_to_the_specific_team(): void
+    {
+        Schema::create('rescue_teams', function (Blueprint $table): void {
+            $table->string('team_id')->primary();
+            $table->string('team_code');
+            $table->string('team_name');
+            $table->string('team_type');
+        });
+        DB::table('rescue_teams')->insert(['team_id' => 'T-1', 'team_code' => 'SAR', 'team_name' => 'Search Rescue Team', 'team_type' => 'Response']);
+        $results = app(GlobalSearchService::class)->search('rescue search', ['teams']);
+        $this->assertCount(1, $results);
+        $this->assertSame('/rescuers/teams?team_id=T-1', $results[0]['href']);
+    }
+
     public function test_account_login_fields_find_and_open_committee_accounts_by_role(): void
     {
         $results = app(GlobalSearchService::class)->search('mara@example.test', ['responders']);
