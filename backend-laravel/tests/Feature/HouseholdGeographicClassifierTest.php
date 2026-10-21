@@ -22,6 +22,7 @@ class HouseholdGeographicClassifierTest extends TestCase
         $geometry = $this->polygon(0, 0, 10, 10);
         $this->mock(BarangayProfileService::class, function ($mock) use ($geometry): void {
             $mock->shouldReceive('mapFocus')->andReturn(['barangay_id' => 1, 'name' => 'Mambaling', 'barangay_code' => '072217049', 'boundary' => $geometry]);
+            $mock->shouldReceive('mambalingMapFocus')->andReturn(['barangay_id' => 1, 'boundary' => $geometry]);
             $mock->shouldReceive('current')->andReturn(['barangay_id' => 1, 'name' => 'Mambaling', 'barangay_code' => '072217049']);
             $mock->shouldReceive('isMambalingProfile')->andReturn(true);
         });

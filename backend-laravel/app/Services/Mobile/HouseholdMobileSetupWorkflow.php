@@ -26,12 +26,11 @@ class HouseholdMobileSetupWorkflow
             'address_label' => ['required', 'string', 'max:255'],
             'sitio_id' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
-        $profileService = app(\App\Services\Shared\BarangayProfileService::class);
-        $profile = $profileService->current();
-        if (! $profileService->isMambalingProfile($profile)) {
-            return response()->json(['message' => 'Household geotags can only be updated within Mambaling.'], 422);
+        $mambalingFocus = app(\App\Services\Shared\BarangayProfileService::class)->mambalingMapFocus();
+        if (! $mambalingFocus['boundary']) {
+            return response()->json(['message' => 'The Mambaling boundary is unavailable, so this location cannot be validated.'], 503);
         }
-        $barangayId = (int) ($profile['barangay_id'] ?? 0);
+        $barangayId = (int) ($mambalingFocus['barangay_id'] ?? 0);
         if (isset($validated['sitio_id']) && $barangayId < 1) {
             return response()->json(['message' => 'The registered Mambaling barangay ID is unavailable.'], 503);
         }
@@ -46,7 +45,7 @@ class HouseholdMobileSetupWorkflow
             ]));
         }
         $classifier = app(\App\Services\Shared\HouseholdGeographicClassifier::class);
-        $classification = $classifier->resolve((float) $validated['latitude'], (float) $validated['longitude']);
+        $classification = $classifier->resolve((float) $validated['latitude'], (float) $validated['longitude'], $mambalingFocus);
         if ($classification['status'] === 'barangay_boundary_missing') {
             return response()->json(['message' => 'The Mambaling boundary is unavailable, so this location cannot be validated.'], 503);
         }
@@ -62,8 +61,8 @@ class HouseholdMobileSetupWorkflow
         if ($confirmedSitio && $classification['status'] === 'matched' && (int) $classification['sitio_id'] !== (int) $confirmedSitio->sitio_id) {
             return response()->json(['message' => 'The selected sitio does not match the verified boundary at this pin.'], 422);
         }
-        DB::transaction(function () use ($request, $householdId, $validated, $confirmedSitio, $barangayId, &$classification): void {
-            $classification = $this->saveGeotag($householdId, $request->user()?->user_id, $validated, now(), $confirmedSitio, $barangayId);
+        DB::transaction(function () use ($request, $householdId, $validated, $confirmedSitio, $barangayId, $mambalingFocus, &$classification): void {
+            $classification = $this->saveGeotag($householdId, $request->user()?->user_id, $validated, now(), $confirmedSitio, $barangayId, $mambalingFocus);
             $this->support->writeAuditLog($request, 'mobile_household_geotag', 'households', $householdId, $validated);
         });
         $this->queueRouteRecompute($householdId);
@@ -170,14 +169,15 @@ class HouseholdMobileSetupWorkflow
         ]);
     }
 
-    private function saveGeotag(string $householdId, ?string $userId, array $validated, $now, ?object $confirmedSitio = null, ?int $barangayId = null): array
+    private function saveGeotag(string $householdId, ?string $userId, array $validated, $now, ?object $confirmedSitio = null, ?int $barangayId = null, ?array $focus = null): array
     {
         $classification = app(\App\Services\Shared\HouseholdGeographicClassifier::class)->classify(
             $householdId,
             (float) $validated['latitude'],
             (float) $validated['longitude'],
             $confirmedSitio ? (int) $confirmedSitio->sitio_id : null,
-            $barangayId
+            $barangayId,
+            $focus
         );
         $data = $this->support->filterColumns('geotagged_locations', [
             'household_id' => $householdId,
@@ -316,5 +316,4 @@ class HouseholdMobileSetupWorkflow
         ], $trackingId));
     }
 }
-
 

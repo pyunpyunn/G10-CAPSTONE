@@ -162,7 +162,8 @@ export function committeeKeyForTeam(team) {
   })[type]
   if (subcommitteeKeys.has(explicitCommittee)) return explicitCommittee
 
-  return ANNEX_H_TEAM_GROUPS.find(group => group.teamCodes.includes(code))?.committeeKey || 'unassigned'
+  const deskCommittee = Object.entries(ANNEX_H_DESK_FUNCTIONS).find(([, units]) => units.some(unit => unit.code === code))?.[0]
+  return deskCommittee || ANNEX_H_TEAM_GROUPS.find(group => group.teamCodes.includes(code))?.committeeKey || 'unassigned'
 }
 
 export function teamGroupKey(team) {
@@ -171,6 +172,7 @@ export function teamGroupKey(team) {
   const groupByCommittee = {
     mitigation_prevention: 'research_planning',
     preparedness: 'preparedness',
+    recovery_rehabilitation: 'recovery_rehabilitation',
     response: 'operations_warning',
   }
 

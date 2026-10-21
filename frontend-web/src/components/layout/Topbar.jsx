@@ -11,7 +11,8 @@ const searchTypes = [
   { id: 'events', label: 'Disasters' },
   { id: 'broadcasts', label: 'Broadcasts' },
   { id: 'households', label: 'Households' },
-  { id: 'responders', label: 'Responders' },
+  { id: 'responders', label: 'Personnel' },
+  { id: 'teams', label: 'Teams' },
   { id: 'dispatches', label: 'Dispatches' },
   { id: 'resources', label: 'Resource requests' },
   { id: 'sitreps', label: 'Situation reports' },
@@ -60,23 +61,23 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
   const query = searchTerm.trim()
   const recordTypes = selectedTypes.filter((type) => type !== 'pages')
   const recordSearchKey = `${query}::${recordTypes.join('|')}`
-  const canSearchRecords = hasWebAccess(user) && user?.role?.role_key !== 'operations_admin' && query.length >= 2 && recordTypes.length > 0
+  const canSearchRecords = hasWebAccess(user) && query.length >= 2 && recordTypes.length > 0
   const currentRecordSearch = canSearchRecords && recordSearch.key === recordSearchKey ? recordSearch : null
-  const isSearching = currentRecordSearch?.status === 'loading'
+  const isSearching = canSearchRecords && (!currentRecordSearch || currentRecordSearch.status === 'loading')
   const searchError = currentRecordSearch?.error || ''
   const pageResults = query.length >= 2 && selectedTypes.includes('pages')
     ? searchablePages
       .filter((page) => (!page.superAdminOnly || canViewInquiries))
       .filter((page) => canOpenWebPage(user, page.href))
-      .filter((page) => `${page.title} ${page.keywords}`.toLowerCase().includes(query.toLowerCase()))
+      .filter((page) => query.toLowerCase().split(/\s+/).every(token => `${page.title} ${page.keywords}`.toLowerCase().includes(token)))
       .map((page) => ({ ...page, type: 'pages', subtitle: 'Open page' }))
     : []
-  const searchResults = [...pageResults, ...(currentRecordSearch?.results || [])]
+  const searchResults = [...(currentRecordSearch?.results || []), ...pageResults].sort((a, b) => Number(b.title.toLowerCase() === query.toLowerCase()) - Number(a.title.toLowerCase() === query.toLowerCase()))
 
   useEffect(() => {
     const currentQuery = searchTerm.trim()
     const types = selectedTypes.filter((type) => type !== 'pages')
-    if (!hasWebAccess(user) || user?.role?.role_key === 'operations_admin' || currentQuery.length < 2 || types.length === 0) return undefined
+    if (!hasWebAccess(user) || currentQuery.length < 2 || types.length === 0) return undefined
 
     const key = `${currentQuery}::${types.join('|')}`
     let ignore = false

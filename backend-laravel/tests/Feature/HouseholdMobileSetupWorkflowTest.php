@@ -52,15 +52,42 @@ class HouseholdMobileSetupWorkflowTest extends TestCase
         $this->assertDatabaseCount('geotagged_locations', 0);
     }
 
+    public function test_geotag_uses_mambaling_boundary_instead_of_unrelated_active_profile(): void
+    {
+        $feature = json_decode(file_get_contents(database_path('boundaries/0730600049.geojson')), true);
+        $this->mock(\App\Services\Shared\BarangayProfileService::class, function ($mock) use ($feature): void {
+            $mock->shouldNotReceive('current');
+            $mock->shouldNotReceive('isMambalingProfile');
+            $mock->shouldReceive('mambalingMapFocus')->andReturn([
+                'barangay_id' => 1,
+                'boundary' => $feature['geometry'],
+            ]);
+        });
+
+        $response = app(HouseholdMobileSetupWorkflow::class)->updateGeotag(
+            $this->householdRequest('/api/v1/household/geotag', 'PUT', [
+                'latitude' => 10.288,
+                'longitude' => 123.881,
+                'address_label' => 'Household in Mambaling',
+            ])
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertDatabaseHas('geotagged_locations', [
+            'household_id' => 'HH-1',
+            'latitude' => 10.288,
+            'longitude' => 123.881,
+        ]);
+    }
+
     public function test_confirmed_sitio_is_saved_from_the_registered_mambaling_list(): void
     {
         $feature = json_decode(file_get_contents(database_path('boundaries/0730600049.geojson')), true);
         $this->mock(\App\Services\Shared\BarangayProfileService::class, function ($mock) use ($feature): void {
             $mock->shouldReceive('current')->andReturn(['barangay_id' => 1, 'name' => 'Mambaling', 'barangay_code' => '072217049']);
             $mock->shouldReceive('isMambalingProfile')->andReturn(true);
-            $mock->shouldReceive('mapFocus')->andReturn([
+            $mock->shouldReceive('mambalingMapFocus')->andReturn([
                 'barangay_id' => 1,
-                'name' => 'Mambaling',
                 'boundary' => $feature['geometry'],
             ]);
         });
