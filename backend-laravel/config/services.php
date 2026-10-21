@@ -45,6 +45,12 @@ return [
         'app_id' => env('ONESIGNAL_APP_ID'),
         'api_key' => env('ONESIGNAL_API_KEY'),
         'base_url' => env('ONESIGNAL_BASE_URL', 'https://api.onesignal.com'),
+        'dispatch_alarm' => [
+            'sound_seconds' => 60,
+            'pause_seconds' => max(10, min(15, (int) env('DISPATCH_ALARM_PAUSE_SECONDS', 15))),
+            // Four blasts plus three pauses = 285 seconds.
+            'cycles' => max(3, min(4, (int) env('DISPATCH_ALARM_CYCLES', 4))),
+        ],
     ],
 
     'sms_gateway' => [

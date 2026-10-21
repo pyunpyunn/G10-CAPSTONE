@@ -51,6 +51,11 @@ api.interceptors.response.use(
   (response) => {
     const method = String(response.config?.method || 'get').toLowerCase()
     const path = response.config?.url || ''
+    if (['post', 'patch', 'put', 'delete'].includes(method)
+      && (/^\/(dispatches|resource-requests)(\/|$)/.test(path)
+        || /^\/disaster-events\/[^/]+\/broadcasts?$/.test(path))) {
+      window.dispatchEvent(new Event('notifications:changed'))
+    }
     if (['post', 'patch', 'put', 'delete'].includes(method) && /^\/(rescuers|headquarters-accounts)(\/|$)/.test(path)) {
       window.dispatchEvent(new Event('personnel-access:changed'))
     }

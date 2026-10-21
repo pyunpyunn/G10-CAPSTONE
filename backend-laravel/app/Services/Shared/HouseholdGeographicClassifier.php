@@ -4,6 +4,7 @@ namespace App\Services\Shared;
 
 use Illuminate\Support\Facades\DB;
 use App\Support\RequestSchema as Schema;
+use Illuminate\Validation\ValidationException;
 
 class HouseholdGeographicClassifier
 {
@@ -36,23 +37,53 @@ class HouseholdGeographicClassifier
             'sitio_name' => $area->sitio_name, 'purok_name' => $area->purok_name];
     }
 
-    public function classify(string $householdId, float $latitude, float $longitude): array
+    public function classify(string $householdId, float $latitude, float $longitude, ?int $confirmedSitioId = null, ?int $barangayId = null): array
     {
         $result = $this->resolve($latitude, $longitude);
         // Preserve a usable geotag even when the required official area data is unavailable.
-        if (! Schema::hasTable('household_geographic_classifications')) return $result;
-        return DB::transaction(function () use ($householdId, $latitude, $longitude, $result): array {
+        if (! Schema::hasTable('household_geographic_classifications') && $confirmedSitioId === null) return $result;
+        return DB::transaction(function () use ($householdId, $latitude, $longitude, $result, $confirmedSitioId, $barangayId): array {
             $household = DB::table('households')->where('household_id', $householdId)->lockForUpdate()->first();
-            if (! $household || ($household->deleted_at ?? null)) return ['status' => 'household_unavailable'];
-            $previous = DB::table('household_geographic_classifications')->where('household_id', $householdId)->first();
+            if (! $household || ($household->deleted_at ?? null)) {
+                if ($confirmedSitioId !== null) {
+                    throw ValidationException::withMessages(['sitio_id' => 'The household record is unavailable; the sitio assignment was not saved.']);
+                }
+                return ['status' => 'household_unavailable'];
+            }
+            $previous = Schema::hasTable('household_geographic_classifications')
+                ? DB::table('household_geographic_classifications')->where('household_id', $householdId)->first()
+                : null;
             if ($result['status'] === 'matched' || ($previous->status ?? null) === 'matched') {
                 $this->saveAddress($household, $result);
             }
-            DB::table('household_geographic_classifications')->updateOrInsert(['household_id' => $householdId], [
-                'status' => $result['status'], 'latitude' => $latitude, 'longitude' => $longitude,
-                'sitio_id' => $result['sitio_id'] ?? null, 'purok_id' => $result['purok_id'] ?? null,
-                'created_at' => $previous->created_at ?? now(), 'updated_at' => now(),
-            ]);
+            $assignedSitio = null;
+            if ($confirmedSitioId !== null) {
+                $assignedSitio = DB::table('sitios')
+                    ->where('sitio_id', $confirmedSitioId)
+                    ->where('barangay_id', $barangayId)
+                    ->first(['sitio_id', 'sitio_name']);
+                if (! $assignedSitio) {
+                    throw ValidationException::withMessages(['sitio_id' => 'Choose a sitio registered in Mambaling.']);
+                }
+                if ($result['status'] === 'matched' && (int) $result['sitio_id'] !== $confirmedSitioId) {
+                    throw ValidationException::withMessages(['sitio_id' => 'The selected sitio does not match the verified boundary at this pin.']);
+                }
+                if ($result['status'] !== 'matched') {
+                    $this->saveConfirmedSitio($household, (int) $assignedSitio->sitio_id, $assignedSitio->sitio_name, (int) $barangayId);
+                }
+            }
+            if (Schema::hasTable('household_geographic_classifications')) {
+                DB::table('household_geographic_classifications')->updateOrInsert(['household_id' => $householdId], [
+                    'status' => $result['status'], 'latitude' => $latitude, 'longitude' => $longitude,
+                    'sitio_id' => $result['sitio_id'] ?? null, 'purok_id' => $result['purok_id'] ?? null,
+                    'created_at' => $previous->created_at ?? now(), 'updated_at' => now(),
+                ]);
+            }
+            if ($assignedSitio) {
+                $result['assigned_sitio_id'] = (int) $assignedSitio->sitio_id;
+                $result['assigned_sitio_name'] = $assignedSitio->sitio_name;
+                $result['assignment_source'] = $result['status'] === 'matched' ? 'boundary' : 'user_confirmed';
+            }
             return $result;
         });
     }
@@ -74,7 +105,6 @@ class HouseholdGeographicClassifier
 
     private function saveAddress(object $household, array $result): void
     {
-        $address = $household->address_id ? DB::table('addresses')->where('address_id', $household->address_id)->lockForUpdate()->first() : null;
         $changes = ['purok_id' => $result['purok_id'] ?? null, 'sitio_id' => $result['sitio_id'] ?? null];
         if ($result['status'] === 'matched') {
             $changes['barangay_id'] = $result['barangay_id'];
@@ -82,6 +112,18 @@ class HouseholdGeographicClassifier
         } else {
             $changes['purok_sitio'] = null;
         }
+        $this->persistHouseholdAddress($household, $changes);
+    }
+
+    private function saveConfirmedSitio(object $household, int $sitioId, string $sitioName, int $barangayId): void
+    {
+        $changes = ['sitio_id' => $sitioId, 'barangay_id' => $barangayId, 'purok_sitio' => $sitioName, 'purok_id' => null];
+        $this->persistHouseholdAddress($household, $changes);
+    }
+
+    private function persistHouseholdAddress(object $household, array $changes): void
+    {
+        $address = $household->address_id ? DB::table('addresses')->where('address_id', $household->address_id)->lockForUpdate()->first() : null;
         if (Schema::hasColumn('addresses', 'updated_at')) $changes['updated_at'] = now();
         $shared = $address && DB::table('households')->where('address_id', $address->address_id)->where('household_id', '<>', $household->household_id)->exists();
         if ($address && ! $shared) {

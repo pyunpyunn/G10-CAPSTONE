@@ -11,6 +11,49 @@ use Tests\TestCase;
 
 class DisasterBroadcastPushTest extends TestCase
 {
+    public function test_rescuers_receive_plain_broadcast_without_household_status_options(): void
+    {
+        Http::fake(['*' => Http::response(['id' => 'notification-id'], 200)]);
+        app(\App\Services\Web\DisasterBroadcastWorkflow::class)->sendBroadcastPush(42, [
+            'broadcast_title' => 'Flood warning', 'message' => 'Prepare for rising water.',
+            'scope_type' => 'barangay_wide', 'allowed_statuses' => ['safe', 'unsafe'],
+        ], ['puroks' => []], (object) ['event_id' => 'EVT-TEST']);
+        Http::assertSentCount(2);
+        Http::assertSent(fn ($request) => $request['include_subscription_ids'] === ['subscription-1']
+            && $request['contents']['en'] === 'Prepare for rising water.'
+            && $request['data']['type'] === 'rescuer_broadcast'
+            && ! isset($request['data']['allowed_statuses']) && ! isset($request['data']['status_options']));
+    }
+
+    public function test_selected_purok_broadcast_still_notifies_rescuers(): void
+    {
+        Http::fake(['*' => Http::response(['id' => 'notification-id'], 200)]);
+        app(\App\Services\Web\DisasterBroadcastWorkflow::class)->sendBroadcastPush(42, [
+            'broadcast_title' => 'Flood warning', 'message' => 'Prepare.',
+            'scope_type' => 'selected_puroks', 'allowed_statuses' => ['safe'],
+        ], ['puroks' => [['name' => 'Sitio A']]], (object) ['event_id' => 'EVT-TEST']);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request['include_subscription_ids'] === ['subscription-1']
+            && $request['data']['target_puroks'] === ['Sitio A']);
+    }
+
+    public function test_dispatch_alarm_and_assignment_payload_and_retry_idempotency(): void
+    {
+        Schema::table('device_tokens', fn (Blueprint $table) => $table->integer('responder_id')->nullable());
+        DB::table('device_tokens')->where('player_id', 'subscription-1')->update(['responder_id' => 7]);
+        Http::fake(['*' => Http::response(['id' => 'notification-id'], 200)]);
+        $job = new \App\Jobs\SendDispatchPush([7], 42, 'DSP-42', 'Sitio A', 'EVT-TEST', 12);
+        $job->handle(app(OneSignalNotificationService::class));
+        $job->handle(app(OneSignalNotificationService::class));
+        $requests = Http::recorded();
+        $this->assertSame($requests[0][0]['idempotency_key'], $requests[1][0]['idempotency_key']);
+        Http::assertSent(fn ($request) => $request['include_subscription_ids'] === ['subscription-1']
+            && $request['data']['total_target_households'] === 12
+            && $request['data']['assigned_sitio'] === 'Sitio A'
+            && $request['data']['alarm'] === ['sound_seconds' => 60, 'pause_seconds' => 15, 'cycles' => 4]
+            && str_contains($request['contents']['en'], 'Total target households: 12'));
+    }
+
     public function test_missing_android_setup_returns_a_clear_provider_error(): void
     {
         Http::fake(['*' => Http::response([

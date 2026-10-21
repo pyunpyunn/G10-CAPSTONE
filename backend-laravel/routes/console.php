@@ -13,6 +13,40 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 
+Artisan::command('web-push:keys', function () {
+    if (config('web_push.public_key') && config('web_push.private_key')) { $this->info('Web Push keys already configured.'); return; }
+    $keys = \Minishlink\WebPush\VAPID::createVapidKeys();
+    $path = base_path('.env');
+    $env = file_get_contents($path);
+    foreach (['WEB_PUSH_PUBLIC_KEY' => $keys['publicKey'], 'WEB_PUSH_PRIVATE_KEY' => $keys['privateKey']] as $name => $value) {
+        $env = preg_match('/^'.preg_quote($name, '/').'=/m', $env)
+            ? preg_replace('/^'.preg_quote($name, '/').'=.*$/m', $name.'='.$value, $env) : $env."\n".$name.'='.$value."\n";
+    }
+    file_put_contents($path, $env);
+    $this->info('Web Push keys saved to the backend environment. Run config:clear.');
+});
+
+Artisan::command('web-push:deliver', function (\App\Services\Web\BrowserPushService $push) {
+    $this->info('Delivered '.$push->deliver().' browser notifications.');
+});
+Artisan::command('web-push:work {--once}', function (\App\Services\Web\BrowserPushService $push, \App\Services\Shared\OfficialAdvisoryNotificationSync $sync) {
+    $lastSync = 0;
+    do {
+        try {
+            if (time() - $lastSync >= 300) { $this->line(json_encode($sync->sync())); $lastSync = time(); }
+            $sent = $push->deliver();
+            if ($sent) $this->info('Delivered '.$sent.' browser notifications.');
+        } catch (\Throwable $error) { report($error); $this->error($error->getMessage()); }
+        if ($this->option('once')) break;
+        sleep(10);
+    } while (true);
+});
+Artisan::command('advisories:sync', function (\App\Services\Shared\OfficialAdvisoryNotificationSync $sync) {
+    $this->line(json_encode($sync->sync()));
+});
+Schedule::command('web-push:deliver')->everyTenSeconds()->withoutOverlapping();
+Schedule::command('advisories:sync')->everyFiveMinutes()->withoutOverlapping();
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

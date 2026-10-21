@@ -1,4 +1,5 @@
 import api from './client'
+import { disableBrowserPush } from './browserPush'
 
 export async function loginUser(form) {
   const response = await api.post('/auth/login', {
@@ -16,6 +17,7 @@ export async function getCurrentUser() {
 }
 
 export async function logoutUser() {
+  await disableBrowserPush().catch(() => {})
   await api.post('/auth/logout')
 }
 

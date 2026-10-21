@@ -5,6 +5,7 @@ import Topbar from './Topbar'
 import { connectRealtimeNotifications } from '../../api/realtimeNotifications'
 import { topicsForPath } from '../../utils/realtimeTopics'
 import { hasAdminWebAccess } from '../../utils/personnelAccess'
+import BrowserNotificationPrompt from '../notifications/BrowserNotificationPrompt'
 
 export default function AppShell({ user, pages, onLogout, onUserChange }) {
   const [isPinned, setIsPinned] = useState(false)
@@ -80,6 +81,7 @@ export default function AppShell({ user, pages, onLogout, onUserChange }) {
   return (
     <div className={shellClass}>
       <Sidebar
+        notificationControl={notificationsAccess ? <BrowserNotificationPrompt key={userId} /> : null}
         pages={pages}
         isPinned={isPinned}
         onTogglePin={() => setIsPinned(!isPinned)}

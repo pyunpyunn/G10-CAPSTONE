@@ -21,8 +21,9 @@ class HouseholdGeographicClassifierTest extends TestCase
         (require database_path('migrations/2026_10_15_000001_create_household_geographic_classification_tables.php'))->up();
         $geometry = $this->polygon(0, 0, 10, 10);
         $this->mock(BarangayProfileService::class, function ($mock) use ($geometry): void {
-            $mock->shouldReceive('mapFocus')->andReturn(['barangay_id' => 1, 'boundary' => $geometry]);
-            $mock->shouldReceive('current')->andReturn(['barangay_id' => 1]);
+            $mock->shouldReceive('mapFocus')->andReturn(['barangay_id' => 1, 'name' => 'Mambaling', 'barangay_code' => '072217049', 'boundary' => $geometry]);
+            $mock->shouldReceive('current')->andReturn(['barangay_id' => 1, 'name' => 'Mambaling', 'barangay_code' => '072217049']);
+            $mock->shouldReceive('isMambalingProfile')->andReturn(true);
         });
         DB::table('sitios')->insert([['sitio_id' => 10, 'barangay_id' => 1, 'sitio_name' => 'Sitio A'], ['sitio_id' => 20, 'barangay_id' => 2, 'sitio_name' => 'Elsewhere']]);
         DB::table('puroks')->insert([['purok_id' => 100, 'sitio_id' => 10, 'purok_name' => 'Purok 1'], ['purok_id' => 200, 'sitio_id' => 20, 'purok_name' => 'Purok 1']]);
@@ -92,7 +93,6 @@ class HouseholdGeographicClassifierTest extends TestCase
         $this->boundary(100, $this->polygon(1, 1, 5, 5));
         $request = \Illuminate\Http\Request::create('/api/v1/household/geotag', 'PUT', [
             'latitude' => 2, 'longitude' => 3, 'address_label' => 'Saved home pin',
-            'sitio_id' => 999, 'purok_id' => 999,
         ]);
         $request->setUserResolver(fn () => (object) ['household_id' => 'HH-1', 'user_id' => 'U-1']);
         $response = app(\App\Services\Mobile\HouseholdMobileSetupWorkflow::class)->updateGeotag($request);

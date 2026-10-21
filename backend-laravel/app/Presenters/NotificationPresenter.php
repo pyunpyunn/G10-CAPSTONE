@@ -2,17 +2,14 @@
 
 namespace App\Presenters;
 
-use App\Models\HouseholdStatusLog;
-use App\Models\Notification;
 use App\Models\ResourceRequest;
-use App\Models\ResponderAssignment;
 use App\Models\User;
-use App\Models\WeatherLog;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class NotificationPresenter
 {
+    public const WEB_TYPES = ['Broadcast', 'Dispatch status', 'Dispatch log', 'Approval request', 'PAGASA advisory sync', 'PHIVOLCS advisory sync'];
     public function workspace(array $feed): array
     {
         $allItems = $feed['items'];
@@ -36,7 +33,7 @@ class NotificationPresenter
                 'total' => $filtered->count(),
                 'page_count' => $pageCount,
             ],
-            'preview' => $allItems->take(5)->values()->all(),
+            'preview' => $allItems->values()->all(),
             'status_filter' => $status,
             'scope_note' => 'Notification actions affect only your role-scoped view. Delivery logs stay unchanged for audit.',
         ];
@@ -45,14 +42,14 @@ class NotificationPresenter
     public function feed(array $sources): Collection
     {
         return collect()
-            ->merge($sources['outgoing']->map(fn (Notification $row): array => $this->outgoing($row)))
-            ->merge($sources['household']->map(fn (HouseholdStatusLog $row): array => $this->household($row)))
-            ->merge($sources['dispatch']->map(fn (ResponderAssignment $row): array => $this->dispatch($row)))
-            ->merge($sources['requests']->map(fn (ResourceRequest $row): array => $this->request($row)))
-            ->merge($sources['weather']->map(fn (WeatherLog $row): array => $this->weather($row)))
+            ->merge(($sources['advisories'] ?? collect())->map(fn ($row): array => $this->advisory($row)))
+
+            ->merge($sources['requests']->filter(fn ($row) => in_array($row->validation_status, [null, '', 'needs_validation', 'pending'], true))->map(fn (ResourceRequest $row): array => $this->request($row)))
+
             ->merge($sources['broadcasts']->map(fn ($row): array => $this->broadcast($row)))
-            ->merge($sources['audit']->map(fn ($row): array => $this->audit($row)))
-            ->sortByDesc('sort_time')->values()->take(80);
+            ->merge($sources['audit']->filter(fn ($row) => $row->reference_table === 'responder_assignments' && in_array($row->module, ['rescue_dispatch', 'rescuer_mobile'], true) && in_array($row->action, ['create_dispatch', 'update_dispatch', 'complete_dispatch', 'mobile_update_assignment'], true))->map(fn ($row): array => $this->audit($row)))
+            ->filter(fn (array $item) => $item['sort_time'] > 0)
+            ->sortByDesc('sort_time')->values();
     }
 
     public function forUser(Collection $items, User $user): Collection
@@ -61,7 +58,8 @@ class NotificationPresenter
         $roleKey = $user->roleKey();
 
         return $items->filter(function (array $item) use ($modules, $roleKey, $user): bool {
-            if ($roleKey === 'rescuer' && $item['type'] === 'Dispatch route') {
+            if (! in_array($item['type'], self::WEB_TYPES, true)) return false;
+            if ($roleKey === 'rescuer' && $item['type'] === 'Dispatch status') {
                 return in_array('dashboard', $modules, true)
                     && (string) ($item['recipient_user_id'] ?? '') === (string) $user->user_id;
             }
@@ -79,47 +77,19 @@ class NotificationPresenter
         return in_array($status, ['all','read','unread'], true) ? $status : 'all';
     }
 
-    private function outgoing(Notification $row): array
+    private function advisory($row): array
     {
-        return $this->notice('notif-'.$row->notif_id, 'Broadcast', $this->priorityFromUrgency($row->urgency_level_id),
-            $this->notificationTitle($row), $row->message ?: 'Notification message saved in shared DB.', $row->created_at,
-            false, 'dashboard');
-    }
-
-    private function household(HouseholdStatusLog $row): array
-    {
-        $purok = $row->household?->address?->purok_sitio ?: 'unassigned area';
-        $name = $row->household?->household_name ?: 'Household';
-        $status = $row->status?->status_label ?: 'Unsafe';
-        return $this->notice('household-'.$row->status_log_id, 'Household status', 'Critical', $status.' household report from '.$purok,
-            $name.' reported '.$status.'. '.($row->notes ?: $row->location_label ?: 'HQ review is required.'), $row->submitted_at, false, 'geospatial_analytics');
-    }
-
-    private function dispatch(ResponderAssignment $row): array
-    {
-        $team = $row->team?->team_name ?: $row->responder?->full_name ?: 'Responder team';
-        $priority = in_array($row->priority_level, ['high','critical','urgent'], true) ? 'High' : 'Medium';
-        return $this->notice('dispatch-'.$row->assignment_id, 'Dispatch route', $priority, $team.' route updated',
-            $this->label($row->status ?: 'assigned').' to '.($row->assigned_area ?: 'assigned area').'.', $row->assigned_at, false,
-            'response_operations', $row->responder?->user_id);
+        $item = $this->notice('advisory-'.$row->id, $row->source.' advisory sync', 'High', $row->title, $row->body, $row->created_at, false, 'geospatial_analytics');
+        $item['source_url'] = $row->source_url;
+        return $item;
     }
 
     private function request(ResourceRequest $row): array
     {
         $priority = $row->validation_status === 'needs_validation' ? 'Medium' : 'Normal';
         $item = $row->item_name ?: $row->resource_type ?: 'Request';
-        return $this->notice('request-'.$row->request_id, 'Resources', $priority, $item.' request '.$this->label($row->validation_status ?: 'needs_validation'),
+        return $this->notice('request-'.$row->request_id, 'Approval request', $priority, $item.' request '.$this->label($row->validation_status ?: 'needs_validation'),
             ($row->requested_by ?: 'Requester').' requested '.trim(($row->quantity ?? '').' '.($row->unit ?? '')).'.', $row->created_at, false, 'resources_requests');
-    }
-
-    private function weather(WeatherLog $row): array
-    {
-        $text = strtolower(trim(($row->condition_name ?? '').' '.($row->advisory_title ?? '').' '.($row->advisory_text ?? '')));
-        $critical = str_contains($text, 'storm') || str_contains($text, 'heavy') || str_contains($text, 'flood');
-        return $this->notice('weather-'.$row->weather_log_id, 'Weather', $critical ? 'High' : 'Normal',
-            $row->advisory_title ?: ($row->condition_name ?: 'Weather snapshot saved'),
-            $row->advisory_text ?: 'Weather data was saved from '.$row->source_name.'. Confirm official warnings through PAGASA before broadcasting.',
-            $row->created_at ?: $row->observed_at, false, 'geospatial_analytics');
     }
 
     private function broadcast($row): array
@@ -132,8 +102,24 @@ class NotificationPresenter
 
     private function audit($row): array
     {
-        return $this->notice('audit-'.$row->audit_log_id, 'System activity', 'Normal', $this->label($row->module).' '.$this->label($row->action),
-            'Action recorded for '.$row->reference_table.' #'.$row->reference_id.'.', $row->created_at, false, $this->auditModule($row->module));
+        $new = $this->auditValues($row->new_values ?? null);
+        $old = $this->auditValues($row->old_values ?? null);
+        $status = $row->action === 'complete_dispatch' ? 'completed' : ($new['status'] ?? $new['status_key'] ?? null);
+        $previous = $old['status'] ?? $old['status_key'] ?? $new['previous_status'] ?? null;
+        $changed = $row->action !== 'create_dispatch' && $status && $status !== $previous;
+        $code = $new['assignment_code'] ?? $old['assignment_code'] ?? ('#'.$row->reference_id);
+        return $this->notice('audit-'.$row->audit_log_id, $changed ? 'Dispatch status' : 'Dispatch log', 'Normal',
+            'Dispatch '.$code.($changed ? ': '.$this->label($status) : ' '.$this->label($row->action)),
+            $changed ? 'Rescue dispatch status changed'.($previous ? ' from '.$this->label($previous) : '').' to '.$this->label($status).'.'
+                : 'Dispatch activity recorded for assignment '.$code.'.',
+            $row->created_at, false, 'response_operations');
+    }
+
+    private function auditValues(mixed $values): array
+    {
+        // Some older workflows double-encoded these JSON columns.
+        for ($i = 0; $i < 2 && is_string($values); $i++) $values = json_decode($values, true);
+        return is_array($values) ? $values : [];
     }
 
     private function auditModule(?string $module): string
@@ -152,7 +138,8 @@ class NotificationPresenter
 
     private function notice(string $id,string $type,string $priority,string $title,string $body,mixed $time,bool $read,string $accessModule,?string $recipientUserId=null): array
     {
-        $date = $time ? Carbon::parse($time) : now();
+        // Undated legacy rows are not events. Never turn them into new alerts on every read.
+        $date = $time ? Carbon::parse($time) : Carbon::createFromTimestamp(0);
         return ['id'=>$id,'type'=>$type,'priority'=>$priority,'title'=>$title,'body'=>$body,'date'=>$this->dateLabel($date),
             'time'=>$date->format('g:i A'),'created_at'=>$date->toDateTimeString(),'sort_time'=>$date->timestamp,'read'=>$read,
             'tone'=>$this->priorityTone($priority),'action_url'=>$this->actionUrlForType($type),
@@ -161,11 +148,9 @@ class NotificationPresenter
 
     private function actionUrlForType(string $type): string
     {
-        return match ($type) {'Broadcast'=>'/broadcast','Household status'=>'/households','Dispatch route'=>'/dispatch','Resources'=>'/resources-requests','Weather'=>'/weather',default=>'/notifications'};
+        return match ($type) {'Broadcast'=>'/broadcast','Household status'=>'/households','Dispatch status'=>'/rescue-management','Dispatch log'=>'/rescue-management','Approval request'=>'/resources-requests','PAGASA advisory sync'=>'/weather','PHIVOLCS advisory sync'=>'/mapping','Weather'=>'/weather',default=>'/notifications'};
     }
-    private function priorityFromUrgency(mixed $id): string { return (int)$id >= 4 ? 'Critical' : ((int)$id >= 3 ? 'High' : ((int)$id >= 2 ? 'Medium' : 'Normal')); }
     private function priorityTone(string $priority): string { return match($priority) {'Critical'=>'red','High'=>'amber','Medium'=>'blue',default=>'gray'}; }
-    private function notificationTitle(Notification $row): string { return ($row->status ? $this->label($row->status) : 'Saved').' notification'.($row->channel ? ' via '.$this->label($row->channel) : ''); }
     private function dateLabel(Carbon $date): string { return $date->isToday() ? 'Today' : ($date->isYesterday() ? 'Yesterday' : $date->format('M d, Y')); }
     private function label(?string $value): string { return ucwords(str_replace(['_','-'],' ',$value ?? 'Unknown')); }
 }

@@ -33,6 +33,15 @@ class BarangayProfileService
         return $this->current()['name'];
     }
 
+    public function isMambalingProfile(?array $profile = null): bool
+    {
+        $profile ??= $this->current();
+        $code = trim((string) ($profile['barangay_code'] ?? ''));
+        if ($code !== '') return in_array($code, ['072217049', '0730600049'], true);
+        $name = $this->cleanBarangayName((string) ($profile['name'] ?? ''));
+        return strcasecmp($name, 'Mambaling') === 0;
+    }
+
     public function weatherLocation(): array
     {
         $profile = $this->current();
@@ -279,7 +288,6 @@ class BarangayProfileService
         return $this->sharedGeometry;
     }
 }
-
 
 
 

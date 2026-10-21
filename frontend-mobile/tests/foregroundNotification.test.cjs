@@ -34,3 +34,13 @@ test('a failed dashboard listener cannot prevent native display', () => {
   }) }), /listener failed/);
   assert.equal(displayed, true);
 });
+
+for (const type of ['rescuer_broadcast', 'rescue_dispatch', 'rescue_dispatch_change']) {
+  test(`${type} displays and refreshes rescuer assignments`, () => {
+    const calls = [];
+    load(() => calls.push('refresh'))({ getNotification: () => ({
+      display: () => calls.push('display'), additionalData: { type },
+    }) });
+    assert.deepEqual(calls, ['display', 'refresh']);
+  });
+}

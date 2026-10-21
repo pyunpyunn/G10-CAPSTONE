@@ -97,6 +97,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/dashboard/requests', [DashboardController::class, 'requests']);
             Route::get('/dashboard/activity', [DashboardController::class, 'activity']);
             Route::get('/notifications', [NotificationController::class, 'index']);
+            Route::get('/notifications/push/config', [\App\Http\Controllers\Api\BrowserPushController::class, 'configuration']);
+            Route::post('/notifications/push/subscription', [\App\Http\Controllers\Api\BrowserPushController::class, 'store'])->middleware('throttle:15,1');
+            Route::delete('/notifications/push/subscription', [\App\Http\Controllers\Api\BrowserPushController::class, 'destroy']);
             Route::post('/notifications/mark-read', [NotificationController::class, 'markRead']);
             Route::post('/notifications/delete-selected', [NotificationController::class, 'deleteSelected']);
             Route::post('/notifications/clear-all', [NotificationController::class, 'clearAll']);

@@ -170,10 +170,17 @@ class RescueDispatchService
         $dispatch = $creation['dispatch'];
         $assignmentId = (int) $dispatch['assignment_id'];
         $selectedResponderIds = $creation['responder_ids'];
+        $leaderId = RescueTeam::query()->where('team_id', $validated['team_id'])->value('leader_responder_id');
+        if ($leaderId) $selectedResponderIds = array_values(array_unique([...$selectedResponderIds, (int) $leaderId]));
 
-        SendDispatchPush::dispatch($selectedResponderIds, $assignmentId, (string) $dispatch['assignment_code'],
-            (string) $dispatch['assigned_area'], (string) $activeEvent->event_id)
-            ->onConnection('operations_outbox')->onQueue('operations');
+        $pushJob = new SendDispatchPush($selectedResponderIds, $assignmentId, (string) $dispatch['assignment_code'],
+            (string) $dispatch['assigned_area'], (string) $activeEvent->event_id,
+            count(array_unique($dispatch['household_ids'] ?? [])) ?: (int) ($dispatch['households_to_cover'] ?? 0));
+        // Prepare the assigned household routes before announcing the assignment.
+        $jobs = ! empty($validated['team_id']) && Schema::hasTable('cached_routes')
+            ? array_map(fn ($householdId) => new \App\Jobs\PrecomputeRoutesForTeam((int) $validated['team_id'], (string) $householdId), $dispatch['household_ids'] ?? []) : [];
+        $jobs[] = $pushJob;
+        \Illuminate\Support\Facades\Bus::chain($jobs)->onConnection('operations_outbox')->onQueue('operations')->dispatch();
         $pushResult = ['status' => 'queued', 'recipient_count' => count($selectedResponderIds), 'sent_count' => 0];
 
         return response()->json([

@@ -117,7 +117,7 @@ test('household picker fits Mambaling borders and publishes the draggable pin on
   let position = { lat: 10.287, lng: 123.88 };
   const map = {
     setView() { return this; }, on: (name, callback) => { mapEvents[name] = callback; },
-    fitBounds: (bounds) => fits.push(bounds), getBounds: () => ({ contains: () => true }),
+    fitBounds: (bounds) => fits.push(bounds), getBounds: () => ({ contains: () => true }), removeLayer() {},
   };
   const pin = {
     addTo() { return this; }, bindTooltip() { return this; },
@@ -125,15 +125,21 @@ test('household picker fits Mambaling borders and publishes the draggable pin on
     setLatLng(value) { position = Array.isArray(value) ? { lat: value[0], lng: value[1] } : value; },
   };
   let boundary, draggable;
+  const buttonEvents = {};
   const window = { addEventListener() {}, ReactNativeWebView: { postMessage: (message) => messages.push(JSON.parse(message)) } };
   vm.runInNewContext(script, {
     window,
     L: {
-      map: () => map, tileLayer: () => ({ addTo() {} }), latLngBounds: () => ({ isValid: () => false }),
+      map: () => map, tileLayer: () => ({ addTo() { return this; } }), latLngBounds: () => ({ isValid: () => false }),
+      control: () => ({ onAdd: null, addTo() { this.onAdd(); return this; } }),
+      DomUtil: { create: (tag) => tag === 'button' ? { style: {}, setAttribute() {} } : {} },
+      DomEvent: { disableClickPropagation() {}, on: (_, name, fn) => { buttonEvents[name] = fn; } },
       geoJSON: (data) => {
         boundary = data;
         return { addTo() { return this; }, getBounds: () => ({ getCenter: () => position }) };
       },
+      latLng: (latitude, longitude) => ({ lat: latitude, lng: longitude }),
+      divIcon: (options) => options,
       marker: (_, options) => { draggable = options.draggable; return pin; },
     },
   });
@@ -149,7 +155,66 @@ test('household picker fits Mambaling borders and publishes the draggable pin on
   assert.equal(messages.length, 2, 'controlled GPS update must not trigger another save');
   mapEvents.click({ latlng: { lat: 10.289, lng: 123.882 } });
   assert.equal(messages[2].latitude, 10.289);
+  const savedPosition = position;
+  mapEvents.click({ latlng: { lat: 10.5, lng: 124 } });
+  assert.equal(messages.length, 3, 'clicks outside Mambaling must not move or save the pin');
+  position = { lat: 10.5, lng: 124 };
+  events.dragend();
+  assert.deepEqual(position, savedPosition, 'a pin dragged outside Mambaling must return to its last valid point');
+  assert.equal(messages.length, 3, 'outside pin drops must not be saved');
+  window.setHouseholdPin(10.5, 124);
+  assert.deepEqual(position, savedPosition, 'controlled coordinates outside Mambaling must be ignored');
   assert.equal(fits.length, 1, 'pin changes must preserve the map viewport');
+});
+
+test('center pin publishes the map center on every pan end for server validation and toggles satellite imagery', () => {
+  const html = loadMapHtml()({ markers: [], routes: [], geotagPicker: true, geotagMode: 'center' });
+  const script = html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
+  const messages = [], mapEvents = {}, buttonEvents = {}, tileSources = [];
+  let center = { lat: 10.287, lng: 123.88 };
+  let pinOptions;
+  const map = {
+    setView() { return this; }, on: (name, callback) => { mapEvents[name] = callback; },
+    fitBounds() {}, getCenter: () => center, panTo(point) { center = point; return this; },
+    removeLayer() {},
+  };
+  const satelliteButton = { style: {}, setAttribute() {}, textContent: '' };
+  const window = { addEventListener() {}, ReactNativeWebView: { postMessage: (message) => messages.push(JSON.parse(message)) } };
+  vm.runInNewContext(script, {
+    window,
+    L: {
+      map: () => map, tileLayer: (url) => { tileSources.push(url); return { addTo() { return this; } }; },
+      latLngBounds: () => ({ isValid: () => false }),
+      control: () => ({ onAdd: null, addTo() { this.onAdd(); return this; } }),
+      DomUtil: { create: (tag) => tag === 'button' ? satelliteButton : {} },
+      DomEvent: { disableClickPropagation() {}, on: (_, name, fn) => { buttonEvents[name] = fn; } },
+      geoJSON: () => ({ addTo() { return this; }, getBounds: () => ({ getCenter: () => center }) }),
+      latLng: (latitude, longitude) => ({ lat: latitude, lng: longitude }),
+      divIcon: (options) => options,
+      marker: (_, options) => {
+        pinOptions = options;
+        return { addTo() { return this; }, setLatLng(point) { this.point = point; } };
+      },
+    },
+  });
+  assert.equal(pinOptions.interactive, false, 'the pin stays fixed at the map center');
+  assert.equal(pinOptions.draggable, undefined);
+  assert.equal(messages.length, 0, 'opening the map does not save a location');
+  mapEvents.dragstart();
+  center = { lat: 10.288, lng: 123.881 };
+  mapEvents.moveend();
+  assert.equal(messages.at(-1).type, 'mapPress');
+  assert.equal(messages.at(-1).latitude, 10.288);
+  mapEvents.dragstart();
+  center = { lat: 10.5, lng: 124 };
+  mapEvents.moveend();
+  assert.equal(messages.at(-1).type, 'mapPress', 'server validation is authoritative and must receive the selected coordinates');
+  assert.equal(messages.at(-1).latitude, 10.5);
+  assert.equal(messages.at(-1).longitude, 124);
+  assert.deepEqual(center, { lat: 10.5, lng: 124 }, 'the selected map center is not silently replaced on the client');
+  buttonEvents.click();
+  assert.match(tileSources.at(-1), /World_Imagery/);
+  assert.equal(satelliteButton.textContent, 'Map');
 });
 
 test('household GPS reminder waits for confirmation and allows cancellation', async () => {

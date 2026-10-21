@@ -18,18 +18,22 @@ class PrecomputeRoutesForTeam implements ShouldBeUnique, ShouldQueue
     public array $backoff = [60, 300];
     public int $uniqueFor = 1800;
 
-    public function __construct(public int $teamId)
+    public function __construct(public int $teamId, public ?string $householdId = null)
     {
         $this->onQueue('navigation');
     }
 
     public function uniqueId(): string
     {
-        return (string) $this->teamId;
+        return $this->teamId.($this->householdId !== null ? ':'.$this->householdId : '');
     }
 
     public function handle(RoutePrecomputeService $routes): void
     {
-        $routes->precomputeTeam($this->teamId);
+        if ($this->householdId !== null) {
+            $routes->precomputeHouseholdForTeam($this->teamId, $this->householdId);
+        } else {
+            $routes->precomputeTeam($this->teamId);
+        }
     }
 }

@@ -4,14 +4,14 @@ $phpPath = (Get-Command php -ErrorAction Stop).Source
 $existing = Get-CimInstance Win32_Process | Where-Object {
     $_.Name -eq 'php.exe' -and
     $_.CommandLine -match 'artisan\s+queue:work\s+operations_outbox\b' -and
-    $_.CommandLine -match '--queue=broadcasts(?:,operations)?(?:\s|$)'
+    $_.CommandLine -match '--queue=broadcasts,operations,navigation(?:\s|$)'
 }
 if ($existing) {
     Write-Output "Operations worker is already running (PID $($existing.ProcessId -join ', '))."
     exit 0
 }
 $worker = Start-Process -FilePath $phpPath `
-    -ArgumentList @('artisan', 'queue:work', 'operations_outbox', '--queue=broadcasts', '--sleep=1', '--tries=3', '--timeout=120') `
+    -ArgumentList @('artisan', 'queue:work', 'operations_outbox', '--queue=broadcasts,operations,navigation', '--sleep=1', '--tries=3', '--timeout=120') `
     -WorkingDirectory $backendPath -WindowStyle Hidden `
     -RedirectStandardOutput (Join-Path $backendPath 'storage/logs/operations-worker.stdout.log') `
     -RedirectStandardError (Join-Path $backendPath 'storage/logs/operations-worker.stderr.log') `

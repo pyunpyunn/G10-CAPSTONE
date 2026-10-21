@@ -47,7 +47,7 @@ const icons = {
   '/archive': Database,
 }
 
-export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onPeekEnd, onLogout }) {
+export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onPeekEnd, onLogout, notificationControl }) {
   const location = useLocation()
   const activeGroup = getActiveGroup(location.pathname, pages)
   const [navigation, setNavigation] = useState(() => ({ activeGroup, openGroups: new Set([activeGroup]) }))
@@ -121,6 +121,7 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
       </nav>
 
       <div className="left-sidebar-logout">
+        {notificationControl}
         <button className="nav-item" type="button" onClick={onLogout}>
           <LogOut size={17} />
           <span>Logout</span>

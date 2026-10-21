@@ -3,6 +3,7 @@
 namespace App\Queries;
 
 use App\Presenters\HouseholdMobilePresenter;
+use App\Services\Shared\BarangayProfileService;
 use Illuminate\Support\Facades\DB;
 use App\Support\RequestSchema as Schema;
 use Illuminate\Support\Str;
@@ -37,19 +38,50 @@ class HouseholdMobileReadQuery
         if (Schema::hasTable('addresses') && Schema::hasColumn('households', 'address_id') && Schema::hasColumn('addresses', 'address_id')) {
             $query->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id');
             $columns[] = $this->optionalColumnSelect('addresses', 'full_address', 'full_address', 'a');
+            $columns[] = $this->optionalColumnSelect('addresses', 'sitio_id', 'sitio_id', 'a');
             $columns[] = $this->optionalColumnSelect('addresses', 'purok_sitio', 'purok_sitio', 'a');
             $columns[] = $this->optionalColumnSelect('addresses', 'barangay_name', 'barangay_name', 'a');
             $columns[] = $this->optionalColumnSelect('addresses', 'city_municipality', 'city_municipality', 'a');
             $columns[] = $this->optionalColumnSelect('addresses', 'province', 'province', 'a');
+            if (Schema::hasTable('sitios') && Schema::hasColumn('addresses', 'sitio_id')
+                && Schema::hasColumn('sitios', 'sitio_id') && Schema::hasColumn('sitios', 'sitio_name')) {
+                $query->leftJoin('sitios as s', 's.sitio_id', '=', 'a.sitio_id');
+                $columns[] = 's.sitio_name as sitio_name';
+            } else {
+                $columns[] = DB::raw('NULL as sitio_name');
+            }
         } else {
             $columns[] = DB::raw('NULL as full_address');
+            $columns[] = DB::raw('NULL as sitio_id');
             $columns[] = DB::raw('NULL as purok_sitio');
             $columns[] = DB::raw('NULL as barangay_name');
             $columns[] = DB::raw('NULL as city_municipality');
             $columns[] = DB::raw('NULL as province');
+            $columns[] = DB::raw('NULL as sitio_name');
         }
 
         return $query->first($columns);
+    }
+
+    public function mambalingSitioOptions(): array
+    {
+        $profiles = app(BarangayProfileService::class);
+        $profile = $profiles->current();
+        $barangayId = (int) ($profile['barangay_id'] ?? 0);
+        if (! $profiles->isMambalingProfile($profile) || $barangayId < 1
+            || ! Schema::hasTable('sitios')
+            || ! Schema::hasColumn('sitios', 'sitio_id')
+            || ! Schema::hasColumn('sitios', 'sitio_name')
+            || ! Schema::hasColumn('sitios', 'barangay_id')) return [];
+
+        return DB::table('sitios')
+            ->where('barangay_id', $barangayId)
+            ->orderBy('sitio_name')
+            ->get(['sitio_id', 'sitio_name'])
+            ->map(fn (object $sitio): array => [
+                'sitio_id' => (int) $sitio->sitio_id,
+                'sitio_name' => $sitio->sitio_name,
+            ])->all();
     }
 
     public function activeEvent(): ?array
@@ -947,5 +979,3 @@ class HouseholdMobileReadQuery
         return DB::raw("NULL as {$alias}");
     }
 }
-
-

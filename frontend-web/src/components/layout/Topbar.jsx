@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { searchGlobalRecords } from '../../api/globalSearchApi'
 import { markNotificationsRead, subscribeNotifications } from '../../api/notificationApi'
 import { notificationErrorMessage } from '../../utils/notificationHelpers'
-import { canOpenWebPage, hasAdminWebAccess, hasWebAccess } from '../../utils/personnelAccess'
+import { canOpenWebPage, hasWebAccess } from '../../utils/personnelAccess'
 
 const searchTypes = [
   { id: 'pages', label: 'Pages' },
@@ -133,7 +133,7 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
 
   useEffect(() => {
     let unsubscribe
-    if (!hasAdminWebAccess(user)) return undefined
+    if (!canOpenWebPage(user, '/notifications')) return undefined
     const notificationLoad = window.setTimeout(() => {
       unsubscribe = subscribeNotifications({ status: 'all', page: 1 }, (data) => {
         setNotifications(data.preview || [])

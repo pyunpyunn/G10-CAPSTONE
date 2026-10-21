@@ -20,18 +20,21 @@ export function mobileLeafletHtml({
   center,
   interactive = false,
   geotagPicker = false,
+  geotagMode = 'drag',
 }: {
   markers: LeafletPoint[];
   routes: LeafletRoute[];
   center?: { latitude: number; longitude: number };
   interactive?: boolean;
   geotagPicker?: boolean;
+  geotagMode?: 'drag' | 'center';
 }) {
   const data = JSON.stringify({
     markers,
     routes,
     interactive,
     geotagPicker,
+    geotagMode,
     boundary: geotagPicker ? mambalingBoundary : null,
     center: center || { latitude: 10.3157, longitude: 123.8854 },
   }).replace(/</g, '\\u003c');
@@ -56,7 +59,7 @@ export function mobileLeafletHtml({
   <script>
     const data = ${data};
     const map = L.map('map', { zoomControl: true }).setView([data.center.latitude, data.center.longitude], 14);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    let baseLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       keepBuffer: 1,
       updateWhenIdle: true,
@@ -66,28 +69,119 @@ export function mobileLeafletHtml({
     if (data.geotagPicker) {
       const border = L.geoJSON(data.boundary, { style: { color: '#236a73', weight: 3, fillOpacity: 0.06 } }).addTo(map);
       map.fitBounds(border.getBounds(), { padding: [18, 18] });
-      const pin = L.marker(border.getBounds().getCenter(), { draggable: true, autoPan: true }).addTo(map);
-      pin.bindTooltip('Drag to your household', { direction: 'top', offset: [0, -35] });
+      const geometry = data.boundary.type === 'Feature' ? data.boundary.geometry : data.boundary;
+      const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+      const boundaryContains = (point) => polygons.some((rings) => {
+        const insideRing = (ring) => {
+          let inside = false;
+          for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const [xi, yi] = ring[i], [xj, yj] = ring[j];
+            const cross = (point.lng - xi) * (yj - yi) - (point.lat - yi) * (xj - xi);
+            if (Math.abs(cross) < 1e-10
+              && point.lng >= Math.min(xi, xj) - 1e-10 && point.lng <= Math.max(xi, xj) + 1e-10
+              && point.lat >= Math.min(yi, yj) - 1e-10 && point.lat <= Math.max(yi, yj) + 1e-10) return true;
+            if ((yi > point.lat) !== (yj > point.lat)
+              && point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi) inside = !inside;
+          }
+          return inside;
+        };
+        return insideRing(rings[0]) && !rings.slice(1).some(insideRing);
+      });
       const send = (message) => {
         if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(message));
         else window.parent.postMessage(message, '*');
       };
-      const publish = () => {
-        const point = pin.getLatLng();
-        send({ type: 'mapPress', latitude: point.lat, longitude: point.lng });
+      const basemapControl = L.control({ position: 'topright' });
+      let basemapButton;
+      basemapControl.onAdd = () => {
+        const container = L.DomUtil.create('div', 'leaflet-bar');
+        basemapButton = L.DomUtil.create('button', '', container);
+        basemapButton.type = 'button';
+        basemapButton.textContent = 'Satellite';
+        basemapButton.setAttribute('aria-label', 'Switch to satellite map');
+        basemapButton.style.cssText = 'background:white;border:0;padding:9px;font:13px system-ui;min-height:40px';
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(basemapButton, 'click', () => {
+          const satellite = basemapButton.textContent === 'Satellite';
+          map.removeLayer(baseLayer);
+          baseLayer = L.tileLayer(satellite
+            ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+            : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            keepBuffer: 1,
+            updateWhenIdle: true,
+            attribution: satellite ? 'Tiles &copy; Esri' : '&copy; OpenStreetMap contributors'
+          }).addTo(map);
+          basemapButton.textContent = satellite ? 'Map' : 'Satellite';
+          basemapButton.setAttribute('aria-label', satellite ? 'Switch to street map' : 'Switch to satellite map');
+        });
+        return container;
       };
-      pin.on('dragstart', () => send({ type: 'pinMoving' }));
-      pin.on('dragend', publish);
-      map.on('click', (event) => { pin.setLatLng(event.latlng); publish(); });
+      basemapControl.addTo(map);
+      if (data.geotagMode === 'center') {
+        const pin = L.marker(map.getCenter(), {
+          interactive: false,
+          icon: L.divIcon({
+            className: 'household-center-pin',
+            html: '<svg width="36" height="46" viewBox="0 0 36 46" aria-hidden="true"><path d="M18 44C14 36 3 26 3 16a15 15 0 1 1 30 0c0 10-11 20-15 28Z" fill="#b4232f" stroke="#fff" stroke-width="3"/><circle cx="18" cy="16" r="5" fill="#fff"/></svg>',
+            iconSize: [36, 46],
+            iconAnchor: [18, 44]
+          })
+        }).addTo(map);
+        let userPanning = false;
+        map.on('move', () => pin.setLatLng(map.getCenter()));
+        map.on('dragstart', () => {
+          userPanning = true;
+          send({ type: 'pinMoving' });
+        });
+        map.on('moveend', () => {
+          if (!userPanning) return;
+          userPanning = false;
+          const point = map.getCenter();
+          send({ type: 'mapPress', latitude: point.lat, longitude: point.lng });
+        });
+        window.setHouseholdPin = (latitude, longitude) => {
+          const point = L.latLng(latitude, longitude);
+          map.panTo(point, { animate: false });
+        };
+      } else {
+        const boundsCenter = border.getBounds().getCenter();
+        const initialPin = boundaryContains(boundsCenter) ? boundsCenter : L.latLng(10.2875, 123.8854);
+        const pin = L.marker(initialPin, { draggable: true, autoPan: true }).addTo(map);
+        let lastValid = pin.getLatLng();
+        pin.bindTooltip('Drag to your household', { direction: 'top', offset: [0, -35] });
+        const publish = () => {
+          const point = pin.getLatLng();
+          send({ type: 'mapPress', latitude: point.lat, longitude: point.lng });
+        };
+        pin.on('dragstart', () => send({ type: 'pinMoving' }));
+        pin.on('dragend', () => {
+          if (!boundaryContains(pin.getLatLng())) {
+            pin.setLatLng(lastValid);
+            return;
+          }
+          lastValid = pin.getLatLng();
+          publish();
+        });
+        map.on('click', (event) => {
+          if (!boundaryContains(event.latlng)) return;
+          pin.setLatLng(event.latlng);
+          lastValid = event.latlng;
+          publish();
+        });
+        window.setHouseholdPin = (latitude, longitude) => {
+          const point = L.latLng(latitude, longitude);
+          if (!boundaryContains(point)) return;
+          pin.setLatLng(point);
+          lastValid = point;
+          if (!map.getBounds().contains(point)) map.panTo(point);
+        };
+      }
       window.addEventListener('message', (event) => {
         if (event.source === window.parent && event.data?.type === 'setHouseholdPin' && Number.isFinite(event.data.latitude) && Number.isFinite(event.data.longitude)) {
           window.setHouseholdPin(event.data.latitude, event.data.longitude);
         }
       });
-      window.setHouseholdPin = (latitude, longitude) => {
-        pin.setLatLng([latitude, longitude]);
-        if (!map.getBounds().contains(pin.getLatLng())) map.panTo(pin.getLatLng());
-      };
     }
     if (data.interactive && !data.geotagPicker) {
       map.on('click', (event) => {
@@ -184,4 +278,3 @@ export function mobileLeafletHtml({
 </body>
 </html>`;
 }
-

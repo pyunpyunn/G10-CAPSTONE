@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, ScrollView, Text, View } from 'react-native';
+import { Alert, Button, Modal, ScrollView, Text, View } from 'react-native';
 import { Camera, GeoJSONSource, Layer, Map, Marker, type CameraRef, type MarkerRef } from '@maplibre/maplibre-react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { activeLocalTrip, getActivePack, getLocalNavigationSnapshot, getLocalTrip, queueOutboxEvent, type LocalTrip } from '@/utils/navigationStore';
 import * as Crypto from 'expo-crypto';
 import { endNavigationTrip, lastNavigationError, mountNavigationSync, refreshNavigation, startNavigationTrip, subscribeNavigationPosition, syncNavigation } from '@/utils/navigationRuntime';
@@ -9,6 +9,10 @@ import { navigationPackStatus, prepareNavigationPack } from '@/utils/navigationP
 import { bearingDegrees, decodePolyline6, distanceMeters, routeProgress, type Coordinate, type RouteStep } from '@/utils/routeGeometry';
 import type { LocationObject } from 'expo-location';
 import { api } from '@/api/client';
+import * as Location from 'expo-location';
+import { selectNavigationAssignment, selectAssignedRoute } from '@/utils/assignedNavigationRoute';
+
+const streetStyle = { version: 8 as const, sources: { osm: { type: 'raster' as const, tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '© OpenStreetMap contributors', maxzoom: 19 } }, layers: [{ id: 'streets', type: 'raster' as const, source: 'osm' }] };
 
 const RouteLine = memo(function RouteLine({ points }: { points: Coordinate[] }) {
   const data = useMemo(() => ({ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: points } }), [points]);
@@ -18,11 +22,13 @@ const RouteLine = memo(function RouteLine({ points }: { points: Coordinate[] }) 
 export default function OfflineNavigationScreen() {
   const { dispatchId } = useLocalSearchParams<{ dispatchId?: string }>();
   const [chosenDispatch, setChosenDispatch] = useState(dispatchId || '');
+  const [showSettings, setShowSettings] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [showStatuses, setShowStatuses] = useState(false);
   const [snapshot, setSnapshot] = useState<any>(null), [pack, setPack] = useState<any>(null);
   const [profile, setProfile] = useState<'auto' | 'pedestrian'>('auto');
   const [route, setRoute] = useState<any>(null), [trip, setTrip] = useState<LocalTrip | null>(null);
-  const [message, setMessage] = useState(''), [guidance, setGuidance] = useState('Start a trip to follow the route.');
+  const [message, setMessage] = useState(''), [guidance, setGuidance] = useState('');
   const [remaining, setRemaining] = useState(0), [distance, setDistance] = useState(0), [mapReady, setMapReady] = useState(false);
   const [busy, setBusy] = useState(false), [packMessage, setPackMessage] = useState('Map has not been downloaded.');
   const camera = useRef<CameraRef>(null), marker = useRef<MarkerRef>(null);
@@ -30,39 +36,64 @@ export default function OfflineNavigationScreen() {
   const rerouteAt = useRef(0), rerouting = useRef(false);
   const points = useMemo(() => { try { return route?.polyline6 ? decodePolyline6(route.polyline6) : []; } catch { return []; } }, [route]);
   const steps: RouteStep[] = useMemo(() => { try { return typeof route?.steps === 'string' ? JSON.parse(route.steps) : route?.steps || []; } catch { return []; } }, [route]);
-  const eligible = (snapshot?.routes || []).filter((item: any) => item.profile === profile && item.status === 'ready');
   const dispatch = snapshot?.dispatches.find((item: any) => Number(item.assignment_id) === Number(trip?.dispatchId || chosenDispatch));
+  const householdIds: string[] = (dispatch?.household_ids || [dispatch?.household_id]).filter(Boolean).map(String);
+  const eligible = (snapshot?.routes || []).filter((item: any) => item.profile === profile && item.status === 'ready'
+    && householdIds.includes(String(item.household_id)));
 
   async function load() {
     const [data, manifest, active] = await Promise.all([getLocalNavigationSnapshot(), getActivePack(), activeLocalTrip()]);
     setSnapshot(data); setPack(manifest); setTrip(active);
     const selectedProfile = active?.profile || profile;
     if (active) { setProfile(active.profile); setDistance(active.distanceM); }
-    const selected = data.dispatches.find((item: any) => Number(item.assignment_id) === Number(dispatchId || active?.dispatchId));
-    setRoute((current: any) => current || data.routes.find((item: any) => item.profile === selectedProfile && item.status === 'ready'
-      && (!selected?.household_id || String(item.household_id) === String(selected.household_id))) || null);
+    const selectedId = active?.dispatchId || dispatchId || chosenDispatch;
+    const selected = selectedId ? data.dispatches.find((item: any) => String(item.assignment_id) === String(selectedId))
+      : data.dispatches.find((item: any) => !['completed', 'cancelled'].includes(item.status));
+    setChosenDispatch(selected ? String(selected.assignment_id) : '');
+    setRoute(data.routes.find((item: any) => item.profile === selectedProfile && item.status === 'ready'
+      && (selected?.household_ids || [selected?.household_id]).map(String).includes(String(item.household_id))) || null);
+    setLoaded(true);
     const status = await navigationPackStatus();
     setPackMessage(status?.state === 'complete' ? 'Map saved for offline use.' : status ? `Map ${Math.round(status.percentage)}% downloaded. Resume on Wi-Fi.` : 'Download the map on Wi-Fi before going offline.');
   }
 
-  useEffect(() => { void load().catch((error) => setMessage(error.message)); }, []);
+  useEffect(() => { void action(async () => { await load(); try { await refreshNavigation(); } finally { await load(); } }); }, [dispatchId]);
+  useEffect(() => {
+    setRemaining(Number(route?.distance_m || 0));
+    setGuidance(steps[0]?.instruction || 'Follow the highlighted route.');
+    lastStep.current = 0; arrivalShown.current = false;
+  }, [route, steps]);
+  useEffect(() => {
+    let stopped = false;
+    let watcher: Location.LocationSubscription | undefined;
+    void (async () => {
+      if (!(await Location.requestForegroundPermissionsAsync()).granted) {
+        if (!stopped) setMessage('Enable location to follow your position on the route.');
+        return;
+      }
+      if (stopped) return;
+      const subscription = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, distanceInterval: 5, timeInterval: 2000 }, (fix) => { latest.current = fix; });
+      if (stopped) subscription.remove(); else watcher = subscription;
+    })().catch(() => setMessage('Enable location to follow your position on the route.'));
+    return () => { stopped = true; watcher?.remove(); };
+  }, []);
   useEffect(() => mountNavigationSync(), []);
   useEffect(() => subscribeNavigationPosition((location) => { latest.current = location; }), []);
   useEffect(() => {
     if (!mapReady || points.length < 2) return;
     camera.current?.fitBounds([Math.min(...points.map((p) => p[0])), Math.min(...points.map((p) => p[1])),
-      Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1]))], { duration: 0, padding: { top: 30, right: 30, bottom: 30, left: 30 } });
+      Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1]))], { duration: 0, padding: { top: 140, right: 40, bottom: 100, left: 40 } });
   }, [mapReady, points]);
   useEffect(() => {
     const timer = setInterval(() => {
       const fix = latest.current;
       latest.current = null;
-      if (!fix || !trip || points.length < 2 || fix.coords.accuracy === null || fix.coords.accuracy > 30) return;
+      if (!fix || points.length < 2 || fix.coords.accuracy === null || fix.coords.accuracy > 30) return;
       const position: Coordinate = [fix.coords.longitude, fix.coords.latitude];
       const progress = routeProgress(points, position), offRoute = progress.offRouteM > 40;
-      if (offRoute && route?.household_id && !rerouting.current && Date.now() > rerouteAt.current) {
+      if (offRoute && dispatch && route?.household_id && !rerouting.current && Date.now() > rerouteAt.current) {
         rerouting.current = true; rerouteAt.current = Date.now() + 60000;
-        void api.post(`/dispatches/${trip.dispatchId}/route`, { latitude: position[1], longitude: position[0], profile, household_id: route.household_id })
+        void api.post(`/dispatches/${dispatch.assignment_id}/route`, { latitude: position[1], longitude: position[0], profile, household_id: route.household_id })
           .then((response) => { setRoute(response.data.data); lastStep.current = 0; })
           .catch(() => { /* Keep the cached line and destination bearing when disconnected. */ })
           .finally(() => { rerouting.current = false; });
@@ -76,10 +107,10 @@ export default function OfflineNavigationScreen() {
       const step = steps[lastStep.current];
       const toStep = Math.max(0, (progress.cumulative[step?.polyline_index] ?? 0) - progress.alongM);
       const destination = points[points.length - 1];
-      setGuidance(offRoute ? `Off route: ${Math.round(distanceMeters(position, destination))} m, bearing ${Math.round(bearingDegrees(position, destination))}° to destination. Cached directions remain below.`
+      setGuidance(offRoute ? `Off route: ${Math.round(distanceMeters(position, destination))} m, bearing ${Math.round(bearingDegrees(position, destination))}° to destination. Follow the highlighted route.`
         : step ? `${Math.round(toStep)} m — ${step.instruction}` : 'Continue to the destination.');
       setRemaining(progress.remainingM);
-      void getLocalTrip(trip.localTripId).then((value) => { if (value) setDistance(value.distanceM); });
+      if (trip) void getLocalTrip(trip.localTripId).then((value) => { if (value) setDistance(value.distanceM); });
       const radius = Number(process.env.EXPO_PUBLIC_NAVIGATION_ARRIVAL_RADIUS_M || 25);
       if (!arrivalShown.current && distanceMeters(position, destination) <= radius && fix.coords.accuracy <= radius) {
         arrivalShown.current = true;
@@ -88,14 +119,32 @@ export default function OfflineNavigationScreen() {
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [points, steps, trip, profile, route]);
+  }, [points, steps, trip, profile, route, dispatch]);
 
   async function action(operation: () => Promise<unknown>) {
     setBusy(true); setMessage('');
-    try { await operation(); } catch (error: any) { setMessage(error.message); } finally { setBusy(false); }
+    try { await operation(); } catch (error: any) { setMessage(error.response?.status === 401 || error.response?.status === 403 ? 'Sign in again to load your assigned route.' : error.userMessage || error.message); } finally { setBusy(false); }
   }
 
-  return <ScrollView contentContainerStyle={{ padding: 16, gap: 12, backgroundColor: '#fff' }}>
+  return <View style={{ flex: 1, backgroundColor: '#e5eef2' }}>
+    <Stack.Screen options={{ title: 'Navigation' }} />
+    <Map style={{ flex: 1 }} mapStyle={pack?.style_url || streetStyle} onDidFinishLoadingMap={() => setMapReady(true)}>
+      <Camera ref={camera} initialViewState={{ center: [123.8854, 10.3157], zoom: 11 }} />
+      {points.length >= 2 && <RouteLine points={points} />}
+      {points.length > 0 && <Marker ref={marker} lngLat={points[0]}><View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#1479ed', borderColor: '#fff', borderWidth: 3 }} /></Marker>}
+      {points.length > 1 && <Marker lngLat={points[points.length - 1]}><View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#dc2626', borderColor: '#fff', borderWidth: 3 }} /></Marker>}
+    </Map>
+    <View style={{ position: 'absolute', top: 16, left: 16, right: 16, padding: 16, borderRadius: 16, backgroundColor: '#fff', elevation: 5 }}>
+      <Text style={{ fontSize: 19, fontWeight: '700', color: '#12304a' }}>{points.length >= 2 ? guidance : !loaded ? 'Loading assigned route…' : message || (dispatch ? 'Waiting for your assigned route.' : 'No active dispatch assigned.')}</Text>
+      {points.length >= 2 && !!message && <Text accessibilityRole="alert" style={{ marginTop: 8, color: '#b91c1c' }}>{message}</Text>}
+      {points.length >= 2 && <Text style={{ marginTop: 8 }}>{(remaining / 1000).toFixed(1)} km remaining · {Math.ceil((route?.duration_s || 0) * (remaining / Math.max(1, route?.distance_m || 1)) / 60)} min</Text>}
+    </View>
+    <View style={{ position: 'absolute', bottom: 24, right: 16, gap: 8 }}>
+      <Button title="Route options" onPress={() => setShowSettings(true)} />
+    </View>
+    <Modal visible={showSettings || showStatuses} animationType="slide" onRequestClose={() => { setShowSettings(false); setShowStatuses(false); }}>
+    <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 48, gap: 12, backgroundColor: '#fff' }}>
+    <Button title="Back to map" onPress={() => { setShowSettings(false); setShowStatuses(false); }} />
     <Text style={{ fontSize: 22, fontWeight: '700' }}>Dispatch directions</Text>
     <Text>{packMessage}</Text>
     <Button title="Refresh assigned routes" disabled={busy} onPress={() => void action(async () => { await refreshNavigation(); await load(); })} />
@@ -105,22 +154,26 @@ export default function OfflineNavigationScreen() {
     <Text>Travel profile: {profile === 'auto' ? 'Vehicle' : 'On foot'}</Text>
     {!trip && snapshot?.dispatches.filter((item: any) => !['completed', 'cancelled'].includes(item.status)).map((item: any) => <Button key={item.assignment_id}
       title={`Dispatch ${item.assignment_code || item.assignment_id}${String(item.assignment_id) === chosenDispatch ? ' (selected)' : ''}`}
-      onPress={() => { setChosenDispatch(String(item.assignment_id)); setRoute(snapshot.routes.find((r: any) => r.profile === profile && r.status === 'ready' && String(r.household_id) === String(item.household_id)) || null); }} />)}
-    <Button title="Switch vehicle / foot" disabled={!!trip} onPress={() => { const value = profile === 'auto' ? 'pedestrian' : 'auto'; setProfile(value); setRoute(null); lastStep.current = 0; arrivalShown.current = false; }} />
+      onPress={() => { setChosenDispatch(String(item.assignment_id)); setRoute(snapshot.routes.find((r: any) => r.profile === profile && r.status === 'ready' && (item.household_ids || [item.household_id]).map(String).includes(String(r.household_id))) || null); }} />)}
+    <Button title="Switch vehicle / foot" disabled={!!trip} onPress={() => { const value = profile === 'auto' ? 'pedestrian' : 'auto'; setProfile(value); setRoute(snapshot?.routes.find((item: any) => item.profile === value && item.status === 'ready' && householdIds.includes(String(item.household_id))) || null); lastStep.current = 0; arrivalShown.current = false; }} />
     {!trip && eligible.map((item: any) => <Button key={`${item.household_id || item.evac_center_id}:${item.profile}`}
       title={`Directions: ${snapshot?.households.find((h: any) => String(h.household_id) === String(item.household_id))?.household_name || snapshot?.evacuation_centers.find((c: any) => String(c.evacuation_center_id) === String(item.evac_center_id))?.name || item.household_id || item.evac_center_id}`}
       onPress={() => { setRoute(item); lastStep.current = 0; arrivalShown.current = false; }} />)}
     {!eligible.length && <Text>No cached routes available for this profile. Refresh while online; ask HQ to precompute missing routes.</Text>}
-    {pack?.style_url && points.length >= 2 && <Map style={{ height: 380 }} mapStyle={pack.style_url} onDidFinishLoadingMap={() => setMapReady(true)}>
-      <Camera ref={camera} initialViewState={{ center: points[0], zoom: 15 }} />
-      <RouteLine points={points} />
-      <Marker ref={marker} lngLat={points[0]}><View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#1479ed', borderColor: '#fff', borderWidth: 3 }} /></Marker>
-    </Map>}
+    {!trip && householdIds.map((id) => <Button key={`live-${id}`} disabled={busy} title={`Route from my GPS: ${snapshot?.households.find((h: any) => String(h.household_id) === id)?.household_name || id}`}
+      onPress={() => void action(async () => {
+        if (!(await Location.requestForegroundPermissionsAsync()).granted) throw new Error('Location permission is required.');
+        const fix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        const response = await api.post(`/dispatches/${dispatch.assignment_id}/route`, {
+          latitude: fix.coords.latitude, longitude: fix.coords.longitude, profile, household_id: id,
+        });
+        setRoute(response.data.data); setRemaining(response.data.data.distance_m || 0); lastStep.current = 0; arrivalShown.current = false;
+      })} />)}
     <Text style={{ fontSize: 18, fontWeight: '600' }}>{guidance}</Text>
     <Text>{(distance / 1000).toFixed(2)} km recorded · {(remaining / 1000).toFixed(2)} km remaining · ETA {Math.ceil((route?.duration_s || 0) * (remaining / Math.max(1, route?.distance_m || 1)) / 60)} min</Text>
     {trip ? <Button title="End trip and stop GPS" disabled={busy} onPress={() => void action(async () => { await endNavigationTrip(); setTrip(null); })} />
       : <Button title="Start dispatch trip" disabled={busy || !dispatch || !route || points.length < 2 || ['completed', 'cancelled'].includes(dispatch?.status)} onPress={() => void action(async () => {
-        const value = await startNavigationTrip(Number(dispatch.assignment_id), profile); setTrip(value); setDistance(0);
+        const value = await startNavigationTrip(Number(dispatch.assignment_id), profile); setTrip(value); setDistance(0); setRemaining(route.distance_m || 0);
       })} />}
     {!dispatch && <Text>Open this screen from a dispatch to record a trip. You can still view saved directions.</Text>}
     <Button title="Sync saved trip events" disabled={busy} onPress={() => void action(async () => { await syncNavigation(); if (lastNavigationError) setMessage(lastNavigationError); })} />
@@ -135,5 +188,7 @@ export default function OfflineNavigationScreen() {
     <Text style={{ fontWeight: '700' }}>Directions</Text>
     {steps.map((step, index) => <Text key={index}>{index + 1}. {step.instruction} ({Math.round(step.distance_m)} m)</Text>)}
     <Text>© OpenStreetMap contributors</Text>
-  </ScrollView>;
+  </ScrollView>
+    </Modal>
+  </View>;
 }

@@ -30,7 +30,16 @@ class MobileNavigationService
             ->when($since !== null, fn ($query) => $query->where('updated_at', '>=', $since))
             ->orderByDesc('assigned_at')
             ->limit(250)
-            ->get(['assignment_id', 'assignment_code', 'disaster_id', 'dispatch_type', 'household_id', 'assigned_area', 'status', 'assigned_at', 'updated_at']);
+            ->get(['assignment_id', 'assignment_code', 'disaster_id', 'dispatch_type', 'household_id', 'assigned_area', 'route_notes', 'status', 'assigned_at', 'updated_at'])
+            ->map(function ($assignment) {
+                $notes = json_decode((string) $assignment->route_notes, true) ?: [];
+                $assignment->household_ids = array_values(array_unique(array_filter([
+                    $assignment->household_id, ...($notes['household_ids'] ?? []),
+                    ...array_merge([], ...array_values($notes['responder_households'] ?? [])),
+                ])));
+                unset($assignment->route_notes);
+                return $assignment;
+            });
 
         $households = DB::table('households as household')
             ->whereIn('household.household_id', $householdIds->all())

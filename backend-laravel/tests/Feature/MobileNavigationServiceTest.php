@@ -77,6 +77,7 @@ class MobileNavigationServiceTest extends TestCase
         $this->assertSame(['HH-SAR'], collect($payload['households'])->pluck('household_id')->all());
         $this->assertSame(['HH-SAR'], collect($payload['geotags'])->pluck('household_id')->all());
         $this->assertSame(['HH-SAR'], collect($payload['routes'])->pluck('household_id')->filter()->values()->all());
+        $this->assertSame(['HH-SAR'], $payload['dispatches'][0]->household_ids);
         $this->assertSame('v1', $payload['pack']['version']);
         $this->assertStringContainsString('signature=', $payload['pack']['download_url']);
         // Includes one fixed query for the offline household status choices.

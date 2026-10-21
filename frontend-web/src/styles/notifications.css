@@ -469,3 +469,5 @@
 .notification-open-button:focus-visible {
   text-decoration: underline;
 }
+.left-sidebar-logout .browser-notification-control { margin-bottom: 6px; }
+.browser-notification-control:disabled { opacity: .65; cursor: default; }
