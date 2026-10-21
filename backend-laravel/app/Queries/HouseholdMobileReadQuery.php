@@ -385,11 +385,19 @@ class HouseholdMobileReadQuery
                 'broadcast_id' => $row->broadcast_id,
                 'title' => $row->broadcast_title ?: 'Disaster alert',
                 'message' => $row->message,
+                'estimated_duration' => $this->broadcastDuration($row->allowed_statuses ?? null),
                 'scope_type' => $row->scope_type,
                 'sent_at' => $row->sent_at ? date('M d, Y g:i A', strtotime($row->sent_at)) : null,
             ])
             ->values()
             ->all();
+    }
+
+    private function broadcastDuration(?string $metadata): ?string
+    {
+        $decoded = json_decode($metadata ?? '', true);
+        $duration = is_array($decoded) ? ($decoded['duration'] ?? null) : null;
+        return is_string($duration) && trim($duration) !== '' ? trim($duration) : null;
     }
 
     public function distanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float

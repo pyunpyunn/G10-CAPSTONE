@@ -42,3 +42,20 @@
 .mapping-reference .map-hazard-legend i{width:10px;height:10px;flex:none;margin-top:2px;border:1px solid #ffffff66;border-radius:2px}
 .mapping-reference .map-hazard-legend span{overflow-wrap:anywhere}
 @media(max-width:900px){.mapping-reference .lay{max-height:calc(66% - 30px)}}
+
+/* Only the Hazard Planning launcher and its portaled modal use light cards. */
+.mapping-reference .hazard-planning,
+.mapping-reference .hazard-planning > button{background:#fff;border-color:#cbd5e1;color:#18334b}
+.mapping-reference .hazard-planning > button span{color:#18334b}
+.mapping-reference .hazard-planning > button:hover{background:#f7f9fc}
+.hazard-planning-modal{margin:0;border:0;background:#fff;color:#18334b}
+.hazard-planning-modal .hazard-planning-body{padding:0;max-height:none;overflow:visible}
+.hazard-planning-modal summary{cursor:pointer;font-weight:600}
+.hazard-planning-modal a{color:#2a5a90;text-underline-offset:3px}
+.hazard-planning-modal .hazard-source{border:1px solid #d0d9e4;background:#f7f9fc}
+
+.mapping-reference:not(.mapping-fullscreen) > .hazard-planning{margin:12px 0 0}
+
+.mapping-reference .hazard-planning > button[aria-haspopup="dialog"]{background:#1f3e5a;border-color:#1f3e5a;color:#fff}
+.mapping-reference .hazard-planning > button[aria-haspopup="dialog"] span{color:#fff}
+.mapping-reference .hazard-planning > button[aria-haspopup="dialog"]:hover{background:#2a4f72;border-color:#2a4f72}

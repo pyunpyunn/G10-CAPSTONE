@@ -1,7 +1,8 @@
+import { DisasterBroadcastBanner } from './DisasterBroadcastBanner';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
+import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
 import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection, statusColor } from './HouseholdUI';
 
@@ -58,34 +59,11 @@ export function HouseholdDashboardScreen({
   return (
     <View style={styles.stack}>
       {activeEvent ? (
-        <View style={styles.eventCard}>
-          <View style={styles.eventTop}>
-            <HouseholdBadge label="Disaster active" tone="danger" />
-          <Text style={styles.eventDate}>{formatDate(activeEvent.started_at)}</Text>
-          </View>
-          <Text style={styles.eventTitle}>{activeEvent.name}</Text>
-          <Text style={styles.eventMeta}>{activeEvent.type} · {activeEvent.severity}</Text>
-          {activeEvent.message ? <Text style={styles.eventBody}>{activeEvent.message}</Text> : null}
-        </View>
-      ) : (
-        <View style={styles.standbyCard}>
-          <HouseholdBadge label="No current disaster" tone="safe" />
-        </View>
-      )}
-
-      {latestAlert ? (
-        <View style={styles.card}>
-          <HouseholdSection title="Latest disaster alert" action={
-            <Pressable accessibilityRole="button" accessibilityLabel="Recent broadcasts" style={styles.historyButton} onPress={() => setShowBroadcastHistory(true)}>
-              <Ionicons name="time-outline" size={18} color={palette.navActive} />
-            </Pressable>
-          } />
-          <View style={styles.lastSaved} accessibilityRole="alert">
-            <Text style={styles.lastSavedValue}>{latestAlert.title}</Text>
-            <Text style={styles.muted}>{latestAlert.message}</Text>
-            {latestAlert.sent_at ? <Text style={styles.muted}>{latestAlert.sent_at}</Text> : null}
-          </View>
-        </View>
+        <DisasterBroadcastBanner
+          event={activeEvent}
+          broadcast={latestAlert}
+          onOpenHistory={alerts.length > 1 ? () => setShowBroadcastHistory(true) : undefined}
+        />
       ) : null}
 
       <Modal visible={showBroadcastHistory} transparent animationType="fade" onRequestClose={() => setShowBroadcastHistory(false)}>
@@ -98,11 +76,7 @@ export function HouseholdDashboardScreen({
             } />
             <ScrollView contentContainerStyle={styles.stack}>
               {alerts.slice(1).map((alert: any) => (
-                <View key={alert.broadcast_id} style={styles.lastSaved}>
-                  <Text style={styles.lastSavedValue}>{alert.title}</Text>
-                  <Text style={styles.muted}>{alert.message}</Text>
-                  {alert.sent_at ? <Text style={styles.muted}>{alert.sent_at}</Text> : null}
-                </View>
+                <DisasterBroadcastBanner key={alert.broadcast_id} event={activeEvent || {}} broadcast={alert} />
               ))}
               {alerts.length < 2 ? <Text style={styles.muted}>No earlier broadcasts.</Text> : null}
             </ScrollView>
@@ -774,48 +748,6 @@ const styles = StyleSheet.create({
   stack: {
     gap: spacing.md,
   },
-  standbyCard: {
-    gap: spacing.sm,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    backgroundColor: palette.nav,
-    ...shadow,
-  },
-  eventCard: {
-    gap: spacing.sm,
-    borderLeftWidth: 5,
-    borderLeftColor: palette.unsafe,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    backgroundColor: '#fff5f5',
-  },
-  eventTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  eventDate: {
-    color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  eventTitle: {
-    color: palette.text,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  eventMeta: {
-    color: palette.unsafe,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  eventBody: {
-    color: palette.text,
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: '800',
-  },
   card: {
     gap: spacing.md,
     borderWidth: 1,
@@ -825,7 +757,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.card,
   },
   broadcastBackdrop: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.lg,
+    flex: 1, backgroundColor: 'rgba(15,28,45,0.55)', justifyContent: 'center', padding: spacing.lg,
   },
   broadcastModal: {
     maxHeight: '80%',

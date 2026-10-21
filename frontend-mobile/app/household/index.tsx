@@ -737,7 +737,7 @@ export default function HouseholdHomeScreen() {
         </View>
       ) : null}
 
-      <HouseholdQrModal visible={showQr} qr={overview.qr} onClose={() => setShowQr(false)} />
+      <HouseholdQrModal visible={showQr} householdId={overview.profile.household?.household_id} qr={overview.qr} onClose={() => setShowQr(false)} />
       <HouseholdNotificationsModal
         visible={showNotifications}
         requests={overview.trusted?.incoming_requests || []}
