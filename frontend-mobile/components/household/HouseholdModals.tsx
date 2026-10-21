@@ -1,27 +1,32 @@
+import { householdQrValue } from '@/utils/householdQr';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import QRCode from 'react-native-qrcode-svg';
 import { palette, radius, spacing } from '@/constants/resqTheme';
-import { HouseholdButton, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
+import { HouseholdButton, HouseholdEmpty } from './HouseholdUI';
 
 type QrModalProps = {
   visible: boolean;
   qr: any;
+  householdId: string | number | null | undefined;
   onClose: () => void;
 };
 
-export function HouseholdQrModal({ visible, qr, onClose }: QrModalProps) {
+export function HouseholdQrModal({ visible, qr, householdId, onClose }: QrModalProps) {
+  const qrValue = householdQrValue(qr, householdId);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.modalCard}>
           <ModalHeader title="Evacuation QR" onClose={onClose} />
-          <View style={styles.qrBox}>
-            <QRCode value={qr?.value || 'RESQPERATION-HOUSEHOLD'} size={180} />
-          </View>
-          <Text style={styles.qrTitle}>{qr?.household_name || 'Household'}</Text>
-          <Text style={styles.qrMeta}>{qr?.household_id || 'Household ID'}</Text>
+          {qrValue ? <>
+            <View style={styles.qrBox}>
+              <QRCode value={qrValue} size={180} quietZone={16} color="#0a1520" backgroundColor="#fff" />
+            </View>
+            {qr?.household_name ? <Text style={styles.qrTitle}>{qr.household_name}</Text> : null}
+            <Text style={styles.qrMeta} selectable>Household ID: {qrValue}</Text>
+          </> : <Text style={styles.qrMeta} accessibilityRole="alert">Household QR unavailable. Refresh your household data and try again.</Text>}
         </View>
       </View>
     </Modal>

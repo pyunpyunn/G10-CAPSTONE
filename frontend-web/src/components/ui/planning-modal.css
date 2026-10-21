@@ -1,0 +1,10 @@
+.planning-modal{box-sizing:border-box;width:min(960px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 48px);margin:auto;padding:0;border:1px solid #d0d9e4;border-radius:16px;background:#fff;color:#0a1520;box-shadow:0 24px 80px #0f1c2d40;font:13px/1.5 Inter,system-ui,sans-serif;color-scheme:light}
+.planning-modal[open]{display:flex;flex-direction:column}
+.planning-modal::backdrop{background:#0f1c2d80;backdrop-filter:blur(3px)}
+.planning-modal .planning-modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #d0d9e4;background:#f7f9fc;flex:none}
+.planning-modal .planning-modal-head h2{margin:0;font-size:17px;font-weight:650;color:#0f1c2d}
+.planning-modal .planning-modal-head button{display:grid;place-items:center;width:36px;height:36px;flex:none;border:1px solid #d0d9e4;border-radius:8px;background:#fff;color:#3a4d61;cursor:pointer}
+.planning-modal .planning-modal-head button:hover{background:#edf1f6}
+.planning-modal .planning-modal-body{padding:20px;overflow:auto;overscroll-behavior:contain;min-height:0;scrollbar-width:thin;scrollbar-color:#b0bfce #f7f9fc}
+.planning-modal :focus-visible{outline:3px solid #2a5a90;outline-offset:3px}
+@media(max-width:600px){.planning-modal{width:calc(100vw - 16px);max-height:calc(100dvh - 24px)}.planning-modal .planning-modal-head,.planning-modal .planning-modal-body{padding:14px}}
