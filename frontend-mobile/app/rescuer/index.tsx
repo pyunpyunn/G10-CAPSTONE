@@ -314,7 +314,7 @@ export default function RescuerHomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
       <RescuerHeader
         onOpenRadio={() => setActiveTab('radio')}
       />

@@ -1,31 +1,81 @@
+<p align="center">
+<strong>UNIVERSITY OF SAN JOSE–RECOLETOS</strong><br>
+School of Computer Studies<br>
+Cebu City, Philippines
+</p>
+
 # RESQPERATION
 
-## Software Requirements Specification (SRS)
+## A Geo-Tagged Household Monitoring and Barangay Disaster Risk Reduction and Management Rescue Coordination System
 
-**Version:** 1.0
-**Status:** Draft for review
-**System:** Barangay Rescue Operations and Disaster Response Management System
-**Prepared for:** School of Computer Studies, University of San Jose–Recoletos
-**Project location:** Barangay Mambaling, Cebu City, Philippines
-**Prepared by:** RESQPERATION project team
-**Date:** October 22, 2026
+### Software Requirements Specification
 
-> This SRS describes the intended system and distinguishes connected implementation from partial or deployment-dependent behavior. It is based on the project README, current system use cases, implementation audit, architecture notes, diagrams, and development checklist. A checked requirement does not certify a production deployment or a partner's availability.
+**Version 1.1 | October 22, 2026**
+
+<p align="center">
+A Capstone Project Presented to the Faculty of the<br>
+School of Computer Studies<br>
+University of San Jose–Recoletos<br><br>
+In Partial Fulfillment of the Requirements for<br>
+Associate in Computer Technology, Major in Software Development
+</p>
+
+**Presented by**
+
+- Niña Kathleen B. Barro
+- Vinzon Arellano
+- Erece Joy Eria
+- Vince Pacillan
+
+**Capstone Adviser:** Mr. Roderick A. Bandalan
+
+---
+
+## Abstract
+
+Barangay disaster response depends on timely situational information, coordinated assignments, and accountable communication among residents, responders, and local operations personnel. RESQPERATION is a multi-client capstone system designed to support these activities in Barangay Mambaling, Cebu City. This Software Requirements Specification (SRS) defines the system boundary, intended users, operational workflows, external interfaces, functional and quality requirements, data responsibilities, verification conditions, and known implementation limitations. The specification was prepared by reviewing project requirements materials, the use-case inventory, architecture and integration documentation, an implementation audit, and available application evidence. RESQPERATION comprises an HQ/Admin web client, household and rescuer mobile workflows, a Laravel application programming interface, a configured relational database, and optional external services. Its principal workflows include household status reporting, disaster-event coordination, responder assignment and field reporting, resource-request review, weather and map context, situation reporting, and incident archiving. The document distinguishes system requirements from implementation evidence and deployment-dependent integrations; it does not claim that the software is an official warning authority, a substitute for emergency services, or a validated predictor of safety or response outcomes. Operational acceptance remains subject to stakeholder review, security and privacy approval, deployment verification, and end-to-end testing.
+
+**Keywords:** disaster response coordination, barangay, household monitoring, geotagging, rescue dispatch, software requirements specification
 
 ## Revision History
 
 | Version | Date | Description | Author(s) |
 | --- | --- | --- | --- |
-| 1.0 | October 22, 2026 | Initial RESQPERATION SRS adapted from the PIS-SRS-v1.0 structure and current project documentation. | All proponents |
+| 1.0 | October 22, 2026 | Initial requirements baseline assembled from the project SRS template and current system documentation. | All proponents |
+| 1.1 | October 22, 2026 | Reorganized as a formal capstone SRS; added academic front matter, project context, problem statement, objectives, requirements method, system flows, acceptance criteria, and evidence-qualified implementation status. | All proponents |
+
+## Document Control
+
+| Control field | Value |
+| --- | --- |
+| System | RESQPERATION: A Geo-Tagged Household Monitoring and Barangay Disaster Risk Reduction and Management Rescue Coordination System |
+| Document | Software Requirements Specification, Version 1.1 |
+| Document status | Draft requirements baseline submitted for adviser and panel review |
+| Prepared by | Niña Kathleen B. Barro; Vinzon Arellano; Erece Joy Eria; Vince Pacillan |
+| Reviewed by | Mr. Roderick A. Bandalan, Capstone Adviser |
+| Approved by | To be completed after formal review |
+| Date | October 22, 2026 |
+| Initial deployment area | Barangay Mambaling, Cebu City, Philippines |
+
+> This SRS is an academic requirements and design document. Statements of intended behavior are normative requirements; implementation status is reported separately and is not proof of production readiness, stakeholder acceptance, or legal compliance.
 
 ## Table of Contents
 
+- [Abstract](#abstract)
+- [Revision History](#revision-history)
+- [Document Control](#document-control)
+- [List of Figures](#list-of-figures)
+- [Table of Contents](#table-of-contents)
 1. [Introduction](#1-introduction)
    1. [Purpose](#11-purpose)
-   2. [Scope](#12-scope)
-   3. [Definitions, Acronyms, and Abbreviations](#13-definitions-acronyms-and-abbreviations)
-   4. [References](#14-references)
-   5. [Overview](#15-overview)
+   2. [Project Background and Rationale](#12-project-background-and-rationale)
+   3. [Problem Statement](#13-problem-statement)
+   4. [Project Objectives](#14-project-objectives)
+   5. [Scope and Limitations](#15-scope-and-limitations)
+   6. [Requirements Engineering Method](#16-requirements-engineering-method)
+   7. [Definitions, Acronyms, and Abbreviations](#17-definitions-acronyms-and-abbreviations)
+   8. [References](#18-references)
+   9. [Organization of the SRS](#19-organization-of-the-srs)
 2. [Overall Description](#2-overall-description)
    1. [Product Perspective](#21-product-perspective)
    2. [Product Functions](#22-product-functions)
@@ -39,13 +89,33 @@
    2. [Functional Requirements](#32-functional-requirements)
    3. [Non-Functional Requirements](#33-non-functional-requirements)
    4. [Database Requirements](#34-database-requirements)
+   5. [System Flows](#35-system-flows)
+   6. [Verification and Acceptance](#36-verification-and-acceptance)
 4. [Appendix A. Use Case Diagram](#appendix-a-use-case-diagram)
 5. [Appendix B. Use Case Narratives](#appendix-b-use-case-narratives)
 6. [Appendix C. System Architecture](#appendix-c-system-architecture)
 7. [Appendix D. Entity-Relationship Diagram](#appendix-d-entity-relationship-diagram)
 8. [Appendix E. User Interface Screenshot Placeholders](#appendix-e-user-interface-screenshot-placeholders)
 9. [Appendix F. Requirements Traceability Summary](#appendix-f-requirements-traceability-summary)
-10. [Appendix G. Approval](#appendix-g-approval)
+10. [Appendix G. Implementation Status and Verification Evidence](#appendix-g-implementation-status-and-verification-evidence)
+11. [Appendix H. Acceptance Criteria](#appendix-h-acceptance-criteria)
+12. [Appendix I. Approval](#appendix-i-approval)
+
+## List of Figures
+
+| Figure | Caption |
+| --- | --- |
+| 1 | RESQPERATION use-case model and system boundary |
+| 2 | RESQPERATION logical system architecture |
+| 3 | RESQPERATION logical entity-relationship diagram |
+| 4 | RESQPERATION web login screen |
+| 5 | HQ/Admin dashboard and active incident overview |
+| 6 | HQ/Admin map and household/responder layers |
+| 7 | Household mobile home and current disaster alert |
+| 8 | Household mobile status-reporting screen |
+| 9 | Rescuer mobile assignment and navigation screen |
+| 10 | HQ/Admin resource-request review and validation screen |
+| 11 | Situation report / archive screen |
 
 ---
 
@@ -53,38 +123,94 @@
 
 ## 1.1 Purpose
 
-This Software Requirements Specification defines the system boundary, users, interfaces, functions, quality requirements, data requirements, and acceptance considerations for RESQPERATION. It is intended for the project proponents, adviser, reviewers, future maintainers, and authorized operational stakeholders.
+This Software Requirements Specification establishes the agreed subject, system boundary, actors, interfaces, functional requirements, quality requirements, data responsibilities, system flows, and acceptance conditions for RESQPERATION. Its primary audience is the capstone panel, adviser, project proponents, and any authorized stakeholder asked to review or validate the proposed system.
 
-The specification covers the HQ/Admin web application, the household and rescuer mobile application, the Laravel API, the operational database boundary, and configured external integrations. It records the current implementation status where known so that existing behavior is not confused with planned or unverified behavior.
+The SRS is intended to be used as (a) an academic description of the project’s requirements and design boundary, (b) a baseline for implementation and verification, and (c) a record of known implementation gaps requiring review. Normative statements use “shall.” The implementation-status appendix is informative and must not be interpreted as a substitute for test evidence or stakeholder acceptance.
 
-## 1.2 Scope
+## 1.2 Project Background and Rationale
 
-RESQPERATION is a barangay disaster response and emergency operations coordination system initially focused on Mambaling, Cebu City. It provides:
+Disaster response at the barangay level requires local officials and responders to receive, review, and act on information about affected households, responder assignments, evacuation activity, and resource needs. These activities may involve multiple user groups and data sources. RESQPERATION is proposed as a shared digital workspace that supports the recording and coordination of those workflows; it does not replace the decision-making authority of the barangay, city, or national disaster-risk-reduction and management offices.
 
-- An HQ/Admin web workspace for disaster-event monitoring, alerts, weather and map context, household-status review, rescue dispatch, resource-request review, situation reporting, notifications, and archives.
-- A mobile application for household residents to complete household setup, view alerts, submit household/member safety status, and use supported evacuation and trusted-household features.
-- A mobile application for rescuers to review assignments, navigate, send operational location/status updates, submit field reports, request support, and communicate through internet-based radio/voice features.
-- A Laravel JSON API that authenticates users, authorizes operations, validates data, coordinates workflows, and accesses the active configured database.
-- Integration boundaries for shared household identity data, external request/report exchange, weather and advisory sources, maps, routing, push notifications, and optional SMS.
+The initial project setting is Barangay Mambaling in Cebu City. PhilAtlas reports a 2020 Census population of 30,459 and reports 7,583 households from the 2015 Census, with the underlying census figures attributed to the Philippine Statistics Authority [10]. The figures refer to different census years and are contextual references only; they are not current system records, a present-day population estimate, or a substitute for an authoritative barangay registry. Geographic susceptibility information included in the project is likewise a sourced planning layer, not a live sensor reading or a household-level risk determination [8].
 
-The product supports coordination and recordkeeping. It is **not** an emergency dispatch authority, an official warning service, a replacement for government agencies, or a guarantee of rescue, route safety, provider delivery, or uninterrupted availability.
+The policy context includes the Philippine Disaster Risk Reduction and Management Act of 2010, which establishes national and local disaster-risk-reduction and management responsibilities [9]. RESQPERATION is designed to support coordination and information management within that broader institutional context. It is not an official warning issuer, dispatch authority, or emergency-service provider. Its privacy requirements are informed by the Data Privacy Act of 2012 [11]; reference to the law does not certify that the project or any deployment is legally compliant.
 
-**Out of scope or not established as complete in version 1.0:**
+The project’s technical basis is documented in its system architecture, use cases, integration notes, and repository evidence [1–8]. The system aligns conceptually with Sustainable Development Goal 11 (sustainable cities and communities) and Goal 13 (climate action); the alignment is a project rationale, not an endorsement or verified social-impact outcome [12].
 
-- Replacing SafeTrack's household identity/census ownership, EvaTrack's evacuation operations, or TrackingAid's inventory/fulfillment ownership.
-- Guaranteed real-time delivery, guaranteed emergency-service response, or automatic optimal dispatch.
-- Fully verified end-to-end offline household reporting and offline navigation across all supported devices.
-- A complete dedicated staff scanning interface for evacuation QR verification.
-- Automatic receipt/acknowledgement of escalated reports by city or national agencies.
-- A certified public warning system or authoritative hazard prediction.
-- A production service-level commitment or formal legal/privacy compliance certification.
+## 1.3 Problem Statement
 
-## 1.3 Definitions, Acronyms, and Abbreviations
+The project addresses the requirements-design problem of coordinating disaster-related records and actions across household residents, field responders, and barangay headquarters using separate client workflows and data sources. Without a shared operational workflow, information submitted by one role may be difficult for another authorized role to locate, interpret, validate, or follow through.
+
+Specifically, the system is intended to address the following information-management and coordination needs:
+
+1. Household safety updates need to be associated with the correct household, member, event, source, and submission time so that authorized personnel can review the reported status.
+2. Rescue assignments and field updates need a traceable link between the event, responder/team, target, assignment state, and subsequent report.
+3. Requests for resources or personnel need a controlled intake and review process that distinguishes internal approval from an external handoff or actual fulfillment.
+4. Weather, map, hazard, and advisory information needs clear source and freshness context so users do not confuse decision-support data with official local direction.
+5. Situation reports and archives need to represent recorded information and missing data faithfully, while restricting personal and operational information to authorized users.
+
+RESQPERATION’s requirements therefore focus on controlled data access, auditable workflows, explicit system/provider outcomes, and human review. The project does not claim—without a separate evaluation—that deploying the software will reduce casualties, guarantee rescue, improve response time, or independently resolve the operational challenges described above.
+
+## 1.4 Project Objectives
+
+### General objective
+
+To specify and develop a role-based, multi-client barangay disaster-response coordination system for the initial project setting of Mambaling, Cebu City, with traceable workflows for household status reporting, responder operations, HQ coordination, resource requests, and incident documentation.
+
+### Specific objectives
+
+The system shall:
+
+1. provide authenticated and role-authorized web and mobile workspaces for HQ/Admin personnel, household residents, and rescuers;
+2. allow household users to view linked household information and submit event-related safety status for authorized household members;
+3. allow HQ users to create and manage disaster events and broadcasts, review incoming status information, and coordinate responder assignments;
+4. allow rescuers to review authorized assignments and submit supported progress, location, check-in, field-report, and resource-request information;
+5. provide controlled request review and distinguish RESQPERATION approval and handoff from partner-system processing and fulfillment;
+6. present map, weather, advisory, and hazard context with appropriate source attribution and limitations;
+7. support the preparation, controlled exchange, retrieval, and archiving of situation reports and related operational records; and
+8. define verifiable security, privacy, reliability, usability, data-integrity, and acceptance requirements for the stated scope.
+
+These objectives describe intended system capabilities. They are not claims that every capability has passed acceptance testing or that the system has demonstrated a measurable disaster-response impact.
+
+## 1.5 Scope and Limitations
+
+RESQPERATION is a barangay disaster-response and emergency-operations coordination system initially scoped to Mambaling, Cebu City. Its project boundary comprises:
+
+- **HQ/Admin web client:** event and broadcast administration, household-status review, dispatch, operational map and weather context, request validation, situation reporting, notifications, and archive workflows, subject to the user’s assigned permissions.
+- **Household mobile workflows:** authentication, linked household/member views, household setup information, event-status submission and history, trusted-household features, and supported evacuation information.
+- **Rescuer mobile workflows:** authentication, assignment access, supported location and progress updates, field check-ins and reports, resource requests, and internet-dependent team communication.
+- **Application services:** a Laravel JSON API responsible for authentication, authorization, validation, business rules, and access to the active configured database.
+- **External interfaces:** specifically configured household-data sharing, partner request/report exchange, weather/advisory sources, maps/routing, push notifications, and optional SMS services.
+
+The system supports information management, coordination, and recordkeeping. It does not independently make emergency decisions, certify the accuracy of source data, or guarantee a response. The following are excluded from the current requirements baseline or remain unverified:
+
+- ownership or replacement of SafeTrack household identity/census records, EvaTrack evacuation operations, or TrackingAid inventory and fulfillment;
+- an official government warning function, authoritative hazard prediction, automatic optimal dispatch, or certified life-safety operation;
+- guaranteed message delivery, route safety, uninterrupted availability, response time, rescue, or resource fulfillment;
+- end-to-end household reporting and navigation during loss of connectivity beyond specifically tested capabilities;
+- a complete dedicated evacuation-QR scanning/operator interface;
+- automatic city or national agency receipt and acknowledgement unless a separate, verified integration is established;
+- production deployment service-level commitments, formal operational-readiness certification, and legal/privacy compliance certification; and
+- system-wide population statistics beyond the date-identified sources and authorized operational records.
+
+The project is initially bounded to one barangay profile and the roles/workflows identified in this document. Expansion to other barangays, jurisdictions, mobile operating systems, or partner systems requires configuration, privacy and authority review, interface validation, and acceptance testing. External-provider access, partner credentials, network availability, and third-party service terms remain dependencies outside the project’s control.
+
+## 1.6 Requirements Engineering Method
+
+Requirements were consolidated from the supplied SRS template, the project README, the documented use cases, the implementation audit, architecture and integration materials, development checklist, and inspection of available application and backend evidence [1–8]. Requirements were grouped by user workflow and quality attribute, assigned unique identifiers, and written using testable “shall” statements where the expected behavior could be stated without prescribing an unnecessary implementation detail.
+
+Each requirement’s implementation condition is recorded separately using the status vocabulary defined in Section 3.2. Status is evidence-qualified: source code or a route may demonstrate that an implementation exists, but does not by itself demonstrate usability, successful integration, production operation, or stakeholder acceptance. Verification is to use an appropriate combination of inspection, analysis, unit/feature tests, integration tests, device testing, and stakeholder acceptance.
+
+This requirements baseline is based on document review and implementation inspection. No user survey, controlled field trial, performance benchmark, or measured outcome study is asserted by this SRS. Operational users and the project adviser should review unresolved assumptions and the acceptance criteria before the specification is treated as an approved baseline. Changes shall be versioned and their affected requirements, use cases, interfaces, tests, and diagrams updated together.
+
+## 1.7 Definitions, Acronyms, and Abbreviations
 
 | Term | Definition |
 | --- | --- |
 | API | Application Programming Interface used by web/mobile clients and approved partner systems. |
 | Barangay | The local government unit targeted by this system; the initial project area is Mambaling, Cebu City. |
+| BDRRM | Barangay Disaster Risk Reduction and Management. |
+| BDRRMC | Barangay Disaster Risk Reduction and Management Committee. |
 | CAP | Common Alerting Protocol, a structured format used by public alert feeds. |
 | CRUD | Create, Read, Update, and Delete data operations. |
 | ERD | Entity-Relationship Diagram showing data entities and their relationships. |
@@ -93,45 +219,49 @@ The product supports coordination and recordkeeping. It is **not** an emergency 
 | MySQL | Relational database management system used by the configured operational database. |
 | ODbL | Open Database License, applicable to OpenStreetMap database data. |
 | PII | Personally identifiable information. |
-| PTT | Push-To-Talk style communication. The implemented application feature uses internet-connected voice/session functionality; it is not a hardware radio. |
+| PTT | Push-to-talk style communication. The documented project feature is internet-dependent and is not a hardware radio. |
 | RBAC | Role-Based Access Control; permissions are associated with user roles and module/action policy. |
-| RESQPERATION | Barangay Rescue Operations and Disaster Response Management System. |
+| RESQPERATION | The Geo-Tagged Household Monitoring and Barangay Disaster Risk Reduction and Management Rescue Coordination System specified in this document. |
 | SRS | Software Requirements Specification. |
 | SitRep | Situation Report, a structured summary of incident conditions and response. |
 | SMS | Short Message Service. |
+| UAT | User Acceptance Testing. |
 | UI | User Interface. |
 | Use case | A description of an actor's goal and the system interactions that accomplish or reject it. |
 | VAPID | Voluntary Application Server Identification, used to identify an application server for browser push. |
 
-## 1.4 References
+## 1.8 References
 
-### Project sources
+### Project documents and evidence
 
-1. RESQPERATION project [README](../README.md).
-2. [Canonical system use cases](USE_CASES.md), updated October 20, 2026.
-3. [Must-Haves implementation audit](MUST_HAVES_IMPLEMENTATION_AUDIT.md), reviewed October 20, 2026.
-4. System architecture and data boundaries described in [Appendix C](#appendix-c-system-architecture).
-5. The development checklist is maintained by the project team; this SRS records known implementation status and gaps.
-6. System diagrams and use-case narratives are included in this SRS appendices.
-7. [Mambaling hazard source notes](MAMBALING_HAZARD_SOURCES.md).
-8. [Offline navigation notes](OFFLINE_NAVIGATION.md) and [progress](OFFLINE_NAVIGATION_PROGRESS.md).
+1. RESQPERATION project team. (2026). [Project README](../README.md) [Project document].
+2. RESQPERATION project team. (2026, October 20). [System use cases](USE_CASES.md) [Project document].
+3. RESQPERATION project team. (2026, October 20). [Must-Haves implementation audit](MUST_HAVES_IMPLEMENTATION_AUDIT.md) [Project audit].
+4. RESQPERATION project team. (2026). System architecture and file-stack documentation; the architecture view is included in [Appendix C](#appendix-c-system-architecture).
+5. RESQPERATION project team. (2026). Development checklist [Project planning document maintained outside the application repository; entries are dated and may not reflect later work].
+6. RESQPERATION project team. (2026). Workspace documentation index and diagram catalogue [Project documents maintained outside the application repository].
+7. RESQPERATION project team. (2026). [Mambaling hazard source notes](MAMBALING_HAZARD_SOURCES.md) [Project source notes].
+8. RESQPERATION project team. (2026). [Offline navigation notes](OFFLINE_NAVIGATION.md) and [progress record](OFFLINE_NAVIGATION_PROGRESS.md) [Project documents].
 
 ### Standards, laws, and external technical sources
 
-10. ISO/IEC/IEEE 29148:2018, *Systems and software engineering — Life cycle processes — Requirements engineering* (structural guidance).
-11. IEEE Std 830-1998, *Recommended Practice for Software Requirements Specifications* (legacy structural reference).
-12. Republic Act No. 10173, *Data Privacy Act of 2012*, and its Implementing Rules and Regulations. This reference does not assert legal compliance.
-13. OWASP, [Application Security Verification Standard](https://owasp.org/www-project-application-security-verification-standard/) and [Top 10](https://owasp.org/www-project-top-ten/).
-14. Laravel [official documentation](https://laravel.com/docs); React [documentation](https://react.dev/); Expo [documentation](https://docs.expo.dev/).
-15. MySQL [reference manual](https://dev.mysql.com/doc/).
-16. Open-Meteo [API documentation](https://open-meteo.com/en/docs), [licence](https://open-meteo.com/en/licence), and [terms](https://open-meteo.com/en/terms).
-17. DOST-PAGASA [public alert feed](https://publicalert.pagasa.dost.gov.ph/feeds/) and [products and services](https://pagasa.dost.gov.ph/products-and-services).
-18. OpenStreetMap [copyright and ODbL attribution](https://www.openstreetmap.org/copyright) and [tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
-19. PhilAtlas, [Mambaling, Cebu City](https://www.philatlas.com/visayas/r07/cebu-city/mambaling.html), reporting census data sourced from PSA.
+9. Republic of the Philippines. (2010). *Republic Act No. 10121: Philippine Disaster Risk Reduction and Management Act of 2010*. [Official Senate legislative reference](https://issuances-library.senate.gov.ph/legislative%2Bissuances/Republic%20Act%20No.%2010121).
+10. PhilAtlas. (n.d.). [Mambaling, Cebu City](https://www.philatlas.com/visayas/r07/cebu-city/mambaling.html). Census statistics reported from the Philippine Statistics Authority; population and household figures in this SRS retain their respective census years. Retrieved October 22, 2026.
+11. Republic of the Philippines. (2012). *Republic Act No. 10173: Data Privacy Act of 2012*. [National Privacy Commission reference](https://privacy.gov.ph/data-privacy-act/). Cited as a design and governance reference, not as evidence of compliance.
+12. United Nations. (n.d.). [Sustainable Development Goals: Goals 11 and 13](https://sdgs.un.org/goals). Retrieved October 22, 2026.
+13. ISO/IEC/IEEE. (2018). *ISO/IEC/IEEE 29148:2018: Systems and software engineering — Life cycle processes — Requirements engineering*.
+14. IEEE. (1998). *IEEE Std 830-1998: Recommended Practice for Software Requirements Specifications*. Legacy structural reference.
+15. OWASP Foundation. (n.d.). [Application Security Verification Standard](https://owasp.org/www-project-application-security-verification-standard/) and [OWASP Top 10](https://owasp.org/www-project-top-ten/). Retrieved October 22, 2026.
+16. Laravel. (n.d.). [Documentation](https://laravel.com/docs); Meta. (n.d.). [React documentation](https://react.dev/); Expo. (n.d.). [Documentation](https://docs.expo.dev/); Oracle. (n.d.). [MySQL reference manual](https://dev.mysql.com/doc/). Retrieved October 22, 2026.
+17. Open-Meteo. (n.d.). [API documentation](https://open-meteo.com/en/docs), [licence](https://open-meteo.com/en/licence), and [terms](https://open-meteo.com/en/terms). Retrieved October 22, 2026.
+18. Department of Science and Technology–Philippine Atmospheric, Geophysical and Astronomical Services Administration. (n.d.). [Public alert feeds](https://publicalert.pagasa.dost.gov.ph/feeds/) and [products and services](https://pagasa.dost.gov.ph/products-and-services). Retrieved October 22, 2026.
+19. OpenStreetMap Foundation. (n.d.). [Copyright and ODbL attribution](https://www.openstreetmap.org/copyright) and [tile usage policy](https://operations.osmfoundation.org/policies/tiles/). Retrieved October 22, 2026.
 
-## 1.5 Overview
+Project documents [1–8] describe the project-specific requirements and evidence. External standards, laws, and service documentation [9–19] provide contextual or technical references. The project’s broader review of related literature and studies belongs in the capstone manuscript’s literature-review chapter and is not replaced by this engineering specification.
 
-Section 2 describes the product context, primary features, user classes, operating environment, constraints, dependencies, and planned releases. Section 3 defines external interfaces, testable functional requirements, quality requirements, and database requirements. The appendices provide use-case diagrams and narratives, system architecture, the scoped ERD, screenshot placeholders, traceability, and approval fields.
+## 1.9 Organization of the SRS
+
+Section 1 establishes the project context, problem, objectives, scope, and requirements method. Section 2 defines product perspective, functions, users, operating environment, constraints, assumptions, and requirement allocation. Section 3 specifies external interfaces, functional and non-functional requirements, database expectations, operational flows, and verification and acceptance. Appendices A–E provide the use-case diagram and narratives, system architecture, logical ERD, and screenshot placeholders. Appendix F traces requirement groups to use cases. Appendices G–I record evidence-qualified implementation status, acceptance criteria, and approval.
 
 # 2. Overall Description
 
@@ -260,7 +390,7 @@ Priorities and release dates are subject to adviser and stakeholder approval. No
 
 # 3. Specific Requirements
 
-**Requirement notation:** Each requirement has a unique identifier and uses “shall” for a normative system obligation. Status values are **Implemented**, **Partial**, **Conditional**, or **Proposed** and describe the documented working-tree state as of October 20, 2026, not a deployment guarantee. Requirements marked Partial or Conditional need the corresponding completion/acceptance work before being certified.
+**Requirement notation:** Each requirement has a unique identifier and uses “shall” for a normative system obligation. The status column is implementation evidence, not part of the normative requirement. Status values are **Implemented**, **Partial**, **Conditional**, **Proposed**, or **Not independently verified** and summarize the evidence reviewed in the October 20, 2026 implementation audit [3]. They do not certify the state of a later build, a deployment, user acceptance, or a live partner connection. Appendix G explains the evidence limitations.
 
 ## 3.1 External Interface Requirements
 
@@ -396,8 +526,8 @@ API keys and private credentials shall be supplied through protected runtime con
 | OPS-009 | The system shall retrieve and store configured weather snapshots and display their provider/source and observation/forecast context. | Implemented |
 | OPS-010 | The system shall distinguish forecast-provider data from official warning authority and direct operators to confirm official warnings through PAGASA/appropriate authority. | Implemented |
 | OPS-011 | The system shall display official advisory content only when obtained through an enabled official-source feed or link and shall preserve its source/time/expiry context where supplied. | Conditional on configured feed and upstream availability |
-| OPS-012 | The system shall support map/routing failures by showing unavailable/error state rather than representing a missing route as safe. | Required |
-| OPS-013 | The system shall not claim automatic optimal dispatch, official severity classification per affected area, or complete exposure analysis unless implemented and validated. | Required boundary |
+| OPS-012 | The system shall support map/routing failures by showing unavailable/error state rather than representing a missing route as safe. | Not independently verified |
+| OPS-013 | The system shall not claim automatic optimal dispatch, official severity classification per affected area, or complete exposure analysis unless implemented and validated. | Not independently verified |
 
 ### 3.2.5 Resource Requests and Partner Exchange (REQ)
 
@@ -410,7 +540,7 @@ API keys and private credentials shall be supplied through protected runtime con
 | REQ-005 | The system shall preserve a durable retryable record for handoff synchronization where configured and shall not report failed synchronization as successful fulfillment. | Implemented/conditional on workers and partner connectivity |
 | REQ-006 | The system shall provide authenticated external resource-request intake with an integration-specific credential and validation. | Implemented |
 | REQ-007 | The system shall map request states to clear operational meanings such as pending review, validated, forwarded/in progress, and fulfilled/completed. | Implemented |
-| REQ-008 | The system shall not claim TrackingAid fulfillment or partner end-to-end acceptance until confirmed by the supported partner workflow. | Required boundary |
+| REQ-008 | The system shall not claim TrackingAid fulfillment or partner end-to-end acceptance until confirmed by the supported partner workflow. | Not independently verified |
 | REQ-009 | The system shall support external report request review, manual accept/reject, frozen report snapshots, signed status/download links, and configured file renewal. | Implemented for local contract; partner acceptance conditional |
 | REQ-010 | The system shall keep resource-intake and report-exchange authentication scopes separate. | Implemented |
 
@@ -420,12 +550,12 @@ API keys and private credentials shall be supplied through protected runtime con
 | --- | --- | --- |
 | REP-001 | The system shall generate situation reports from available event-scoped operational data and configured partner findings. | Implemented; partner data conditional |
 | REP-002 | The system shall preserve a report snapshot when a report is saved/locked where that workflow applies. | Implemented |
-| REP-003 | The system shall represent unknown/unavailable data as unknown or unavailable and shall not invent values to complete a report. | Required |
+| REP-003 | The system shall represent unknown/unavailable data as unknown or unavailable and shall not invent values to complete a report. | Not independently verified |
 | REP-004 | The system shall support the defined situation-report sections and available formats (PDF, CSV, XLSX) according to the authorized workflow. | Implemented for documented report flows |
 | REP-005 | The system shall allow an authorized operator to review an external report request and decide whether to release a report. | Implemented |
-| REP-006 | The system shall provide event, household status, dispatch, request, situation-report, and other supported archive views with search/filter/pagination. | Implemented; one legacy-admin authorization contract needs reconciliation |
+| REP-006 | The system shall provide event, household status, dispatch, request, situation-report, and other supported archive views with search/filter/pagination. | Partial; one legacy-admin authorization contract needs reconciliation |
 | REP-007 | The system shall export only records allowed by the user's authorization and selected scope. | Implemented by documented access policy; validate per role |
-| REP-008 | The system shall preserve a distinction between generating/downloading a report and external agency receipt/acknowledgement. | Required boundary |
+| REP-008 | The system shall preserve a distinction between generating/downloading a report and external agency receipt/acknowledgement. | Not independently verified |
 
 ### 3.2.7 Notifications and Communications (NOT)
 
@@ -436,8 +566,8 @@ API keys and private credentials shall be supplied through protected runtime con
 | NOT-003 | The system shall send supported broadcast/dispatch notifications through configured OneSignal services. | Conditional; provider acceptance does not establish device display |
 | NOT-004 | The system shall support browser push registration and delivery on supported secure browser origins when configured. | Conditional |
 | NOT-005 | The system shall use the configured SMS gateway for supported SMS workflows only when gateway credentials, network, device, and carrier service are available. | Optional/conditional |
-| NOT-006 | The system shall distinguish message submission/provider acceptance from delivery/receipt by a person. | Required |
-| NOT-007 | The system shall not disclose records from unauthorized modules through notification content or links. | Required |
+| NOT-006 | The system shall distinguish message submission/provider acceptance from delivery/receipt by a person. | Not independently verified |
+| NOT-007 | The system shall not disclose records from unauthorized modules through notification content or links. | Not independently verified |
 | NOT-008 | The system shall provide a recoverable refresh/fallback path when realtime notification infrastructure is unavailable. | Implemented for documented areas |
 
 ### 3.2.8 Audit, Administration, and System Health (ADM)
@@ -449,7 +579,7 @@ API keys and private credentials shall be supplied through protected runtime con
 | ADM-003 | The system shall provide health/readiness endpoints for operational monitoring without exposing secrets. | Implemented |
 | ADM-004 | The system shall support configured scheduled/queued work for weather refresh, notification delivery, partner synchronization, and other enabled jobs. | Conditional on deployment |
 | ADM-005 | The system shall allow authorized super administrators to review and manage supported inquiries. | Implemented |
-| ADM-006 | The system shall protect secrets through local/private environment configuration and shall avoid returning secrets in client responses. | Required |
+| ADM-006 | The system shall protect secrets through local/private environment configuration and shall avoid returning secrets in client responses. | Not independently verified |
 
 ## 3.3 Non-Functional Requirements
 
@@ -565,9 +695,86 @@ Actual tables and columns vary with the approved shared schema and implemented m
 - Seed data shall be explicitly marked as development/test data and shall not be mixed with real operational records.
 - Destructive commands and unreviewed sample SQL shall not be used against a shared or production database.
 
+## 3.5 System Flows
+
+This section describes the expected end-to-end exchange among clients, API services, the configured database, and external providers. It is a logical flow description; exact endpoint paths, schemas, and provider contracts remain subject to the current implementation and approved integration documentation.
+
+### 3.5.1 Authentication and role routing
+
+1. The user submits an account identifier and password through an approved web or mobile client.
+2. The API validates the request, resolves the account against the active approved data source, verifies the credential and account state, and determines the user’s role.
+3. If authentication succeeds, the API issues the configured session/token and role context. The client stores the credential using the platform-appropriate mechanism and requests only authorized resources.
+4. The client routes the user to the workspace associated with the account and role. Backend authorization remains mandatory for every protected operation.
+5. Invalid credentials, inactive accounts, denied authorization, unavailable services, and expired credentials produce explicit outcomes and do not grant access.
+
+### 3.5.2 HQ disaster-to-response flow
+
+1. An authorized HQ user reviews the operational dashboard and, when needed, creates or updates a disaster event and broadcast.
+2. The API validates the user’s permission and event scope, persists the accepted event/broadcast, and initiates any configured notification workflow.
+3. Household residents submit event-related status reports; rescuers submit supported assignment progress, location, check-in, and field-report information.
+4. HQ reviews available reports, map context, weather/advisory information, and requests; selects an appropriate team or responder; and creates an authorized assignment.
+5. The rescuer views the assignment and sends supported progress updates. HQ monitors the recorded state and uses the available information to make operational decisions.
+6. The system records available actions and status transitions for later reporting and authorized archive access.
+
+### 3.5.3 Household mobile flow
+
+1. A resident authenticates and retrieves only the household and member records linked to the account.
+2. If first-use setup is required, the client requests location permission before reading device location and allows the user to confirm or provide permitted location information.
+3. During an applicable event, the resident selects the household or authorized member and a status offered by the system, then submits it to the API.
+4. The API validates identity linkage, event and member scope, status value, and authorization before recording the update.
+5. The client reports success only after server confirmation and displays available history.
+6. If the API cannot confirm persistence, the client reports the failure or pending state. The current requirements do not imply a durable offline queue unless it is implemented and verified for that workflow.
+
+### 3.5.4 Responder field flow
+
+1. An authenticated rescuer retrieves assignments and target information permitted by the account’s authorization.
+2. The rescuer reviews the assignment, available location/route context, and operational instructions.
+3. During field activity, the rescuer submits supported progress, location, household/member check-in, field observations, and requests.
+4. The API validates the assignment and event context, records accepted information, and exposes it to authorized HQ workflows.
+5. Missing GPS, route-provider failure, or network loss is represented as unavailable or failed; the system does not imply that an unrecorded update was synchronized.
+6. Any internet-based voice or radio-style feature is identified as network-dependent communication, not as a standalone emergency radio.
+
+### 3.5.5 Evacuation verification flow
+
+1. The household client displays the supported evacuation QR credential or related workflow information.
+2. An authorized operator or supported backend workflow submits the credential and event/center context for verification.
+3. The system checks the credential and context and records a check-in only when the verification conditions pass.
+4. Invalid, expired, mismatched, unauthorized, or unverifiable credentials are not recorded as verified.
+5. A complete dedicated operator scanning interface remains subject to implementation and acceptance evidence; backend capability alone does not establish an end-user workflow.
+
+### 3.5.6 Resource-request flow
+
+1. A request is submitted by an authorized internal user or a configured external partner.
+2. The API authenticates the source, validates the payload and event/location context, and applies duplicate prevention where the integration contract supports it.
+3. The request is persisted with its source and review state and made available to authorized HQ approvers.
+4. The approver validates, returns, rejects/cancels, or otherwise updates the request only through supported transitions.
+5. An approved request may be handed off to TrackingAid through the configured integration and monitored as a separate synchronization process.
+6. A failed or pending handoff is not described as partner acceptance or fulfillment. TrackingAid and other partners retain ownership of their respective downstream operations.
+
+### 3.5.7 Weather, situation-report, and archive flow
+
+1. The system retrieves weather information from the configured provider and retains source and time context where available.
+2. HQ users review the data alongside sourced map layers and official advisory links; official warnings are confirmed through PAGASA or the responsible authority before local communication.
+3. An authorized user selects an event and assembles a situation report from available recorded operational data.
+4. Unknown or unavailable values remain explicitly unknown; the system does not synthesize a value merely to fill a report field.
+5. Authorized users save, export, or exchange supported reports. Export or provider submission is distinguished from recipient receipt and acknowledgement.
+6. After event closure, authorized users retrieve supported historical records and exports under the applicable role, retention, and privacy rules.
+
+## 3.6 Verification and Acceptance
+
+Each requirement shall be verified using the method identified in its requirement row or an approved test case. Verification shall use representative, non-sensitive test data and shall record the build, environment, test date, test result, and any defect or limitation. Security-sensitive tests shall include denied-role and unauthorized-record cases, not only successful workflows.
+
+Acceptance is based on the criteria in Appendix H and requires demonstration of the complete user-to-persistence-to-authorized-review path for each accepted core workflow. A visible screen or implemented route alone is insufficient. Provider integration acceptance requires testing against an authorized, reachable provider or a clearly identified test environment; a mocked response shall not be reported as a live partner acceptance. Device acceptance requires testing on the documented target device/build. Performance targets and production recovery objectives remain to be approved by the deployment owner before production use.
+
+The capstone panel’s academic review and the operational stakeholder’s acceptance are distinct decisions. Passing software tests does not establish field suitability, legal compliance, official authority, or emergency-service readiness.
+
 # Appendix A. Use Case Diagram
 
-The diagram shows the primary human and external actors. The role-specific workflows are described in the narratives in Appendix B. Mermaid-capable Markdown viewers can render the diagram.
+**Figure 1. RESQPERATION use-case model and system boundary**
+
+_[Insert the exported UML use-case diagram here for the panel/submission copy. The diagram should show the system boundary, human actors, external systems, and their principal use cases. The Mermaid block below is the editable source representation and may be used for review; it is not a substitute for a legible, page-sized figure in the final Word/PDF copy.]_
+
+The diagram summarizes the principal human and external actors. Role-specific use-case narratives are provided in Appendix B.
 
 ```mermaid
 flowchart LR
@@ -632,8 +839,8 @@ flowchart LR
 
 ## UC-01: Sign in and enter the authorized workspace
 
-**Primary actors:** Household resident, rescuer, HQ personnel, HQ leader, super administrator
-**Preconditions:** API and active database are reachable; account exists and is eligible; a mobile device is configured to use the API where applicable.
+**Primary actors:** Household resident, rescuer, HQ personnel, HQ leader, super administrator<br>
+**Preconditions:** API and active database are reachable; account exists and is eligible; a mobile device is configured to use the API where applicable.<br>
 **Trigger:** User submits their identifier and password.
 
 **Main flow**
@@ -651,8 +858,8 @@ flowchart LR
 
 ## UC-02: Set up household and report safety status
 
-**Primary actor:** Household resident
-**Preconditions:** Resident is authenticated and linked to a household; an applicable event/status set exists for event-based reporting.
+**Primary actor:** Household resident<br>
+**Preconditions:** Resident is authenticated and linked to a household; an applicable event/status set exists for event-based reporting.<br>
 **Trigger:** Resident opens household setup or chooses to submit/update status.
 
 **Main flow**
@@ -672,9 +879,9 @@ flowchart LR
 
 ## UC-03: Publish a disaster broadcast
 
-**Primary actor:** Authorized HQ user
-**Supporting actors:** Household residents, OneSignal/platform push
-**Preconditions:** HQ user may manage the event/broadcast; event and target scope are valid. Push delivery additionally requires provider configuration, subscriptions, permissions, and connectivity.
+**Primary actor:** Authorized HQ user<br>
+**Supporting actors:** Household residents, OneSignal/platform push<br>
+**Preconditions:** HQ user may manage the event/broadcast; event and target scope are valid. Push delivery additionally requires provider configuration, subscriptions, permissions, and connectivity.<br>
 **Trigger:** HQ creates an event broadcast or update.
 
 **Main flow**
@@ -692,8 +899,8 @@ flowchart LR
 
 ## UC-04: Review household reports and dispatch a responder
 
-**Primary actors:** HQ dispatcher, rescuer
-**Preconditions:** HQ has permission; applicable event, household, team, and responder records exist; rescuer has authorized access.
+**Primary actors:** HQ dispatcher, rescuer<br>
+**Preconditions:** HQ has permission; applicable event, household, team, and responder records exist; rescuer has authorized access.<br>
 **Trigger:** HQ identifies a household requiring response.
 
 **Main flow**
@@ -712,9 +919,9 @@ flowchart LR
 
 ## UC-05: Submit field report and household assessment
 
-**Primary actor:** Rescuer
-**Supporting actor:** HQ personnel
-**Preconditions:** Rescuer is authenticated and has a valid assignment/event context.
+**Primary actor:** Rescuer<br>
+**Supporting actor:** HQ personnel<br>
+**Preconditions:** Rescuer is authenticated and has a valid assignment/event context.<br>
 **Trigger:** Rescuer performs a check-in or records field observations.
 
 **Main flow**
@@ -732,9 +939,9 @@ flowchart LR
 
 ## UC-06: Submit and review a resource/personnel request
 
-**Primary actors:** Rescuer, HQ approver
-**Supporting actors:** External partner, TrackingAid
-**Preconditions:** Requester is authorized; request type/event/location references are valid; external intake credentials are configured for partner submissions.
+**Primary actors:** Rescuer, HQ approver<br>
+**Supporting actors:** External partner, TrackingAid<br>
+**Preconditions:** Requester is authorized; request type/event/location references are valid; external intake credentials are configured for partner submissions.<br>
 **Trigger:** Requester submits a request or partner calls the intake API.
 
 **Main flow**
@@ -752,8 +959,8 @@ flowchart LR
 
 ## UC-07: Prepare and exchange a situation report
 
-**Primary actors:** Authorized HQ user, authorized partner system
-**Preconditions:** Event/report scope is valid; user has report permissions; partner exchange credentials and endpoints are configured when used.
+**Primary actors:** Authorized HQ user, authorized partner system<br>
+**Preconditions:** Event/report scope is valid; user has report permissions; partner exchange credentials and endpoints are configured when used.<br>
 **Trigger:** HQ creates a report or a partner submits an authorized report request.
 
 **Main flow**
@@ -772,9 +979,9 @@ flowchart LR
 
 ## UC-08: Review maps, weather, and advisories
 
-**Primary actor:** Authorized HQ user
-**Supporting actors:** Open-Meteo, PAGASA, PHIVOLCS, OpenStreetMap, route provider
-**Preconditions:** User has geospatial/operations access; sources are reachable or cached data exists.
+**Primary actor:** Authorized HQ user<br>
+**Supporting actors:** Open-Meteo, PAGASA, PHIVOLCS, OpenStreetMap, route provider<br>
+**Preconditions:** User has geospatial/operations access; sources are reachable or cached data exists.<br>
 **Trigger:** HQ opens mapping or weather workspace.
 
 **Main flow**
@@ -790,8 +997,8 @@ flowchart LR
 
 ## UC-09: Search and export incident archive
 
-**Primary actor:** Authorized HQ user
-**Preconditions:** User has the relevant archive/export permissions.
+**Primary actor:** Authorized HQ user<br>
+**Preconditions:** User has the relevant archive/export permissions.<br>
 **Trigger:** User opens archive and selects a record category or export.
 
 **Main flow**
@@ -807,9 +1014,9 @@ flowchart LR
 
 ## UC-10: Register and receive notifications
 
-**Primary actors:** Household resident, rescuer, HQ user
-**Supporting actors:** OneSignal, browser Push service, operating system
-**Preconditions:** Supported app/browser, secure web origin as required, provider configuration, user permission, and network.
+**Primary actors:** Household resident, rescuer, HQ user<br>
+**Supporting actors:** OneSignal, browser Push service, operating system<br>
+**Preconditions:** Supported app/browser, secure web origin as required, provider configuration, user permission, and network.<br>
 **Trigger:** User enables notifications or an operational event generates a notification.
 
 **Main flow**
@@ -825,6 +1032,10 @@ flowchart LR
 **Postcondition:** Subscription and delivery attempts are recorded where supported; no guaranteed receipt is asserted.
 
 # Appendix C. System Architecture
+
+**Figure 2. RESQPERATION logical system architecture**
+
+_[Insert the exported architecture diagram here for the panel/submission copy. The architecture should distinguish client applications, backend services, owned/shared data stores, and external providers. The Mermaid block is the editable source representation.]_
 
 ```mermaid
 flowchart TB
@@ -893,6 +1104,10 @@ flowchart TB
 
 # Appendix D. Entity-Relationship Diagram
 
+**Figure 3. RESQPERATION logical entity-relationship diagram**
+
+_[Insert the exported ERD here for the panel/submission copy. Identify the diagram as logical and show cardinality and ownership boundaries. The Mermaid block is the editable source representation.]_
+
 The following logical ERD is scoped to RESQPERATION data and integration boundaries. It is not a migration plan or a claim that every deployment contains identical tables. External systems are represented as actors, not as internal RESQPERATION entities.
 
 ```mermaid
@@ -952,41 +1167,41 @@ erDiagram
 - Actual key names and optional relationships are governed by the connected shared schema.
 - SafeTrack, EvaTrack, and TrackingAid table internals are excluded.
 - Household identity/source data and RESQPERATION operational data have distinct ownership boundaries.
-- The diagram summarizes the logical RESQPERATION data scope documented in this project.
+- The diagram is a logical synthesis of the project's documented data scope. It must be checked against the approved schema before being presented as a physical database design.
 
 # Appendix E. User Interface Screenshot Placeholders
 
-Replace each placeholder with a current screenshot from the relevant application build. Before capture, remove or mask real household/member personal data, credentials, device tokens, private hostnames, and other sensitive information. Captions should identify the screen, client, and build/version.
+Replace each placeholder with a legible screenshot from the build used for the defense or submission. Each image should have a figure number and caption, identify the client and build/version, and be discussed in the relevant section. Before capture, remove or mask real household/member personal data, credentials, device tokens, private hostnames, and other sensitive information. Do not submit example data as if it were live operational data.
 
-**Figure 1. RESQPERATION web login screen**
-
-_[Insert screenshot here.]_
-
-**Figure 2. HQ/Admin dashboard and active incident overview**
+**Figure 4. RESQPERATION web login screen**
 
 _[Insert screenshot here.]_
 
-**Figure 3. HQ/Admin map and household/responder layers**
+**Figure 5. HQ/Admin dashboard and active incident overview**
 
 _[Insert screenshot here.]_
 
-**Figure 4. Household mobile home and current disaster alert**
+**Figure 6. HQ/Admin map and household/responder layers**
 
 _[Insert screenshot here.]_
 
-**Figure 5. Household mobile status-reporting screen**
+**Figure 7. Household mobile home and current disaster alert**
 
 _[Insert screenshot here.]_
 
-**Figure 6. Rescuer mobile assignment and navigation screen**
+**Figure 8. Household mobile status-reporting screen**
 
 _[Insert screenshot here.]_
 
-**Figure 7. HQ/Admin resource-request review and validation screen**
+**Figure 9. Rescuer mobile assignment and navigation screen**
 
 _[Insert screenshot here.]_
 
-**Figure 8. Situation report / archive screen**
+**Figure 10. HQ/Admin resource-request review and validation screen**
+
+_[Insert screenshot here.]_
+
+**Figure 11. Situation report / archive screen**
 
 _[Insert screenshot here.]_
 
@@ -995,23 +1210,67 @@ _[Insert screenshot here.]_
 | Requirement group | Related use cases | Evidence / current boundary |
 | --- | --- | --- |
 | AUTH | UC-01 and account/admin use cases | Login, role routing, protected API, profile, recovery, and administration; see [USE_CASES.md](USE_CASES.md) and API routes. |
-| HOU | UC-02; UC-08 through UC-14 | Household setup/status/trusted household/QR. QR operator UI and full offline reporting remain partial. |
-| RES | UC-04, UC-05; UC-15 through UC-21 | Assignment, location, check-in, field report, request, radio. Offline and urgency persistence boundaries remain. |
-| OPS | UC-03, UC-04, UC-08; UC-22 through UC-27 | Dashboard, event, broadcast, household review, dispatch, maps/weather. Severity-per-area and provider claims are bounded. |
-| REQ | UC-06 and UC-31 through UC-35 | Intake, approval, forwarding, report exchange. Live partner fulfillment remains conditional. |
-| REP | UC-07, UC-09; UC-28 through UC-30 and UC-36 | Situation report, archive, exports, external report decisions. Archive regression/partner receipt must be separately tested. |
+| HOU | UC-02; canonical catalog UC-08 through UC-14 | Household setup/status/trusted household/QR. QR operator UI and full offline reporting remain partial. |
+| RES | UC-04, UC-05; canonical catalog UC-15 through UC-21 | Assignment, location, check-in, field report, request, radio. Offline and urgency-persistence boundaries remain. |
+| OPS | UC-03, UC-04, UC-08; canonical catalog UC-22 through UC-27 | Dashboard, event, broadcast, household review, dispatch, maps/weather. Affected-area severity and provider claims are bounded. |
+| REQ | UC-06 and canonical catalog UC-31 through UC-35 | Intake, approval, forwarding, report exchange. Live partner fulfillment remains conditional. |
+| REP | UC-07, UC-09; canonical catalog UC-28 through UC-30 and UC-36 | Situation report, archive, exports, external report decisions. Archive regression and partner receipt must be separately tested. |
 | NOT | UC-03, UC-10 | In-app, mobile push, browser push, optional SMS; delivery depends on provider/device/network. |
 | ADM | UC-01 and administration use cases | Audit, system health, jobs, inquiries, secrets; see API routes and implementation audit. |
 | NFR | All use cases | Verify authorization, input validation, stale/error behavior, privacy, usability, performance, and provider failure cases as stated in Section 3.3. |
 
-For detailed evidence and known gaps, refer to the [October 20, 2026 implementation audit](MUST_HAVES_IMPLEMENTATION_AUDIT.md). Requirement statuses must be reviewed when implementation, deployment configuration, or acceptance-test results change.
+The UC-01 through UC-10 references above identify the condensed narratives in Appendix B. “Canonical catalog” numbers refer to the separately maintained [project use-case catalog](USE_CASES.md); they are not additional narratives in this document. For detailed evidence and known gaps, refer to the [October 20, 2026 implementation audit](MUST_HAVES_IMPLEMENTATION_AUDIT.md). Requirement statuses must be reviewed when implementation, deployment configuration, or acceptance-test results change.
 
-# Appendix G. Approval
+# Appendix G. Implementation Status and Verification Evidence
 
-Signatures indicate review/approval of this requirements baseline; they do not certify legal compliance, emergency-service readiness, partner acceptance, or production availability.
+The implementation evidence below is summarized from the Must-Haves audit dated October 20, 2026 [3]. The audit reviewed source, routes, tests, and selected UI flows. It expressly includes uncommitted working-tree changes and is not a certification of the public repository commit, deployed system, every installed mobile build, or operational partner availability. Its status labels describe only the scope assessed by that audit.
+
+| Area | Audit status | Evidence and remaining acceptance condition |
+| --- | --- | --- |
+| HQ/Admin web workflows | Implemented in reviewed source | Dashboard, broadcast, weather, mapping, household status, dispatch, responder/team, requests, situation reports, archives, notifications, and profile paths were found. Full role-based acceptance and deployment configuration remain separate checks. |
+| Household mobile workflows | Implemented with gaps | Household setup, profile, location, members, alerts, status, history, QR display, evacuation map, and trusted-household flows were evidenced. Persistent household offline overview/status outbox and reconnect/restart acceptance remain incomplete. |
+| Rescuer mobile workflows | Implemented with limitations | Assignment, location, map, field-report, check-in, request, communication, profile, and push paths were evidenced. Device/build validation and the request urgency-persistence regression remain open. |
+| Authentication and access control | Implemented in reviewed source | Protected API and role-access evidence was reviewed. Negative authorization and current deployment tests remain required. |
+| Evacuation verification | Partial | Backend verification capability exists, but a complete authorized operator scanning/user-interface path and end-to-end test were not established. |
+| Affected-area severity classification | Partial | Event-level severity exists; the audit found a mismatch between requested affected-area levels and current priority values. |
+| Rescuer resource-request urgency | Partial | A targeted test reproduced `urgency_id` persistence as `NULL` where the test expected `3`; the mapping requires correction and regression verification. |
+| Incident archives | Partial | Archive services and pages exist; `AuthenticatedArchiveContractTest` reproducibly received HTTP 403 for a legacy admin-role fixture. Current-role access must be reconciled and retested. |
+| TrackingAid request handoff | Partial / external | Local durable handoff workflow evidence exists; no live partner-backed fulfillment round trip was established by the audit. |
+| Push notifications | Implemented in code; device acceptance pending | Provider/client code was reviewed; real supported-build, permission, credential, and device-delivery acceptance was not performed by the audit. |
+| Offline operation | Partial / not established end to end | The audit did not establish a persistent household status queue or verified offline navigation pack on a physical device. Online map/report functionality is not evidence of offline operation. |
+
+The same audit reported **23 Implemented and 7 Partial** decisions among 30 reviewed checklist dropdowns. For its targeted test runs, it reported **81 passed and 2 failed tests out of 83** (429 assertions); the isolated rerun reported the same two failures, while the selected web suite reported 8 passed and the selected mobile suite reported 19 passed. These are dated audit results, not results produced by this SRS revision. Consult the linked audit for exact test commands, failure details, and scope before citing the figures in a defense presentation.
+
+No production load test, full live partner verification, all-device usability study, or disaster-field trial is represented by these totals. The project team should rerun applicable tests on the exact submission commit and archive the output with build and environment details.
+
+# Appendix H. Acceptance Criteria
+
+The following end-to-end criteria define minimum acceptance evidence for the principal system workflows. The acceptance record must identify the test build, environment, test data, evaluator, execution date, result, and linked defect/report. A criterion marked “Pass” requires evidence for the entire described workflow, not merely the presence of a screen or endpoint.
+
+| ID | Acceptance criterion | Required evidence | Result |
+| --- | --- | --- | --- |
+| AC-01 | Users with valid accounts enter only their authorized web/mobile workspace; invalid, inactive, or unauthorized accounts are denied. | Positive and negative authentication/role tests, including API authorization. | Pending panel/UAT record |
+| AC-02 | A household user views only linked household/member data, submits a valid event status, receives a truthful result, and the status appears in an authorized HQ view with event and time context. | End-to-end test using non-sensitive test records and persistence verification. | Pending panel/UAT record |
+| AC-03 | An authorized HQ user creates or updates an event/broadcast and the saved event and configured status choices appear to eligible clients. | API/database verification and client workflow demonstration; push delivery recorded separately. | Pending panel/UAT record |
+| AC-04 | HQ creates a valid assignment, the assigned rescuer can retrieve it, and an allowed progress/report update is visible to authorized HQ users. | Assignment state-transition and role-scope tests. | Pending panel/UAT record |
+| AC-05 | A resource request passes validation and approval rules; the system distinguishes local approval, queued handoff, partner receipt, and fulfillment. | Workflow tests plus live partner evidence for any claim of partner acceptance/fulfillment. | Pending panel/UAT record |
+| AC-06 | Invalid, stale, unauthorized, and unavailable-provider cases produce explicit outcomes and do not create success-shaped records. | Negative, stale-data, timeout, and failure-injection tests. | Pending panel/UAT record |
+| AC-07 | A situation report uses available event data, labels unavailable values appropriately, and exports only within authorized scope. | Report-content review, export test, and role-authorization tests. | Pending panel/UAT record |
+| AC-08 | Archive queries and exports are restricted to authorized users and return records consistent with the selected scope. | Authenticated archive tests for each accepted role and export class. | Pending panel/UAT record |
+| AC-09 | Location, household, and member data are collected and displayed only within the approved purpose and role scope; denied location permission does not yield fabricated coordinates. | Permission-denial device test, data-flow review, and privacy/security sign-off. | Pending panel/UAT record |
+| AC-10 | The submission build can be installed and the selected core tasks completed on the declared target devices and browsers. | Build/version manifest, installation record, and task-based device/browser test results. | Pending panel/UAT record |
+
+The adviser/panel may require additional acceptance criteria. Any added criterion shall receive a unique identifier and be traced to its originating requirement, use case, and test evidence.
+
+# Appendix I. Approval
+
+The signatures below record academic review and approval of this requirements baseline. They do not certify legal compliance, emergency-service readiness, partner acceptance, field suitability, or production availability.
 
 | Role | Name | Signature | Date |
 | --- | --- | --- | --- |
-| Project Manager | Niña Kathleen B. Barro | ____________________ | __________ |
-| Project Adviser | Mr. Roderick A. Bandalan | ____________________ | __________ |
-| School / Project Representative | ____________________ | ____________________ | __________ |
+| Project Manager / Proponent | Niña Kathleen B. Barro | ____________________ | __________ |
+| Proponent | Vinzon Arellano | ____________________ | __________ |
+| Proponent | Erece Joy Eria | ____________________ | __________ |
+| Proponent | Vince Pacillan | ____________________ | __________ |
+| Capstone Adviser | Mr. Roderick A. Bandalan | ____________________ | __________ |
+| Panel Chair / Representative | ____________________ | ____________________ | __________ |
