@@ -11,7 +11,7 @@ export async function getResourceRequest(requestId) {
 }
 
 export async function createResourceRequest(payload) {
-  const response = await api.post('/resource-requests', payload)
+  const response = await api.post('/resource-requests', payload, { timeout: 30000 })
   return response.data.data
 }
 

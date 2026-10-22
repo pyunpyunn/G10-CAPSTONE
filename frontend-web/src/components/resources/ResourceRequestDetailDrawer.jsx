@@ -49,7 +49,11 @@ export default function ResourceRequestDetailDrawer({
             </span>
             <h2 className="rr-drawer-title">
               Request #{request.request_id}
-              {request.need?.type ? ` · ${request.need.type}` : ''}
+              {request.need?.item_name
+                ? ` · ${request.need.item_name}`
+                : request.need?.type
+                ? ` · ${request.need.type}`
+                : ''}
             </h2>
           </div>
           <button className="rr-drawer-close" type="button" onClick={onClose} aria-label="Close drawer">
@@ -292,34 +296,38 @@ export default function ResourceRequestDetailDrawer({
             <>
               {/* Item & Logistics Overview */}
               <div className="rr-drawer-section">
-                <h3 className="rr-section-title"><Truck size={16} /> Logistics & Fulfillment Stream</h3>
-                <div className="rr-detail-group">
-                  <div className="rr-detail-row">
-                    <span className="rr-detail-label">Tracking Reference:</span>
-                    <span className="rr-detail-value highlight" style={{ fontFamily: 'monospace' }}>
+                <h3 className="rr-section-title">
+                  <Truck size={16} />
+                  <span>Logistics & Fulfillment Stream</span>
+                </h3>
+                <div className="rr-stream-card">
+                  <div className="rr-stream-row">
+                    <span className="rr-stream-label">Tracking Reference:</span>
+                    <span className="rr-stream-ref">
                       {request.handoff?.tracking_reference || request.tracking_reference || 'Ref: Auto-synced'}
                     </span>
                   </div>
-                  <div className="rr-detail-row">
-                    <span className="rr-detail-label">Relief Supplies:</span>
-                    <span className="rr-detail-value">{request.need?.quantity_text} of {request.need?.type}</span>
+                  <div className="rr-stream-row">
+                    <span className="rr-stream-label">Relief Supplies:</span>
+                    <span className="rr-stream-val">
+                      {formatQuantityText(request.need?.quantity, request.need?.unit, request.need?.quantity_text)} of {request.need?.item_name || request.need?.type || 'Supplies'}
+                    </span>
                   </div>
-                  <div className="rr-detail-row">
-                    <span className="rr-detail-label">Delivery Destination:</span>
-                    <span className="rr-detail-value highlight">{request.area?.label || 'General Relief Hub'}</span>
+                  <div className="rr-stream-row">
+                    <span className="rr-stream-label">Delivery Destination:</span>
+                    <div className="rr-stream-dest">
+                      <span className="rr-dest-title">{request.area?.label || 'General Relief Hub'}</span>
+                      {request.area?.meta && (
+                        <span className="rr-dest-meta" title={request.area.meta}>
+                          {request.area.meta}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="rr-detail-row">
-                    <span className="rr-detail-label">TrackingAid Shared DB:</span>
-                    <span className="rr-detail-value" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <span
-                        style={{
-                          width: '7px',
-                          height: '7px',
-                          borderRadius: '50%',
-                          background: request.handoff?.tracking_reference ? '#16a34a' : '#f59e0b',
-                          boxShadow: request.handoff?.tracking_reference ? '0 0 6px #16a34a' : 'none',
-                        }}
-                      />
+                  <div className="rr-stream-row">
+                    <span className="rr-stream-label">TrackingAid Shared DB:</span>
+                    <span className={`rr-sync-pill ${request.handoff?.tracking_reference ? 'connected' : 'pending'}`}>
+                      <span className={`rr-sync-dot ${request.handoff?.tracking_reference ? 'live' : 'pulse'}`} />
                       <span>
                         {request.handoff?.tracking_reference
                           ? `Connected (${request.handoff.tracking_reference})`
@@ -329,35 +337,29 @@ export default function ResourceRequestDetailDrawer({
                   </div>
                 </div>
 
-                <div style={{ marginTop: '12px' }}>
+                <div style={{ marginTop: '4px' }}>
                   <a
                     href="/mapping"
-                    className="btn btn-secondary btn-sm"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      textDecoration: 'none',
-                      fontSize: '11.5px',
-                      padding: '6px 12px',
-                      fontWeight: 650,
-                      borderRadius: '6px',
-                    }}
+                    className="rr-map-btn"
                   >
                     <MapPin size={13} style={{ color: '#2563eb' }} />
                     <span>View Evacuation Center on Live Map</span>
+                    <ExternalLink size={12} style={{ opacity: 0.6 }} />
                   </a>
                 </div>
               </div>
 
               {/* Handoff Audit Timeline */}
               <div className="rr-drawer-section">
-                <h3 className="rr-section-title"><Clock size={16} /> TrackingAid Handoff Timeline</h3>
+                <h3 className="rr-section-title">
+                  <Clock size={16} />
+                  <span>TrackingAid Handoff Timeline</span>
+                </h3>
                 <div className="rr-timeline">
                   {/* Step 1: Logged */}
                   <div className="rr-timeline-item completed">
                     <div className="rr-timeline-icon">
-                      <CheckCircle2 size={16} />
+                      <CheckCircle2 size={15} />
                     </div>
                     <div className="rr-timeline-content">
                       <div className="rr-timeline-title">Request Registered</div>
@@ -368,7 +370,7 @@ export default function ResourceRequestDetailDrawer({
                   {/* Step 2: Validated */}
                   <div className={`rr-timeline-item ${handoffStep >= 2 ? 'completed' : 'active'}`}>
                     <div className="rr-timeline-icon">
-                      {handoffStep >= 2 ? <UserCheck size={16} /> : <Clock size={16} />}
+                      {handoffStep >= 2 ? <UserCheck size={15} /> : <Clock size={15} />}
                     </div>
                     <div className="rr-timeline-content">
                       <div className="rr-timeline-title">HQ Command Validation</div>
@@ -381,7 +383,7 @@ export default function ResourceRequestDetailDrawer({
                   {/* Step 3: Forwarded */}
                   <div className={`rr-timeline-item ${handoffStep >= 3 ? 'completed' : handoffStep === 2 ? 'active' : ''}`}>
                     <div className="rr-timeline-icon">
-                      {handoffStep >= 3 ? <Send size={16} /> : <ExternalLink size={16} />}
+                      {handoffStep >= 3 ? <Send size={15} /> : <ExternalLink size={15} />}
                     </div>
                     <div className="rr-timeline-content">
                       <div className="rr-timeline-title">TrackingAid Shared DB Forwarding</div>
@@ -396,7 +398,7 @@ export default function ResourceRequestDetailDrawer({
                   {/* Step 4: Dispatch/Fulfill */}
                   <div className={`rr-timeline-item ${handoffStep >= 4 ? 'completed' : ''}`}>
                     <div className="rr-timeline-icon">
-                      <ShieldCheck size={16} />
+                      <ShieldCheck size={15} />
                     </div>
                     <div className="rr-timeline-content">
                       <div className="rr-timeline-title">Dispatch & Fulfilled</div>
@@ -519,4 +521,32 @@ function validationTone(validationStatus) {
     forwarded: 'green',
     returned: 'red',
   }[validationStatus] || 'gray'
+}
+
+function formatQuantityText(quantity, unit, fallbackText) {
+  const qty = Number(quantity) || (fallbackText ? parseInt(fallbackText, 10) : 1) || 1
+  let rawUnit = unit
+  if (!rawUnit && fallbackText) {
+    rawUnit = fallbackText.replace(/^[0-9.]+\s*/, '')
+  }
+  rawUnit = (rawUnit || 'units').trim().toLowerCase()
+
+  if (qty === 1) {
+    if (rawUnit === 'kits' || rawUnit === 'kit') return '1 kit'
+    if (rawUnit === 'boxes' || rawUnit === 'box') return '1 box'
+    if (rawUnit === 'packs' || rawUnit === 'pack') return '1 pack'
+    if (rawUnit === 'pieces' || rawUnit === 'pcs' || rawUnit === 'piece') return '1 piece'
+    if (rawUnit === 'units' || rawUnit === 'unit') return '1 unit'
+    if (rawUnit.endsWith('s') && !rawUnit.endsWith('ss')) return `1 ${rawUnit.slice(0, -1)}`
+    return `1 ${rawUnit}`
+  }
+
+  // Plural
+  if (rawUnit === 'kit') return `${qty} kits`
+  if (rawUnit === 'box') return `${qty} boxes`
+  if (rawUnit === 'pack') return `${qty} packs`
+  if (rawUnit === 'piece') return `${qty} pieces`
+  if (rawUnit === 'unit') return `${qty} units`
+  if (!rawUnit.endsWith('s')) return `${qty} ${rawUnit}s`
+  return `${qty} ${rawUnit}`
 }

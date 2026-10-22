@@ -20,7 +20,7 @@ class ResourceRequestPayloadValidator
             'request_source'=>['required',Rule::in(self::SOURCES)],'source_reference'=>['nullable','string','max:120'],
             'request_category'=>['required',Rule::in(self::CATEGORIES)],'evacuation_center_id'=>['nullable','string','max:255'],
             'requested_by'=>['required','string','max:255'],'resource_type'=>['required','string','max:100'],
-            'item_name'=>['nullable','string','max:150'],'sku'=>['nullable','string','max:100'],'item_id'=>['nullable','integer'],
+            'item_name'=>['nullable','string','max:150'],'sku'=>['nullable','string','max:100'],'item_id'=>['nullable'],
             'quantity'=>['required','integer','min:1','max:100000'],'unit'=>['nullable','string','max:50'],
             'urgency_id'=>['nullable','integer','min:1'],'description'=>['nullable','string','max:2000'],
             'validation_notes'=>['nullable','string','max:2000'],'validation_status'=>['nullable','string',Rule::in(self::STATUSES)],
