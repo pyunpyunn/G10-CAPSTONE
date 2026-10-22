@@ -60,6 +60,10 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'throttle:300,1', 'realtime.atomic'])->group(function () {
         Route::get('/realtime/health', \App\Http\Controllers\Api\RealtimeHealthController::class)->middleware('role:super_admin');
         Route::patch('/profile/password', [ProfileController::class, 'changePassword'])->middleware('throttle:5,1,password-change');
+        Route::post('/profile/photo', [ProfileController::class, 'uploadPhoto']);
+        Route::delete('/profile/photo', [ProfileController::class, 'removePhoto']);
+        Route::post('/profile/members/{member}/photo', [ProfileController::class, 'uploadMemberPhoto']);
+        Route::delete('/profile/members/{member}/photo', [ProfileController::class, 'removeMemberPhoto']);
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/security-questions', [AuthController::class, 'recoveryQuestions']);

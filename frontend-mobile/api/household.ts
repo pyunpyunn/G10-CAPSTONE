@@ -33,6 +33,30 @@ export async function getHouseholdOverview() {
   return response.data.data;
 }
 
+export async function uploadProfilePhoto(formData: FormData) {
+  const response = await api.post('/profile/photo', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data.data;
+}
+
+export async function uploadHouseholdMemberPhoto(memberId: string, formData: FormData) {
+  const response = await api.post(`/profile/members/${encodeURIComponent(memberId)}/photo`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data.data;
+}
+
+export async function removeProfilePhoto() {
+  const response = await api.delete('/profile/photo');
+  return response.data.data;
+}
+
+export async function removeHouseholdMemberPhoto(memberId: string) {
+  const response = await api.delete(`/profile/members/${encodeURIComponent(memberId)}/photo`);
+  return response.data.data;
+}
+
 export async function completeHouseholdSetup(payload: any) {
   const response = await api.post('/household/setup', payload);
   return response.data;

@@ -18,7 +18,7 @@ class HouseholdMember extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['household_id', 'first_name', 'middle_name', 'last_name', 'birth_date', 'gender_id', 'relationship_id', 'is_household_head', 'can_report_for_household', 'contact_number', 'civil_status_id', 'occupation', 'education_level_id', 'is_graduate', 'is_pwd', 'is_senior', 'is_pregnant'];
+    protected $fillable = ['household_id', 'first_name', 'middle_name', 'last_name', 'profile_photo', 'birth_date', 'gender_id', 'relationship_id', 'is_household_head', 'can_report_for_household', 'contact_number', 'civil_status_id', 'occupation', 'education_level_id', 'is_graduate', 'is_pwd', 'is_senior', 'is_pregnant'];
 
     protected function casts(): array
     {
@@ -50,5 +50,3 @@ class HouseholdMember extends Model
         return $this->hasMany(MemberDisasterStatus::class, 'member_id', 'member_id');
     }
 }
-
-

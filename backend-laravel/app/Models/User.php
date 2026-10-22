@@ -39,7 +39,6 @@ class User extends Authenticatable
         'is_active',
         'must_change_password',
         'temp_password',
-        'profile_photo',
         'security_question_1',
         'security_answer_1',
         'security_question_2',
@@ -164,5 +163,4 @@ class User extends Authenticatable
         return $this->roleKey() === 'super_admin' || $this->isHqccLeader();
     }
 }
-
 

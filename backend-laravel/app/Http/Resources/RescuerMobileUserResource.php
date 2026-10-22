@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class RescuerMobileUserResource extends JsonResource
 {
@@ -18,6 +19,10 @@ class RescuerMobileUserResource extends JsonResource
             'display_username' => $this->username,
             'email' => $this->email,
             'contact_number' => $this->contact_number,
+            'profile_photo' => $this->relationLoaded('member') ? $this->member?->profile_photo : null,
+            'profile_photo_url' => $this->relationLoaded('member') && $this->member?->profile_photo
+                ? Storage::disk('public')->url($this->member->profile_photo)
+                : null,
             'role' => $this->whenLoaded('role', fn ($role): array => [
                 'role_key' => $role?->role_key,
                 'role_name' => $role?->role_name,
@@ -25,5 +30,3 @@ class RescuerMobileUserResource extends JsonResource
         ];
     }
 }
-
-

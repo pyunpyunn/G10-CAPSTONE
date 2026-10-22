@@ -1,21 +1,37 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Alert, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import Svg, { Circle, Path } from 'react-native-svg';
 import * as Location from 'expo-location';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
+import { storageUrl } from '@/api/client';
 import { reverseGeocodeAddress } from '@/utils/geocoding';
 import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection, HouseholdStatusIcon, statusColor } from './HouseholdUI';
 
 type ProfileProps = {
   overview: any;
   onUpdateGeotag: (payload: any) => Promise<void>;
+  onUploadPhoto: (payload: FormData) => Promise<void>;
+  onRemovePhoto: () => Promise<void>;
+  onUploadMemberPhoto: (memberId: string, payload: FormData) => Promise<void>;
+  onRemoveMemberPhoto: (memberId: string) => Promise<void>;
   onLogout: () => void;
+};
+
+type PendingPhoto = {
+  uri: string;
+  name: string;
+  type: string;
 };
 
 export function HouseholdProfileScreen({
   overview,
   onUpdateGeotag,
+  onUploadPhoto,
+  onRemovePhoto,
+  onUploadMemberPhoto,
+  onRemoveMemberPhoto,
   onLogout,
 }: ProfileProps) {
   const household = overview.profile?.household || {};
@@ -25,6 +41,14 @@ export function HouseholdProfileScreen({
   const currentStatus = overview.current_status || null;
   const selectedMemberId = String(user.member_id || members[0]?.member_id || '');
   const [savingGeotag, setSavingGeotag] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [pendingPhoto, setPendingPhoto] = useState<PendingPhoto | null>(null);
+  const [showPhotoPreview, setShowPhotoPreview] = useState(false);
+  const [showPhotoMenu, setShowPhotoMenu] = useState(false);
+  const [photoTarget, setPhotoTarget] = useState<any>(null);
+  const [showPhotoView, setShowPhotoView] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showNoPermission, setShowNoPermission] = useState(false);
   const selectedMember = useMemo(() => {
     return members.find((member: any) => String(member.member_id) === String(selectedMemberId)) || members[0] || null;
   }, [members, selectedMemberId]);
@@ -38,6 +62,116 @@ export function HouseholdProfileScreen({
   const householdIdentifier = household.household_id || user.username || 'No household ID';
   const memberCount = members.length || Number(household.member_count || 0);
   const hasGeotag = Boolean(geotag?.latitude && geotag?.longitude);
+  const profilePhotoUrl = profileImageUrl(user.profile_photo_url);
+  const ownPhotoTarget = members.find((member: any) => String(member.member_id) === String(user.member_id)) || user;
+  const activePhotoTarget = photoTarget
+    ? (String(photoTarget.member_id) === String(user.member_id)
+        ? user
+        : members.find((member: any) => String(member.member_id) === String(photoTarget.member_id)) || photoTarget)
+    : ownPhotoTarget;
+  const activePhotoMemberId = String(activePhotoTarget.member_id || user.member_id || '');
+  const canChangePhoto = user.can_report_for_household === true;
+
+  async function handlePickPhoto(target: any = activePhotoTarget) {
+    if (target !== activePhotoTarget) {
+      setPhotoTarget(target);
+    }
+
+    if (!canChangePhoto) {
+      setShowPhotoMenu(false);
+      setShowNoPermission(true);
+      return;
+    }
+
+    setShowPhotoMenu(false);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.9,
+    });
+
+    const asset = result.canceled ? null : result.assets[0];
+    if (!asset?.uri) return;
+
+    setPendingPhoto({
+      uri: asset.uri,
+      name: asset.fileName || 'profile-photo.jpg',
+      type: asset.mimeType || 'image/jpeg',
+    });
+    setShowPhotoPreview(true);
+  }
+
+  async function handleConfirmPhoto() {
+    if (!pendingPhoto) return;
+
+    setPhotoBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', {
+        uri: pendingPhoto.uri,
+        name: pendingPhoto.name,
+        type: pendingPhoto.type,
+      } as any);
+      if (activePhotoMemberId === String(user.member_id || '')) {
+        await onUploadPhoto(formData);
+      } else {
+        await onUploadMemberPhoto(activePhotoMemberId, formData);
+      }
+      setPendingPhoto(null);
+      setShowPhotoPreview(false);
+      Alert.alert('Profile picture updated', 'Your picture was saved to your account.');
+    } catch (error: any) {
+      Alert.alert('Unable to update profile picture', error?.response?.data?.message || 'Please try again.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function handleRemovePhoto() {
+    if (!canChangePhoto) {
+      setShowDeleteConfirm(false);
+      setShowNoPermission(true);
+      return;
+    }
+
+    setPhotoBusy(true);
+    try {
+      if (activePhotoMemberId === String(user.member_id || '')) {
+        await onRemovePhoto();
+      } else {
+        await onRemoveMemberPhoto(activePhotoMemberId);
+      }
+      setShowDeleteConfirm(false);
+      setShowPhotoMenu(false);
+      Alert.alert('Profile picture removed', 'Your default avatar is now shown.');
+    } catch (error: any) {
+      Alert.alert('Unable to remove profile picture', error?.response?.data?.message || 'Please try again.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  function handleAvatarPress(target: any = user) {
+    setPhotoTarget(target);
+    if (!canChangePhoto) {
+      setShowPhotoMenu(false);
+      setShowNoPermission(true);
+      return;
+    }
+
+    if (!profileImageUrl(target.profile_photo_url)) {
+      void handlePickPhoto(target);
+      return;
+    }
+
+    setShowPhotoMenu((current) => !current);
+  }
+
+  function handleViewPhoto() {
+    setShowPhotoMenu(false);
+    setShowPhotoView(true);
+  }
 
   async function handleUpdateGeotag() {
     const permission = await Location.requestForegroundPermissionsAsync();
@@ -90,8 +224,38 @@ export function HouseholdProfileScreen({
         <Text style={styles.userInfoTitle}>User information</Text>
 
         <View style={styles.devicePanel}>
-          <View style={styles.memberAvatar}>
-            <Text style={styles.memberAvatarText}>{initials(deviceOwnerName)}</Text>
+          <View style={[
+            styles.avatarAnchor,
+            showPhotoMenu && String(photoTarget?.member_id) === String(user.member_id) && styles.avatarAnchorActive,
+          ]}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.memberAvatar,
+                showPhotoMenu && String(photoTarget?.member_id) === String(user.member_id) && styles.memberAvatarSelected,
+                pressed && styles.memberAvatarPressed,
+              ]}
+              onPress={() => handleAvatarPress(user)}
+              accessibilityRole="button"
+              accessibilityLabel={profilePhotoUrl ? 'Open profile picture options' : 'Add profile picture'}
+            >
+              {profilePhotoUrl ? <Image source={{ uri: profilePhotoUrl }} style={styles.memberAvatarImage} /> : <Text style={styles.memberAvatarText}>{initials(deviceOwnerName)}</Text>}
+            </Pressable>
+            {showPhotoMenu && String(photoTarget?.member_id) === String(user.member_id) ? (
+              <View style={styles.photoMenu}>
+                <Pressable style={styles.photoMenuItem} onPress={handleViewPhoto}>
+                  <Ionicons name="eye-outline" size={17} color={palette.nav} />
+                  <Text style={styles.photoMenuText}>View</Text>
+                </Pressable>
+                <Pressable style={styles.photoMenuItem} onPress={() => void handlePickPhoto()}>
+                  <Ionicons name="image-outline" size={17} color={palette.nav} />
+                  <Text style={styles.photoMenuText}>Update Photo</Text>
+                </Pressable>
+                <Pressable style={styles.photoMenuItem} onPress={() => { setShowPhotoMenu(false); setShowDeleteConfirm(true); }}>
+                  <Ionicons name="trash-outline" size={17} color={palette.brandRed} />
+                  <Text style={[styles.photoMenuText, styles.photoMenuDanger]}>Delete Photo</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
           <View style={styles.panelText}>
             <Text style={styles.panelTitle}>{deviceOwnerName}</Text>
@@ -116,9 +280,46 @@ export function HouseholdProfileScreen({
               const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'Household member';
 
               return (
-                <View key={memberKey} style={[styles.memberRow, index === householdMembers.length - 1 && styles.memberRowLast]}>
-                  <View style={styles.memberAvatar}>
-                    <Text style={styles.memberAvatarText}>{initials(memberName)}</Text>
+                <View
+                  key={memberKey}
+                  style={[
+                    styles.memberRow,
+                    index === householdMembers.length - 1 && styles.memberRowLast,
+                    showPhotoMenu && String(photoTarget?.member_id) === String(member.member_id) && styles.memberRowActive,
+                  ]}
+                >
+                  <View style={[
+                    styles.avatarAnchor,
+                    showPhotoMenu && String(photoTarget?.member_id) === String(member.member_id) && styles.avatarAnchorActive,
+                  ]}>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.memberAvatar,
+                        showPhotoMenu && String(photoTarget?.member_id) === String(member.member_id) && styles.memberAvatarSelected,
+                        pressed && styles.memberAvatarPressed,
+                      ]}
+                      onPress={() => handleAvatarPress(member)}
+                      accessibilityRole="button"
+                      accessibilityLabel={member.profile_photo_url ? `Open photo options for ${memberName}` : `Add photo for ${memberName}`}
+                    >
+                      {profileImageUrl(member.profile_photo_url) ? <Image source={{ uri: profileImageUrl(member.profile_photo_url) }} style={styles.memberAvatarImage} /> : <Text style={styles.memberAvatarText}>{initials(memberName)}</Text>}
+                    </Pressable>
+                    {showPhotoMenu && String(photoTarget?.member_id) === String(member.member_id) ? (
+                      <View style={styles.photoMenu}>
+                        <Pressable style={styles.photoMenuItem} onPress={handleViewPhoto}>
+                          <Ionicons name="eye-outline" size={17} color={palette.nav} />
+                          <Text style={styles.photoMenuText}>View</Text>
+                        </Pressable>
+                        <Pressable style={styles.photoMenuItem} onPress={() => void handlePickPhoto(member)}>
+                          <Ionicons name="image-outline" size={17} color={palette.nav} />
+                          <Text style={styles.photoMenuText}>Update Photo</Text>
+                        </Pressable>
+                        <Pressable style={styles.photoMenuItem} onPress={() => { setShowPhotoMenu(false); setShowDeleteConfirm(true); }}>
+                          <Ionicons name="trash-outline" size={17} color={palette.brandRed} />
+                          <Text style={[styles.photoMenuText, styles.photoMenuDanger]}>Delete Photo</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
                   </View>
                   <View style={styles.panelText}>
                     <Text style={styles.panelTitle}>{memberName}</Text>
@@ -136,6 +337,13 @@ export function HouseholdProfileScreen({
           </View>
         ) : null}
       </View>
+
+      {!profilePhotoUrl ? (
+        <View style={styles.card}>
+          <HouseholdSection title="Profile picture" />
+          <Text style={styles.panelMeta}>Tap the profile icon above to add a JPEG, PNG, or WebP image up to 5 MB.</Text>
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <HouseholdSection
@@ -177,6 +385,53 @@ export function HouseholdProfileScreen({
       </View>
 
       <HouseholdButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
+
+      <Modal visible={showPhotoPreview} transparent animationType="fade" onRequestClose={() => !photoBusy && setShowPhotoPreview(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Preview profile picture</Text>
+            {pendingPhoto ? <Image source={{ uri: pendingPhoto.uri }} style={styles.previewImage} /> : null}
+            <Text style={styles.modalNote}>Save this image as your profile picture?</Text>
+            <View style={styles.modalActions}>
+              <HouseholdButton label="Cancel" tone="gray" disabled={photoBusy} onPress={() => setShowPhotoPreview(false)} />
+              <HouseholdButton label={photoBusy ? 'Saving...' : 'Confirm and save'} disabled={photoBusy} onPress={() => void handleConfirmPhoto()} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showPhotoView} transparent animationType="fade" onRequestClose={() => setShowPhotoView(false)}>
+        <View style={styles.photoViewBackdrop}>
+          <Pressable style={styles.photoViewClose} onPress={() => setShowPhotoView(false)} accessibilityRole="button" accessibilityLabel="Close profile photo">
+            <Ionicons name="close" size={28} color="#fff" />
+          </Pressable>
+          {profileImageUrl(activePhotoTarget.profile_photo_url) ? <Image source={{ uri: profileImageUrl(activePhotoTarget.profile_photo_url) }} style={styles.photoViewImage} resizeMode="contain" /> : null}
+        </View>
+      </Modal>
+
+      <Modal visible={showDeleteConfirm} transparent animationType="fade" onRequestClose={() => !photoBusy && setShowDeleteConfirm(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Delete Photo</Text>
+            <Text style={styles.modalNote}>Are you sure you want to remove your profile picture?</Text>
+            <View style={styles.modalActions}>
+              <HouseholdButton label="Cancel" tone="gray" disabled={photoBusy} onPress={() => setShowDeleteConfirm(false)} />
+              <HouseholdButton label={photoBusy ? 'Deleting...' : 'Delete Photo'} tone="danger" disabled={photoBusy} onPress={() => void handleRemovePhoto()} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showNoPermission} transparent animationType="fade" onRequestClose={() => setShowNoPermission(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Ionicons name="lock-closed-outline" size={30} color={palette.brandRed} />
+            <Text style={styles.modalTitle}>No Permission</Text>
+            <Text style={styles.modalNote}>You do not have the required permissions to change this profile picture.</Text>
+            <HouseholdButton label="Close" tone="gray" onPress={() => setShowNoPermission(false)} />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -237,6 +492,21 @@ function initials(value: string) {
     .join('');
 }
 
+function profileImageUrl(value: unknown): string {
+  if (!value) {
+    return '';
+  }
+
+  const photo = String(value);
+  const storageIndex = photo.indexOf('/storage/');
+
+  if (storageIndex >= 0) {
+    return storageUrl(photo.slice(storageIndex + '/storage/'.length));
+  }
+
+  return /^https?:\/\//i.test(photo) ? photo : storageUrl(photo);
+}
+
 function memberRelationship(member: any) {
   return member?.relationship || member?.relation || 'Member';
 }
@@ -279,6 +549,11 @@ const styles = StyleSheet.create({
     borderRadius: 31,
     backgroundColor: '#fff',
   },
+  avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
   heroText: {
     flex: 1,
     minWidth: 0,
@@ -312,6 +587,8 @@ const styles = StyleSheet.create({
   userInfoCard: {
     gap: 0,
     padding: spacing.md,
+    zIndex: 20,
+    elevation: 20,
   },
   userInfoTitle: {
     marginBottom: spacing.xs,
@@ -342,6 +619,13 @@ const styles = StyleSheet.create({
   memberRowLast: {
     borderBottomWidth: 0,
   },
+  memberRowActive: {
+    zIndex: 30,
+    elevation: 30,
+  },
+  memberRowPressed: {
+    backgroundColor: '#f2f6fa',
+  },
   memberAvatar: {
     width: 36,
     height: 36,
@@ -350,10 +634,120 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: palette.secondary,
   },
+  memberAvatarPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.92 }],
+    backgroundColor: '#dbe7f3',
+  },
+  memberAvatarSelected: {
+    borderWidth: 2,
+    borderColor: palette.navActive,
+    backgroundColor: '#e8f1fb',
+  },
+  avatarAnchor: {
+    position: 'relative',
+    zIndex: 5,
+  },
+  avatarAnchorActive: {
+    zIndex: 50,
+    elevation: 50,
+  },
   memberAvatarText: {
     color: palette.brandRed,
     fontSize: 12,
     fontWeight: '800',
+  },
+  memberAvatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  photoMenu: {
+    position: 'absolute',
+    top: 44,
+    left: 0,
+    zIndex: 20,
+    width: 170,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    paddingVertical: 4,
+    backgroundColor: palette.card,
+    shadowColor: '#000',
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 8,
+  },
+  photoMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  photoMenuText: {
+    color: palette.nav,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  photoMenuDanger: {
+    color: palette.brandRed,
+  },
+  modalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    backgroundColor: '#0b1728aa',
+  },
+  photoViewBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000ee',
+  },
+  photoViewClose: {
+    position: 'absolute',
+    top: 52,
+    right: 20,
+    zIndex: 2,
+    padding: spacing.sm,
+  },
+  photoViewImage: {
+    width: '92%',
+    height: '78%',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    backgroundColor: palette.card,
+  },
+  modalTitle: {
+    color: palette.text,
+    fontSize: 17,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  modalNote: {
+    color: palette.textSoft,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  previewImage: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: palette.secondary,
+  },
+  modalActions: {
+    width: '100%',
+    gap: spacing.sm,
   },
   panelText: {
     flex: 1,

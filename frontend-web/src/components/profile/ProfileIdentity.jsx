@@ -1,4 +1,7 @@
-export default function ProfileIdentity({ identity = {}, barangayProfile = {}, settingsMenu = null }) {
+import { useRef } from 'react'
+
+export default function ProfileIdentity({ identity = {}, barangayProfile = {}, settingsMenu = null, onUploadPhoto, onRemovePhoto, photoBusy = false, photoError = '' }) {
+  const fileInput = useRef(null)
   const name = identity.name || 'Name not recorded'
   const barangayName = barangayProfile.name || 'Registered barangay'
   const registered = barangayProfile.registered_barangay || {}
@@ -26,7 +29,9 @@ export default function ProfileIdentity({ identity = {}, barangayProfile = {}, s
     <section className="profile-identity profile-identity-large">
       <div className="profile-hero-block">
         <div className="profile-hero-main">
-          <div className="profile-page-avatar">{initials(name)}</div>
+          <div className="profile-page-avatar">
+            {identity.profile_photo_url ? <img src={identity.profile_photo_url} alt="Profile" /> : initials(name)}
+          </div>
           <div className="profile-hero-copy">
             <div className="profile-kicker">HQ/Admin profile</div>
             <div className="profile-name">{name}</div>
@@ -37,6 +42,24 @@ export default function ProfileIdentity({ identity = {}, barangayProfile = {}, s
             </div>
           </div>
         </div>
+        {onUploadPhoto && <div className="profile-photo-actions">
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ''
+              if (file) onUploadPhoto(file)
+            }}
+          />
+          <button type="button" className="btn btn-secondary btn-sm" disabled={photoBusy} onClick={() => fileInput.current?.click()}>
+            {photoBusy ? 'Saving...' : identity.profile_photo_url ? 'Replace picture' : 'Upload picture'}
+          </button>
+          {identity.profile_photo_url && <button type="button" className="btn btn-danger btn-sm" disabled={photoBusy} onClick={onRemovePhoto}>Remove picture</button>}
+          {photoError && <span className="form-error" role="alert">{photoError}</span>}
+        </div>}
         {settingsMenu && <div className="profile-hero-settings">{settingsMenu}</div>}
       </div>
 

@@ -5,6 +5,7 @@ namespace App\Presenters;
 use Carbon\Carbon;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 class ProfilePresenter
 {
@@ -43,6 +44,10 @@ class ProfilePresenter
             'assigned_station' => $user->assigned_center_id ?: 'Command desk',
             'role_name' => $user->roleName() ?: 'Unassigned',
             'role_key' => $user->roleKey() ?: 'unassigned',
+            'profile_photo' => $user->relationLoaded('member') ? $user->member?->profile_photo : null,
+            'profile_photo_url' => $user->relationLoaded('member') && $user->member?->profile_photo
+                ? Storage::disk('public')->url($user->member->profile_photo)
+                : null,
         ];
     }
 
@@ -135,5 +140,3 @@ class ProfilePresenter
         return ucwords(str_replace(['_', '-'], ' ', $value ?? 'Unknown'));
     }
 }
-
-

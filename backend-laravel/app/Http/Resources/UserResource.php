@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Presenters\UserRolePresenter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -24,6 +25,10 @@ class UserResource extends JsonResource
             'username' => $this->username,
             'email' => $this->email,
             'contact_number' => $this->contact_number,
+            'profile_photo' => $this->relationLoaded('member') ? $this->member?->profile_photo : null,
+            'profile_photo_url' => $this->relationLoaded('member') && $this->member?->profile_photo
+                ? Storage::disk('public')->url($this->member->profile_photo)
+                : null,
             'assigned_center_id' => $this->assigned_center_id,
             'household_id' => $this->household_id,
             'is_active' => (bool) $this->is_active,
@@ -40,5 +45,3 @@ class UserResource extends JsonResource
         ];
     }
 }
-
-

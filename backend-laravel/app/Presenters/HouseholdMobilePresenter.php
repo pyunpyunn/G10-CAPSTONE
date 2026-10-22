@@ -4,6 +4,7 @@ namespace App\Presenters;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class HouseholdMobilePresenter
 {
@@ -33,6 +34,9 @@ class HouseholdMobilePresenter
             'username' => $user->username,
             'email' => $user->email,
             'contact_number' => $user->contact_number,
+            'profile_photo' => $member?->profile_photo,
+            'profile_photo_url' => $member?->profile_photo ? Storage::disk('public')->url($member->profile_photo) : null,
+            'can_report_for_household' => (bool) ($member?->can_report_for_household ?? false),
             'role' => [
                 'role_key' => $user->role?->role_key,
                 'role_name' => $user->role?->role_name,
@@ -151,5 +155,3 @@ class HouseholdMobilePresenter
         ];
     }
 }
-
-

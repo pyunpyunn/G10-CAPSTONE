@@ -26,7 +26,7 @@ class HouseholdMobileService
 
     public function overview(Request $request): JsonResponse
     {
-        $user = $request->user()?->load('role');
+        $user = $request->user()?->load('role', 'member');
         $householdId = $this->householdId($user);
 
         if (! $householdId) {
@@ -1527,6 +1527,8 @@ class HouseholdMobileService
             $this->optionalColumnSelect('household_members', 'first_name', 'first_name'),
             $this->optionalColumnSelect('household_members', 'middle_name', 'middle_name'),
             $this->optionalColumnSelect('household_members', 'last_name', 'last_name'),
+            $this->optionalColumnSelect('household_members', 'profile_photo', 'profile_photo'),
+            $this->optionalColumnSelect('household_members', 'can_report_for_household', 'can_report_for_household'),
             $this->firstExistingColumnSelect('household_members', ['relation', 'relationship'], 'relation'),
             $this->optionalColumnSelect('household_members', 'relationship_id', 'relationship_id'),
             $this->optionalColumnSelect('household_members', 'age', 'age'),
@@ -1566,6 +1568,9 @@ class HouseholdMobileService
                     'first_name' => $member->first_name ?? null,
                     'middle_name' => $member->middle_name ?? null,
                     'last_name' => $member->last_name ?? null,
+                    'profile_photo' => $member->profile_photo ?? null,
+                    'profile_photo_url' => $member->profile_photo ? \Illuminate\Support\Facades\Storage::disk('public')->url($member->profile_photo) : null,
+                    'can_report_for_household' => (bool) ($member->can_report_for_household ?? false),
                     'relationship' => $member->relationship_title ?: $member->relation ?: 'Member',
                     'relationship_id' => $member->relationship_id ?? null,
                     'age' => $member->age ?? null,
@@ -2398,6 +2403,8 @@ class HouseholdMobileService
                     $this->optionalColumnSelect('household_members', 'first_name', 'first_name'),
                     $this->optionalColumnSelect('household_members', 'middle_name', 'middle_name'),
                     $this->optionalColumnSelect('household_members', 'last_name', 'last_name'),
+                    $this->optionalColumnSelect('household_members', 'profile_photo', 'profile_photo'),
+                    $this->optionalColumnSelect('household_members', 'can_report_for_household', 'can_report_for_household'),
                     $this->firstExistingColumnSelect('household_members', ['relation', 'relationship'], 'relation'),
                     $this->optionalColumnSelect('relationships', 'relationship_label', 'relationship_title'),
                 ]);
@@ -2417,6 +2424,9 @@ class HouseholdMobileService
             'username' => $user->username,
             'email' => $user->email,
             'contact_number' => $user->contact_number,
+            'profile_photo' => $member?->profile_photo,
+            'profile_photo_url' => $member?->profile_photo ? \Illuminate\Support\Facades\Storage::disk('public')->url($member->profile_photo) : null,
+            'can_report_for_household' => (bool) ($member?->can_report_for_household ?? false),
             'role' => [
                 'role_key' => $user->role?->role_key,
                 'role_name' => $user->role?->role_name,

@@ -4,6 +4,7 @@ namespace App\Queries;
 
 use App\Presenters\HouseholdMobilePresenter;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use App\Support\RequestSchema as Schema;
 use Illuminate\Support\Str;
 
@@ -388,6 +389,8 @@ class HouseholdMobileReadQuery
             $this->optionalColumnSelect('household_members', 'first_name', 'first_name'),
             $this->optionalColumnSelect('household_members', 'middle_name', 'middle_name'),
             $this->optionalColumnSelect('household_members', 'last_name', 'last_name'),
+            $this->optionalColumnSelect('household_members', 'profile_photo', 'profile_photo'),
+            $this->optionalColumnSelect('household_members', 'can_report_for_household', 'can_report_for_household'),
             $this->firstExistingColumnSelect('household_members', ['relation', 'relationship'], 'relation'),
             $this->optionalColumnSelect('household_members', 'relationship_id', 'relationship_id'),
             $this->optionalColumnSelect('household_members', 'age', 'age'),
@@ -418,6 +421,9 @@ class HouseholdMobileReadQuery
                     'first_name' => $member->first_name ?? null,
                     'middle_name' => $member->middle_name ?? null,
                     'last_name' => $member->last_name ?? null,
+                    'profile_photo' => $member->profile_photo ?? null,
+                    'profile_photo_url' => $member->profile_photo ? Storage::disk('public')->url($member->profile_photo) : null,
+                    'can_report_for_household' => (bool) ($member->can_report_for_household ?? false),
                     'relationship' => $member->relation ?: 'Member',
                     'relationship_id' => $member->relationship_id ?? null,
                     'age' => $member->age ?? null,
@@ -882,6 +888,8 @@ class HouseholdMobileReadQuery
                 $this->optionalColumnSelect('household_members', 'first_name', 'first_name'),
                 $this->optionalColumnSelect('household_members', 'middle_name', 'middle_name'),
                 $this->optionalColumnSelect('household_members', 'last_name', 'last_name'),
+                $this->optionalColumnSelect('household_members', 'profile_photo', 'profile_photo'),
+                $this->optionalColumnSelect('household_members', 'can_report_for_household', 'can_report_for_household'),
             ]);
     }
 
@@ -947,5 +955,3 @@ class HouseholdMobileReadQuery
         return DB::raw("NULL as {$alias}");
     }
 }
-
-

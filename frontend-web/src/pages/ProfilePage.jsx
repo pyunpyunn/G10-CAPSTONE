@@ -2,7 +2,7 @@ import { showAuthError, getRememberedLogin, saveRememberedPassword } from '../ap
 import { KeyRound, Pencil, Settings, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { changePassword, getProfile, updateProfile } from '../api/profileApi'
+import { changePassword, getProfile, removeProfilePhoto, updateProfile, uploadProfilePhoto } from '../api/profileApi'
 import ActionMenu from '../components/ui/ActionMenu'
 import DeleteAccountModal from '../components/profile/DeleteAccountModal'
 import PasswordModal from '../components/profile/PasswordModal'
@@ -29,6 +29,8 @@ export default function ProfilePage() {
   const [passwordValues, setPasswordValues] = useState(passwordForm())
   const [profileFormError, setProfileFormError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isPhotoBusy, setIsPhotoBusy] = useState(false)
+  const [photoError, setPhotoError] = useState('')
 
   useEffect(() => {
     loadProfile()
@@ -124,6 +126,34 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleUploadPhoto(file) {
+    setIsPhotoBusy(true)
+    setPhotoError('')
+    try {
+      await uploadProfilePhoto(file)
+      setMessage('Profile picture updated.')
+      await loadProfile(false)
+    } catch (photoSaveError) {
+      setPhotoError(profileErrorMessage(photoSaveError, 'Unable to update profile picture.'))
+    } finally {
+      setIsPhotoBusy(false)
+    }
+  }
+
+  async function handleRemovePhoto() {
+    setIsPhotoBusy(true)
+    setPhotoError('')
+    try {
+      await removeProfilePhoto()
+      setMessage('Profile picture removed. The default avatar is now shown.')
+      await loadProfile(false)
+    } catch (photoSaveError) {
+      setPhotoError(profileErrorMessage(photoSaveError, 'Unable to remove profile picture.'))
+    } finally {
+      setIsPhotoBusy(false)
+    }
+  }
+
   const profileActions = [
     { label: 'Edit profile', icon: Pencil, onClick: openEditModal, disabled: !payload },
     { label: 'Change password', icon: KeyRound, onClick: openPasswordModal, disabled: !payload },
@@ -143,6 +173,10 @@ export default function ProfilePage() {
           <ProfileIdentity
             identity={payload.identity || {}}
             barangayProfile={payload.barangay_profile || {}}
+            onUploadPhoto={handleUploadPhoto}
+            onRemovePhoto={handleRemovePhoto}
+            photoBusy={isPhotoBusy}
+            photoError={photoError}
             settingsMenu={(
               <ActionMenu
                 label="Profile settings"

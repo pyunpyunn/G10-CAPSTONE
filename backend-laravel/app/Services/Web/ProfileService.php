@@ -15,7 +15,7 @@ class ProfileService
 
     public function show(Request $request): array
     {
-        $user = $request->user()->load('role');
+        $user = $request->user()->load('role', 'member');
         return [
             'user' => $user,
             'last_seen' => $this->query->lastSeen($user),
@@ -39,7 +39,6 @@ class ProfileService
         return $this->workflow->updateBarangay($request);
     }
 }
-
 
 
 

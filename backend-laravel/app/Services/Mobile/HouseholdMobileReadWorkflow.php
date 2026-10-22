@@ -18,7 +18,7 @@ class HouseholdMobileReadWorkflow
 
     public function overview(Request $request): JsonResponse
     {
-        $user = $request->user()?->load('role');
+        $user = $request->user()?->load('role', 'member');
         $householdId = $this->support->householdId($user);
         if (! $householdId) {
             return response()->json(['message' => 'This account is not linked to a household record.'], 403);
@@ -80,7 +80,6 @@ class HouseholdMobileReadWorkflow
         return response()->json(['data' => ['qr' => $this->presenter->qrPayload($household, $this->query->activeEvent())]]);
     }
 }
-
 
 
 

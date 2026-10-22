@@ -29,6 +29,10 @@ import {
   respondToTrustedHousehold,
   updateHouseholdDeviceLocation,
   updateHouseholdMember,
+  uploadProfilePhoto,
+  removeProfilePhoto,
+  uploadHouseholdMemberPhoto,
+  removeHouseholdMemberPhoto,
   verifyTrustedPin,
 } from '@/api/household';
 import type { HouseholdOverview } from '@/api/household';
@@ -266,6 +270,26 @@ export default function HouseholdHomeScreen() {
       Alert.alert('Unable to update geotag', errorMessage(error));
       throw error;
     }
+  }
+
+  async function handleUploadProfilePhoto(formData: FormData) {
+    await uploadProfilePhoto(formData);
+    await loadOverview(true);
+  }
+
+  async function handleRemoveProfilePhoto() {
+    await removeProfilePhoto();
+    await loadOverview(true);
+  }
+
+  async function handleUploadHouseholdMemberPhoto(memberId: string, formData: FormData) {
+    await uploadHouseholdMemberPhoto(memberId, formData);
+    await loadOverview(true);
+  }
+
+  async function handleRemoveHouseholdMemberPhoto(memberId: string) {
+    await removeHouseholdMemberPhoto(memberId);
+    await loadOverview(true);
   }
 
   async function handleUpdateMember(memberId: string, payload: any) {
@@ -611,6 +635,10 @@ export default function HouseholdHomeScreen() {
         <HouseholdProfileScreen
           overview={overview}
           onUpdateGeotag={handleUpdateGeotag}
+          onUploadPhoto={handleUploadProfilePhoto}
+          onRemovePhoto={handleRemoveProfilePhoto}
+          onUploadMemberPhoto={handleUploadHouseholdMemberPhoto}
+          onRemoveMemberPhoto={handleRemoveHouseholdMemberPhoto}
           onLogout={handleLogout}
         />
       );
