@@ -299,9 +299,31 @@ class TrackingAidForwardingService
         };
     }
 
-    private function readTableAvailable(string $connection, string $table): bool
+    private function isHostReachable(string $connection): bool
     {
         if (static::$isUnreachable) {
+            return false;
+        }
+
+        $host = (string) config("database.connections.{$connection}.host");
+        $port = (int) (config("database.connections.{$connection}.port") ?: 3306);
+
+        if ($host !== '' && ! in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
+            $fp = @fsockopen($host, $port, $errno, $errstr, 0.4);
+            if (! $fp) {
+                static::$isUnreachable = true;
+
+                return false;
+            }
+            fclose($fp);
+        }
+
+        return true;
+    }
+
+    private function readTableAvailable(string $connection, string $table): bool
+    {
+        if (static::$isUnreachable || ! $this->isHostReachable($connection)) {
             return false;
         }
 
@@ -334,6 +356,10 @@ class TrackingAidForwardingService
         }
 
         $connection = (string) config('services.trackingaid.connection', 'trackingaid');
+
+        if (static::$isUnreachable || ! $this->isHostReachable($connection)) {
+            return ['deducted' => 0, 'remaining' => 0, 'error' => 'TrackingAid DB unreachable'];
+        }
 
         try {
             config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 2]);
@@ -426,6 +452,10 @@ class TrackingAidForwardingService
         }
 
         $connection = (string) config('services.trackingaid.connection', 'trackingaid');
+
+        if (static::$isUnreachable || ! $this->isHostReachable($connection)) {
+            return ['restored' => 0, 'error' => 'TrackingAid DB unreachable'];
+        }
 
         try {
             config(["database.connections.{$connection}.options." . \PDO::ATTR_TIMEOUT => 2]);
