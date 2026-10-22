@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import {
   Activity,
   ArrowRight,
+  Box,
   Boxes,
   Calendar,
   CheckCircle2,
@@ -27,13 +28,36 @@ import RequestTypeFilterDrawer from '../components/resources/RequestTypeFilterDr
 import DeclareRequestTypeModal from '../components/resources/DeclareRequestTypeModal'
 import RequestResourceModal from '../components/resources/RequestResourceModal'
 
-function getCategoryIcon(categoryKey = '') {
-  const key = String(categoryKey).toLowerCase()
-  if (key.includes('food') || key.includes('water')) return { icon: Package, pillClass: 'cat-pill-food' }
-  if (key.includes('med') || key.includes('health')) return { icon: Activity, pillClass: 'cat-pill-medical' }
-  if (key.includes('rescue') || key.includes('gear')) return { icon: LifeBuoy, pillClass: 'cat-pill-rescue' }
-  if (key.includes('shelter') || key.includes('tent')) return { icon: ShieldAlert, pillClass: 'cat-pill-shelter' }
-  return { icon: Boxes, pillClass: 'cat-pill-default' }
+function getCategoryDisplay(item) {
+  const catKey = [
+    item.category_key,
+    item.category_label,
+    item.category,
+    item.type,
+    item.classification,
+    item.name,
+    item.label,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  if (catKey.includes('med') || catKey.includes('health') || catKey.includes('trauma') || catKey.includes('first aid'))
+    return 'Medical kit'
+  if (catKey.includes('food') || catKey.includes('water') || catKey.includes('meal') || catKey.includes('ration') || catKey.includes('noodle'))
+    return 'Food & water'
+  if (catKey.includes('comm') || catKey.includes('radio') || catKey.includes('cable'))
+    return 'Communications'
+  if (catKey.includes('rescue') || catKey.includes('gear') || catKey.includes('boat') || catKey.includes('vest'))
+    return 'Rescue equipment'
+  if (catKey.includes('shelter') || catKey.includes('tent') || catKey.includes('blanket'))
+    return 'Emergency shelter'
+
+  if (item.type && item.type.toLowerCase() !== 'resource') return item.type
+  if (item.classification && item.classification.toLowerCase() !== 'resource') return item.classification
+  if (item.category_label && item.category_label.toLowerCase() !== 'resource') return item.category_label
+  if (item.category && item.category.toLowerCase() !== 'resource') return item.category
+  return 'Relief goods'
 }
 
 export default function RequestTypesPage() {
@@ -321,7 +345,7 @@ export default function RequestTypesPage() {
                 <RequestTypeCard
                   key={item.id || item.sku || index}
                   item={item}
-                  isFirst={index === 0}
+                  isSelected={Boolean(selectedItem && (selectedItem.id === item.id || (selectedItem.sku && selectedItem.sku === item.sku)))}
                   onSelect={handleSelectItem}
                   onRequestNow={handleRequestNow}
                 />
@@ -333,46 +357,103 @@ export default function RequestTypesPage() {
             <table>
               <thead>
                 <tr>
-                  <th>SKU / Code</th>
-                  <th>Relief Resource Item</th>
-                  <th>Category</th>
-                  <th>Classification</th>
-                  <th>Depot Location</th>
-                  <th>Current Stock</th>
-                  <th>Availability</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <th style={{ whiteSpace: 'nowrap', width: '12%' }}>SKU / Code</th>
+                  <th style={{ whiteSpace: 'nowrap', width: '22%' }}>Relief Resource Item</th>
+                  <th style={{ whiteSpace: 'nowrap', width: '13%' }}>Category</th>
+                  <th style={{ whiteSpace: 'nowrap', width: '13%' }}>Classification</th>
+                  <th style={{ whiteSpace: 'nowrap', width: '16%' }}>Depot Location</th>
+                  <th style={{ whiteSpace: 'nowrap', width: '8%' }}>Current Stock</th>
+                  <th style={{ whiteSpace: 'nowrap', width: '8%' }}>Availability</th>
+                  <th
+                    style={{
+                      textAlign: 'right',
+                      whiteSpace: 'nowrap',
+                      width: '8%',
+                      position: 'sticky',
+                      right: 0,
+                      background: 'var(--color-bg-secondary, #f8fafc)',
+                      zIndex: 2,
+                      boxShadow: '-4px 0 6px -2px rgba(0,0,0,0.04)',
+                      paddingRight: '12px',
+                    }}
+                  >
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, index) => {
-                  const isOutOfStock = Boolean(item.is_out_of_stock || item.quantity <= 0)
-                  const catMeta = getCategoryIcon(item.category_key || item.category)
-                  const CatIcon = catMeta.icon
+                  const quantity = Number(item.quantity ?? 0)
+                  const isOutOfStock = Boolean(item.is_out_of_stock || quantity <= 0)
+                  const isLowStock = !isOutOfStock && quantity <= 20
+                  const isNew = Boolean(item.is_new)
+                  const categoryLabel = getCategoryDisplay(item)
+
+                  const rawLocation =
+                    item.storage_location ||
+                    item.location ||
+                    item.depot_location ||
+                    item.detail ||
+                    'Barangay Resource Depot'
+                  const locationText = rawLocation.replace(/^Evacuation:\s*/i, '')
+
+                  const itemSku =
+                    item.sku ||
+                    item.tracking_reference ||
+                    (item.id
+                      ? String(item.id).startsWith('TA-') || String(item.id).startsWith('RR-')
+                        ? item.id
+                        : `TA-${item.id}`
+                      : '—')
+
+                  const unitText = item.unit || 'units'
+                  const classificationText =
+                    item.classification && item.classification.toLowerCase() !== 'resource'
+                      ? item.classification
+                      : item.type && item.type.toLowerCase() !== 'resource' && item.type.toLowerCase() !== categoryLabel.toLowerCase()
+                        ? item.type
+                        : 'Consumable'
+
                   return (
                     <tr
                       key={item.id || item.sku || index}
                       onClick={() => handleSelectItem(item)}
                       style={{ cursor: 'pointer' }}
                     >
-                      <td>
-                        <strong style={{ fontFamily: 'monospace', color: 'var(--color-text-1)' }}>
-                          {item.sku || `ITEM-${item.id}`}
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <strong style={{ fontFamily: 'monospace', color: 'var(--color-text-1)', fontSize: '12.5px' }}>
+                          {itemSku}
                         </strong>
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <div
-                            className={`card-category-avatar ${catMeta.pillClass}`}
+                            className="card-category-icon-box"
                             style={{ width: '28px', height: '28px', borderRadius: '6px', flexShrink: 0 }}
                           >
-                            <CatIcon size={14} />
+                            <Box size={14} strokeWidth={2.2} />
                           </div>
-                          <div>
-                            <div style={{ fontWeight: 650, color: 'var(--color-text-1)', fontSize: '13px' }}>
-                              {item.name || item.label}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <span
+                                style={{
+                                  fontWeight: 650,
+                                  color: 'var(--color-text-1)',
+                                  fontSize: '12.5px',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={item.name || item.label}
+                              >
+                                {item.name || item.label}
+                              </span>
+                              {isNew && (
+                                <span className="human-new-badge" style={{ fontSize: '9.5px', padding: '1px 5px' }}>
+                                  New
+                                </span>
+                              )}
                             </div>
                             {item.expiration_date && (
-                              <div style={{ fontSize: '11px', color: '#b45309', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <div style={{ fontSize: '10.5px', color: '#b45309', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '1px', whiteSpace: 'nowrap' }}>
                                 <Calendar size={10} />
                                 <span>Exp: {item.expiration_date}</span>
                               </div>
@@ -380,66 +461,89 @@ export default function RequestTypesPage() {
                           </div>
                         </div>
                       </td>
-                      <td>
-                        <span className="channel-chip hq">
-                          {item.category_label || item.category || 'Relief Goods'}
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--color-text-2)', fontSize: '12px' }}>
+                          {categoryLabel}
+                        </span>
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-3)', fontWeight: 500 }}>
+                          {classificationText}
                         </span>
                       </td>
                       <td>
-                        <span style={{ fontSize: '12px', color: 'var(--color-text-2)', fontWeight: 550 }}>
-                          {item.type || 'Consumable'}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--color-text-3)' }}>
-                          <MapPin size={11} style={{ flexShrink: 0 }} />
-                          <span>{item.storage_location || 'Warehouse Depot'}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                          <strong style={{ fontSize: '14px', color: isOutOfStock ? 'var(--color-text-3)' : 'var(--color-text-1)' }}>
-                            {isOutOfStock ? 0 : Number(item.quantity).toLocaleString()}
-                          </strong>
-                          <span style={{ fontSize: '11px', color: 'var(--color-text-3)' }}>
-                            {item.unit || 'units'}
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '12px',
+                            color: 'var(--color-text-2)',
+                            maxWidth: '100%',
+                          }}
+                          title={locationText}
+                        >
+                          <MapPin size={11} style={{ color: 'var(--color-text-3)', flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {locationText}
                           </span>
                         </div>
                       </td>
-                      <td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
+                          <strong style={{ fontSize: '13.5px', color: isOutOfStock ? 'var(--color-text-3)' : 'var(--color-text-1)' }}>
+                            {isOutOfStock ? 0 : quantity.toLocaleString()}
+                          </strong>
+                          <span style={{ fontSize: '11px', color: 'var(--color-text-3)' }}>
+                            {unitText}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
                         {isOutOfStock ? (
-                          <Badge tone="danger">Out of Stock</Badge>
-                        ) : Number(item.quantity) <= 20 ? (
-                          <Badge tone="warning">Low Stock ({item.quantity})</Badge>
+                          <span className="human-stock-pill pill-out">Out of stock</span>
+                        ) : isLowStock ? (
+                          <span className="human-stock-pill pill-low">Low stock</span>
                         ) : (
-                          <Badge tone="success">Available</Badge>
+                          <span className="human-stock-pill pill-in">In stock</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                      <td
+                        style={{
+                          textAlign: 'right',
+                          whiteSpace: 'nowrap',
+                          position: 'sticky',
+                          right: 0,
+                          background: '#ffffff',
+                          zIndex: 1,
+                          boxShadow: '-4px 0 6px -2px rgba(0,0,0,0.04)',
+                          paddingRight: '12px',
+                        }}
+                      >
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
                           <button
                             type="button"
                             className="button secondary"
-                            style={{ padding: '4px 8px', fontSize: '11.5px' }}
+                            style={{ padding: '3px 8px', fontSize: '11px', lineHeight: 1.2 }}
                             onClick={(e) => {
                               e.stopPropagation()
                               handleSelectItem(item)
                             }}
                             title="View resource specifications"
                           >
-                            <Eye size={12} />
+                            <Eye size={11} />
                             <span>Specs</span>
                           </button>
 
                           {isOutOfStock ? (
-                            <span style={{ fontSize: '11.5px', color: 'var(--color-text-3)', fontStyle: 'italic', padding: '4px 8px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--color-text-3)', fontStyle: 'italic', padding: '3px 6px' }}>
                               Unavailable
                             </span>
                           ) : (
                             <button
                               type="button"
                               className="button review"
-                              style={{ padding: '4px 10px', fontSize: '11.5px' }}
+                              style={{ padding: '3px 10px', fontSize: '11px', lineHeight: 1.2, display: 'inline-flex', alignItems: 'center', gap: '3px' }}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleRequestNow(item)
@@ -447,7 +551,7 @@ export default function RequestTypesPage() {
                               title="Create a resource request for this item"
                             >
                               <span>Request</span>
-                              <ArrowRight size={12} />
+                              <ArrowRight size={11} />
                             </button>
                           )}
                         </div>
