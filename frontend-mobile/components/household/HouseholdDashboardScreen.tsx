@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
-import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection, statusColor } from './HouseholdUI';
+import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection, HouseholdStatusIcon, statusColor, statusIconName } from './HouseholdUI';
 
 type DashboardProps = {
   overview: any;
@@ -100,6 +100,7 @@ export function HouseholdDashboardScreen({
             {statusOptions.map((status: any) => {
               const isSelected = pendingStatus === status.key;
               const locked = !editingStatus && Boolean(currentStatus);
+              const icon = statusIconName(status.key);
 
               return (
                 <Pressable
@@ -113,11 +114,13 @@ export function HouseholdDashboardScreen({
                   onPress={() => editingStatus && onSelectStatus(status.key)}
                   disabled={!editingStatus}
                 >
-                  <Ionicons
-                    name={statusIcon(status.key)}
-                    size={20}
-                    color={isSelected && editingStatus ? '#fff' : statusColor(status.key)}
-                  />
+                  {icon ? (
+                    <Ionicons
+                      name={icon}
+                      size={20}
+                      color={isSelected && editingStatus ? '#fff' : statusColor(status.key)}
+                    />
+                  ) : null}
                   <Text style={[styles.statusText, isSelected && editingStatus && styles.statusTextActive]}>
                     {status.label}
                   </Text>
@@ -406,7 +409,7 @@ function MemberStatusDots({ members }: { members: any[] }) {
 
   return (
     <View
-      style={styles.memberStatusDots}
+      style={styles.memberStatusIcons}
       accessible
       accessibilityLabel={`Trusted household member statuses: ${memberStatusLabels.join(', ')}`}
     >
@@ -414,9 +417,10 @@ function MemberStatusDots({ members }: { members: any[] }) {
         const status = member.current_status?.status_key || 'neutral';
 
         return (
-          <View
+          <HouseholdStatusIcon
             key={member.member_id || index}
-            style={[styles.memberStatusDot, { backgroundColor: statusColor(status) }]}
+            tone={status}
+            size={12}
           />
         );
       })}
@@ -634,13 +638,6 @@ const defaultStatusOptions = [
 
 function isTrustedValidated(household: any) {
   return ['validated', 'approved'].includes(String(household.validation_status || '').toLowerCase());
-}
-
-function statusIcon(statusKey: string): keyof typeof Ionicons.glyphMap {
-  if (statusKey === 'safe') return 'shield-checkmark-outline';
-  if (statusKey === 'evacuated') return 'walk-outline';
-  if (statusKey === 'unsafe') return 'warning-outline';
-  return 'medical-outline';
 }
 
 function parseSpecialNeeds(value?: string) {
@@ -1057,16 +1054,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 5,
   },
-  memberStatusDots: {
+  memberStatusIcons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
     gap: 3,
     maxWidth: 112,
-  },
-  memberStatusDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 4,
   },
 });

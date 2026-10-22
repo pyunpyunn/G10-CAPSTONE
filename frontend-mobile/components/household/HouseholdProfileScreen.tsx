@@ -5,7 +5,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import * as Location from 'expo-location';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { reverseGeocodeAddress } from '@/utils/geocoding';
-import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
+import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection, HouseholdStatusIcon, statusColor } from './HouseholdUI';
 
 type ProfileProps = {
   overview: any;
@@ -86,8 +86,8 @@ export function HouseholdProfileScreen({
 
       </View>
 
-      <View style={styles.card}>
-        <HouseholdSection title="User Information" />
+      <View style={[styles.card, styles.userInfoCard]}>
+        <Text style={styles.userInfoTitle}>User information</Text>
 
         <View style={styles.devicePanel}>
           <View style={styles.memberAvatar}>
@@ -101,7 +101,7 @@ export function HouseholdProfileScreen({
             </View>
           </View>
           <View style={styles.statusCell}>
-            <HouseholdBadge
+            <ProfileStatusBadge
               label={currentStatus?.status_label || 'Unchecked'}
               tone={currentStatus?.status_key || 'neutral'}
             />
@@ -110,13 +110,13 @@ export function HouseholdProfileScreen({
 
         {householdMembers.length ? (
           <View style={styles.memberProfilePanel}>
-            <Text style={styles.panelLabel}>Member profile</Text>
-            {householdMembers.map((member: any) => {
+            <Text style={styles.profileSectionLabel}>Member profile</Text>
+            {householdMembers.map((member: any, index: number) => {
               const memberKey = memberProfileKey(member);
               const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'Household member';
 
               return (
-                <View key={memberKey} style={styles.memberRow}>
+                <View key={memberKey} style={[styles.memberRow, index === householdMembers.length - 1 && styles.memberRowLast]}>
                   <View style={styles.memberAvatar}>
                     <Text style={styles.memberAvatarText}>{initials(memberName)}</Text>
                   </View>
@@ -125,7 +125,7 @@ export function HouseholdProfileScreen({
                     <Text style={styles.panelMeta}>{memberRelationship(member)}</Text>
                   </View>
                   <View style={styles.statusCell}>
-                    <HouseholdBadge
+                    <ProfileStatusBadge
                       label={member.current_status?.status_label || 'Unchecked'}
                       tone={member.current_status?.status_key || 'neutral'}
                     />
@@ -202,6 +202,17 @@ function HouseholdAccountIcon() {
         strokeLinejoin="round"
       />
     </Svg>
+  );
+}
+
+function ProfileStatusBadge({ label, tone }: { label: string; tone: string }) {
+  const color = statusColor(tone);
+
+  return (
+    <View style={[styles.profileStatusBadge, { borderColor: `${color}35`, backgroundColor: `${color}12` }]}>
+      <HouseholdStatusIcon tone={tone} size={12} color={color} />
+      <Text style={[styles.profileStatusText, { color }]}>{label}</Text>
+    </View>
   );
 }
 
@@ -298,43 +309,51 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     backgroundColor: palette.card,
   },
+  userInfoCard: {
+    gap: 0,
+    padding: spacing.md,
+  },
+  userInfoTitle: {
+    marginBottom: spacing.xs,
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   devicePanel: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: palette.secondary,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+    paddingVertical: spacing.sm,
   },
   memberProfilePanel: {
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: palette.secondary,
+    paddingTop: spacing.sm,
   },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    minHeight: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+    paddingVertical: spacing.xs,
+  },
+  memberRowLast: {
+    borderBottomWidth: 0,
   },
   memberAvatar: {
-    width: 48,
-    height: 48,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 24,
+    borderRadius: 18,
     backgroundColor: palette.secondary,
-    borderWidth: 1,
-    borderColor: palette.border,
   },
   memberAvatarText: {
-    color: palette.navActive,
-    fontSize: 16,
-    fontWeight: '900',
+    color: palette.brandRed,
+    fontSize: 12,
+    fontWeight: '800',
   },
   panelText: {
     flex: 1,
@@ -353,14 +372,35 @@ const styles = StyleSheet.create({
   panelTitle: {
     marginTop: 3,
     color: palette.text,
-    fontSize: 16,
-    fontWeight: '900',
+    fontSize: 14,
+    fontWeight: '800',
   },
   panelMeta: {
     marginTop: 3,
     color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  profileSectionLabel: {
+    marginBottom: spacing.xs,
+    color: palette.textSoft,
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  profileStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  profileStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   userRelationshipRow: {
     flexDirection: 'row',

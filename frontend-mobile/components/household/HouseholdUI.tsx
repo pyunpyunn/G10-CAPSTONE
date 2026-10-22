@@ -26,12 +26,20 @@ export function HouseholdButton({ label, icon, tone = 'primary', disabled = fals
 
 export function HouseholdBadge({ label, tone = 'neutral', size = 'regular' }: { label: string; tone?: string; size?: 'regular' | 'large' }) {
   const color = statusColor(tone);
+  const icon = statusIconName(tone);
 
   return (
     <View style={[styles.badge, size === 'large' && styles.badgeLarge, { borderColor: `${color}55`, backgroundColor: `${color}18` }]}>
+      {icon ? <Ionicons name={icon} size={size === 'large' ? 14 : 12} color={color} /> : null}
       <Text style={[styles.badgeText, size === 'large' && styles.badgeTextLarge, { color }]}>{label}</Text>
     </View>
   );
+}
+
+export function HouseholdStatusIcon({ tone, size = 16, color }: { tone: string; size?: number; color?: string }) {
+  const icon = statusIconName(tone);
+
+  return icon ? <Ionicons name={icon} size={size} color={color || statusColor(tone)} /> : null;
 }
 
 export function HouseholdSection({ title, action }: { title: string; action?: ReactNode }) {
@@ -68,6 +76,17 @@ export function statusColor(tone: string) {
   if (['unsafe', 'needs_help', 'critical', 'danger'].includes(tone)) return palette.brandRed;
   if (['pending', 'warning'].includes(tone)) return palette.warning;
   return palette.textSoft;
+}
+
+export function statusIconName(tone: string): keyof typeof Ionicons.glyphMap | null {
+  const normalizedTone = tone.toLowerCase();
+
+  if (normalizedTone === 'safe') return 'shield-checkmark-outline';
+  if (normalizedTone === 'evacuated') return 'walk-outline';
+  if (normalizedTone === 'unsafe') return 'warning-outline';
+  if (normalizedTone === 'needs_help') return 'medical-outline';
+
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -107,6 +126,9 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     borderWidth: 1,
     borderRadius: radius.pill,
     paddingHorizontal: 9,
