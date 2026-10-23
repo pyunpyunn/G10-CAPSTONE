@@ -18,6 +18,30 @@ export const palette = {
   dispatch: '#240e6a',
 };
 
+export const typography = {
+  families: {
+    regular: '400' as const,
+    medium: '500' as const,
+    semibold: '600' as const,
+    bold: '700' as const,
+    extraBold: '800' as const,
+  },
+  sizes: {
+    caption: 12,
+    small: 12,
+    body: 14,
+    subtitle: 16,
+    heading: 20,
+    display: 24,
+  },
+  weights: {
+    regular: '400' as const,
+    medium: '500' as const,
+    semibold: '600' as const,
+    bold: '700' as const,
+  },
+};
+
 export const spacing = {
   xs: 6,
   sm: 10,

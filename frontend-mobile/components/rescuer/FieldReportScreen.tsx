@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getAssignedHousehold } from '@/api/rescuer';
-import { palette, radius, spacing } from '@/constants/resqTheme';
+import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
-import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
+import { ActionButton, EmptyState, RescuerSelect, SectionHeader, StatusBadge } from './RescuerUI';
 
 type FieldReportProps = {
   reports: any[];
@@ -56,9 +56,6 @@ export function FieldReportScreen({
   const [incidentType, setIncidentType] = useState('');
   const [otherIncidentType, setOtherIncidentType] = useState('');
   const [propertyDamage, setPropertyDamage] = useState('');
-  const [memberConditionMenus, setMemberConditionMenus] = useState<Record<string, boolean>>({});
-  const [isIncidentMenuOpen, setIsIncidentMenuOpen] = useState(false);
-  const [isDamageMenuOpen, setIsDamageMenuOpen] = useState(false);
   const [deathCount, setDeathCount] = useState('');
   const [injuredCount, setInjuredCount] = useState('');
   const [countError, setCountError] = useState('');
@@ -91,9 +88,6 @@ export function FieldReportScreen({
     setInjuredCount('');
     setCountError('');
     setNotes('');
-    setMemberConditionMenus({});
-    setIsIncidentMenuOpen(false);
-    setIsDamageMenuOpen(false);
     idempotencyKey.current = `field-report-${assignmentId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     async function loadHousehold() {
@@ -273,51 +267,15 @@ export function FieldReportScreen({
                     <Text style={styles.fieldValue}>{member.name}</Text>
                     {member.isHouseholdHead && <Text style={styles.fieldLabel}>Household head</Text>}
                   </View>
-                  <Pressable
-                    style={[styles.dropdownButton, styles.memberConditionDropdown]}
+                  <RescuerSelect
+                    title={`Assessment for ${member.name}`}
+                    placeholder="Unchecked · select status"
+                    options={availableMemberStatuses}
+                    value={member.condition}
+                    onChange={(value) => updateMemberCondition(member.id, value)}
                     disabled={submitting || alreadySubmitted}
-                    onPress={() => setMemberConditionMenus((current) => ({ ...current, [member.id]: !current[member.id] }))}
-                  >
-                    <View style={styles.dropdownValueRow}>
-                      <Text style={styles.dropdownText}>
-                        {availableMemberStatuses.find((option) => option.key === member.condition)?.label || 'Unchecked · select status'}
-                      </Text>
-                      <Ionicons name="chevron-down" size={18} color={palette.textSoft} />
-                    </View>
-                  </Pressable>
-
-                  {memberConditionMenus[member.id] && (
-                    <Modal
-                      transparent
-                      visible={Boolean(memberConditionMenus[member.id])}
-                      animationType="fade"
-                      onRequestClose={() => setMemberConditionMenus((current) => ({ ...current, [member.id]: false }))}
-                    >
-                      <Pressable
-                        style={styles.modalOverlay}
-                        onPress={() => setMemberConditionMenus((current) => ({ ...current, [member.id]: false }))}
-                      >
-                        <Pressable style={styles.modalContent} onPress={() => undefined}>
-                          <ScrollView style={styles.modalList}>
-                            {availableMemberStatuses.map((option) => (
-                              <Pressable
-                                key={option.key}
-                                style={[styles.modalOption, member.condition === option.key && styles.modalOptionActive]}
-                                onPress={() => {
-                                  updateMemberCondition(member.id, option.key);
-                                  setMemberConditionMenus((current) => ({ ...current, [member.id]: false }));
-                                }}
-                              >
-                                <Text style={[styles.modalOptionText, member.condition === option.key && styles.modalOptionTextActive]}>
-                                  {option.label}
-                                </Text>
-                              </Pressable>
-                            ))}
-                          </ScrollView>
-                        </Pressable>
-                      </Pressable>
-                    </Modal>
-                  )}
+                    style={styles.memberConditionDropdown}
+                  />
                 </View>
               ))}
             </View>
@@ -329,44 +287,15 @@ export function FieldReportScreen({
             <SectionHeader title="Incident Details" />
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Incident type *</Text>
-              <Pressable
-                style={styles.dropdownButton}
+              <RescuerSelect
+                title="Incident type"
+                placeholder="Select incident type"
+                options={incidentTypeOptions}
+                value={incidentType}
+                onChange={setIncidentType}
                 disabled={submitting || alreadySubmitted}
-                onPress={() => setIsIncidentMenuOpen(true)}
-              >
-                <View style={styles.dropdownValueRow}>
-                  <Text style={styles.dropdownText}>
-                    {incidentTypeOptions.find((option) => option.key === incidentType)?.label || 'Select incident type'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={18} color={palette.textSoft} />
-                </View>
-              </Pressable>
+              />
             </View>
-
-            {isIncidentMenuOpen && (
-              <Modal transparent visible={isIncidentMenuOpen} animationType="fade" onRequestClose={() => setIsIncidentMenuOpen(false)}>
-                <Pressable style={styles.modalOverlay} onPress={() => setIsIncidentMenuOpen(false)}>
-                  <Pressable style={styles.modalContent} onPress={() => undefined}>
-                    <ScrollView style={styles.modalList}>
-                      {incidentTypeOptions.map((option) => (
-                        <Pressable
-                          key={option.key}
-                          style={[styles.modalOption, incidentType === option.key && styles.modalOptionActive]}
-                          onPress={() => {
-                            setIncidentType(option.key);
-                            setIsIncidentMenuOpen(false);
-                          }}
-                        >
-                          <Text style={[styles.modalOptionText, incidentType === option.key && styles.modalOptionTextActive]}>
-                            {option.label}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </Pressable>
-                </Pressable>
-              </Modal>
-            )}
 
             {incidentType === 'other' ? (
               <TextInput
@@ -382,44 +311,15 @@ export function FieldReportScreen({
 
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Property damage *</Text>
-              <Pressable
-                style={styles.dropdownButton}
+              <RescuerSelect
+                title="Property damage"
+                placeholder="Select property damage"
+                options={propertyDamageOptions}
+                value={propertyDamage}
+                onChange={setPropertyDamage}
                 disabled={submitting || alreadySubmitted}
-                onPress={() => setIsDamageMenuOpen(true)}
-              >
-                <View style={styles.dropdownValueRow}>
-                  <Text style={styles.dropdownText}>
-                    {propertyDamageOptions.find((option) => option.key === propertyDamage)?.label || 'Select property damage'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={18} color={palette.textSoft} />
-                </View>
-              </Pressable>
+              />
             </View>
-
-            {isDamageMenuOpen && (
-              <Modal transparent visible={isDamageMenuOpen} animationType="fade" onRequestClose={() => setIsDamageMenuOpen(false)}>
-                <Pressable style={styles.modalOverlay} onPress={() => setIsDamageMenuOpen(false)}>
-                  <Pressable style={styles.modalContent} onPress={() => undefined}>
-                    <ScrollView style={styles.modalList}>
-                      {propertyDamageOptions.map((option) => (
-                        <Pressable
-                          key={option.key}
-                          style={[styles.modalOption, propertyDamage === option.key && styles.modalOptionActive]}
-                          onPress={() => {
-                            setPropertyDamage(option.key);
-                            setIsDamageMenuOpen(false);
-                          }}
-                        >
-                          <Text style={[styles.modalOptionText, propertyDamage === option.key && styles.modalOptionTextActive]}>
-                            {option.label}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </Pressable>
-                </Pressable>
-              </Modal>
-            )}
 
             <View style={styles.countRow}>
               <View style={styles.fieldGroup}>
@@ -534,6 +434,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: palette.card,
+    ...shadow,
   },
   householdDetails: {
     gap: spacing.sm,
@@ -578,69 +479,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     backgroundColor: '#fff',
-  },
-  dropdownButton: {
-    minHeight: 54,
-    borderWidth: 1,
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-  },
-  dropdownValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dropdownText: {
-    color: palette.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
-    padding: spacing.lg,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#fff',
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  modalTitle: {
-    color: palette.text,
-    fontSize: 16,
-    fontWeight: '900',
-    marginBottom: spacing.sm,
-  },
-  modalList: {
-    maxHeight: 240,
-  },
-  modalOption: {
-    minHeight: 46,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.border,
-  },
-  modalOptionActive: {
-    backgroundColor: palette.navActive,
-  },
-  modalOptionText: {
-    color: palette.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  modalOptionTextActive: {
-    color: '#fff',
   },
   memberSection: {
     gap: spacing.sm,

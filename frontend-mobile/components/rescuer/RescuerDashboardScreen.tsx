@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
+import { palette, radius, shadow, spacing, typography } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
 import { ActionButton, EmptyState, SectionHeader, StatTile, StatusBadge } from './RescuerUI';
 
@@ -41,7 +41,8 @@ export function RescuerDashboardScreen({
       <View style={styles.identityCard}>
         <View style={styles.identityTop}>
           <View style={styles.identityText}>
-            <Text style={styles.kicker}>Emergency event</Text>
+            <Text style={styles.kicker}>RESPONDER CONSOLE</Text>
+            <Text style={styles.welcomeTitle}>{responder.full_name || profile.user?.full_name || 'Rescuer'}</Text>
             <Text style={styles.meta}>
               {responder.responder_code || profile.user?.username || 'Mobile account'} ·{' '}
               {responder.team_name || 'No team assigned'}
@@ -263,15 +264,22 @@ const styles = StyleSheet.create({
   },
   kicker: {
     color: palette.navMuted,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.medium,
+    letterSpacing: 1,
+  },
+  welcomeTitle: {
+    marginTop: spacing.xs,
+    color: '#fff',
+    fontSize: typography.sizes.heading,
+    fontWeight: typography.weights.semibold,
+    letterSpacing: -0.3,
   },
   meta: {
-    marginTop: 6,
+    marginTop: 4,
     color: palette.navMuted,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: typography.sizes.small,
+    fontWeight: typography.weights.regular,
   },
   eventStrip: {
     marginTop: spacing.lg,
@@ -292,14 +300,14 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: typography.sizes.subtitle,
+    fontWeight: typography.weights.semibold,
   },
   eventMeta: {
     marginTop: 2,
     color: palette.navMuted,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: typography.sizes.small,
+    fontWeight: typography.weights.regular,
   },
   statsRow: {
     flexDirection: 'row',
@@ -313,28 +321,31 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: palette.card,
+    ...shadow,
   },
   assignmentTitle: {
     color: palette.text,
-    fontSize: 20,
-    fontWeight: '900',
+    fontSize: typography.sizes.heading,
+    fontWeight: typography.weights.semibold,
+    letterSpacing: -0.2,
   },
   assignmentMeta: {
     color: palette.textSoft,
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: typography.sizes.small,
+    fontWeight: typography.weights.medium,
   },
   destinationText: {
     color: palette.text,
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
     lineHeight: 18,
   },
   note: {
     borderRadius: radius.md,
     padding: spacing.md,
     color: palette.textSoft,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.regular,
     lineHeight: 19,
     backgroundColor: palette.secondary,
   },
@@ -351,8 +362,8 @@ const styles = StyleSheet.create({
   },
   reportRequiredText: {
     color: palette.navActive,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: typography.sizes.small,
+    fontWeight: typography.weights.medium,
   },
   queueItem: {
     flexDirection: 'row',
@@ -383,14 +394,14 @@ const styles = StyleSheet.create({
   },
   queueTitle: {
     color: palette.text,
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.semibold,
   },
   queueMeta: {
     marginTop: 3,
     color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: typography.sizes.small,
+    fontWeight: typography.weights.regular,
   },
   quickRow: {
     flexDirection: 'row',
@@ -418,7 +429,7 @@ const styles = StyleSheet.create({
   },
   quickText: {
     color: palette.nav,
-    fontSize: 13,
-    fontWeight: '900',
+    fontSize: typography.sizes.small,
+    fontWeight: typography.weights.semibold,
   },
 });

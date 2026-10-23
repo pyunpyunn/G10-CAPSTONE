@@ -170,6 +170,7 @@ Actual mobile login is DB-driven. Household accounts from SafeTrack work in RESQ
 - Household app loads `/api/v1/household/overview`
 - Rescuer login uses `/api/v1/auth/login`
 - Rescuer app loads `/api/v1/rescuer/overview`
+- Rescuer resource-request location suggestions use `/api/v1/rescuer/resource-request-locations` and include saved addresses, mapped locations, puroks, and evacuation centers for the configured barangay
 - Rescuer assignment household details use `/api/v1/rescuer/assignments/{assignmentId}/household`
 - Rescuer field reports use `/api/v1/rescuer/field-reports`
 - Laravel rejects household assignment completion until a report is saved for that assignment

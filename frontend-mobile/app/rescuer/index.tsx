@@ -34,7 +34,7 @@ import { RescueMapScreen } from '@/components/rescuer/RescueMapScreen';
 import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScreen';
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
 import { LoadingState } from '@/components/rescuer/RescuerUI';
-import { palette, radius, spacing } from '@/constants/resqTheme';
+import { palette, radius, spacing, typography } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
 
@@ -309,6 +309,7 @@ export default function RescuerHomeScreen() {
       return (
         <ResourceRequestScreen
           requests={overview.resource_requests || []}
+          assignments={overview.assignments || []}
           categoryOptions={overview.category_options || []}
           onSubmitRequest={handleSubmitResourceRequest}
           onCancelRequest={handleCancelResourceRequest}
@@ -332,7 +333,15 @@ export default function RescuerHomeScreen() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadOverview(true)}
+            tintColor={palette.navActive}
+            colors={[palette.navActive]}
+          />
+        }
       >
         {renderContent()}
       </ScrollView>
@@ -346,6 +355,10 @@ export default function RescuerHomeScreen() {
               key={tab.key}
               style={[styles.tabButton, tab.special && styles.specialTab, isActive && styles.activeTab]}
               onPress={() => setActiveTab(tab.key)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={tab.special ? 'Create field report' : tab.label}
+              hitSlop={4}
             >
               <Ionicons
                 name={tab.icon}
@@ -397,7 +410,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
     paddingBottom: 100,
   },
   tabBar: {
@@ -405,7 +419,7 @@ const styles = StyleSheet.create({
     right: spacing.md,
     bottom: spacing.md,
     left: spacing.md,
-    minHeight: 70,
+    minHeight: 76,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
@@ -413,14 +427,21 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     backgroundColor: palette.nav,
+    shadowColor: palette.nav,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
   },
   tabButton: {
-    minWidth: 54,
-    minHeight: 48,
+    flex: 1,
+    minWidth: 48,
+    minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: 4,
     borderRadius: radius.md,
   },
   activeTab: {
@@ -437,10 +458,12 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     color: palette.navMuted,
-    fontSize: 10,
-    fontWeight: '900',
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.medium,
+    letterSpacing: 0.1,
   },
   activeTabLabel: {
     color: '#fff',
+    fontWeight: typography.weights.semibold,
   },
 });

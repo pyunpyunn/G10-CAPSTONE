@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import MapView, { Circle, Marker } from 'react-native-maps';
 import { canUseNativeMap, MobileMapFallback } from '@/components/MobileMapFallback';
-import { palette, radius, spacing } from '@/constants/resqTheme';
+import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { formatPhilippineTime } from '@/utils/time';
 import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
 
@@ -258,6 +258,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
     backgroundColor: palette.card,
+    ...shadow,
   },
   errorStrip: {
     flexDirection: 'row',

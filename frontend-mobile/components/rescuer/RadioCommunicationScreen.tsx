@@ -548,6 +548,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: palette.card,
+    ...shadow,
   },
   memberRow: {
     gap: spacing.md,

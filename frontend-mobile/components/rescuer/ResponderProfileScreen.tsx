@@ -58,38 +58,42 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
 
   return (
     <View style={styles.stack}>
-      <View style={styles.hero}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </View>
-        <View style={styles.heroText}>
-          <Text style={styles.role}>RESPONDER PROFILE</Text>
-          <Text style={styles.name}>{responder.full_name || user.full_name || 'Responder'}</Text>
-          <Text style={styles.meta}>@{user.username || 'username'}</Text>
-          <View style={styles.heroStatus}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>{responder.duty_status || 'Stand-by'}</Text>
+      {!isEditing ? (
+        <>
+          <View style={styles.hero}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+            <View style={styles.heroText}>
+              <Text style={styles.role}>RESPONDER PROFILE</Text>
+              <Text style={styles.name}>{responder.full_name || user.full_name || 'Responder'}</Text>
+              <Text style={styles.meta}>@{user.username || 'username'}</Text>
+              <View style={styles.heroStatus}>
+                <View style={styles.statusDot} />
+                <Text style={styles.statusText}>{responder.duty_status || 'Stand-by'}</Text>
+              </View>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+              style={styles.editButton}
+              onPress={() => setIsEditing(true)}
+              disabled={saving}
+            >
+              <Ionicons name="create-outline" size={19} color="#fff" />
+            </Pressable>
           </View>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={isEditing ? 'Cancel profile editing' : 'Edit profile'}
-          style={styles.editButton}
-          onPress={isEditing ? handleCancelEdit : () => setIsEditing(true)}
-          disabled={saving}
-        >
-          <Ionicons name={isEditing ? 'close' : 'create-outline'} size={19} color="#fff" />
-        </Pressable>
-      </View>
 
-      <View style={styles.card}>
-        <SectionHeader title="Account information" />
-        <InfoRow icon="card-outline" label="Account ID" value={responder.responder_code || 'Not recorded'} />
-        <InfoRow icon="at-outline" label="Username" value={user.username ? `@${user.username}` : 'Not recorded'} />
-        <InfoRow icon="shield-checkmark-outline" label="Role" value={user.role?.role_name || 'Rescuer'} />
-        <InfoRow icon="mail-outline" label="Email" value={user.email || 'Not recorded'} />
-        <InfoRow icon="call-outline" label="Mobile" value={user.contact_number || responder.contact_number || 'Not recorded'} />
-      </View>
+          <View style={styles.card}>
+            <SectionHeader title="Account information" />
+            <InfoRow icon="card-outline" label="Account ID" value={responder.responder_code || 'Not recorded'} />
+            <InfoRow icon="at-outline" label="Username" value={user.username ? `@${user.username}` : 'Not recorded'} />
+            <InfoRow icon="shield-checkmark-outline" label="Role" value={user.role?.role_name || 'Rescuer'} />
+            <InfoRow icon="mail-outline" label="Email" value={user.email || 'Not recorded'} />
+            <InfoRow icon="call-outline" label="Mobile" value={user.contact_number || responder.contact_number || 'Not recorded'} />
+          </View>
+        </>
+      ) : null}
 
       {isEditing ? (
         <View style={styles.card}>
@@ -120,22 +124,26 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
         </View>
       ) : null}
 
-      <View style={styles.card}>
-        <SectionHeader title="Team & readiness" />
-        <InfoRow icon="people-outline" label="Team" value={responder.team_name || 'Unassigned'} />
-        <InfoRow icon="key-outline" label="Team code" value={responder.team_code || 'Not recorded'} />
-        <InfoRow icon="briefcase-outline" label="Title" value={responder.title || 'Responder'} />
-        <InfoRow icon="water-outline" label="Blood type" value={responder.blood_type || 'Unknown'} />
-        <InfoRow icon="construct-outline" label="Skills" value={responder.skills || 'Not recorded'} />
-      </View>
+      {!isEditing ? (
+        <>
+          <View style={styles.card}>
+            <SectionHeader title="Team & readiness" />
+            <InfoRow icon="people-outline" label="Team" value={responder.team_name || 'Unassigned'} />
+            <InfoRow icon="key-outline" label="Team code" value={responder.team_code || 'Not recorded'} />
+            <InfoRow icon="briefcase-outline" label="Title" value={responder.title || 'Responder'} />
+            <InfoRow icon="water-outline" label="Blood type" value={responder.blood_type || 'Unknown'} />
+            <InfoRow icon="construct-outline" label="Skills" value={responder.skills || 'Not recorded'} />
+          </View>
 
-      <View style={styles.card}>
-        <SectionHeader title="Emergency contact" />
-        <InfoRow icon="person-outline" label="Name" value={responder.emergency_contact_name || 'Not recorded'} />
-        <InfoRow icon="call-outline" label="Mobile" value={responder.emergency_contact_number || 'Not recorded'} />
-      </View>
+          <View style={styles.card}>
+            <SectionHeader title="Emergency contact" />
+            <InfoRow icon="person-outline" label="Name" value={responder.emergency_contact_name || 'Not recorded'} />
+            <InfoRow icon="call-outline" label="Mobile" value={responder.emergency_contact_number || 'Not recorded'} />
+          </View>
 
-      <ActionButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
+          <ActionButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
+        </>
+      ) : null}
     </View>
   );
 }
@@ -353,6 +361,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: palette.card,
+    ...shadow,
   },
   cardHint: {
     marginTop: -spacing.xs,

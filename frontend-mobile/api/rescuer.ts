@@ -72,6 +72,13 @@ export async function cancelResourceRequest(requestId: string) {
   return response.data;
 }
 
+export async function getRescuerRequestLocations() {
+  const response = await api.get<{ data: { barangay: string; locations: any[] } }>(
+    '/rescuer/resource-request-locations'
+  );
+  return response.data.data;
+}
+
 export async function getRadioFeed(params: any = {}) {
   const response = await api.get('/rescuer/radio', { params });
   return response.data.data;

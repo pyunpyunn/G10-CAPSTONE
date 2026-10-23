@@ -1,7 +1,7 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, type ReactNode } from 'react';
-import { palette, radius, spacing } from '@/constants/resqTheme';
+import { palette, radius, spacing, typography } from '@/constants/resqTheme';
 
 type ButtonProps = {
   label: string;
@@ -67,6 +67,120 @@ export function SectionHeader({ title, action }: { title: string; action?: React
   );
 }
 
+export type SelectOption = {
+  key: string;
+  label: string;
+  description?: string;
+};
+
+export function RescuerSelect({
+  title,
+  placeholder,
+  options,
+  value,
+  onChange,
+  disabled = false,
+  style,
+  accessibilityLabel,
+}: {
+  title: string;
+  placeholder: string;
+  options: SelectOption[];
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  const selected = options.find((option) => option.key === value);
+
+  return (
+    <View style={style}>
+      <Pressable
+        style={[styles.selectTrigger, disabled && styles.selectDisabled]}
+        onPress={() => setVisible(true)}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel || title}
+        accessibilityState={{ disabled, expanded: visible }}
+      >
+        <View style={styles.selectValueWrap}>
+          <Text style={[styles.selectValue, !selected && styles.selectPlaceholder]} numberOfLines={1}>
+            {selected?.label || placeholder}
+          </Text>
+        </View>
+        <View style={styles.selectChevron}>
+          <Ionicons name="chevron-down" size={17} color={palette.navActive} />
+        </View>
+      </Pressable>
+
+      <Modal
+        transparent
+        visible={visible}
+        animationType="fade"
+        onRequestClose={() => setVisible(false)}
+        statusBarTranslucent
+      >
+        <View style={styles.selectOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setVisible(false)} accessibilityLabel="Close selector" />
+          <View style={styles.selectSheet}>
+            <View style={styles.selectHeader}>
+              <View style={styles.selectHeaderCopy}>
+                <Text style={styles.selectTitle}>{title}</Text>
+                <Text style={styles.selectSubtitle}>
+                  {selected ? `Selected: ${selected.label}` : 'Choose one option to continue.'}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.selectClose}
+                onPress={() => setVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close choices"
+              >
+                <Ionicons name="close" size={19} color={palette.textSoft} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.selectList} showsVerticalScrollIndicator={false}>
+              {options.map((option, index) => {
+                const isSelected = value === option.key;
+                return (
+                  <Pressable
+                    key={option.key}
+                    style={[
+                      styles.selectOption,
+                      index === 0 && styles.selectOptionFirst,
+                      isSelected && styles.selectOptionActive,
+                    ]}
+                    onPress={() => {
+                      onChange(option.key);
+                      setVisible(false);
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected }}
+                  >
+                    <View style={styles.selectOptionCopy}>
+                      <Text style={[styles.selectOptionText, isSelected && styles.selectOptionTextActive]}>
+                        {option.label}
+                      </Text>
+                      {option.description ? (
+                        <Text style={styles.selectOptionDescription}>{option.description}</Text>
+                      ) : null}
+                    </View>
+                    <View style={[styles.selectRadio, isSelected && styles.selectRadioActive]}>
+                      {isSelected ? <View style={styles.selectRadioDot} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 export function LoadingState({ label = 'Loading...' }: { label?: string }) {
   return (
     <View style={styles.centerState}>
@@ -96,7 +210,7 @@ function toneColor(tone: string) {
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 44,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -132,8 +246,9 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontSize: 13,
-    fontWeight: '900',
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.semibold,
+    letterSpacing: 0.1,
   },
   lightText: {
     color: palette.nav,
@@ -146,8 +261,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   badgeText: {
-    fontSize: 11,
-    fontWeight: '900',
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.semibold,
+    letterSpacing: 0.1,
   },
   statTile: {
     flex: 1,
@@ -160,14 +276,14 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     color: palette.textSoft,
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.medium,
+    letterSpacing: 0.5,
   },
   statValue: {
     marginTop: 6,
-    fontSize: 24,
-    fontWeight: '900',
+    fontSize: typography.sizes.display,
+    fontWeight: typography.weights.bold,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -177,8 +293,147 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: palette.text,
-    fontSize: 16,
-    fontWeight: '900',
+    fontSize: typography.sizes.subtitle,
+    fontWeight: typography.weights.semibold,
+    letterSpacing: -0.2,
+  },
+  selectTrigger: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: radius.md,
+    paddingVertical: spacing.xs,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
+    backgroundColor: palette.card,
+  },
+  selectDisabled: {
+    opacity: 0.55,
+  },
+  selectValueWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  selectValue: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  selectPlaceholder: {
+    color: palette.textSoft,
+    fontWeight: '500',
+  },
+  selectChevron: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    backgroundColor: palette.secondary,
+  },
+  selectOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10, 21, 32, 0.48)',
+    paddingHorizontal: spacing.lg,
+  },
+  selectSheet: {
+    maxHeight: '78%',
+    borderRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+    backgroundColor: palette.page,
+  },
+  selectHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  selectHeaderCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  selectTitle: {
+    color: palette.text,
+    fontSize: 19,
+    fontWeight: '800',
+  },
+  selectSubtitle: {
+    color: palette.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  selectClose: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    backgroundColor: palette.secondary,
+  },
+  selectList: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: palette.card,
+  },
+  selectOption: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  selectOptionFirst: {
+    borderTopWidth: 0,
+  },
+  selectOptionActive: {
+    backgroundColor: palette.secondary,
+  },
+  selectOptionCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  selectOptionText: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectOptionTextActive: {
+    color: palette.navActive,
+    fontWeight: '700',
+  },
+  selectOptionDescription: {
+    color: palette.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  selectRadio: {
+    width: 21,
+    height: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: palette.borderStrong,
+    borderRadius: radius.pill,
+  },
+  selectRadioActive: {
+    borderColor: palette.navActive,
+  },
+  selectRadioDot: {
+    width: 11,
+    height: 11,
+    borderRadius: radius.pill,
+    backgroundColor: palette.navActive,
   },
   centerState: {
     alignItems: 'center',
@@ -188,7 +443,7 @@ const styles = StyleSheet.create({
   },
   centerText: {
     color: palette.textSoft,
-    fontWeight: '800',
+    fontWeight: typography.weights.medium,
   },
   empty: {
     alignItems: 'center',
@@ -203,12 +458,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: palette.text,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: typography.weights.semibold,
   },
   emptyBody: {
     marginTop: 6,
     color: palette.textSoft,
     fontSize: 13,
+    fontWeight: typography.weights.regular,
     lineHeight: 18,
     textAlign: 'center',
   },

@@ -86,6 +86,11 @@ class RescuerMobileController extends Controller
         return $this->service->resourceRequests($request);
     }
 
+    public function resourceRequestLocations(): JsonResponse
+    {
+        return $this->service->resourceRequestLocations();
+    }
+
     public function storeResourceRequest(Request $request): JsonResponse
     {
         return $this->service->storeResourceRequest($request);

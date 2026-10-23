@@ -16,10 +16,12 @@ use Illuminate\Validation\ValidationException;
 class RescuerMobileService
 {
     private RoutingService $routingService;
+    private BarangayProfileService $barangayProfile;
 
-    public function __construct(RoutingService $routingService)
+    public function __construct(RoutingService $routingService, BarangayProfileService $barangayProfile)
     {
         $this->routingService = $routingService;
+        $this->barangayProfile = $barangayProfile;
     }
 
     public function profile(Request $request): JsonResponse
@@ -870,6 +872,208 @@ class RescuerMobileService
                 ],
             ],
         ]);
+    }
+
+    public function resourceRequestLocations(): JsonResponse
+    {
+        $locations = collect();
+        $barangay = $this->barangayProfile->current();
+        $barangayName = trim((string) ($barangay['name'] ?? 'Mambaling'));
+        $barangayId = $barangay['barangay_id'] ?? null;
+        $locality = implode(', ', array_filter([
+            $barangayName,
+            trim((string) ($barangay['city_name'] ?? 'Cebu City')),
+        ]));
+
+        if (Schema::hasTable('addresses')) {
+            $addressQuery = DB::table('addresses as a')
+                ->when(Schema::hasColumn('addresses', 'deleted_at'), fn ($query) => $query->whereNull('a.deleted_at'));
+
+            if (Schema::hasColumn('addresses', 'barangay_id') && $barangayId) {
+                $addressQuery->where('a.barangay_id', $barangayId);
+            } elseif (
+                $barangayId
+                && Schema::hasColumn('addresses', 'purok_id')
+                && Schema::hasTable('puroks')
+                && Schema::hasColumn('puroks', 'purok_id')
+                && Schema::hasColumn('puroks', 'barangay_id')
+            ) {
+                $addressQuery
+                    ->join('puroks as p', 'p.purok_id', '=', 'a.purok_id')
+                    ->where('p.barangay_id', $barangayId);
+            }
+
+            $addressColumns = array_filter([
+                Schema::hasColumn('addresses', 'full_address') ? 'a.full_address' : null,
+                Schema::hasColumn('addresses', 'purok_sitio') ? 'a.purok_sitio' : null,
+            ]);
+
+            if ($addressColumns !== []) {
+                $locations = $locations->merge(
+                    $addressQuery
+                        ->select($addressColumns)
+                        ->distinct()
+                        ->limit(2000)
+                        ->get()
+                        ->flatMap(function (object $row) use ($locality): array {
+                            $options = [];
+                            foreach (['full_address' => 'address', 'purok_sitio' => 'purok'] as $column => $type) {
+                                $label = trim((string) ($row->{$column} ?? ''));
+                                if ($label !== '') {
+                                    $completeAddress = $this->appendLocality($label, $locality);
+                                    $options[] = [
+                                        'type' => $type,
+                                        'label' => $label,
+                                        'address' => $completeAddress,
+                                        'subtitle' => 'Barangay address',
+                                        'latitude' => null,
+                                        'longitude' => null,
+                                    ];
+                                }
+                            }
+                            return $options;
+                        })
+                );
+            }
+        }
+
+        if (
+            Schema::hasTable('geotagged_locations')
+            && Schema::hasTable('households')
+            && Schema::hasTable('addresses')
+        ) {
+            $query = DB::table('geotagged_locations as gl')
+                ->join('households as h', 'h.household_id', '=', 'gl.household_id')
+                ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
+                ->whereNotNull('gl.latitude')
+                ->whereNotNull('gl.longitude')
+                ->when(Schema::hasColumn('households', 'deleted_at'), fn ($builder) => $builder->whereNull('h.deleted_at'))
+                ->when(Schema::hasColumn('geotagged_locations', 'deleted_at'), fn ($builder) => $builder->whereNull('gl.deleted_at'));
+
+            if (Schema::hasColumn('addresses', 'barangay_id') && $barangayId) {
+                $query->where('a.barangay_id', $barangayId);
+            } elseif (
+                $barangayId
+                && Schema::hasColumn('addresses', 'purok_id')
+                && Schema::hasTable('puroks')
+                && Schema::hasColumn('puroks', 'purok_id')
+                && Schema::hasColumn('puroks', 'barangay_id')
+            ) {
+                $query
+                    ->join('puroks as p', 'p.purok_id', '=', 'a.purok_id')
+                    ->where('p.barangay_id', $barangayId);
+            }
+
+            $locations = $locations->merge(
+                $query
+                    ->select([
+                        'gl.latitude',
+                        'gl.longitude',
+                        Schema::hasColumn('geotagged_locations', 'location_label')
+                            ? 'gl.location_label'
+                            : DB::raw('NULL as location_label'),
+                        Schema::hasColumn('addresses', 'full_address')
+                            ? 'a.full_address'
+                            : DB::raw('NULL as full_address'),
+                        Schema::hasColumn('addresses', 'purok_sitio')
+                            ? 'a.purok_sitio'
+                            : DB::raw('NULL as purok_sitio'),
+                    ])
+                    ->distinct()
+                    ->limit(2000)
+                    ->get()
+                    ->map(function (object $row) use ($locality, $barangayName): array {
+                        $label = trim((string) ($row->location_label ?: $row->full_address ?: $row->purok_sitio ?: $barangayName));
+                        $address = trim((string) ($row->full_address ?: $row->purok_sitio ?: $row->location_label ?: $barangayName));
+
+                        return [
+                            'type' => 'mapped_area',
+                            'label' => $label,
+                            'address' => $this->appendLocality($address, $locality),
+                            'subtitle' => 'Mapped area in '.$barangayName,
+                            'latitude' => (float) $row->latitude,
+                            'longitude' => (float) $row->longitude,
+                        ];
+                    })
+            );
+        }
+
+        if (Schema::hasTable('puroks') && Schema::hasColumn('puroks', 'purok_name')) {
+            $purokQuery = DB::table('puroks')
+                ->whereNotNull('purok_name')
+                ->where('purok_name', '<>', '');
+
+            if (Schema::hasColumn('puroks', 'barangay_id') && $barangayId) {
+                $purokQuery->where('barangay_id', $barangayId);
+            }
+
+            $locations = $locations->merge(
+                $purokQuery->distinct()->orderBy('purok_name')->limit(500)->pluck('purok_name')
+                    ->map(fn (string $name): array => [
+                        'type' => 'purok',
+                        'label' => $name,
+                        'address' => $this->appendLocality($name, $locality),
+                        'subtitle' => 'Purok, '.$barangayName,
+                        'latitude' => null,
+                        'longitude' => null,
+                    ])
+            );
+        }
+
+        if (Schema::hasTable('evacuation_centers')) {
+            $centerQuery = DB::table('evacuation_centers')
+                ->whereNotNull('name')
+                ->where('name', '<>', '')
+                ->when(Schema::hasColumn('evacuation_centers', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'));
+
+            if (Schema::hasColumn('evacuation_centers', 'barangay_id') && $barangayId) {
+                $centerQuery->where('barangay_id', $barangayId);
+            }
+
+            $locations = $locations->merge(
+                $centerQuery
+                    ->select([
+                        'name',
+                        Schema::hasColumn('evacuation_centers', 'latitude') ? 'latitude' : DB::raw('NULL as latitude'),
+                        Schema::hasColumn('evacuation_centers', 'longitude') ? 'longitude' : DB::raw('NULL as longitude'),
+                    ])
+                    ->distinct()
+                    ->limit(500)
+                    ->get()
+                    ->map(fn (object $row): array => [
+                        'type' => 'evacuation_center',
+                        'label' => trim((string) $row->name),
+                        'address' => $this->appendLocality(trim((string) $row->name), $locality),
+                        'subtitle' => 'Evacuation center, '.$barangayName,
+                        'latitude' => $row->latitude !== null ? (float) $row->latitude : null,
+                        'longitude' => $row->longitude !== null ? (float) $row->longitude : null,
+                    ])
+            );
+        }
+
+        $results = $locations
+            ->filter(fn (array $location): bool => $location['label'] !== '')
+            ->unique(fn (array $location): string => strtolower($location['type'].'|'.$location['label'].'|'.$location['latitude'].'|'.$location['longitude']))
+            ->sortBy(fn (array $location): string => strtolower($location['label']))
+            ->values();
+
+        return response()->json([
+            'data' => [
+                'barangay' => $barangayName,
+                'locations' => $results,
+            ],
+        ]);
+    }
+
+    private function appendLocality(string $address, string $locality): string
+    {
+        $address = trim($address);
+
+        if ($address === '' || stripos($address, $locality) !== false) {
+            return $address;
+        }
+
+        return $address.', '.$locality;
     }
 
     public function storeResourceRequest(Request $request): JsonResponse

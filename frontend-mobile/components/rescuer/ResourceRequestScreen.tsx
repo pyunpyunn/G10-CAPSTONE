@@ -1,12 +1,15 @@
-import { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radius, spacing } from '@/constants/resqTheme';
+import MapView, { Marker } from 'react-native-maps';
+import { getRescuerRequestLocations } from '@/api/rescuer';
+import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
-import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
+import { ActionButton, EmptyState, RescuerSelect, SectionHeader, StatusBadge } from './RescuerUI';
 
 type ResourceRequestProps = {
   requests: any[];
+  assignments: any[];
   categoryOptions: any[];
   onSubmitRequest: (payload: any) => Promise<void>;
   onCancelRequest: (requestId: string) => Promise<void>;
@@ -24,8 +27,24 @@ const resourceTypeOptions = [
   'Others',
 ];
 
+type RequestLocationOption = {
+  id: string;
+  type: string;
+  label: string;
+  address: string;
+  subtitle: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+type MappedRequestLocationOption = RequestLocationOption & {
+  latitude: number;
+  longitude: number;
+};
+
 export function ResourceRequestScreen({
   requests,
+  assignments,
   categoryOptions,
   onSubmitRequest,
   onCancelRequest,
@@ -33,9 +52,16 @@ export function ResourceRequestScreen({
   const categories = (categoryOptions?.length ? categoryOptions : defaultCategories)
     .filter((category) => category.key !== 'vehicle');
   const [location, setLocation] = useState('');
+  const [locationOptions, setLocationOptions] = useState<any[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [locationsError, setLocationsError] = useState('');
+  const [locationsBarangay, setLocationsBarangay] = useState('the barangay');
+  const [isLocationInputFocused, setIsLocationInputFocused] = useState(false);
+  const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
+  const [locationQuery, setLocationQuery] = useState('');
+  const [pinnedLocation, setPinnedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [requestCategory, setRequestCategory] = useState(categories[0]?.key || 'resource');
   const [resourceType, setResourceType] = useState('');
-  const [isResourceTypeMenuOpen, setIsResourceTypeMenuOpen] = useState(false);
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [personnelCount, setPersonnelCount] = useState('');
@@ -45,6 +71,56 @@ export function ResourceRequestScreen({
   const [submitting, setSubmitting] = useState(false);
   const [showCompletedRequests, setShowCompletedRequests] = useState(false);
   const isPersonnelRequest = requestCategory === 'personnel';
+  useEffect(() => {
+    let isCurrent = true;
+
+    getRescuerRequestLocations()
+      .then((result) => {
+        if (!isCurrent) return;
+        setLocationOptions(result.locations || []);
+        setLocationsBarangay(result.barangay || 'the barangay');
+        setLocationsError('');
+        setLocationsLoading(false);
+      })
+      .catch((error) => {
+        if (!isCurrent) return;
+        setLocationsError(
+          error?.response?.data?.message
+          || error?.userMessage
+          || 'Saved barangay locations could not be loaded. You can still enter a location manually.'
+        );
+        setLocationsLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  const allLocations = mergeLocationOptions(locationOptions, assignments);
+  const locationSuggestions = location.trim()
+    ? allLocations
+        .filter((item) => `${item.label} ${item.address} ${item.subtitle || ''}`.toLowerCase().includes(location.trim().toLowerCase()))
+        .slice(0, 5)
+    : [];
+  const filteredLocationOptions = allLocations.filter((item) =>
+    `${item.label} ${item.address} ${item.subtitle || ''}`.toLowerCase().includes(locationQuery.trim().toLowerCase())
+  );
+  const mappedLocationOptions = allLocations.filter(hasCoordinates);
+  const firstMappedLocation = mappedLocationOptions[0];
+  const mapInitialRegion = firstMappedLocation
+    ? {
+        latitude: firstMappedLocation.latitude,
+        longitude: firstMappedLocation.longitude,
+        latitudeDelta: 0.06,
+        longitudeDelta: 0.06,
+      }
+    : {
+        latitude: 10.3157,
+        longitude: 123.8854,
+        latitudeDelta: 0.06,
+        longitudeDelta: 0.06,
+      };
   const visibleRequests = requests.filter((request) => {
     const status = String(request.validation_status || '').toLowerCase();
     const isCompleted = status === 'fulfilled' || status === 'completed';
@@ -124,6 +200,7 @@ export function ResourceRequestScreen({
       });
 
       setLocation('');
+      setPinnedLocation(null);
       setResourceType('');
       setItemName('');
       setQuantity('1');
@@ -155,13 +232,179 @@ export function ResourceRequestScreen({
           ))}
         </View>
 
-        <TextInput
-          style={styles.input}
-          value={location}
-          onChangeText={setLocation}
-          placeholder="Needed at location"
-          placeholderTextColor="#7d8da0"
-        />
+        <View style={styles.locationSection}>
+          <Text style={styles.fieldLabel}>Request location</Text>
+          <TextInput
+            style={styles.input}
+            value={location}
+            onFocus={() => setIsLocationInputFocused(true)}
+            onBlur={() => setIsLocationInputFocused(false)}
+            onChangeText={(value) => {
+              setLocation(value);
+              setPinnedLocation(null);
+            }}
+            placeholder={`Search locations in ${locationsBarangay}`}
+            placeholderTextColor="#7d8da0"
+            returnKeyType="search"
+            accessibilityLabel="Request location"
+          />
+          {isLocationInputFocused && location.trim().length > 0 ? (
+            <View style={styles.suggestionList}>
+              {locationSuggestions.length ? (
+                locationSuggestions.map((item) => (
+                  <Pressable
+                    key={item.id}
+                    style={styles.suggestionRow}
+                    onPressIn={() => {
+                      setLocation(item.address || item.label);
+                      setPinnedLocation(item.latitude !== null && item.longitude !== null
+                        ? { latitude: item.latitude, longitude: item.longitude }
+                        : null);
+                      setIsLocationInputFocused(false);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Use ${item.label}`}
+                  >
+                    <View style={styles.suggestionIcon}>
+                      <Ionicons name="location" size={17} color={palette.navActive} />
+                    </View>
+                    <View style={styles.locationResultText}>
+                      <Text style={styles.locationResultLabel}>{item.label}</Text>
+                      <Text style={styles.locationResultMeta}>{item.address || item.subtitle || 'Barangay location'}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={17} color={palette.textSoft} />
+                  </Pressable>
+                ))
+              ) : (
+                <Text style={styles.noSuggestions}>
+                  {locationsLoading
+                    ? `Loading locations in ${locationsBarangay}...`
+                    : locationsError || `No saved locations match. You can keep typing in ${locationsBarangay}.`}
+                </Text>
+              )}
+            </View>
+          ) : null}
+          <Pressable
+            style={styles.locationPickerButton}
+            onPress={() => setIsLocationPickerOpen(true)}
+            accessibilityRole="button"
+          >
+            <Ionicons name="map-outline" size={18} color={palette.navActive} />
+            <Text style={styles.locationPickerText}>Browse barangay locations or pin on map</Text>
+            <Ionicons name="chevron-forward" size={16} color={palette.textSoft} />
+          </Pressable>
+          {pinnedLocation ? (
+            <Text style={styles.locationHint}>
+              Pinned at {pinnedLocation.latitude.toFixed(5)}, {pinnedLocation.longitude.toFixed(5)}
+            </Text>
+          ) : null}
+        </View>
+
+        <Modal
+          transparent
+          visible={isLocationPickerOpen}
+          animationType="slide"
+          onRequestClose={() => setIsLocationPickerOpen(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.locationModal}>
+              <View style={styles.locationModalHeader}>
+                <View style={styles.locationModalTitleWrap}>
+                  <Text style={styles.locationModalTitle}>Choose request location</Text>
+                  <Text style={styles.locationModalSubtitle}>
+                    Search saved addresses and local destinations in {locationsBarangay}, or tap the map to pin.
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.closeButton}
+                  onPress={() => setIsLocationPickerOpen(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close location picker"
+                >
+                  <Ionicons name="close" size={20} color={palette.text} />
+                </Pressable>
+              </View>
+              <View style={styles.locationSearchWrap}>
+                <Ionicons name="search-outline" size={18} color={palette.textSoft} />
+                <TextInput
+                  style={styles.locationSearchInput}
+                  value={locationQuery}
+                  onChangeText={setLocationQuery}
+                  placeholder="Search by household or area"
+                  placeholderTextColor="#7d8da0"
+                />
+              </View>
+              {Platform.OS !== 'web' ? (
+                <MapView
+                  style={styles.locationMap}
+                  initialRegion={mapInitialRegion}
+                  onPress={(event) => {
+                    const coordinate = event.nativeEvent.coordinate;
+                    setPinnedLocation(coordinate);
+                    setLocation(`Pinned location (${coordinate.latitude.toFixed(5)}, ${coordinate.longitude.toFixed(5)})`);
+                    setIsLocationPickerOpen(false);
+                  }}
+                >
+                  {mappedLocationOptions.map((item) => (
+                    <Marker
+                      key={item.id}
+                      coordinate={{ latitude: item.latitude, longitude: item.longitude }}
+                      title={item.label}
+                      description={item.subtitle}
+                      onPress={() => {
+                        setLocation(item.address || item.label);
+                        setPinnedLocation({ latitude: item.latitude, longitude: item.longitude });
+                        setIsLocationPickerOpen(false);
+                      }}
+                    />
+                  ))}
+                </MapView>
+              ) : null}
+              <Text style={styles.locationResultsTitle}>
+                {allLocations.length ? `Locations in ${locationsBarangay}` : `No saved locations for ${locationsBarangay}`}
+              </Text>
+              {filteredLocationOptions.length ? (
+                <ScrollView style={styles.locationResults} keyboardShouldPersistTaps="handled">
+                  {filteredLocationOptions.map((item) => (
+                    <Pressable
+                      key={item.id}
+                      style={styles.locationResult}
+                      onPress={() => {
+                        setLocation(item.address || item.label);
+                        setPinnedLocation(item.latitude !== null && item.longitude !== null
+                          ? { latitude: item.latitude, longitude: item.longitude }
+                          : null);
+                        setIsLocationPickerOpen(false);
+                      }}
+                    >
+                      <View style={styles.locationResultIcon}>
+                        <Ionicons name="location" size={17} color={palette.navActive} />
+                      </View>
+                      <View style={styles.locationResultText}>
+                        <Text style={styles.locationResultLabel}>{item.label}</Text>
+                        <Text style={styles.locationResultMeta}>
+                          {item.address || item.subtitle}
+                          {item.latitude !== null && item.longitude !== null
+                            ? ` · ${item.latitude.toFixed(4)}, ${item.longitude.toFixed(4)}`
+                            : ''}
+                        </Text>
+                      </View>
+                      <Ionicons name="push-outline" size={18} color={palette.navActive} />
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              ) : (
+                <Text style={styles.noLocationResults}>
+                  {allLocations.length
+                    ? 'No locations match your search.'
+                    : locationsLoading
+                      ? `Loading locations in ${locationsBarangay}...`
+                      : locationsError || 'You can still enter a location manually above.'}
+                </Text>
+              )}
+            </View>
+          </View>
+        </Modal>
 
         {isPersonnelRequest && (
           <TextInput
@@ -192,19 +435,14 @@ export function ResourceRequestScreen({
           </>
         ) : (
           <>
-            <Pressable
-              style={styles.dropdownButton}
-              onPress={() => setIsResourceTypeMenuOpen(true)}
-              accessibilityRole="button"
+            <RescuerSelect
+              title="Resource category"
+              placeholder="Select category"
+              options={resourceTypeOptions.map((option) => ({ key: option, label: option }))}
+              value={resourceType}
+              onChange={setResourceType}
               accessibilityLabel="Choose resource category"
-            >
-              <View style={styles.dropdownValueRow}>
-                <Text style={[styles.dropdownText, !resourceType && styles.dropdownPlaceholder]} numberOfLines={1}>
-                  {resourceType || 'Select category'}
-                </Text>
-                <Ionicons name="chevron-down" size={18} color={palette.textSoft} />
-              </View>
-            </Pressable>
+            />
 
             <TextInput
               style={styles.input}
@@ -213,34 +451,6 @@ export function ResourceRequestScreen({
               placeholder="Item name"
               placeholderTextColor="#7d8da0"
             />
-
-            <Modal
-              transparent
-              visible={isResourceTypeMenuOpen}
-              animationType="fade"
-              onRequestClose={() => setIsResourceTypeMenuOpen(false)}
-            >
-              <Pressable style={styles.modalOverlay} onPress={() => setIsResourceTypeMenuOpen(false)}>
-                <Pressable style={styles.modalContent} onPress={() => undefined}>
-                  <ScrollView style={styles.modalList}>
-                    {resourceTypeOptions.map((option) => (
-                      <Pressable
-                        key={option}
-                        style={[styles.modalOption, resourceType === option && styles.modalOptionActive]}
-                        onPress={() => {
-                          setResourceType(option);
-                          setIsResourceTypeMenuOpen(false);
-                        }}
-                      >
-                        <Text style={[styles.modalOptionText, resourceType === option && styles.modalOptionTextActive]}>
-                          {option}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </Pressable>
-              </Pressable>
-            </Modal>
 
             <View style={styles.twoColumn}>
               <QuantityStepper value={quantity} onChange={setQuantity} placeholder="Quantity" />
@@ -330,6 +540,83 @@ export function ResourceRequestScreen({
   );
 }
 
+function mergeLocationOptions(locations: any[], assignments: any[]): RequestLocationOption[] {
+  const uniqueLocations = new Map<string, RequestLocationOption>();
+
+  locations.forEach((item, index) => {
+    const label = String(item.label || '').trim();
+    const address = String(item.address || label).trim();
+    const latitude = item.latitude === null || item.latitude === undefined ? null : Number(item.latitude);
+    const longitude = item.longitude === null || item.longitude === undefined ? null : Number(item.longitude);
+
+    if (!label) return;
+    if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) return;
+    if (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) return;
+
+    const type = String(item.type || 'location');
+    const key = `${label.toLowerCase()}|${latitude ?? ''}|${longitude ?? ''}`;
+    if (!uniqueLocations.has(key)) {
+      uniqueLocations.set(key, {
+        id: String(item.id || `${type}-${index}-${key}`),
+        type,
+        label,
+        address,
+        subtitle: String(item.subtitle || 'Barangay location'),
+        latitude,
+        longitude,
+      });
+    }
+  });
+
+  assignments.forEach((assignment) => {
+    const householdId = String(assignment.household_id || '').trim();
+    const latitude = Number(assignment.latitude);
+    const longitude = Number(assignment.longitude);
+
+    if (
+      !householdId
+      || assignment.latitude === null
+      || assignment.latitude === undefined
+      || assignment.longitude === null
+      || assignment.longitude === undefined
+      || !Number.isFinite(latitude)
+      || !Number.isFinite(longitude)
+      || latitude < -90
+      || latitude > 90
+      || longitude < -180
+      || longitude > 180
+    ) {
+      return;
+    }
+
+    const label = String(
+      assignment.destination_label
+      || assignment.assigned_area
+      || `Household ${householdId}`
+    ).trim();
+    const key = `${label.toLowerCase()}|${latitude}|${longitude}`;
+    if (!uniqueLocations.has(key)) {
+      uniqueLocations.set(key, {
+        id: `assignment-${householdId}`,
+        type: 'assigned_household',
+        label,
+        address: String(assignment.destination_label || assignment.assigned_area || label).trim(),
+        subtitle: `Assigned household ${householdId}`,
+        latitude,
+        longitude,
+      });
+    }
+  });
+
+  return [...uniqueLocations.values()].sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function hasCoordinates(
+  location: RequestLocationOption
+): location is MappedRequestLocationOption {
+  return location.latitude !== null && location.longitude !== null;
+}
+
 function labelize(value?: string) {
   if (!value) return 'Pending';
   return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -394,6 +681,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: palette.card,
+    ...shadow,
   },
   requestViewButton: {
     minHeight: 36,
@@ -447,36 +735,80 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     backgroundColor: '#fff',
   },
+  fieldLabel: {
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  locationSection: {
+    gap: spacing.xs,
+    zIndex: 2,
+  },
+  suggestionList: {
+    maxHeight: 230,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: palette.card,
+    shadowColor: palette.text,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  suggestionRow: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+    paddingVertical: spacing.xs,
+  },
+  suggestionIcon: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    backgroundColor: palette.secondary,
+  },
+  noSuggestions: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.md,
+    color: palette.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  locationPickerButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: palette.secondary,
+  },
+  locationPickerText: {
+    flex: 1,
+    color: palette.navActive,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  locationHint: {
+    color: palette.textSoft,
+    fontSize: 11,
+    fontWeight: '700',
+  },
   twoColumn: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
   flexInput: {
     flex: 1,
-  },
-  dropdownButton: {
-    minHeight: 46,
-    borderWidth: 1,
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-  },
-  dropdownValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.xs,
-  },
-  dropdownText: {
-    flex: 1,
-    color: palette.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  dropdownPlaceholder: {
-    color: '#7d8da0',
   },
   modalOverlay: {
     flex: 1,
@@ -485,32 +817,114 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.4)',
     padding: spacing.lg,
   },
-  modalContent: {
+  locationModal: {
     width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#fff',
+    maxWidth: 520,
+    maxHeight: '92%',
     borderRadius: radius.lg,
     padding: spacing.md,
+    backgroundColor: palette.card,
   },
-  modalList: {
-    maxHeight: 320,
+  locationModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
-  modalOption: {
-    minHeight: 48,
+  locationModalTitleWrap: {
+    flex: 1,
+  },
+  locationModalTitle: {
+    color: palette.text,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  locationModalSubtitle: {
+    marginTop: 3,
+    color: palette.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.md,
     borderRadius: radius.md,
-  },
-  modalOptionActive: {
     backgroundColor: palette.secondary,
   },
-  modalOptionText: {
+  locationSearchWrap: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: '#fff',
+  },
+  locationSearchInput: {
+    flex: 1,
+    minHeight: 42,
     color: palette.text,
     fontSize: 14,
-    fontWeight: '700',
   },
-  modalOptionTextActive: {
-    color: palette.navActive,
+  locationMap: {
+    height: 250,
+    marginTop: spacing.md,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  locationResultsTitle: {
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    color: palette.textSoft,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  locationResults: {
+    flexShrink: 1,
+    maxHeight: 220,
+  },
+  locationResult: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    paddingVertical: spacing.xs,
+  },
+  locationResultIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    backgroundColor: palette.secondary,
+  },
+  locationResultText: {
+    flex: 1,
+    gap: 2,
+  },
+  locationResultLabel: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  locationResultMeta: {
+    color: palette.textSoft,
+    fontSize: 11,
+  },
+  noLocationResults: {
+    paddingVertical: spacing.md,
+    color: palette.textSoft,
+    fontSize: 13,
+    lineHeight: 18,
   },
   quantityControl: {
     flex: 1,

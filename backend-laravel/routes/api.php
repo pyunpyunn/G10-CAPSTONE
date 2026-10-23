@@ -170,6 +170,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/rescuer/check-ins', [RescuerMobileController::class, 'checkIns']);
             Route::post('/rescuer/check-ins', [RescuerMobileController::class, 'storeCheckIn']);
             Route::get('/rescuer/resource-requests', [RescuerMobileController::class, 'resourceRequests']);
+            Route::get('/rescuer/resource-request-locations', [RescuerMobileController::class, 'resourceRequestLocations']);
             Route::post('/rescuer/resource-requests', [RescuerMobileController::class, 'storeResourceRequest']);
             Route::patch('/rescuer/resource-requests/{requestId}/cancel', [RescuerMobileController::class, 'cancelResourceRequest']);
             Route::get('/rescuer/radio', [RescuerMobileController::class, 'radioFeed']);

@@ -1,6 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radius, spacing } from '@/constants/resqTheme';
+import { palette, radius, spacing, typography } from '@/constants/resqTheme';
 
 type HeaderProps = {
   onOpenRadio?: () => void;
@@ -15,7 +15,10 @@ export function RescuerHeader({ onOpenRadio }: HeaderProps) {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.brand}>RESQPERATION</Text>
+        <View style={styles.brandCopy}>
+          <Text style={styles.brand}>RESQPERATION</Text>
+          <Text style={styles.subtitle}>FIELD RESPONSE</Text>
+        </View>
         <View style={styles.actions}>
           {onOpenRadio ? (
             <Pressable style={styles.iconButton} onPress={onOpenRadio}>
@@ -30,11 +33,13 @@ export function RescuerHeader({ onOpenRadio }: HeaderProps) {
 
 const styles = StyleSheet.create({
   header: {
-    minHeight: 72,
+    minHeight: 76,
     paddingTop: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.sm,
     backgroundColor: palette.nav,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.navActive,
   },
   brandRow: {
     flexDirection: 'row',
@@ -47,9 +52,18 @@ const styles = StyleSheet.create({
   },
   brand: {
     color: '#fff',
-    fontSize: 19,
-    fontWeight: '900',
-    letterSpacing: 0,
+    fontSize: 16,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 0.9,
+  },
+  brandCopy: {
+    gap: 2,
+  },
+  subtitle: {
+    color: palette.navMuted,
+    fontSize: 9,
+    fontWeight: typography.weights.medium,
+    letterSpacing: 1.4,
   },
   actions: {
     marginLeft: 'auto',
@@ -57,8 +71,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   iconButton: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
