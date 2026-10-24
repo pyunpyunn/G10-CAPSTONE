@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
-import { createRescueTeam,createRescuer,deleteRescueTeam,deactivateRescuer,deleteRescuer,getRescueTeamConfig,getRescuer,getRescuers,updateRescueTeam,updateRescuer,getPersonnelRoles } from '../api/rescuerApi'
+import { createRescueTeam,createRescuer,deleteRescueTeam,deactivateRescuer,deleteRescuer,getCachedRescuers,getCachedRescueTeamConfig,getRescueTeamConfig,getRescuer,getRescuers,updateRescueTeam,updateRescuer,getPersonnelRoles } from '../api/rescuerApi'
 import { getHeadquartersAccounts,saveHeadquartersAccount } from '../api/headquartersAccountsApi'
 import { getCurrentUser } from '../api/authApi'
 import { buildRescuerPayload,formFromRescuer,rescuerErrorMessage } from '../utils/rescuerHelpers'
@@ -20,29 +20,69 @@ function AccountsWorkspace() {
   const requestedId=params.get('id') || location.state?.rescuer?.responder_id
   const view=route==='teams' ? 'teams' : params.get('manage')==='roles' ? 'roles' : 'accounts'
   const [category,setCategory]=useState(location.state?.category==='headquarters' || params.get('type')==='command_center' ? 'command_center' : 'rescuer')
-  const [page,setPage]=useState(1),[teamFilter,setTeamFilter]=useState('all'),[selectedId,setSelectedId]=useState(requestedId || null)
-  const [payload,setPayload]=useState(null),[teams,setTeams]=useState(null),[roleWorkspace,setRoleWorkspace]=useState(null),[hq,setHq]=useState(null)
-  const [detail,setDetail]=useState(null),[loading,setLoading]=useState(true),[detailLoading,setDetailLoading]=useState(false)
+  const initialRoster=getCachedRescuers({page:1,per_page:8,team:'all',account_type:category})
+  const initialTeams=getCachedRescueTeamConfig()
+  const [page,setPage]=useState(1),[teamFilter,setTeamFilter]=useState('all'),[selectedId,setSelectedId]=useState(requestedId || initialRoster?.rescuers?.data?.[0]?.responder_id || null)
+  const [payload,setPayload]=useState(initialRoster),[teams,setTeams]=useState(initialTeams),[roleWorkspace,setRoleWorkspace]=useState(null),[hq,setHq]=useState(null)
+  const [detail,setDetail]=useState(null),[loading,setLoading]=useState(!initialRoster),[detailLoading,setDetailLoading]=useState(false),[roleOptionsLoading,setRoleOptionsLoading]=useState(false)
   const [error,setError]=useState(''),[notice,setNotice]=useState(location.state?.notice || ''),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0)
   const [modal,setModal]=useState(null),[newTeam,setNewTeam]=useState('')
   const detailVersion=useRef(0),savedSelection=useRef(null)
   useEffect(() => {
     let active=true
     async function load() {
-      setLoading(true);setError('')
-      const results=await Promise.allSettled([getRescuers({page,per_page:8,team:teamFilter,account_type:category}),getRescueTeamConfig(),getPersonnelRoles(),getHeadquartersAccounts()])
-      if(!active) return
-      const setters=[setPayload,setTeams,setRoleWorkspace,setHq],failures=[]
-      results.forEach((result,index) => {if(result.status==='fulfilled') setters[index](result.value);else failures.push(rescuerErrorMessage(result.reason,'Account settings could not be loaded.'))})
-      if(results[0].status==='fulfilled') {
-        const roster=results[0].value.rescuers
+      const cachedRoster=getCachedRescuers({page,per_page:8,team:teamFilter,account_type:category})
+      if(cachedRoster) {
+        setPayload(cachedRoster)
+        const roster=cachedRoster.rescuers
+        setSelectedId(current => requestedId || (roster.data.some(r => String(r.responder_id)===String(current)) ? current : roster.data[0]?.responder_id || null))
+        setLoading(false)
+      } else setLoading(true)
+      setError('')
+      const failures=[]
+      const rosterRequest=getRescuers({page,per_page:8,team:teamFilter,account_type:category}).then(data => {
+        if(!active) return
+        setPayload(data)
+        const roster=data.rescuers
         if(page>1 && !roster.data.length) setPage(Math.max(1,roster.last_page))
         else { const savedId=savedSelection.current; savedSelection.current=null; setSelectedId(current => requestedId || savedId || (roster.data.some(r => String(r.responder_id)===String(current)) ? current : roster.data[0]?.responder_id || null)) }
-      }
-      setError([...new Set(failures)].join(' '));setLoading(false)
+      }).catch(reason => {
+        if(active) failures.push(rescuerErrorMessage(reason,'Rescuer accounts could not be loaded.'))
+      }).finally(() => {
+        if(active) {setLoading(false);setError([...new Set(failures)].join(' '))}
+      })
+      const teamsRequest=getRescueTeamConfig().then(data => {
+        if(active) setTeams(data)
+      }).catch(reason => {
+        if(active) failures.push(rescuerErrorMessage(reason,'Team settings could not be loaded.'))
+      }).finally(() => {
+        if(active) setError([...new Set(failures)].join(' '))
+      })
+      await Promise.all([rosterRequest,teamsRequest])
     }
     load();return () => {active=false}
   },[page,teamFilter,category,revision,requestedId])
+  useEffect(() => {
+    const needsAccountOptions=route==='new' || route==='edit' || modal?.kind==='account'
+    if(view!=='roles' && !needsAccountOptions) return
+    let active=true
+    async function loadRoleOptions() {
+      setRoleOptionsLoading(true)
+      const requests=needsAccountOptions
+        ? await Promise.allSettled([getPersonnelRoles(),getHeadquartersAccounts()])
+        : await Promise.allSettled([getPersonnelRoles()])
+      if(!active) return
+      if(requests[0].status==='fulfilled') setRoleWorkspace(requests[0].value)
+      else setError(rescuerErrorMessage(requests[0].reason,'Account roles could not be loaded.'))
+      if(needsAccountOptions) {
+        if(requests[1].status==='fulfilled') setHq(requests[1].value)
+        else setError(rescuerErrorMessage(requests[1].reason,'Account ID options could not be loaded.'))
+      }
+      setRoleOptionsLoading(false)
+    }
+    loadRoleOptions()
+    return () => {active=false}
+  },[view,route,modal?.kind,revision])
   useEffect(() => {
     if(!selectedId) return
     const version=++detailVersion.current
@@ -64,6 +104,7 @@ function AccountsWorkspace() {
   async function refreshAccess() {try{onUserChange?.(await getCurrentUser())}catch{/* The API checks access again on every request. */}}
   function closeModal() {
     if(busy) return
+    setRoleOptionsLoading(false)
     setModal(null)
     if(['new','edit'].includes(route)) navigate('/rescuers',{state:{category:category==='command_center' ? 'headquarters' : 'responders'}})
   }
@@ -112,10 +153,10 @@ function AccountsWorkspace() {
   const hqCategory=category==='command_center',selectedDetail=detail && String(detail.responder_id)===String(selectedId) ? detail : null
   const ask=(action,record) => setModal({kind:'confirm',action,record})
   const closeManagement=() => navigate('/rescuers')
-  return <section className="account-html" aria-label="Account Management"><div className="bar">{view==='accounts' ? <><div className="seg" role="tablist" aria-label="Account category">{[['rescuer','Field teams'],['command_center','Committee / Operations']].map(([key,label]) => <button key={key} role="tab" aria-selected={category===key} disabled={busy} onClick={() => {setCategory(key);setPage(1);setTeamFilter('all');setSelectedId(null);setDetail(null)}}>{label} <small>{teams?.responders?.filter(r => r.account_type===key).length || 0}</small></button>)}</div><span className="sp" /><button className="btn" disabled={busy} onClick={() => navigate('/rescuers?manage=roles')}>Manage roles</button><button className="btn" disabled={busy} onClick={() => navigate('/rescuers/teams')}>Manage teams</button><button className="btn p" disabled={busy || !payload || !roleWorkspace} onClick={() => setModal({kind:'account',account:null})}>+ Create account</button></> : <><button className="btn" onClick={closeManagement}>‹ Back to accounts</button><h2 className="vt">Manage {view}</h2></>}</div>{error && <div className="notices"><div className="err" role="alert">{error} <button className="btn" disabled={busy} onClick={() => setRevision(current => current+1)}>Retry</button></div></div>}
+  return <section className="account-html" aria-label="Account Management"><div className="bar">{view==='accounts' ? <><div className="seg" role="tablist" aria-label="Account category">{[['rescuer','Field teams'],['command_center','Committee / Operations']].map(([key,label]) => <button key={key} role="tab" aria-selected={category===key} disabled={busy} onClick={() => {setCategory(key);setPage(1);setTeamFilter('all');setSelectedId(null);setDetail(null)}}>{label} <small>{teams?.responders?.filter(r => r.account_type===key).length || 0}</small></button>)}</div><span className="sp" /><button className="btn" disabled={busy} onClick={() => navigate('/rescuers?manage=roles')}>Manage roles</button><button className="btn" disabled={busy} onClick={() => navigate('/rescuers/teams')}>Manage teams</button><button className="btn p" disabled={busy || !payload?.form_options || roleOptionsLoading} onClick={() => setModal({kind:'account',account:null})}>+ Create account</button></> : <><button className="btn" onClick={closeManagement}>‹ Back to accounts</button><h2 className="vt">Manage {view}</h2></>}</div>{error && <div className="notices"><div className="err" role="alert">{error} <button className="btn" disabled={busy} onClick={() => setRevision(current => current+1)}>Retry</button></div></div>}{roleOptionsLoading && (view==='roles' || modal?.kind==='account' || route==='new' || route==='edit') && <p role="status">Loading account options…</p>}
     {view==='accounts' && <div className="grid"><aside className="ros"><div className="rh"><b>{hqCategory ? 'Committee / Operations' : 'Field teams'}</b><span className="chip">{pager.total || 0} total</span></div>{!hqCategory && <><label className="l" htmlFor="account-team-filter">Team</label><select id="account-team-filter" value={teamFilter} disabled={busy} onChange={event => {setTeamFilter(event.target.value);setPage(1)}}><option value="all">All teams</option>{(payload?.team_options || []).filter(t => String(t.team_code).toUpperCase()!=='HQCC').map(t => <option key={t.team_id} value={String(t.team_id)}>{t.team_name}</option>)}</select></>}<div className="rl">{loading ? Array.from({length:4},(_,i) => <div className="skl" key={i} role={i===0 ? 'status' : undefined} aria-label={i===0 ? 'Loading accounts' : undefined} />) : rows.length ? rows.map(r => <button key={r.responder_id} type="button" className={`row ${String(selectedId)===String(r.responder_id) ? 'sel' : ''}`} aria-pressed={String(selectedId)===String(r.responder_id)} onClick={() => setSelectedId(r.responder_id)}><span className="av s">{initials(r.full_name)}</span><span className="rt"><b>{r.full_name}</b><small>{r.title}{r.is_active===false ? ' · Inactive' : ''}</small></span></button>) : <div className="empty">No accounts{teamFilter!=='all' ? ' in this team' : ''}.{teamFilter!=='all' && <p><button className="btn" onClick={() => {setTeamFilter('all');setPage(1)}}>Show all teams</button></p>}</div>}</div><div className="pgn"><span>{pager.total ? `${pager.from}–${pager.to} of ${pager.total}` : '0 of 0'}</span><span><button type="button" className="btn" disabled={loading || page<=1} aria-label="Previous page" onClick={() => setPage(p => p-1)}>‹</button> <button type="button" className="btn" disabled={loading || page>=(pager.last_page || 1)} aria-label="Next page" onClick={() => setPage(p => p+1)}>›</button></span></div></aside><div>{loading || detailLoading ? <div className="card"><div className="skl" /><div className="skl" /></div> : selectedDetail ? <Profile key={selectedDetail.responder_id} account={selectedDetail} dutyStatuses={payload?.form_options?.duty_statuses || []} onDutyChange={saveDutyStatus} onEdit={() => setModal({kind:'account',account:selectedDetail})} onAction={action => ask(action,selectedDetail)} busy={busy} /> : <div className="card empty">Select an account to view its profile.</div>}</div></div>}
     {view==='teams' && <div className="grid management-grid"><div className="card"><label className="l" htmlFor="new-team-name">New team</label><form style={{display:'flex',gap:8,maxWidth:420}} onSubmit={event => {event.preventDefault();setModal({kind:'team',record:{...teams.form_defaults,team_name:newTeam,member_ids:[]},creating:true})}}><input id="new-team-name" required placeholder="Team name" value={newTeam} onChange={event => setNewTeam(event.target.value)} /><button type="submit" className="btn p" disabled={loading || !teams}>Add team</button></form><div className="tbl"><table><thead><tr><th>Team</th><th className="n">Members</th><th>Leader</th><th className="n">Actions</th></tr></thead><tbody>{(teams?.teams || []).map(t => <tr key={t.team_id}><td><b>{t.team_name}</b></td><td className="n">{t.member_count}</td><td>{t.leader_name || 'Not recorded'}</td><td className="n"><button className="btn" onClick={() => setModal({kind:'team',record:t})}>Edit</button> <button className="btn dg" disabled={!t.can_delete} onClick={() => ask('team',t)}>Delete</button></td></tr>)}</tbody></table></div><p className="note">Renaming a team updates its members. Deleting a team leaves its members unassigned and preserves past dispatch records.</p></div></div>}
-    {view==='roles' && <div className="grid management-grid"><div className="card"><p className="note">Access roles follow the BDRRMC committee structure. Role definitions are fixed; assign the appropriate role when creating or editing an account.</p><div className="tbl"><table><thead><tr><th>Role</th><th>Account type</th><th>Web access</th><th className="n">Accounts</th></tr></thead><tbody>{roles.map(r => <tr key={r.role_id}><td><b>{r.role_name}</b></td><td>{r.base_role_key.replaceAll('_',' ')}</td><td>{r.web_modules.map(key => key.replaceAll('_',' ')).join(', ') || 'Mobile field access'}</td><td className="n">{r.member_count}</td></tr>)}</tbody></table></div></div></div>}
+    {view==='roles' && <div className="grid management-grid"><div className="card"><p className="note">Access roles follow the BDRRMC committee structure. Role definitions are fixed; assign the appropriate role when creating or editing an account.</p>{roleOptionsLoading ? <p role="status">Loading access roles…</p> : <div className="tbl"><table><thead><tr><th>Role</th><th>Account type</th><th>Web access</th><th className="n">Accounts</th></tr></thead><tbody>{roles.map(r => <tr key={r.role_id}><td><b>{r.role_name}</b></td><td>{r.base_role_key.replaceAll('_',' ')}</td><td>{r.web_modules.map(key => key.replaceAll('_',' ')).join(', ') || 'Mobile field access'}</td><td className="n">{r.member_count}</td></tr>)}</tbody></table></div>}</div></div>}
     {editor && payload && roleWorkspace && <AccountEditor key={editor.account?.responder_id || 'new-account'} account={editor.account} category={editorCategory} payload={payload} roles={roles} hqNextIds={hq?.next_account_ids} busy={busy} onClose={closeModal} onSave={saveAccount} />}
     {modal?.kind==='team' && <AccountReferenceTeamEditor key={modal.record?.team_id || 'new-team'} team={modal.record} workspace={teams} busy={busy} onClose={closeModal} onSave={saveTeam} />}
     {modal?.kind==='confirm' && <Confirmation action={modal.action} record={modal.record} roles={roles} busy={busy} onClose={closeModal} onConfirm={confirmAction} />}

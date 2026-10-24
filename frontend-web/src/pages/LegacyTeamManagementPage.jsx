@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import RescueTeamConfigModal from '../components/rescuers/RescueTeamConfigModal'
-import { createRescueTeam, deleteRescueTeam, getRescueTeamConfig, updateRescueTeam } from '../api/rescuerApi'
+import { createRescueTeam, deleteRescueTeam, getCachedRescueTeamConfig, getRescueTeamConfig, updateRescueTeam } from '../api/rescuerApi'
 import { getCurrentUser } from '../api/authApi'
 import { rescuerErrorMessage } from '../utils/rescuerHelpers'
 import {
@@ -15,13 +15,13 @@ import {
 export default function LegacyTeamManagementPage() {
   const navigate = useNavigate()
   const { onUserChange } = useOutletContext()
-  const [workspace, setWorkspace] = useState(null)
+  const [workspace, setWorkspace] = useState(getCachedRescueTeamConfig)
   const [activeView, setActiveView] = useState('hierarchy')
   const [revision, setRevision] = useState(0)
   const [, setSelectedId] = useState(null)
   const [editor, setEditor] = useState(null)
   const [reload, setReload] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!getCachedRescueTeamConfig())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')

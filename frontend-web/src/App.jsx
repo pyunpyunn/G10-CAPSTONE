@@ -14,6 +14,7 @@ import PlaceholderPage from './pages/PlaceholderPage'
 import HouseholdReviewPage from './pages/HouseholdReviewPage'
 import { getCurrentUser, loginUser, logoutUser, saveRememberedPassword } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
+import { clearSessionCache, readSessionCache, removeSessionCache, writeSessionCache } from './api/sessionCache'
 import { canOpenWebPage, hasWebAccess, webHomeForUser } from './utils/personnelAccess'
 import './App.css'
 import './styles/foundation.css'
@@ -54,6 +55,7 @@ const pageComponents = {
   '/mapping': lazy(() => import('./pages/MappingPage')),
   '/households': lazy(() => import('./pages/HouseholdStatusPage')),
   '/households/_household-list': lazy(() => import('./pages/HouseholdPurokListPage')),
+  '/households/_data-directory': lazy(() => import('./pages/HouseholdDataDirectoryPage')),
   '/rescue-management': lazy(() => import('./pages/RescueManagementPage')),
   '/field-reports': lazy(() => import('./pages/FieldReportsPage')),
   '/dispatch/communication': lazy(() => import('./pages/FieldCommunicationPage')),
@@ -183,20 +185,27 @@ function App() {
 }
 
 function AuthRoutes() {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(() => {
+    const cached = readSessionCache('web-user', 24 * 60 * 60 * 1000)
+    return isWebUser(cached) ? cached : null
+  })
   const [checkingSession, setCheckingSession] = useState(true)
   const [loginError, setLoginError] = useState('')
   const navigate = useNavigate()
   const sessionUserId = user?.user_id || user?.id
 
   useEffect(() => {
+    if (user && getToken()) writeSessionCache('web-user', user)
+    else removeSessionCache('web-user')
+  }, [user])
+
+  useEffect(() => {
     if (!sessionUserId) return undefined
     let disposed = false
     let inFlight = false
-    let queued = false
     async function refreshAccess() {
       if (disposed || !getToken()) return
-      if (inFlight) { queued = true; return }
+      if (inFlight) return
       inFlight = true
       const token = getToken()
       try {
@@ -206,27 +215,29 @@ function AuthRoutes() {
           setUser(current => JSON.stringify(current) === JSON.stringify(nextUser) ? current : nextUser)
         } else {
           clearToken()
+          clearSessionCache()
           setUser(null)
           setLoginError('Your role access changed. Please sign in again.')
           navigate('/login', { replace: true })
         }
       } catch (error) {
         if (!disposed && token === getToken() && [401, 403].includes(error.response?.status)) {
-          clearToken(); setUser(null); navigate('/login', { replace: true })
+          clearToken()
+          clearSessionCache()
+          setUser(null)
+          navigate('/login', { replace: true })
         }
       } finally {
         inFlight = false
-        if (queued && !disposed) { queued = false; refreshAccess() }
       }
     }
     const onVisible = () => { if (!document.hidden) refreshAccess() }
     const onOperations = event => { if (event.detail?.topics?.includes('accounts')) refreshAccess() }
-    const interval = window.setInterval(onVisible, 3000)
+    const interval = window.setInterval(onVisible, 60000)
     window.addEventListener('personnel-access:changed', refreshAccess)
     window.addEventListener('operations:changed', onOperations)
     window.addEventListener('focus', onVisible)
     document.addEventListener('visibilitychange', onVisible)
-    refreshAccess()
     return () => {
       disposed = true
       window.clearInterval(interval)
@@ -240,6 +251,7 @@ function AuthRoutes() {
   useEffect(() => {
     async function loadSession() {
       if (!getToken()) {
+        clearSessionCache()
         setCheckingSession(false)
         return
       }
@@ -250,10 +262,17 @@ function AuthRoutes() {
           setUser(currentUser)
         } else {
           clearToken()
+          clearSessionCache()
+          setUser(null)
           setLoginError('This account is for the mobile app.')
         }
-      } catch {
+      } catch (error) {
         clearToken()
+        clearSessionCache()
+        setUser(null)
+        if (error.response?.status === 503) {
+          setLoginError(error.response.data?.message || 'The database is unavailable. Please try again when the backend is connected.')
+        }
       } finally {
         setCheckingSession(false)
       }
@@ -272,6 +291,7 @@ function AuthRoutes() {
 
       if (!isWebUser(nextUser)) {
         clearToken()
+        clearSessionCache()
         throw new Error('Household and rescuer accounts should use the mobile app.')
       }
 
@@ -289,6 +309,7 @@ function AuthRoutes() {
       await logoutUser()
     } finally {
       clearToken()
+      clearSessionCache()
       setUser(null)
       navigate('/login', { replace: true })
     }
@@ -299,12 +320,13 @@ function AuthRoutes() {
       setUser(nextUser)
     } else {
       clearToken()
+      clearSessionCache()
       setUser(null)
       navigate('/login', { replace: true })
     }
   }
 
-  if (checkingSession) {
+  if (checkingSession && !user) {
     return <div className="screen-loader">Loading...</div>
   }
 
@@ -347,6 +369,7 @@ function AuthRoutes() {
           />
         ))}
         <Route path="households/_household-list" element={<LazyPage page={{ path: '/households/_household-list' }} />} />
+        <Route path="households/_data-directory" element={<LazyPage page={{ path: '/households/_data-directory' }} />} />
         <Route path="households/:householdId" element={<GuardedHouseholdReviewPage />} />
         <Route path="notifications" element={<LazyPage page={{ path: '/notifications' }} />} />
         <Route path="profile" element={<LazyPage page={{ path: '/profile' }} />} />

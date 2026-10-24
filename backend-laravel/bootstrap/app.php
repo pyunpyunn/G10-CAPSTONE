@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->api(append: [
             SecurityHeaders::class,
+            \App\Http\Middleware\EnsureOperationalDatabaseReachable::class,
             ProfileLocalQueries::class,
         ]);
 
