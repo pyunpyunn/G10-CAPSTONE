@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DisasterBroadcastController;
 use App\Http\Controllers\Api\EvacuationCheckInController;
 use App\Http\Controllers\Api\GlobalSearchController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\HouseholdDirectoryController;
 use App\Http\Controllers\Api\HouseholdMobileController;
 use App\Http\Controllers\Api\HouseholdStatusController;
 use App\Http\Controllers\Api\InquiryController;
@@ -137,6 +138,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/map/evacuation-sites', [MappingController::class, 'evacuationSites']);
             Route::get('/map/dispatch-routes', [MappingController::class, 'dispatchRoutes']);
             Route::get('/map/households/{householdId}/route', [MappingController::class, 'householdRoute']);
+            Route::get('/households/directory', [HouseholdDirectoryController::class, 'index']);
             Route::get('/households', [HouseholdStatusController::class, 'index']);
             Route::get('/households/{householdId}', [HouseholdStatusController::class, 'show']);
             Route::get('/households/{householdId}/status-logs', [HouseholdStatusController::class, 'statusLogs']);

@@ -36,7 +36,7 @@ export default function HouseholdPurokListPage() {
     navigate(`/households/${household.household_id}`, { state: { returnTo: location.pathname + location.search } })
   }
   return <section className="hh-prototype" aria-label="Household list">
-    <div className="hd"><Link className="bk" to="/households" title="Go back to main page" aria-label="Go back to main page">‹</Link><b className="ttl">{loading ? 'Loading households…' : scope?.sitio ? `${scope.sitio.sitio_name}${scope.purok ? ` · ${scope.purok.purok_name}` : ''}` : error ? 'Household list unavailable' : 'All households'}</b><span className="sp" />
+    <div className="hd"><Link className="bk" to="/households" title="Go back to main page" aria-label="Go back to main page">‹</Link><b className="ttl">{loading ? 'Loading households…' : scope?.sitio ? `${scope.sitio.sitio_name}${scope.purok ? ` · ${scope.purok.purok_name}` : ''}` : error ? 'Household list unavailable' : 'All households'}</b><span className="sp" /><Link className="bt" to="/households/_data-directory">Data directory</Link>
       {scope?.sitio && <select aria-label="Purok" value={purokId || ''} onChange={event => filter('purok_id', event.target.value)}><option value="">All puroks</option>{scope.puroks.map(purok => <option key={purok.purok_id} value={purok.purok_id}>{purok.purok_name}</option>)}</select>}
       <select aria-label="Status" value={params.get('status') || ''} onChange={event => filter('status', event.target.value)}><option value="">All status</option>{statuses.map(status => <option key={status.key} value={status.key}>{status.label}</option>)}</select><RefreshButton onClick={refresh} loading={loading} />
     </div>

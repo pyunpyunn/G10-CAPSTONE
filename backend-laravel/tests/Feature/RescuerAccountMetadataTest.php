@@ -195,8 +195,10 @@ class RescuerAccountMetadataTest extends TestCase
         });
         DB::table('addresses')->insert(['address_id' => 3, 'purok_sitio' => 'Purok 3']);
         DB::table('rescue_teams')->insert([
-            'team_id' => 1, 'team_code' => 'SAR', 'team_name' => 'Search and Rescue', 'team_type' => 'Rescue',
-            'assigned_purok_id' => 3, 'leader_responder_id' => 10, 'duty_status' => 'available',
+            ['team_id' => 1, 'team_code' => 'SAR', 'team_name' => 'Search and Rescue', 'team_type' => 'Rescue',
+                'assigned_purok_id' => 3, 'leader_responder_id' => 10, 'duty_status' => 'available'],
+            ['team_id' => 2, 'team_code' => 'MED', 'team_name' => 'Water Rescue', 'team_type' => 'Rescue',
+                'assigned_purok_id' => null, 'leader_responder_id' => null, 'duty_status' => 'available'],
         ]);
         DB::table('responders')->insert([
             ['responder_id' => 10, 'team_id' => 1, 'full_name' => 'Alex Leader', 'title' => 'Leader', 'duty_status' => 'available', 'is_deployed' => false, 'deleted_at' => null],
@@ -207,7 +209,12 @@ class RescuerAccountMetadataTest extends TestCase
             ['team_id' => 1, 'status' => 'completed'],
         ]);
 
-        $card = app(RescuerAccountQuery::class)->teamConfigCards()[0];
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $cards = app(RescuerAccountQuery::class)->teamConfigCards();
+        $queryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+        $card = $cards[0];
 
         $this->assertSame('Search and Rescue', $card['team_name']);
         $this->assertSame('Purok 3', $card['assigned_purok']);
@@ -215,5 +222,44 @@ class RescuerAccountMetadataTest extends TestCase
         $this->assertSame(2, $card['member_count']);
         $this->assertSame(1, $card['deployed_count']);
         $this->assertSame(1, $card['active_dispatch_count']);
+        $this->assertSame(0, $cards[1]['member_count']);
+        $this->assertSame(0, $cards[1]['active_dispatch_count']);
+        $this->assertSame(3, $queryCount, 'Team cards should load teams, members, and dispatch counts in three queries.');
+    }
+
+    public function test_account_id_options_load_all_team_sequences_in_three_queries(): void
+    {
+        Schema::create('users', function (Blueprint $table) {
+            $table->string('user_id')->primary();
+            $table->string('username')->nullable();
+        });
+        Schema::create('responders', function (Blueprint $table) {
+            $table->integer('responder_id')->primary();
+            $table->string('username')->nullable();
+            $table->string('responder_code')->nullable();
+        });
+        DB::table('users')->insert([
+            'user_id' => 'USER-1',
+            'username' => 'SRR-1002',
+        ]);
+        DB::table('responders')->insert([
+            'responder_id' => 1,
+            'username' => 'SRR-1004',
+            'responder_code' => 'SRR-1005',
+        ]);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $choices = app(RescuerAccountQuery::class)->accountIdChoices([
+            ['team_name' => 'Search and Rescue', 'team_code' => 'SAR'],
+            ['team_name' => 'Medical', 'team_code' => 'MED'],
+        ]);
+        $queryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertSame('SRR-1006', $choices['options'][0]['account_id']);
+        $this->assertSame('HFAPS-3000', $choices['options'][1]['account_id']);
+        $this->assertSame('SRR-1006', $choices['default']);
+        $this->assertSame(3, $queryCount, 'Account ID choices should query users, responder usernames, and responder codes once each.');
     }
 }
