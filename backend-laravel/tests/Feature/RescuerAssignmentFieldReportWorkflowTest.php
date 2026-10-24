@@ -280,6 +280,12 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $this->assertSame(200,$fresh->getStatusCode());
         $this->assertNotEmpty($fresh->getData(true)['data']['route']['coordinates']);
         $this->assertDatabaseHas('responder_routes',['assignment_id'=>$id,'responder_id'=>5,'start_latitude'=>10.282,'start_longitude'=>123.872]);
+        try {
+            $workflow->storeLocation($this->request(['latitude'=>10.1,'longitude'=>123.1,'recorded_at'=>now()->subSeconds(5)->toIso8601String()]),$id);
+            $this->fail('An old GPS sample must not overwrite the live location.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $error) {
+            $this->assertSame(409,$error->getStatusCode());
+        }
         $mapRoutes = app(\App\Queries\MappingQuery::class)->getDispatchRoutes('EVT-1');
         $this->assertCount(1,$mapRoutes);
         $this->assertSame(5,(int)$mapRoutes[0]['responder_id']);
@@ -288,6 +294,12 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $change('accepted',6,['latitude'=>10.28,'longitude'=>123.87]);
         $this->assertSame('en_route',$query->find($id,5)->status);
         $this->assertSame('accepted',$query->find($id,6)->status);
+        $markers = app(\App\Queries\MappingQuery::class)->getRescueTeamMarkers('EVT-1');
+        $this->assertCount(2,$markers);
+        $this->assertEqualsCanonicalizing([5,6],array_column($markers,'responder_id'));
+        $this->assertSame(10.282,collect($markers)->firstWhere('responder_id',5)['latitude']);
+        (new \App\Jobs\RefreshResponderRoadRoute($id,['responder_id'=>5,'latitude'=>10.28,'longitude'=>123.87]))->handle($workflow);
+        $this->assertDatabaseHas('responder_routes',['assignment_id'=>$id,'responder_id'=>5,'start_latitude'=>10.282]);
         $change('on_scene');
         // No field report: explicit safe confirmation still creates official status/history.
         $next = $change('completed',5,['household_id'=>'HH-4','household_status_key'=>'safe']);

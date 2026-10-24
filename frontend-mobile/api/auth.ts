@@ -70,6 +70,8 @@ export async function loginMobile(login: string, password: string) {
 
 export async function logoutMobile() {
   if (Platform.OS !== 'web') {
+    const { stopRescuerTracking } = await import('@/utils/rescuerLiveLocation');
+    await stopRescuerTracking().catch(() => {});
     const { endNavigationTrip, suspendNavigationSync } = await import('@/utils/navigationRuntime');
     // Stop recording before revoking the session. The account's saved outbox is
     // retained if the phone is offline and resumes after this account signs in.

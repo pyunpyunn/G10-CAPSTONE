@@ -2179,26 +2179,8 @@ class HouseholdMobileService
 
     private function saveLatestHouseholdStatusFromMemberStatuses(string $eventId, string $householdId, array $validated, ?string $userId, ?int $deviceId, $now): void
     {
-        $statusKey = $this->householdRollupStatusKey($householdId, $eventId);
-        $status = $this->resolveStatus($statusKey);
-
-        if (! $status) {
-            return;
-        }
-
-        $notes = json_encode([
-            'report_type' => 'household_member_rollup',
-            'mobile_status_key' => $statusKey,
-            'mobile_status_label' => $this->mobileStatusLabel($statusKey, null),
-            'user_notes' => $this->householdRollupNote($statusKey),
-            'latest_member_status_key' => $validated['status_key'],
-        ], JSON_UNESCAPED_SLASHES);
-
-        $this->saveLatestDisasterStatus($eventId, $householdId, $status['status_id'], array_merge($validated, [
-            'status_key' => $statusKey,
-            'status_source' => 'household_member_mobile',
-            'notes' => $notes,
-        ]), $userId, $deviceId, $now);
+        app(\App\Services\Mobile\HouseholdMobileStatusWriter::class)
+            ->saveLatestHouseholdStatusFromMemberStatuses($eventId, $householdId, $validated, $userId, $deviceId, $now);
     }
 
     private function saveMemberDisasterStatus(string $eventId, string $householdId, string $memberId, array $validated, ?string $userId, ?int $deviceId, $now): void
