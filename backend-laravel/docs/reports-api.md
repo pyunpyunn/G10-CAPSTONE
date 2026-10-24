@@ -9,9 +9,9 @@ document's placeholder records and totals are not used.
 
 ## Local setup
 
-Reports use the existing default database connection (`resq_local` on this
-machine). A second/shared database is not needed. Report generation reads existing
-queries and saved Situation snapshots; it does not copy or seed operational data.
+Reports use the existing default `mysql` connection to the shared `klint`
+database. Report generation reads existing queries and saved Situation
+snapshots; it does not copy or seed operational data.
 
 Settings in `.env`:
 

@@ -1,386 +1,81 @@
-import { statusColor } from '@/constants/statusPalette';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { getAssignedHousehold } from '@/api/rescuer';
 import { palette, radius, spacing } from '@/constants/resqTheme';
-import { formatPhilippineDateTime } from '@/utils/time';
-import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
+import { ActionButton, SectionHeader, StatTile } from './RescuerUI';
+import { ReportSelect, type ReportOption } from './ReportSelect';
 
-type FieldReportProps = {
-  reports: any[];
-  assignmentId: number;
-  householdId: string;
-  onSubmitReport: (payload: any) => Promise<void>;
-};
-
-const incidentOptions = [
-  { key: 'flood', label: 'Flood' },
-  { key: 'fire', label: 'Fire' },
-  { key: 'earthquake', label: 'Earthquake' },
-  { key: 'landslide', label: 'Landslide' },
-  { key: 'typhoon_strong_winds', label: 'Typhoon / strong winds' },
-  { key: 'other', label: 'Other' },
-];
-
-const damageOptions = [
-  { key: 'no_damage', label: 'None' },
-  { key: 'minor_damage', label: 'Minor' },
-  { key: 'major_damage', label: 'Major' },
-  { key: 'completely_destroyed', label: 'Destroyed' },
-  { key: 'not_yet_assessed', label: 'Not assessed' },
-];
-
-const uncheckedStatuses = new Set(['unknown', 'unchecked', 'unreported']);
-
-export function FieldReportScreen({ reports, assignmentId, householdId, onSubmitReport }: FieldReportProps) {
+export function FieldReportScreen({ reports, assignmentId, householdId, onSubmitReport, onCompleteHousehold }: {
+  reports: any[]; assignmentId: number; householdId: string; onSubmitReport: (payload: any) => Promise<void>; onCompleteHousehold?: () => void;
+}) {
   const [household, setHousehold] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
-  const [memberStatusOptions, setMemberStatusOptions] = useState<any[]>([]);
-  const [loadingHousehold, setLoadingHousehold] = useState(Boolean(assignmentId));
-  const [householdError, setHouseholdError] = useState('');
-  const [incidentType, setIncidentType] = useState('');
-  const [otherIncidentType, setOtherIncidentType] = useState('');
-  const [propertyDamage, setPropertyDamage] = useState('');
-  const [deathCount, setDeathCount] = useState('');
-  const [injuredCount, setInjuredCount] = useState('');
+  const [statusOptions, setStatusOptions] = useState<ReportOption[]>([]);
+  const [damageOptions, setDamageOptions] = useState<ReportOption[]>([]);
+  const [damage, setDamage] = useState('');
   const [notes, setNotes] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-  const [reportSubmitted, setReportSubmitted] = useState(false);
-  const idempotencyKey = useRef('');
-  const alreadySubmitted = reportSubmitted || reports.some((report) => String(report.assignment_id) === String(assignmentId));
-  const membersAssessed = members.length > 0 && members.every((member) => Boolean(member.statusKey) && !uncheckedStatuses.has(member.statusKey));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const requestKey = useRef('');
+  const submitted = saved || reports.some(report => String(report.assignment_id) === String(assignmentId) && String(report.household_id) === String(householdId));
+  const deathCount = members.filter(member => statusOptions.find(option => option.key === member.statusKey)?.counts_as_death).length;
+  const injuredCount = members.filter(member => statusOptions.find(option => option.key === member.statusKey)?.counts_as_injury).length;
 
   useEffect(() => {
-    let isCurrent = true;
-    setHousehold(null);
-    setMembers([]);
-    setMemberStatusOptions([]);
-    setHouseholdError('');
-    setSubmitError('');
-    setReportSubmitted(false);
-    setIncidentType('');
-    setOtherIncidentType('');
-    setPropertyDamage('');
-    setDeathCount('');
-    setInjuredCount('');
-    setNotes('');
-    idempotencyKey.current = `field-report-${assignmentId}`;
+    let active = true;
+    setHousehold(null); setMembers([]); setStatusOptions([]); setDamageOptions([]); setDamage(''); setNotes(''); setSaved(false); setError('');
+    requestKey.current = `field-report-${assignmentId}-${householdId}`;
+    if (!assignmentId || !householdId) { setLoading(false); setError('No current household.'); return; }
+    setLoading(true);
+    getAssignedHousehold(assignmentId).then(data => {
+      if (!active) return;
+      if (String(data.household?.household_id) !== String(householdId)) throw new Error('The current household changed. Refresh your queue.');
+      setHousehold(data.household); setStatusOptions(data.member_status_options || []); setDamageOptions(data.property_damage_options || []); setDamage(data.saved_property_damage || '');
+      setMembers((data.members || []).map((member: any) => ({ id: String(member.member_id), name: member.name, head: member.is_household_head, statusKey: member.member_status?.key || '' })));
+    }).catch(failure => { if (active) setError(failure.message || 'Unable to load report.'); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [assignmentId, householdId, revision]);
 
-    if (!assignmentId || !householdId) {
-      setHouseholdError('Select an active household assignment before opening a field report.');
-      setLoadingHousehold(false);
-      return () => { isCurrent = false; };
+  async function submit() {
+    if (busy || submitted) return;
+    if (!damage || !members.length || members.some(member => !statusOptions.some(option => option.key === member.statusKey))) {
+      Alert.alert('Report incomplete', 'Select a status for each member and a property damage level.'); return;
     }
-
-    setLoadingHousehold(true);
-    getAssignedHousehold(assignmentId)
-      .then((data) => {
-        if (!isCurrent) return;
-        const statusOptions = data.member_status_options || [];
-        setHousehold(data.household);
-        setMemberStatusOptions(statusOptions);
-        setMembers((data.members || []).map((member: any) => {
-          const savedKey = member.member_status?.key || '';
-          const savedOption = statusOptions.find((option: any) => option.key === savedKey);
-          return {
-            id: String(member.member_id),
-            name: member.name || 'Unnamed member',
-            isHouseholdHead: member.is_household_head,
-            statusKey: savedOption && !uncheckedStatuses.has(savedKey) ? savedKey : '',
-          };
-        }));
-      })
-      .catch(() => {
-        if (isCurrent) setHouseholdError('Unable to load the assigned household and members. Refresh the assignment and try again.');
-      })
-      .finally(() => {
-        if (isCurrent) setLoadingHousehold(false);
-      });
-
-    return () => { isCurrent = false; };
-  }, [assignmentId, householdId]);
-
-  function updateMemberStatus(memberId: string, statusKey: string) {
-    setMembers((current) => current.map((member) => member.id === memberId ? { ...member, statusKey } : member));
-  }
-
-  async function handleSubmit() {
-    if (alreadySubmitted || submitting) return;
-    if (!membersAssessed || !incidentType || !propertyDamage) {
-      Alert.alert('Report details required', 'Assess every member, then select an incident type and property damage level.');
-      return;
-    }
-    const counts = [deathCount, injuredCount];
-    if (counts.some((value) => value.trim() === '' || !/^\d+$/.test(value.trim()))) {
-      Alert.alert('Counts required', 'Enter a non-negative whole number for deaths and injuries.');
-      return;
-    }
-    if (incidentType === 'other' && !otherIncidentType.trim()) {
-      Alert.alert('Incident type required', 'Describe the incident type.');
-      return;
-    }
-
-    setSubmitError('');
-    setSubmitting(true);
-
+    setBusy(true); setError('');
     try {
-      await onSubmitReport({
-        assignment_id: assignmentId,
-        household_id: String(household.household_id),
-        idempotency_key: idempotencyKey.current,
-        incident_type: incidentType,
-        incident_type_other: incidentType === 'other' ? otherIncidentType.trim() : undefined,
-        property_damage: propertyDamage,
-        death_count: Number(deathCount),
-        injured_count: Number(injuredCount),
-        notes: notes.trim() || undefined,
-        members: members.map((member) => ({ member_id: member.id, status_key: member.statusKey })),
-      });
-      setReportSubmitted(true);
-    } catch (error: any) {
-      setSubmitError(error?.response?.data?.message || 'The field report could not be saved. Check your connection and retry.');
-    } finally {
-      setSubmitting(false);
-    }
+      await onSubmitReport({ assignment_id: assignmentId, household_id: householdId, idempotency_key: requestKey.current, property_damage: damage,
+        death_count: deathCount, injured_count: injuredCount, notes: notes.trim() || undefined, members: members.map(member => ({ member_id: member.id, status_key: member.statusKey })) });
+      setSaved(true);
+    } catch (failure: any) { setError(failure.response?.data?.message || 'Unable to save report.'); }
+    finally { setBusy(false); }
   }
 
-  return (
-    <View style={styles.stack}>
-      <View style={styles.card}>
-        <SectionHeader title="Household field report" />
-        {loadingHousehold ? <Text style={styles.helperText}>Loading assigned household…</Text> : null}
-        {householdError ? <Text style={styles.errorText}>{householdError}</Text> : null}
-        {household ? (
-          <View style={styles.householdSummary}>
-            <Text style={styles.householdName}>{household.household_name || household.household_code || household.household_id}</Text>
-            <Text style={styles.helperText}>{household.household_id} · {household.address || household.purok || 'Address unavailable'}</Text>
-          </View>
-        ) : null}
-
-        {members.map((member) => (
-          <View key={member.id} style={styles.memberCard}>
-            <Text style={styles.memberName}>{member.name}{member.isHouseholdHead ? ' · Head' : ''}</Text>
-            <View style={styles.statusRow}>
-              {memberStatusOptions.filter((option) => !uncheckedStatuses.has(option.key)).map((option) => (
-                <Pressable
-                  key={option.key}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: member.statusKey === option.key }}
-                  style={[styles.statusChip, { borderColor: statusColor(option.key) }, member.statusKey === option.key && { backgroundColor: statusColor(option.key) }]}
-                  onPress={() => updateMemberStatus(member.id, option.key)}
-                >
-                  <Text style={[styles.statusChipText, { color: statusColor(option.key) }, member.statusKey === option.key && styles.statusChipTextActive]}>
-                    {option.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ))}
-
-        <Text style={styles.sectionLabel}>Incident type</Text>
-        <View style={styles.statusRow}>
-          {incidentOptions.map((option) => (
-            <Pressable key={option.key} style={[styles.statusChip, incidentType === option.key && styles.selectedOption]} onPress={() => setIncidentType(option.key)}>
-              <Text style={[styles.statusChipText, incidentType === option.key && styles.statusChipTextActive]}>{option.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-        {incidentType === 'other' ? (
-          <TextInput style={styles.input} value={otherIncidentType} onChangeText={setOtherIncidentType} placeholder="Describe incident type" placeholderTextColor="#7d8da0" maxLength={255} />
-        ) : null}
-
-        <Text style={styles.sectionLabel}>Property damage</Text>
-        <View style={styles.statusRow}>
-          {damageOptions.map((option) => (
-            <Pressable key={option.key} style={[styles.statusChip, propertyDamage === option.key && styles.selectedOption]} onPress={() => setPropertyDamage(option.key)}>
-              <Text style={[styles.statusChipText, propertyDamage === option.key && styles.statusChipTextActive]}>{option.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <View style={styles.twoColumn}>
-          <TextInput style={[styles.input, styles.flexInput]} value={deathCount} onChangeText={setDeathCount} placeholder="Deaths" placeholderTextColor="#7d8da0" keyboardType="number-pad" />
-          <TextInput style={[styles.input, styles.flexInput]} value={injuredCount} onChangeText={setInjuredCount} placeholder="Injured" placeholderTextColor="#7d8da0" keyboardType="number-pad" />
-        </View>
-        <TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes} placeholder="Notes for HQ (optional)" placeholderTextColor="#7d8da0" multiline textAlignVertical="top" maxLength={2000} />
-        {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
-        {alreadySubmitted ? <Text style={styles.successText}>A field report is saved for this assignment.</Text> : null}
-        <ActionButton
-          label={alreadySubmitted ? 'Report saved' : submitting ? 'Submitting…' : 'Submit to HQ'}
-          icon={alreadySubmitted ? 'checkmark-circle-outline' : 'send-outline'}
-          disabled={submitting || loadingHousehold || !household || alreadySubmitted || members.length === 0}
-          onPress={handleSubmit}
-        />
-      </View>
-
-      <View style={styles.card}>
-        <SectionHeader title="Submitted reports" />
-        {reports.length === 0 ? (
-          <EmptyState icon="document-text-outline" title="No field reports yet" />
-        ) : (
-          reports.map((report) => (
-            <View key={report.report_id || report.status_log_id} style={styles.reportRow}>
-              <View style={styles.reportIcon}>
-                <Ionicons name="document-text-outline" size={18} color={palette.navActive} />
-              </View>
-              <View style={styles.reportText}>
-                <Text style={styles.reportTitle}>
-                  {report.household_head || report.household_code || report.household_id}
-                </Text>
-                <Text style={styles.reportMeta}>
-                  {report.household_id} · {formatDate(report.submitted_at)}
-                </Text>
-              </View>
-              <StatusBadge label={report.status_label} tone={report.status_key} />
-            </View>
-          ))
-        )}
-      </View>
+  return <View style={styles.stack}>
+    <View style={styles.card}><SectionHeader title="Field report" />
+      {loading && <Text style={styles.meta}>Loading…</Text>}
+      {household && <><Text style={styles.name}>{household.household_name || household.household_id}</Text><Text style={styles.meta}>{household.household_id}</Text></>}
+      {!!members.length && <View style={styles.columns}><Text style={styles.columnLabel}>Member</Text><Text style={styles.columnLabel}>Status check-in</Text></View>}
+      {members.map(member => <View style={styles.member} key={member.id}><Text style={styles.memberName}>{member.name}{member.head ? ' · Head' : ''}</Text>
+        <View style={styles.selectColumn}><ReportSelect label={`${member.name} status`} showLabel={false} value={member.statusKey} options={statusOptions} disabled={busy || submitted} onChange={statusKey => setMembers(current => current.map(item => item.id === member.id ? { ...item, statusKey } : item))} /></View>
+      </View>)}
     </View>
-  );
+    {household && <><View style={styles.card}><SectionHeader title="Property damage" /><ReportSelect label="Damage level" value={damage} options={damageOptions} onChange={setDamage} disabled={busy || submitted} />{!damageOptions.length && <Text style={styles.error}>Damage levels are unavailable.</Text>}</View>
+      <View style={styles.counts}><StatTile label="Deaths" value={deathCount} tone="danger" /><StatTile label="Injured" value={injuredCount} tone="warning" /></View>
+      <View style={styles.card}><Text style={styles.meta}>Notes (optional)</Text><TextInput accessibilityLabel="Notes for HQ" style={styles.input} value={notes} onChangeText={setNotes} editable={!busy && !submitted} multiline maxLength={2000} textAlignVertical="top" />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <ActionButton label={submitted ? 'Report saved' : busy ? 'Saving…' : 'Submit report'} icon="send-outline" onPress={submit} disabled={busy || submitted || !damageOptions.length} />
+        {submitted && onCompleteHousehold && <ActionButton label="Complete household" icon="flag-outline" onPress={onCompleteHousehold} />}
+      </View></>}
+    {!household && error ? <View style={styles.card}><Text style={styles.error}>{error}</Text><ActionButton label="Retry" onPress={() => setRevision(value => value + 1)} /></View> : null}
+  </View>;
 }
-
-function formatDate(value?: string) {
-  return formatPhilippineDateTime(value);
-}
-
 const styles = StyleSheet.create({
-  stack: {
-    gap: spacing.md,
-  },
-  card: {
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    backgroundColor: palette.card,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  statusChip: {
-    minHeight: 38,
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    backgroundColor: palette.card,
-  },
-  statusChipActive: {
-    borderColor: palette.navActive,
-    backgroundColor: palette.navActive,
-  },
-  statusChipText: {
-    color: palette.textSoft,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  statusChipTextActive: {
-    color: '#fff',
-  },
-  selectedOption: {
-    borderColor: palette.navActive,
-    backgroundColor: palette.navActive,
-  },
-  sectionLabel: {
-    color: palette.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  helperText: {
-    color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  errorText: {
-    color: palette.unsafe,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  successText: {
-    color: palette.safe,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  householdSummary: {
-    gap: 3,
-    borderLeftWidth: 3,
-    borderLeftColor: palette.navActive,
-    paddingLeft: spacing.md,
-  },
-  householdName: {
-    color: palette.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  memberCard: {
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-    paddingTop: spacing.md,
-  },
-  memberName: {
-    color: palette.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  input: {
-    minHeight: 46,
-    borderWidth: 1,
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    color: palette.text,
-    fontSize: 14,
-    fontWeight: '700',
-    backgroundColor: '#fff',
-  },
-  twoColumn: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  flexInput: {
-    flex: 1,
-  },
-  textArea: {
-    minHeight: 96,
-    paddingTop: spacing.md,
-  },
-  reportRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-    paddingTop: spacing.md,
-  },
-  reportIcon: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    backgroundColor: palette.secondary,
-  },
-  reportText: {
-    flex: 1,
-  },
-  reportTitle: {
-    color: palette.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  reportMeta: {
-    marginTop: 2,
-    color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  stack: { gap: spacing.md }, card: { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
+  name: { color: palette.text, fontSize: 18, fontWeight: '700' }, meta: { color: palette.textSoft, fontSize: 13 },
+  columns: { flexDirection: 'row', gap: 8, marginTop: 8 }, columnLabel: { flex: 1, color: palette.textSoft, fontSize: 12 },
+  member: { flexDirection: 'row', alignItems: 'center', paddingTop: 6, gap: 8, borderTopWidth: 1, borderColor: palette.border }, memberName: { flex: 1, color: palette.text, fontSize: 15, fontWeight: '600' }, selectColumn: { flex: 1, minWidth: 0 },
+  counts: { flexDirection: 'row', gap: spacing.sm }, input: { minHeight: 78, borderWidth: 1, borderColor: palette.border, borderRadius: radius.md, padding: spacing.sm, color: palette.text }, error: { color: palette.unsafe, fontSize: 13 },
 });

@@ -41,7 +41,7 @@ async function deliver(method: 'post' | 'patch', path: string, payload: any, fin
   await setStoredItem(storageKey, JSON.stringify({ key, createdAt }));
   for (let attempt = 0; ; attempt += 1) {
     try {
-      const response = await api.request({ method, url: path, data: payload, headers: { 'Idempotency-Key': key } });
+      const response = await api.request({ method, url: path, data: payload, timeout: /\/rescuer\/assignments\/\d+\/status$/.test(path) ? 30000 : 12000, headers: { 'Idempotency-Key': key } });
       // Failure to clear local storage must not turn a successful save into an error.
       await deleteStoredItem(storageKey).catch(() => {});
       return response;

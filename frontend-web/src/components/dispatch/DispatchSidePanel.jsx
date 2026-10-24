@@ -1,3 +1,4 @@
+import PersonnelProfileLink from '../PersonnelProfileLink'
 import { statusColor } from '../../utils/statusPalette'
 import { useState } from 'react'
 import Modal from '../ui/Modal'
@@ -23,7 +24,7 @@ export default function DispatchSidePanel({ teams = [], responders = [] }) {
             <span className="sc"><i style={{ width: `${Math.max(0, Math.min(100, Number(team.coverage_percent) || 0))}%`, background:'var(--nv)' }} /></span>
             <em>{team.assigned_households ? `${team.coverage_percent || 0}%` : '—'}</em><em className="mu">{team.reported_households || 0}/{team.assigned_households || 0}</em>
           </button>
-          <div className="px"><div>{responders.filter((member) => String(member.team_id) === String(team.team_id)).map((member) => <span className="mc2" key={member.responder_id}><i style={{ background:statusColor(member.status?.key || (member.is_available ? 'available' : 'unavailable')) }} />{member.full_name}<em>{member.status?.label || 'Not recorded'}</em></span>)}</div></div>
+          <div className="px"><div>{responders.filter((member) => String(member.team_id) === String(team.team_id)).map((member) => <span className="mc2" key={member.responder_id}><i style={{ background:statusColor(member.status?.key || (member.is_available ? 'available' : 'unavailable')) }} /><PersonnelProfileLink id={member.responder_id}>{member.full_name}</PersonnelProfileLink><em>{member.status?.label || 'Not recorded'}</em></span>)}</div></div>
         </div>)}
       </div>
     </Modal>

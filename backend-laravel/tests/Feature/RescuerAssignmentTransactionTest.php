@@ -22,6 +22,7 @@ class RescuerAssignmentTransactionTest extends TestCase
             $table->integer('assignment_id')->primary();
             $table->integer('responder_id')->nullable();
             $table->string('status');
+            $table->text('route_notes')->nullable();
             $table->timestamp('accepted_at')->nullable();
             $table->timestamp('updated_at')->nullable();
         });

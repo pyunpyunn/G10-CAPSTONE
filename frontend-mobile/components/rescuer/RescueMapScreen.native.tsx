@@ -24,11 +24,13 @@ const defaultRegion = {
 };
 
 export function RescueMapScreen({ assignments, evacuationCenters = [], activeAssignment, selectedAssignment, onSendLocation }: RescueMapProps) {
-  const [tracking, setTracking] = useState(false);
+  const [tracking, setTracking] = useState(true);
   const { position, error: gpsError } = useMapGps(tracking);
   const sendLocation = useRef(onSendLocation);
   sendLocation.current = onSendLocation;
   const sending = useRef(false);
+  const lastRouteRefresh = useRef(0);
+  const gpsAssignment = selectedAssignment || activeAssignment;
   const [lastUpdated, setLastUpdated] = useState('');
   const [locError, setLocError] = useState('');
   const [syncing, setSyncing] = useState(false);
@@ -38,14 +40,16 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
   useEffect(() => {
     if (!tracking || !position) return;
     setLastUpdated(formatPhilippineTime());
-    if (!activeAssignment?.assignment_id || sending.current) return;
+    if (!gpsAssignment?.assignment_id || !['dispatched','accepted','en_route','on_scene'].includes(gpsAssignment.status_key) || sending.current) return;
     sending.current = true;
     setSyncing(true);
-    void sendLocation.current(activeAssignment.assignment_id, position)
+    const refreshRoute = Date.now() - lastRouteRefresh.current > 20000;
+    if (refreshRoute) lastRouteRefresh.current = Date.now();
+    void sendLocation.current(gpsAssignment.assignment_id, { ...position, refresh_route: refreshRoute })
       .then(() => setLocError(''))
-      .catch(() => setLocError('GPS is active, but the latest location could not be saved to the backend.'))
+      .catch(error => { lastRouteRefresh.current = 0; setLocError(error.message || 'Location sync unavailable.'); })
       .finally(() => { sending.current = false; setSyncing(false); });
-  }, [position, tracking, activeAssignment?.assignment_id]);
+  }, [position, tracking, gpsAssignment?.assignment_id, gpsAssignment?.status_key]);
 
   function stopTracking() {
     setTracking(false);

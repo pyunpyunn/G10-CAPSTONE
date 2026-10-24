@@ -60,13 +60,17 @@ Route::prefix('v1')->group(function () {
         ->middleware(['signed', 'throttle:20,1'])
         ->name('mobile.packs.download');
 
-    Route::middleware(['auth:sanctum', 'mobile.device', 'role:rescuer', 'throttle:120,1'])->prefix('mobile')->group(function (): void {
-        Route::get('/bootstrap', [MobileNavigationController::class, 'bootstrap']);
+    // Route reads use the authenticated rescuer's own assignment scope; trip writes remain device-bound.
+    Route::get('/mobile/bootstrap', [MobileNavigationController::class, 'bootstrap'])
+        ->middleware(['auth:sanctum', 'role:rescuer,tl,tm', 'throttle:120,1']);
+    Route::middleware(['auth:sanctum', 'mobile.device', 'role:rescuer,tl,tm', 'throttle:120,1'])->prefix('mobile')->group(function (): void {
         Route::post('/sync', [MobileNavigationController::class, 'sync']);
         Route::get('/packs/{version}', [MobileNavigationController::class, 'packManifest']);
     });
+    Route::post('/rescuer/assignments/{assignmentId}/route', [MobileNavigationController::class, 'assignedRoadRoute'])
+        ->middleware(['auth:sanctum', 'role:rescuer,tl,tm', 'throttle:12,1']);
     Route::post('/dispatches/{id}/route', [MobileNavigationController::class, 'freshRoute'])
-        ->middleware(['auth:sanctum', 'mobile.device', 'role:rescuer', 'throttle:6,1']);
+        ->middleware(['auth:sanctum', 'mobile.device', 'role:rescuer,tl,tm', 'throttle:6,1']);
     Route::get('/auth/password-recovery/questions', [AuthController::class, 'recoveryQuestions'])
         ->middleware('throttle:10,1');
     Route::post('/auth/password-recovery/verify', [AuthController::class, 'verifyPasswordChange'])
@@ -90,6 +94,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('web.access')->group(function () {
             Route::get('/global-search', [GlobalSearchController::class, 'index']);
+            Route::get('/personnel-profiles/{responderId}', [\App\Http\Controllers\Api\PersonnelProfileController::class, 'show'])->whereNumber('responderId');
             Route::get('/dashboard', [DashboardController::class, 'index']);
             Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
             Route::get('/dashboard/dispatch', [DashboardController::class, 'dispatch']);
@@ -247,6 +252,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:rescuer')->group(function () {
             Route::patch('/dispatches/{assignmentId}/location', [RescueDispatchController::class, 'updateLocation']);
 
+            Route::get('/rescuer/assignments/history', [\App\Http\Controllers\Api\RescuerDispatchHistoryController::class, 'index']);
             Route::get('/rescuer/profile', [RescuerMobileController::class, 'profile']);
             Route::patch('/rescuer/profile', [RescuerMobileController::class, 'updateProfile']);
             Route::get('/rescuer/overview', [RescuerMobileController::class, 'overview']);

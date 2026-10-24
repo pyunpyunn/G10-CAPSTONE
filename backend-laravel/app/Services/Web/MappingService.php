@@ -117,12 +117,16 @@ class MappingService
 
     private function routesInsideBoundary(array $routes, array $focus): array
     {
-        if (! $focus['boundary']) return [];
+        // Rescue roads can cross the boundary between origin and destination.
+        $ids = array_values(array_unique(array_filter(array_column($routes, 'household_id'))));
+        $eligible = $ids ? \Illuminate\Support\Facades\DB::table('households')->whereIn('household_id',$ids)
+            ->whereIn('household_id', \App\Queries\HouseholdEligibilityQuery::ids($focus['barangay_id'] ?? null))->pluck('household_id')->all() : [];
         $boundaries = app(\App\Services\Shared\BarangayBoundaryService::class);
-        return array_values(array_filter($routes, fn (array $route): bool =>
-            count($route['coordinates'] ?? []) >= 2
-            && collect($route['coordinates'])->every(fn (array $point): bool =>
-                $boundaries->contains($focus['boundary'], (float) $point[0], (float) $point[1]))));
+        return array_values(array_filter($routes, function ($route) use ($focus,$eligible,$boundaries) {
+            if (count($route['coordinates'] ?? []) < 2) return false;
+            if (!empty($route['household_id'])) return in_array($route['household_id'],$eligible,true);
+            return !empty($focus['boundary']) && collect($route['coordinates'])->contains(fn ($point) => $boundaries->contains($focus['boundary'],(float)$point[0],(float)$point[1]));
+        }));
     }
 
     private function eventContext(Request $request): array

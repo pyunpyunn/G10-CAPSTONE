@@ -39,7 +39,7 @@ import { LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
-import { mountNavigationSync } from '@/utils/navigationRuntime';
+import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 const deviceUuidKey = 'resq_rescuer_device_uuid';
@@ -127,7 +127,7 @@ export default function RescuerHomeScreen() {
   const activeAssignment = useMemo(
     () =>
       assignments.find((assignment) =>
-        ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(assignment.status_key)
+        ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(assignment.status_key) && (assignment.household_id || !assignment.route_notes?.assigned_household_count)
       ),
     [assignments]
   );
@@ -140,43 +140,46 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleStatusChange(assignmentId: number, status: string) {
+    let completionStatus: 'safe' | 'evacuated' | null = null;
     if (status === 'completed') {
-      const assignment = assignments.find((item) => Number(item.assignment_id) === Number(assignmentId));
-      const hasReport = !assignment?.household_id || (overview?.field_reports || []).some((report: any) =>
-        String(report.assignment_id) === String(assignmentId)
-        && String(report.household_id) === String(assignment.household_id)
-        && String(report.event_id) === String(assignment.event_id)
-      );
-
-      if (!hasReport) {
-        Alert.alert('Field report required', 'Submit the household field report before completing this assignment.', [
-          { text: 'Open report', onPress: () => openReport(assignment) },
-          { text: 'Cancel', style: 'cancel' },
-        ]);
+      const current = assignments.find((item) => Number(item.assignment_id) === Number(assignmentId));
+      if (current?.status_key !== 'on_scene') {
+        Alert.alert('Arrival required', 'Accept this household, start En route, and mark Arrived before confirming its final status.');
         return;
       }
+      completionStatus = await new Promise<'safe' | 'evacuated' | null>((resolve) => {
+        Alert.alert('Complete current household', 'Confirm the household’s official status. This updates HQ records and advances your queue. A detailed field report is optional.', [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+          { text: 'Safe', onPress: () => resolve('safe') },
+          { text: 'Evacuated', onPress: () => resolve('evacuated') },
+        ], { cancelable: true, onDismiss: () => resolve(null) });
+      });
+      if (!completionStatus) return;
     }
 
     try {
       const payload = ['accepted', 'en_route'].includes(status)
         ? await currentLocationPayload()
-        : {};
+        : status === 'completed' ? { household_id: assignments.find((item) => Number(item.assignment_id) === Number(assignmentId))?.household_id, household_status_key: completionStatus } : {};
 
       if (payload === null) {
         return;
       }
 
-      if (status === 'en_route') {
-        await updateAssignmentStatus(assignmentId, 'en_route', payload);
-        await updateAssignmentStatus(assignmentId, 'on_scene', payload);
-      } else {
-        await updateAssignmentStatus(assignmentId, status, payload);
+      await updateAssignmentStatus(assignmentId, status, payload);
+      if (status === 'completed' && Platform.OS !== 'web') {
+        await endNavigationTrip().catch(() => Alert.alert('Household saved', 'The household was completed, but trip recording could not be stopped. Open navigation to stop the trip.'));
       }
 
       await loadOverview(true);
+      if (status === 'completed') { setSelectedAssignment(null); setActiveTab('dashboard'); }
 
       if (['accepted', 'en_route'].includes(status)) {
+        setSelectedAssignment(null);
         setActiveTab('map');
+        if (Platform.OS !== 'web') {
+          router.push({ pathname: '/rescuer/navigation' as any, params: { dispatchId: String(assignmentId) } });
+        }
       }
     } catch (error: any) {
       Alert.alert('Unable to update assignment', errorMessage(error));
@@ -184,7 +187,9 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleSendLocation(assignmentId: number, payload: any) {
-    await sendAssignmentLocation(assignmentId, payload);
+    const result = await sendAssignmentLocation(assignmentId, payload);
+    if (payload.refresh_route && result.data) setOverview(current => current ? { ...current, assignments: current.assignments.map(item => Number(item.assignment_id) === Number(assignmentId) ? { ...item, route: result.data.route } : item) } : current);
+    if (payload.refresh_route && result.data && !result.data.route) throw new Error('GPS saved. Current directions unavailable.');
   }
 
   async function currentLocationPayload() {
@@ -291,6 +296,7 @@ export default function RescuerHomeScreen() {
           assignmentId={Number(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || 0)}
           householdId={String(selectedAssignment?.household_id || activeAssignment?.household_id || '')}
           onSubmitReport={handleSubmitFieldReport}
+          onCompleteHousehold={() => handleStatusChange(Number(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || 0), 'completed')}
         />
       );
     }

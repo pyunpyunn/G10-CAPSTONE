@@ -74,7 +74,7 @@ class AuthService
         $deviceUuid = null;
         $responder = null;
         if ($deviceBound) {
-            if ($user->roleKey() !== 'rescuer') {
+            if (! in_array($user->roleKey(), ['rescuer', 'tl', 'tm'], true)) {
                 return response()->json(['message' => 'Device-bound navigation login is only available to rescuer accounts.'], 403);
             }
             if (! Schema::hasTable('devices') || ! Schema::hasTable('responders')) {

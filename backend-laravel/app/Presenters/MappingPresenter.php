@@ -85,6 +85,9 @@ class MappingPresenter
         return [
             'route_id' => $route->route_id,
             'assignment_id' => $route->assignment_id,
+            'household_id' => $route->household_id ?? null,
+            'responder_id' => $route->responder_id ?? null,
+            'responder_name' => $route->full_name ?? null,
             'route_name' => $route->route_name ?: $route->team_name ?: 'Dispatch route',
             'team_name' => $route->team_name ?: $route->full_name ?: 'Responder team',
             'assigned_area' => $route->assigned_area ?: 'No assigned area',
