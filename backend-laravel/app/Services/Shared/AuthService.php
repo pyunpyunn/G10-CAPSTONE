@@ -45,10 +45,6 @@ class AuthService
     {
         $login = trim($request->string('login')->toString());
 
-        if ($response = $this->databaseUnavailableResponse()) {
-            return $response;
-        }
-
         try {
             $user = $this->accounts->userFromLogin($login);
         } catch (QueryException|PDOException) {
@@ -204,7 +200,6 @@ class AuthService
             'login' => ['required', 'string', 'max:255'],
             'current_password' => ['sometimes', 'required', 'string', 'max:255'],
         ]);
-        if ($response = $this->databaseUnavailableResponse()) return $response;
         $user = $this->accounts->userFromLogin(trim($values['login']));
         if (! $user) {
             throw ValidationException::withMessages(['login' => ['Account ID does not exist. Check the ID issued by your administrator.']]);
@@ -310,42 +305,6 @@ class AuthService
         return $isValidated !== null && (int) $isValidated !== 1;
     }
 
-    private function databaseUnavailableResponse(): ?JsonResponse
-    {
-        if (app()->runningUnitTests() || app()->environment('testing') || app()->environment('local')) {
-            return null;
-        }
-
-        $connectionName = config('database.default');
-        $connection = config("database.connections.$connectionName", []);
-        $driver = $connection['driver'] ?? DB::connection()->getDriverName();
-        $databaseName = (string) ($connection['database'] ?? '');
-
-        if (in_array($driver, ['sqlite'], true) || $databaseName === ':memory:' || str_contains($databaseName, 'database.sqlite')) {
-            return null;
-        }
-
-        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
-            return null;
-        }
-
-        $host = (string) ($connection['host'] ?? '');
-        $port = (int) ($connection['port'] ?? 3306);
-        if ($host === '') {
-            return null;
-        }
-
-        $timeout = max(1.0, (float) env('DB_CONNECTION_TIMEOUT', 5));
-        $target = str_contains($host, ':') ? "tcp://[$host]:$port" : "tcp://$host:$port";
-        $socket = @stream_socket_client($target, $errno, $error, $timeout);
-        if ($socket === false) {
-            Log::warning('Database connectivity check failed.', ['connection' => $connectionName, 'driver' => $driver, 'host' => $host, 'port' => $port, 'errno' => $errno, 'error' => $error]);
-            return response()->json(['message' => "The database is not reachable at $host:$port. Make sure the shared MySQL laptop is online, or update DB_HOST to a working database."], 503);
-        }
-        fclose($socket);
-        return null;
-    }
-
     private function userQuery()
     {
         $query = User::query();
@@ -367,4 +326,3 @@ class AuthService
         foreach ($columns as $column) if ($value !== null && Schema::hasColumn($table, $column)) $query->orWhere($column, $value);
     }
 }
-

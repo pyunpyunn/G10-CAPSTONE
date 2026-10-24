@@ -73,6 +73,25 @@ class HealthEndpointsTest extends TestCase
             ->assertHeader('X-Request-ID');
     }
 
+    public function test_database_backed_api_requests_fail_fast_when_mysql_is_unreachable(): void
+    {
+        config(['database.default' => 'mysql']);
+        config(['database.connections.mysql' => array_merge(
+            config('database.connections.mysql'),
+            [
+                'host' => '127.0.0.1',
+                'port' => 1,
+                'database' => 'preflight_test',
+            ],
+        )]);
+
+        $this->getJson('/api/v1/health/ready')
+            ->assertStatus(503)
+            ->assertJsonStructure(['message', 'request_id'])
+            ->assertJsonPath('message', 'Database unreachable.')
+            ->assertHeader('X-Request-ID');
+    }
+
     public function test_api_database_connection_exceptions_return_safe_503_json(): void
     {
         $this->app['router']->get('/api/v1/test-database-connection-failure', function () {
@@ -88,4 +107,3 @@ class HealthEndpointsTest extends TestCase
             ->assertHeader('X-Request-ID');
     }
 }
-

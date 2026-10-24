@@ -6,6 +6,7 @@ use App\Http\Requests\ListRequest;
 use App\Presenters\RescuerAccountPresenter;
 use App\Services\Mobile\RescuerAccountSupport;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 
 class RescuerAccountQuery
 {
@@ -85,7 +86,7 @@ class RescuerAccountQuery
 
     public function teamConfigCards(): array
     {
-        $databaseTeams = DB::table('rescue_teams as rt')
+        $teams = DB::table('rescue_teams as rt')
             ->leftJoin('responders as leader', 'leader.responder_id', '=', 'rt.leader_responder_id')
             ->leftJoin('addresses as a', 'a.address_id', '=', 'rt.assigned_purok_id')
             ->orderBy('rt.team_name')
@@ -99,15 +100,38 @@ class RescuerAccountQuery
                 'rt.duty_status',
                 'leader.full_name as leader_name',
                 'a.purok_sitio',
-            ])
-            ->map(fn (object $team): array => $this->formatTeamConfigCard($team, 'database'));
+            ]);
+        $membersByTeam = DB::table('responders')
+            ->whereNotNull('team_id')
+            ->whereNull('deleted_at')
+            ->orderBy('full_name')
+            ->get(['responder_id', 'team_id', 'full_name', 'title', 'duty_status', 'is_deployed'])
+            ->groupBy('team_id');
+        $activeDispatchesByTeam = DB::table('responder_assignments')
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->select('team_id')
+            ->selectRaw('COUNT(*) as active_dispatch_count')
+            ->groupBy('team_id')
+            ->pluck('active_dispatch_count', 'team_id');
+
+        $databaseTeams = $teams->map(fn (object $team): array => $this->formatTeamConfigCard(
+            $team,
+            'database',
+            $membersByTeam->get($team->team_id, collect()),
+            (int) ($activeDispatchesByTeam[$team->team_id] ?? 0),
+        ));
 
         return $databaseTeams->sortBy('team_name')->values()->all();
     }
 
-    public function formatTeamConfigCard(object $team, string $source): array
+    public function formatTeamConfigCard(
+        object $team,
+        string $source,
+        ?Collection $members = null,
+        ?int $activeDispatchCount = null,
+    ): array
     {
-        $members = $team->team_id
+        $members ??= $team->team_id
             ? DB::table('responders')
                 ->where('team_id', $team->team_id)
                 ->whereNull('deleted_at')
@@ -115,7 +139,7 @@ class RescuerAccountQuery
                 ->get(['responder_id', 'full_name', 'title', 'duty_status', 'is_deployed'])
             : collect();
 
-        $activeDispatchCount = $team->team_id
+        $activeDispatchCount ??= $team->team_id
             ? DB::table('responder_assignments')
                 ->where('team_id', $team->team_id)
                 ->whereNotIn('status', ['completed', 'cancelled'])
@@ -335,12 +359,20 @@ class RescuerAccountQuery
 
     public function accountIdChoices(array $teamOptions): array
     {
-        $next = fn (string $code): string => $this->support->nextAccountId($code);
-        $options = collect($teamOptions)->map(function (array $team) use ($next): array {
+        $codes = collect($teamOptions)
+            ->map(fn (array $team): string => $this->support->normalizeTeamCode(
+                $team['team_code'] ?? $this->support->teamCode($team['team_name']),
+            ))
+            ->push('SRR')
+            ->unique()
+            ->values()
+            ->all();
+        $nextIds = $this->support->nextAccountIds($codes);
+        $options = collect($teamOptions)->map(function (array $team) use ($nextIds): array {
             $code = $this->support->normalizeTeamCode($team['team_code'] ?? $this->support->teamCode($team['team_name']));
-            return ['team_name' => $team['team_name'], 'team_code' => $code, 'account_id' => $next($code)];
+            return ['team_name' => $team['team_name'], 'team_code' => $code, 'account_id' => $nextIds[$code]];
         })->values()->all();
-        return ['options' => $options, 'default' => $next('SAR')];
+        return ['options' => $options, 'default' => $nextIds['SRR']];
     }
 
 

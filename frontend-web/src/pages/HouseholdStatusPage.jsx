@@ -27,6 +27,7 @@ export default function HouseholdStatusPage() {
     navigate(`/households/_household-list?${new URLSearchParams({ sitio_id: String(row.sitio_id) })}`)
   }
   return <section className="hh-prototype" aria-label="Household status">
+    <div className="hd"><span className="ttl">Household status</span><span className="sp" /><Link className="bt" to="/households/_data-directory">Household data directory</Link></div>
     {error && <div className="emp" role="alert">{error}</div>}
     {loading ? <div className="cd sby" role="status">Loading household status…</div> : data && !data.event ? <div className="cd sby"><div>Standby<small>Household reporting starts after HQ/Admin broadcasts an active event.</small></div></div> : data && <div className="ovg">
       <HouseholdChart rows={rows} mode={mode} setMode={setMode} selected={selected} onSelect={select} />

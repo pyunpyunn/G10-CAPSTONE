@@ -1,5 +1,9 @@
 import api from './client'
 import { disableBrowserPush } from './browserPush'
+import { getToken } from './token'
+
+let currentUserRequest = null
+let currentUserToken = null
 
 export async function loginUser(form) {
   const response = await api.post('/auth/login', {
@@ -11,9 +15,19 @@ export async function loginUser(form) {
   return response.data
 }
 
-export async function getCurrentUser() {
-  const response = await api.get('/auth/me')
-  return response.data.data
+export function getCurrentUser() {
+  const token = getToken()
+  if (currentUserRequest && currentUserToken === token) return currentUserRequest
+
+  currentUserToken = token
+  const request = api.get('/auth/me').then(response => response.data.data).finally(() => {
+    if (currentUserRequest === request) {
+      currentUserRequest = null
+      currentUserToken = null
+    }
+  })
+  currentUserRequest = request
+  return request
 }
 
 export async function logoutUser() {

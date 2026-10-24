@@ -203,3 +203,28 @@
 .hh-prototype .rk .mts>.sitio-dispatch{background:#2563eb;border-color:#2563eb;color:#fff}
 .hh-prototype .rk .mts>.sitio-dispatch:hover{background:#1d4ed8;border-color:#1d4ed8}
 @media(hover:none){.hh-prototype .rk .rx{grid-template-rows:1fr}}
+
+.household-directory-search{display:flex;gap:6px}
+.household-directory-search input{min-width:min(280px,45vw);height:34px;border:1px solid #b9c6d9;border-radius:99px;background:#f7f9fc;padding:0 14px;color:#0f1c2d;font:inherit}
+.household-directory-note{margin:0;color:#475569}
+.household-directory-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;flex:none}
+.household-directory-summary{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;border:1px solid #c6d1e0;border-radius:10px;background:#f2f5f9}
+.household-directory-summary strong{font-size:18px}
+.hh-prototype .household-directory-details{margin-top:8px}
+.household-directory-details summary{cursor:pointer;color:#2563eb}
+.household-directory-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:10px 0}
+.household-directory-detail-grid section{min-width:0;padding:10px;border:1px solid #c6d1e0;border-radius:8px;background:#f7f9fc}
+.household-directory-detail-grid h3,.household-directory-record h4{margin:0 0 8px;font-size:13px}
+.household-directory-detail-grid dl,.household-directory-record dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0}
+.household-directory-detail-grid dl>div,.household-directory-record dl>div{min-width:0}
+.household-directory-detail-grid dt,.household-directory-record dt{color:#64748b;font-size:11px}
+.household-directory-detail-grid dd,.household-directory-record dd{margin:0;overflow-wrap:anywhere}
+.household-directory-records{display:grid;gap:8px}
+.household-directory-record{padding:8px;border:1px solid #d6dfeb;border-radius:6px;background:#fff}
+.household-directory-record h4 small{color:#64748b;font-weight:400}
+.hh-prototype .tw>table>tbody>tr>td{vertical-align:top}
+@media(max-width:700px){
+  .household-directory-detail-grid{grid-template-columns:1fr}
+  .household-directory-search{width:100%}
+  .household-directory-search input{flex:1;min-width:0}
+}

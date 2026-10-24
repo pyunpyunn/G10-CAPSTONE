@@ -5,6 +5,11 @@ export async function getHouseholds(params = {}) {
   return response.data.data
 }
 
+export async function getHouseholdDirectory(params = {}) {
+  const response = await api.get('/households/directory', { params })
+  return response.data.data
+}
+
 export async function getHousehold(householdId) {
   const response = await api.get(`/households/${householdId}`)
   return response.data.data
