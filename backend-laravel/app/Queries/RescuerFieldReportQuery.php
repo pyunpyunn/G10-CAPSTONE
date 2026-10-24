@@ -21,7 +21,7 @@ class RescuerFieldReportQuery
     public function paginateAdmin(array $filters, int $perPage): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
         abort_unless(Schema::hasTable('household_status_logs'), 503, 'Field report records are currently unavailable.');
-        return $this->reportQuery(null, null, $filters)->paginate($perPage);
+        return $this->reportQuery(null, null, array_merge($filters, ['assignment_status_filter' => true]))->paginate($perPage);
     }
 
     private function reportQuery(?int $responderId, ?string $userId, array $filters): \Illuminate\Database\Query\Builder
@@ -30,6 +30,8 @@ class RescuerFieldReportQuery
         $statusId = trim((string) ($filters['status_id'] ?? ''));
         $eventId = trim((string) ($filters['event_id'] ?? ''));
         $query = DB::table('household_status_logs as hsl');
+        $hasAssignmentStatus = false;
+        $assignmentStatusExpression = 'assignment.status';
         $columns = [
             $this->optional('household_status_logs', 'status_log_id', 'status_log_id', 'hsl'),
             $this->optional('household_status_logs', 'household_id', 'household_id', 'hsl'),
@@ -69,6 +71,14 @@ class RescuerFieldReportQuery
             && Schema::hasColumn('responder_field_reports', 'assignment_id')) {
             $query->leftJoin('responder_field_reports as rfr', 'rfr.status_log_id', '=', 'hsl.status_log_id');
             $columns[] = 'rfr.assignment_id';
+            if (Schema::hasTable('responder_assignments')) {
+                $query->leftJoin('responder_assignments as assignment', 'assignment.assignment_id', '=', 'rfr.assignment_id');
+                if (Schema::hasColumn('responder_assignments', 'route_notes') && Schema::hasColumn('household_status_logs', 'responder_id')) {
+                    $assignmentStatusExpression = $this->reportTaskStatusExpression();
+                }
+                $columns[] = DB::raw($assignmentStatusExpression.' as assignment_status');
+                $hasAssignmentStatus = true;
+            }
             $columns[] = $this->optional('responder_field_reports', 'incident_type', 'incident_type', 'rfr');
             $columns[] = $this->optional('responder_field_reports', 'incident_type_other', 'incident_type_other', 'rfr');
             $columns[] = $this->optional('responder_field_reports', 'property_damage', 'property_damage', 'rfr');
@@ -79,10 +89,26 @@ class RescuerFieldReportQuery
                 DB::raw('NULL as incident_type_other'), DB::raw('NULL as property_damage'),
                 DB::raw('NULL as death_count'), DB::raw('NULL as injured_count'));
         }
+        if (! $hasAssignmentStatus) $columns[] = DB::raw('NULL as assignment_status');
         if ($responderId && Schema::hasColumn('household_status_logs', 'responder_id')) $query->where('hsl.responder_id', $responderId);
         elseif ($userId && Schema::hasColumn('household_status_logs', 'submitted_by_user_id')) $query->where('hsl.submitted_by_user_id', $userId);
         if ($eventId !== '' && $eventId !== 'all' && Schema::hasColumn('household_status_logs', 'disaster_id')) $query->where('hsl.disaster_id', $eventId);
-        if ($statusId !== '' && Schema::hasColumn('household_status_logs', 'status_id')) $query->where('hsl.status_id', $statusId);
+        if (! empty($filters['assignment_status_filter'])) {
+            if ($status !== '' && $status !== 'all') {
+                if ($hasAssignmentStatus) {
+                    if ($status === 'unlinked') $query->whereRaw('('.$assignmentStatusExpression.') IS NULL');
+                    else {
+                        $values = match ($status) {
+                        'en_route' => ['en_route', 'en-route'],
+                        'on_scene' => ['on_scene', 'on-scene', 'onscene'],
+                        default => [$status],
+                        };
+                        $query->whereRaw('('.$assignmentStatusExpression.') IN ('.implode(',', array_fill(0, count($values), '?')).')', $values);
+                    }
+                } elseif ($status !== 'unlinked') $query->whereRaw('1 = 0');
+            }
+        }
+        elseif ($statusId !== '' && Schema::hasColumn('household_status_logs', 'status_id')) $query->where('hsl.status_id', $statusId);
         elseif ($status !== '' && $status !== 'all' && Schema::hasTable('household_statuses')) $query->where('hs.status_key', $status);
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -123,6 +149,44 @@ class RescuerFieldReportQuery
         return $this->presenter->options(DB::table('household_statuses')->orderBy('status_id')->get([
             'status_id', 'status_key', $this->statusLabel('household_statuses'),
         ]));
+    }
+
+    public function assignmentStatusOptions(): array
+    {
+        $presenter = app(\App\Presenters\RescueDispatchPresenter::class);
+        return array_merge(array_map(fn ($key) => $presenter->status($key), [
+            'dispatched', 'accepted', 'en_route', 'on_scene', 'returning', 'completed', 'cancelled',
+        ]), [['key' => 'unlinked', 'label' => 'No linked assignment']]);
+    }
+
+    private function reportTaskStatusExpression(): string
+    {
+        // A dispatch can contain multiple rescuers and queued households. The
+        // report belongs to its author and household, not the shared HQ status.
+        $notes = "CASE WHEN JSON_VALID(assignment.route_notes) THEN assignment.route_notes ELSE '{}' END";
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            $completedPath = "'$.completed_households.\"' || hsl.responder_id || '\"'";
+            $statusPath = "'$.responder_statuses.\"' || hsl.responder_id || '\"'";
+            $completed = "EXISTS (SELECT 1 FROM json_each($notes, $completedPath) done WHERE done.value = hsl.household_id)";
+            $personal = "json_extract($notes, $statusPath)";
+        } else {
+            $completedPath = "CONCAT('$.completed_households.\"', hsl.responder_id, '\"')";
+            $statusPath = "CONCAT('$.responder_statuses.\"', hsl.responder_id, '\"')";
+            $completed = "JSON_CONTAINS(JSON_EXTRACT($notes, $completedPath), JSON_QUOTE(hsl.household_id)) = 1";
+            $personal = "NULLIF(JSON_UNQUOTE(JSON_EXTRACT($notes, $statusPath)), 'null')";
+        }
+        return "CASE WHEN $completed THEN 'completed' ELSE COALESCE($personal, assignment.status) END";
+    }
+
+    public function assignmentSummary(?string $eventId): array
+    {
+        $rows = [];
+        foreach ($this->assignmentStatusOptions() as $option) {
+            $count = $this->reportQuery(null, null, ['event_id' => $eventId,
+                'status' => $option['key'], 'assignment_status_filter' => true])->count();
+            $rows[] = array_merge($option, ['count' => $count]);
+        }
+        return ['rows' => $rows];
     }
 
     private function optional(string $table, string $column, string $alias, ?string $prefix = null)

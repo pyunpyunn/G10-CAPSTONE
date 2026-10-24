@@ -166,8 +166,8 @@ class RescuerFieldReportWorkflow
 
         return [
             'active_event' => $activeEvent,
-            'status_options' => $this->query->statusOptions(),
-            'summary' => $this->query->summary($eventId),
+            'status_options' => $this->query->assignmentStatusOptions(),
+            'summary' => $this->query->assignmentSummary($eventId),
             'reports' => collect($reports->items()),
             'reports_meta' => ['current_page' => $reports->currentPage(), 'per_page' => $reports->perPage(),
                 'total' => $reports->total(), 'last_page' => $reports->lastPage(),

@@ -275,7 +275,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/rescuer/radio/clip', [RescuerMobileController::class, 'storeRadioClip']);
             Route::post('/rescuer/radio/signal', [RescuerMobileController::class, 'storeRadioSignal']);
         });
-        Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport'])->middleware('role:tl');
+        Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport'])->middleware('role:rescuer,tl,tm');
         Route::post('/rescuer/resource-requests', [RescuerMobileController::class, 'storeResourceRequest'])->middleware('role:tl');
     });
 });

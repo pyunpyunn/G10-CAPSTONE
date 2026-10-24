@@ -23,6 +23,9 @@ class RescuerMobileFieldReportResource extends JsonResource
             'status_label' => $row->status_label ?? 'Reported',
             'event_id' => $row->disaster_id ?? null,
             'assignment_id' => $row->assignment_id ?? null,
+            ...(property_exists($row, 'assignment_status') ? ['assignment_status' => $row->assignment_status
+                ? app(\App\Presenters\RescueDispatchPresenter::class)->status($row->assignment_status)
+                : ['key' => 'unlinked', 'label' => 'No linked assignment']] : []),
             'incident_type' => $row->incident_type ?? null,
             'incident_type_other' => $row->incident_type_other ?? null,
             'property_damage' => $row->property_damage ?? null,
@@ -31,9 +34,20 @@ class RescuerMobileFieldReportResource extends JsonResource
             'latitude' => $row->latitude,
             'longitude' => $row->longitude,
             'battery_level' => $row->battery_level,
-            'notes' => $row->notes,
+            'notes' => $this->reportNotes($row->notes),
             'submitted_at' => $row->submitted_at,
         ];
+    }
+
+    private function reportNotes(?string $storedNotes): ?string
+    {
+        $details = json_decode($storedNotes ?? '', true);
+        if (is_array($details) && (($details['report_type'] ?? null) === 'rescuer_field_report'
+            || array_key_exists('user_notes', $details))) {
+            return is_string($details['user_notes'] ?? null) ? $details['user_notes'] : null;
+        }
+
+        return $storedNotes;
     }
 }
 
