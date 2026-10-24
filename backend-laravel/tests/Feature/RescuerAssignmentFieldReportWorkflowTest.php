@@ -99,6 +99,69 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $this->assertSame('completed', $completed['assignment']->status);
     }
 
+    public function test_field_report_route_allows_assigned_rescuers_and_team_members_but_not_residents(): void
+    {
+        $route = app('router')->getRoutes()->match(Request::create('/api/v1/rescuer/field-reports', 'POST'));
+        $roleMiddleware = array_values(array_filter($route->gatherMiddleware(), fn ($middleware) => str_starts_with($middleware, 'role:')));
+        $this->assertCount(1, $roleMiddleware);
+        $roles = explode(',', substr($roleMiddleware[0], 5));
+        foreach (['rescuer', 'tl', 'tm', 'household_resident'] as $role) {
+            $request = $this->request($this->validPayload());
+            $user = new class($role) {
+                public string $user_id = 'rescuer-5';
+                public function __construct(private string $role) {}
+                public function refresh(): static { return $this; }
+                public function roleKey(): string { return $this->role; }
+                public function assignedRoleKey(): string { return $this->role; }
+            };
+            $request->setUserResolver(fn () => $user);
+            $response = app(\App\Http\Middleware\EnsureUserHasRole::class)->handle(
+                $request, fn ($request) => app(RescuerFieldReportWorkflow::class)->store($request), ...$roles
+            );
+            $this->assertSame($role === 'household_resident' ? 403 : 201, $response->getStatusCode(), $role);
+        }
+        $this->assertDatabaseCount('responder_field_reports', 1);
+    }
+
+    public function test_admin_report_status_and_filter_follow_the_linked_dispatch_assignment(): void
+    {
+        app(RescuerFieldReportWorkflow::class)->store($this->request($this->validPayload()));
+        $query = app(\App\Queries\RescuerFieldReportQuery::class);
+        DB::table('responder_assignments')->where('assignment_id', 7)->update(['status' => 'en-route']);
+        $page = $query->paginateAdmin(['event_id' => 'EVT-1', 'status' => 'en_route'], 20);
+        $this->assertSame(1, $page->total());
+        $data = (new \App\Http\Resources\RescuerMobileFieldReportResource($page->items()[0]))->resolve(Request::create('/'));
+        $this->assertSame('en_route', $data['assignment_status']['key']);
+        $this->assertSame('En route', $data['assignment_status']['label']);
+        $this->assertSame(0, $query->paginateAdmin(['status' => 'completed'], 20)->total());
+        DB::table('responder_assignments')->where('assignment_id', 7)->update(['status' => 'completed']);
+        $this->assertSame(1, $query->paginateAdmin(['status' => 'completed'], 20)->total());
+        $this->assertSame(0, $query->paginateAdmin(['status' => 'en_route'], 20)->total());
+        $summary = collect($query->assignmentSummary('EVT-1')['rows'])->keyBy('key');
+        $this->assertSame(1, $summary['completed']['count']);
+        $this->assertSame(0, $summary['en_route']['count']);
+        DB::table('responder_assignments')->where('assignment_id', 7)->update([
+            'status' => 'on_scene',
+            'route_notes' => json_encode(['responder_statuses' => [5 => 'completed', 6 => 'on_scene']]),
+        ]);
+        $this->assertSame(1, $query->paginateAdmin(['status' => 'completed'], 20)->total());
+        $this->assertSame(0, $query->paginateAdmin(['status' => 'on_scene'], 20)->total());
+        // Moving to a later household must not reopen this report's completed task.
+        DB::table('responder_assignments')->where('assignment_id', 7)->update([
+            'route_notes' => json_encode(['responder_statuses' => [5 => 'en_route', 6 => 'on_scene'],
+                'completed_households' => [5 => ['HH-4']]]),
+        ]);
+        $completed = $query->paginateAdmin(['status' => 'completed'], 20);
+        $this->assertSame(1, $completed->total());
+        $data = (new \App\Http\Resources\RescuerMobileFieldReportResource($completed->items()[0]))->resolve(Request::create('/'));
+        $this->assertSame('completed', $data['assignment_status']['key']);
+        DB::table('responder_assignments')->where('assignment_id', 7)->delete();
+        $unlinked = $query->paginateAdmin(['status' => 'unlinked'], 20);
+        $this->assertSame(1, $unlinked->total());
+        $data = (new \App\Http\Resources\RescuerMobileFieldReportResource($unlinked->items()[0]))->resolve(Request::create('/'));
+        $this->assertSame('unlinked', $data['assignment_status']['key']);
+    }
+
     public function test_assignment_report_rejects_incomplete_or_foreign_member_assessments(): void
     {
         $payload = $this->validPayload();
