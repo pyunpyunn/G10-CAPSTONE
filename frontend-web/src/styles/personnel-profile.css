@@ -1,0 +1,13 @@
+.personnel-profile { max-width: 1050px; margin: 0 auto; padding: 24px; }
+.personnel-profile article { margin-top: 20px; border: 1px solid #ccd7e3; border-radius: 18px; background: var(--card, #fff); overflow: hidden; }
+.personnel-profile header { display: flex; align-items: center; gap: 20px; padding: 28px; border-bottom: 1px solid #ccd7e3; }
+.personnel-profile header h1 { margin: 8px 0; font-size: 28px; overflow-wrap: anywhere; }
+.personnel-profile header p { margin: 0; color: var(--muted, #526476); }
+.personnel-profile-avatar { display: grid; place-items: center; flex: 0 0 72px; height: 72px; border-radius: 50%; background: #1f3e5a; color: white; font-size: 26px; }
+.personnel-profile dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 16px 28px 28px; gap: 0 28px; }
+.personnel-profile dl div { padding: 16px 0; border-bottom: 1px solid #e2e8f0; }
+.personnel-profile dt { color: var(--muted, #526476); font-size: 13px; }
+.personnel-profile dd { margin: 7px 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.personnel-name-link { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.personnel-name-link:hover, .personnel-name-link:focus-visible { color: #2563a0; }
+@media (max-width: 600px) { .personnel-profile { padding: 16px; } .personnel-profile header { padding: 20px; } .personnel-profile dl { grid-template-columns: 1fr; padding: 8px 20px 20px; } }

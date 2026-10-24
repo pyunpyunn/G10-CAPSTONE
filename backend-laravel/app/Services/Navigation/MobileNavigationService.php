@@ -17,29 +17,40 @@ class MobileNavigationService
         $validated = $request->validate(['since' => ['nullable', 'date']]);
         $since = isset($validated['since']) ? CarbonImmutable::parse($validated['since'])->format('Y-m-d H:i:s') : null;
         $device = $request->attributes->get('mobile_device');
-        $teamId = (int) $device->team_id;
+        $responder = $request->user() ? DB::table('responders')->where('user_id', $request->user()->user_id)->first(['responder_id', 'team_id']) : null;
+        $teamId = (int) ($responder?->team_id ?? $device?->team_id);
+        abort_unless($teamId > 0, 409, 'Your rescuer account has no assigned team.');
         $snapshotAt = CarbonImmutable::now()->startOfSecond();
         $team = DB::table('rescue_teams')->where('team_id', $teamId)->first(['team_id', 'team_name', 'team_code', 'team_type', 'updated_at']);
         if (! $team) {
             throw ValidationException::withMessages(['team' => ['The rescuer team is no longer available.']]);
         }
 
+        $responderId = $responder ? (int) $responder->responder_id : null;
         $householdIds = $this->routes->assignedHouseholdIds($teamId);
         $assignments = DB::table('responder_assignments')
             ->where('team_id', $teamId)
+            ->when($responderId, fn ($query) => $query->where(fn ($scope) => $scope->where('responder_id', $responderId)->orWhereJsonContains('route_notes->selected_responder_ids', $responderId)))
             ->when($since !== null, fn ($query) => $query->where('updated_at', '>=', $since))
             ->orderByDesc('assigned_at')
             ->limit(250)
             ->get(['assignment_id', 'assignment_code', 'disaster_id', 'dispatch_type', 'household_id', 'assigned_area', 'route_notes', 'status', 'assigned_at', 'updated_at'])
-            ->map(function ($assignment) {
+            ->map(function ($assignment) use ($responderId) {
                 $notes = json_decode((string) $assignment->route_notes, true) ?: [];
                 $assignment->household_ids = array_values(array_unique(array_filter([
                     $assignment->household_id, ...($notes['household_ids'] ?? []),
                     ...array_merge([], ...array_values($notes['responder_households'] ?? [])),
                 ])));
+                if ($responderId) {
+                    $assignment->status = \App\Support\RescuerHouseholdQueue::status($assignment, $responderId);
+                    $assignment->household_ids = \App\Support\RescuerHouseholdQueue::pending($assignment, $responderId);
+                    $assignment->household_id = \App\Support\RescuerHouseholdQueue::target($assignment, $responderId);
+                }
                 unset($assignment->route_notes);
                 return $assignment;
             });
+
+        if ($responderId) $householdIds = $assignments->flatMap(fn ($assignment) => $assignment->household_ids)->unique()->values();
 
         $households = DB::table('households as household')
             ->whereIn('household.household_id', $householdIds->all())
@@ -65,6 +76,27 @@ class MobileNavigationService
         }
         $routes = $routeQuery->orderBy('target_key')->orderBy('profile')
             ->get(['team_id', 'household_id', 'evac_center_id', 'profile', 'polyline6', 'steps', 'distance_m', 'duration_s', 'status', 'failure_reason', 'computed_at']);
+
+        // The dispatch route shown by HQ is also immediately available to navigation.
+        // Do not wait for a separate team-base precompute or offline-map download.
+        if ($responderId && \Illuminate\Support\Facades\Schema::hasColumn('responder_routes', 'household_id')) {
+            $planned = DB::table('responder_routes')->whereIn('assignment_id', $assignments->filter(fn ($assignment) => ! in_array($assignment->status, ['completed', 'cancelled'], true))->pluck('assignment_id'))
+                ->where('responder_id', $responderId)->whereIn('household_id', $householdIds->all())
+                ->where('route_status', 'active')->whereNotNull('route_polyline')->orderByDesc('updated_at')->get()
+                ->unique('household_id')->map(function ($route) use ($teamId) {
+                    $points = app(\App\Presenters\RescuerRoutePresenter::class)->plannedCoordinates($route->route_polyline);
+                    if (count($points) < 2) return null;
+                    return (object) ['assignment_id' => $route->assignment_id, 'team_id' => $teamId,
+                        'household_id' => $route->household_id, 'evac_center_id' => null, 'profile' => 'auto', 'status' => 'ready',
+                        'polyline6' => \App\Support\NavigationPolyline::encode($points),
+                        'steps' => json_decode($route->navigation_steps ?? '[]', true) ?: [],
+                        'distance_m' => (float) $route->estimated_distance_km * 1000,
+                        'duration_s' => (float) $route->estimated_duration_min * 60,
+                        'computed_at' => $route->updated_at];
+                })->filter()->values();
+            $routes = $planned->merge($routes->reject(fn ($route) => $route->profile === 'auto'
+                && $planned->contains(fn ($ready) => (string) $ready->household_id === (string) $route->household_id)))->values();
+        }
 
         $centerQuery = DB::table('evacuation_centers')->where('status', 'active')
             ->whereNull('deleted_at');

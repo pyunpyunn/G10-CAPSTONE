@@ -35,4 +35,19 @@ test('walking profile selects only its matching ready route', () => {
 });
 test('no active dispatch returns no assignment', () => {
   assert.equal(selectNavigationAssignment([closed, { ...other, status: 'cancelled' }]), undefined);
+  assert.equal(selectNavigationAssignment([closed, active], 1), undefined);
+  assert.equal(selectAssignedRoute(routes, closed, 'auto'), null);
+});
+test('another dispatch to the same household does not replace the selected dispatch route', () => {
+  const wrong = { household_id: 'b', assignment_id: 99, profile: 'auto', status: 'ready' };
+  const correct = { ...wrong, assignment_id: 2 };
+  assert.equal(selectAssignedRoute([wrong, correct], active, 'auto'), correct);
+});
+
+test('advancing the household queue cannot reuse the previous households route', () => {
+  const next = { assignment_id: 2, status: 'dispatched', household_id: 'next', household_ids: ['previous', 'next'] };
+  const stale = { assignment_id: 2, household_id: 'previous', profile: 'auto', status: 'ready' };
+  const ready = { ...stale, household_id: 'next' };
+  assert.equal(selectAssignedRoute([stale], next, 'auto'), null);
+  assert.equal(selectAssignedRoute([stale, ready], next, 'auto'), ready);
 });

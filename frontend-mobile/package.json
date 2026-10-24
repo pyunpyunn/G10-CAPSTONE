@@ -14,8 +14,11 @@
     "lint": "expo lint",
     "test:map": "node --test tests/mobileLeafletMap.test.cjs",
     "build:android": "npx eas-cli build --platform android --profile production",
+    "build:android:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-local-android.ps1",
     "build:android:store": "npx eas-cli build --platform android --profile store",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

@@ -130,7 +130,7 @@ export default function LegacyTeamManagementPage() {
     </> : <>
       {error && <div className="tm-feedback" role="alert">{error}<button className="bt" onClick={() => {setLoading(true); setError(''); setReload(value => value + 1)}}>Retry</button></div>}
       {notice && <div className="tm-feedback" role="status">{notice}</div>}
-      {loading ? <div role="status">Loading Annex H team structure…</div> : workspace && <AnnexHierarchyChart workspace={workspace} onAccounts={account => navigate(account?.responder_id ? `/rescuers?id=${encodeURIComponent(account.responder_id)}&type=${account.account_type === 'command_center' || ['chair','operations_admin','mitigation_prevention','preparedness','response','recovery_rehabilitation'].includes(account.role_key) ? 'command_center' : 'rescuer'}` : '/rescuers')} onTeams={() => setActiveView('teams')} />}
+      {loading ? <div role="status">Loading Annex H team structure…</div> : workspace && <AnnexHierarchyChart workspace={workspace} onAccounts={account => navigate(account?.responder_id ? `/rescuers/view?id=${encodeURIComponent(account.responder_id)}` : '/rescuers')} onTeams={() => setActiveView('teams')} />}
     </>}
     {editor && editorWorkspace && <RescueTeamConfigModal
       key={`${editor.team?.team_id || 'new'}-${editor.committeeKey || ''}`}

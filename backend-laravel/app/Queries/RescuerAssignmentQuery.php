@@ -18,13 +18,18 @@ class RescuerAssignmentQuery
             return collect();
         }
 
-        return $this->forResponder($responderId)
-            ->orderByRaw("CASE WHEN ra.status IN ('accepted', 'dispatched', 'en_route', 'on_scene') THEN 0 ELSE 1 END")
-            ->orderByDesc('ra.assigned_at')
-            ->limit($limit)
-            ->get()
-            ->map(function (object $row): object {
-                $row->mobile_route = $this->routeForAssignment((int) $row->assignment_id);
+        $activeStatuses = ['accepted', 'dispatched', 'en_route', 'en-route', 'on_scene', 'on-scene'];
+        $active = $this->forResponder($responderId)->whereIn('ra.status', $activeStatuses)
+            ->orderBy('ra.assigned_at')->orderBy('ra.assignment_id')->get();
+        $history = $this->forResponder($responderId)->whereNotIn('ra.status', $activeStatuses)
+            ->orderByDesc('ra.assigned_at')->limit($limit)->get();
+
+        return $active->concat($history)
+            ->map(function (object $row) use ($responderId): object {
+                $row->status = \App\Support\RescuerHouseholdQueue::status($row, $responderId);
+                $row->dispatch_household_id = $row->household_id;
+                $row->household_id = \App\Support\RescuerHouseholdQueue::target($row, $responderId);
+                $row->mobile_route = $this->routeForAssignment((int) $row->assignment_id, $responderId);
 
                 return $row;
             });
@@ -36,9 +41,11 @@ class RescuerAssignmentQuery
             return null;
         }
 
-        return $this->forResponder($responderId)
-            ->where('ra.assignment_id', $assignmentId)
-            ->first();
+        $assignment = $this->forResponder($responderId)->where('ra.assignment_id', $assignmentId)->first();
+        if ($assignment) $assignment->status = \App\Support\RescuerHouseholdQueue::status($assignment, $responderId);
+        if ($assignment) $assignment->dispatch_household_id = $assignment->household_id;
+        if ($assignment) $assignment->household_id = \App\Support\RescuerHouseholdQueue::target($assignment, $responderId);
+        return $assignment;
     }
 
     public function active(?int $responderId): ?object
@@ -50,7 +57,7 @@ class RescuerAssignmentQuery
         ));
     }
 
-    public function routeForAssignment(int $assignmentId): ?object
+    public function routeForAssignment(int $assignmentId, ?int $responderId = null): ?object
     {
         if (! Schema::hasTable('responder_routes')) {
             return null;
@@ -58,11 +65,19 @@ class RescuerAssignmentQuery
 
         $route = DB::table('responder_routes')
             ->where('assignment_id', $assignmentId)
+            ->when($responderId && Schema::hasColumn('responder_routes', 'responder_id'), fn ($query) => $query->where('responder_id', $responderId))
             ->orderByDesc('created_at')
+            ->orderByDesc('route_id')
             ->first();
 
         if (! $route) {
             return null;
+        }
+
+        if ($responderId && Schema::hasColumn('responder_routes', 'household_id')) {
+            $assignment = DB::table('responder_assignments')->where('assignment_id', $assignmentId)->first();
+            $target = $assignment ? \App\Support\RescuerHouseholdQueue::target($assignment, $responderId) : null;
+            if (!$target || ($route->household_id ?? null) !== $target || ($route->route_status ?? null) === 'completed') return null;
         }
 
         $route->mobile_trail_coordinates = Schema::hasTable('route_coordinates')

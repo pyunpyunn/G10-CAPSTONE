@@ -60,7 +60,9 @@ class HouseholdMobileReadQuery
             $columns[] = DB::raw('NULL as sitio_name');
         }
 
-        return $query->first($columns);
+        $record = $query->first($columns);
+        if ($record) $record->full_address = app(HouseholdAddressQuery::class)->forHouseholds([$householdId])->get($householdId);
+        return $record;
     }
 
     public function mambalingSitioOptions(): array

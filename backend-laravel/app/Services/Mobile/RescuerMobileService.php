@@ -102,7 +102,7 @@ class RescuerMobileService
             ], 404);
         }
 
-        $assignment->mobile_route = $this->assignmentQuery->routeForAssignment($assignmentId);
+        $assignment->mobile_route = $this->assignmentQuery->routeForAssignment($assignmentId, $responder?->responder_id);
         $assignment = $this->personalizeAssignmentHouseholds(collect([$assignment]), $responder?->responder_id)->first();
 
         return [
@@ -117,7 +117,10 @@ class RescuerMobileService
 
     public function updateAssignmentStatus(Request $request, int $assignmentId): JsonResponse|array
     {
-        return $this->assignmentWorkflow->updateAssignmentStatus($request, $assignmentId);
+        $result = $this->assignmentWorkflow->updateAssignmentStatus($request, $assignmentId);
+        if ($result instanceof JsonResponse) return $result;
+        $details = $this->assignment($request, $assignmentId);
+        return $details instanceof JsonResponse ? $details : $details + ['message' => 'Assignment status updated.'];
     }
 
     private function personalizeAssignmentHouseholds(Collection $assignments, ?int $responderId): Collection
@@ -125,23 +128,42 @@ class RescuerMobileService
         if (!$responderId || $assignments->isEmpty()) return $assignments;
         $coverage = $assignments->mapWithKeys(function ($assignment) use ($responderId) {
             $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
-            $ids = isset($notes['responder_households']) && array_key_exists($responderId, $notes['responder_households'])
-                ? $notes['responder_households'][$responderId] : ($assignment->household_id ? [$assignment->household_id] : []);
+            $ids = \App\Support\RescuerHouseholdQueue::ids($assignment, $responderId);
             return [$assignment->assignment_id => $ids];
         });
         $ids = $coverage->flatten()->unique()->values()->all();
         $households = $ids && \App\Support\RequestSchema::hasTable('households')
             ? \App\Models\Household::query()->whereIn('household_id', $ids)->get()->keyBy('household_id') : collect();
-        return $assignments->map(function ($assignment) use ($coverage, $households) {
+        $addresses = app(\App\Queries\HouseholdAddressQuery::class)->forHouseholds($ids);
+        $geotags = $ids && \App\Support\RequestSchema::hasTable('geotagged_locations')
+            ? \Illuminate\Support\Facades\DB::table('geotagged_locations')->whereIn('household_id', $ids)
+                ->whereNotNull('latitude')->whereNotNull('longitude')->orderByDesc('updated_at')->orderByDesc('location_id')
+                ->get()->unique('household_id')->keyBy('household_id') : collect();
+        return $assignments->map(function ($assignment) use ($coverage, $households, $geotags, $responderId, $addresses) {
             $assignment = clone $assignment;
             $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
             $notes['assigned_household_ids'] = $coverage[$assignment->assignment_id];
             $notes['assigned_household_count'] = count($notes['assigned_household_ids']);
-            $notes['assigned_households'] = collect($notes['assigned_household_ids'])->map(function ($id) use ($households) {
+            $notes['assigned_households'] = collect($notes['assigned_household_ids'])->map(function ($id) use ($households, $addresses) {
                 $household = $households->get($id);
                 return ['household_id'=>$id, 'household_name'=>$household?->household_name ?? $household?->household_code ?? $id,
-                    'household_code'=>$household?->household_code, 'member_count'=>$household?->member_count];
+                    'household_code'=>$household?->household_code, 'member_count'=>$household?->member_count, 'address'=>$addresses->get($id)];
             })->values()->all();
+            $pending = \App\Support\RescuerHouseholdQueue::pending($assignment, $responderId);
+            $notes['pending_household_ids'] = $pending;
+            $notes['completed_household_count'] = count($notes['assigned_household_ids']) - count($pending);
+            $assignment->household_id = $pending[0] ?? null;
+            if ($notes['assigned_household_count'] > 0 && ! $pending && ! in_array($assignment->status, ['cancelled', 'completed'], true)) {
+                $assignment->status = 'completed';
+            }
+            $point = $geotags->get($assignment->household_id);
+            $assignment->household_latitude = $point?->latitude;
+            $assignment->household_longitude = $point?->longitude;
+            $assignment->household_location_label = $addresses->get($assignment->household_id);
+            if (! $assignment->household_id || (isset($assignment->mobile_route->household_id)
+                && (string) $assignment->mobile_route->household_id !== (string) $assignment->household_id)) {
+                $assignment->mobile_route = null;
+            }
             $assignment->route_notes = json_encode($notes);
             return $assignment;
         });

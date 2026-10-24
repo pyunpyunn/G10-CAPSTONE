@@ -172,6 +172,7 @@ class HouseholdStatusWorkflow
             $deviceId,
             $validated,
             array_key_exists('needs_dispatch', $validated) ? (bool) $validated['needs_dispatch'] : null,
+            $source !== 'responder_field_report',
         );
     }
 

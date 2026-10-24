@@ -1,0 +1,68 @@
+{
+  "retrievedAt": "2026-10-22",
+  "note": "Google place points, not boundaries. Paglaum is the exact user-confirmed Google listing, included as a reference even though outside the stored barangay outline. Ybanez is a road reference. Other entries are named landmarks or addresses, not official sitio centers.",
+  "places": [
+    {
+      "cid": "5439189471944924854",
+      "title": "Larima Mambaling Homeowners Association",
+      "address": "Larima Mambaling Homeowners Association, 237 Larima St, Mambaling, Cebu City, 6000 Cebu",
+      "latitude": 10.2948409,
+      "longitude": 123.8791363,
+      "googleMapsUrl": "https://www.google.com/maps?cid=5439189471944924854",
+      "retrievedAt": "2026-10-22"
+    },
+    {
+      "cid": "13143145446609449095",
+      "title": "Lawis Alaska Mambaling Cebu City Philippines",
+      "address": "Lawis Alaska Mambaling Cebu City Philippines, Lawis Alaska, Mambaling, Cebu City, 6000 Cebu",
+      "latitude": 10.2880266,
+      "longitude": 123.8806039,
+      "googleMapsUrl": "https://www.google.com/maps?cid=13143145446609449095",
+      "retrievedAt": "2026-10-22"
+    },
+    {
+      "cid": "1517692800786653094",
+      "title": "Mambaling Cebu City",
+      "address": "Mambaling Cebu City, 406 Main Rd, Sitio Manga, Mambaling, Cebu City, 6000 Cebu",
+      "latitude": 10.2892999,
+      "longitude": 123.8781814,
+      "googleMapsUrl": "https://www.google.com/maps?cid=1517692800786653094",
+      "retrievedAt": "2026-10-22"
+    },
+    {
+      "cid": "1225294149079693663",
+      "title": "664 B",
+      "address": "664 B, 664-B, Tromar, F. Vestil St, Mambaling, Cebu City, Cebu",
+      "latitude": 10.2903804,
+      "longitude": 123.8779543,
+      "googleMapsUrl": "https://www.google.com/maps?cid=1225294149079693663",
+      "retrievedAt": "2026-10-22"
+    },
+    {
+      "cid": "12741785657808034142",
+      "title": "210 H Alaska Viking Mambaling",
+      "address": "210 H Alaska Viking Mambaling, 19 Ybanez Compound Rd, Cebu City, 6000 Cebu",
+      "latitude": 10.2897254,
+      "longitude": 123.8806118,
+      "googleMapsUrl": "https://www.google.com/maps?cid=12741785657808034142",
+      "retrievedAt": "2026-10-22"
+    },
+    {
+      "cid": "1377466696183318961",
+      "title": "Sitio Paglaum",
+      "address": "Sitio Paglaum, V Rama Ave, Cebu City, 6000 Cebu",
+      "latitude": 10.3123253,
+      "longitude": 123.8862491,
+      "googleMapsUrl": "https://www.google.com/maps?cid=1377466696183318961",
+      "retrievedAt": "2026-10-22"
+    },
+    {
+      "title": "Ybanez Compound Rd",
+      "address": "Ybanez Compound Rd, Mambaling, Cebu City, 6000 Cebu",
+      "latitude": 10.2892956,
+      "longitude": 123.8801145,
+      "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Ybanez+Compound+Rd+Mambaling+Cebu+City",
+      "retrievedAt": "2026-10-22"
+    }
+  ]
+}

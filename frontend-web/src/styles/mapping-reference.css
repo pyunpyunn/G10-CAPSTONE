@@ -145,3 +145,11 @@
 .mapping-reference .map-coordinate-readout{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:800;background:rgba(255,255,255,.94);border:1px solid #c8d3df;border-radius:8px;padding:7px 10px;box-shadow:0 2px 10px #0f1c2d22;font:12px/1.4 system-ui,sans-serif;white-space:nowrap;color:#243449;pointer-events:auto}
 .mapping-reference .map-coordinate-readout button{border:0;background:none;margin-left:8px;padding:0 3px;font-size:16px;cursor:pointer}
 @media(max-width:900px){.mapping-reference .map-coordinate-readout{bottom:calc(34% + 24px);font-size:11px}}
+
+.mapping-reference .lay{max-height:calc(100% - 90px);overflow-y:auto}
+.mapping-reference .map-sitio-controls{border-top:1px solid var(--ln);padding:10px;font-size:12px;color:var(--tx)}
+.mapping-reference .map-sitio-controls label{display:block;margin-bottom:6px;font-weight:600}
+.mapping-reference .map-sitio-controls select{width:100%;min-width:0;padding:7px 4px;border:1px solid var(--ln);border-radius:6px;background:var(--in);color:var(--tx);font:inherit}
+.mapping-reference .map-sitio-controls p{line-height:1.45;margin:8px 0;overflow-wrap:anywhere}
+.mapping-reference .map-sitio-controls a{color:#6d28d9;text-decoration:underline}
+.mapping-reference .lay.min .map-sitio-controls{display:none}

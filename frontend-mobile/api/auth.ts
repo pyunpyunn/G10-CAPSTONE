@@ -3,11 +3,14 @@ import { logoutPushIdentity } from '@/utils/pushNotifications';
 import { getMobileDeviceUuid } from '@/utils/mobileDeviceRegistration';
 import axios from 'axios';
 import { Platform } from 'react-native';
-import { clearNavigationStorage, navigationMetadata, pendingEventCount, activeLocalTrip } from '@/utils/navigationStore';
+import { randomUUID } from 'expo-crypto';
+import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
+import { selectNavigationAccount } from '@/utils/navigationStore';
 
 type Role = {
   role_key: string;
   role_name: string;
+  base_role_key?: string;
 };
 
 export type AuthUser = {
@@ -31,13 +34,21 @@ export async function loginMobile(login: string, password: string) {
 
   let token = response.data.token;
 
-  if (response.data.user.role?.role_key === 'rescuer') {
-    const deviceUuid = await getMobileDeviceUuid('rescuer');
-    const mobileResponse = await api.post<{ token: string }>('/mobile/login', {
-      login,
-      password,
-      device_uuid: deviceUuid,
-    });
+  if (['rescuer', 'tl', 'tm'].includes(response.data.user.role?.role_key) || response.data.user.role?.base_role_key === 'rescuer') {
+    const accountDeviceKey = `resq_device_account_${String(response.data.user.user_id)}`;
+    let deviceUuid = await getStoredItem(accountDeviceKey) || await getMobileDeviceUuid('rescuer');
+    const bindDevice = (uuid: string) => api.post<{ token: string }>('/mobile/login', { login, password, device_uuid: uuid });
+    let mobileResponse;
+    try {
+      mobileResponse = await bindDevice(deviceUuid);
+    } catch (error: any) {
+      if (error.response?.status !== 409 || error.response?.data?.message !== 'This device is already registered to another account.') throw error;
+      // A shared phone keeps a separate server registration for each account.
+      deviceUuid = `rescuer-${randomUUID()}`;
+      mobileResponse = await bindDevice(deviceUuid);
+    }
+    await setStoredItem(accountDeviceKey, deviceUuid);
+    await setStoredItem('resq_rescuer_device_uuid', deviceUuid);
     token = mobileResponse.data.token;
     try {
       await axios.post(`${api.defaults.baseURL}/auth/logout`, {}, {
@@ -50,12 +61,7 @@ export async function loginMobile(login: string, password: string) {
   }
 
   if (Platform.OS !== 'web') {
-    const owner = await navigationMetadata('owner');
-    if (owner && owner !== response.data.user.user_id && (await activeLocalTrip() || await pendingEventCount())) {
-      throw new Error('Sign in to the previous account and sync its saved trip events before switching accounts.');
-    }
-    if (owner !== response.data.user.user_id) await clearNavigationStorage();
-    await navigationMetadata('owner', response.data.user.user_id);
+    await selectNavigationAccount(String(response.data.user.user_id));
   }
   await saveToken(token);
 
@@ -63,14 +69,19 @@ export async function loginMobile(login: string, password: string) {
 }
 
 export async function logoutMobile() {
-  if (Platform.OS !== 'web' && (await activeLocalTrip() || await pendingEventCount())) {
-    throw new Error('End the active trip and sync saved trip events before logging out.');
+  if (Platform.OS !== 'web') {
+    const { endNavigationTrip, suspendNavigationSync } = await import('@/utils/navigationRuntime');
+    // Stop recording before revoking the session. The account's saved outbox is
+    // retained if the phone is offline and resumes after this account signs in.
+    try { await suspendNavigationSync(); await endNavigationTrip({ sync: false }); } catch { /* Keep saved events. */ }
   }
   try {
-    await api.post('/auth/logout');
+    await api.post('/auth/logout', {}, { timeout: 5000 });
+  } catch {
+    // Local logout must also work when the server is unreachable.
   } finally {
     try {
-      await logoutPushIdentity();
+      await logoutPushIdentity().catch(() => {});
     } finally {
       await clearToken();
     }

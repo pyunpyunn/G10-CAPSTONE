@@ -2,7 +2,7 @@
 
 **Status:** partial local implementation. A1–A3 still have gaps documented in `A1_A3_ARCHITECTURE_AUDIT.md`. B1 archive CSV streaming is implemented locally; B2 list-read findings are documented in `B2_LIST_QUERY_AUDIT.md` and require follow-up. Shared-database validation remains deferred. See `REFACTOR_REPORT.md` for local verification.
 
-**Baseline:** Laravel 13.12, PHP ^8.3, SQLite in-memory for PHPUnit, operational database connection `resq_local`, separate integration connection `trackingaid`.
+**Baseline:** Laravel 13.12, PHP ^8.3, SQLite in-memory for PHPUnit, shared operational database `klint` via the default `mysql` connection, separate integration connection `trackingaid`.
 
 **Compatibility rule:** preserve route paths, HTTP methods, input names, authorization, status codes, and JSON/CSV contracts unless a separately approved API change explicitly updates every web/mobile client.
 

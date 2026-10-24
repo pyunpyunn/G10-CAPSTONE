@@ -6,14 +6,15 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const flush = () => new Promise(setImmediate);
 
-function load({ granted = true, pending = false } = {}) {
+function load({ granted = true, pending = false, currentFix } = {}) {
   let stateListener, fixListener, completeWatch;
   let watches = 0, removed = 0;
   const appState = { currentState: 'active', addEventListener: (_, fn) => {
     stateListener = fn; return { remove() { stateListener = null; } };
   } };
   const location = {
-    Accuracy: { Balanced: 3 },
+    Accuracy: { Balanced: 3, High: 4 },
+    ...(currentFix ? { getCurrentPositionAsync: async () => currentFix } : {}),
     requestForegroundPermissionsAsync: async () => ({ status: granted ? 'granted' : 'denied' }),
     watchPositionAsync: async (options, listener) => {
       watches++; fixListener = listener;
@@ -31,7 +32,7 @@ function load({ granted = true, pending = false } = {}) {
     { exports, Number, require: (name) => name === 'react-native' ? { AppState: appState } : location });
   return { start: exports.watchForegroundMapGps, counts: () => ({ watches, removed }),
     state(value) { appState.currentState = value; stateListener?.(value); },
-    fix(coords) { fixListener({ coords }); }, resolve: () => completeWatch() };
+    fix(coords, timestamp) { fixListener({ coords, timestamp }); }, resolve: () => completeWatch() };
 }
 
 test('GPS stops in the background, resumes once and cleans up on close', async () => {
@@ -74,4 +75,16 @@ test('invalid and inaccurate fixes are ignored', async () => {
   assert.equal(points.length, 1);
   assert.equal(points[0].accuracy_m, 10);
   stop();
+});
+
+test('opening a map requests a fresh fix and rejects stale watch locations', async () => {
+ const received = [];
+ const gps = load({ currentFix: { timestamp: Date.now(), coords: { latitude: 10.29, longitude: 123.88, accuracy: 5 } } });
+ const stop = gps.start(point => received.push(point), () => {});
+ await flush();
+ assert.equal(received.length,1);
+ assert.equal(received[0].latitude,10.29);
+ gps.fix({ latitude: 11, longitude: 124, accuracy: 5 },Date.now()-60000);
+ assert.equal(received.length,1);
+ stop();
 });

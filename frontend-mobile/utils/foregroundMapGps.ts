@@ -24,11 +24,20 @@ export function watchForegroundMapGps(onPosition: (point: MapGpsPoint) => void, 
         onError('Allow location access to follow your GPS position.');
         return;
       }
+      if (typeof Location.getCurrentPositionAsync === 'function') {
+        void Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }).then(fix => {
+          if (disposed || current !== generation) return;
+          const { latitude, longitude, accuracy } = fix.coords;
+          if ((!Number.isFinite(fix.timestamp) || Date.now() - fix.timestamp < 15000) && Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180 && (accuracy == null || accuracy <= 75)) {
+            onError(''); onPosition({ latitude, longitude, accuracy_m: accuracy });
+          }
+        }).catch(() => { if (!disposed && current === generation) onError('Waiting for a current GPS fix.'); });
+      }
       const subscription = await Location.watchPositionAsync({
         accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 5,
       }, (fix) => {
         const { latitude, longitude, accuracy } = fix.coords;
-        if (disposed || current !== generation || !Number.isFinite(latitude) || !Number.isFinite(longitude)
+        if (disposed || current !== generation || (Number.isFinite(fix.timestamp) && Date.now() - fix.timestamp > 15000) || !Number.isFinite(latitude) || !Number.isFinite(longitude)
           || Math.abs(latitude) > 90 || Math.abs(longitude) > 180 || (accuracy != null && accuracy > 75)) return;
         onError('');
         onPosition({ latitude, longitude, accuracy_m: accuracy });

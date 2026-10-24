@@ -18,6 +18,7 @@ export function webHomeForUser(user) {
 export function canOpenWebPage(user, path) {
   if (user?.is_active === false) return false
   const route = String(path || '').split('?')[0]
+  if (route === '/rescuers/view') return hasWebAccess(user)
   let module
   if (route === '/super-admin') module = 'inquiries'
   else if (route === '/dashboard') module = 'dashboard'

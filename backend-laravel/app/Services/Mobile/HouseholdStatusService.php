@@ -34,6 +34,8 @@ class HouseholdStatusService
             ->paginate($perPage);
         $items = collect($paginator->items());
         $householdIds = $items->pluck('household_id')->filter()->values();
+        $addresses = app(\App\Queries\HouseholdAddressQuery::class)->forHouseholds($householdIds->all());
+        $items->each(function ($row) use ($addresses) { $row->full_address = $addresses->get($row->household_id); });
         $latestLogs = $this->query->getLatestLogs($householdIds, $eventId);
         $latestDevices = $this->query->getLatestDevices($householdIds);
         $accountUsers = $this->query->getHouseholdAccountUsers($householdIds);
@@ -70,6 +72,7 @@ class HouseholdStatusService
             return response()->json(['message' => 'Household record was not found.'], 404);
         }
 
+        $household->full_address = app(\App\Queries\HouseholdAddressQuery::class)->forHouseholds([$householdId])->get($householdId);
         $latestLog = $this->query->getLatestLogs(collect([$householdId]), $eventId)->get($householdId);
         $latestDevice = $this->query->getLatestDevices(collect([$householdId]))->get($householdId);
         $accountUser = $this->query->getHouseholdAccountUsers(collect([$householdId]))->get($householdId);

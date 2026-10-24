@@ -1,0 +1,101 @@
+✖ household dashboard renders the server broadcast title, message and date (204.3364ms)
+✖ older API responses without recent_alerts still render safely (93.3749ms)
+✖ only the latest alert appears on the dashboard and earlier broadcasts appear in the open modal (68.2907ms)
+✖ broadcast buttons render the exact four API labels in selected order (58.6338ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 768.1687
+
+✖ failing tests:
+
+test at tests\householdAlerts.test.cjs:44:1
+✖ household dashboard renders the server broadcast title, message and date (204.3364ms)
+  C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:31
+        throw new Error(`Unexpected import ${name}`);
+        ^
+  
+  Error: Unexpected import ./DisasterBroadcastBanner
+      at require (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:31:13)
+      at evalmachine.<anonymous>:53:33
+      at Script.runInContext (node:vm:149:12)
+      at Script.runInNewContext (node:vm:154:17)
+      at Object.runInNewContext (node:vm:310:38)
+      at dashboard (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:15:6)
+      at TestContext.<anonymous> (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:45:18)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.start (node:internal/test_runner/test:1003:17)
+
+test at tests\householdAlerts.test.cjs:55:1
+✖ older API responses without recent_alerts still render safely (93.3749ms)
+  AssertionError [ERR_ASSERTION]: Got unwanted exception.
+  Actual message: "Unexpected import ./DisasterBroadcastBanner"
+      at TestContext.<anonymous> (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:56:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:31
+          throw new Error(`Unexpected import ${name}`);
+          ^
+    
+    Error: Unexpected import ./DisasterBroadcastBanner
+        at require (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:31:13)
+        at evalmachine.<anonymous>:53:33
+        at Script.runInContext (node:vm:149:12)
+        at Script.runInNewContext (node:vm:154:17)
+        at Object.runInNewContext (node:vm:310:38)
+        at dashboard (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:15:6)
+        at C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:56:29
+        at getActual (node:assert:611:5)
+        at strict.doesNotThrow (node:assert:779:32)
+        at TestContext.<anonymous> (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:56:10),
+    expected: undefined,
+    operator: 'doesNotThrow',
+    diff: 'simple'
+  }
+
+test at tests\householdAlerts.test.cjs:59:1
+✖ only the latest alert appears on the dashboard and earlier broadcasts appear in the open modal (68.2907ms)
+  C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:31
+        throw new Error(`Unexpected import ${name}`);
+        ^
+  
+  Error: Unexpected import ./DisasterBroadcastBanner
+      at require (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:31:13)
+      at evalmachine.<anonymous>:53:33
+      at Script.runInContext (node:vm:149:12)
+      at Script.runInNewContext (node:vm:154:17)
+      at Object.runInNewContext (node:vm:310:38)
+      at dashboard (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:15:6)
+      at TestContext.<anonymous> (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:64:21)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+
+test at tests\householdAlerts.test.cjs:69:1
+✖ broadcast buttons render the exact four API labels in selected order (58.6338ms)
+  C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:31
+        throw new Error(`Unexpected import ${name}`);
+        ^
+  
+  Error: Unexpected import ./DisasterBroadcastBanner
+      at require (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:31:13)
+      at evalmachine.<anonymous>:53:33
+      at Script.runInContext (node:vm:149:12)
+      at Script.runInNewContext (node:vm:154:17)
+      at Object.runInNewContext (node:vm:310:38)
+      at dashboard (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:15:6)
+      at TestContext.<anonymous> (C:\backend\G10CAPSTONE\resqperation-system\frontend-mobile\tests\householdAlerts.test.cjs:70:24)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)

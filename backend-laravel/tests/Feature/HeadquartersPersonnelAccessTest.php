@@ -77,6 +77,52 @@ class HeadquartersPersonnelAccessTest extends TestCase
         ]);
     }
 
+    public function test_all_web_roles_can_view_profiles_but_non_managers_cannot_modify_personnel(): void
+    {
+        $target = $this->account('TARGET', 1);
+        DB::table('responders')->insert([
+            'responder_id' => 91, 'user_id' => $target->user_id,
+            'full_name' => 'Directory Target', 'password_hash' => 'must-not-be-disclosed',
+        ]);
+        foreach (WebAccessPolicy::MODULES as $key => $modules) {
+            if ($modules === []) continue;
+            $roleId = 20 + array_search($key, array_keys(WebAccessPolicy::MODULES), true);
+            DB::table('roles')->insert([
+                'role_id' => $roleId, 'role_key' => $key, 'base_role_key' => $key,
+                'role_name' => $key, 'web_modules' => json_encode($modules),
+                'can_manage_personnel' => $key === 'operations_admin',
+            ]);
+            $viewer = $this->account('VIEWER-'.$key, $roleId);
+            \Laravel\Sanctum\Sanctum::actingAs($viewer);
+            $profile = $this->getJson('/api/v1/personnel-profiles/91')->assertOk()
+                ->assertJsonPath('data.profile.full_name', 'Directory Target')->json('data.profile');
+            $this->assertArrayNotHasKey('password_hash', $profile);
+            $this->assertArrayNotHasKey('emergency_contact_number', $profile);
+            $this->assertArrayNotHasKey('address', $profile);
+            $this->patchJson('/api/v1/personnel-profiles/91', ['full_name' => 'Changed'])->assertStatus(405);
+            if ($key !== 'operations_admin') {
+                $this->patchJson('/api/v1/rescuers/91', ['full_name' => 'Changed'])->assertForbidden();
+                $this->deleteJson('/api/v1/rescuers/91')->assertForbidden();
+                $this->postJson('/api/v1/rescuers/91/deactivate')->assertForbidden();
+                $this->getJson('/api/v1/rescuers')->assertForbidden();
+            }
+        }
+        $this->assertSame('Directory Target', DB::table('responders')->where('responder_id', 91)->value('full_name'));
+    }
+
+    public function test_profile_requires_web_access_and_hides_deleted_personnel(): void
+    {
+        $this->getJson('/api/v1/personnel-profiles/91')->assertUnauthorized();
+        DB::table('roles')->insert(['role_id' => 90, 'role_key' => 'rescuer', 'role_name' => 'Rescuer']);
+        \Laravel\Sanctum\Sanctum::actingAs($this->account('MOBILE', 90));
+        $this->getJson('/api/v1/personnel-profiles/91')->assertForbidden();
+        $web = $this->account('WEB', 2);
+        \Laravel\Sanctum\Sanctum::actingAs($web);
+        $this->getJson('/api/v1/personnel-profiles/99999')->assertNotFound();
+        DB::table('responders')->insert(['responder_id' => 91, 'user_id' => $web->user_id, 'deleted_at' => now()]);
+        $this->getJson('/api/v1/personnel-profiles/91')->assertNotFound();
+    }
+
     private function account(string $id, int $roleId): User
     {
         return User::query()->create([

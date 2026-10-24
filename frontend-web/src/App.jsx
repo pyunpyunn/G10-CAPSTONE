@@ -24,6 +24,7 @@ import './styles/main.css'
 import './styles/dashboard.css'
 import './styles/notifications.css'
 import './styles/profile.css'
+import './styles/personnel-profile.css'
 import './styles/operations.css'
 import './styles/archive.css'
 import './styles/ui.css'
@@ -63,7 +64,7 @@ const pageComponents = {
   '/rescuers': lazy(() => import('./pages/RescuerAccountsPage')),
   '/rescuers/new': lazy(() => import('./pages/RescuerAccountsPage')),
   '/rescuers/teams': lazy(() => import('./pages/RescuerAccountsPage')),
-  '/rescuers/view': lazy(() => import('./pages/RescuerAccountsPage')),
+  '/rescuers/view': lazy(() => import('./pages/PersonnelProfilePage')),
   '/rescuers/edit': lazy(() => import('./pages/RescuerAccountsPage')),
   '/resources-requests': lazy(() => import('./pages/RequestWorkflowPage')),
   '/resources-requests/new': lazy(() => import('./pages/ResourceRequestEditorPage')),

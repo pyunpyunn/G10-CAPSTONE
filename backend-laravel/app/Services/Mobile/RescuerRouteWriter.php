@@ -18,9 +18,10 @@ class RescuerRouteWriter
         }
 
         DB::transaction(function () use ($assignmentId, $validated, $now): void {
-        DB::table('responder_assignments')->where('assignment_id', $assignmentId)->lockForUpdate()->first();
-        $route = DB::table('responder_routes')
-            ->where('assignment_id', $assignmentId)
+        $assignment = DB::table('responder_assignments')->where('assignment_id', $assignmentId)->lockForUpdate()->first();
+        $responderId = (int) ($validated['responder_id'] ?? $assignment->responder_id);
+        $route = $this->routeQuery($assignmentId, $responderId)
+            ->when(Schema::hasColumn('responder_routes', 'route_status'), fn ($query) => $query->where('route_status', 'active'))
             ->orderByDesc('created_at')
             ->first();
 
@@ -31,7 +32,9 @@ class RescuerRouteWriter
                 'route_id' => $routeId,
                 'assignment_id' => $assignmentId,
                 'route_name' => 'Responder mobile route',
+                'responder_id' => $responderId,
                 'route_status' => 'active',
+                'household_id' => \App\Support\RescuerHouseholdQueue::target($assignment, $responderId),
                 'start_latitude' => $validated['latitude'],
                 'start_longitude' => $validated['longitude'],
                 'created_at' => $now,
@@ -61,7 +64,7 @@ class RescuerRouteWriter
             return null;
         }
 
-        $target = $this->assignmentTarget($assignment);
+        $target = $this->assignmentTarget($assignment, (int) ($start['responder_id'] ?? $assignment->responder_id), $start['household_id'] ?? null);
 
         if (! $target) {
             return null;
@@ -79,14 +82,18 @@ class RescuerRouteWriter
     public function refreshPlannedRoadRoute(int $assignmentId, array $start): void
     {
         $assignment = DB::table('responder_assignments')->where('assignment_id', $assignmentId)->first();
-        if (! $assignment) return;
-        $assignment = $this->assignmentQuery->find($assignmentId, (int) $assignment->responder_id);
+        if (! $assignment || in_array($assignment->status, ['completed', 'cancelled'], true)) return;
+        $responderId = (int) ($start['responder_id'] ?? $assignment->responder_id);
+        $assignment = $this->assignmentQuery->find($assignmentId, $responderId);
         if (! $assignment) return;
         $plannedRoute = $this->planRoadRoute($assignment, $start);
         if (! $plannedRoute) return;
 
         DB::transaction(function () use ($assignmentId, $assignment, $start, $plannedRoute): void {
-            DB::table('responder_assignments')->where('assignment_id', $assignmentId)->lockForUpdate()->first();
+            $current = DB::table('responder_assignments')->where('assignment_id', $assignmentId)->lockForUpdate()->first();
+            if (! $current || in_array($current->status, ['completed', 'cancelled'], true)) return;
+            $target = $this->assignmentTarget($current, (int) ($start['responder_id'] ?? $current->responder_id), $start['household_id'] ?? null);
+            if ($target !== $plannedRoute['target']) return; // Destination changed while the provider was routing.
             $this->savePlannedRoadRoute($assignmentId, $assignment, $start, now(), $plannedRoute);
         }, 3);
     }
@@ -98,13 +105,17 @@ class RescuerRouteWriter
         }
         ['route' => $route, 'target' => $target] = $plannedRoute;
 
-        $existingRoute = DB::table('responder_routes')
-            ->where('assignment_id', $assignmentId)
+        $responderId = (int) ($start['responder_id'] ?? $assignment->responder_id);
+        $existingRoute = $this->routeQuery($assignmentId, $responderId)
+            ->when(Schema::hasColumn('responder_routes', 'household_id'), fn ($query) => $query->where('household_id', $target['household_id']))
             ->orderByDesc('created_at')
             ->first();
 
         $data = $this->support->filterColumns('responder_routes', [
             'assignment_id' => $assignmentId,
+            'responder_id' => $responderId,
+            'household_id' => $target['household_id'],
+            'navigation_steps' => json_encode($route['steps'] ?? []),
             'route_name' => 'Road route to '.($assignment->assigned_area ?: $assignment->household_id ?: 'assigned location'),
             'route_status' => 'active',
             'start_latitude' => $start['latitude'],
@@ -131,16 +142,29 @@ class RescuerRouteWriter
         ])));
     }
 
-    private function assignmentTarget(object $assignment): ?array
+    private function routeQuery(int $assignmentId, int $responderId)
     {
-        if ($assignment->household_latitude === null || $assignment->household_longitude === null) {
-            return null;
+        $query = DB::table('responder_routes')->where('assignment_id', $assignmentId);
+        if (Schema::hasColumn('responder_routes', 'responder_id')) {
+            $query->where('responder_id', $responderId);
         }
+        return $query;
+    }
 
-        return [
-            'latitude' => (float) $assignment->household_latitude,
-            'longitude' => (float) $assignment->household_longitude,
-        ];
+    private function assignmentTarget(object $assignment, int $responderId, ?string $requestedHouseholdId = null): ?array
+    {
+        $notes = json_decode((string) ($assignment->route_notes ?? ''), true) ?: [];
+        $coverage = $notes['responder_households'] ?? [];
+        // An explicitly empty coverage list must not inherit another rescuer's target.
+        $ids = \App\Support\RescuerHouseholdQueue::pending($assignment, $responderId);
+        $householdId = $requestedHouseholdId && in_array($requestedHouseholdId, $ids, true)
+            ? $requestedHouseholdId : ($ids[0] ?? null);
+        if (! $householdId) return null;
+        $point = DB::table('geotagged_locations')->where('household_id', $householdId)
+            ->whereNotNull('latitude')->whereNotNull('longitude')
+            ->orderByDesc('updated_at')->orderByDesc('location_id')->first();
+        if (! $point) return null;
+        return ['household_id' => $householdId, 'latitude' => (float) $point->latitude, 'longitude' => (float) $point->longitude];
     }
 
     private function hasPoint(array $data): bool
