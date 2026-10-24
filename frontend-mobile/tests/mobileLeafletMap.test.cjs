@@ -74,6 +74,21 @@ function loadMapHtml() {
   return exported.mobileLeafletHtml;
 }
 
+test('route refresh replaces layers without moving or reloading the map', () => {
+  const script=loadMapHtml()({markers:[],routes:[]}).match(/<script>\s*([\s\S]*?)<\/script>/)[1];
+  let cameraMoves=0,removed=0,lines=0;
+  const map={setView(){cameraMoves++;return this;},on(){},removeLayer(){removed++;}};
+  const bounds={isValid:()=>false,extend(){return this;}};
+  const window={};
+  vm.runInNewContext(script,{window,L:{map:()=>map,tileLayer:()=>({addTo(){}}),latLngBounds:()=>bounds,
+    control:()=>({addTo(){this.onAdd();}}),DomUtil:{create:()=>({style:{},setAttribute(){}})},DomEvent:{disableClickPropagation(){},on(){}},
+    polyline:()=>{lines++;return {addTo(){return this;},bindPopup(){return this;}};},
+  }});
+  const data={markers:[],routes:[{id:'r1',coordinates:[{latitude:10,longitude:123},{latitude:10.1,longitude:123.1}]}]};
+  window.updateRescueData(data);window.updateRescueData(data);
+  assert.equal(lines,2);assert.equal(removed,1);assert.equal(cameraMoves,1);
+});
+
 test('GPS zooms once, moves one marker, permits panning and recenters on demand', () => {
   const script = loadMapHtml()({ markers: [], routes: [] }).match(/<script>\s*([\s\S]*?)<\/script>/)[1];
   const views = [], mapEvents = {}, buttonEvents = {};

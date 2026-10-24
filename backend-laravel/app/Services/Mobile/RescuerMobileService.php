@@ -66,6 +66,7 @@ class RescuerMobileService
         $responder = $this->support->responderForUser($user);
         $assignments = $this->personalizeAssignmentHouseholds($this->assignmentQuery->list($responder?->responder_id, 10), $responder?->responder_id);
         $activeEvent = $this->support->activeEvent();
+        $assignments = $assignments->filter(fn ($assignment) => !in_array($assignment->status, ['dispatched','accepted','en_route','on_scene'], true) || ($activeEvent && (string)$assignment->disaster_id === (string)$activeEvent->event_id))->values();
 
         return [
             'profile' => [

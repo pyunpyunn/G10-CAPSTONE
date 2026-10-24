@@ -27,6 +27,7 @@ function fixture({ offline = false, conflict = false } = {}) {
     'axios': { async post() { calls.push('revoke-temporary-token'); } },
     'react-native': { Platform: { OS: 'android' } },
     '@/utils/navigationStore': { async selectNavigationAccount(id) { calls.push(['select-account', id]); } },
+    '@/utils/rescuerLiveLocation': { async stopRescuerTracking() { calls.push('stop-live-gps'); } },
     '@/utils/navigationRuntime': { async endNavigationTrip() { calls.push('end-trip'); }, async suspendNavigationSync() { calls.push('suspend-sync'); } },
   };
   const context = { exports: {}, require(name) { if (!(name in mocks)) throw new Error(`Unexpected import ${name}`); return mocks[name]; } };
@@ -38,7 +39,7 @@ function fixture({ offline = false, conflict = false } = {}) {
 test('logout suspends sync, stops recording, and clears credentials even when offline', async () => {
   const { auth, calls } = fixture({ offline: true });
   await auth.logoutMobile();
-  assert.deepEqual(calls, ['suspend-sync', 'end-trip', '/auth/logout', 'push-logout', 'clear-token']);
+  assert.deepEqual(calls, ['stop-live-gps', 'suspend-sync', 'end-trip', '/auth/logout', 'push-logout', 'clear-token']);
 });
 test('rescuer login normalizes numeric account IDs and saves the device token', async () => {
   const { auth, calls } = fixture();

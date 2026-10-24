@@ -37,7 +37,7 @@ class HouseholdMemberStatusQueryTest extends TestCase
         $this->assertNull($query->householdHead('hh-1'));
     }
 
-    public function test_household_report_supplies_unassessed_members_without_overwriting_individual_status(): void
+    public function test_household_report_does_not_supply_an_unassessed_members_status(): void
     {
         Schema::create('household_statuses', function ($table) {
             $table->integer('status_id')->primary(); $table->string('status_key'); $table->string('status_label');
@@ -52,8 +52,8 @@ class HouseholdMemberStatusQueryTest extends TestCase
         $members = app(HouseholdStatusQuery::class)->getMembers('hh-1', 'evt-1', collect());
         $this->assertSame('Safe', $members[0]['status']['label']);
         $this->assertSame('member', $members[0]['status_scope']);
-        $this->assertSame('Unsafe', $members[1]['status']['label']);
-        $this->assertSame('household', $members[1]['status_scope']);
+        $this->assertSame('No report', $members[1]['status']['label']);
+        $this->assertNull($members[1]['status_scope']);
         $otherEvent = app(HouseholdStatusQuery::class)->getMembers('hh-1', 'evt-other', collect());
         $this->assertSame('No report', $otherEvent[1]['status']['label']);
     }

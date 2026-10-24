@@ -49,6 +49,22 @@ class HouseholdMobileStatusWriter
             'latest_member_status_key' => $validated['status_key'],
         ], JSON_UNESCAPED_SLASHES);
 
+        // Member logs are individual observations. Persist the separate rollup
+        // after them so dashboard/directory readers never use the last member
+        // report as the overall household result.
+        DB::table('household_status_logs')->insert($this->support->filterColumns('household_status_logs', [
+            'disaster_id' => $eventId,
+            'household_id' => $householdId,
+            'status_id' => $status['status_id'],
+            'source' => 'household_member_mobile',
+            'submitted_by_user_id' => $userId,
+            'device_token_id' => $deviceId,
+            'notes' => $notes,
+            'submitted_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]));
+
         $this->saveLatestDisasterStatus($eventId, $householdId, $status['status_id'], array_merge($validated, [
             'status_key' => $statusKey,
             'canonical_status_key' => $status['status_key'],

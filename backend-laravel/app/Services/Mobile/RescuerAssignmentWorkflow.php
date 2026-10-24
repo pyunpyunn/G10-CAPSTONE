@@ -173,6 +173,7 @@ class RescuerAssignmentWorkflow
         }
 
         $validated = $request->validate([
+            'recorded_at' => ['nullable', 'date'],
             'refresh_route' => ['sometimes', 'boolean'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
@@ -193,11 +194,20 @@ class RescuerAssignmentWorkflow
             ], 404);
         }
 
+        if (Schema::hasTable('disaster_events') && isset($assignment->disaster_id)) {
+            $event = $this->support->activeEvent();
+            if (!$event || (string)$event->event_id !== (string)$assignment->disaster_id) abort(409, 'This dispatch is not in the active event.');
+        }
         $validated['responder_id'] = (int) $responder->responder_id;
         $now = now();
         DB::transaction(function () use ($assignmentId, $validated, $responder, $now, $request): void {
             $current = DB::table('responder_assignments')->where('assignment_id', $assignmentId)->lockForUpdate()->first();
             if (!$current || !in_array(\App\Support\RescuerHouseholdQueue::status($current, (int)$responder->responder_id), ['dispatched', 'accepted', 'en_route', 'on_scene'], true)) abort(409, 'This household task is not active.');
+            if (!empty($validated['recorded_at'])) {
+                $captured = \Illuminate\Support\Carbon::parse($validated['recorded_at']);
+                $last = DB::table('responder_location_logs')->where('responder_id',$responder->responder_id)->max('logged_at');
+                if ($captured->lt(now()->subSeconds(60)) || $captured->gt(now()->addSeconds(10)) || ($last && $captured->lt(\Illuminate\Support\Carbon::parse($last)))) abort(409, 'An older GPS fix cannot replace your current position.');
+            }
             $logId = $this->saveResponderLocation($responder, $validated, $now);
             $this->routeWriter()->saveRouteCoordinate($assignmentId, $validated, $now);
             RefreshResponderRoadRoute::dispatch($assignmentId, $validated)
@@ -252,7 +262,7 @@ class RescuerAssignmentWorkflow
             'longitude' => $validated['longitude'],
             'battery_level' => $validated['battery_level'] ?? null,
             'signal_strength' => $validated['signal_strength'] ?? null,
-            'logged_at' => $now,
+            'logged_at' => !empty($validated['recorded_at']) ? \Illuminate\Support\Carbon::parse($validated['recorded_at'])->setTimezone(config('app.timezone')) : $now,
             'created_at' => $now,
             'updated_at' => $now,
         ]));

@@ -2,6 +2,7 @@ import { statusColor } from '@/constants/statusPalette';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { hasActiveRescuerTracking } from '@/utils/rescuerLiveLocation';
 import { useMapGps } from '@/hooks/useMapGps';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
@@ -40,6 +41,7 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
   useEffect(() => {
     if (!tracking || !position) return;
     setLastUpdated(formatPhilippineTime());
+    if (hasActiveRescuerTracking() && lastRouteRefresh.current > 0) return;
     if (!gpsAssignment?.assignment_id || !['dispatched','accepted','en_route','on_scene'].includes(gpsAssignment.status_key) || sending.current) return;
     sending.current = true;
     setSyncing(true);
@@ -127,7 +129,7 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
       <View style={styles.card}>
         <SectionHeader
           title="Barangay rescue map"
-          action={
+          action={activeAssignment ? <StatusBadge label={position ? 'GPS active' : 'Acquiring GPS'} tone={position ? 'safe' : 'neutral'} /> :
             <ActionButton
               label={tracking ? 'Stop' : 'Track Me'}
               icon={tracking ? 'stop-outline' : 'navigate-outline'}

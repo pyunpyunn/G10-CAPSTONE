@@ -39,6 +39,7 @@ import { LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
+import { configureRescuerTracking, stopRescuerTracking, subscribeRescuerPosition } from '@/utils/rescuerLiveLocation';
 import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
@@ -131,6 +132,23 @@ export default function RescuerHomeScreen() {
       ),
     [assignments]
   );
+
+  const [gpsStatus, setGpsStatus] = useState('');
+  const trackingAssignmentId = activeAssignment?.assignment_id || null;
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    setGpsStatus(trackingAssignmentId ? 'GPS · Acquiring location' : '');
+    void configureRescuerTracking(trackingAssignmentId).catch(() => setGpsStatus('GPS · Enable location access'));
+    return () => { void stopRescuerTracking(); };
+  }, [trackingAssignmentId]);
+  useEffect(() => subscribeRescuerPosition(fix => {
+    setGpsStatus(`GPS · ${new Date(fix.timestamp).toLocaleTimeString()} · ±${Math.round(fix.coords.accuracy || 0)} m`);
+  }, problem => { if (problem) setGpsStatus(problem); }), []);
+  useEffect(() => {
+    if (!trackingAssignmentId) return;
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void getRescuerOverview(true).then(setOverview).catch(() => {}); }, 15000);
+    return () => clearInterval(timer);
+  }, [trackingAssignmentId]);
 
   async function handleLogout() {
     try {
@@ -330,11 +348,12 @@ export default function RescuerHomeScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
-        {Platform.OS !== 'web' && <Pressable style={{ padding: 16, backgroundColor: '#e8f1ff', borderRadius: 12 }}
+        {Platform.OS !== 'web' && <Pressable style={{ padding: 16, backgroundColor: palette.nav, borderRadius: 12 }}
           onPress={() => router.push({ pathname: '/rescuer/navigation' as any,
             params: { dispatchId: String(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || '') } })}>
-          <Text style={{ color: '#1358a4', fontWeight: '700' }}>View directions / Offline navigation</Text>
+          <Text style={{ color: palette.navText, fontWeight: '700' }}>View directions / Offline navigation</Text>
         </Pressable>}
+        {!!trackingAssignmentId && !!gpsStatus && <Text accessibilityRole="text" style={{ color: palette.textSoft, fontSize: 12 }}>{gpsStatus}</Text>}
         {renderContent()}
       </ScrollView>
 

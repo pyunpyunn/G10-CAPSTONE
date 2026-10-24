@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { hasActiveRescuerTracking, subscribeRescuerPosition } from '@/utils/rescuerLiveLocation';
 import { watchForegroundMapGps, type MapGpsPoint } from '@/utils/foregroundMapGps';
 
 export function useMapGps(enabled: boolean) {
@@ -8,7 +9,9 @@ export function useMapGps(enabled: boolean) {
     setPosition(null);
     setError('');
     if (!enabled) return;
-    return watchForegroundMapGps(setPosition, setError);
+    const unsubscribe = subscribeRescuerPosition(fix => setPosition({ latitude: fix.coords.latitude, longitude: fix.coords.longitude, accuracy_m: fix.coords.accuracy }), setError);
+    const stop = hasActiveRescuerTracking() ? () => {} : watchForegroundMapGps(point => { if (!hasActiveRescuerTracking()) setPosition(point); }, problem => { if (!hasActiveRescuerTracking()) setError(problem); });
+    return () => { unsubscribe(); stop(); };
   }, [enabled]);
   return { position, error };
 }

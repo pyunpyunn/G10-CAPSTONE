@@ -63,7 +63,8 @@ class MappingPresenter
     public function formatTeamMarker(object $row): array
     {
         return [
-            'id' => $row->log_id,
+            'id' => $row->responder_id,
+            'log_id' => $row->log_id,
             'responder_id' => $row->responder_id,
             'team_name' => $row->team_name ?: 'Unassigned responder',
             'team_code' => $row->team_code ?? null,
@@ -77,6 +78,7 @@ class MappingPresenter
             'battery_level' => $row->battery_level,
             'signal_strength' => $row->signal_strength,
             'logged_at' => $this->formatDateTime($row->logged_at),
+            'gps_is_stale' => !$row->logged_at || Carbon::parse($row->logged_at)->lt(now()->subSeconds(30)),
         ];
     }
 

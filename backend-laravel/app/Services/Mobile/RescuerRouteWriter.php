@@ -86,6 +86,7 @@ class RescuerRouteWriter
         $responderId = (int) ($start['responder_id'] ?? $assignment->responder_id);
         $assignment = $this->assignmentQuery->find($assignmentId, $responderId);
         if (! $assignment) return;
+        if (!$this->isCurrentLocation($start)) return;
         $plannedRoute = $this->planRoadRoute($assignment, $start);
         if (! $plannedRoute) return;
 
@@ -93,9 +94,17 @@ class RescuerRouteWriter
             $current = DB::table('responder_assignments')->where('assignment_id', $assignmentId)->lockForUpdate()->first();
             if (! $current || in_array($current->status, ['completed', 'cancelled'], true)) return;
             $target = $this->assignmentTarget($current, (int) ($start['responder_id'] ?? $current->responder_id), $start['household_id'] ?? null);
+            if (!$this->isCurrentLocation($start)) return;
             if ($target !== $plannedRoute['target']) return; // Destination changed while the provider was routing.
             $this->savePlannedRoadRoute($assignmentId, $assignment, $start, now(), $plannedRoute);
         }, 3);
+    }
+
+    private function isCurrentLocation(array $start): bool
+    {
+        if (empty($start['_latest_location_only']) || empty($start['responder_id']) || !Schema::hasTable('responder_location_logs')) return true;
+        $latest = DB::table('responder_location_logs')->where('responder_id',$start['responder_id'])->orderByDesc('log_id')->first();
+        return !$latest || (abs((float)$latest->latitude - (float)$start['latitude']) < 0.0000001 && abs((float)$latest->longitude - (float)$start['longitude']) < 0.0000001);
     }
 
     private function savePlannedRoadRoute(int $assignmentId, object $assignment, array $start, $now, ?array $plannedRoute): void
