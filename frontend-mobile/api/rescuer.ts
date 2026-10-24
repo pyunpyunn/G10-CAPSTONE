@@ -126,3 +126,7 @@ export async function sendRadioSignal(payload: any) {
   const response = await api.post('/rescuer/radio/signal', payload);
   return response.data.data;
 }
+
+export async function getRescuerDispatchHistory(page = 1): Promise<any> {
+  return (await api.get('/rescuer/assignments/history', { params: { page } })).data.data;
+}

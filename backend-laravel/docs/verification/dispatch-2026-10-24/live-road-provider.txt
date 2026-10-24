@@ -1,0 +1,1 @@
+{"provider_returned_route":true,"geometry_points":32,"distance_km":0.62,"duration_min":2,"steps":7}

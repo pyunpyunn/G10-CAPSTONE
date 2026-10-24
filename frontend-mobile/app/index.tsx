@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Easing,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -29,6 +30,23 @@ export default function MobileLoginScreen() {
   const router = useRouter();
   const { width: viewportWidth } = useWindowDimensions();
   const logoEntrance = useRef(new Animated.Value(0)).current;
+  const scrollView = useRef<ScrollView>(null);
+  const focusedInput = useRef<number | null>(null);
+  function scrollToFocusedInput() {
+    requestAnimationFrame(() => {
+      if (focusedInput.current !== null) {
+        scrollView.current?.scrollResponderScrollNativeHandleToKeyboard(focusedInput.current, 24, true);
+      }
+    });
+  }
+  useEffect(() => {
+    const listener = Keyboard.addListener('keyboardDidShow', scrollToFocusedInput);
+    return () => listener.remove();
+  }, []);
+  function focusInput(target: number) {
+    focusedInput.current = target;
+    scrollToFocusedInput();
+  }
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [rememberPassword, setRememberPassword] = useState(false);
@@ -156,9 +174,10 @@ export default function MobileLoginScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={styles.keyboard}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scrollView} style={styles.keyboard} contentContainerStyle={styles.screen}
+          keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}>
           <Animated.View
             style={[
               styles.brandBlock,
@@ -178,6 +197,7 @@ export default function MobileLoginScreen() {
             {editingServer && <View style={styles.fieldGroup}>
               <Text style={styles.label}>Server API address</Text>
               <TextInput style={[styles.input, { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 12 }]}
+                onFocus={(event) => focusInput(event.nativeEvent.target)}
                 value={serverUrl} onChangeText={setServerUrl} autoCapitalize="none" autoCorrect={false}
                 keyboardType="url" placeholder="https://your-server/api/v1" />
               <Pressable style={{ paddingVertical: 10 }} onPress={() => {
@@ -197,6 +217,7 @@ export default function MobileLoginScreen() {
                 <TextInput
                   style={styles.input}
                   value={login}
+                  onFocus={(event) => focusInput(event.nativeEvent.target)}
                   onChangeText={value => { edited.current = true; setLogin(value); }}
                   onBlur={() => { void verifyAccountId(); }}
                   placeholder="Enter your account ID"
@@ -214,6 +235,7 @@ export default function MobileLoginScreen() {
                 <TextInput
                   style={styles.input}
                   value={password}
+                  onFocus={(event) => focusInput(event.nativeEvent.target)}
                   onChangeText={value => { edited.current = true; setPassword(value); }}
                   onBlur={() => { void verifyOldPassword(); }}
                   placeholder="Enter password"
@@ -245,8 +267,8 @@ export default function MobileLoginScreen() {
               }}
             ><Ionicons name={rememberPassword ? 'checkbox' : 'square-outline'} size={21} color={palette.brandRed} /><Text style={styles.rememberText}>Remember password</Text></Pressable>}
             {changing && <>
-              <View style={styles.fieldGroup}><Text style={styles.label}>New password</Text><View style={styles.inputShell}><TextInput style={styles.input} value={newPassword} onChangeText={setNewPassword} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" maxLength={128} editable={!loading} /></View></View>
-              <View style={styles.fieldGroup}><Text style={styles.label}>Confirm new password</Text><View style={styles.inputShell}><TextInput style={styles.input} value={confirmation} onChangeText={setConfirmation} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" maxLength={128} editable={!loading} /></View></View>
+              <View style={styles.fieldGroup}><Text style={styles.label}>New password</Text><View style={styles.inputShell}><TextInput style={styles.input} onFocus={(event) => focusInput(event.nativeEvent.target)} value={newPassword} onChangeText={setNewPassword} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" maxLength={128} editable={!loading} /></View></View>
+              <View style={styles.fieldGroup}><Text style={styles.label}>Confirm new password</Text><View style={styles.inputShell}><TextInput style={styles.input} onFocus={(event) => focusInput(event.nativeEvent.target)} value={confirmation} onChangeText={setConfirmation} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" maxLength={128} editable={!loading} /></View></View>
             </>}
             {!!notice && <Text accessibilityLiveRegion="polite" style={styles.help}>{notice}</Text>}
             {offlineSession && !changing && <Pressable style={{ paddingVertical: 14 }} onPress={() => router.push('/rescuer/navigation' as Href)}>

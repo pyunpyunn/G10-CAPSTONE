@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import '@/utils/navigationRuntime';
 
-import { palette } from '@/constants/resqTheme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { configureNotificationHandler } from '@/utils/pushNotifications';
 import { NotificationPermissionNotice } from '@/components/NotificationPermissionNotice';
@@ -25,7 +24,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <NotificationPermissionNotice statusBarBackgroundColor={hasBrandedHeader ? palette.nav : undefined} />
+      <NotificationPermissionNotice />
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="household/index" options={{ headerShown: false }} />
@@ -33,7 +32,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
-      <StatusBar style={hasBrandedHeader ? "light" : "auto"} />
+      <StatusBar style={hasBrandedHeader || pathname === '/' ? "light" : "auto"} />
     </ThemeProvider>
   );
 }

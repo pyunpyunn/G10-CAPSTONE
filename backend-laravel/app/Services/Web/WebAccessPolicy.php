@@ -39,8 +39,8 @@ class WebAccessPolicy
 
         $roleKey = $user->roleKey();
         $modules = $this->modulesFor($user);
-        if ($module === 'global_search') {
-            return $modules !== [];
+        if ($module === 'global_search' || $module === 'personnel_profiles') {
+            return $modules !== [] && ($module !== 'personnel_profiles' || $action === 'view');
         }
         if (! in_array($module, $modules, true)) {
             return false;
@@ -68,6 +68,7 @@ class WebAccessPolicy
         if ($path === 'profile') return 'profile';
         if (str_starts_with($path, 'notifications')) return 'notifications';
         if (str_starts_with($path, 'rescuers') || str_starts_with($path, 'headquarters-accounts')) return 'personnel_access';
+        if (str_starts_with($path, 'personnel-profiles/')) return 'personnel_profiles';
         if ($path === 'global-search') return 'global_search';
         if (str_starts_with($path, 'dashboard')) {
             return str_starts_with($path, 'dashboard/active-event') ? 'response_operations' : 'dashboard';

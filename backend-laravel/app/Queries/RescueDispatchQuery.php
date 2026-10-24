@@ -36,7 +36,7 @@ class RescueDispatchQuery
         $counts = ['safe_count'=>0,'evacuated_count'=>0,'unsafe_count'=>0,'pending_count'=>0,'report_count'=>0];
         if (!$ids) return $counts;
         $rows = DB::table('household_status_logs as log')->leftJoin('household_statuses as status', 'status.status_id', '=', 'log.status_id')
-            ->where('log.disaster_id', $dispatch->disaster_id)->where('log.source', 'responder_field_report')->whereIn('log.household_id', $ids)
+            ->where('log.disaster_id', $dispatch->disaster_id)->whereIn('log.source', ['responder_field_report', 'responder_completion'])->whereIn('log.household_id', $ids)
             ->orderByDesc('log.submitted_at')->orderByDesc('log.status_log_id')->get(['log.household_id','status.status_key'])->unique('household_id');
         foreach ($rows as $row) {
             $key = match ($row->status_key) {

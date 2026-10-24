@@ -34,12 +34,12 @@ export default function OfflineNavigationScreen() {
   const camera = useRef<CameraRef>(null), marker = useRef<MarkerRef>(null);
   const latest = useRef<LocationObject | null>(null), arrivalShown = useRef(false), lastStep = useRef(0);
   const rerouteAt = useRef(0), rerouting = useRef(false);
-  const points = useMemo(() => { try { return route?.polyline6 ? decodePolyline6(route.polyline6) : []; } catch { return []; } }, [route]);
+  const points = useMemo<Coordinate[]>(() => { try { return route?.polyline6 ? decodePolyline6(route.polyline6) : (route?.coordinates || []).map((point: any) => [Number(point.longitude), Number(point.latitude)] as Coordinate).filter((point: Coordinate) => Number.isFinite(point[0]) && Number.isFinite(point[1])); } catch { return []; } }, [route]);
   const steps: RouteStep[] = useMemo(() => { try { return typeof route?.steps === 'string' ? JSON.parse(route.steps) : route?.steps || []; } catch { return []; } }, [route]);
   const dispatch = snapshot?.dispatches.find((item: any) => Number(item.assignment_id) === Number(trip?.dispatchId || chosenDispatch));
-  const householdIds: string[] = (dispatch?.household_ids || [dispatch?.household_id]).filter(Boolean).map(String);
+  const householdIds: string[] = (dispatch?.household_id ? [dispatch.household_id] : []).map(String);
   const eligible = (snapshot?.routes || []).filter((item: any) => item.profile === profile && item.status === 'ready'
-    && householdIds.includes(String(item.household_id)));
+    && (!item.assignment_id || String(item.assignment_id) === String(dispatch?.assignment_id)) && householdIds.includes(String(item.household_id)));
 
   async function load() {
     const [data, manifest, active] = await Promise.all([getLocalNavigationSnapshot(), getActivePack(), activeLocalTrip()]);
@@ -47,17 +47,28 @@ export default function OfflineNavigationScreen() {
     const selectedProfile = active?.profile || profile;
     if (active) { setProfile(active.profile); setDistance(active.distanceM); }
     const selectedId = active?.dispatchId || dispatchId || chosenDispatch;
-    const selected = selectedId ? data.dispatches.find((item: any) => String(item.assignment_id) === String(selectedId))
-      : data.dispatches.find((item: any) => !['completed', 'cancelled'].includes(item.status));
+    const selected = selectNavigationAssignment(data.dispatches, selectedId);
     setChosenDispatch(selected ? String(selected.assignment_id) : '');
-    setRoute(data.routes.find((item: any) => item.profile === selectedProfile && item.status === 'ready'
-      && (selected?.household_ids || [selected?.household_id]).map(String).includes(String(item.household_id))) || null);
+    setRoute(selectAssignedRoute(data.routes, selected, selectedProfile));
     setLoaded(true);
     const status = await navigationPackStatus();
     setPackMessage(status?.state === 'complete' ? 'Map saved for offline use.' : status ? `Map ${Math.round(status.percentage)}% downloaded. Resume on Wi-Fi.` : 'Download the map on Wi-Fi before going offline.');
   }
 
   useEffect(() => { void action(async () => { await load(); try { await refreshNavigation(); } finally { await load(); } }); }, [dispatchId]);
+  useEffect(() => {
+    if (!loaded || !dispatch?.household_id || ['completed','cancelled'].includes(dispatch.status)) return;
+    let active = true;
+    void (async () => {
+      if (!(await Location.requestForegroundPermissionsAsync()).granted) throw new Error('Location permission required.');
+      const fix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      if (!active) return;
+      latest.current = fix;
+      const response = await api.post(`/rescuer/assignments/${dispatch.assignment_id}/route`, { latitude: fix.coords.latitude, longitude: fix.coords.longitude, household_id: dispatch.household_id, profile });
+      if (active) { setRoute(response.data.data); setMessage(''); }
+    })().catch(() => { if (active) setMessage('Current directions unavailable. Showing saved route.'); });
+    return () => { active = false; };
+  }, [loaded, dispatch?.assignment_id, dispatch?.household_id, dispatch?.status, profile]);
   useEffect(() => {
     setRemaining(Number(route?.distance_m || 0));
     setGuidance(steps[0]?.instruction || 'Follow the highlighted route.');
@@ -93,7 +104,7 @@ export default function OfflineNavigationScreen() {
       const progress = routeProgress(points, position), offRoute = progress.offRouteM > 40;
       if (offRoute && dispatch && route?.household_id && !rerouting.current && Date.now() > rerouteAt.current) {
         rerouting.current = true; rerouteAt.current = Date.now() + 60000;
-        void api.post(`/dispatches/${dispatch.assignment_id}/route`, { latitude: position[1], longitude: position[0], profile, household_id: route.household_id })
+        void api.post(`/rescuer/assignments/${dispatch.assignment_id}/route`, { latitude: position[1], longitude: position[0], profile, household_id: route.household_id })
           .then((response) => { setRoute(response.data.data); lastStep.current = 0; })
           .catch(() => { /* Keep the cached line and destination bearing when disconnected. */ })
           .finally(() => { rerouting.current = false; });
@@ -123,7 +134,7 @@ export default function OfflineNavigationScreen() {
 
   async function action(operation: () => Promise<unknown>) {
     setBusy(true); setMessage('');
-    try { await operation(); } catch (error: any) { setMessage(error.response?.status === 401 || error.response?.status === 403 ? 'Sign in again to load your assigned route.' : error.userMessage || error.message); } finally { setBusy(false); }
+    try { await operation(); } catch (error: any) { setMessage(error.response?.status === 401 ? 'Your session expired. Sign in again to refresh routes; saved directions remain available.' : error.response?.data?.message || error.userMessage || error.message); } finally { setBusy(false); }
   }
 
   return <View style={{ flex: 1, backgroundColor: '#e5eef2' }}>
@@ -140,6 +151,9 @@ export default function OfflineNavigationScreen() {
       {points.length >= 2 && <Text style={{ marginTop: 8 }}>{(remaining / 1000).toFixed(1)} km remaining · {Math.ceil((route?.duration_s || 0) * (remaining / Math.max(1, route?.distance_m || 1)) / 60)} min</Text>}
     </View>
     <View style={{ position: 'absolute', bottom: 24, right: 16, gap: 8 }}>
+      <Button title="Zoom in" onPress={() => camera.current?.zoomTo(18, { duration: 250 })} />
+      <Button title="Recenter route" disabled={points.length < 2} onPress={() => camera.current?.jumpTo({ center: points[0], zoom: 17, pitch: 45, bearing: bearingDegrees(points[0], points[1]) })} />
+      <Button title="Refresh route" disabled={busy} onPress={() => void action(async () => { await refreshNavigation(); await load(); })} />
       <Button title="Route options" onPress={() => setShowSettings(true)} />
     </View>
     <Modal visible={showSettings || showStatuses} animationType="slide" onRequestClose={() => { setShowSettings(false); setShowStatuses(false); }}>
@@ -154,8 +168,8 @@ export default function OfflineNavigationScreen() {
     <Text>Travel profile: {profile === 'auto' ? 'Vehicle' : 'On foot'}</Text>
     {!trip && snapshot?.dispatches.filter((item: any) => !['completed', 'cancelled'].includes(item.status)).map((item: any) => <Button key={item.assignment_id}
       title={`Dispatch ${item.assignment_code || item.assignment_id}${String(item.assignment_id) === chosenDispatch ? ' (selected)' : ''}`}
-      onPress={() => { setChosenDispatch(String(item.assignment_id)); setRoute(snapshot.routes.find((r: any) => r.profile === profile && r.status === 'ready' && (item.household_ids || [item.household_id]).map(String).includes(String(r.household_id))) || null); }} />)}
-    <Button title="Switch vehicle / foot" disabled={!!trip} onPress={() => { const value = profile === 'auto' ? 'pedestrian' : 'auto'; setProfile(value); setRoute(snapshot?.routes.find((item: any) => item.profile === value && item.status === 'ready' && householdIds.includes(String(item.household_id))) || null); lastStep.current = 0; arrivalShown.current = false; }} />
+      onPress={() => { setChosenDispatch(String(item.assignment_id)); setRoute(selectAssignedRoute(snapshot.routes, item, profile)); }} />)}
+    <Button title="Switch vehicle / foot" disabled={!!trip} onPress={() => { const value = profile === 'auto' ? 'pedestrian' : 'auto'; setProfile(value); setRoute(selectAssignedRoute(snapshot?.routes || [], dispatch, value)); lastStep.current = 0; arrivalShown.current = false; }} />
     {!trip && eligible.map((item: any) => <Button key={`${item.household_id || item.evac_center_id}:${item.profile}`}
       title={`Directions: ${snapshot?.households.find((h: any) => String(h.household_id) === String(item.household_id))?.household_name || snapshot?.evacuation_centers.find((c: any) => String(c.evacuation_center_id) === String(item.evac_center_id))?.name || item.household_id || item.evac_center_id}`}
       onPress={() => { setRoute(item); lastStep.current = 0; arrivalShown.current = false; }} />)}
@@ -164,7 +178,7 @@ export default function OfflineNavigationScreen() {
       onPress={() => void action(async () => {
         if (!(await Location.requestForegroundPermissionsAsync()).granted) throw new Error('Location permission is required.');
         const fix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        const response = await api.post(`/dispatches/${dispatch.assignment_id}/route`, {
+        const response = await api.post(`/rescuer/assignments/${dispatch.assignment_id}/route`, {
           latitude: fix.coords.latitude, longitude: fix.coords.longitude, profile, household_id: id,
         });
         setRoute(response.data.data); setRemaining(response.data.data.distance_m || 0); lastStep.current = 0; arrivalShown.current = false;

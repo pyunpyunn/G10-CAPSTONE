@@ -166,26 +166,11 @@ class GlobalSearchService
             ->limit(self::RESULT_LIMIT)
             ->get(['responder_id', 'user_id', 'responder_code', 'username', 'full_name', 'contact_number', 'duty_status'])
             ->map(function (Responder $responder): array {
-                $accountId = $responder->username ?: $responder->responder_code;
-                $roleKey = $responder->user?->roleKey();
-                $isCommitteeAccount = in_array($roleKey, [
-                    'chair',
-                    'operations_admin',
-                    'mitigation_prevention',
-                    'preparedness',
-                    'response',
-                    'recovery_rehabilitation',
-                ], true);
-                $accountType = $isCommitteeAccount
-                    || str_starts_with(strtoupper((string) $accountId), 'BDRRM-HQCC-')
-                    ? 'command_center'
-                    : 'responders';
-
                 return $this->result(
                     'responders',
                     $responder->full_name ?: $responder->responder_code,
-                    trim(($responder->responder_code ?? $accountId ?? '').' · '.($responder->duty_status ?? $responder->contact_number ?? 'Account')),
-                    '/rescuers?id='.rawurlencode((string) $responder->responder_id).'&type='.rawurlencode($accountType)
+                    trim(($responder->responder_code ?? $responder->username ?? '').' · '.($responder->duty_status ?? $responder->contact_number ?? 'Account')),
+                    '/rescuers/view?id='.rawurlencode((string) $responder->responder_id)
                 );
             })
             ->all();

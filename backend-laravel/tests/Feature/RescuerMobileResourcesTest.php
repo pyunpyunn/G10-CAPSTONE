@@ -334,6 +334,9 @@ class RescuerMobileResourcesTest extends TestCase
     {
         $response = (new RescuerMobileRouteResource((object) [
             'route_id' => 4,
+            'responder_id' => 5,
+            'household_id' => 'HH-A',
+            'navigation_steps' => '[{"instruction":"Turn right","polyline_index":1}]',
             'route_status' => null,
             'route_name' => null,
             'estimated_distance_km' => '1.25',
@@ -346,6 +349,9 @@ class RescuerMobileResourcesTest extends TestCase
 
         $this->assertSame(['data' => [
             'route_id' => 4,
+            'responder_id' => 5,
+            'household_id' => 'HH-A',
+            'steps' => [['instruction' => 'Turn right', 'polyline_index' => 1]],
             'route_status' => 'active',
             'route_name' => 'Road route',
             'distance_km' => '1.25',

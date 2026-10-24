@@ -17,6 +17,40 @@ use Illuminate\Support\Facades\DB;
 
 class MobileNavigationController extends Controller
 {
+    public function assignedRoadRoute(Request $request, int $assignmentId): JsonResponse
+    {
+        $payload = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'profile' => ['required', 'in:auto,pedestrian'],
+            'household_id' => ['required', 'string'],
+        ]);
+        $responderId = (int) DB::table('responders')->where('user_id', $request->user()->user_id)->value('responder_id');
+        $query = app(\App\Queries\RescuerAssignmentQuery::class);
+        $assignment = $query->find($assignmentId, $responderId);
+        abort_unless($assignment, 404, 'This dispatch is not assigned to your account.');
+        abort_if(in_array($assignment->status, ['completed', 'cancelled'], true), 409, 'This dispatch is closed.');
+        abort_unless((string)$assignment->household_id === (string)$payload['household_id'], 403, 'Only your current queued household can be routed.');
+        if ($payload['profile'] === 'pedestrian') {
+            $target = DB::table('geotagged_locations')->where('household_id', $payload['household_id'])
+                ->whereNotNull('latitude')->whereNotNull('longitude')->orderByDesc('updated_at')->orderByDesc('location_id')->first();
+            abort_unless($target, 404, 'The household has no location pin.');
+            try {
+                $route = app(ValhallaRoutingService::class)->routeBetween($payload, (array) $target, 'pedestrian');
+            } catch (\Throwable) {
+                abort(503, 'Walking directions are unavailable. Keep the saved route or choose vehicle directions.');
+            }
+            abort_unless($route, 422, 'No walking route is available.');
+            return response()->json(['data' => $route + ['household_id' => $payload['household_id'], 'status' => 'ready']]);
+        }
+        app(\App\Services\Mobile\RescuerRouteWriter::class)->refreshPlannedRoadRoute($assignmentId, $payload + ['responder_id' => $responderId]);
+        $route = $query->routeForAssignment($assignmentId, $responderId);
+        abort_unless($route && $route->route_polyline, 503, 'Road routing is unavailable. Retry while connected; keep any saved route.');
+        $data = (new \App\Http\Resources\RescuerMobileRouteResource($route))->resolve($request);
+        return response()->json(['data' => $data + ['profile' => 'auto', 'status' => 'ready',
+            'distance_m' => (float) $data['distance_km'] * 1000, 'duration_s' => (float) $data['duration_min'] * 60]]);
+    }
+
     public function freshRoute(Request $request, int $id, RoutePrecomputeService $routes, ValhallaRoutingService $routing): JsonResponse
     {
         $payload = $request->validate([

@@ -75,9 +75,23 @@ class GlobalSearchTest extends TestCase
         foreach (['mara santos', 'SANTOS MARA', '  Mara   Santos  '] as $query) {
             $results = app(GlobalSearchService::class)->search($query, ['responders']);
             $this->assertCount(1, $results);
-            $this->assertSame('/rescuers?id=6&type=command_center', $results[0]['href']);
+            $this->assertSame('/rescuers/view?id=6', $results[0]['href']);
         }
         $this->assertSame([], app(GlobalSearchService::class)->search('Mara Missing', ['responders']));
+    }
+
+    public function test_each_web_role_can_find_personnel_without_personnel_management_access(): void
+    {
+        foreach (WebAccessPolicy::MODULES as $roleKey => $modules) {
+            if ($modules === []) continue;
+            $user = new User(['is_active' => true]);
+            $user->setRelation('role', new Role(['role_key' => $roleKey]));
+            $request = Request::create('/api/v1/global-search', 'GET', ['q' => 'santos mara', 'types' => ['responders']]);
+            $request->setUserResolver(fn (): User => $user);
+            $response = app(GlobalSearchController::class)->index($request)->getData(true);
+            $this->assertSame('Mara Santos', $response['data']['results'][0]['title']);
+            $this->assertSame('/rescuers/view?id=6', $response['data']['results'][0]['href']);
+        }
     }
 
     public function test_operations_admin_can_search_within_its_existing_modules(): void
@@ -109,7 +123,7 @@ class GlobalSearchTest extends TestCase
 
         $this->assertCount(1, $results);
         $this->assertSame('Mara Santos', $results[0]['title']);
-        $this->assertSame('/rescuers?id=6&type=command_center', $results[0]['href']);
+        $this->assertSame('/rescuers/view?id=6', $results[0]['href']);
     }
 
     public function test_global_search_is_available_to_any_user_with_a_web_module(): void
@@ -130,7 +144,7 @@ class GlobalSearchTest extends TestCase
     public function test_api_only_searches_record_types_allowed_by_the_users_modules(): void
     {
         $search = $this->mock(GlobalSearchService::class);
-        $search->shouldReceive('search')->once()->with('storm', ['resources'])->andReturn([]);
+        $search->shouldReceive('search')->once()->with('storm', ['responders', 'resources'])->andReturn([]);
 
         $user = new User();
         $user->setAttribute('is_active', true);

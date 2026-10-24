@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
 import * as Crypto from 'expo-crypto';
+import { getStoredItem, setStoredItem } from './secureStorage';
 
 const databaseName = 'resq_navigation.db';
 const maxLocalTrips = 100;
@@ -30,77 +31,85 @@ async function database() {
   }
 
   if (!databasePromise) {
-    databasePromise = SQLite.openDatabaseAsync(databaseName).then(async (db) => {
-      await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS metadata (
-          key TEXT PRIMARY KEY NOT NULL,
-          value TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS households (
-          household_id TEXT PRIMARY KEY NOT NULL,
-          payload_json TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS dispatches (
-          dispatch_id INTEGER PRIMARY KEY NOT NULL,
-          payload_json TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS routes (
-          team_id INTEGER NOT NULL,
-          target_key TEXT NOT NULL,
-          profile TEXT NOT NULL,
-          status TEXT NOT NULL,
-          payload_json TEXT NOT NULL,
-          PRIMARY KEY (team_id, target_key, profile)
-        );
-        CREATE TABLE IF NOT EXISTS evacuation_centers (
-          center_id TEXT PRIMARY KEY NOT NULL,
-          payload_json TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS outbox (
-          client_event_id TEXT PRIMARY KEY NOT NULL,
-          type TEXT NOT NULL,
-          payload_json TEXT NOT NULL,
-          occurred_at TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          status TEXT NOT NULL DEFAULT 'pending',
-          error_message TEXT
-        );
-        CREATE INDEX IF NOT EXISTS outbox_pending_created_idx ON outbox(status, created_at);
-        CREATE TABLE IF NOT EXISTS local_trips (
-          local_trip_id TEXT PRIMARY KEY NOT NULL,
-          server_trip_id INTEGER,
-          dispatch_id INTEGER NOT NULL,
-          profile TEXT NOT NULL,
-          started_at TEXT NOT NULL,
-          ended_at TEXT,
-          distance_m REAL NOT NULL DEFAULT 0,
-          status TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS local_trips_started_idx ON local_trips(started_at DESC);
-        CREATE TABLE IF NOT EXISTS local_trip_points (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          local_trip_id TEXT NOT NULL,
-          latitude REAL NOT NULL,
-          longitude REAL NOT NULL,
-          accuracy REAL,
-          speed REAL,
-          heading REAL,
-          recorded_at TEXT NOT NULL,
-          FOREIGN KEY (local_trip_id) REFERENCES local_trips(local_trip_id) ON DELETE CASCADE
-        );
-        CREATE INDEX IF NOT EXISTS local_trip_points_trip_recorded_idx ON local_trip_points(local_trip_id, recorded_at);
-      `);
-      return db;
+    databasePromise = getStoredItem('resq_navigation_database').then((name) => SQLite.openDatabaseAsync(name || databaseName)).then(async (db) => {
+      try {
+        await db.execAsync('PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+        await db.execAsync(`
+          CREATE TABLE IF NOT EXISTS metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+          );
+          CREATE TABLE IF NOT EXISTS households (
+            household_id TEXT PRIMARY KEY NOT NULL,
+            payload_json TEXT NOT NULL
+          );
+          CREATE TABLE IF NOT EXISTS dispatches (
+            dispatch_id INTEGER PRIMARY KEY NOT NULL,
+            payload_json TEXT NOT NULL
+          );
+          CREATE TABLE IF NOT EXISTS routes (
+            team_id INTEGER NOT NULL,
+            target_key TEXT NOT NULL,
+            profile TEXT NOT NULL,
+            status TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            PRIMARY KEY (team_id, target_key, profile)
+          );
+          CREATE TABLE IF NOT EXISTS evacuation_centers (
+            center_id TEXT PRIMARY KEY NOT NULL,
+            payload_json TEXT NOT NULL
+          );
+          CREATE TABLE IF NOT EXISTS outbox (
+            client_event_id TEXT PRIMARY KEY NOT NULL,
+            type TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            occurred_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            error_message TEXT
+          );
+          CREATE INDEX IF NOT EXISTS outbox_pending_created_idx ON outbox(status, created_at);
+          CREATE TABLE IF NOT EXISTS local_trips (
+            local_trip_id TEXT PRIMARY KEY NOT NULL,
+            server_trip_id INTEGER,
+            dispatch_id INTEGER NOT NULL,
+            profile TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            ended_at TEXT,
+            distance_m REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS local_trips_started_idx ON local_trips(started_at DESC);
+          CREATE TABLE IF NOT EXISTS local_trip_points (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            local_trip_id TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            accuracy REAL,
+            speed REAL,
+            heading REAL,
+            recorded_at TEXT NOT NULL,
+            FOREIGN KEY (local_trip_id) REFERENCES local_trips(local_trip_id) ON DELETE CASCADE
+          );
+          CREATE INDEX IF NOT EXISTS local_trip_points_trip_recorded_idx ON local_trip_points(local_trip_id, recorded_at);
+        `);
+        return db;
+      } catch (error) {
+        await db.closeAsync().catch(() => {});
+        throw error;
+      }
+    }).catch((error) => {
+      databasePromise = null;
+      throw error;
     });
   }
 
   return databasePromise;
 }
 
-export async function saveBootstrap(snapshot: any) {
+async function saveBootstrapStored(snapshot: any) {
   const db = await database();
-  await db.withExclusiveTransactionAsync(async (transaction) => {
+  await withNavigationTransaction(db, async (transaction) => {
     if (snapshot.full_snapshot) {
       await transaction.execAsync('DELETE FROM households; DELETE FROM dispatches; DELETE FROM routes; DELETE FROM evacuation_centers;');
     }
@@ -163,28 +172,28 @@ export async function saveBootstrap(snapshot: any) {
   });
 }
 
-export async function getBootstrapCursor(): Promise<string | null> {
+async function getBootstrapCursorStored(): Promise<string | null> {
   const db = await database();
   const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM metadata WHERE key = ?', 'bootstrap_cursor');
   return row?.value || null;
 }
 
-export async function getActivePack(): Promise<any | null> {
+async function getActivePackStored(): Promise<any | null> {
   const db = await database();
   const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM metadata WHERE key = ?', 'active_pack');
   return row?.value ? JSON.parse(row.value) : null;
 }
 
-export async function getLocalTeam(): Promise<any | null> {
+async function getLocalTeamStored(): Promise<any | null> {
   const db = await database();
   const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM metadata WHERE key = ?', 'team');
   return row?.value ? JSON.parse(row.value) : null;
 }
 
-export async function getLocalNavigationSnapshot() {
+async function getLocalNavigationSnapshotStored() {
   const db = await database();
   const [team, households, dispatchRows, routeRows, centerRows] = await Promise.all([
-    getLocalTeam(),
+    getLocalTeamStored(),
     db.getAllAsync<{ payload_json: string }>('SELECT payload_json FROM households'),
     db.getAllAsync<{ payload_json: string }>('SELECT payload_json FROM dispatches ORDER BY dispatch_id DESC'),
     db.getAllAsync<{ payload_json: string }>('SELECT payload_json FROM routes'),
@@ -193,7 +202,7 @@ export async function getLocalNavigationSnapshot() {
 
   return {
     team,
-    status_options: JSON.parse(await navigationMetadata('status_options') || '[]'),
+    status_options: JSON.parse(await navigationMetadataStored('status_options') || '[]'),
     households: households.map((row) => JSON.parse(row.payload_json)),
     dispatches: dispatchRows.map((row) => JSON.parse(row.payload_json)),
     routes: routeRows.map((row) => JSON.parse(row.payload_json)),
@@ -201,7 +210,7 @@ export async function getLocalNavigationSnapshot() {
   };
 }
 
-export async function queueOutboxEvent(event: OutboxEvent) {
+async function queueOutboxEventStored(event: OutboxEvent) {
   const db = await database();
   await db.runAsync(
     'INSERT OR IGNORE INTO outbox (client_event_id, type, payload_json, occurred_at, created_at, status) VALUES (?, ?, ?, ?, ?, ?)',
@@ -209,7 +218,7 @@ export async function queueOutboxEvent(event: OutboxEvent) {
   );
 }
 
-export async function getPendingOutboxEvents(limit = 25): Promise<OutboxEvent[]> {
+async function getPendingOutboxEventsStored(limit = 25): Promise<OutboxEvent[]> {
   const db = await database();
   const rows = await db.getAllAsync<{ client_event_id: string; type: OutboxEvent['type']; payload_json: string; occurred_at: string }>(
     'SELECT client_event_id, type, payload_json, occurred_at FROM outbox WHERE status = ? ORDER BY created_at LIMIT ?',
@@ -223,9 +232,9 @@ export async function getPendingOutboxEvents(limit = 25): Promise<OutboxEvent[]>
   }));
 }
 
-export async function acknowledgeOutbox(acks: Array<{ client_event_id: string; status: string; error?: string; result?: { trip_id?: number } }>) {
+async function acknowledgeOutboxStored(acks: Array<{ client_event_id: string; status: string; error?: string; result?: { trip_id?: number } }>) {
   const db = await database();
-  await db.withExclusiveTransactionAsync(async (transaction) => {
+  await withNavigationTransaction(db, async (transaction) => {
     for (const ack of acks) {
       if (ack.status === 'processed') {
         const event = await transaction.getFirstAsync<{ type: string; payload_json: string }>(
@@ -246,10 +255,10 @@ export async function acknowledgeOutbox(acks: Array<{ client_event_id: string; s
   });
 }
 
-export async function createLocalTrip(dispatchId: number, profile: 'auto' | 'pedestrian', startedAt: string): Promise<LocalTrip> {
+async function createLocalTripStored(dispatchId: number, profile: 'auto' | 'pedestrian', startedAt: string): Promise<LocalTrip> {
   const db = await database();
   const localTripId = Crypto.randomUUID();
-  await db.withExclusiveTransactionAsync(async (transaction) => {
+  await withNavigationTransaction(db, async (transaction) => {
   await transaction.runAsync(
     'INSERT INTO local_trips (local_trip_id, dispatch_id, profile, started_at, distance_m, status) VALUES (?, ?, ?, ?, ?, ?)',
     localTripId, dispatchId, profile, startedAt, 0, 'recording',
@@ -261,7 +270,7 @@ export async function createLocalTrip(dispatchId: number, profile: 'auto' | 'ped
   return { localTripId, dispatchId, profile, startedAt, distanceM: 0, status: 'recording' };
 }
 
-export async function getLocalTrip(localTripId: string): Promise<LocalTrip | null> {
+async function getLocalTripStored(localTripId: string): Promise<LocalTrip | null> {
   const db = await database();
   const row = await db.getFirstAsync<any>('SELECT * FROM local_trips WHERE local_trip_id = ?', localTripId);
   return row ? {
@@ -276,7 +285,7 @@ export async function getLocalTrip(localTripId: string): Promise<LocalTrip | nul
   } : null;
 }
 
-export async function addLocalTripPoint(localTripId: string, point: {
+async function addLocalTripPointStored(localTripId: string, point: {
   latitude: number; longitude: number; accuracy: number | null; speed: number | null; heading: number | null; recordedAt: string;
 }) {
   const db = await database();
@@ -309,7 +318,7 @@ export async function addLocalTripPoint(localTripId: string, point: {
   const minimumStepM = trip.profile === 'auto' ? Math.max(7, Math.min(25, (point.speed || 0) * 2)) : 3;
   if (previous && distanceM < minimumStepM) return { accepted: false, distanceM: 0 };
   let pointId = 0;
-  await db.withExclusiveTransactionAsync(async (transaction) => {
+  await withNavigationTransaction(db, async (transaction) => {
   const result = await transaction.runAsync(
     'INSERT INTO local_trip_points (local_trip_id, latitude, longitude, accuracy, speed, heading, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     localTripId, point.latitude, point.longitude, point.accuracy, point.speed, point.heading, point.recordedAt,
@@ -326,16 +335,16 @@ export async function addLocalTripPoint(localTripId: string, point: {
   return { accepted: true, distanceM: distanceM >= minimumStepM ? distanceM : 0, pointId };
 }
 
-export async function completeLocalTrip(localTripId: string) {
+async function completeLocalTripStored(localTripId: string) {
   const db = await database(), endedAt = new Date().toISOString();
-  await db.withExclusiveTransactionAsync(async (transaction) => {
+  await withNavigationTransaction(db, async (transaction) => {
     await transaction.runAsync("UPDATE local_trips SET ended_at = ?, status = 'completed' WHERE local_trip_id = ?", endedAt, localTripId);
     await transaction.runAsync('INSERT INTO outbox (client_event_id, type, payload_json, occurred_at, created_at) VALUES (?, ?, ?, ?, ?)',
       Crypto.randomUUID(), 'trip.end', JSON.stringify({ local_trip_id: localTripId }), endedAt, endedAt);
   });
 }
 
-export async function updateLocalTrip(localTripId: string, updates: { serverTripId?: number; endedAt?: string; distanceM?: number; status?: string }) {
+async function updateLocalTripStored(localTripId: string, updates: { serverTripId?: number; endedAt?: string; distanceM?: number; status?: string }) {
   const db = await database();
   await db.runAsync(
     'UPDATE local_trips SET server_trip_id = COALESCE(?, server_trip_id), ended_at = COALESCE(?, ended_at), distance_m = COALESCE(?, distance_m), status = COALESCE(?, status) WHERE local_trip_id = ?',
@@ -343,18 +352,18 @@ export async function updateLocalTrip(localTripId: string, updates: { serverTrip
   );
 }
 
-export async function getLocalTripPoints(localTripId: string) {
+async function getLocalTripPointsStored(localTripId: string) {
   const db = await database();
   return db.getAllAsync<any>('SELECT latitude, longitude, accuracy, speed, heading, recorded_at FROM local_trip_points WHERE local_trip_id = ? ORDER BY recorded_at, id', localTripId);
 }
 
-export async function pendingEventCount() {
+async function pendingEventCountStored() {
   const db = await database();
   const row = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM outbox');
   return Number(row?.count || 0);
 }
 
-export async function navigationMetadata(key: string, value?: string | null): Promise<string | null> {
+async function navigationMetadataStored(key: string, value?: string | null): Promise<string | null> {
   const db = await database();
   if (value === null) await db.runAsync('DELETE FROM metadata WHERE key = ?', key);
   else if (value !== undefined) await db.runAsync('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)', key, value);
@@ -362,13 +371,13 @@ export async function navigationMetadata(key: string, value?: string | null): Pr
   return row?.value ?? null;
 }
 
-export async function activeLocalTrip(): Promise<LocalTrip | null> {
+async function activeLocalTripStored(): Promise<LocalTrip | null> {
   const db = await database();
   const row = await db.getFirstAsync<{ local_trip_id: string }>("SELECT local_trip_id FROM local_trips WHERE status = 'recording' LIMIT 1");
-  return row ? getLocalTrip(row.local_trip_id) : null;
+  return row ? getLocalTripStored(row.local_trip_id) : null;
 }
 
-export async function clearNavigationStorage() {
+async function clearNavigationStorageStored() {
   const db = await database();
   await db.execAsync('DELETE FROM outbox; DELETE FROM local_trip_points; DELETE FROM local_trips; DELETE FROM households; DELETE FROM routes; DELETE FROM dispatches; DELETE FROM evacuation_centers; DELETE FROM metadata;');
 }
@@ -397,3 +406,61 @@ function haversineMeters(latitude1: number, longitude1: number, latitude2: numbe
       * Math.sin(longitudeDelta / 2) ** 2;
   return earthRadiusM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
 }
+
+// Route refresh, GPS recording, sync acknowledgements and logout all share this
+// queue. Internal Stored calls stay inside the current operation rather than
+// enqueueing themselves, so nested reads cannot deadlock the queue.
+let storageWork: Promise<void> = Promise.resolve();
+function serializeStoreOperation<Args extends unknown[], Result>(operation: (...args: Args) => Promise<Result>) {
+  return (...args: Args): Promise<Result> => {
+    const next = storageWork.then(() => operation(...args));
+    storageWork = next.then(() => {}, () => {});
+    return next;
+  };
+}
+
+async function withNavigationTransaction(db: SQLite.SQLiteDatabase, task: (transaction: SQLite.SQLiteDatabase) => Promise<void>) {
+  // All public store access is serialized, so a transaction on this connection
+  // cannot include unrelated queries. Reuse its busy timeout and foreign keys.
+  await db.withTransactionAsync(() => task(db));
+}
+
+export const saveBootstrap = serializeStoreOperation(saveBootstrapStored);
+export const getBootstrapCursor = serializeStoreOperation(getBootstrapCursorStored);
+export const getActivePack = serializeStoreOperation(getActivePackStored);
+export const getLocalTeam = serializeStoreOperation(getLocalTeamStored);
+export const getLocalNavigationSnapshot = serializeStoreOperation(getLocalNavigationSnapshotStored);
+export const queueOutboxEvent = serializeStoreOperation(queueOutboxEventStored);
+export const getPendingOutboxEvents = serializeStoreOperation(getPendingOutboxEventsStored);
+export const acknowledgeOutbox = serializeStoreOperation(acknowledgeOutboxStored);
+export const createLocalTrip = serializeStoreOperation(createLocalTripStored);
+export const getLocalTrip = serializeStoreOperation(getLocalTripStored);
+export const addLocalTripPoint = serializeStoreOperation(addLocalTripPointStored);
+export const completeLocalTrip = serializeStoreOperation(completeLocalTripStored);
+export const updateLocalTrip = serializeStoreOperation(updateLocalTripStored);
+export const getLocalTripPoints = serializeStoreOperation(getLocalTripPointsStored);
+export const pendingEventCount = serializeStoreOperation(pendingEventCountStored);
+export const navigationMetadata = serializeStoreOperation(navigationMetadataStored);
+export const activeLocalTrip = serializeStoreOperation(activeLocalTripStored);
+export const clearNavigationStorage = serializeStoreOperation(clearNavigationStorageStored);
+
+// Keep each account's outbox and trips in its own database. Existing installations
+// retain the legacy database, including any events that have not synced yet.
+async function selectNavigationAccountStored(userId: string) {
+  const owner = await navigationMetadataStored('owner');
+  if (owner && String(owner) !== String(userId)) {
+    const db = await database();
+    await db.closeAsync();
+    databasePromise = null;
+    const legacyOwner = await getStoredItem('resq_navigation_legacy_owner');
+    if (!legacyOwner && !(await getStoredItem('resq_navigation_database'))) {
+      await setStoredItem('resq_navigation_legacy_owner', String(owner));
+    }
+    const originalOwner = legacyOwner || String(owner);
+    const name = originalOwner === String(userId) ? databaseName
+      : `resq_navigation_${Array.from(String(userId)).map((char) => char.codePointAt(0)!.toString(16)).join('_')}.db`;
+    await setStoredItem('resq_navigation_database', name);
+  }
+  await navigationMetadataStored('owner', String(userId));
+}
+export const selectNavigationAccount = serializeStoreOperation(selectNavigationAccountStored);

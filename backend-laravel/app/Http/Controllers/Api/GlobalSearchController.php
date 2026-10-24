@@ -36,7 +36,8 @@ class GlobalSearchController extends Controller
         $modules = $user ? app(WebAccessPolicy::class)->modulesFor($user->loadMissing('role')) : [];
         $types = array_values(array_filter(
             $validated['types'] ?? GlobalSearchService::TYPES,
-            fn (string $type): bool => in_array(self::TYPE_MODULES[$type], $modules, true)
+            fn (string $type): bool => ($type === 'responders' && $modules !== [])
+                || in_array(self::TYPE_MODULES[$type], $modules, true)
         ));
 
         return response()->json([
