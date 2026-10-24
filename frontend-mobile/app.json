@@ -92,6 +92,16 @@
             "useLegacyPackaging": true
           }
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow RESQPERATION to track your active rescue location.",
+          "locationAlwaysAndWhenInUsePermission": "Allow RESQPERATION to keep HQ updated during an active rescue, including while the screen is locked.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
+        }
       ]
     ],
     "experiments": {

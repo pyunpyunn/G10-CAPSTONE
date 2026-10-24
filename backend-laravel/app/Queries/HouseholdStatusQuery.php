@@ -552,13 +552,6 @@ class HouseholdStatusQuery
             ->groupBy('member_id')
             ->map(fn ($memberDevices) => $memberDevices->first());
 
-        // A household-wide report applies when no individual assessment exists.
-        $householdReport = Schema::hasTable('household_status_logs') && Schema::hasTable('household_statuses')
-            ? $this->getLatestLogs(collect([$householdId]), $eventId)->get($householdId) : null;
-        $householdDisplayStatus = $householdReport
-            ? $this->presenter->formatStatus($householdReport->status_key, $householdReport->status_label, $this->presenter->decodeJson($householdReport->notes))
-            : $this->householdMemberDisplayStatus($householdId, $eventId);
-
         // Use the query builder here because some deployed household-member
         // tables predate the soft-delete column.  The Eloquent model's
         // SoftDeletes global scope would otherwise add an invalid
@@ -595,7 +588,7 @@ class HouseholdStatusQuery
                 'ms.color_hex as status_color',
                 'mds.updated_at as status_updated_at',
             ])
-            ->map(function (object $member) use ($devicesByMember, $householdDisplayStatus, $householdReport): array {
+            ->map(function (object $member) use ($devicesByMember): array {
                 $device = $devicesByMember->get($member->member_id);
                 $fullName = trim(implode(' ', array_filter([
                     $member->first_name,
@@ -605,11 +598,11 @@ class HouseholdStatusQuery
                 $hasIndividualReport = $member->status_key && ! in_array($member->status_key, ['unknown', 'unchecked', 'unreported'], true);
                 $status = $hasIndividualReport
                     ? $this->presenter->formatStatus($member->status_key, $member->status_label)
-                    : ($householdDisplayStatus ?? [
+                    : [
                         'key' => 'unchecked',
                         'label' => 'No report',
                         'tone' => 'gray',
-                    ]);
+                    ];
 
                 return [
                     'member_id' => $member->member_id,
@@ -622,8 +615,8 @@ class HouseholdStatusQuery
                     'is_senior' => (bool) $member->is_senior,
                     'is_pregnant' => (bool) $member->is_pregnant,
                     'status' => $status,
-                    'status_scope' => $hasIndividualReport ? 'member' : ($householdReport ? 'household' : null),
-                    'status_updated_at' => $this->presenter->formatDateTime($hasIndividualReport ? $member->status_updated_at : $householdReport?->submitted_at),
+                    'status_scope' => $hasIndividualReport ? 'member' : null,
+                    'status_updated_at' => $this->presenter->formatDateTime($hasIndividualReport ? $member->status_updated_at : null),
                     'risk_flags' => $this->presenter->memberRiskFlags($member),
                     'device_name' => $device['device_name'] ?? 'No assigned mobile',
                     'device_platform' => $device['platform'] ?? null,

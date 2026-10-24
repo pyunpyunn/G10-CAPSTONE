@@ -40,7 +40,7 @@ class MappingService
         [, $eventId, $hasEvent] = $this->eventContext($request);
         $focus = $this->barangayProfile->mapFocus();
         return $hasEvent ? [
-            'rescue_teams' => $this->insideBoundary($this->query->getRescueTeamMarkers($eventId), $focus),
+            'rescue_teams' => $this->query->getRescueTeamMarkers($eventId),
             'dispatch_routes' => $this->routesInsideBoundary($this->query->getDispatchRoutes($eventId), $focus),
         ] : [];
     }
@@ -62,7 +62,7 @@ class MappingService
             $full,
             $full && $hasEvent ? $this->query->getHouseholdGeotags($request, $eventId, $focus['barangay_id']) : [],
             $full && $hasEvent ? $sites : [],
-            $full && $hasEvent ? $this->insideBoundary($this->query->getRescueTeamMarkers($eventId), $focus) : [],
+            $full && $hasEvent ? $this->query->getRescueTeamMarkers($eventId) : [],
             $full && $hasEvent ? $this->routesInsideBoundary($this->query->getDispatchRoutes($eventId), $focus) : [],
             $this->query->getPurokOptions($focus['barangay_id']),
         );
