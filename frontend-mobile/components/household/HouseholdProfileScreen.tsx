@@ -1,17 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Svg, { Circle, Path } from 'react-native-svg';
 import * as Location from 'expo-location';
+import { MobileLeafletMap } from '@/components/MobileLeafletMap';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { storageUrl } from '@/api/client';
-import { reverseGeocodeAddress } from '@/utils/geocoding';
 import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection, HouseholdStatusIcon, statusColor } from './HouseholdUI';
 
 type ProfileProps = {
   overview: any;
-  onUpdateGeotag: (payload: any) => Promise<void>;
+  onUpdateGeotag: (payload: any) => Promise<any>;
   onUploadPhoto: (payload: FormData) => Promise<void>;
   onRemovePhoto: () => Promise<void>;
   onUploadMemberPhoto: (memberId: string, payload: FormData) => Promise<void>;
@@ -40,7 +40,15 @@ export function HouseholdProfileScreen({
   const geotag = overview.geotag || null;
   const currentStatus = overview.current_status || null;
   const selectedMemberId = String(user.member_id || members[0]?.member_id || '');
+  const [geotagMapVisible, setGeotagMapVisible] = useState(false);
   const [savingGeotag, setSavingGeotag] = useState(false);
+  const [geotagMessage, setGeotagMessage] = useState(
+    household.sitio_id
+      ? `Saved in ${household.sitio_name || 'your registered sitio'}.`
+      : 'Sitio will be identified automatically when verified boundary data is available.'
+  );
+  const geotagVersion = useRef(0);
+  const geotagSaveQueue = useRef<Promise<void>>(Promise.resolve());
   const [photoBusy, setPhotoBusy] = useState(false);
   const [pendingPhoto, setPendingPhoto] = useState<PendingPhoto | null>(null);
   const [showPhotoPreview, setShowPhotoPreview] = useState(false);
@@ -173,6 +181,47 @@ export function HouseholdProfileScreen({
     setShowPhotoView(true);
   }
 
+  function saveGeotagPoint(point: { latitude: number; longitude: number; accuracy_m?: number | null }) {
+    const version = ++geotagVersion.current;
+    setSavingGeotag(true);
+    setGeotagMessage('Saving your household coordinates...');
+
+    const save = geotagSaveQueue.current.catch(() => undefined).then(async () => {
+      if (version !== geotagVersion.current) return;
+      const result = await onUpdateGeotag({
+        ...point,
+        address_label: 'Household geotag in Mambaling',
+        member_id: selectedMemberId || undefined,
+        relationship_to_family: selectedMember?.relationship || 'Household member',
+      });
+      if (version !== geotagVersion.current) return;
+      const classification = result?.data?.geographic_classification;
+      const unresolvedPurok = classification?.status === 'purok_boundaries_missing'
+        ? 'The location was saved, but verified Mambaling sitio/purok boundaries are not configured, so sitio_id could not be assigned automatically.'
+        : classification?.status === 'no_boundary_match'
+          ? 'The location was saved, but no verified Mambaling sitio boundary contains this pin.'
+          : classification?.status === 'ambiguous_boundary'
+            ? 'The location was saved, but the pin falls on an overlapping or shared boundary.'
+            : 'The location was saved, but sitio_id could not be assigned automatically.';
+      setGeotagMessage(classification?.status === 'matched'
+        ? `Saved in ${classification.sitio_name} - ${classification.purok_name}.`
+        : unresolvedPurok);
+    }).catch((error: any) => {
+      if (version === geotagVersion.current) {
+        setGeotagMessage(error?.response?.data?.message || 'Could not save the location. Choose a point inside Mambaling and try again.');
+      }
+    }).finally(() => {
+      if (version === geotagVersion.current) setSavingGeotag(false);
+    });
+
+    geotagSaveQueue.current = save;
+    return save;
+  }
+
+  function handleMapPoint(point: { latitude: number; longitude: number }) {
+    void saveGeotagPoint(point);
+  }
+
   async function handleUpdateGeotag() {
     const permission = await Location.requestForegroundPermissionsAsync();
 
@@ -185,20 +234,13 @@ export function HouseholdProfileScreen({
 
     try {
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const address = await reverseGeocodeAddress(location.coords.latitude, location.coords.longitude);
-
-      await onUpdateGeotag({
+      await saveGeotagPoint({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         accuracy_m: location.coords.accuracy,
-        address_label: address.label || household.address || 'Updated household geotag',
-        member_id: selectedMemberId || undefined,
-        relationship_to_family: selectedMember?.relationship || 'Household member',
       });
-
-      Alert.alert('Geotag updated', 'Your household geotag was saved to the shared database.');
     } catch {
-      // Parent screen already shows the API error message.
+      Alert.alert('Unable to update geotag', 'Your location could not be saved. Choose a point inside Mambaling and try again.');
     } finally {
       setSavingGeotag(false);
     }
@@ -367,18 +409,47 @@ export function HouseholdProfileScreen({
         ) : (
           <HouseholdEmpty icon="location-outline" title="No geotag saved yet" />
         )}
-        <HouseholdButton
-          label={savingGeotag ? 'Updating geotag...' : 'Update geotag from GPS'}
-          icon="locate-outline"
-          tone="light"
-          disabled={savingGeotag}
-          onPress={handleUpdateGeotag}
-        />
+        <View style={styles.mapActions}>
+          <View style={styles.gpsButton}>
+            <HouseholdButton
+              label={savingGeotag ? 'Saving geotag...' : 'Update geotag from GPS'}
+              icon="locate-outline"
+              tone="light"
+              disabled={savingGeotag}
+              onPress={handleUpdateGeotag}
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: geotagMapVisible }}
+            style={[styles.mapOptionButton, geotagMapVisible && styles.mapOptionButtonActive]}
+            disabled={savingGeotag}
+            onPress={() => setGeotagMapVisible((visible) => !visible)}
+          >
+            <Ionicons name="map-outline" size={18} color={geotagMapVisible ? '#fff' : palette.nav} />
+            <Text style={[styles.mapOptionText, geotagMapVisible && styles.mapOptionTextActive]}>
+              {geotagMapVisible ? 'Close map' : 'Choose on map'}
+            </Text>
+          </Pressable>
+        </View>
+        {geotagMapVisible ? (
+          <MobileLeafletMap
+            markers={[]}
+            routes={[]}
+            geotagPicker
+            geotagMode="center"
+            onMapPress={handleMapPoint}
+            onPinMoving={() => setGeotagMessage('Move the map until the center pin is over your home, then stop to save.')}
+            height={300}
+          />
+        ) : null}
+        <Text style={styles.geotagMessage} accessibilityLiveRegion="polite">{geotagMessage}</Text>
       </View>
 
       <View style={styles.card}>
         <HouseholdSection title="Household details" />
         <InfoRow icon="business-outline" label="Barangay" value={household.barangay || 'Not recorded'} />
+        <InfoRow icon="location-outline" label="Sitio" value={household.sitio_name || 'Not recorded'} />
         <InfoRow icon="home-outline" label="Address" value={household.address || 'Not recorded'} />
         <InfoRow icon="people-outline" label="Members" value={String(memberCount)} />
         <InfoRow icon="call-outline" label="Contact" value={household.contact_number || user.contact_number || 'Not recorded'} />
@@ -849,5 +920,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.md,
     backgroundColor: '#3a7d5718',
+  },
+  geotagMessage: {
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  mapActions: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.sm,
+    width: '100%',
+  },
+  gpsButton: {
+    flex: 1,
+  },
+  mapOptionButton: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: palette.card,
+  },
+  mapOptionButtonActive: {
+    borderColor: palette.navActive,
+    backgroundColor: palette.navActive,
+  },
+  mapOptionText: {
+    color: palette.nav,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  mapOptionTextActive: {
+    color: '#fff',
   },
 });
