@@ -4,9 +4,9 @@ import { getPersonnelProfile } from '../api/rescuerApi'
 import { webHomeForUser } from '../utils/personnelAccess'
 import '../styles/personnel-profile.css'
 
-export default function PersonnelProfilePage() {
+export default function PersonnelProfilePage({ requestedId }) {
   const [params] = useSearchParams()
-  const id = params.get('id')
+  const id = requestedId || params.get('id')
   const { user } = useOutletContext()
   const navigate = useNavigate()
   const [revision, setRevision] = useState(0)

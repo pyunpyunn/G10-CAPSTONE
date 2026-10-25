@@ -4,7 +4,7 @@ import { getMobileDeviceUuid } from '@/utils/mobileDeviceRegistration';
 import axios from 'axios';
 import { Platform } from 'react-native';
 import { randomUUID } from 'expo-crypto';
-import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
+import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { selectNavigationAccount } from '@/utils/navigationStore';
 
 type Role = {
@@ -24,6 +24,42 @@ type LoginResponse = {
   token: string;
   user: AuthUser;
 };
+
+const sessionRoleKey = 'resqperation_mobile_role';
+const mobileRoles = ['household_resident', 'rescuer', 'tl', 'tm'];
+
+export async function restoreMobileSession(): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  const token = await getStoredItem('resqperation_mobile_token');
+  if (!token) return null;
+
+  const cachedRole = await getStoredItem(sessionRoleKey);
+  try {
+    const response = await api.get('/auth/me', { timeout: 8000 });
+    const role = response.data?.data?.role?.role_key || response.data?.role?.role_key;
+    if (mobileRoles.includes(role)) {
+      await setStoredItem(sessionRoleKey, role);
+      return role;
+    }
+    await clearToken();
+    await deleteStoredItem(sessionRoleKey);
+    return null;
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      await clearToken();
+      await deleteStoredItem(sessionRoleKey);
+      return null;
+    }
+
+    if (mobileRoles.includes(cachedRole || '')) {
+      return cachedRole;
+    }
+
+    await clearToken();
+    await deleteStoredItem(sessionRoleKey);
+    return null;
+  }
+}
 
 export async function loginMobile(login: string, password: string) {
   const response = await api.post<LoginResponse>('/auth/login', {
@@ -62,6 +98,7 @@ export async function loginMobile(login: string, password: string) {
 
   if (Platform.OS !== 'web') {
     await selectNavigationAccount(String(response.data.user.user_id));
+    await setStoredItem(sessionRoleKey, response.data.user.role?.role_key || '');
   }
   await saveToken(token);
 
@@ -85,17 +122,41 @@ export async function logoutMobile() {
     try {
       await logoutPushIdentity().catch(() => {});
     } finally {
-      await clearToken();
+      try {
+        await clearToken();
+      } finally {
+        await deleteStoredItem(sessionRoleKey);
+      }
     }
   }
 }
 
-export async function changePasswordWithOldPassword(payload: { login: string; current_password: string; password: string; password_confirmation: string }) {
-  return (await api.post('/auth/password-recovery/reset', payload)).data;
+export async function lookupHouseholdRecoveryContact(login: string) {
+  return (await api.post<{ masked_contact_number: string }>('/auth/password-recovery/household/lookup', {
+    login: login.trim(),
+  })).data;
 }
 
-export async function verifyPasswordChange(login: string, currentPassword?: string) {
-  const payload: { login: string; current_password?: string } = { login: login.trim() };
-  if (currentPassword !== undefined) payload.current_password = currentPassword;
-  return (await api.post('/auth/password-recovery/verify', payload)).data;
+export async function validateHouseholdRecoveryContact(login: string, contact_number: string) {
+  return (await api.post('/auth/password-recovery/household/validate-contact', {
+    login: login.trim(),
+    contact_number: contact_number.trim(),
+  })).data;
+}
+
+export async function sendHouseholdRecoveryCode(login: string, contact_number: string) {
+  return (await api.post('/auth/password-recovery/household/send-code', {
+    login: login.trim(),
+    contact_number: contact_number.trim(),
+  })).data;
+}
+
+export async function resetHouseholdPassword(payload: {
+  login: string;
+  contact_number: string;
+  code: string;
+  password: string;
+  password_confirmation: string;
+}) {
+  return (await api.post<{ household_id: string; account_identifier: string }>('/auth/password-recovery/household/reset', payload)).data;
 }

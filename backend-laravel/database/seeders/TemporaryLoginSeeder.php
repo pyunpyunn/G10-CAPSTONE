@@ -90,7 +90,7 @@ class TemporaryLoginSeeder extends Seeder
             DB::table('responders')->insert([
                 'responder_id' => 2024035502,
                 'user_id' => 'USR-RESCUER-BDRRM-SAR-001',
-                'responder_code' => 'BDRRM-SAR-001',
+                'responder_code' => app(\App\Services\Mobile\RescuerAccountSupport::class)->nextResponderCode($sarTeamId),
                 'created_by_admin_id' => 'USR-HQ-2024035500',
                 'team_id' => $sarTeamId,
                 'username' => 'BDRRM-SAR-001',

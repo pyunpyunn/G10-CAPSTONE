@@ -45,6 +45,28 @@ export async function verifyPasswordChange(login, currentPassword) {
   return (await api.post('/auth/password-recovery/verify', payload)).data
 }
 
+export async function lookupHouseholdRecoveryContact(login) {
+  return (await api.post('/auth/password-recovery/household/lookup', { login: login.trim() })).data
+}
+
+export async function validateHouseholdRecoveryContact(login, contact_number) {
+  return (await api.post('/auth/password-recovery/household/validate-contact', {
+    login: login.trim(),
+    contact_number: contact_number.trim(),
+  })).data
+}
+
+export async function sendHouseholdRecoveryCode(login, contact_number) {
+  return (await api.post('/auth/password-recovery/household/send-code', {
+    login: login.trim(),
+    contact_number: contact_number.trim(),
+  })).data
+}
+
+export async function resetHouseholdPassword(payload) {
+  return (await api.post('/auth/password-recovery/household/reset', payload)).data
+}
+
 // Errors stay in a separate popup; textContent keeps server messages as plain text.
 export function showAuthError(message) {
   const existing = document.getElementById('auth-error-popup')

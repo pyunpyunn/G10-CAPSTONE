@@ -22,8 +22,8 @@ export default function FieldCommunicationPanel({ compact = false, recordingsOnl
   const [playbackError, setPlaybackError] = useState('')
   const audioRef = useRef(null)
   const loader = useCallback(() => getFieldCommunications({ page, per_page: 20, search, channel,
-    ...(recordingsOnly ? { recordings_only: 1 } : {}), ...(team === 'all' ? {} : { team_id: team }) }), [page, search, channel, team, recordingsOnly])
-  const { data, loading, error, refresh } = useModuleData(loader, ['dispatch', 'communications', 'disasters'])
+    ...(compact ? { compact: 1 } : {}), ...(recordingsOnly ? { recordings_only: 1 } : {}), ...(team === 'all' ? {} : { team_id: team }) }), [page, search, channel, team, recordingsOnly, compact])
+  const { data, loading, error, refresh } = useModuleData(loader, ['dispatch', 'communications', 'disasters'], { keepPreviousData: true })
   useEffect(() => {
     pollingSubscriptions += 1
     if (!pollingTimer) pollingTimer = window.setInterval(() => {
@@ -69,7 +69,7 @@ export default function FieldCommunicationPanel({ compact = false, recordingsOnl
     const responder = data?.responders?.find((item) => String(item.responder_id) === String(log.responder_id))
     return responder ? <DispatchStatusBadge status={responder.status} /> : null
   }
-  const messages = loading ? <div className="empty-reference" role="status">Loading recordings…</div> : !logs.length && !error ? <div className="empty-reference">No recordings</div> : logs.map((log) => compact ?
+  const messages = loading && !data ? <div className="empty-reference" role="status">Loading recordings…</div> : !logs.length && !error ? <div className="empty-reference">No recordings</div> : logs.map((log) => compact ?
     <div className="bub" key={log.id}><span className="av" style={{ '--c':['#3b82f6','#8b5cf6','#f59e0b','#0ea5e9'][Math.max(0, teams.findIndex((item) => String(item.team_id) === String(log.team_id))) % 4] }}>{initials(log.responder_name)}</span><div className="bb"><div className="bh"><b><PersonnelProfileLink id={log.responder_id}>{log.responder_name}</PersonnelProfileLink></b><span>{log.team_name} · {log.timestamp}</span><span className="sp" />{badge(log)}</div>{log.audio_url ? voices(log) : <span className="mu">No voice clip</span>}</div></div> :
     <div className="msg" key={log.id}><span className="av" style={{ '--c':['#3b82f6','#8b5cf6','#f59e0b','#0ea5e9'][Math.max(0, teams.findIndex((item) => String(item.team_id) === String(log.team_id))) % 4] }}>{initials(log.responder_name)}</span><div className="mb2"><div className="mt2"><b><PersonnelProfileLink id={log.responder_id}>{log.responder_name}</PersonnelProfileLink></b><span className="tg2">{log.team_name}</span><span className="tm">{log.timestamp}</span></div><div className="bb2">{log.audio_url ? voices(log) : <p>{log.message}</p>}{badge(log)}</div></div></div>)
   const pagination = Number(data?.meta?.last_page) > 1 ? <PaginationBar reference meta={data.meta} onPageChange={(value) => { stop(); setPage(value) }} label="communications" /> : null

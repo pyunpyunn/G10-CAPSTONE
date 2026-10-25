@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { clearToken, getApiServerUrl, setApiServerUrl } from '@/api/client';
 import { getRememberedCredentials, saveRememberedCredentials, getStoredItem } from '@/utils/secureStorage';
 import { navigationMetadata } from '@/utils/navigationStore';
-import { loginMobile, changePasswordWithOldPassword, verifyPasswordChange } from '@/api/auth';
+import { loginMobile, restoreMobileSession } from '@/api/auth';
 import { palette, spacing } from '@/constants/resqTheme';
 import { askStandardMobilePermissions } from '@/utils/mobilePermissions';
 import ResQperationLogo from '@/components/ResQperationLogo';
@@ -79,59 +79,31 @@ export default function MobileLoginScreen() {
   }, [logoEntrance]);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(Platform.OS !== 'web');
 
-  const [changing, setChanging] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmation, setConfirmation] = useState('');
-  const [notice, setNotice] = useState('');
-
-  function switchMode() {
-    edited.current = true;
-    setChanging(value => !value); setPassword(''); setNewPassword(''); setConfirmation(''); setShowPassword(false); setNotice('');
-  }
-
-  async function verifyAccountId() {
-    const accountId = login.trim();
-    if (!accountId) return;
-
-    try {
-      await verifyPasswordChange(accountId);
-    } catch (error: any) {
-      Alert.alert('Account ID not found', authErrorMessage(error, 'The account ID could not be verified.'));
-    }
-  }
-
-  async function verifyOldPassword() {
-    const accountId = login.trim();
-    if (!changing || !accountId || !password) return;
-
-    try {
-      await verifyPasswordChange(accountId, password);
-    } catch (error: any) {
-      Alert.alert('Old password not verified', authErrorMessage(error, 'The account ID or old password is incorrect.'));
-    }
-  }
-
-  async function handlePasswordChange() {
-    setLoading(true); setNotice('');
-    try {
-      if (!login.trim()) throw new Error('Enter your account ID.');
-      if (!password) throw new Error('Enter your old password.');
-      await verifyPasswordChange(login, password);
-      if (newPassword.length < 8 || newPassword.length > 128) throw new Error('New password must contain 8 to 128 characters.');
-      if (newPassword !== confirmation) throw new Error('New password and confirmation do not match.');
-      if (newPassword === password) throw new Error('Choose a different new password.');
-      await changePasswordWithOldPassword({ login: login.trim(), current_password: password, password: newPassword, password_confirmation: confirmation });
+  useEffect(() => {
+    let active = true;
+    async function restoreSession() {
       try {
-        const saved = await getRememberedCredentials();
-        if (saved?.login === login.trim()) await saveRememberedCredentials(login, newPassword, rememberPassword);
-      } catch { Alert.alert('Password changed', 'The password was changed, but the saved password could not be updated. Enter the new password on your next login.'); }
-      await clearToken(); setChanging(false); setPassword(''); setNewPassword(''); setConfirmation(''); setShowPassword(false);
-      setNotice('Password changed. Sign in with your new password.');
-    } catch (error: any) {
-      Alert.alert('Password change failed', authErrorMessage(error, 'Unable to change password. Try again.'));
-    } finally { setLoading(false); }
-  }
+        const role = await restoreMobileSession();
+        if (!active) return;
+        if (role === 'household_resident') {
+          router.replace('/household' as Href);
+          return;
+        }
+        if (role === 'rescuer' || role === 'tl' || role === 'tm') {
+          router.replace('/rescuer' as Href);
+          return;
+        }
+      } catch {
+        // Keep the login screen available if session restoration fails.
+      } finally {
+        if (active) setCheckingSession(false);
+      }
+    }
+    void restoreSession();
+    return () => { active = false; };
+  }, [router]);
 
   async function handleLogin() {
     if (!login.trim() || !password.trim()) {
@@ -170,6 +142,15 @@ export default function MobileLoginScreen() {
     }
   }
 
+  if (checkingSession) {
+    return (
+      <SafeAreaView style={styles.sessionChecking}>
+        <ActivityIndicator size="large" color={palette.navText} />
+        <Text style={styles.sessionCheckingText}>Restoring your session...</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -206,8 +187,7 @@ export default function MobileLoginScreen() {
               }}><Text style={{ color: '#1358a4', fontWeight: '700' }}>Save server address</Text></Pressable>
             </View>}
             <View style={styles.headerBlock}>
-              <Text style={styles.title}>{changing ? 'Change password' : 'Sign in'}</Text>
-              {changing && <Text style={styles.help}>Verify your old password, then choose a different password of at least 8 characters. All devices will be signed out.</Text>}
+              <Text style={styles.title}>Sign in</Text>
             </View>
 
             <View style={styles.fieldGroup}>
@@ -219,7 +199,6 @@ export default function MobileLoginScreen() {
                   value={login}
                   onFocus={(event) => focusInput(event.nativeEvent.target)}
                   onChangeText={value => { edited.current = true; setLogin(value); }}
-                  onBlur={() => { void verifyAccountId(); }}
                   placeholder="Enter your account ID"
                   placeholderTextColor={palette.navMuted}
                   autoCapitalize="none"
@@ -229,7 +208,7 @@ export default function MobileLoginScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>{changing ? 'Old password' : 'Password'}</Text>
+              <Text style={styles.label}>Password</Text>
               <View style={styles.inputShell}>
                 <Ionicons name="lock-closed-outline" size={19} color={palette.navMuted} />
                 <TextInput
@@ -237,7 +216,6 @@ export default function MobileLoginScreen() {
                   value={password}
                   onFocus={(event) => focusInput(event.nativeEvent.target)}
                   onChangeText={value => { edited.current = true; setPassword(value); }}
-                  onBlur={() => { void verifyOldPassword(); }}
                   placeholder="Enter password"
                   placeholderTextColor={palette.navMuted}
                   secureTextEntry={!showPassword}
@@ -256,7 +234,7 @@ export default function MobileLoginScreen() {
               </View>
             </View>
 
-            {!changing && Platform.OS !== 'web' && <Pressable
+            {Platform.OS !== 'web' && <Pressable
               style={styles.rememberRow}
               disabled={loading}
               accessibilityRole="checkbox"
@@ -266,33 +244,27 @@ export default function MobileLoginScreen() {
                 if (!next) void saveRememberedCredentials('', '', false).catch(() => Alert.alert('Unable to forget password', 'Please try again.'));
               }}
             ><Ionicons name={rememberPassword ? 'checkbox' : 'square-outline'} size={21} color={palette.brandRed} /><Text style={styles.rememberText}>Remember password</Text></Pressable>}
-            {changing && <>
-              <View style={styles.fieldGroup}><Text style={styles.label}>New password</Text><View style={styles.inputShell}><TextInput style={styles.input} onFocus={(event) => focusInput(event.nativeEvent.target)} value={newPassword} onChangeText={setNewPassword} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" maxLength={128} editable={!loading} /></View></View>
-              <View style={styles.fieldGroup}><Text style={styles.label}>Confirm new password</Text><View style={styles.inputShell}><TextInput style={styles.input} onFocus={(event) => focusInput(event.nativeEvent.target)} value={confirmation} onChangeText={setConfirmation} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" maxLength={128} editable={!loading} /></View></View>
-            </>}
-            {!!notice && <Text accessibilityLiveRegion="polite" style={styles.help}>{notice}</Text>}
-            {offlineSession && !changing && <Pressable style={{ paddingVertical: 14 }} onPress={() => router.push('/rescuer/navigation' as Href)}>
+            {offlineSession && <Pressable style={{ paddingVertical: 14 }} onPress={() => router.push('/rescuer/navigation' as Href)}>
               <Text style={{ color: '#1358a4', fontWeight: '700' }}>Open saved offline navigation</Text>
             </Pressable>}
-            <Pressable style={({ pressed }) => [styles.button, pressed && !loading && styles.buttonPressed, loading && styles.buttonDisabled]} onPress={changing ? handlePasswordChange : handleLogin} disabled={loading}>
+            <Pressable style={({ pressed }) => [styles.button, pressed && !loading && styles.buttonPressed, loading && styles.buttonDisabled]} onPress={handleLogin} disabled={loading}>
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
-                  <Ionicons name={changing ? 'key-outline' : 'log-in-outline'} size={19} color="#fff" />
-                  <Text style={styles.buttonText}>{changing ? 'Update password' : 'Login'}</Text>
+                  <Ionicons name="log-in-outline" size={19} color="#fff" />
+                  <Text style={styles.buttonText}>Login</Text>
                 </>
               )}
             </Pressable>
 
             <Pressable
-              style={({ pressed }) => [styles.modeButton, pressed && styles.modeButtonPressed]}
+              style={{ alignItems: 'center', paddingVertical: spacing.sm }}
               disabled={loading}
-              onPress={switchMode}
+              onPress={() => router.push(`/forgot-password?login=${encodeURIComponent(login.trim())}` as Href)}
             >
-              <Text style={styles.modeButtonText}>{changing ? 'Back to sign in' : 'Change password'}</Text>
+              <Text style={styles.modeButtonText}>Forgot password?</Text>
             </Pressable>
-            {changing && <Text style={styles.recoveryHelp}>Forgot your old password? Contact HQ/Admin for account recovery.</Text>}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -301,12 +273,27 @@ export default function MobileLoginScreen() {
 }
 
 function authErrorMessage(error: any, fallback: string) {
+  if (error?.response?.status === 429) {
+    return 'Unable to log in right now. Please wait a moment and try again.';
+  }
   const responseData = error?.response?.data;
   const validationMessage = Object.values(responseData?.errors || {}).flat()[0];
   return String(validationMessage || error?.userMessage || responseData?.message || error?.message || fallback);
 }
 
 const styles = StyleSheet.create({
+  sessionChecking: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    backgroundColor: palette.nav,
+  },
+  sessionCheckingText: {
+    color: palette.navMuted,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 2 },
   help: { color: palette.navMuted, fontSize: 13, lineHeight: 20 },
   safe: {
@@ -402,23 +389,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  modeButton: {
-    minHeight: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#385670',
-    borderRadius: 11,
-    backgroundColor: '#1a3047',
-  },
-  modeButtonPressed: {
-    backgroundColor: palette.navHover,
-  },
   modeButtonText: {
     color: palette.navText,
     fontSize: 13,
     fontWeight: '700',
   },
   rememberText: { color: palette.navMuted, fontSize: 13, fontWeight: '600' },
-  recoveryHelp: { color: palette.navMuted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
 });

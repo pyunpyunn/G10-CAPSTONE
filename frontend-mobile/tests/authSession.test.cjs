@@ -4,12 +4,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
-function fixture({ offline = false, conflict = false } = {}) {
+function fixture({ offline = false, conflict = false, restoreStatus = 200, restoreRole = 'household_resident' } = {}) {
   const calls = [], storage = new Map();
   let binds = 0;
   const mocks = {
     './client': {
-      api: { defaults: { baseURL: 'https://example.test/api/v1' }, async post(url, payload) {
+      api: {
+        defaults: { baseURL: 'https://example.test/api/v1' },
+        async get(url) {
+          calls.push(url);
+          if (offline) throw new Error('network unavailable');
+          if (restoreStatus === 401) throw { response: { status: 401 } };
+          return { data: { data: { role: { role_key: restoreRole } } } };
+        },
+        async post(url, payload) {
         calls.push(url);
         if (url === '/auth/logout' && offline) throw new Error('offline');
         if (url === '/mobile/login') {
@@ -22,7 +30,11 @@ function fixture({ offline = false, conflict = false } = {}) {
     },
     '@/utils/pushNotifications': { async logoutPushIdentity() { calls.push('push-logout'); if (offline) throw new Error('offline'); } },
     '@/utils/mobileDeviceRegistration': { async getMobileDeviceUuid() { return 'legacy-device'; } },
-    '@/utils/secureStorage': { async getStoredItem(key) { return storage.get(key); }, async setStoredItem(key, value) { storage.set(key, value); } },
+    '@/utils/secureStorage': {
+      async getStoredItem(key) { return storage.get(key); },
+      async setStoredItem(key, value) { storage.set(key, value); },
+      async deleteStoredItem(key) { calls.push(['delete-storage', key]); storage.delete(key); },
+    },
     'expo-crypto': { randomUUID() { return 'new-device'; } },
     'axios': { async post() { calls.push('revoke-temporary-token'); } },
     'react-native': { Platform: { OS: 'android' } },
@@ -39,7 +51,8 @@ function fixture({ offline = false, conflict = false } = {}) {
 test('logout suspends sync, stops recording, and clears credentials even when offline', async () => {
   const { auth, calls } = fixture({ offline: true });
   await auth.logoutMobile();
-  assert.deepEqual(calls, ['stop-live-gps', 'suspend-sync', 'end-trip', '/auth/logout', 'push-logout', 'clear-token']);
+  assert.deepEqual(calls, ['stop-live-gps', 'suspend-sync', 'end-trip', '/auth/logout', 'push-logout', 'clear-token',
+    ['delete-storage', 'resqperation_mobile_role']]);
 });
 test('rescuer login normalizes numeric account IDs and saves the device token', async () => {
   const { auth, calls } = fixture();
@@ -53,4 +66,29 @@ test('another account can sign in on a shared phone using a separate device regi
   assert.equal(calls.filter((item) => item === '/mobile/login').length, 2);
   assert.equal(storage.get('resq_device_account_123'), 'rescuer-new-device');
   assert.equal(storage.get('resq_rescuer_device_uuid'), 'rescuer-new-device');
+});
+
+test('startup restores an authenticated household session from its saved token', async () => {
+  const { auth, calls, storage } = fixture();
+  storage.set('resqperation_mobile_token', 'valid-token');
+  assert.equal(await auth.restoreMobileSession(), 'household_resident');
+  assert.deepEqual(calls, ['/auth/me']);
+  assert.equal(storage.get('resqperation_mobile_role'), 'household_resident');
+});
+
+test('startup keeps the cached mobile session when the server is temporarily unreachable', async () => {
+  const { auth, calls, storage } = fixture({ offline: true });
+  storage.set('resqperation_mobile_token', 'valid-token');
+  storage.set('resqperation_mobile_role', 'rescuer');
+  assert.equal(await auth.restoreMobileSession(), 'rescuer');
+  assert.deepEqual(calls, ['/auth/me']);
+  assert.equal(storage.get('resqperation_mobile_token'), 'valid-token');
+});
+
+test('startup clears an expired server session instead of restoring it', async () => {
+  const { auth, calls, storage } = fixture({ restoreStatus: 401 });
+  storage.set('resqperation_mobile_token', 'expired-token');
+  storage.set('resqperation_mobile_role', 'household_resident');
+  assert.equal(await auth.restoreMobileSession(), null);
+  assert.deepEqual(calls, ['/auth/me', 'clear-token', ['delete-storage', 'resqperation_mobile_role']]);
 });

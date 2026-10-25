@@ -1,9 +1,8 @@
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUpRight, CircleDot } from 'lucide-react'
-import { getFieldReports } from '../api/dispatchApi'
 import { ResponseOperationsLayout } from '../components/ui/PageHeader'
-import { useModuleData } from '../utils/useModuleData'
+import { useWorkspaceQuery } from '../state/operationsApi'
 import PaginationBar from '../components/ui/PaginationBar'
 import Modal from '../components/ui/Modal'
 import DispatchStatusBadge from '../components/dispatch/DispatchStatusBadge'
@@ -11,10 +10,12 @@ import DispatchStatusBadge from '../components/dispatch/DispatchStatusBadge'
 export default function FieldReportsPage() {
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
-  const [selected, setSelected] = useState(null)
-  const loader = useCallback(() => getFieldReports({ status, page, per_page: 20 }), [status, page])
-  const { data, error, loading } = useModuleData(loader, ['field-reports', 'households', 'dispatch', 'disasters'])
+  const [selection, setSelected] = useState(null)
+  const { currentData: data, error: queryError, isFetching, isLoading } = useWorkspaceQuery({ view: 'reports', status, page, per_page: 20 })
+  const error = queryError?.message
+  const loading = isLoading || (isFetching && !data)
   const reports = Array.isArray(data?.reports) ? data.reports : []
+  const selected = reports.find(row => row.status_log_id === selection?.status_log_id) || selection
   const badge = (row) => <DispatchStatusBadge status={row.assignment_status} />
   const location = (row) => row.latitude != null && row.longitude != null ? `${row.latitude}, ${row.longitude}` : null
   return <ResponseOperationsLayout active={2}><section className="pg on">

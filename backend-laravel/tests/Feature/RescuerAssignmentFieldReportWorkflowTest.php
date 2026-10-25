@@ -296,6 +296,29 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $this->assertDatabaseCount('responder_field_reports', 3);
     }
 
+    public function test_last_household_completion_closes_dispatch_despite_an_empty_support_queue(): void
+    {
+        DB::table('responder_assignments')->where('assignment_id', 7)->update([
+            'route_notes' => json_encode(['selected_responder_ids' => [5, 6],
+                'responder_households' => [5 => ['HH-4'], 6 => []],
+                'responder_statuses' => [5 => 'dispatched', 6 => 'on_scene']]),
+        ]);
+        DB::table('responders')->where('responder_id', 6)->update(['is_deployed' => true, 'duty_status' => 'deployed']);
+        $workflow = app(RescuerAssignmentWorkflow::class);
+        $this->arrive($workflow);
+        $workflow->updateAssignmentStatus($this->request(['status' => 'completed',
+            'household_id' => 'HH-4', 'household_status_key' => 'safe']), 7);
+        $assignment = DB::table('responder_assignments')->where('assignment_id', 7)->first();
+        $this->assertSame('completed', $assignment->status);
+        $this->assertNotNull($assignment->completed_at);
+        $notes = json_decode($assignment->route_notes, true);
+        $this->assertSame('completed', $notes['responder_statuses'][6]);
+        $this->assertDatabaseHas('responders', ['responder_id' => 6, 'is_deployed' => false, 'duty_status' => 'available']);
+        $summary = app(\App\Queries\RescueDispatchQuery::class)->summary('EVT-1', []);
+        $this->assertSame(1, $summary['completed']);
+        $this->assertSame(0, $summary['active_units']);
+    }
+
     public function test_web_ranking_dispatch_mobile_routes_optional_reports_and_queue_completion(): void
     {
         $this->lifecycleFixture();
