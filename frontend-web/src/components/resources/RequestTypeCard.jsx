@@ -1,65 +1,65 @@
-import {
-  Activity,
-  ArrowRight,
-  Boxes,
-  LifeBuoy,
-  Package,
-  ShieldAlert,
-  Sparkles,
-} from 'lucide-react'
+import { Box, MapPin } from 'lucide-react'
 
-// Helper to pick category visual styles & icons
-function getCategoryMeta(categoryKey = '') {
-  const key = String(categoryKey).toLowerCase()
-  if (key.includes('food') || key.includes('water')) {
-    return {
-      label: 'Food & Water',
-      pillClass: 'cat-pill-food',
-      icon: Package,
-    }
-  }
-  if (key.includes('med') || key.includes('health')) {
-    return {
-      label: 'Medical Supplies',
-      pillClass: 'cat-pill-medical',
-      icon: Activity,
-    }
-  }
-  if (key.includes('rescue') || key.includes('gear')) {
-    return {
-      label: 'Rescue Equipment',
-      pillClass: 'cat-pill-rescue',
-      icon: LifeBuoy,
-    }
-  }
-  if (key.includes('shelter') || key.includes('tent')) {
-    return {
-      label: 'Emergency Shelter',
-      pillClass: 'cat-pill-shelter',
-      icon: ShieldAlert,
-    }
-  }
-  return {
-    label: categoryKey || 'Relief Goods',
-    pillClass: 'cat-pill-default',
-    icon: Boxes,
-  }
+// Helper to format category labels to match clean sentence case styling
+function getCategoryDisplay(item) {
+  const catKey = String(
+    item.category_key || item.category || item.category_label || '',
+  ).toLowerCase()
+  if (catKey.includes('med') || catKey.includes('health')) return 'Medical kit'
+  if (catKey.includes('food') || catKey.includes('water')) return 'Food & water'
+  if (catKey.includes('comm')) return 'Communications'
+  if (catKey.includes('rescue') || catKey.includes('gear')) return 'Rescue equipment'
+  if (catKey.includes('shelter') || catKey.includes('tent')) return 'Emergency shelter'
+  return item.category_label || item.category || 'Relief goods'
 }
 
 export default function RequestTypeCard({
   item,
+  isSelected = false,
   onSelect,
   onRequestNow,
 }) {
-  const isOutOfStock = Boolean(item.is_out_of_stock || item.quantity <= 0)
-  const isLowStock = !isOutOfStock && Number(item.quantity) <= 20
+  const quantity = Number(item.quantity ?? 0)
+  const isOutOfStock = Boolean(item.is_out_of_stock || quantity <= 0)
+  const isLowStock = !isOutOfStock && quantity <= 20
   const isNew = Boolean(item.is_new)
-  const categoryMeta = getCategoryMeta(item.category_key || item.category)
-  const CategoryIcon = categoryMeta.icon
+
+  // Clean location string (e.g. remove "Evacuation: " prefix)
+  const rawLocation =
+    item.storage_location ||
+    item.location ||
+    item.depot_location ||
+    item.detail ||
+    'Barangay Resource Depot'
+  const locationText = rawLocation.replace(/^Evacuation:\s*/i, '')
+
+  // Code / SKU identifier
+  const itemSku =
+    item.sku ||
+    item.tracking_reference ||
+    (item.id
+      ? String(item.id).startsWith('TA-') || String(item.id).startsWith('RR-')
+        ? item.id
+        : `TA-${item.id}`
+      : '')
+
+  const categoryLabel = getCategoryDisplay(item)
+
+  // Progress bar fill calculation matching design proportions (5 boxes -> 25%, 8 kits -> 40%, 10 boxes -> 50%)
+  let progressPercent = 0
+  if (isOutOfStock) {
+    progressPercent = 0
+  } else if (isLowStock) {
+    progressPercent = Math.max(15, Math.min(85, Math.round((quantity / 20) * 100)))
+  } else {
+    progressPercent = 100
+  }
 
   return (
     <article
-      className={`human-catalog-card ${isOutOfStock ? 'is-out-of-stock' : 'is-in-stock'}`}
+      className={`human-catalog-card ${isOutOfStock ? 'is-out-of-stock' : 'is-in-stock'} ${
+        isSelected ? 'is-selected' : ''
+      }`}
       onClick={() => onSelect?.(item)}
       role="button"
       tabIndex={0}
@@ -69,79 +69,73 @@ export default function RequestTypeCard({
           onSelect?.(item)
         }
       }}
-      aria-label={`${item.name || item.label} - ${isOutOfStock ? 'Out of stock' : `${item.quantity} available in stock`}`}
+      aria-label={`${item.name || item.label} - ${
+        isOutOfStock ? 'Out of stock' : `${quantity} available in stock`
+      }`}
     >
-      {/* Header Bar: Category Avatar & Live Stock Tag */}
+      {/* Header Bar: Category with soft-blue cube icon & clean Stock Pill */}
       <div className="card-header-bar">
-        <div className="card-identity-group">
-          <div className={`card-category-avatar ${categoryMeta.pillClass}`}>
-            <CategoryIcon size={18} />
+        <div className="card-category-badge">
+          <div className="card-category-icon-box">
+            <Box size={16} strokeWidth={2.2} />
           </div>
-          <div className="card-category-text">
-            <span className="card-category-name">{item.category_label || categoryMeta.label}</span>
-            {item.sku && <span className="card-sku-text" title={`SKU: ${item.sku}`}>{item.sku}</span>}
-          </div>
+          <span className="card-category-label">{categoryLabel}</span>
         </div>
 
         <div className="card-status-wrapper">
           {isOutOfStock ? (
-            <span className="human-stock-pill pill-out">
-              <span className="stock-dot" />
-              <span>Out of stock</span>
-            </span>
+            <span className="human-stock-pill pill-out">Out of stock</span>
           ) : isLowStock ? (
-            <span className="human-stock-pill pill-low">
-              <span className="stock-dot" />
-              <span>Low stock ({item.quantity})</span>
-            </span>
+            <span className="human-stock-pill pill-low">Low stock</span>
           ) : (
-            <span className="human-stock-pill pill-in">
-              <span className="stock-dot" />
-              <span>In stock</span>
+            <span className="human-stock-pill pill-in">In stock</span>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content: Title with optional 'New' badge, SKU code, and Location */}
+      <div className="card-main-content">
+        <div className="card-title-row">
+          <h3 className="human-card-title" title={item.name || item.label}>
+            {item.name || item.label}
+          </h3>
+          {isNew && (
+            <span className="human-new-badge" title="Newly registered catalog item">
+              New
             </span>
           )}
         </div>
-      </div>
 
-      {/* Main Content: Title & Natural Human Metadata */}
-      <div className="card-main-content">
-        <h3 className="human-card-title" title={item.name || item.label}>
-          {item.name || item.label}
-        </h3>
+        {itemSku && <div className="card-code-text">{itemSku}</div>}
 
-        {/* Clean, comma/dot separated metadata without pill fatigue */}
-        <div className="human-meta-line">
-          <span>{item.storage_location || 'Warehouse Depot'}</span>
-          <span className="meta-bullet">·</span>
-          <span>{item.type || 'Consumable'}</span>
-          {item.expiration_date && (
-            <>
-              <span className="meta-bullet">·</span>
-              <span className="meta-exp">Exp: {item.expiration_date}</span>
-            </>
-          )}
+        <div className="card-location-row" title={`Location: ${locationText}`}>
+          <MapPin size={13} className="card-location-icon" />
+          <span className="card-location-text">{locationText}</span>
         </div>
       </div>
 
-      {/* Natural Inventory Availability (No inner bordered box!) */}
-      <div className="human-inventory-row">
-        <div className="human-inventory-count">
-          <span className="count-number">
-            {isOutOfStock ? 0 : Number(item.quantity).toLocaleString()}
+      {/* Availability Count & Colored Progress Bar Meter */}
+      <div className="card-stock-meter-section">
+        <div className="card-stock-count-row">
+          <span className="stock-count-number">
+            {isOutOfStock ? 0 : quantity.toLocaleString()}
           </span>
-          <span className="count-unit">
+          <span className="stock-count-unit">
             {item.unit || 'units'} available
           </span>
         </div>
 
-        {isNew && (
-          <span className="human-new-badge" title="Newly registered catalog item">
-            <Sparkles size={11} /> New
-          </span>
-        )}
+        <div className="card-stock-progress-track">
+          <div
+            className={`card-stock-progress-fill ${
+              isOutOfStock ? 'fill-out' : isLowStock ? 'fill-low' : 'fill-in'
+            }`}
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
       </div>
 
-      {/* Card Actions Footer */}
+      {/* Card Actions Footer: View specs & Request buttons */}
       <div className="human-card-footer">
         <button
           type="button"
@@ -150,9 +144,9 @@ export default function RequestTypeCard({
             e.stopPropagation()
             onSelect?.(item)
           }}
-          title="View resource specifications"
+          title="View specs"
         >
-          View Specs
+          View specs
         </button>
 
         {isOutOfStock ? (
@@ -161,7 +155,7 @@ export default function RequestTypeCard({
             className="btn-human-disabled"
             disabled
           >
-            Out of Stock
+            Out of stock
           </button>
         ) : (
           <button
@@ -171,10 +165,9 @@ export default function RequestTypeCard({
               e.stopPropagation()
               onRequestNow?.(item)
             }}
-            title="Create a resource request for this item"
+            title="Request"
           >
-            <span>Request</span>
-            <ArrowRight size={13} />
+            Request
           </button>
         )}
       </div>
