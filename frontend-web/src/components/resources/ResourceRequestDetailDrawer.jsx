@@ -49,7 +49,11 @@ export default function ResourceRequestDetailDrawer({
             </span>
             <h2 className="rr-drawer-title">
               Request #{request.request_id}
-              {request.need?.type ? ` · ${request.need.type}` : ''}
+              {request.need?.item_name
+                ? ` · ${request.need.item_name}`
+                : request.need?.type
+                ? ` · ${request.need.type}`
+                : ''}
             </h2>
           </div>
           <button className="rr-drawer-close" type="button" onClick={onClose} aria-label="Close drawer">
@@ -235,6 +239,7 @@ export default function ResourceRequestDetailDrawer({
                       <span className="rr-detail-value">{request.requester.contact}</span>
                     </div>
                   )}
+<<<<<<< HEAD
                 </div>
               </div>
 
@@ -353,11 +358,133 @@ export default function ResourceRequestDetailDrawer({
               {/* Handoff Audit Timeline */}
               <div className="rr-drawer-section">
                 <h3 className="rr-section-title"><Clock size={16} /> TrackingAid Handoff Timeline</h3>
+=======
+                </div>
+              </div>
+
+              {/* Validation & Verification Record */}
+              <div className="rr-drawer-section">
+                <h3 className="rr-section-title"><FileCheck2 size={16} /> Validation Record</h3>
+                <div className="rr-detail-group">
+                  <div className="rr-detail-row">
+                    <span className="rr-detail-label">Validation Decision:</span>
+                    <span className="rr-detail-value">
+                      <Badge tone={validationTone(request.validation?.key)}>
+                        {request.validation?.label || 'Needs Validation'}
+                      </Badge>
+                    </span>
+                  </div>
+                  {request.validated_by_user_id && (
+                    <div className="rr-detail-row">
+                      <span className="rr-detail-label">Validated By:</span>
+                      <span className="rr-detail-value">{request.validated_by_user_id}</span>
+                    </div>
+                  )}
+                  {request.validated_at && (
+                    <div className="rr-detail-row">
+                      <span className="rr-detail-label">Validated At:</span>
+                      <span className="rr-detail-value">{request.validated_at}</span>
+                    </div>
+                  )}
+                </div>
+
+                {request.validation_notes && (
+                  <div style={{ marginTop: '8px' }}>
+                    <span className="rr-detail-label" style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
+                      Validation / Auditor Notes:
+                    </span>
+                    <div className="rr-notes-box">
+                      {request.validation_notes}
+                    </div>
+                  </div>
+                )}
+
+                {request.missing_information && (
+                  <div style={{ marginTop: '8px' }}>
+                    <span className="rr-detail-label" style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#dc2626' }}>
+                      Missing Details / Return Reason:
+                    </span>
+                    <div className="rr-notes-box" style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}>
+                      {request.missing_information}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* TRACKING MODE: Status Tracking & Logistics Stream ONLY */
+            <>
+              {/* Item & Logistics Overview */}
+              <div className="rr-drawer-section">
+                <h3 className="rr-section-title">
+                  <Truck size={16} />
+                  <span>Logistics & Fulfillment Stream</span>
+                </h3>
+                <div className="rr-stream-card">
+                  <div className="rr-stream-row">
+                    <span className="rr-stream-label">Tracking Reference:</span>
+                    <span className="rr-stream-ref">
+                      {request.handoff?.tracking_reference || request.tracking_reference || 'Ref: Auto-synced'}
+                    </span>
+                  </div>
+                  <div className="rr-stream-row">
+                    <span className="rr-stream-label">Relief Supplies:</span>
+                    <span className="rr-stream-val">
+                      {formatQuantityText(request.need?.quantity, request.need?.unit, request.need?.quantity_text)} of {request.need?.item_name || request.need?.type || 'Supplies'}
+                    </span>
+                  </div>
+                  <div className="rr-stream-row">
+                    <span className="rr-stream-label">Delivery Destination:</span>
+                    <div className="rr-stream-dest">
+                      <span className="rr-dest-title">{request.area?.label || 'General Relief Hub'}</span>
+                      {request.area?.meta && (
+                        <span className="rr-dest-meta" title={request.area.meta}>
+                          {request.area.meta}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rr-stream-row">
+                    <span className="rr-stream-label">TrackingAid Shared DB:</span>
+                    <span className={`rr-sync-pill ${request.handoff?.tracking_reference ? 'connected' : 'pending'}`}>
+                      <span className={`rr-sync-dot ${request.handoff?.tracking_reference ? 'live' : 'pulse'}`} />
+                      <span>
+                        {request.handoff?.tracking_reference
+                          ? `Connected (${request.handoff.tracking_reference})`
+                          : 'Pending Sync to Shared DB'}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '4px' }}>
+                  <a
+                    href="/mapping"
+                    className="rr-map-btn"
+                  >
+                    <MapPin size={13} style={{ color: '#2563eb' }} />
+                    <span>View Evacuation Center on Live Map</span>
+                    <ExternalLink size={12} style={{ opacity: 0.6 }} />
+                  </a>
+                </div>
+              </div>
+
+              {/* Handoff Audit Timeline */}
+              <div className="rr-drawer-section">
+                <h3 className="rr-section-title">
+                  <Clock size={16} />
+                  <span>TrackingAid Handoff Timeline</span>
+                </h3>
+>>>>>>> 280f60972fc9aee233f9e420d198b23d0170580d
                 <div className="rr-timeline">
                   {/* Step 1: Logged */}
                   <div className="rr-timeline-item completed">
                     <div className="rr-timeline-icon">
+<<<<<<< HEAD
                       <CheckCircle2 size={16} />
+=======
+                      <CheckCircle2 size={15} />
+>>>>>>> 280f60972fc9aee233f9e420d198b23d0170580d
                     </div>
                     <div className="rr-timeline-content">
                       <div className="rr-timeline-title">Request Registered</div>
@@ -368,7 +495,11 @@ export default function ResourceRequestDetailDrawer({
                   {/* Step 2: Validated */}
                   <div className={`rr-timeline-item ${handoffStep >= 2 ? 'completed' : 'active'}`}>
                     <div className="rr-timeline-icon">
+<<<<<<< HEAD
                       {handoffStep >= 2 ? <UserCheck size={16} /> : <Clock size={16} />}
+=======
+                      {handoffStep >= 2 ? <UserCheck size={15} /> : <Clock size={15} />}
+>>>>>>> 280f60972fc9aee233f9e420d198b23d0170580d
                     </div>
                     <div className="rr-timeline-content">
                       <div className="rr-timeline-title">HQ Command Validation</div>
@@ -381,7 +512,11 @@ export default function ResourceRequestDetailDrawer({
                   {/* Step 3: Forwarded */}
                   <div className={`rr-timeline-item ${handoffStep >= 3 ? 'completed' : handoffStep === 2 ? 'active' : ''}`}>
                     <div className="rr-timeline-icon">
+<<<<<<< HEAD
                       {handoffStep >= 3 ? <Send size={16} /> : <ExternalLink size={16} />}
+=======
+                      {handoffStep >= 3 ? <Send size={15} /> : <ExternalLink size={15} />}
+>>>>>>> 280f60972fc9aee233f9e420d198b23d0170580d
                     </div>
                     <div className="rr-timeline-content">
                       <div className="rr-timeline-title">TrackingAid Shared DB Forwarding</div>
@@ -396,7 +531,11 @@ export default function ResourceRequestDetailDrawer({
                   {/* Step 4: Dispatch/Fulfill */}
                   <div className={`rr-timeline-item ${handoffStep >= 4 ? 'completed' : ''}`}>
                     <div className="rr-timeline-icon">
+<<<<<<< HEAD
                       <ShieldCheck size={16} />
+=======
+                      <ShieldCheck size={15} />
+>>>>>>> 280f60972fc9aee233f9e420d198b23d0170580d
                     </div>
                     <div className="rr-timeline-content">
                       <div className="rr-timeline-title">Dispatch & Fulfilled</div>
@@ -519,4 +658,32 @@ function validationTone(validationStatus) {
     forwarded: 'green',
     returned: 'red',
   }[validationStatus] || 'gray'
+}
+
+function formatQuantityText(quantity, unit, fallbackText) {
+  const qty = Number(quantity) || (fallbackText ? parseInt(fallbackText, 10) : 1) || 1
+  let rawUnit = unit
+  if (!rawUnit && fallbackText) {
+    rawUnit = fallbackText.replace(/^[0-9.]+\s*/, '')
+  }
+  rawUnit = (rawUnit || 'units').trim().toLowerCase()
+
+  if (qty === 1) {
+    if (rawUnit === 'kits' || rawUnit === 'kit') return '1 kit'
+    if (rawUnit === 'boxes' || rawUnit === 'box') return '1 box'
+    if (rawUnit === 'packs' || rawUnit === 'pack') return '1 pack'
+    if (rawUnit === 'pieces' || rawUnit === 'pcs' || rawUnit === 'piece') return '1 piece'
+    if (rawUnit === 'units' || rawUnit === 'unit') return '1 unit'
+    if (rawUnit.endsWith('s') && !rawUnit.endsWith('ss')) return `1 ${rawUnit.slice(0, -1)}`
+    return `1 ${rawUnit}`
+  }
+
+  // Plural
+  if (rawUnit === 'kit') return `${qty} kits`
+  if (rawUnit === 'box') return `${qty} boxes`
+  if (rawUnit === 'pack') return `${qty} packs`
+  if (rawUnit === 'piece') return `${qty} pieces`
+  if (rawUnit === 'unit') return `${qty} units`
+  if (!rawUnit.endsWith('s')) return `${qty} ${rawUnit}s`
+  return `${qty} ${rawUnit}`
 }

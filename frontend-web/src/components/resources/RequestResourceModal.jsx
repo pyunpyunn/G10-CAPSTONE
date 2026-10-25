@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
-  Boxes,
+  Box,
   Building,
 
   Loader2,
   MapPin,
   Minus,
-  Package,
   Plus,
   Send,
   Tag,
@@ -32,6 +31,27 @@ function formatUnit(qty, unit = 'units') {
     if (u.toLowerCase().endsWith('s') && !u.toLowerCase().endsWith('ss')) return u.slice(0, -1)
   }
   return u
+}
+
+function formatItemTitle(name = '') {
+  if (!name) return 'Relief Resource'
+  // Auto-capitalize first letter of each word if lowercase
+  return name
+    .split(' ')
+    .map((w) => (w.length > 0 ? w.charAt(0).toUpperCase() + w.slice(1) : ''))
+    .join(' ')
+}
+
+function getCategoryDisplay(item) {
+  const catKey = String(
+    item?.category_key || item?.category || item?.category_label || '',
+  ).toLowerCase()
+  if (catKey.includes('med') || catKey.includes('health')) return 'Medical kit'
+  if (catKey.includes('food') || catKey.includes('water')) return 'Food & water'
+  if (catKey.includes('comm')) return 'Communications'
+  if (catKey.includes('rescue') || catKey.includes('gear')) return 'Rescue equipment'
+  if (catKey.includes('shelter') || catKey.includes('tent')) return 'Emergency shelter'
+  return item?.category_label || item?.category || 'Relief Goods'
 }
 
 export default function RequestResourceModal({
@@ -71,13 +91,15 @@ export default function RequestResourceModal({
         if (workspace.status === 'fulfilled' && workspace.value?.options) {
           const opts = workspace.value.options
           setCenters(opts.evacuation_centers || [])
-          setUrgencies(opts.urgencies || [])
+          if (opts.urgencies?.length > 0) {
+            setUrgencies(opts.urgencies)
+            const medUrgency = opts.urgencies.find((u) => u.key === 'medium')
+            if (medUrgency) {
+              setUrgencyId(medUrgency.urgency_id)
+            }
+          }
           if (opts.evacuation_centers?.length > 0) {
             setEvacuationCenterId(opts.evacuation_centers[0].evacuation_center_id)
-          }
-          const medUrgency = opts.urgencies?.find((u) => u.key === 'medium')
-          if (medUrgency) {
-            setUrgencyId(medUrgency.urgency_id)
           }
         }
 
@@ -108,6 +130,10 @@ export default function RequestResourceModal({
   }, [isOpen, item])
 
   const maxAvailable = Math.max(1, Number(item?.quantity) || 1)
+<<<<<<< HEAD
+=======
+  const isLowStock = maxAvailable <= 20
+>>>>>>> 280f60972fc9aee233f9e420d198b23d0170580d
 
   const selectedCenter = useMemo(() => {
     if (!centers || centers.length === 0) return null
@@ -138,6 +164,28 @@ export default function RequestResourceModal({
     ? Math.min(100, Math.round((Math.min(displayQty, maxAvailable) / maxAvailable) * 100))
     : 0
 
+<<<<<<< HEAD
+=======
+  // Formatting values for visual display
+  const titleDisplay = formatItemTitle(item.name || item.label)
+  const categoryLabel = getCategoryDisplay(item)
+  const rawLocation =
+    item.storage_location ||
+    item.location ||
+    item.depot_location ||
+    item.detail ||
+    'Barangay Resource Depot'
+  const locationText = rawLocation.replace(/^Evacuation:\s*/i, '')
+  const itemSku =
+    item.sku ||
+    item.tracking_reference ||
+    (item.id
+      ? String(item.id).startsWith('TA-') || String(item.id).startsWith('RR-')
+        ? item.id
+        : `TA-${item.id}`
+      : '')
+
+>>>>>>> 280f60972fc9aee233f9e420d198b23d0170580d
   const handleClose = () => {
     setFieldErrors({})
     setError(null)
@@ -235,19 +283,25 @@ export default function RequestResourceModal({
       setSubmitting(true)
       setError(null)
 
+      const rawItemId = item.id
+      const validItemId =
+        Number.isInteger(Number(rawItemId)) && Number(rawItemId) > 0
+          ? Number(rawItemId)
+          : null
+
       const payload = {
         request_source: 'hq_desk',
         request_category: 'resource',
-        resource_type: item.category_label || item.category || 'Food & Water',
-        item_name: item.name || item.label,
+        resource_type: categoryLabel,
+        item_name: titleDisplay,
         quantity: reqQty,
         unit: item.unit || 'units',
         requested_by: requestedBy.trim(),
         evacuation_center_id: evacuationCenterId || null,
         urgency_id: urgencyId ? Number(urgencyId) : 2,
-        description: description.trim() || `Disaster resource request for ${item.name || item.label} (${item.sku || ''})`,
-        sku: item.sku || null,
-        item_id: item.id || null,
+        description: description.trim() || `Disaster resource request for ${titleDisplay} (${itemSku})`,
+        sku: itemSku || null,
+        item_id: validItemId,
       }
 
       const res = await createResourceRequest(payload)
@@ -271,7 +325,7 @@ export default function RequestResourceModal({
         className="modal-panel request-resource-modal"
         role="dialog"
         aria-modal="true"
-        aria-label={`Request ${item.name}`}
+        aria-label={`Request ${titleDisplay}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Head */}
@@ -279,13 +333,13 @@ export default function RequestResourceModal({
           <div className="modal-title-with-badge">
             <div className="modal-title-left">
               <div className="modal-icon-badge">
-                <Package size={17} />
+                <Box size={17} strokeWidth={2.2} />
               </div>
               <h2>Request Resource</h2>
             </div>
-            <span className="badge-stock-info">
+            <span className={`badge-stock-info ${isLowStock ? 'stock-low' : 'stock-in'}`}>
               <span className="stock-dot" />
-              {Number(item.quantity).toLocaleString()} {formatUnit(item.quantity, item.unit)} Available
+              {maxAvailable.toLocaleString()} {formatUnit(maxAvailable, item.unit)} Available
             </span>
           </div>
           <button
@@ -308,23 +362,25 @@ export default function RequestResourceModal({
               </div>
             )}
 
-            {/* Selected Item Summary Card */}
+            {/* Selected Item Summary Card (Unified with Catalog Card aesthetic) */}
             <div className="req-item-preview-box">
               <div className="preview-top">
-                <span className="preview-cat-badge">{item.category_label || item.category}</span>
-                {item.sku && (
+                <span className="preview-cat-badge">Resource</span>
+                {itemSku && (
                   <code className="preview-sku">
-                    <Tag size={11} /> {item.sku}
+                    <Tag size={11} /> {itemSku}
                   </code>
                 )}
               </div>
-              <h3 className="preview-title">{item.name || item.label}</h3>
+
+              <h3 className="preview-title">{titleDisplay}</h3>
+
               <div className="preview-meta">
                 <span className="preview-meta-item">
-                  <MapPin size={12} /> {item.storage_location || 'Warehouse Depot'}
+                  <MapPin size={12} className="meta-pin-icon" /> {locationText}
                 </span>
                 <span className="preview-meta-item">
-                  <Boxes size={12} /> {item.type || 'Consumable'}
+                  <Box size={12} /> {categoryLabel}
                 </span>
               </div>
 
@@ -335,6 +391,7 @@ export default function RequestResourceModal({
                     Requesting <strong>{displayQty}</strong> of {maxAvailable} {formatUnit(maxAvailable, item.unit)}
                   </span>
                   {isOverStock ? (
+<<<<<<< HEAD
                     <span
                       className="req-remaining-badge is-deficit"
                       style={{
@@ -349,6 +406,15 @@ export default function RequestResourceModal({
                     >
                       <AlertCircle size={11} /> Over by {excessQty} {formatUnit(excessQty, item.unit)}
                     </span>
+=======
+                    <span className="req-remaining-badge is-deficit">
+                      <AlertCircle size={11} /> Over by {excessQty} {formatUnit(excessQty, item.unit)}
+                    </span>
+                  ) : remainingStock === 0 ? (
+                    <span className="req-remaining-badge is-full">
+                      All available stock requested
+                    </span>
+>>>>>>> 280f60972fc9aee233f9e420d198b23d0170580d
                   ) : (
                     <span className="req-remaining-badge">
                       {remainingStock} {formatUnit(remainingStock, item.unit)} remaining
@@ -360,7 +426,15 @@ export default function RequestResourceModal({
                     className="req-stock-progress-fill"
                     style={{
                       width: isOverStock ? '100%' : `${percentStock}%`,
+<<<<<<< HEAD
                       backgroundColor: isOverStock ? '#dc2626' : percentStock > 80 ? '#f59e0b' : '#3b82f6',
+=======
+                      backgroundColor: isOverStock
+                        ? '#dc2626'
+                        : percentStock > 80
+                          ? '#f59e0b'
+                          : '#2563eb',
+>>>>>>> 280f60972fc9aee233f9e420d198b23d0170580d
                       transition: 'width 200ms ease, background-color 200ms ease',
                     }}
                   />

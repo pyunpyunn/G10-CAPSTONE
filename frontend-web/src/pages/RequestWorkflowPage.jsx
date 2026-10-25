@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import {
+  Box,
   CheckCircle2,
   Clock,
   Eye,
@@ -29,6 +30,77 @@ import LoadingState from '../components/ui/LoadingState'
 import TrackingAidMirror from '../components/resources/TrackingAidMirror'
 import { canApproveRequests } from '../utils/personnelAccess'
 import ResourceRequestDetailDrawer from '../components/resources/ResourceRequestDetailDrawer'
+
+// Format quantity and unit matching Request Types inventory UI
+function getQuantityParts(quantity, unit, fallbackText) {
+  const qty = Number(quantity) || (fallbackText ? parseInt(fallbackText, 10) : 1) || 1
+  let rawUnit = unit
+  if (!rawUnit && fallbackText) {
+    rawUnit = fallbackText.replace(/^[0-9.]+\s*/, '')
+  }
+  rawUnit = (rawUnit || 'units').trim().toLowerCase()
+
+  if (qty === 1) {
+    if (rawUnit === 'kits' || rawUnit === 'kit') return { qty: 1, unit: 'kit' }
+    if (rawUnit === 'boxes' || rawUnit === 'box') return { qty: 1, unit: 'box' }
+    if (rawUnit === 'packs' || rawUnit === 'pack') return { qty: 1, unit: 'pack' }
+    if (rawUnit === 'pieces' || rawUnit === 'pcs' || rawUnit === 'piece') return { qty: 1, unit: 'piece' }
+    if (rawUnit === 'units' || rawUnit === 'unit') return { qty: 1, unit: 'unit' }
+    if (rawUnit.endsWith('s') && !rawUnit.endsWith('ss')) return { qty: 1, unit: rawUnit.slice(0, -1) }
+    return { qty: 1, unit: rawUnit }
+  }
+
+  // Plural
+  if (rawUnit === 'kit') return { qty, unit: 'kits' }
+  if (rawUnit === 'box') return { qty, unit: 'boxes' }
+  if (rawUnit === 'pack') return { qty, unit: 'packs' }
+  if (rawUnit === 'piece') return { qty, unit: 'pieces' }
+  if (rawUnit === 'unit') return { qty, unit: 'units' }
+  if (!rawUnit.endsWith('s')) return { qty, unit: `${rawUnit}s` }
+  return { qty, unit: rawUnit }
+}
+
+// Origin source badge helper
+function getSourceBadge(source) {
+  const key = (source?.key || '').toLowerCase()
+  const rawLabel = (source?.label || '').toLowerCase()
+
+  if (key.includes('mobile') || rawLabel.includes('mobile') || rawLabel.includes('rescuer')) {
+    return { className: 'channel-chip mobile', label: 'Rescuer Mobile' }
+  }
+  if (key.includes('evatrack') || rawLabel.includes('evatrack') || rawLabel.includes('center')) {
+    return { className: 'channel-chip evatrack', label: 'EvaTrack Center' }
+  }
+  if (key.includes('field') || rawLabel.includes('field')) {
+    return { className: 'channel-chip field', label: 'Field Unit' }
+  }
+  return { className: 'channel-chip hq', label: 'HQ Desk' }
+}
+
+// Evacuation area formatter helper
+function formatEvacuationArea(area) {
+  const rawLabel = area?.label || ''
+  const meta = area?.meta || ''
+  const isUnrecorded = !rawLabel || rawLabel.toLowerCase() === 'area not recorded'
+
+  if (isUnrecorded) {
+    if (meta.toLowerCase().startsWith('location:')) {
+      return {
+        title: meta.replace(/^location:\s*/i, '').trim(),
+        subtitle: 'Field Location Dispatch',
+      }
+    }
+    return {
+      title: 'Unassigned Site',
+      subtitle: meta || 'Central Depot Intake',
+    }
+  }
+
+  return {
+    title: rawLabel,
+    subtitle: meta || 'Registered Evacuation Center',
+  }
+}
 
 export default function RequestWorkflowPage() {
   const { user } = useOutletContext()
@@ -329,7 +401,7 @@ export default function RequestWorkflowPage() {
         onReset={handleResetFilters}
       />
 
-      {/* Main Content: Native ResQperation Panel with compact table */}
+      {/* Main Content: Native ResQperation Panel matching Request Types UI */}
       <section className="panel" aria-label={external ? 'For Approval Request List' : 'Requests Stream'}>
         <div className="panel-head">
           <span className="panel-title">
@@ -388,13 +460,18 @@ export default function RequestWorkflowPage() {
                   const urgencyKey = row.urgency?.key || 'medium'
                   const statusKey = row.validation?.key || 'needs_validation'
                   const isCompleted = statusKey === 'fulfilled'
+                  const sourceBadge = getSourceBadge(row.request_source)
+                  const areaInfo = formatEvacuationArea(row.area)
+                  const qtyParts = getQuantityParts(row.need?.quantity, row.need?.unit, row.need?.quantity_text)
 
                   return (
                     <tr key={row.request_id}>
                       {/* Request ID & Timestamp */}
                       <td>
-                        <strong style={{ color: 'var(--color-text-1)' }}>#{row.request_id}</strong>
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-3)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                        <strong style={{ fontFamily: 'monospace', color: 'var(--color-text-1)', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                          #{row.request_id}
+                        </strong>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-3)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', whiteSpace: 'nowrap' }}>
                           <Clock size={10} />
                           <span>{row.created_at || 'Recently submitted'}</span>
                         </div>
@@ -402,10 +479,10 @@ export default function RequestWorkflowPage() {
 
                       {/* Origin & Requester */}
                       <td>
-                        <div style={{ fontWeight: 600, color: 'var(--color-text-2)', fontSize: '12.5px' }}>
-                          {row.request_source?.label || 'EvaTrack'}
+                        <div style={{ fontWeight: 600, color: 'var(--color-text-2)', fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                          {sourceBadge.label}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-3)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-3)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', whiteSpace: 'nowrap' }}>
                           <User size={10} />
                           <span>{row.requested_by || 'Disaster Staff'}</span>
                         </div>
@@ -413,33 +490,48 @@ export default function RequestWorkflowPage() {
 
                       {/* Resource Need */}
                       <td>
-                        <div style={{ fontWeight: 650, color: 'var(--color-text-1)', fontSize: '13px' }}>
-                          {row.need?.item_name || row.need?.type || 'Supplies'}
-                        </div>
-                        {row.need?.type && row.need?.item_name && (
-                          <div style={{ fontSize: '11px', color: 'var(--color-text-3)' }}>
-                            {row.need.type}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            className="card-category-icon-box"
+                            style={{ width: '28px', height: '28px', borderRadius: '6px', flexShrink: 0 }}
+                          >
+                            <Box size={15} strokeWidth={2.2} />
                           </div>
-                        )}
+                          <div>
+                            <div style={{ fontWeight: 650, color: 'var(--color-text-1)', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                              {row.need?.item_name || row.need?.type || 'Supplies'}
+                            </div>
+                            {row.need?.type && row.need?.item_name && (
+                              <div style={{ fontSize: '11px', color: 'var(--color-text-3)', whiteSpace: 'nowrap' }}>
+                                {row.need.type}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       {/* Quantity */}
                       <td>
-                        <span style={{ fontWeight: 700, color: 'var(--color-text-1)', fontSize: '13px' }}>
-                          {row.need?.quantity_text || `${row.need?.quantity || 1} units`}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', whiteSpace: 'nowrap' }}>
+                          <strong style={{ fontSize: '14px', color: 'var(--color-text-1)' }}>
+                            {qtyParts.qty}
+                          </strong>
+                          <span style={{ fontSize: '11px', color: 'var(--color-text-3)' }}>
+                            {qtyParts.unit}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Evacuation Area */}
                       <td>
                         <div style={{ fontWeight: 600, color: 'var(--color-text-2)', fontSize: '12.5px' }}>
-                          {row.area?.label || 'General Relief Hub'}
+                          {areaInfo.title}
                         </div>
-                        {row.area?.meta && (
+                        {areaInfo.subtitle && (
                           <div style={{ fontSize: '11px', color: 'var(--color-text-3)', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
                             <MapPin size={10} style={{ flexShrink: 0 }} />
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
-                              {row.area.meta}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }} title={areaInfo.subtitle}>
+                              {areaInfo.subtitle}
                             </span>
                           </div>
                         )}
@@ -454,7 +546,7 @@ export default function RequestWorkflowPage() {
 
                       {/* Status */}
                       <td>
-                        <Badge tone={row.validation?.tone || 'gray'}>
+                        <Badge tone={row.validation?.tone || 'amber'}>
                           {row.validation?.label || row.status?.label || 'Pending'}
                         </Badge>
                       </td>
@@ -463,7 +555,11 @@ export default function RequestWorkflowPage() {
                       {!external && (
                         <td>
                           <div
+<<<<<<< HEAD
                             style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-2)', cursor: 'pointer' }}
+=======
+                            style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-2)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+>>>>>>> 280f60972fc9aee233f9e420d198b23d0170580d
                             onClick={() => handleTrackLive(row)}
                             title="Inspect live tracking"
                           >
@@ -479,7 +575,7 @@ export default function RequestWorkflowPage() {
 
                       {/* Actions */}
                       <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', whiteSpace: 'nowrap' }}>
                           {external ? (
                             <>
                               <button
@@ -492,26 +588,30 @@ export default function RequestWorkflowPage() {
                                 <Eye size={12} />
                                 <span>View Request</span>
                               </button>
-                              {canApprove && <button
-                                type="button"
-                                className="button review"
-                                style={{ padding: '5px 12px', fontSize: '11.5px' }}
-                                onClick={() => handleApproveRequest(row)}
-                                disabled={isProcessing}
-                                title="Approve Request"
-                              >
-                                <CheckCircle2 size={12} />
-                                <span>Approve Request</span>
-                              </button>}
-                              {canApprove && <button
-                                type="button"
-                                className="button secondary danger-text"
-                                style={{ padding: '5px 8px', fontSize: '11px' }}
-                                onClick={() => open(row, 'return')}
-                                title="Return Request"
-                              >
-                                Return
-                              </button>}
+                              {canApprove && (
+                                <button
+                                  type="button"
+                                  className="button review"
+                                  style={{ padding: '5px 12px', fontSize: '11.5px' }}
+                                  onClick={() => handleApproveRequest(row)}
+                                  disabled={isProcessing}
+                                  title="Approve Request"
+                                >
+                                  <CheckCircle2 size={12} />
+                                  <span>Approve Request</span>
+                                </button>
+                              )}
+                              {canApprove && (
+                                <button
+                                  type="button"
+                                  className="button secondary danger-text"
+                                  style={{ padding: '5px 8px', fontSize: '11px' }}
+                                  onClick={() => open(row, 'return')}
+                                  title="Return Request"
+                                >
+                                  Return
+                                </button>
+                              )}
                             </>
                           ) : (
                             <>
