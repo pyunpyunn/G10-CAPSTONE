@@ -62,7 +62,7 @@ export default function ForgotPasswordScreen() {
       const response = await lookupHouseholdRecoveryContact(accountLogin);
       setMaskedContact(response.masked_contact_number);
     } catch (error: any) {
-      setAccountError(authErrorMessage(error, 'Could not find a household account. Check the user ID and try again.'));
+      setAccountError(authErrorMessage(error, 'Could not find an active system account with a registered phone number. Check the account ID and try again.'));
     } finally {
       setLoading(false);
     }
@@ -107,7 +107,7 @@ export default function ForgotPasswordScreen() {
       await validateHouseholdRecoveryContact(accountLogin, contactNumber);
       setValidatedNumber(contactNumber.trim());
     } catch (error: any) {
-      setContactError(authErrorMessage(error, 'This number does not match the registered household contact number.'));
+      setContactError(authErrorMessage(error, 'This number does not match a phone number registered to this account.'));
     } finally {
       setLoading(false);
     }
@@ -157,7 +157,7 @@ export default function ForgotPasswordScreen() {
       });
       Alert.alert(
         'Password changed',
-        `Password for ${response.household_id} is changed!`,
+        `Password for ${response.account_identifier || response.household_id} is changed!`,
         [{ text: 'Close', onPress: () => router.replace('/' as Href) }],
         { cancelable: false },
       );
@@ -169,7 +169,7 @@ export default function ForgotPasswordScreen() {
   }
 
   const numberHint = maskedContact
-    ? `Enter your phone number ${maskedContact}`
+    ? `enter your phone number ${maskedContact}`
     : 'Enter your user ID to find your registered phone number.';
 
   return (
@@ -182,16 +182,11 @@ export default function ForgotPasswordScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
-          <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={19} color={palette.navText} />
-            <Text style={styles.backText}>Back to sign in</Text>
-          </Pressable>
-
           <View style={styles.card}>
             <View style={styles.header}>
               <Ionicons name="key-outline" size={30} color={palette.navText} />
               <Text style={styles.title}>Forgot password</Text>
-              <Text style={styles.help}>Verify the registered household phone number to receive a password reset code.</Text>
+              <Text style={styles.help}>Verify the phone number registered to your system account to receive a password reset code.</Text>
             </View>
 
             <View style={styles.fieldGroup}>
@@ -223,7 +218,7 @@ export default function ForgotPasswordScreen() {
                   value={contactNumber}
                   onFocus={(event) => scrollToFocusedInput(event.nativeEvent.target)}
                   onChangeText={handleContactChange}
-                  onBlur={() => { if (contactNumber.trim()) void validateContact(); }}
+                  onBlur={() => { if (maskedContact) void validateContact(); }}
                   placeholder="09XX XXX XXXX"
                   placeholderTextColor={palette.navMuted}
                   keyboardType="phone-pad"
@@ -338,8 +333,6 @@ const styles = StyleSheet.create({
   keyboard: { flex: 1 },
   scroll: { flex: 1 },
   screen: { flexGrow: 1, justifyContent: 'flex-start', gap: spacing.lg, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xl },
-  backButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
-  backText: { color: palette.navText, fontSize: 14, fontWeight: '700' },
   card: { gap: spacing.md },
   header: { gap: spacing.sm, marginBottom: spacing.sm },
   title: { color: palette.navText, fontSize: 28, fontWeight: '800' },

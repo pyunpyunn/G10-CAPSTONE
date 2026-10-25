@@ -273,6 +273,9 @@ export default function MobileLoginScreen() {
 }
 
 function authErrorMessage(error: any, fallback: string) {
+  if (error?.response?.status === 429) {
+    return 'Unable to log in right now. Please wait a moment and try again.';
+  }
   const responseData = error?.response?.data;
   const validationMessage = Object.values(responseData?.errors || {}).flat()[0];
   return String(validationMessage || error?.userMessage || responseData?.message || error?.message || fallback);

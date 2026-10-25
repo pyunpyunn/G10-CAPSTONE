@@ -318,27 +318,18 @@ export default function RescuerHomeScreen() {
 
     if (activeTab === 'map') {
       return (
-        <>
-          {Platform.OS !== 'web' ? (
-            <Pressable
-              style={({ pressed }) => [styles.navigationButton, pressed && styles.navigationButtonPressed]}
-              onPress={() => router.push({
-                pathname: '/rescuer/navigation' as any,
-                params: { dispatchId: String(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || '') },
-              })}
-            >
-              <Ionicons name="navigate-outline" size={20} color="#fff" />
-              <Text style={styles.navigationButtonText}>View directions / Offline navigation</Text>
-            </Pressable>
-          ) : null}
-          <RescueMapScreen
-            assignments={assignments}
-            evacuationCenters={overview.evacuation_centers || []}
-            activeAssignment={activeAssignment}
-            selectedAssignment={selectedAssignment}
-            onSendLocation={handleSendLocation}
-          />
-        </>
+        <RescueMapScreen
+          assignments={assignments}
+          evacuationCenters={overview.evacuation_centers || []}
+          activeAssignment={activeAssignment}
+          selectedAssignment={selectedAssignment}
+          onSendLocation={handleSendLocation}
+          showNavigationButton={Platform.OS !== 'web'}
+          onOpenNavigation={() => router.push({
+            pathname: '/rescuer/navigation' as any,
+            params: { dispatchId: String(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || '') },
+          })}
+        />
       );
     }
 
@@ -482,24 +473,6 @@ const styles = StyleSheet.create({
   refreshErrorAction: {
     color: palette.navActive,
     fontWeight: '900',
-  },
-  navigationButton: {
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: palette.nav,
-  },
-  navigationButtonPressed: {
-    opacity: 0.85,
-  },
-  navigationButtonText: {
-    color: palette.navText,
-    fontWeight: '800',
   },
   tabBar: {
     position: 'absolute',

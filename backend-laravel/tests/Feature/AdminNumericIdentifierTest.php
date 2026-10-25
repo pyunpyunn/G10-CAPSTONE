@@ -38,4 +38,12 @@ class AdminNumericIdentifierTest extends TestCase
         $this->expectException(ValidationException::class);
         app(RescuerAccountPayloadValidator::class)->validate($request,false,(object)['role_key'=>'operations_admin']);
     }
+
+    public function test_existing_headquarters_codes_can_be_kept_without_applying_field_team_format(): void
+    {
+        $request=$this->request(); $request->merge(['account_id'=>'USER_EAD-2026','responder_code'=>'USER_EAD-2026']);
+        $payload=app(RescuerAccountPayloadValidator::class)->validate($request,true,(object)[
+            'role_key'=>'response','username'=>'user_EAD-2026','responder_code'=>'USER_EAD-2026']);
+        $this->assertSame('USER_EAD-2026',$payload['responder_code']);
+    }
 }

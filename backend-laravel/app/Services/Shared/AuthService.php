@@ -25,7 +25,7 @@ class AuthService
     public function __construct(
         private AuthAccountQuery $accounts,
         private SmsGatewayService $smsGateway,
-        private OneSignalNotificationService $oneSignal,
+        private SemaphoreSmsService $semaphore,
     ) {}
     private const RECOVERY_QUESTIONS = [
         'first_pet' => "What was your first pet's name?",
@@ -255,7 +255,7 @@ class AuthService
         $details = $this->householdRecoveryDetails(trim($values['login']));
 
         if (! $details) {
-            throw ValidationException::withMessages(['login' => ['Household account was not found. Check the user ID and try again.']]);
+            throw ValidationException::withMessages(['login' => ['This system account was not found or has no registered recovery phone number. Check the account ID and try again.']]);
         }
 
         return response()->json([
@@ -273,7 +273,7 @@ class AuthService
 
         if (! $details || ! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
             throw ValidationException::withMessages([
-                'contact_number' => ['This number does not match the registered household contact number.'],
+                'contact_number' => ['This number does not match a phone number registered to this account.'],
             ]);
         }
 
@@ -290,7 +290,7 @@ class AuthService
 
         if (! $details || ! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
             throw ValidationException::withMessages([
-                'contact_number' => ['This number does not match the registered household contact number.'],
+                'contact_number' => ['This number does not match a phone number registered to this account.'],
             ]);
         }
         if (! Schema::hasTable('household_password_recovery_otps')) {
@@ -305,20 +305,28 @@ class AuthService
         }
 
         $code = (string) random_int(100000, 999999);
-        $sms = $this->smsGateway->sendDirectSms(
-            $details['contact_number'],
-            "Your ResQperation password reset code is {$code}. It expires in 10 minutes."
-        );
-        if ($sms['status'] === 'not_configured') {
-            $sms = $this->oneSignal->sendSmsToPhoneNumber(
-                $details['contact_number'],
-                "Your ResQperation password reset code is {$code}. It expires in 10 minutes."
-            );
+        $smsMessage = "Your ResQperation password reset code is {$code}. It expires in 10 minutes.";
+        $smsProviders = [];
+        $smsProviders[] = fn (): array => $this->smsGateway->sendDirectSms($details['contact_number'], $smsMessage);
+        if ($this->semaphore->isConfigured()) {
+            $smsProviders[] = fn (): array => $this->semaphore->sendDirectSms($details['contact_number'], $smsMessage);
         }
-        if ($sms['status'] !== 'accepted') {
-            $message = $sms['status'] === 'not_configured'
-                ? 'SMS delivery is not configured. Configure an SMS gateway or OneSignal SMS service.'
-                : 'The SMS provider could not send your code. Please try again later.';
+        $sms = null;
+        $lastFailure = null;
+        foreach ($smsProviders as $sendSms) {
+            $smsResult = $sendSms();
+            if ($smsResult['status'] === 'accepted') {
+                $sms = $smsResult;
+                break;
+            }
+            if ($smsResult['status'] !== 'not_configured') {
+                $lastFailure = $smsResult;
+            }
+        }
+        if ($sms === null) {
+            $message = $lastFailure['message']
+                ?? 'SMS delivery is not configured. Start the Android SMS Gateway local server and configure its URL and credentials, or configure a Semaphore API key.';
+
             return response()->json(['message' => $message], 503);
         }
 
@@ -350,7 +358,7 @@ class AuthService
 
         if (! $details || ! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
             throw ValidationException::withMessages([
-                'contact_number' => ['This number does not match the registered household contact number.'],
+                'contact_number' => ['This number does not match a phone number registered to this account.'],
             ]);
         }
         if (! Schema::hasTable('household_password_recovery_otps')) {
@@ -404,7 +412,7 @@ class AuthService
             }
             $table->where('user_id', $details['user']->user_id)->delete();
 
-            return ['household_id' => $details['household_id']];
+            return ['account_identifier' => $details['account_identifier']];
         });
 
         if (isset($result['error'])) {
@@ -413,51 +421,68 @@ class AuthService
 
         return response()->json([
             'message' => 'Password changed successfully.',
-            'household_id' => $result['household_id'],
+            'household_id' => $result['account_identifier'],
+            'account_identifier' => $result['account_identifier'],
         ]);
     }
 
     private function householdRecoveryDetails(string $login): ?array
     {
-        if (! Schema::hasTable('households')
-            || ! Schema::hasColumn('households', 'household_id')
-            || ! Schema::hasColumn('households', 'contact_number')
-            || ! Schema::hasColumn('users', 'household_id')) {
-            return null;
-        }
-
         $user = $this->accounts->userFromLogin($login);
-        if (! $user) {
+        if (! $user
+            || ($user->is_active !== null && ! $user->is_active)
+            || (Schema::hasColumn('users', 'deleted_at') && $user->deleted_at)) {
             return null;
         }
         $user->loadMissing('role');
-        if ($user->roleKey() !== 'household_resident' || ! $user->household_id
-            || ($user->is_active !== null && ! $user->is_active)) {
+
+        $householdId = Schema::hasColumn('users', 'household_id') ? (string) ($user->household_id ?? '') : '';
+        $contactNumbers = [];
+        if ($householdId !== ''
+            && Schema::hasTable('households')
+            && Schema::hasColumn('households', 'household_id')
+            && Schema::hasColumn('households', 'contact_number')) {
+            $household = DB::table('households')
+                ->where('household_id', $householdId)
+                ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+                ->first(['household_id', 'contact_number']);
+            if ($household?->contact_number) {
+                $contactNumbers[] = (string) $household->contact_number;
+            }
+        }
+
+        if (Schema::hasColumn('users', 'contact_number') && filled($user->contact_number)) {
+            $contactNumbers[] = (string) $user->contact_number;
+        }
+
+        if (Schema::hasTable('responders')
+            && Schema::hasColumn('responders', 'user_id')
+            && Schema::hasColumn('responders', 'contact_number')) {
+            $responder = DB::table('responders')
+                ->where('user_id', $user->user_id)
+                ->when(Schema::hasColumn('responders', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+                ->first(['responder_id', 'contact_number']);
+            if ($responder?->contact_number) {
+                $contactNumbers[] = (string) $responder->contact_number;
+            }
+        }
+
+        $contactNumber = collect($contactNumbers)
+            ->first(fn (string $number): bool => $this->normalizePhoneNumber($number) !== null);
+        if (! $contactNumber) {
             return null;
         }
 
-        $household = DB::table('households')
-            ->where('household_id', $user->household_id)
-            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
-            ->first(['household_id', 'contact_number']);
-        if (! $household || ! $household->contact_number || ! $this->normalizePhoneNumber($household->contact_number)) {
-            return null;
-        }
-
-        $owner = User::query()
-            ->where('household_id', $household->household_id)
-            ->whereKey($user->user_id)
-            ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
-            ->with('role')
-            ->first();
-        if (! $owner || $owner->roleKey() !== 'household_resident') {
-            return null;
-        }
+        $accountIdentifier = $householdId !== ''
+            ? $householdId
+            : trim((string) ($user->username ?: ($user->login_id ?? $user->user_id)));
+        $recoveryScopeId = $householdId !== '' ? $householdId : (string) $user->user_id;
 
         return [
-            'user' => $owner,
-            'household_id' => (string) $household->household_id,
-            'contact_number' => (string) $household->contact_number,
+            'user' => $user,
+            'household_id' => $recoveryScopeId,
+            'account_identifier' => $accountIdentifier,
+            'contact_number' => $contactNumber,
         ];
     }
 

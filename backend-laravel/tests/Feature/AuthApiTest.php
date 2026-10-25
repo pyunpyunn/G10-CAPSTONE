@@ -115,6 +115,12 @@ class AuthApiTest extends TestCase
             'role_id' => 6,
             'role_name' => 'Household Resident',
         ]);
+        DB::table('roles')->updateOrInsert([
+            'role_key' => 'operations_admin',
+        ], [
+            'role_id' => 4,
+            'role_name' => 'Operations/Admin',
+        ]);
 
         DB::table('users')->updateOrInsert([
             'user_id' => 'USR-RESCUER-BDRRM-SAR-001',
@@ -400,7 +406,7 @@ class AuthApiTest extends TestCase
         $this->assertTrue(Hash::check('old-password', \App\Models\User::findOrFail('USR-HOUSEHOLD-OTP-001')->password));
     }
 
-    public function test_household_otp_uses_onesignal_sms_when_the_sms_gateway_is_not_configured(): void
+    public function test_password_recovery_does_not_use_onesignal_without_semaphore_or_gateway(): void
     {
         config([
             'services.sms_gateway.base_url' => '',
@@ -410,7 +416,107 @@ class AuthApiTest extends TestCase
             'services.onesignal.api_key' => 'test-api-key',
             'services.onesignal.base_url' => 'https://onesignal.test',
         ]);
-        Http::fake(['onesignal.test/*' => Http::response(['id' => 'onesignal-sms-test'], 200)]);
+        Http::fake();
+
+        $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
+            'login' => 'household.otp.001',
+            'contact_number' => '09171234512',
+        ])->assertStatus(503)->assertJsonPath(
+            'message',
+            'SMS delivery is not configured. Start the Android SMS Gateway local server and configure its URL and credentials, or configure a Semaphore API key.'
+        );
+
+        Http::assertNothingSent();
+        $this->assertDatabaseMissing('household_password_recovery_otps', [
+            'user_id' => 'USR-HOUSEHOLD-OTP-001',
+        ]);
+    }
+
+    public function test_password_recovery_sends_the_same_otp_through_semaphore_and_stores_only_its_hash(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        config([
+            'services.semaphore.api_key' => 'semaphore-test-key',
+            'services.semaphore.sender_name' => 'RESQPERATION',
+            'services.semaphore.base_url' => 'https://semaphore.test/api/v4',
+            'services.sms_gateway.base_url' => '',
+            'services.sms_gateway.username' => '',
+            'services.sms_gateway.password' => '',
+            'services.onesignal.app_id' => 'test-app-id',
+            'services.onesignal.api_key' => 'test-api-key',
+            'services.onesignal.base_url' => 'https://onesignal.test',
+        ]);
+        DB::table('household_password_recovery_otps')
+            ->where('user_id', 'USR-HOUSEHOLD-OTP-001')
+            ->delete();
+        $sentCode = null;
+        Http::fake([
+            'semaphore.test/*' => function ($request) use (&$sentCode) {
+                preg_match('/code is (\d{6})/', $request['message'], $matches);
+                $sentCode = $matches[1] ?? null;
+                return Http::response([[
+                    'message_id' => 1001,
+                    'recipient' => '09171234512',
+                    'status' => 'Queued',
+                ]], 200);
+            },
+        ]);
+
+        $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
+            'login' => 'household.otp.001',
+            'contact_number' => '09171234512',
+        ])->assertOk();
+
+        $this->assertNotNull($sentCode);
+        Http::assertSent(function ($request): bool {
+            return str_contains($request->url(), 'semaphore.test/api/v4/messages')
+                && $request['apikey'] === 'semaphore-test-key'
+                && $request['number'] === '09171234512'
+                && $request['sendername'] === 'RESQPERATION'
+                && str_contains($request['message'], 'password reset code');
+        });
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'onesignal.test'));
+
+        $recovery = DB::table('household_password_recovery_otps')
+            ->where('user_id', 'USR-HOUSEHOLD-OTP-001')
+            ->first();
+        $this->assertTrue(Hash::check($sentCode, $recovery->code_hash));
+
+        $this->postJson('/api/v1/auth/password-recovery/household/reset', [
+            'login' => 'household.otp.001',
+            'contact_number' => '09171234512',
+            'code' => $sentCode,
+            'password' => 'new-semaphore-password',
+            'password_confirmation' => 'new-semaphore-password',
+        ])->assertOk();
+
+        $this->assertTrue(Hash::check(
+            'new-semaphore-password',
+            DB::table('users')->where('user_id', 'USR-HOUSEHOLD-OTP-001')->value('password')
+        ));
+    }
+
+    public function test_password_recovery_uses_sms_gate_cloud_server_credentials_and_api_path(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        config([
+            'services.semaphore.api_key' => '',
+            'services.sms_gateway.base_url' => 'https://api.sms-gate.app/3rdparty/v1',
+            'services.sms_gateway.username' => 'cloud-server-user',
+            'services.sms_gateway.password' => 'cloud-server-password',
+            'services.sms_gateway.message_path' => '/messages',
+        ]);
+        DB::table('household_password_recovery_otps')
+            ->where('user_id', 'USR-HOUSEHOLD-OTP-001')
+            ->delete();
+        $sentCode = null;
+        Http::fake([
+            'api.sms-gate.app/*' => function ($request) use (&$sentCode) {
+                preg_match('/code is (\d{6})/', $request['textMessage']['text'], $matches);
+                $sentCode = $matches[1] ?? null;
+                return Http::response(['id' => 'sms-gate-cloud-otp-1'], 200);
+            },
+        ]);
 
         $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
             'login' => 'household.otp.001',
@@ -418,14 +524,137 @@ class AuthApiTest extends TestCase
         ])->assertOk();
 
         Http::assertSent(function ($request): bool {
-            return str_contains($request->url(), '/notifications?c=sms')
-                && $request['target_channel'] === 'sms'
-                && $request['include_phone_numbers'] === ['+639171234512']
-                && preg_match('/\d{6}/', $request['contents']['en']) === 1;
+            return $request->url() === 'https://api.sms-gate.app/3rdparty/v1/messages'
+                && $request->hasHeader('Authorization', 'Basic '.base64_encode('cloud-server-user:cloud-server-password'))
+                && $request['phoneNumbers'] === ['+639171234512'];
         });
-        $this->assertDatabaseHas('household_password_recovery_otps', [
-            'user_id' => 'USR-HOUSEHOLD-OTP-001',
-            'household_id' => 'HH-OTP-001',
+        $this->assertNotNull($sentCode);
+        $recovery = DB::table('household_password_recovery_otps')
+            ->where('user_id', 'USR-HOUSEHOLD-OTP-001')
+            ->first();
+        $this->assertTrue(Hash::check($sentCode, $recovery->code_hash));
+    }
+
+    public function test_gateway_rejection_is_reported_instead_of_using_onesignal(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        config([
+            'services.sms_gateway.base_url' => 'https://sms-gateway.test',
+            'services.sms_gateway.username' => 'test-user',
+            'services.sms_gateway.password' => 'test-password',
+            'services.onesignal.app_id' => 'test-app-id',
+            'services.onesignal.api_key' => 'test-api-key',
+            'services.onesignal.base_url' => 'https://onesignal.test',
         ]);
+        DB::table('household_password_recovery_otps')
+            ->where('user_id', 'USR-HOUSEHOLD-OTP-001')
+            ->delete();
+        Http::fake([
+            'sms-gateway.test/*' => Http::response(['message' => 'gateway unavailable'], 503),
+            'onesignal.test/*' => Http::response(['id' => 'onesignal-fallback-otp'], 200),
+        ]);
+
+        $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
+            'login' => 'household.otp.001',
+            'contact_number' => '09171234512',
+        ])->assertStatus(503)->assertJsonPath(
+            'message',
+            'Android SMS Gateway did not accept the message.'
+        );
+
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'onesignal.test'));
+        $this->assertDatabaseMissing('household_password_recovery_otps', [
+            'user_id' => 'USR-HOUSEHOLD-OTP-001',
+        ]);
+    }
+
+    public function test_any_active_system_user_can_recover_with_their_registered_phone_number(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+
+        DB::table('users')->insert([
+            'user_id' => 'USR-SYSTEM-ADMIN-001',
+            'first_name' => 'System',
+            'last_name' => 'Administrator',
+            'name' => 'System Administrator',
+            'username' => 'system.admin',
+            'email' => 'system.admin@example.test',
+            'password' => Hash::make('old-admin-password'),
+            'role_id' => 4,
+            'contact_number' => '09178889912',
+            'household_id' => null,
+            'is_active' => 1,
+            'deleted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/auth/password-recovery/household/lookup', [
+            'login' => 'system.admin',
+        ])->assertOk()->assertExactJson(['masked_contact_number' => '*********12']);
+
+        $this->postJson('/api/v1/auth/password-recovery/household/lookup', [
+            'login' => 'outside.system',
+        ])->assertUnprocessable()->assertJsonValidationErrors('login');
+
+        $this->postJson('/api/v1/auth/password-recovery/household/validate-contact', [
+            'login' => 'system.admin',
+            'contact_number' => '09171234512',
+        ])->assertUnprocessable()->assertJsonValidationErrors('contact_number');
+
+        $this->postJson('/api/v1/auth/password-recovery/household/validate-contact', [
+            'login' => 'system.admin@example.test',
+            'contact_number' => '09178889912',
+        ])->assertOk();
+
+        config([
+            'services.semaphore.api_key' => 'semaphore-admin-key',
+            'services.semaphore.sender_name' => 'RESQPERATION',
+            'services.semaphore.base_url' => 'https://semaphore.test/api/v4',
+            'services.sms_gateway.base_url' => '',
+            'services.sms_gateway.username' => '',
+            'services.sms_gateway.password' => '',
+            'services.onesignal.app_id' => 'test-app-id',
+            'services.onesignal.api_key' => 'test-api-key',
+            'services.onesignal.base_url' => 'https://onesignal.test',
+        ]);
+        DB::table('household_password_recovery_otps')
+            ->where('user_id', 'USR-SYSTEM-ADMIN-001')
+            ->delete();
+        $sentCode = null;
+        Http::fake(function ($request) use (&$sentCode) {
+            preg_match('/code is (\d{6})/', $request['message'], $matches);
+            $sentCode = $matches[1] ?? null;
+            return Http::response([[
+                'message_id' => 1002,
+                'recipient' => '09178889912',
+                'status' => 'Queued',
+            ]], 200);
+        });
+
+        $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
+            'login' => 'system.admin',
+            'contact_number' => '09178889912',
+        ])->assertOk();
+        $this->assertNotNull($sentCode);
+        $this->assertDatabaseHas('household_password_recovery_otps', [
+            'user_id' => 'USR-SYSTEM-ADMIN-001',
+            'household_id' => 'USR-SYSTEM-ADMIN-001',
+        ]);
+
+        $this->postJson('/api/v1/auth/password-recovery/household/reset', [
+            'login' => 'system.admin',
+            'contact_number' => '09178889912',
+            'code' => $sentCode,
+            'password' => 'new-admin-password',
+            'password_confirmation' => 'new-admin-password',
+        ])->assertOk()
+            ->assertJsonPath('account_identifier', 'system.admin')
+            ->assertJsonPath('household_id', 'system.admin');
+
+        $this->assertTrue(Hash::check(
+            'new-admin-password',
+            DB::table('users')->where('user_id', 'USR-SYSTEM-ADMIN-001')->value('password')
+        ));
     }
 }

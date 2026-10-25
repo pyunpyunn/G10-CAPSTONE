@@ -75,7 +75,8 @@ class GlobalSearchTest extends TestCase
         foreach (['mara santos', 'SANTOS MARA', '  Mara   Santos  '] as $query) {
             $results = app(GlobalSearchService::class)->search($query, ['responders']);
             $this->assertCount(1, $results);
-            $this->assertSame('/rescuers/view?id=6', $results[0]['href']);
+            $this->assertSame('/rescuers', $results[0]['href']);
+            $this->assertSame(6, (int)$results[0]['responder_id']);
         }
         $this->assertSame([], app(GlobalSearchService::class)->search('Mara Missing', ['responders']));
     }
@@ -90,7 +91,7 @@ class GlobalSearchTest extends TestCase
             $request->setUserResolver(fn (): User => $user);
             $response = app(GlobalSearchController::class)->index($request)->getData(true);
             $this->assertSame('Mara Santos', $response['data']['results'][0]['title']);
-            $this->assertSame('/rescuers/view?id=6', $response['data']['results'][0]['href']);
+            $this->assertSame('/rescuers', $response['data']['results'][0]['href']);
         }
     }
 
@@ -123,7 +124,7 @@ class GlobalSearchTest extends TestCase
 
         $this->assertCount(1, $results);
         $this->assertSame('Mara Santos', $results[0]['title']);
-        $this->assertSame('/rescuers/view?id=6', $results[0]['href']);
+        $this->assertSame('/rescuers', $results[0]['href']);
     }
 
     public function test_global_search_is_available_to_any_user_with_a_web_module(): void

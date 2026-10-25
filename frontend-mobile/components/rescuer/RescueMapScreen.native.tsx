@@ -7,7 +7,7 @@ import { useMapGps } from '@/hooks/useMapGps';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineTime } from '@/utils/time';
-import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
+import { ActionButton, EmptyState, SectionHeader } from './RescuerUI';
 
 type RescueMapProps = {
   assignments: any[];
@@ -15,6 +15,8 @@ type RescueMapProps = {
   activeAssignment: any;
   selectedAssignment?: any;
   onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
+  showNavigationButton?: boolean;
+  onOpenNavigation?: () => void;
 };
 
 const defaultRegion = {
@@ -24,7 +26,15 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
-export function RescueMapScreen({ assignments, evacuationCenters = [], activeAssignment, selectedAssignment, onSendLocation }: RescueMapProps) {
+export function RescueMapScreen({
+  assignments,
+  evacuationCenters = [],
+  activeAssignment,
+  selectedAssignment,
+  onSendLocation,
+  showNavigationButton = false,
+  onOpenNavigation,
+}: RescueMapProps) {
   const [tracking, setTracking] = useState(true);
   const { position, error: gpsError } = useMapGps(tracking);
   const sendLocation = useRef(onSendLocation);
@@ -119,10 +129,20 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
 
   return (
     <View style={styles.stack}>
+      {showNavigationButton && onOpenNavigation ? (
+        <Pressable
+          style={({ pressed }) => [styles.navigationButton, pressed && styles.navigationButtonPressed]}
+          onPress={onOpenNavigation}
+          accessibilityRole="button"
+        >
+          <Ionicons name="navigate-outline" size={20} color="#fff" />
+          <Text style={styles.navigationButtonText}>View directions / Offline navigation</Text>
+        </Pressable>
+      ) : null}
       <View style={styles.card}>
         <SectionHeader
           title="Barangay rescue map"
-          action={activeAssignment ? <StatusBadge label={position ? 'GPS active' : 'Acquiring GPS'} tone={position ? 'safe' : 'neutral'} /> :
+          action={
             <ActionButton
               label={tracking ? 'Stop' : 'Track Me'}
               icon={tracking ? 'stop-outline' : 'navigate-outline'}
@@ -191,7 +211,6 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
                 {activeAssignments.length ? activeAssignments.map((assignment: any) => (
                   <View key={assignment.assignment_id} style={styles.layerItem}>
                     <Text style={styles.rowTitle}>{assignment.assigned_area || assignment.household_id || 'Assigned location'}</Text>
-                    <Text style={styles.rowMeta}>{assignment.status_label || 'Dispatch route'}</Text>
                   </View>
                 )) : <Text style={styles.smallText}>No active dispatch routes.</Text>}
               </View>
@@ -239,6 +258,23 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
 const styles = StyleSheet.create({
   stack: {
     gap: spacing.md,
+  },
+  navigationButton: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: palette.nav,
+  },
+  navigationButtonPressed: {
+    opacity: 0.85,
+  },
+  navigationButtonText: {
+    color: palette.navText,
+    fontWeight: '800',
   },
   mapFilters: {
     gap: spacing.xs,

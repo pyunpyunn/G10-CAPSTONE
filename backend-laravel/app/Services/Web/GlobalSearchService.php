@@ -170,8 +170,8 @@ class GlobalSearchService
                     'responders',
                     $responder->full_name ?: $responder->responder_code,
                     trim(($responder->responder_code ?? $responder->username ?? '').' · '.($responder->duty_status ?? $responder->contact_number ?? 'Account')),
-                    '/rescuers/view?id='.rawurlencode((string) $responder->responder_id)
-                );
+                    '/rescuers'
+                ) + ['responder_id' => $responder->responder_id];
             })
             ->all();
     }

@@ -36,12 +36,34 @@ class OneSignalNotificationService
                     'contents' => ['en' => $message],
                 ]);
 
-            if (! $response->successful() || ! $response->json('id')) {
+            $providerErrors = $response->json('errors', []);
+            $providerErrors = is_array($providerErrors)
+                ? collect($providerErrors)->flatten()->filter(fn ($error): bool => is_string($error) && trim($error) !== '')->values()->all()
+                : [];
+
+            if (! $response->successful() || ! $response->json('id') || $providerErrors !== []) {
                 Log::warning('OneSignal SMS request was not accepted', [
                     'status' => $response->status(),
-                    'errors' => $response->json('errors'),
+                    'errors' => $providerErrors,
                 ]);
-                return $this->result('failed', 1, 'OneSignal did not accept the SMS request.');
+
+                $isNotSubscribed = collect($providerErrors)
+                    ->contains(fn (string $error): bool => str_contains(strtolower($error), 'all included players are not subscribed'));
+                if ($isNotSubscribed) {
+                    return [
+                        ...$this->result(
+                            'not_subscribed',
+                            1,
+                            'OneSignal has no active SMS subscription for this number. Enable SMS with an approved Philippine sender and ensure the number can receive ResQperation security-code messages, or configure an SMS gateway.'
+                        ),
+                        'errors' => $providerErrors,
+                    ];
+                }
+
+                return [
+                    ...$this->result('failed', 1, 'OneSignal did not accept the SMS request.'),
+                    'errors' => $providerErrors,
+                ];
             }
 
             return [
@@ -428,7 +450,6 @@ class OneSignalNotificationService
         ];
     }
 }
-
 
 
 

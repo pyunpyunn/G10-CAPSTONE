@@ -51,7 +51,13 @@ export async function restoreMobileSession(): Promise<string | null> {
       return null;
     }
 
-    return mobileRoles.includes(cachedRole || '') ? cachedRole : null;
+    if (mobileRoles.includes(cachedRole || '')) {
+      return cachedRole;
+    }
+
+    await clearToken();
+    await deleteStoredItem(sessionRoleKey);
+    return null;
   }
 }
 
@@ -152,5 +158,5 @@ export async function resetHouseholdPassword(payload: {
   password: string;
   password_confirmation: string;
 }) {
-  return (await api.post<{ household_id: string }>('/auth/password-recovery/household/reset', payload)).data;
+  return (await api.post<{ household_id: string; account_identifier: string }>('/auth/password-recovery/household/reset', payload)).data;
 }
