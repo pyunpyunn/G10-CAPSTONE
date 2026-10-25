@@ -10,6 +10,54 @@ use App\Support\RequestSchema as Schema;
 
 class OneSignalNotificationService
 {
+    public function sendSmsToPhoneNumber(string $phoneNumber, string $message): array
+    {
+        if (! $this->isConfigured()) {
+            return $this->result('not_configured', 0, 'OneSignal credentials are not configured.');
+        }
+
+        $number = $this->normalizePhoneNumber($phoneNumber);
+        if (! $number) {
+            return $this->result('invalid_number', 0, 'The phone number is not a valid Philippine mobile number.');
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Key '.$this->apiKey(),
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ])
+                ->timeout(15)
+                ->connectTimeout(5)
+                ->post(rtrim($this->baseUrl(), '/').'/notifications?c=sms', [
+                    'app_id' => $this->appId(),
+                    'target_channel' => 'sms',
+                    'include_phone_numbers' => [$number],
+                    'contents' => ['en' => $message],
+                ]);
+
+            if (! $response->successful() || ! $response->json('id')) {
+                Log::warning('OneSignal SMS request was not accepted', [
+                    'status' => $response->status(),
+                    'errors' => $response->json('errors'),
+                ]);
+                return $this->result('failed', 1, 'OneSignal did not accept the SMS request.');
+            }
+
+            return [
+                'status' => 'accepted',
+                'recipient_count' => 1,
+                'accepted_count' => 1,
+                'provider_ids' => [(string) $response->json('id')],
+                'message' => 'OneSignal accepted the SMS request.',
+                'errors' => [],
+            ];
+        } catch (\Throwable $error) {
+            Log::warning('OneSignal SMS request failed', ['message' => $error->getMessage()]);
+            return $this->result('failed', 1, 'OneSignal could not send the SMS.');
+        }
+    }
+
     public function prepareDelivery(array $options): array
     {
         $ids = $this->mobilePlayerIds($options);
@@ -343,6 +391,16 @@ class OneSignalNotificationService
         return $this->appId() !== '' && $this->apiKey() !== '';
     }
 
+    private function normalizePhoneNumber(string $number): ?string
+    {
+        $digits = preg_replace('/\D+/', '', $number);
+        if (! $digits) return null;
+        if (str_starts_with($digits, '0') && strlen($digits) === 11) return '+63'.substr($digits, 1);
+        if (str_starts_with($digits, '9') && strlen($digits) === 10) return '+63'.$digits;
+        if (str_starts_with($digits, '63') && strlen($digits) === 12) return '+'.$digits;
+        return null;
+    }
+
     private function appId(): string
     {
         return trim((string) config('services.onesignal.app_id'));
@@ -370,7 +428,6 @@ class OneSignalNotificationService
         ];
     }
 }
-
 
 
 

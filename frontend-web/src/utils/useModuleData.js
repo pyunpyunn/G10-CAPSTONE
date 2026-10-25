@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRealtimeVersion } from './useRealtimeVersion'
 import { createRefreshScheduler } from './refreshScheduler'
+import { invalidateApiState } from '../state/apiStore'
 
 export function useModuleData(loader, topics = [], { keepPreviousData = false } = {}) {
   const [version, setVersion] = useState(0)
@@ -46,6 +47,9 @@ export function useModuleData(loader, topics = [], { keepPreviousData = false } 
     if (realtimeVersion > 0) realtimeRefresh.current?.()
   }, [realtimeVersion])
   const current = result?.loader === loader && result?.version === version
-  const refresh = useCallback(() => setVersion((value) => value + 1), [])
+  const refresh = useCallback(() => {
+    invalidateApiState()
+    setVersion((value) => value + 1)
+  }, [])
   return { data: current || (keepPreviousData && result?.loader === loader) ? result.data : null, error: current ? result.error : '', loading: !current, refresh }
 }

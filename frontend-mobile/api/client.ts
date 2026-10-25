@@ -2,7 +2,7 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
-import { invalidateMobileReads } from '@/utils/mobileReadCache';
+import { installReduxTransport, resetApiState } from '@/state/apiStore';
 
 const tokenKey = 'resqperation_mobile_token';
 const rescuerDeviceUuidKey = 'resq_rescuer_device_uuid';
@@ -81,6 +81,8 @@ export const api = axios.create({
   },
 });
 
+installReduxTransport(api);
+
 api.interceptors.request.use(async (config) => {
   const serverUrl = await getApiServerUrl();
   if (!serverUrl) throw new Error('Set the server address on the sign-in screen first.');
@@ -102,10 +104,10 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => {
-    if (response.config.method !== 'get') invalidateMobileReads();
     return response;
   },
   (error) => {
+    if (error.response?.status === 401) resetApiState();
     if (error.code === 'ECONNABORTED') {
       error.userMessage = 'The server took too long to respond. Check Wi-Fi, Laravel, and the database connection.';
     } else if (!error.response) {
@@ -117,12 +119,12 @@ api.interceptors.response.use(
 );
 
 export async function saveToken(token: string) {
-  invalidateMobileReads();
+  resetApiState();
   await setStoredItem(tokenKey, token);
 }
 
 export async function clearToken() {
-  invalidateMobileReads();
+  resetApiState();
   await deleteStoredItem(tokenKey);
 }
 

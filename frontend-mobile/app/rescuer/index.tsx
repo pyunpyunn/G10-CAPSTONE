@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import {
   Alert,
@@ -35,7 +35,7 @@ import { RadioCommunicationScreen } from '@/components/rescuer/RadioCommunicatio
 import { RescueMapScreen } from '@/components/rescuer/RescueMapScreen';
 import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScreen';
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
-import { LoadingState } from '@/components/rescuer/RescuerUI';
+import { ActionButton, EmptyState, LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
@@ -60,30 +60,38 @@ export default function RescuerHomeScreen() {
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [overviewError, setOverviewError] = useState('');
+  const overviewRequest = useRef(false);
   useEffect(() => Platform.OS === 'web' ? undefined : mountNavigationSync(), []);
 
-  const loadOverview = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
+  const loadOverview = useCallback(async (isRefresh = false, silent = false) => {
+    if (overviewRequest.current) return;
+    overviewRequest.current = true;
+
+    if (!silent) {
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
     }
 
     try {
       const data = await getRescuerOverview(isRefresh);
       setOverview(data);
+      setOverviewError('');
     } catch (error: any) {
-      Alert.alert('Unable to load rescuer data', errorMessage(error));
+      setOverviewError(errorMessage(error));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      overviewRequest.current = false;
+      if (!silent) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     const removeBroadcast = onDisasterBroadcast(() => { void loadOverview(true); });
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void loadOverview(true);
+      if (state === 'active') void loadOverview(true, true);
     });
     return () => { removeBroadcast(); subscription.remove(); };
   }, [loadOverview]);
@@ -146,9 +154,13 @@ export default function RescuerHomeScreen() {
   }, problem => { if (problem) setGpsStatus(problem); }), []);
   useEffect(() => {
     if (!trackingAssignmentId) return;
-    const timer = setInterval(() => { if (AppState.currentState === 'active') void getRescuerOverview(true).then(setOverview).catch(() => {}); }, 15000);
+    const timer = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        void loadOverview(true, true);
+      }
+    }, 15000);
     return () => clearInterval(timer);
-  }, [trackingAssignmentId]);
+  }, [trackingAssignmentId, loadOverview]);
 
   async function handleLogout() {
     try {
@@ -280,8 +292,17 @@ export default function RescuerHomeScreen() {
   }
 
   function renderContent() {
-    if (loading || !overview) {
+    if (loading && !overview) {
       return <LoadingState label="Loading rescuer console..." />;
+    }
+
+    if (!overview) {
+      return (
+        <View style={styles.loadFailure}>
+          <EmptyState icon="cloud-offline-outline" title="Unable to load rescuer data" body={overviewError || 'Check your connection, then try again.'} />
+          <ActionButton label="Try again" icon="refresh-outline" onPress={() => { void loadOverview(); }} />
+        </View>
+      );
     }
 
     if (activeTab === 'dashboard') {
@@ -297,13 +318,27 @@ export default function RescuerHomeScreen() {
 
     if (activeTab === 'map') {
       return (
-        <RescueMapScreen
-          assignments={assignments}
-          evacuationCenters={overview.evacuation_centers || []}
-          activeAssignment={activeAssignment}
-          selectedAssignment={selectedAssignment}
-          onSendLocation={handleSendLocation}
-        />
+        <>
+          {Platform.OS !== 'web' ? (
+            <Pressable
+              style={({ pressed }) => [styles.navigationButton, pressed && styles.navigationButtonPressed]}
+              onPress={() => router.push({
+                pathname: '/rescuer/navigation' as any,
+                params: { dispatchId: String(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || '') },
+              })}
+            >
+              <Ionicons name="navigate-outline" size={20} color="#fff" />
+              <Text style={styles.navigationButtonText}>View directions / Offline navigation</Text>
+            </Pressable>
+          ) : null}
+          <RescueMapScreen
+            assignments={assignments}
+            evacuationCenters={overview.evacuation_centers || []}
+            activeAssignment={activeAssignment}
+            selectedAssignment={selectedAssignment}
+            onSendLocation={handleSendLocation}
+          />
+        </>
       );
     }
 
@@ -348,11 +383,14 @@ export default function RescuerHomeScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
-        {Platform.OS !== 'web' && <Pressable style={{ padding: 16, backgroundColor: palette.nav, borderRadius: 12 }}
-          onPress={() => router.push({ pathname: '/rescuer/navigation' as any,
-            params: { dispatchId: String(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || '') } })}>
-          <Text style={{ color: palette.navText, fontWeight: '700' }}>View directions / Offline navigation</Text>
-        </Pressable>}
+        {!!overviewError && overview ? (
+          <View style={styles.refreshError}>
+            <Text style={styles.refreshErrorText}>Unable to refresh data: {overviewError}</Text>
+            <Pressable onPress={() => { void loadOverview(true); }} accessibilityRole="button">
+              <Text style={styles.refreshErrorAction}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
         {!!trackingAssignmentId && !!gpsStatus && <Text accessibilityRole="text" style={{ color: palette.textSoft, fontSize: 12 }}>{gpsStatus}</Text>}
         {renderContent()}
       </ScrollView>
@@ -419,6 +457,49 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     paddingBottom: 100,
+  },
+  loadFailure: {
+    gap: spacing.md,
+    alignItems: 'stretch',
+    paddingTop: spacing.xl,
+  },
+  refreshError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: '#96202012',
+  },
+  refreshErrorText: {
+    flex: 1,
+    color: palette.unsafe,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  refreshErrorAction: {
+    color: palette.navActive,
+    fontWeight: '900',
+  },
+  navigationButton: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: palette.nav,
+  },
+  navigationButtonPressed: {
+    opacity: 0.85,
+  },
+  navigationButtonText: {
+    color: palette.navText,
+    fontWeight: '800',
   },
   tabBar: {
     position: 'absolute',

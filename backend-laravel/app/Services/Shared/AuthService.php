@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Responder;
 use App\Models\Household;
 use App\Queries\AuthAccountQuery;
+use App\Services\Shared\SmsGatewayService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,11 @@ use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
-    public function __construct(private AuthAccountQuery $accounts) {}
+    public function __construct(
+        private AuthAccountQuery $accounts,
+        private SmsGatewayService $smsGateway,
+        private OneSignalNotificationService $oneSignal,
+    ) {}
     private const RECOVERY_QUESTIONS = [
         'first_pet' => "What was your first pet's name?",
         'birth_city' => "What's the name of the city where you were born?",
@@ -242,6 +247,249 @@ class AuthService
             if (Schema::hasTable('personal_access_tokens')) $user->tokens()->delete();
         });
         return response()->json(['message' => 'Password changed successfully. Sign in with your new password.']);
+    }
+
+    public function lookupHouseholdRecoveryContact(Request $request): JsonResponse
+    {
+        $values = $request->validate(['login' => ['required', 'string', 'max:255']]);
+        $details = $this->householdRecoveryDetails(trim($values['login']));
+
+        if (! $details) {
+            throw ValidationException::withMessages(['login' => ['Household account was not found. Check the user ID and try again.']]);
+        }
+
+        return response()->json([
+            'masked_contact_number' => $this->maskPhoneNumber($details['contact_number']),
+        ]);
+    }
+
+    public function validateHouseholdRecoveryContact(Request $request): JsonResponse
+    {
+        $values = $request->validate([
+            'login' => ['required', 'string', 'max:255'],
+            'contact_number' => ['required', 'string', 'max:40'],
+        ]);
+        $details = $this->householdRecoveryDetails(trim($values['login']));
+
+        if (! $details || ! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
+            throw ValidationException::withMessages([
+                'contact_number' => ['This number does not match the registered household contact number.'],
+            ]);
+        }
+
+        return response()->json(['message' => 'Registered contact number verified.']);
+    }
+
+    public function sendHouseholdRecoveryCode(Request $request): JsonResponse
+    {
+        $values = $request->validate([
+            'login' => ['required', 'string', 'max:255'],
+            'contact_number' => ['required', 'string', 'max:40'],
+        ]);
+        $details = $this->householdRecoveryDetails(trim($values['login']));
+
+        if (! $details || ! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
+            throw ValidationException::withMessages([
+                'contact_number' => ['This number does not match the registered household contact number.'],
+            ]);
+        }
+        if (! Schema::hasTable('household_password_recovery_otps')) {
+            return response()->json(['message' => 'Password recovery is not configured. Run the latest database migration.'], 503);
+        }
+
+        $existing = DB::table('household_password_recovery_otps')
+            ->where('user_id', $details['user']->user_id)
+            ->first(['sent_at']);
+        if ($existing && now()->lt(\Illuminate\Support\Carbon::parse($existing->sent_at)->addSeconds(60))) {
+            return response()->json(['message' => 'Please wait before requesting another code.'], 429);
+        }
+
+        $code = (string) random_int(100000, 999999);
+        $sms = $this->smsGateway->sendDirectSms(
+            $details['contact_number'],
+            "Your ResQperation password reset code is {$code}. It expires in 10 minutes."
+        );
+        if ($sms['status'] === 'not_configured') {
+            $sms = $this->oneSignal->sendSmsToPhoneNumber(
+                $details['contact_number'],
+                "Your ResQperation password reset code is {$code}. It expires in 10 minutes."
+            );
+        }
+        if ($sms['status'] !== 'accepted') {
+            $message = $sms['status'] === 'not_configured'
+                ? 'SMS delivery is not configured. Configure an SMS gateway or OneSignal SMS service.'
+                : 'The SMS provider could not send your code. Please try again later.';
+            return response()->json(['message' => $message], 503);
+        }
+
+        DB::table('household_password_recovery_otps')->updateOrInsert(
+            ['user_id' => $details['user']->user_id],
+            [
+                'household_id' => $details['household_id'],
+                'code_hash' => Hash::make($code),
+                'failed_attempts' => 0,
+                'expires_at' => now()->addMinutes(10),
+                'sent_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+
+        return response()->json(['message' => 'A password reset code was sent by SMS.']);
+    }
+
+    public function resetHouseholdPassword(Request $request): JsonResponse
+    {
+        $values = $request->validate([
+            'login' => ['required', 'string', 'max:255'],
+            'contact_number' => ['required', 'string', 'max:40'],
+            'code' => ['required', 'digits:6'],
+            'password' => ['required', 'string', 'min:8', 'max:128', 'confirmed'],
+        ]);
+        $details = $this->householdRecoveryDetails(trim($values['login']));
+
+        if (! $details || ! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
+            throw ValidationException::withMessages([
+                'contact_number' => ['This number does not match the registered household contact number.'],
+            ]);
+        }
+        if (! Schema::hasTable('household_password_recovery_otps')) {
+            return response()->json(['message' => 'Password recovery is not configured. Run the latest database migration.'], 503);
+        }
+        if ($details['user']->is_active !== null && ! $details['user']->is_active) {
+            return response()->json(['message' => 'This account is inactive. Contact HQ/Admin.'], 403);
+        }
+
+        $result = DB::transaction(function () use ($details, $values): array {
+            $table = DB::table('household_password_recovery_otps');
+            $recovery = $table->where('user_id', $details['user']->user_id)->lockForUpdate()->first();
+
+            if (! $recovery) {
+                return ['error' => 'Request a new verification code.'];
+            }
+            if ((string) $recovery->household_id !== $details['household_id']) {
+                $table->where('user_id', $details['user']->user_id)->delete();
+                return ['error' => 'Household details changed. Request a new verification code.'];
+            }
+            if (now()->gte(\Illuminate\Support\Carbon::parse($recovery->expires_at))) {
+                $table->where('user_id', $details['user']->user_id)->delete();
+                return ['error' => 'Your verification code has expired. Request a new code.'];
+            }
+            if (! Hash::check($values['code'], $recovery->code_hash)) {
+                $attempts = (int) $recovery->failed_attempts + 1;
+                if ($attempts >= 5) {
+                    $table->where('user_id', $details['user']->user_id)->delete();
+                    return ['error' => 'Too many incorrect codes. Request a new verification code.'];
+                }
+                $table->where('user_id', $details['user']->user_id)->update([
+                    'failed_attempts' => $attempts,
+                    'updated_at' => now(),
+                ]);
+                return ['error' => 'The verification code is incorrect.'];
+            }
+            if (! $details['user']->password || Hash::check($values['password'], $details['user']->password)) {
+                return ['error' => 'Choose a different new password.'];
+            }
+
+            $updates = ['password' => Hash::make($values['password']), 'updated_at' => now()];
+            if (Schema::hasColumn('users', 'password_changed_at')) {
+                $updates['password_changed_at'] = now();
+            }
+            if (Schema::hasColumn('users', 'must_change_password')) {
+                $updates['must_change_password'] = 0;
+            }
+            User::query()->whereKey($details['user']->user_id)->update($updates);
+            if (Schema::hasTable('personal_access_tokens')) {
+                $details['user']->tokens()->delete();
+            }
+            $table->where('user_id', $details['user']->user_id)->delete();
+
+            return ['household_id' => $details['household_id']];
+        });
+
+        if (isset($result['error'])) {
+            throw ValidationException::withMessages(['code' => [$result['error']]]);
+        }
+
+        return response()->json([
+            'message' => 'Password changed successfully.',
+            'household_id' => $result['household_id'],
+        ]);
+    }
+
+    private function householdRecoveryDetails(string $login): ?array
+    {
+        if (! Schema::hasTable('households')
+            || ! Schema::hasColumn('households', 'household_id')
+            || ! Schema::hasColumn('households', 'contact_number')
+            || ! Schema::hasColumn('users', 'household_id')) {
+            return null;
+        }
+
+        $user = $this->accounts->userFromLogin($login);
+        if (! $user) {
+            return null;
+        }
+        $user->loadMissing('role');
+        if ($user->roleKey() !== 'household_resident' || ! $user->household_id
+            || ($user->is_active !== null && ! $user->is_active)) {
+            return null;
+        }
+
+        $household = DB::table('households')
+            ->where('household_id', $user->household_id)
+            ->when(Schema::hasColumn('households', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->first(['household_id', 'contact_number']);
+        if (! $household || ! $household->contact_number || ! $this->normalizePhoneNumber($household->contact_number)) {
+            return null;
+        }
+
+        $owner = User::query()
+            ->where('household_id', $household->household_id)
+            ->whereKey($user->user_id)
+            ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->with('role')
+            ->first();
+        if (! $owner || $owner->roleKey() !== 'household_resident') {
+            return null;
+        }
+
+        return [
+            'user' => $owner,
+            'household_id' => (string) $household->household_id,
+            'contact_number' => (string) $household->contact_number,
+        ];
+    }
+
+    private function phoneNumbersMatch(string $input, string $registered): bool
+    {
+        $normalizedInput = $this->normalizePhoneNumber($input);
+        return $normalizedInput !== null && $normalizedInput === $this->normalizePhoneNumber($registered);
+    }
+
+    private function normalizePhoneNumber(string $number): ?string
+    {
+        $digits = preg_replace('/\D+/', '', $number);
+        if (! $digits) {
+            return null;
+        }
+        if (str_starts_with($digits, '0') && strlen($digits) === 11) {
+            return '+63'.substr($digits, 1);
+        }
+        if (str_starts_with($digits, '9') && strlen($digits) === 10) {
+            return '+63'.$digits;
+        }
+        if (str_starts_with($digits, '63') && strlen($digits) === 12) {
+            return '+'.$digits;
+        }
+
+        return null;
+    }
+
+    private function maskPhoneNumber(string $number): string
+    {
+        $digits = preg_replace('/\D+/', '', $number);
+        return str_repeat('*', max(0, strlen($digits) - 2)).substr($digits, -2);
     }
 
     private function hasRecoveryColumns(): bool

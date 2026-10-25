@@ -89,6 +89,9 @@ class RescueDispatchQuery
     {
         $query = ResponderAssignment::query()->from('responder_assignments as ra')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'ra.team_id')->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')->where('ra.disaster_id', $eventId)->select(['ra.assignment_id', 'ra.assignment_code', 'ra.responder_id', 'ra.responder_count', 'ra.dispatch_type', 'ra.team_id', 'ra.disaster_id', 'ra.household_id', 'ra.assigned_area', 'ra.route_notes', 'ra.priority_level', 'ra.dispatch_notes', 'ra.status', 'ra.assigned_at', 'ra.accepted_at', 'ra.en_route_at', 'ra.arrived_at', 'ra.completed_at', 'ra.outcome_notes', 'ra.updated_at', 'rt.team_name', 'rt.team_code', 'rt.team_type', 'r.full_name as responder_name', 'r.contact_number as responder_contact']);
         $status = trim((string) $request->query('status', 'all')); $search = trim((string) $request->query('search', ''));
+        if ($request->query('view') === 'management') $query->select([
+            'ra.assignment_id','ra.assignment_code','ra.assigned_area','ra.priority_level','ra.status','ra.assigned_at','rt.team_name',
+        ]);
         if ($status === 'active') $query->whereIn('ra.status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning']);
         elseif ($status === 'closed') $query->whereIn('ra.status', ['completed', 'cancelled']);
         elseif ($status !== '' && $status !== 'all') $query->where('ra.status', $this->presenter->statusKey($status));
@@ -114,9 +117,12 @@ class RescueDispatchQuery
         return ['route_id' => $route->route_id, 'route_name' => $route->route_name, 'route_status' => $route->route_status, 'estimated_distance_km' => $route->estimated_distance_km, 'estimated_duration_min' => $route->estimated_duration_min, 'coordinates' => RouteCoordinate::query()->where('route_id', $route->route_id)->orderBy('sequence_order')->get(['latitude', 'longitude', 'sequence_order', 'recorded_at', 'accuracy_m'])];
     }
 
-    public function responders(?string $eventId)
+    public function responders(?string $eventId, ?array $responderIds = null)
     {
-        $responders = Responder::query()->withoutGlobalScopes()->from('responders as r')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'r.team_id')->when(Schema::hasColumn('responders', 'deleted_at'), fn ($q) => $q->whereNull('r.deleted_at'))->orderBy('r.full_name')->get(['r.responder_id','r.user_id','r.team_id','r.full_name','r.title','r.contact_number','r.duty_status','r.is_deployed','r.last_active_at','rt.team_name','rt.team_code']);
+        if ($responderIds === []) return collect();
+        $responders = Responder::query()->withoutGlobalScopes()->from('responders as r')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'r.team_id')->when(Schema::hasColumn('responders', 'deleted_at'), fn ($q) => $q->whereNull('r.deleted_at'))
+            ->when($responderIds !== null, fn($query) => $query->whereIn('r.responder_id',$responderIds))
+            ->orderBy('r.full_name')->get(['r.responder_id','r.user_id','r.team_id','r.full_name','r.title','r.contact_number','r.duty_status','r.is_deployed','r.last_active_at','rt.team_name','rt.team_code']);
         $activeByResponder = $eventId && $responders->isNotEmpty()
             ? ResponderAssignment::query()->where('disaster_id', $eventId)
                 ->whereIn('responder_id', $responders->pluck('responder_id'))

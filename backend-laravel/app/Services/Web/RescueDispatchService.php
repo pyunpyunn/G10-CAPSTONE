@@ -54,16 +54,21 @@ class RescueDispatchService
             'search' => ['nullable', 'string', 'max:255'],
         ]);
         $event = $this->query->activeEvent();
+        $logs = app(\App\Queries\FieldCommunicationQuery::class)->paginate($request, $event?->event_id);
+        $compact = $request->boolean('compact');
         return [
             'active_event' => $event ? $this->presenter->activeEvent($event) : null,
-            'logs' => app(\App\Queries\FieldCommunicationQuery::class)->paginate($request, $event?->event_id),
-            'responders' => $this->query->responders($event?->event_id),
-            'teams' => $this->query->teamCards($event?->event_id)->filter(fn ($team) => $team['team_id'])->values(),
+            'logs' => $logs,
+            'responders' => $this->query->responders($event?->event_id, $compact ? collect($logs->items())->pluck('responder_id')->filter()->unique()->all() : null),
+            'teams' => $compact ? RescueTeam::query()->orderBy('team_name')->get(['team_id','team_code','team_name'])
+                : $this->query->teamCards($event?->event_id)->filter(fn ($team) => $team['team_id'])->values(),
         ];
     }
 
     public function index(Request $request): JsonResponse
     {
+        $request->validate(['view' => ['sometimes', \Illuminate\Validation\Rule::in(['overview', 'management', 'coverage'])]]);
+        if ($request->filled('view')) return $this->pageView($request);
         $request->validate(['sitio_id' => ['sometimes', 'integer', 'min:1']]);
         if ($request->has('sitio_id')) app(\App\Queries\HouseholdStatusQuery::class)->listScope($request);
         $activeEvent = $this->query->activeEvent();
@@ -133,6 +138,32 @@ class RescueDispatchService
                 'dispatch_history' => $this->query->activity(null, 50),
             ],
         ]);
+    }
+
+    private function pageView(Request $request): JsonResponse
+    {
+        $event = $this->query->activeEvent();
+        $eventId = $request->query('event_id') ?: $event?->event_id;
+        $data = ['active_event' => $event ? $this->presenter->activeEvent($event) : null];
+        if ($request->query('view') === 'coverage') {
+            return response()->json(['data' => $data + ['teams' => $this->query->teamCoverage($eventId), 'responders' => $this->query->responders($eventId)]]);
+        }
+        if ($request->query('view') === 'management') {
+            $page = $eventId ? $this->query->dispatches($request, (string) $eventId) : null;
+            return response()->json(['data' => $data + ['dispatches' => [
+                'data' => $page ? collect($page->items())->map(fn ($row) => $this->presenter->managementDispatch($row))->values() : [],
+                'meta' => ['current_page' => $page?->currentPage() ?? 1, 'per_page' => $page?->perPage() ?? 20,
+                    'total' => $page?->total() ?? 0, 'last_page' => $page?->lastPage() ?? 1,
+                    'from' => $page?->firstItem(), 'to' => $page?->lastItem()],
+            ]]]);
+        }
+        $teams = $this->query->teamCards($eventId);
+        $priorities = $eventId ? app(\App\Queries\SitioPriorityQuery::class)->ranked((string) $eventId) : [];
+        $active = $eventId ? $this->query->activeDispatches((string) $eventId) : [];
+        return response()->json(['data' => $data + [
+            'summary' => $this->query->summary($eventId, $teams),
+            'priorities' => app(\App\Queries\SitioDispatchCoverageQuery::class)->withActiveAssignments($priorities, $active),
+        ]]);
     }
 
     public function store(Request $request): JsonResponse

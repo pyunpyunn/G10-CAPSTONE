@@ -1,7 +1,6 @@
 import api from './client'
 import { readSessionCache, removeSessionCache, removeSessionCachePrefix, writeSessionCache } from './sessionCache'
 
-const inFlightRequests = new Map()
 const pageCacheTtl = 24 * 60 * 60 * 1000
 
 if (typeof window !== 'undefined') {
@@ -13,14 +12,8 @@ if (typeof window !== 'undefined') {
 }
 
 function shareInFlight(key, request) {
-  const existing = inFlightRequests.get(key)
-  if (existing) return existing
-
-  const pending = Promise.resolve().then(request).finally(() => {
-    if (inFlightRequests.get(key) === pending) inFlightRequests.delete(key)
-  })
-  inFlightRequests.set(key, pending)
-  return pending
+  // Redux transport scopes deduplication to the current account and server.
+  return request()
 }
 
 export async function getRescuers(params = {}) {

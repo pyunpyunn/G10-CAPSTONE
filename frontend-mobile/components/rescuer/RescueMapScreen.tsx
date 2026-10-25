@@ -133,19 +133,8 @@ export function RescueMapScreen({ assignments, activeAssignment, selectedAssignm
   }
 
   const mappedAssignments = assignments.filter((item) => item.latitude && item.longitude);
-  const urgentCount = assignments.filter((item) => item.priority_level === 'urgent').length;
-  const activeCount = assignments.filter((item) =>
-    ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(item.status_key)
-  ).length;
-
   return (
     <View style={styles.stack}>
-      <View style={styles.summaryRow}>
-        <StatusBadge label={`${assignments.length} assigned`} tone="neutral" />
-        <StatusBadge label={`${activeCount} active`} tone="en_route" />
-        <StatusBadge label={`${urgentCount} urgent`} tone={urgentCount > 0 ? 'urgent' : 'neutral'} />
-      </View>
-
       <View style={styles.card}>
         <SectionHeader
           title="Barangay rescue map"
@@ -274,11 +263,6 @@ function normalizeRoute(points: any[] = []) {
 const styles = StyleSheet.create({
   stack: {
     gap: spacing.md,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
   },
   card: {
     gap: spacing.md,

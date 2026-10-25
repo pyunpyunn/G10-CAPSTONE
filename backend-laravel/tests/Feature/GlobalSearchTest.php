@@ -100,7 +100,7 @@ class GlobalSearchTest extends TestCase
         $user->setAttribute('is_active', true);
         $user->setRelation('role', new Role(['role_key' => 'operations_admin']));
         $this->assertTrue(app(WebAccessPolicy::class)->allows($user, 'global_search'));
-        $this->assertFalse(app(WebAccessPolicy::class)->allows($user, 'geospatial_analytics'));
+        $this->assertTrue(app(WebAccessPolicy::class)->allows($user, 'geospatial_analytics'));
     }
 
     public function test_team_search_links_to_the_specific_team(): void

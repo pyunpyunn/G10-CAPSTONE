@@ -4,6 +4,28 @@ namespace App\Support;
 
 class RescuerHouseholdQueue
 {
+    public static function overallStatus(object $assignment): string
+    {
+        $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
+        $coverage = $notes['responder_households'] ?? [];
+        $statuses = $notes['responder_statuses'] ?? [];
+        if ($coverage) {
+            $statuses = [];
+            foreach ($coverage as $id => $households) {
+                // Support members with no household queue must not keep a
+                // finished dispatch open indefinitely.
+                if (! $households) continue;
+                $statuses[] = self::pending($assignment, (int) $id)
+                    ? self::status($assignment, (int) $id) : 'completed';
+            }
+        }
+        if (! $statuses) return str_replace('-', '_', $assignment->status ?? 'dispatched');
+        foreach (['on_scene', 'en_route', 'accepted', 'dispatched', 'returning'] as $active) {
+            if (in_array($active, $statuses, true)) return $active;
+        }
+        return in_array('cancelled', $statuses, true) ? 'cancelled' : 'completed';
+    }
+
     public static function status(object $assignment, int $responderId): string
     {
         $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
