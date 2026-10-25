@@ -1,10 +1,13 @@
 # RESQPERATION APK: First-Run Server Setup
 
-Use the existing standalone APK for household and rescuer accounts. Expo Go,
-QR scanning, Metro, and an APK rebuild are not required.
+Use the standalone APK for household and rescuer accounts. Expo Go, QR scanning,
+and Metro are not required. Build 6 needs a manually configured API address;
+automatic ngrok → Tailscale → LAN failover is included only in new APK builds.
 
-**Use Tailscale or LAN for this setup.** The old `127.0.0.1` + ngrok commands
-are not needed. `127.0.0.1` alone is reachable only from the server computer.
+For build 6, follow the manual Tailscale or LAN steps below. For a new APK with
+automatic fallback, see [TAILSCALE_LAN.md](./TAILSCALE_LAN.md); ngrok must be
+running on the backend computer. `127.0.0.1` alone is reachable only from the
+server computer.
 There is no frontend command to run for the installed APK: open the app itself.
 `npm start` is for development and is not part of this installation flow.
 
@@ -192,7 +195,7 @@ Use plain LAN HTTP only on a trusted local network.
 | Tailscale connection times out | Tailscale is connected on both devices and access policies permit TCP 8000. |
 | LAN connection times out | Both devices share the network; guest Wi-Fi or client isolation may block connections. |
 | Health endpoint reports a database error | MySQL95 is running and the existing Laravel database configuration is correct. |
-| APK still uses ngrok | Save the Tailscale or LAN address in **Server settings**. |
+| Build 6 cannot connect | Save the Tailscale or LAN address in **Server settings**. |
 | Notifications do not arrive | Check Android permission, internet access, OneSignal/FCM configuration, worker and scheduler. |
 | API stops working when the computer sleeps | Keep the computer awake while it acts as the server. |
 | Starting Laravel says port 8000 is already in use | Check the existing listener in step 4. If it is already listening on `0.0.0.0`, use that server instead of launching another copy. |

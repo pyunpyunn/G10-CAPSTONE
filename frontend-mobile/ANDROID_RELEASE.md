@@ -54,50 +54,16 @@ npm run build:android:store
 
 ## API hosting
 
-**Updated:** [Tailscale and LAN setup](./TAILSCALE_LAN.md) replaces the ngrok
-tunnel described below. The existing APK works after saving the new server
-address; a rebuild is not required. Future APK builds default to Tailscale.
+**Updated:** See [automatic API connection fallback](./TAILSCALE_LAN.md). New
+APK builds check ngrok, Tailscale, then LAN for a ready Laravel API. The ngrok
+tunnel must be started on the backend computer; the computer and Laravel must
+stay online. The backend's Laravel `.env` chooses its database, so all routes
+must reach that same backend and database. Do not expose the database port.
 
-The current default API is:
-`https://sturdily-morse-sitter.ngrok-free.dev/api/v1`.
-
-No existing permanent online deployment was found in the project configuration.
-This HTTPS endpoint was created using the computer's existing ngrok account. It
-forwards to Laravel on this computer and stays independent of the Wi-Fi LAN IP.
-**The computer, Laravel, MySQL and ngrok must remain online.** This is a testing
-tunnel, not a new always-on cloud server; ngrok account traffic limits apply.
-
-The computer's default DNS resolver intermittently returned “name does not
-exist” for this tunnel. Google and Cloudflare public DNS resolved it correctly,
-and the public HTTPS readiness check succeeded using that resolved address.
-No system DNS settings were changed. If a phone also cannot resolve the host,
-check its network/DNS or switch to permanent hosting using Server settings.
-
-Start Laravel in one PowerShell terminal:
-
-```powershell  
-cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
-$env:APP_DEBUG = 'false'
-$env:APP_ENV = 'production'
-php artisan serve --host=127.0.0.1 --port=8000 --no-reload
-```
-
-Start the HTTPS tunnel in another terminal (the existing ngrok login is used):
-
-```powershell
-  ngrok http http://127.0.0.1:8000 --url=https://sturdily-morse-sitter.ngrok-free.dev
-```
-
-During the build session both were started as hidden background processes. Do
-not start duplicate listeners while those processes are still running.
-
-When permanent hosting is ready, open **Server settings** on the APK sign-in
-screen and save its HTTPS API address ending in `/api/v1`. No rebuild is needed.
-Changing servers signs out the old account and clears its navigation cache;
-active trips and unsynced events must be completed/synced first.
-
-For later builds, change `EXPO_PUBLIC_API_BASE_URL` in `eas.json` to make the new
-address the default on new installations. Never embed Laravel secrets or the
+The current release APK does not contain automatic fallback; build and install
+a new APK for this behavior. The fallback URLs are configured in
+`EXPO_PUBLIC_API_FALLBACK_URLS` in `eas.json`. Update them if the ngrok domain,
+Tailscale address, or LAN IP changes. Never embed Laravel secrets or the
 OneSignal REST API key into the app.
 
 ## OneSignal

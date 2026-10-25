@@ -334,9 +334,12 @@ class RescueTeamRosterSeeder extends Seeder
             $counter++;
         }
 
-        private function teamIdBase(string $teamCode): int
-        {
-            return match ($teamCode) {
+        return $username;
+    }
+
+    private function teamIdBase(string $teamCode): int
+    {
+        return match ($teamCode) {
                 'SRR' => 1000,
                 'ECM' => 2000,
                 'HFAPS' => 3000,
@@ -348,10 +351,7 @@ class RescueTeamRosterSeeder extends Seeder
                 'RDANA' => 9000,
                 'PDANA' => 10000,
                 default => 11000,
-            };
-        }
-
-        return $username;
+        };
     }
 
     private function displayUsernameExists(string $username, string $accountId): bool

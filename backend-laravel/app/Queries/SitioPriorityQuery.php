@@ -89,13 +89,18 @@ class SitioPriorityQuery
             ->whereIn('status.status_key', HouseholdEventStatusQuery::VALID_KEYS)
             ->orderByDesc('report.submitted_at')->orderByDesc('report.status_log_id')
             ->select('status.status_key')->limit(1);
-        $statusRows = DB::table('households as h')
+        $statusQuery = DB::table('households as h')
             ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
             ->leftJoin('puroks as p', 'p.purok_id', '=', 'a.purok_id')
             ->whereIn('a.purok_id', HouseholdEligibilityQuery::puroks($barangayId))->whereNull('h.deleted_at')
             ->select('a.sitio_id as address_sitio_id', 'p.sitio_id as purok_sitio_id',
                 'a.purok_id as address_purok_id', 'a.purok_sitio as address_label')
-            ->selectSub($latestStatus, 'reported_status_key')->get();
+            ->selectSub($latestStatus, 'reported_status_key');
+        // Return one status-count row per area, not one PHP object per household.
+        $statusRows = DB::query()->fromSub($statusQuery, 'area_status')
+            ->select('address_sitio_id','purok_sitio_id','address_purok_id','address_label','reported_status_key')
+            ->selectRaw('COUNT(*) as household_total')
+            ->groupBy('address_sitio_id','purok_sitio_id','address_purok_id','address_label','reported_status_key')->get();
         $purokStatuses = [];
         $groups = $sitios->mapWithKeys(fn (Sitio $sitio): array => [(int) $sitio->sitio_id => [
                 'sitio_id' => (int) $sitio->sitio_id,
@@ -116,10 +121,10 @@ class SitioPriorityQuery
             $sitio = $resolveSitio($statusRow);
             if (! $sitio) continue;
             $key = HouseholdEventStatusQuery::category($statusRow->reported_status_key);
-            $groups[$sitio['sitio_id']]['status_counts'][$key]++;
+            $groups[$sitio['sitio_id']]['status_counts'][$key] += (int)$statusRow->household_total;
             if ($sitio['purok_id'] !== null) {
                 $purokStatuses[$sitio['purok_id']] ??= ['unsafe' => 0, 'unchecked' => 0, 'evacuated' => 0, 'safe' => 0];
-                $purokStatuses[$sitio['purok_id']][$key]++;
+                $purokStatuses[$sitio['purok_id']][$key] += (int)$statusRow->household_total;
             }
         }
         foreach ($households as $householdRow) {

@@ -1,0 +1,31 @@
+
+Fatal error: Allowed memory size of 134217728 bytes exhausted (tried to allocate 20480 bytes) in C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\framework\src\Illuminate\Database\Connection.php on line 428
+Stack trace:
+#0 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\framework\src\Illuminate\Database\Connection.php(428): PDOStatement->fetchAll()
+#1 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\framework\src\Illuminate\Database\Connection.php(830): Illuminate\Database\Connection->{closure:Illuminate\Database\Connection::select():412}('select * from "..', Array)
+#2 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\framework\src\Illuminate\Database\Connection.php(797): Illuminate\Database\Connection->runQueryCallback('select * from "..', Array, Object(Closure))
+#3 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\framework\src\Illuminate\Database\Connection.php(412): Illuminate\Database\Connection->run('select * from "..', Array, Object(Closure))
+#4 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3567): Illuminate\Database\Connection->select('select * from "..', Array, true, Array)
+#5 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3551): Illuminate\Database\Query\Builder->runSelect()
+#6 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\framework\src\Illuminate\Database\Eloquent\Builder.php(908): Illuminate\Database\Query\Builder->get(Array)
+#7 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\framework\src\Illuminate\Database\Eloquent\Builder.php(890): Illuminate\Database\Eloquent\Builder->getModels(Array)
+#8 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\framework\src\Illuminate\Database\Concerns\BuildsQueries.php(337): Illuminate\Database\Eloquent\Builder->get()
+#9 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\app\Queries\ResourceRequestMirror.php(26): Illuminate\Database\Eloquent\Builder->{closure:Illuminate\Database\Concerns\BuildsQueries::orderedLazyById():330}()
+#10 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\tests\Feature\ResourceRequestWriteWorkflowTest.php(179): App\Queries\ResourceRequestMirror->summarize()
+#11 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\src\Framework\TestCase.php(1314): Tests\Feature\ResourceRequestWriteWorkflowTest->test_tracking_mirror_reads_requests_in_bounded_pages()
+#12 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\src\Framework\TestCase.php(1351): PHPUnit\Framework\TestCase->invokeTestMethod('test_tracking_m..', Array)
+#13 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\src\Framework\TestCase.php(521): PHPUnit\Framework\TestCase->runTest()
+#14 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#15 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\src\Framework\TestCase.php(361): PHPUnit\Framework\TestRunner->run(Object(Tests\Feature\ResourceRequestWriteWorkflowTest))
+#16 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#17 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#18 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#19 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#20 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#21 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\phpunit\phpunit\phpunit(104): PHPUnit\TextUI\Application->run(Array)
+#22 {main}
+Fatal error: Allowed memory size of 134217728 bytes exhausted (tried to allocate 86016 bytes) in C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\pao\src\Autoload.php on line 67
+Stack trace:
+#0 C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\pao\src\Autoload.php(67): json_encode(Array, 6291520)
+#1 [internal function]: {closure:C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\vendor\laravel\pao\src\Autoload.php:35}()
+#2 {main}

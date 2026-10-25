@@ -5,6 +5,7 @@ import { searchGlobalRecords } from '../../api/globalSearchApi'
 import { markNotificationsRead, subscribeNotifications } from '../../api/notificationApi'
 import { notificationErrorMessage } from '../../utils/notificationHelpers'
 import { canOpenWebPage, hasWebAccess } from '../../utils/personnelAccess'
+import { searchResultDestination } from '../../utils/personnelNavigation'
 
 const searchTypes = [
   { id: 'pages', label: 'Pages' },
@@ -204,7 +205,8 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
     setIsSearchOpen(false)
     setIsFilterOpen(false)
     setSearchTerm('')
-    navigate(result.href)
+    const destination = searchResultDestination(result)
+    navigate(destination.to, { state: destination.state })
   }
 
   function toggleSearchType(typeId) {

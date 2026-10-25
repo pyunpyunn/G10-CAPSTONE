@@ -1,26 +1,29 @@
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
-import { invalidateMobileReads } from '@/utils/mobileReadCache';
+import { installReduxTransport, resetApiState } from '@/state/apiStore';
 
 const tokenKey = 'resqperation_mobile_token';
 const rescuerDeviceUuidKey = 'resq_rescuer_device_uuid';
 const serverUrlKey = 'resqperation_server_url';
+const serverHealthCacheMs = 20_000;
+const serverProbeTimeoutMs = 2_500;
+
+type FailoverRequestConfig = {
+  _resqFailoverAttempted?: boolean;
+  _resqForcedServerUrl?: string;
+};
+
+let activeServerUrl: string | null = null;
+let activeServerCheckedAt = 0;
 
 export async function getApiServerUrl() {
   return (await getStoredItem(serverUrlKey)) || getApiBaseUrl();
 }
 
 export async function setApiServerUrl(value: string) {
-  const parsed = new URL(value.trim());
-  if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) {
-    throw new Error('Enter a server URL beginning with https://, without passwords or query parameters.');
-  }
-  let path = parsed.pathname.replace(/\/+$/, '');
-  if (!path) path = '/api/v1';
-  if (!path.endsWith('/api/v1')) throw new Error('The server address must end with /api/v1.');
-  const next = `${parsed.origin}${path}`;
+  const next = normalizeApiServerUrl(value);
   if (next === await getApiServerUrl()) return next;
   if (Platform.OS !== 'web') {
     const navigation = await import('@/utils/navigationStore');
@@ -33,8 +36,21 @@ export async function setApiServerUrl(value: string) {
   await logoutPushIdentity();
   await clearToken();
   await setStoredItem(serverUrlKey, next);
+  activeServerUrl = null;
+  activeServerCheckedAt = 0;
   api.defaults.baseURL = next;
   return next;
+}
+
+function normalizeApiServerUrl(value: string) {
+  const parsed = new URL(value.trim());
+  if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new Error('Enter a server URL beginning with https://, without passwords or query parameters.');
+  }
+  let path = parsed.pathname.replace(/\/+$/, '');
+  if (!path) path = '/api/v1';
+  if (!path.endsWith('/api/v1')) throw new Error('The server address must end with /api/v1.');
+  return `${parsed.origin}${path}`;
 }
 
 function getApiBaseUrl() {
@@ -59,6 +75,63 @@ function getApiBaseUrl() {
   return configuredUrl || 'http://127.0.0.1:8000/api/v1';
 }
 
+async function getApiServerCandidates() {
+  const configured = (process.env.EXPO_PUBLIC_API_FALLBACK_URLS || '')
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean)
+    .map((url) => normalizeApiServerUrl(url));
+  const baseUrl = getApiBaseUrl();
+  if (baseUrl) {
+    configured.push(normalizeApiServerUrl(baseUrl));
+  }
+
+  const uniqueConfigured = [...new Set(configured)];
+  const savedUrl = await getStoredItem(serverUrlKey);
+  if (!savedUrl || uniqueConfigured.includes(savedUrl)) return uniqueConfigured;
+  return [savedUrl, ...uniqueConfigured];
+}
+
+function ngrokHeaders(url: string) {
+  return /\.ngrok(-free)?\.(dev|app|io)(\/|$)/.test(url)
+    ? { 'ngrok-skip-browser-warning': '1' }
+    : {};
+}
+
+async function selectReadyServer(forceCheck = false, excludedUrls: string[] = []) {
+  if (!forceCheck && activeServerUrl && Date.now() - activeServerCheckedAt < serverHealthCacheMs) {
+    return activeServerUrl;
+  }
+
+  const excluded = new Set(excludedUrls);
+  const candidates = (await getApiServerCandidates()).filter((url) => !excluded.has(url));
+  let databaseUnavailable = false;
+  for (const url of candidates) {
+    try {
+      const response = await axios.get(`${url}/health/ready`, {
+        timeout: serverProbeTimeoutMs,
+        headers: { Accept: 'application/json', ...ngrokHeaders(url) },
+      });
+      if (response.data?.status !== 'ready') continue;
+      activeServerUrl = url;
+      activeServerCheckedAt = Date.now();
+      api.defaults.baseURL = url;
+      return url;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 503) {
+        databaseUnavailable = true;
+      }
+    }
+  }
+
+  activeServerUrl = null;
+  activeServerCheckedAt = 0;
+  if (databaseUnavailable) {
+    throw new Error('The API is reachable, but its database is not ready. Check the database configured on the Laravel server.');
+  }
+  throw new Error('No configured API route is reachable. Check ngrok, Tailscale, the local network, and that Laravel is running.');
+}
+
 function isLocalhostUrl(url: string) {
   return url.includes('127.0.0.1') || url.includes('localhost');
 }
@@ -81,12 +154,14 @@ export const api = axios.create({
   },
 });
 
+installReduxTransport(api);
+
 api.interceptors.request.use(async (config) => {
-  const serverUrl = await getApiServerUrl();
-  if (!serverUrl) throw new Error('Set the server address on the sign-in screen first.');
+  const failoverConfig = config as typeof config & FailoverRequestConfig;
+  const serverUrl = failoverConfig._resqForcedServerUrl || await selectReadyServer();
   config.baseURL = serverUrl;
   api.defaults.baseURL = serverUrl;
-  if (/\.ngrok(-free)?\.(dev|app|io)(\/|$)/.test(serverUrl)) config.headers['ngrok-skip-browser-warning'] = '1';
+  Object.assign(config.headers, ngrokHeaders(serverUrl));
   const token = await getStoredItem(tokenKey);
   const deviceUuid = await getStoredItem(rescuerDeviceUuidKey);
 
@@ -102,14 +177,31 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => {
-    if (response.config.method !== 'get') invalidateMobileReads();
     return response;
   },
   (error) => {
+    if (error.response?.status === 401) resetApiState();
+    const config = error.config as (typeof error.config & FailoverRequestConfig) | undefined;
+    const method = String(config?.method || 'get').toLowerCase();
+    const currentUrl = config?.baseURL;
+    if (!error.response && config && !config._resqFailoverAttempted) {
+      activeServerUrl = null;
+      activeServerCheckedAt = 0;
+      if (['get', 'head', 'options'].includes(method)) {
+        return selectReadyServer(true, currentUrl ? [currentUrl] : [])
+          .then((serverUrl) => {
+            config._resqFailoverAttempted = true;
+            config._resqForcedServerUrl = serverUrl;
+            config.baseURL = serverUrl;
+            return api.request(config);
+          })
+          .catch(() => Promise.reject(error));
+      }
+    }
     if (error.code === 'ECONNABORTED') {
-      error.userMessage = 'The server took too long to respond. Check Wi-Fi, Laravel, and the database connection.';
+      error.userMessage = 'The server timed out. The app will check the other configured connection routes on the next request.';
     } else if (!error.response) {
-      error.userMessage = 'The app cannot reach the server. Check the API URL and make sure Laravel is running.';
+      error.userMessage = 'The app cannot reach the server. Check ngrok, Tailscale, the local network, and that Laravel is running.';
     }
 
     return Promise.reject(error);
@@ -117,12 +209,12 @@ api.interceptors.response.use(
 );
 
 export async function saveToken(token: string) {
-  invalidateMobileReads();
+  resetApiState();
   await setStoredItem(tokenKey, token);
 }
 
 export async function clearToken() {
-  invalidateMobileReads();
+  resetApiState();
   await deleteStoredItem(tokenKey);
 }
 

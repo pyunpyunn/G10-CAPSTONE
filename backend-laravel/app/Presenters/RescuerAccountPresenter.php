@@ -19,7 +19,7 @@ class RescuerAccountPresenter
             'role_id' => $row->access_role_id ?? null, 'role_name' => $row->access_role_name ?? null,
             'role_key' => $row->role_key ?? null,
             'user_id' => $row->user_id,
-            'account_id' => $row->username,
+            'account_id' => $row->responder_code ?: ($row->username ?: ($row->user_username ?? null)),
             'username' => $row->user_username,
             'display_username' => $row->user_username,
             'responder_code' => $row->responder_code,

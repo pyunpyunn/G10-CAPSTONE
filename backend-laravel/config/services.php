@@ -63,6 +63,12 @@ return [
         'webhook_signing_key' => env('SMS_GATEWAY_WEBHOOK_SIGNING_KEY'),
     ],
 
+    'semaphore' => [
+        'api_key' => env('SEMAPHORE_API_KEY'),
+        'sender_name' => env('SEMAPHORE_SENDER_NAME'),
+        'base_url' => env('SEMAPHORE_BASE_URL', 'https://api.semaphore.co/api/v4'),
+    ],
+
     'trackingaid' => [
         'connection' => env('TRACKINGAID_DB_CONNECTION_NAME', 'trackingaid'),
         'forward_table' => env('TRACKINGAID_FORWARD_TABLE', 'resqperation_forwarded_requests'),

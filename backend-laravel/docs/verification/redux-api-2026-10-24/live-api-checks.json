@@ -1,0 +1,14 @@
+[
+  {
+    "case": "approved",
+    "status": 200
+  },
+  {
+    "case": "foreign",
+    "status": 403
+  },
+  {
+    "case": "forged_identity",
+    "status": 401
+  }
+]

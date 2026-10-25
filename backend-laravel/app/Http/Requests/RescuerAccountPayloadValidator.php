@@ -7,8 +7,14 @@ use Illuminate\Validation\Rule;
 
 class RescuerAccountPayloadValidator
 {
-    public function validate(Request $request, bool $isUpdate = false): array
+    public function validate(Request $request, bool $isUpdate = false, ?object $existing = null): array
     {
+        if ($isUpdate && str_starts_with((string)($existing->username ?? ''), 'BDRRM-')
+            && preg_match('/^[A-Z0-9]{2,8}-[0-9]{4,}$/i', (string)($existing->responder_code ?? ''))) {
+            foreach (['account_id','responder_code'] as $field) {
+                if ($request->input($field) === $existing->username) $request->merge([$field=>$existing->responder_code]);
+            }
+        }
         if (in_array($request->input('duty_status'), ['standby', 'stand-by'], true)) {
             $request->merge(['duty_status' => 'available']);
         }
@@ -25,14 +31,34 @@ class RescuerAccountPayloadValidator
             'password.min' => 'Temporary password must have at least 6 characters.',
         ];
 
-        $validated = $request->validate($this->rules($isUpdate), $messages);
+        // The saved account determines this exception, never the role submitted
+        // by a caller. Existing administrators may retain numeric identifiers.
+        $numericAdminId = $isUpdate && in_array(strtolower((string) ($existing->role_key ?? '')),
+            ['operations_admin', 'super_admin', 'superadmin', 'admin'], true);
+        $rules = $this->rules($isUpdate, $numericAdminId);
+        if ($isUpdate && in_array(strtolower((string)($existing->role_key ?? '')),
+            ['operations_admin','super_admin','superadmin','admin','chair','response','mitigation_prevention','preparedness','recovery_rehabilitation'],true)) {
+            // Headquarters identities may predate the field-team format. Only
+            // their actual saved identifiers receive this exception.
+            foreach (['account_id','responder_code'] as $key) {
+                $saved = $key === 'responder_code' ? ($existing->responder_code ?? null)
+                    : (($existing->responder_code ?? null) ?: ($existing->username ?? $existing->user_username ?? null));
+                if (is_string($saved) && $saved !== '' && $request->input($key) === $saved) {
+                    $rules[$key] = ['nullable','string','max:80'];
+                }
+            }
+        }
+        $validated = $request->validate($rules, $messages);
         return $validated;
     }
-    public function rules(bool $isUpdate = false): array
+    public function rules(bool $isUpdate = false, bool $numericAdminId = false): array
     {
+        $identifier = $isUpdate && $numericAdminId
+            ? 'regex:/^(?:[A-Z0-9]{2,8}-[0-9]{4,}|[0-9]{10})$/i'
+            : 'regex:/^[A-Z0-9]{2,8}-[0-9]{4,}$/i';
         return [
-            'account_id' => ['nullable', 'string', 'max:30', 'regex:/^[A-Z0-9]{2,8}-[0-9]{4,}$/i'],
-            'responder_code' => ['nullable', 'string', 'max:80', 'regex:/^[A-Z0-9]{2,8}-[0-9]{4,}$/i'],
+            'account_id' => ['nullable', 'string', 'max:30', $identifier],
+            'responder_code' => ['nullable', 'string', 'max:80', $identifier],
             'account_status' => ['nullable', Rule::in(array_keys(config('rescuers.account_statuses')))],
             'first_name' => ['required', 'string', 'max:100'],
             'middle_initial' => ['nullable', 'string', 'max:5'],

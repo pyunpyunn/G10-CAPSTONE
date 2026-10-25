@@ -119,7 +119,7 @@ class RescuerAccountWriteWorkflow
         }
 
         abort_if($existing->role_key === 'operations_admin' && $request->user()?->roleKey() !== 'operations_admin', 403, 'Only Operations/Admin can edit this account.');
-        $validated = $this->support->validatePayload($request, true);
+        $validated = $this->support->validatePayload($request, true, $existing);
         $this->support->ensureAccountTeamType((string) $existing->username, $validated);
         $isHq = strtoupper((string) $existing->team_code) === 'HQCC';
         $selectedRole = app(\App\Services\Web\PersonnelRoleService::class)->selected($validated, $isHq, (int) ($existing->access_role_id ?? 0));

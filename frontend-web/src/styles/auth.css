@@ -1047,6 +1047,65 @@
   opacity: 0.65;
 }
 
+.login-recovery-hint {
+  color: var(--color-nav-text);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.login-recovery-button,
+.login-recovery-resend {
+  min-height: 42px;
+  border: 1px solid var(--color-nav-hover);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--color-nav-text);
+  background: var(--color-nav-active);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.login-recovery-button:hover:not(:disabled),
+.login-recovery-button:focus-visible,
+.login-recovery-resend:hover:not(:disabled),
+.login-recovery-resend:focus-visible {
+  border-color: var(--color-nav-hover);
+  background: var(--color-nav-hover);
+  outline: none;
+}
+
+.login-recovery-button:disabled,
+.login-recovery-resend:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.login-recovery-resend {
+  justify-self: start;
+  min-height: 34px;
+  border: 0;
+  padding: 4px 0;
+  color: var(--color-nav-text-muted);
+  background: transparent;
+  text-decoration: underline;
+}
+
+.login-recovery-resend:hover:not(:disabled),
+.login-recovery-resend:focus-visible {
+  color: var(--color-nav-text);
+  background: transparent;
+}
+
+.login-recovery-error {
+  border-color: #9e4b4b;
+  color: #ffd1d1;
+  background: #642f35;
+  overflow-wrap: anywhere;
+}
+
 /* Account validation popups use the existing rounded card and button style. */
 .auth-error-popup {
   width: min(420px, calc(100vw - 40px));

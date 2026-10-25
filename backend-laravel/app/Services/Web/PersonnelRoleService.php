@@ -16,10 +16,10 @@ class PersonnelRoleService
         $roleKeys = array_merge(array_keys(WebAccessPolicy::MODULES), ['tl', 'tm']);
         return ['roles' => Role::query()->whereIn('role_key', $roleKeys)->orderBy('role_name')->get()->map(function ($role) use ($counts) {
             $base = $role->base_role_key ?: $role->role_key;
-            $modules = $role->web_modules ?? (WebAccessPolicy::MODULES[$base] ?? []);
+            $modules = $base === 'operations_admin' ? WebAccessPolicy::MODULES[$base] : ($role->web_modules ?? (WebAccessPolicy::MODULES[$base] ?? []));
             return ['role_id' => $role->role_id, 'role_key' => $role->role_key, 'role_name' => $role->role_name, 'base_role_key' => $base,
                 'web_modules' => $modules, 'can_manage_personnel' => $role->can_manage_personnel ?? $base === 'operations_admin',
-                'can_approve_requests' => $role->can_approve_requests ?? $base === 'chair',
+                'can_approve_requests' => $base === 'operations_admin' || ($role->can_approve_requests ?? $base === 'chair'),
                 'member_count' => (int) ($counts[$role->role_id] ?? 0),
                 'can_edit' => false,
                 'can_delete' => false];

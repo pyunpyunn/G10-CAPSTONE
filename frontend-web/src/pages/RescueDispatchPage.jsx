@@ -1,28 +1,21 @@
 import { statusColor } from '../utils/statusPalette'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
-import { getDispatchDashboard, getSitioPriorities } from '../api/dispatchApi'
+import { useWorkspaceQuery } from '../state/operationsApi'
 import DispatchSummary from '../components/dispatch/DispatchSummary'
 import DispatchStatusBadge from '../components/dispatch/DispatchStatusBadge'
 import DispatchSidePanel from '../components/dispatch/DispatchSidePanel'
 import FieldCommunicationPanel from '../components/dispatch/FieldCommunicationPanel'
 import { ResponseOperationsLayout } from '../components/ui/PageHeader'
-import { useModuleData } from '../utils/useModuleData'
 import { emptySummary } from '../utils/dispatchHelpers'
 
 export default function RescueDispatchPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const [open, setOpen] = useState(undefined)
-  const loader = useCallback(async () => {
-    const [workspace, priorities] = await Promise.allSettled([getDispatchDashboard({ per_page: 5 }), getSitioPriorities()])
-    if (workspace.status === 'rejected') throw workspace.reason
-    const sitioCoverage = new Map((workspace.value?.sitio_coverage || []).map((item) => [String(item.sitio_id), item]))
-    const rankedSitios = priorities.status === 'fulfilled' && Array.isArray(priorities.value) ? priorities.value : []
-    return { ...workspace.value, priorities: rankedSitios.map((row) => ({ ...row, activeDispatches: sitioCoverage.get(String(row.sitio_id))?.active_assignments || [] })), priorityError: priorities.status === 'rejected' ? 'Rescue priorities could not be loaded. Please refresh.' : '' }
-  }, [])
-  const { data, error, loading } = useModuleData(loader, ['dispatch', 'households', 'disasters', 'accounts'])
+  const { data, error: queryError, isLoading: loading } = useWorkspaceQuery({ view: 'overview' })
+  const error = queryError?.message
   const selected = open === undefined ? data?.priorities?.[0]?.sitio_id : open
   useEffect(() => { if (location.state?.selectedHousehold) navigate('/rescue-management/new', { replace: true, state: location.state }) }, [location.state, navigate])
   return <ResponseOperationsLayout><section className="pg on">
@@ -46,7 +39,7 @@ export default function RescueDispatchPage() {
               </div></div></div>
           })}</section>)}
         </div></div><FieldCommunicationPanel compact recordingsOnly />
-      </div></div><DispatchSidePanel teams={data.team_coverage || []} responders={data.responders || []} />
+      </div></div><DispatchSidePanel lazy />
     </>}
   </section></ResponseOperationsLayout>
 }

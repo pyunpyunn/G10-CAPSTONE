@@ -26,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(fn (Request $request) => null);
 
-        $middleware->api(append: [
+        $middleware->api(prepend: [\App\Http\Middleware\GuardApiHeaders::class], append: [
             SecurityHeaders::class,
             \App\Http\Middleware\EnsureOperationalDatabaseReachable::class,
             ProfileLocalQueries::class,
