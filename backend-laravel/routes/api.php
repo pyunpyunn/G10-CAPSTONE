@@ -70,6 +70,8 @@ Route::prefix('v1')->group(function () {
     });
     Route::post('/rescuer/assignments/{assignmentId}/route', [MobileNavigationController::class, 'assignedRoadRoute'])
         ->middleware(['auth:sanctum', 'role:rescuer,tl,tm', 'throttle:12,1']);
+    Route::post('/rescuer/evacuation-centers/{centerId}/route', [MobileNavigationController::class, 'evacuationCenterRoadRoute'])
+        ->middleware(['auth:sanctum', 'role:rescuer,tl,tm', 'throttle:12,1']);
     Route::post('/dispatches/{id}/route', [MobileNavigationController::class, 'freshRoute'])
         ->middleware(['auth:sanctum', 'mobile.device', 'role:rescuer,tl,tm', 'throttle:6,1']);
     Route::get('/auth/password-recovery/questions', [AuthController::class, 'recoveryQuestions'])

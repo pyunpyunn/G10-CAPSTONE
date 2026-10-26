@@ -122,7 +122,13 @@ export default function RescuerHomeScreen() {
   const trackingAssignmentId = activeAssignment?.assignment_id || null;
   useEffect(() => {
     if (Platform.OS === 'web') return;
+<<<<<<< HEAD
     void configureRescuerTracking(trackingAssignmentId).catch(() => {});
+=======
+    void configureRescuerTracking(trackingAssignmentId).catch((error) => {
+      console.error('Rescuer GPS tracking could not start.', error);
+    });
+>>>>>>> sub-main
     return () => { void stopRescuerTracking(); };
   }, [trackingAssignmentId]);
   useEffect(() => {
@@ -211,6 +217,18 @@ export default function RescuerHomeScreen() {
       longitude: location.coords.longitude,
       accuracy_m: location.coords.accuracy,
     };
+  }
+
+  async function handleSendLocation(assignmentId: number, payload: any) {
+    const result = await sendAssignmentLocation(assignmentId, payload);
+    if (payload.refresh_route && result.data) setOverview(current => current ? {
+      ...current,
+      assignments: current.assignments.map(item => Number(item.assignment_id) === Number(assignmentId)
+        ? { ...item, route: result.data.route } : item),
+    } : current);
+    if (payload.refresh_route && result.data && !result.data.route) {
+      throw new Error('GPS saved. Current directions unavailable.');
+    }
   }
 
   async function handleSubmitFieldReport(payload: any) {
