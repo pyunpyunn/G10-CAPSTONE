@@ -1,3 +1,4 @@
+import { ChangePasswordSection } from '@/components/ChangePasswordSection';
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -120,6 +121,8 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
         <InfoRow label="Name" value={responder.emergency_contact_name || 'Not recorded'} />
         <InfoRow label="Mobile" value={responder.emergency_contact_number || 'Not recorded'} />
       </View>
+
+      <ChangePasswordSection accountIdentifiers={[user.user_id, user.username, user.email, responder.responder_code]} />
 
       <ActionButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
     </View>

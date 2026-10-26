@@ -14,6 +14,12 @@ class HouseholdMobileSupport
         return $user?->household_id ? (string) $user->household_id : null;
     }
 
+    public function authenticatedMemberId($user): string
+    {
+        abort_unless(app(\App\Queries\HouseholdMobileReadQuery::class)->memberForUser($user), 403, 'This account is not linked to a registered household member.');
+        return (string) $user->member_id;
+    }
+
     public function nextId(string $table, string $column): int
     {
         return app(\App\Services\Shared\OperationalSequence::class)->nextNumericId($table, $column);

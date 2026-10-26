@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMobileOverview } from '@/hooks/useMobileOverview';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   AppState,
@@ -15,7 +16,7 @@ import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { logoutMobile } from '@/api/auth';
+import { logoutMobile, resetHouseholdDeviceOwner } from '@/api/auth';
 import { savePushRegistration } from '@/api/device';
 import {
   completeHouseholdSetup,
@@ -43,13 +44,15 @@ import {
   TrustedPinModal,
 } from '@/components/household/HouseholdModals';
 import { HouseholdProfileScreen } from '@/components/household/HouseholdProfileScreen';
+import { MobileLogoutOverlay } from '@/components/MobileLogoutOverlay';
 import { HouseholdRouteScreen } from '@/components/household/HouseholdRouteScreen';
 import { HouseholdSetupScreen } from '@/components/household/HouseholdSetupScreen';
-import { HouseholdLoading } from '@/components/household/HouseholdUI';
+import { HouseholdButton, HouseholdEmpty, HouseholdLoading } from '@/components/household/HouseholdUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
 import { onDisasterBroadcast } from '@/utils/mobileReadCache';
+import { createAdaptivePoller } from '@/utils/networkScheduling';
 
 const deviceUuidKey = 'resq_household_device_uuid';
 type TabKey = 'home' | 'route' | 'trusted' | 'profile';
@@ -67,9 +70,8 @@ export default function HouseholdHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
-  const [overview, setOverview] = useState<HouseholdOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { overview, setOverview, loading, refreshing, error: overviewError, loadOverview: refreshOverview }
+    = useMobileOverview<HouseholdOverview>('household', getHouseholdOverview);
   const [deviceUuid, setDeviceUuid] = useState('');
   const [realBatteryLevel, setRealBatteryLevel] = useState<number | null>(null);
   const [pendingStatus, setPendingStatus] = useState('safe');
@@ -89,6 +91,8 @@ export default function HouseholdHomeScreen() {
   const [trustedLoading, setTrustedLoading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationBusyId, setNotificationBusyId] = useState('');
+  const [loggingOut, setLoggingOut] = useState(false);
+  const logoutPending = useRef(false);
   const statusOptionsSignature = JSON.stringify(overview?.status_options || []);
 
   useEffect(() => {
@@ -110,41 +114,21 @@ export default function HouseholdHomeScreen() {
 
   }, []);
 
-  const loadOverview = useCallback(async (isRefresh = false, silent = false) => {
-    if (silent) {
-      // Incoming alerts must not interrupt an unfinished household status edit.
-    } else if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
+  const loadOverview = useCallback(async (isRefresh = false, silent = false, afterWrite = false) => {
+    const data = await refreshOverview(isRefresh, silent, afterWrite);
+    if (data && !silent) {
+      setPendingStatus(data.member_status?.status_key || data.status_options?.[0]?.key || 'safe');
+      setEditingStatus(true);
     }
+  }, [refreshOverview]);
 
-    try {
-      const data = await getHouseholdOverview();
-      setOverview(data);
-      setTrustedPinConfigured(Boolean(data.trusted?.pin_configured));
-      setViewingTrusted((current: any) =>
-        current
-          ? data.trusted?.households?.find((household: any) =>
-              household.connection_id === current.connection_id
-              && ['active', 'validated'].includes(household.validation_status)
-            ) || null
-          : null
-      );
-      const savedStatus = data.current_status?.status_key || data.status_options?.[0]?.key || 'safe';
-      if (!silent) {
-        setPendingStatus(savedStatus);
-        setEditingStatus(true);
-      }
-    } catch (error: any) {
-      if (!silent) Alert.alert('Unable to load household data', errorMessage(error));
-    } finally {
-      if (!silent) {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }
-  }, []);
+  useEffect(() => {
+    if (!overview) return;
+    setTrustedPinConfigured(Boolean(overview.trusted?.pin_configured));
+    setViewingTrusted((current: any) => current
+      ? overview.trusted?.households?.find((household: any) => household.connection_id === current.connection_id
+        && ['active', 'validated'].includes(household.validation_status)) || null : null);
+  }, [overview]);
 
   useEffect(() => {
     let pending = false;
@@ -158,13 +142,15 @@ export default function HouseholdHomeScreen() {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void refreshAlerts();
     });
-    // Small foreground-only fallback when Android push delivery is delayed.
-    const timer = setInterval(() => { void refreshAlerts(); }, 30000);
+    const stopPolling = createAdaptivePoller(
+      () => AppState.currentState === 'active' ? loadOverview(true, true) : null,
+      { intervalMs: 30000, maxIntervalMs: 300000 },
+    ).start();
     return () => {
       disposed = true;
       unsubscribe();
       subscription.remove();
-      clearInterval(timer);
+      stopPolling();
     };
   }, [loadOverview]);
 
@@ -277,15 +263,28 @@ export default function HouseholdHomeScreen() {
   }, [deviceUuid, overview?.devices]);
 
   async function handleLogout() {
-    await logoutMobile();
-    router.replace('/' as Href);
+    if (logoutPending.current) return;
+    logoutPending.current = true;
+    setLoggingOut(true);
+    try {
+      await logoutMobile();
+      router.replace('/' as Href);
+    } catch (error: any) {
+      logoutPending.current = false;
+      setLoggingOut(false);
+      Alert.alert('Unable to log out', error?.message || 'Please try again.');
+    }
   }
 
   async function handleSetupComplete(payload: any) {
     try {
-      await completeHouseholdSetup(payload);
+      const result = await completeHouseholdSetup(payload);
+      setOverview((current) => current ? { ...current,
+        setup: { ...current.setup, is_setup_complete: true, has_geotag: true, has_device: true },
+        geotag: result.data?.geotag || { latitude: payload.latitude, longitude: payload.longitude, accuracy_m: payload.accuracy_m },
+      } : current);
       Alert.alert('Setup saved', 'Your household mobile setup is complete.');
-      await loadOverview(true);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to save setup', errorMessage(error));
     }
@@ -294,7 +293,7 @@ export default function HouseholdHomeScreen() {
   async function handleUpdateGeotag(payload: any) {
     try {
       const response = await saveHouseholdGeotag(payload);
-      await loadOverview(true);
+      void loadOverview(true, true, true);
       return response;
     } catch (error: any) {
       Alert.alert('Unable to update geotag', errorMessage(error));
@@ -303,13 +302,9 @@ export default function HouseholdHomeScreen() {
   }
 
   async function handleUpdateMember(memberId: string, payload: any) {
-    try {
-      await updateHouseholdMember(memberId, payload);
-      await loadOverview(true);
-    } catch (error: any) {
-      Alert.alert('Unable to save member', errorMessage(error));
-      throw error;
-    }
+    const saved = await updateHouseholdMember(memberId, payload);
+    setOverview((current) => current && saved.user ? { ...current, profile: { ...current.profile, user: saved.user } } : current);
+    void loadOverview(true, true, true);
   }
 
   async function handleSaveStatus() {
@@ -334,14 +329,20 @@ export default function HouseholdHomeScreen() {
     setSavingStatus(true);
 
     try {
-      await saveHouseholdStatus({
+      const saved = await saveHouseholdStatus({
         status_key: pendingStatus,
         device_uuid: deviceUuid,
         battery_level: realBatteryLevel ?? undefined,
         ...locationPayload,
         notes: pendingStatus === 'needs_help' ? 'Household requested assistance from mobile.' : null,
       });
-      await loadOverview(true);
+      const selected = overview.status_options.find((option) => option.key === pendingStatus);
+      setOverview((current) => current ? { ...current, member_status: {
+        member_id: current.profile.user.member_id, status_log_id: saved.data?.status_log_id,
+        status_key: pendingStatus, status_label: selected?.label || pendingStatus,
+        submitted_label: 'Just saved',
+      } } : current);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to save status', errorMessage(error));
     } finally {
@@ -369,13 +370,15 @@ export default function HouseholdHomeScreen() {
     }
 
     try {
-      await saveHouseholdMemberStatus(memberId, {
+      const saved = await saveHouseholdMemberStatus(memberId, {
         status_key: statusKey,
         device_uuid: deviceUuid,
         battery_level: realBatteryLevel ?? undefined,
         ...locationPayload,
       });
-      await loadOverview(true);
+      setOverview((current) => current ? { ...current, members: current.members.map((member) =>
+        String(member.member_id) === memberId ? { ...member, current_status: saved.member_status } : member) } : current);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to save member status', errorMessage(error));
       throw error;
@@ -408,7 +411,7 @@ export default function HouseholdHomeScreen() {
         battery_level: realBatteryLevel ?? undefined,
         ...locationPayload,
       });
-      await loadOverview(true);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to save trusted member status', errorMessage(error));
       throw error;
@@ -475,7 +478,7 @@ export default function HouseholdHomeScreen() {
     try {
       await respondToTrustedHousehold(connectionId, 'accept');
       setShowNotifications(false);
-      await loadOverview(true);
+      void loadOverview(true, true, true);
       Alert.alert('Trusted household accepted', 'The household request was accepted and added to Trusted Household.');
     } catch (error: any) {
       Alert.alert('Unable to accept request', errorMessage(error));
@@ -498,7 +501,7 @@ export default function HouseholdHomeScreen() {
             setNotificationBusyId(connectionId);
             try {
               await respondToTrustedHousehold(connectionId, 'reject');
-              await loadOverview(true);
+              void loadOverview(true, true, true);
             } catch (error: any) {
               Alert.alert('Unable to reject request', errorMessage(error));
             } finally {
@@ -546,7 +549,7 @@ export default function HouseholdHomeScreen() {
       );
       setShowAddTrusted(false);
       setTrustedLookup(null);
-      await loadOverview(true);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to save trusted household', errorMessage(error));
     } finally {
@@ -597,7 +600,7 @@ export default function HouseholdHomeScreen() {
     try {
       const response = await deleteTrustedHousehold(household.connection_id);
       setViewingTrusted(null);
-      await loadOverview(true);
+      void loadOverview(true, true, true);
       Alert.alert(
         household.validation_status === 'pending' ? 'Request cancelled' : 'Trusted household removed',
         response.message || (household.validation_status === 'pending' ? 'Your trusted household request was cancelled.' : 'The trusted household was removed successfully.')
@@ -650,6 +653,8 @@ export default function HouseholdHomeScreen() {
         <HouseholdProfileScreen
           overview={overview}
           onUpdateGeotag={handleUpdateGeotag}
+          onSaveContact={(contactNumber) => handleUpdateMember(String(overview.profile.user.member_id), { contact_number: contactNumber })}
+          onResetDeviceOwner={async () => { await resetHouseholdDeviceOwner(); router.replace('/household-owner' as Href); }}
           onLogout={handleLogout}
         />
       );
@@ -672,7 +677,16 @@ export default function HouseholdHomeScreen() {
     );
   }
 
-  if (loading || !overview || !deviceUuid) {
+  if (!loading && !overview && overviewError) {
+    return <SafeAreaView style={styles.safe}>
+      <View style={{ padding: spacing.lg, gap: spacing.md }}>
+        <HouseholdEmpty icon="cloud-offline-outline" title="Unable to load household data" body={overviewError} />
+        <HouseholdButton label="Try again" icon="refresh-outline" onPress={() => { void loadOverview(); }} />
+      </View>
+    </SafeAreaView>;
+  }
+
+  if ((!overview && loading) || !overview || !deviceUuid) {
     return (
       <SafeAreaView style={styles.safe}>
         <HouseholdLoading label="Loading household mobile..." />
@@ -699,6 +713,12 @@ export default function HouseholdHomeScreen() {
         ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
+        {overviewError ? <View style={{ padding: spacing.sm, gap: spacing.xs }}>
+          <Text accessibilityLiveRegion="polite" style={{ color: palette.textSoft }}>
+            Could not refresh. Showing previously loaded data.
+          </Text>
+          <HouseholdButton label="Retry refresh" tone="light" onPress={() => { void loadOverview(true); }} />
+        </View> : null}
         {renderContent()}
       </ScrollView>
 
@@ -763,6 +783,7 @@ export default function HouseholdHomeScreen() {
         onLookup={handleLookupTrusted}
         onSubmit={handleCreateTrusted}
       />
+      <MobileLogoutOverlay visible={loggingOut} />
     </SafeAreaView>
   );
 }

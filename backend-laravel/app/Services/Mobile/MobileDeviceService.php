@@ -96,8 +96,8 @@ class MobileDeviceService
             'updated_at' => $now,
         ];
 
-        if (! $canLinkUser && ! $canLinkResponder && $canLinkMember) {
-            $data['member_id'] = $user->user_id;
+        if ($appRole === 'household' && $canLinkMember) {
+            $data['member_id'] = app(HouseholdMobileSupport::class)->authenticatedMemberId($user);
         }
 
         $data = $this->filterColumns('device_tokens', $data);

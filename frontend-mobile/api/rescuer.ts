@@ -1,6 +1,5 @@
 import { api } from './client';
 import { submitReport } from './reportSubmission';
-import { cachedMobileRead } from '@/utils/mobileReadCache';
 
 export type RescuerOverview = {
   profile: {
@@ -23,10 +22,9 @@ export type RescuerOverview = {
 };
 
 export async function getRescuerOverview(refresh = false) {
-  return cachedMobileRead('rescuer/overview', async () => {
-    const response = await api.get<{ data: RescuerOverview }>('/rescuer/overview');
-    return response.data.data;
-  }, refresh);
+  const config = { timeout: 12000, cache: !refresh };
+  const response = await api.get<{ data: RescuerOverview }>('/rescuer/overview', config);
+  return response.data.data;
 }
 
 export async function getAssignedHousehold(assignmentId: number) {

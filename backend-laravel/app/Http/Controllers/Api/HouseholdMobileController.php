@@ -21,9 +21,29 @@ class HouseholdMobileController extends Controller
         return $this->service->overview($request);
     }
 
+    public function ownerOptions(Request $request, \App\Services\Mobile\HouseholdAccessService $access): JsonResponse
+    {
+        return $access->options($request);
+    }
+
+    public function selectOwner(Request $request, \App\Services\Mobile\HouseholdAccessService $access): JsonResponse
+    {
+        return $access->select($request);
+    }
+
+    public function resetOwner(Request $request, \App\Services\Mobile\HouseholdAccessService $access): JsonResponse
+    {
+        return $access->reset($request);
+    }
+
     public function completeSetup(Request $request): JsonResponse
     {
         return $this->service->completeSetup($request);
+    }
+
+    public function previewSetupLocation(Request $request, \App\Services\Mobile\HouseholdMobileSetupWorkflow $workflow): JsonResponse
+    {
+        return $workflow->previewSetupLocation($request);
     }
 
     public function updateDeviceLocation(Request $request): JsonResponse

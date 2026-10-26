@@ -87,6 +87,37 @@ class AcceptedDispatchRouteTest extends TestCase
         $this->assertNull(app(RescuerAssignmentQuery::class)->routeForAssignment(12,7));
     }
 
+    public function test_rescuer_mobile_route_only_loads_the_latest_three_hundred_gps_trail_points(): void
+    {
+        DB::table('responder_routes')->insert([
+            'route_id' => 44,
+            'assignment_id' => 12,
+            'responder_id' => 5,
+            'household_id' => 'HH-A',
+            'route_status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $points = [];
+        for ($sequence = 1; $sequence <= 305; $sequence++) {
+            $points[] = [
+                'coordinate_id' => $sequence,
+                'route_id' => 44,
+                'latitude' => 10 + $sequence / 100000,
+                'longitude' => 123 + $sequence / 100000,
+                'sequence_order' => $sequence,
+                'recorded_at' => now(),
+            ];
+        }
+        DB::table('route_coordinates')->insert($points);
+
+        $route = app(RescuerAssignmentQuery::class)->routeForAssignment(12, 5);
+
+        $this->assertCount(300, $route->mobile_trail_coordinates);
+        $this->assertSame(6, (int) $route->mobile_trail_coordinates->first()->sequence_order);
+        $this->assertSame(305, (int) $route->mobile_trail_coordinates->last()->sequence_order);
+    }
+
     public function test_routing_failure_does_not_invent_a_straight_line(): void
     {
         Http::swap(new \Illuminate\Http\Client\Factory());

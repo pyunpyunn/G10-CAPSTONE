@@ -1,76 +1,23 @@
-import { getToken } from './token'
+import { store, saveViewState, removeViewState } from '../state/apiStore'
 
-const cachePrefix = 'resqperation_session_cache:'
-
+// Existing screen APIs now read/write the Redux session slice, not browser
+// storage. Redux resets these records on logout, account change and invalidation.
 export function readSessionCache(key, maxAgeMs) {
-  const storageKey = getStorageKey(key)
-  if (!storageKey) return null
-
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(storageKey) || 'null')
-    if (!cached || Date.now() - cached.savedAt > maxAgeMs) return null
-    return cached.value ?? null
-  } catch {
-    return null
-  }
+  const entry = store.getState().serverData.views[key]
+  return entry && Date.now() - entry.savedAt <= maxAgeMs ? entry.value : null
 }
-
-export function writeSessionCache(key, value) {
-  const storageKey = getStorageKey(key)
-  if (!storageKey) return
-
-  try {
-    sessionStorage.setItem(storageKey, JSON.stringify({ savedAt: Date.now(), value }))
-  } catch {
-    // Caching is optional; API requests remain the source of truth.
-  }
-}
-
-export function removeSessionCache(key) {
-  const storageKey = getStorageKey(key)
-  if (!storageKey) return
-
-  try {
-    sessionStorage.removeItem(storageKey)
-  } catch {
-    // Storage may be disabled by browser settings.
-  }
-}
-
-export function removeSessionCachePrefix(prefix) {
-  const storagePrefix = getStorageKey(prefix)
-  if (!storagePrefix) return
-
-  try {
-    for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
-      const key = sessionStorage.key(index)
-      if (key?.startsWith(storagePrefix)) sessionStorage.removeItem(key)
-    }
-  } catch {
-    // Storage may be disabled by browser settings.
-  }
-}
-
+export function writeSessionCache(key, value) { saveViewState(key, value) }
+export function removeSessionCache(key) { removeViewState(key) }
+export function removeSessionCachePrefix(prefix) { removeViewState(prefix) }
 export function clearSessionCache() {
+  removeViewState('')
+  // Remove the obsolete persisted cache left by earlier releases.
   try {
-    for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+    for (let index = sessionStorage.length - 1; index >= 0; index--) {
       const key = sessionStorage.key(index)
-      if (key?.startsWith(cachePrefix)) sessionStorage.removeItem(key)
+      if (key?.startsWith('resqperation_session_cache:')) sessionStorage.removeItem(key)
     }
-  } catch {
-    // Storage may be disabled by browser settings.
-  }
+  } catch { /* Browser storage can be unavailable. */ }
 }
 
-function getStorageKey(key) {
-  const token = getToken()
-  return token ? `${cachePrefix}${fingerprint(token)}:${key}` : null
-}
-
-function fingerprint(value) {
-  let hash = 2166136261
-  for (let index = 0; index < value.length; index += 1) {
-    hash = Math.imul(hash ^ value.charCodeAt(index), 16777619)
-  }
-  return (hash >>> 0).toString(36)
-}
+clearSessionCache()

@@ -52,6 +52,25 @@ class AuthController extends Controller
     {
         return $this->service->resetPassword($request);
     }
-}
 
+    public function lookupHouseholdRecoveryContact(Request $request): JsonResponse
+    {
+        return $this->service->lookupHouseholdRecoveryContact($request);
+    }
+
+    public function validateHouseholdRecoveryContact(Request $request): JsonResponse
+    {
+        return $this->service->validateHouseholdRecoveryContact($request);
+    }
+
+    public function sendHouseholdRecoveryCode(Request $request): JsonResponse
+    {
+        return $this->service->sendHouseholdRecoveryCode($request);
+    }
+
+    public function resetHouseholdPassword(Request $request): JsonResponse
+    {
+        return $this->service->resetHouseholdPassword($request);
+    }
+}
 

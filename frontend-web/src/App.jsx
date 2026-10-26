@@ -357,11 +357,12 @@ function AuthRoutes() {
         <Route path="rescue-management/:assignmentId/edit" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
         <Route path="dispatch/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
         <Route path="rescuers/new" element={<LazyPage page={{ path: '/rescuers/new' }} />} />
-        <Route path="rescuers/view" element={<LazyPage page={{ path: '/rescuers/view' }} />} />
+        <Route path="rescuers" element={<GuardedRescuersPage />} />
+        <Route path="rescuers/view" element={<LegacyPersonnelRedirect />} />
         <Route path="rescuers/edit" element={<LazyPage page={{ path: '/rescuers/edit' }} />} />
         <Route path="resources-requests/new" element={<LazyPage page={{ path: '/resources-requests/new' }} />} />
         <Route path="resources-requests/:requestId/:mode" element={<LazyPage page={{ path: '/resources-requests/edit' }} />} />
-        {pagesForUser(user).map((page) => (
+        {pagesForUser(user).filter(page => page.path !== '/rescuers').map((page) => (
           <Route
             key={page.path}
             path={page.path.replace('/', '')}
@@ -405,6 +406,23 @@ function GuardedHouseholdReviewPage() {
   return <HouseholdReviewPage />
 }
 
+function LegacyPersonnelRedirect() {
+  const location = useLocation()
+  const id = new URLSearchParams(location.search).get('id')
+  return <Navigate to="/rescuers" replace state={{ ...location.state, selectedProfileId: id }} />
+}
+
+function GuardedRescuersPage() {
+  const { user } = useOutletContext()
+  const location = useLocation()
+  const id = location.state?.selectedProfileId || new URLSearchParams(location.search).get('id')
+  const Page = pageComponents['/rescuers']
+  if (!canOpenWebPage(user, '/rescuers') && !(hasWebAccess(user) && /^\d+$/.test(String(id || '')))) {
+    return <Navigate to={webHomeForUser(user)} replace />
+  }
+  return <Suspense fallback={<div className="screen-loader">Loading...</div>}><Page /></Suspense>
+}
+
 function ProtectedRoute({ user, children }) {
   const location = useLocation()
 
@@ -432,6 +450,10 @@ function getLoginMessage(error) {
 
   const data = error?.response?.data
   const status = error?.response?.status
+
+  if (status === 429) {
+    return 'Unable to log in right now. Please wait a moment and try again.'
+  }
 
   if (data?.errors) {
     const firstError = Object.values(data.errors)[0]

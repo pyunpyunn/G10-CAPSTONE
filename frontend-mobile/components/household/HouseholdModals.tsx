@@ -1,6 +1,8 @@
 import { householdQrValue } from '@/utils/householdQr';
-import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import type Svg from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import QRCode from 'react-native-qrcode-svg';
 import { palette, radius, spacing } from '@/constants/resqTheme';
@@ -15,17 +17,68 @@ type QrModalProps = {
 
 export function HouseholdQrModal({ visible, qr, householdId, onClose }: QrModalProps) {
   const qrValue = householdQrValue(qr, householdId);
+  const qrRef = useRef<Svg | null>(null);
+  const downloading = useRef(false);
+  const [saving, setSaving] = useState(false);
+
+  async function downloadQr() {
+    if (!qrValue || !qrRef.current || downloading.current) return;
+    downloading.current = true;
+    setSaving(true);
+    try {
+      const filename = `qr-${qrValue.replace(/[^a-zA-Z0-9._-]/g, '_')}-${Date.now()}.png`;
+      const svg = qrRef.current;
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('QR export timed out. Please try again.')), 10000);
+        try {
+          svg.toDataURL((data) => {
+            clearTimeout(timeout);
+            if (!data) reject(new Error('Unable to export the QR image.'));
+            else resolve(data);
+          }, { width: 1024, height: 1024 });
+        } catch (error) {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      });
+
+      if (Platform.OS === 'android') {
+        const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permission.granted) return;
+        const uri = await FileSystem.StorageAccessFramework.createFileAsync(permission.directoryUri, filename, 'image/png');
+        try {
+          await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+        } catch (error) {
+          await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+          throw error;
+        }
+        Alert.alert('QR downloaded', `${filename} was saved in your selected folder.`);
+      } else if (Platform.OS === 'ios' && FileSystem.documentDirectory) {
+        await FileSystem.writeAsStringAsync(`${FileSystem.documentDirectory}${filename}`, base64, { encoding: FileSystem.EncodingType.Base64 });
+        Alert.alert('QR downloaded', `${filename} was saved in Files > On My iPhone/iPad > RESQPERATION.`);
+      } else {
+        throw new Error('Download QR is available in the Android and iOS mobile app.');
+      }
+    } catch (error) {
+      Alert.alert('Unable to download QR', error instanceof Error ? error.message : 'Could not save the PNG. Please try again.');
+    } finally {
+      downloading.current = false;
+      setSaving(false);
+    }
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={saving ? () => {} : onClose}>
       <View style={styles.backdrop}>
         <View style={styles.modalCard}>
-          <ModalHeader title="Evacuation QR" onClose={onClose} />
+          <ModalHeader title="Evacuation QR" onClose={saving ? () => {} : onClose} />
           {qrValue ? <>
             <View style={styles.qrBox}>
-              <QRCode value={qrValue} size={180} quietZone={16} color="#0a1520" backgroundColor="#fff" />
+              <QRCode value={qrValue} getRef={(ref: Svg | null) => { qrRef.current = ref; }} size={180} quietZone={16} color="#0a1520" backgroundColor="#fff" />
             </View>
             {qr?.household_name ? <Text style={styles.qrTitle}>{qr.household_name}</Text> : null}
             <Text style={styles.qrMeta} selectable>Household ID: {qrValue}</Text>
+            <HouseholdButton label={saving ? 'Saving PNG...' : 'Download QR'} icon="download-outline" disabled={saving} onPress={downloadQr} />
           </> : <Text style={styles.qrMeta} accessibilityRole="alert">Household QR unavailable. Refresh your household data and try again.</Text>}
         </View>
       </View>

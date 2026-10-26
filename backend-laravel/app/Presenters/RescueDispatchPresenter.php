@@ -17,6 +17,14 @@ class RescueDispatchPresenter
         return ['key' => $key, 'label' => match ($key) { 'accepted' => 'Accepted', 'returning' => 'Returning to base', 'on_scene' => 'On-scene', 'en_route' => 'En route', 'dispatched' => 'Dispatched', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'available' => 'Available', 'deployed' => 'Deployed', default => $this->label($key) }, 'tone' => \App\Support\StatusPalette::tone($key)];
     }
 
+    public function managementDispatch(object $row): array
+    {
+        return ['assignment_id'=>$row->assignment_id,'assignment_code'=>$row->assignment_code,
+            'team_name'=>$row->team_name ?: 'Responder assignment','assigned_area'=>$row->assigned_area,
+            'priority_level'=>$row->priority_level ?: 'monitor','priority_label'=>$this->label($row->priority_level ?: 'monitor'),
+            'assigned_at'=>$this->dateTime($row->assigned_at),'status'=>$this->status($row->status)];
+    }
+
     public function activeEvent(object $event): array
     {
         return ['event_id' => $event->event_id, 'name' => $event->name, 'type' => $event->type_name ?? $event->type?->type_name ?? 'Disaster event', 'severity' => $event->severity_label ?? $event->severity?->severity_label ?? 'Unspecified', 'severity_key' => $event->severity_key ?? $event->severity?->severity_key ?? 'medium', 'started_at' => $this->dateTime($event->started_at), 'started_time' => $this->time($event->started_at)];

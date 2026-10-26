@@ -135,16 +135,33 @@ class RescuerAssignmentWorkflow
             $updates['route_notes'] = $current->route_notes;
             // Shared HQ status summarizes the most advanced active rescuer;
             // each mobile account retains its own acceptance and navigation state.
-            $active = array_values(array_intersect(['on_scene', 'en_route', 'accepted', 'dispatched'], array_values($notes['responder_statuses'])));
-            $updates['status'] = $active[0] ?? (in_array('cancelled', $notes['responder_statuses'], true) ? 'cancelled' : 'completed');
-            if ($updates['status'] !== 'completed') unset($updates['completed_at']);
+            $updates['status'] = \App\Support\RescuerHouseholdQueue::overallStatus($current);
+            if ($updates['status'] === 'completed') {
+                $updates['completed_at'] = $current->completed_at ?? $now;
+                foreach ($selectedIds as $id) $notes['responder_statuses'][(int) $id] = 'completed';
+                $updates['route_notes'] = json_encode($notes);
+            } else unset($updates['completed_at']);
             DB::table('responder_assignments')->where('assignment_id', $assignmentId)->update($updates);
+            if ($updates['status'] === 'completed' && Schema::hasTable('responder_routes')) {
+                DB::table('responder_routes')->where('assignment_id', $assignmentId)
+                    ->update($this->support->filterColumns('responder_routes', ['route_status' => 'completed', 'updated_at' => $now]));
+            }
             if ($this->hasPoint($validated)) {
                 $this->saveResponderLocation($responder, $validated, $now);
                 $this->routeWriter()->saveRouteCoordinate($assignmentId, $validated, $now);
 
             }
             $this->updateResponderDuty($actorId, $current->team_id ?? $responder?->team_id, $personalStatus);
+            if ($updates['status'] === 'completed') {
+                foreach ($selectedIds as $id) {
+                    if ((int) $id === $actorId) continue;
+                    $hasOtherWork = DB::table('responder_assignments')->where('assignment_id', '<>', $assignmentId)
+                        ->whereIn('status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'])
+                        ->where(fn ($query) => $query->where('responder_id', (int) $id)
+                            ->orWhereJsonContains('route_notes->selected_responder_ids', (int) $id))->exists();
+                    if (! $hasOtherWork) $this->updateResponderDuty((int) $id, $current->team_id, 'completed');
+                }
+            }
             $this->support->writeAuditLog($request, 'mobile_update_assignment', 'responder_assignments', (string) $assignmentId, $updates + ['previous_status' => $current->status]);
         }, 3);
 

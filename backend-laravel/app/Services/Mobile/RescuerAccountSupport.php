@@ -15,9 +15,9 @@ class RescuerAccountSupport
         'SST' => 4000, 'FMT' => 5000, 'RDT' => 6000, 'TRT' => 7000,
         'CLT' => 8000, 'RDANA' => 9000, 'PDANA' => 10000,
     ];
-    public function validatePayload(Request $request, bool $isUpdate = false): array
+    public function validatePayload(Request $request, bool $isUpdate = false, ?object $existing = null): array
     {
-        $validated = app(\App\Http\Requests\RescuerAccountPayloadValidator::class)->validate($request, $isUpdate);
+        $validated = app(\App\Http\Requests\RescuerAccountPayloadValidator::class)->validate($request, $isUpdate, $existing);
         $validated['account_status'] = $validated['account_status'] ?? config('rescuers.account_defaults.account_status');
 
         if (! empty($validated['account_id'])) {
