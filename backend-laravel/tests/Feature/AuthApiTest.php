@@ -385,6 +385,39 @@ class AuthApiTest extends TestCase
         ])->assertOk()->assertJsonPath('message', 'Registered contact number verified.');
     }
 
+    public function test_rescuer_id_recovery_uses_the_linked_registered_contact(): void
+    {
+        $this->postJson('/api/v1/auth/password-recovery/household/lookup', [
+            'login' => 'BDRRM-SAR-001',
+        ])->assertOk()->assertExactJson(['masked_contact_number' => '*********01']);
+
+        $this->postJson('/api/v1/auth/password-recovery/household/validate-contact', [
+            'login' => 'BDRRM-SAR-001',
+            'contact_number' => '09170001001',
+        ])->assertOk()->assertJsonPath('message', 'Registered contact number verified.');
+    }
+
+    public function test_existing_household_without_registered_phone_is_not_reported_as_missing_and_cannot_request_otp(): void
+    {
+        DB::table('households')->where('household_id', 'HH-OTP-001')->update(['contact_number' => null]);
+        DB::table('users')->where('user_id', 'USR-HOUSEHOLD-OTP-001')->update(['contact_number' => null]);
+
+        $this->postJson('/api/v1/auth/password-recovery/household/lookup', [
+            'login' => 'HH-OTP-001',
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.login.0', 'This account exists, but no valid registered recovery phone number is on file. Contact an administrator to update it before requesting an OTP.');
+
+        $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
+            'login' => 'HH-OTP-001',
+            'contact_number' => '09171234512',
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.contact_number.0', 'This account exists, but no valid registered recovery phone number is on file. Contact an administrator to update it before requesting an OTP.');
+
+        $this->assertDatabaseMissing('household_password_recovery_otps', [
+            'user_id' => 'USR-HOUSEHOLD-OTP-001',
+        ]);
+    }
+
     public function test_household_otp_resets_password_and_revokes_existing_sessions(): void
     {
         config([

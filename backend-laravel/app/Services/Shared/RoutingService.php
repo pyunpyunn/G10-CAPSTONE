@@ -3,10 +3,14 @@
 namespace App\Services\Shared;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Response;
 use Throwable;
 
 class RoutingService
 {
+    private const NEAREST_ROAD_CANDIDATE_LIMIT = 5;
+    private const MAX_ROAD_SNAP_DISTANCE_METERS = 500;
+
     public function drivingRoute(float $startLatitude, float $startLongitude, float $endLatitude, float $endLongitude): ?array
     {
         $baseUrl = rtrim((string) config('services.osrm.base_url'), '/');
@@ -15,23 +19,31 @@ class RoutingService
             return null;
         }
 
-        $coordinates = $startLongitude.','.$startLatitude.';'.$endLongitude.','.$endLatitude;
-
         try {
-            $response = Http::withOptions([
-                'verify' => (bool) config('services.osrm.ssl_verify'),
-            ])->timeout(10)
-                ->get($baseUrl.'/route/v1/driving/'.$coordinates, [
-                    'overview' => 'full',
-                    'geometries' => 'geojson',
-                    'steps' => 'true',
-                ]);
+            $response = $this->requestDrivingRoute($baseUrl, $startLatitude, $startLongitude, $endLatitude, $endLongitude);
 
-            if (! $response->successful()) {
+            $snapRequired = in_array($response->json('code'), ['NoRoute', 'NoSegment'], true);
+            if (! $response->successful() && ! $snapRequired) {
                 return null;
             }
 
             $route = $response->json('routes.0');
+            if (! is_array($route) && $snapRequired) {
+                $nearestRoad = $this->nearestRoad($baseUrl, $startLatitude, $startLongitude);
+                if ($nearestRoad) {
+                    $response = $this->requestDrivingRoute(
+                        $baseUrl,
+                        $nearestRoad['latitude'],
+                        $nearestRoad['longitude'],
+                        $endLatitude,
+                        $endLongitude,
+                    );
+                    if (! $response->successful()) {
+                        return null;
+                    }
+                    $route = $response->json('routes.0');
+                }
+            }
 
             if (! is_array($route)) {
                 return null;
@@ -82,9 +94,70 @@ class RoutingService
             return null;
         }
     }
+
+    private function requestDrivingRoute(
+        string $baseUrl,
+        float $startLatitude,
+        float $startLongitude,
+        float $endLatitude,
+        float $endLongitude,
+    ): Response {
+        $coordinates = $startLongitude.','.$startLatitude.';'.$endLongitude.','.$endLatitude;
+
+        return Http::withOptions([
+            'verify' => (bool) config('services.osrm.ssl_verify'),
+        ])->timeout(10)
+            ->get($baseUrl.'/route/v1/driving/'.$coordinates, [
+                'overview' => 'full',
+                'geometries' => 'geojson',
+                'steps' => 'true',
+            ]);
+    }
+
+    /**
+     * Ask the routing provider's spatial index for nearby road segments, then
+     * sort only those bounded candidates by their distance from the GPS fix.
+     *
+     * @return array{latitude: float, longitude: float}|null
+     */
+    private function nearestRoad(string $baseUrl, float $latitude, float $longitude): ?array
+    {
+        $response = Http::withOptions([
+            'verify' => (bool) config('services.osrm.ssl_verify'),
+        ])->timeout(5)
+            ->get($baseUrl.'/nearest/v1/driving/'.$longitude.','.$latitude, [
+                'number' => self::NEAREST_ROAD_CANDIDATE_LIMIT,
+                'radiuses' => self::MAX_ROAD_SNAP_DISTANCE_METERS,
+            ]);
+
+        if (! $response->successful() || $response->json('code') !== 'Ok') {
+            return null;
+        }
+
+        $candidates = array_filter($response->json('waypoints', []), function (mixed $candidate): bool {
+            if (! is_array($candidate)) {
+                return false;
+            }
+            $location = $candidate['location'] ?? null;
+            return is_array($location)
+                && count($location) >= 2
+                && is_numeric($location[0])
+                && is_numeric($location[1])
+                && is_numeric($candidate['distance'] ?? null)
+                && (float) $candidate['distance'] <= self::MAX_ROAD_SNAP_DISTANCE_METERS;
+        });
+        usort($candidates, fn (array $left, array $right): int => (float) $left['distance'] <=> (float) $right['distance']);
+
+        if (! $candidates) {
+            return null;
+        }
+
+        return [
+            'latitude' => (float) $candidates[0]['location'][1],
+            'longitude' => (float) $candidates[0]['location'][0],
+        ];
+    }
 }
-
-
 
 
 

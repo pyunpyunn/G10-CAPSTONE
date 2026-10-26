@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
-function fixture({ offline = false, conflict = false, restoreStatus = 200, restoreRole = 'household_resident', loginRole = 'rescuer', ownerRequired = false } = {}) {
+function fixture({ offline = false, slowLogout = false, conflict = false, restoreStatus = 200, restoreRole = 'household_resident', loginRole = 'rescuer', ownerRequired = false } = {}) {
   const calls = [], storage = new Map(), payloads = [], views = new Map();
   let binds = 0;
   const mocks = {
@@ -43,7 +43,11 @@ function fixture({ offline = false, conflict = false, restoreStatus = 200, resto
       async deleteStoredItem(key) { calls.push(['delete-storage', key]); storage.delete(key); },
     },
     'expo-crypto': { randomUUID() { return 'new-device'; } },
-    'axios': { async post() { calls.push('revoke-temporary-token'); } },
+    'axios': { default: { post(url, payload, config) {
+      calls.push(['remote-logout', url, config?.headers?.Authorization]);
+      if (slowLogout) return new Promise(() => {});
+      return Promise.resolve();
+    } } },
     'react-native': { Platform: { OS: 'android' } },
     '@/utils/navigationStore': { async selectNavigationAccount(id) { calls.push(['select-account', id]); } },
     '@/utils/rescuerLiveLocation': { async stopRescuerTracking() { calls.push('stop-live-gps'); } },
@@ -55,15 +59,35 @@ function fixture({ offline = false, conflict = false, restoreStatus = 200, resto
   }).outputText, context);
   return { auth: context.exports, calls, storage, payloads, views };
 }
-test('logout suspends sync, stops recording, and clears credentials even when offline', async () => {
-  const { auth, calls } = fixture({ offline: true });
+test('logout clears the local session when offline and makes a small best-effort server request', async () => {
+  const { auth, calls, storage } = fixture({ offline: true });
+  storage.set('resqperation_mobile_token', 'current-token');
+  storage.set('resqperation_mobile_role', 'rescuer');
+  storage.set('resq_household_owner_required', '1');
   await auth.logoutMobile();
-  assert.deepEqual(calls, ['stop-live-gps', 'suspend-sync', 'end-trip', '/auth/logout', 'push-logout', 'clear-token',
-    ['delete-storage', 'resqperation_mobile_role'], ['delete-storage', 'resq_household_owner_required']]);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(storage.has('resqperation_mobile_token'), false);
+  assert.equal(storage.has('resqperation_mobile_role'), false);
+  assert.equal(storage.has('resq_household_owner_required'), false);
+  assert.ok(calls.some((call) => Array.isArray(call) && call[0] === 'remote-logout' &&
+    call[1] === 'https://example.test/api/v1/auth/logout' && call[2] === 'Bearer current-token'));
+});
+
+test('logout does not wait for a slow server logout request', async () => {
+  const { auth, calls, storage } = fixture({ slowLogout: true });
+  storage.set('resqperation_mobile_token', 'current-token');
+  await Promise.race([
+    auth.logoutMobile(),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('logout waited for the server')), 100)),
+  ]);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(storage.has('resqperation_mobile_token'), false);
+  assert.ok(calls.some((call) => Array.isArray(call) && call[0] === 'remote-logout'));
 });
 test('rescuer login normalizes numeric account IDs and saves the device token', async () => {
-  const { auth, calls } = fixture();
+  const { auth, calls, payloads } = fixture();
   await auth.loginMobile('rescuer', 'password');
+  assert.equal(payloads[0].payload.login, 'rescuer');
   assert.ok(calls.some((item) => Array.isArray(item) && item[0] === 'select-account' && item[1] === '123'));
   assert.ok(calls.some((item) => Array.isArray(item) && item[0] === 'save-token' && item[1] === 'device-token'));
 });
@@ -113,10 +137,13 @@ test('household login sends the shared ID and stable phone ID, and caches the ow
 });
 
 test('choosing an owner saves the selected session and stops requiring the picker', async () => {
-  const { auth, storage } = fixture();
+  const { auth, storage, calls, payloads } = fixture();
   storage.set('resq_household_owner_required', '1');
   const user = await auth.selectHouseholdDeviceOwner('HM-1-2');
+  assert.equal(payloads.at(-1).url, '/household/device-owner/select');
+  assert.equal(payloads.at(-1).payload.member_id, 'HM-1-2');
   assert.equal(user.member_id, 'HM-1-2');
+  assert.ok(calls.some((item) => Array.isArray(item) && item[0] === 'select-account' && item[1] === 'member-account'));
   assert.equal(storage.get('resqperation_mobile_token'), 'selected-owner-token');
   assert.equal(storage.get('resq_household_owner_required'), '0');
   assert.equal(storage.get('resqperation_mobile_role'), 'household_resident');

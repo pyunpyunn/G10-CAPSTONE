@@ -10,9 +10,7 @@ export function useMobileOverview<T>(key: string, read: (refresh?: boolean) => P
   current.current = overview;
   const [loading, setLoading] = useState(!overview);
   const [refreshing, setRefreshing] = useState(false);
-  const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
-  const [lastUpdated, setLastUpdated] = useState(cached.current?.savedAt || 0);
   const queue = useRef(createRefreshQueue());
   const readVersion = useRef(0);
 
@@ -20,7 +18,6 @@ export function useMobileOverview<T>(key: string, read: (refresh?: boolean) => P
     if (afterWrite) readVersion.current++;
     const version = readVersion.current;
     return queue.current.run(async () => {
-      setFetching(true);
       if (!silent) {
         if (current.current) setRefreshing(true);
         else setLoading(true);
@@ -32,7 +29,6 @@ export function useMobileOverview<T>(key: string, read: (refresh?: boolean) => P
         current.current = data;
         setOverview(data);
         saveViewState(`mobile:${key}`, data);
-        setLastUpdated(Date.now());
         setError('');
         return data;
       } catch (failure: any) {
@@ -41,10 +37,9 @@ export function useMobileOverview<T>(key: string, read: (refresh?: boolean) => P
       } finally {
         setLoading(false);
         setRefreshing(false);
-        setFetching(false);
       }
     }, afterWrite || isRefresh && !silent);
   }, [key, read]);
 
-  return { overview, setOverview, loading, refreshing, fetching, error, lastUpdated, loadOverview };
+  return { overview, setOverview, loading, refreshing, error, loadOverview };
 }

@@ -10,6 +10,8 @@ use App\Support\RequestSchema as Schema;
 
 class RescuerAssignmentQuery
 {
+    private const MOBILE_TRAIL_POINT_LIMIT = 300;
+
     public function __construct(private RescuerAssignmentPresenter $presenter) {}
 
     public function list(?int $responderId, int $limit): Collection
@@ -83,8 +85,10 @@ class RescuerAssignmentQuery
         $route->mobile_trail_coordinates = Schema::hasTable('route_coordinates')
             ? DB::table('route_coordinates')
                 ->where('route_id', $route->route_id)
-                ->orderBy('sequence_order')
+                ->orderByDesc('sequence_order')
+                ->limit(self::MOBILE_TRAIL_POINT_LIMIT)
                 ->get(['latitude', 'longitude', 'sequence_order', 'recorded_at', 'accuracy_m'])
+                ->reverse()
                 ->values()
             : collect();
 
@@ -128,5 +132,4 @@ class RescuerAssignmentQuery
         return $query->select($columns);
     }
 }
-
 
