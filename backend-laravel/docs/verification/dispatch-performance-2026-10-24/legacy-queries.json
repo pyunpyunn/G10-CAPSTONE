@@ -1,0 +1,32 @@
+{
+    "total_ms": 184.3,
+    "queries": 28,
+    "db_ms": 49.5,
+    "bytes": 42836,
+    "slowest": [
+        {
+            "ms": 29.51,
+            "sql": "select * from `disaster_events` where `deleted_at` is null and `ended_at` is null order by `started_at` desc limit 1"
+        },
+        {
+            "ms": 1.65,
+            "sql": "select `h`.`household_id`, `h`.`household_code`, `h`.`household_name`, `h`.`member_count`, COALESCE(p.sitio_id, a.sitio_id) as sitio_id, `a`.`purok_id`, `a`.`full_address`, `a`.`house_number`, COALESCE(CONCAT(p.purok_name, ', ', s.sitio_name), s.sitio_name, NULLIF(a.purok_sitio, ''), 'Unassigned') as area_name, (SELECT gl.location_label FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.location_label IS NOT NULL ORDER BY COALESCE(gl.updated_at,gl.created_at) DESC LIMIT 1) as geotag_label, `hs`.`status_key`, `hs`.`status_label`, `hd`.`needs_dispatch`, `hd`.`priority_level`, `hd`.`last_battery_level`, `hd`.`last_reported_at`, EXISTS (SELECT 1 FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.latitude IS NOT NULL AND gl.longitude IS NOT NULL) as has_geotag from `households` as `h` inner join `addresses` as `a` on `a`.`address_id` = `h`.`address_id` left join `puroks` as `p` on `p`.`purok_id` = `a`.`purok_id` left join `sitios` as `s` on `s`.`sitio_id` = COALESCE(p.sitio_id, a.sitio_id) left join `household_disasters` as `hd` on `hd`.`household_id` = `h`.`household_id` and `hd`.`disaster_id` = ? left join (select `report`.`household_id`, `report`.`status_id`, `report`.`status_log_id` from `household_status_logs` as `report` inner join `household_statuses` as `valid_status` on `valid_status`.`status_id` = `report`.`status_id` where `report`.`disaster_id` = ? and `valid_status`.`status_key` in (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) and not exists (select 1 from `household_status_logs` as `newer` inner join `household_statuses` as `newer_status` on `newer_status`.`status_id` = `newer`.`status_id` where `newer`.`household_id` = `report`.`household_id` and `newer`.`disaster_id` = `report`.`disaster_id` and `newer_status`.`status_key` in (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) and (`newer`.`submitted_at` > `report`.`submitted_at` or (`newer`.`submitted_at` = `report`.`submitted_at` and `newer`.`status_log_id` > `report`.`status_log_id`)))) as `latest_report` on `latest_report`.`household_id` = `h`.`household_id` left join `household_statuses` as `hs` on `hs`.`status_id` = `latest_report`.`status_id` where `a`.`purok_id` in (select `eligible_purok`.`purok_id` from `puroks` as `eligible_purok` inner join `sitios` as `eligible_sitio` on `eligible_sitio`.`sitio_id` = `eligible_purok`.`sitio_id` where `eligible_sitio`.`barangay_id` = ?) and `h`.`deleted_at` is null and `h`.`household_id` is not null"
+        },
+        {
+            "ms": 1.06,
+            "sql": "select * from (select `team_id`, `assignment_id`, `responder_id`, `assigned_area`, `assigned_at`, `status`, `route_notes`, `outcome_notes`, ROW_NUMBER() OVER (PARTITION BY team_id ORDER BY assigned_at DESC, assignment_id DESC) as row_rank from `responder_assignments` where `disaster_id` = ? and `team_id` in (?, ?, ?, ?, ?, ?, ?, ?) and `status` not in (?, ?)) as `ranked_assignments` where `row_rank` = ?"
+        },
+        {
+            "ms": 0.96,
+            "sql": "select `rt`.`team_id`, `rt`.`team_code`, `rt`.`team_name`, `rt`.`team_type`, `rt`.`duty_status`, `leader`.`full_name` as `leader_name` from `rescue_teams` as `rt` left join `responders` as `leader` on `leader`.`responder_id` = `rt`.`leader_responder_id` order by `rt`.`team_name` asc"
+        },
+        {
+            "ms": 0.95,
+            "sql": "select `ra`.`assignment_id`, `ra`.`status`, `ra`.`assigned_area`, `ra`.`assigned_at`, `ra`.`updated_at`, `rt`.`team_name`, `r`.`full_name` from `responder_assignments` as `ra` left join `rescue_teams` as `rt` on `rt`.`team_id` = `ra`.`team_id` left join `responders` as `r` on `r`.`responder_id` = `ra`.`responder_id` where `ra`.`disaster_id` = ? order by `ra`.`updated_at` desc, `ra`.`assigned_at` desc limit 10"
+        },
+        {
+            "ms": 0.93,
+            "sql": "select `ra`.*, `rt`.`team_name`, `rt`.`team_code`, `rt`.`team_type`, `r`.`full_name` as `responder_name`, `r`.`contact_number` as `responder_contact` from `responder_assignments` as `ra` left join `rescue_teams` as `rt` on `rt`.`team_id` = `ra`.`team_id` left join `responders` as `r` on `r`.`responder_id` = `ra`.`responder_id` where `ra`.`disaster_id` = ? and `ra`.`status` in (?, ?, ?, ?, ?, ?) order by `ra`.`assigned_at` desc, `ra`.`assignment_id` desc"
+        }
+    ]
+}

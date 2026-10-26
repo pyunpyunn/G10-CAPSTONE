@@ -178,7 +178,6 @@ export default function RequestResourceModal({
         ? item.id
         : `TA-${item.id}`
       : '')
-
   const handleClose = () => {
     setFieldErrors({})
     setError(null)

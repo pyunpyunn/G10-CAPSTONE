@@ -38,7 +38,7 @@ export function MobileLeafletMap({
   if (initialMap.current === null) initialMap.current = mobileLeafletHtml({ markers, routes, center, interactive: !!onMapPress });
   const html = geotagPicker ? mobileLeafletHtml({ markers: [], routes: [], geotagPicker: true, geotagMode }) : initialMap.current;
   const source = useMemo(() => ({ html }), [html]);
-  const layerPayload = JSON.stringify({ markers, routes }).replace(/</g, '\\u003c');
+  const layerPayload = useMemo(() => JSON.stringify({ markers, routes }).replace(/</g, '\\u003c'), [markers, routes]);
   const updateLayers = useCallback(() => {
     if (!geotagPicker) webView.current?.injectJavaScript(`window.updateRescueData?.(${layerPayload}); true;`);
   }, [geotagPicker, layerPayload]);

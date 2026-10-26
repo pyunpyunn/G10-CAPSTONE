@@ -9,6 +9,47 @@ use App\Support\RequestSchema as Schema;
 
 class SmsGatewayService
 {
+    public function sendDirectSms(string $phoneNumber, string $message): array
+    {
+        if (! $this->baseUrl() || ! $this->username() || ! $this->password()) {
+            return $this->result('not_configured', 1, 'Android SMS Gateway URL and credentials are not configured.');
+        }
+
+        $number = $this->normalizeNumber($phoneNumber);
+        if (! $number) {
+            return $this->result('invalid_number', 1, 'The phone number is not a valid Philippine mobile number.');
+        }
+
+        try {
+            $response = Http::withBasicAuth($this->username(), $this->password())
+                ->acceptJson()
+                ->asJson()
+                ->timeout(20)
+                ->post($this->messageUrl(), [
+                    'textMessage' => ['text' => $message],
+                    'phoneNumbers' => [$number],
+                ]);
+
+            if (! $response->successful()) {
+                Log::warning('Direct SMS gateway request failed', ['status' => $response->status()]);
+                return $this->result('failed', 1, 'Android SMS Gateway did not accept the message.');
+            }
+
+            $providerId = $response->json('id') ?? $response->json('messageId');
+            return [
+                'status' => 'accepted',
+                'recipient_count' => 1,
+                'accepted_count' => 1,
+                'provider_ids' => $providerId ? [(string) $providerId] : [],
+                'message' => 'Android gateway accepted the SMS request.',
+                'errors' => [],
+            ];
+        } catch (\Throwable $error) {
+            Log::warning('Direct SMS gateway send failed', ['message' => $error->getMessage()]);
+            return $this->result('failed', 1, 'Android SMS Gateway could not send the message.');
+        }
+    }
+
     public function sendBroadcastSms(string $message, array $options = []): array
     {
         if (! $this->baseUrl() || ! $this->username() || ! $this->password()) {
@@ -142,7 +183,6 @@ class SmsGatewayService
             'provider_ids' => [], 'message' => $message, 'errors' => []];
     }
 }
-
 
 
 

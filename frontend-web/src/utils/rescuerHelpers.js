@@ -97,7 +97,7 @@ export function buildRescuerPayload(form, mode) {
     payload.account_id = form.account_id
   }
 
-  if (form.password) {
+  if (mode === 'create' && form.password) {
     payload.password = form.password
   }
 

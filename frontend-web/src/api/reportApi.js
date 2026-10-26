@@ -7,9 +7,8 @@ export async function downloadBackendReport(payload) {
   while (data.status === 'pending') {
     if (Date.now() > deadline) throw new Error('The report is still processing. Please try again later.')
     await new Promise((resolve) => setTimeout(resolve, 1500))
-    const response = await fetch(statusUrl, { headers: { Accept: 'application/json' } })
-    if (!response.ok) throw new Error('Report status cannot be loaded. Please try again.')
-    data = await response.json()
+    const response = await api.get(statusUrl, { cache: false })
+    data = response.data
   }
   if (data.status !== 'success') throw new Error(data.message || 'Report generation failed.')
   const link = document.createElement('a')

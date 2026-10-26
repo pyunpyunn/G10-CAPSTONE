@@ -9,6 +9,38 @@ class SitioDispatchCoverageQuery
 {
     public function __construct(private BarangayProfileService $barangay) {}
 
+    public function withActiveAssignments(array $priorities, array $assignments): array
+    {
+        $assignments = array_filter($assignments, fn($assignment) => in_array($assignment['status']['key'] ?? '', ['dispatched','accepted','en_route','on_scene','returning'], true));
+        $assignedIds = fn($assignment) => array_values(array_unique(array_filter(array_merge(
+            $assignment['household_ids'] ?? [], [$assignment['household_id'] ?? null],
+            array_merge([], ...array_values($assignment['responder_households'] ?? [])),
+        ))));
+        $legacyIds = [];
+        foreach ($assignments as $assignment) {
+            if (empty($assignment['sitio_id'])) $legacyIds = array_merge($legacyIds, $assignedIds($assignment));
+        }
+        $legacyIds = array_values(array_unique(array_filter($legacyIds)));
+        $sites = $legacyIds ? DB::table('households as h')->join('addresses as a','a.address_id','=','h.address_id')
+            ->leftJoin('puroks as p','p.purok_id','=','a.purok_id')->whereIn('h.household_id',$legacyIds)
+            ->select('h.household_id')->selectRaw('COALESCE(p.sitio_id,a.sitio_id) as sitio_id')
+            ->get()->pluck('sitio_id', 'household_id')->all() : [];
+        return array_map(function ($priority) use ($assignments, $sites, $assignedIds) {
+            $labels = array_merge([$priority['sitio']], array_column($priority['address_labels'] ?? [], 'label'));
+            $priority['activeDispatches'] = [];
+            foreach ($assignments as $assignment) {
+                $ids = $assignedIds($assignment);
+                $matches = !empty($assignment['sitio_id']) ? (int)$assignment['sitio_id'] === (int)$priority['sitio_id']
+                    : ($ids ? collect($ids)->contains(fn($id) => (int)($sites[$id] ?? 0) === (int)$priority['sitio_id'])
+                        : in_array($assignment['assigned_area'] ?? '', $labels, true));
+                if ($matches) $priority['activeDispatches'][] = array_intersect_key($assignment, array_flip([
+                    'assignment_id','assignment_code','team_name','assigned_area','status','selected_responder_ids','responder_id',
+                ]));
+            }
+            return $priority;
+        }, $priorities);
+    }
+
     public function forEvent(?string $eventId, $riskAreas, array $activeAssignments): array
     {
         if (! $eventId) return [];

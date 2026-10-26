@@ -7,7 +7,7 @@ const output = ts.transpileModule(fs.readFileSync(require('node:path').join(__di
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText;
 const context = { exports: {} }; vm.runInNewContext(output, context);
-const { decodePolyline6, distanceMeters, routeProgress, bearingDegrees } = context.exports;
+const { decodePolyline6, distanceMeters, routeProgress, bearingDegrees, downsampleRouteCoordinates } = context.exports;
 
 test('precision-six geometry decodes longitude first and rejects truncated data', () => {
   const decoded = decodePolyline6('_izlhA~rlgdF_{geC~ywl@_kwzCn`{nI');
@@ -29,4 +29,12 @@ test('progress clamps at route ends and detects an off-route fix', () => {
   assert.equal(routeProgress(points, [123.88, 10.31]).remainingM, 0);
   assert.ok(routeProgress(points, [123.89, 10.295]).offRouteM > 1000);
   assert.throws(() => routeProgress([], [0, 0]));
+});
+test('route display downsampling preserves endpoints and bounds rendered geometry', () => {
+  const points = Array.from({ length: 5000 }, (_, index) => [123 + index / 100000, 10 + index / 100000]);
+  const sampled = downsampleRouteCoordinates(points, 1200);
+  assert.equal(sampled.length, 1200);
+  assert.deepEqual(sampled[0], points[0]);
+  assert.deepEqual(sampled.at(-1), points.at(-1));
+  assert.equal(downsampleRouteCoordinates(points, 6000), points);
 });

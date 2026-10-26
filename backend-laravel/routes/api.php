@@ -78,8 +78,16 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:10,1,password-verify');
     Route::post('/auth/password-recovery/reset', [AuthController::class, 'resetPassword'])
         ->middleware('throttle:5,1,password-change');
+    Route::post('/auth/password-recovery/household/lookup', [AuthController::class, 'lookupHouseholdRecoveryContact'])
+        ->middleware('throttle:10,1');
+    Route::post('/auth/password-recovery/household/validate-contact', [AuthController::class, 'validateHouseholdRecoveryContact'])
+        ->middleware('throttle:10,1');
+    Route::post('/auth/password-recovery/household/send-code', [AuthController::class, 'sendHouseholdRecoveryCode'])
+        ->middleware('throttle:3,1');
+    Route::post('/auth/password-recovery/household/reset', [AuthController::class, 'resetHouseholdPassword'])
+        ->middleware('throttle:5,1,password-change');
 
-    Route::middleware(['auth:sanctum', 'throttle:300,1', 'realtime.atomic'])->group(function () {
+    Route::middleware(['auth:sanctum', 'household.owner', 'throttle:300,1', 'realtime.atomic'])->group(function () {
         Route::get('/realtime/health', \App\Http\Controllers\Api\RealtimeHealthController::class)->middleware('role:operations_admin');
         Route::patch('/profile/password', [ProfileController::class, 'changePassword'])->middleware('throttle:5,1,password-change');
         Route::get('/auth/me', [AuthController::class, 'me']);
@@ -226,8 +234,12 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::middleware('role:household_resident')->group(function () {
+            Route::get('/household/device-owner/options', [HouseholdMobileController::class, 'ownerOptions']);
+            Route::post('/household/device-owner/select', [HouseholdMobileController::class, 'selectOwner']);
+            Route::post('/household/device-owner/reset', [HouseholdMobileController::class, 'resetOwner']);
             Route::get('/household/overview', [HouseholdMobileController::class, 'overview']);
             Route::post('/household/setup', [HouseholdMobileController::class, 'completeSetup']);
+            Route::post('/household/setup/location', [HouseholdMobileController::class, 'previewSetupLocation']);
             Route::put('/household/geotag', [HouseholdMobileController::class, 'updateGeotag']);
             Route::post('/household/device-location', [HouseholdMobileController::class, 'updateDeviceLocation']);
             Route::patch('/household/members/{memberId}', [HouseholdMobileController::class, 'updateMember']);

@@ -31,17 +31,22 @@ class AnnexHRoleAccessTest extends TestCase
         return $user;
     }
 
-    public function test_operations_admin_has_technical_access_without_incident_command_permissions(): void
+    public function test_operations_admin_has_all_web_modules_and_chair_actions_even_with_legacy_role_settings(): void
     {
         $user = $this->userFor('operations_admin', 'operations_admin', [
             'personnel_access', 'profile', 'notifications', 'inquiries',
         ], manage: true);
         $policy = app(WebAccessPolicy::class);
 
-        $this->assertSame(['personnel_access', 'profile', 'notifications', 'inquiries'], $policy->modulesFor($user));
+        $this->assertSame(WebAccessPolicy::MODULES['operations_admin'], $policy->modulesFor($user));
         $this->assertTrue($user->canManagePersonnel());
-        $this->assertFalse($policy->allows($user, 'response_operations'));
-        $this->assertFalse($policy->allows($user, 'geospatial_analytics', 'manage_hazards'));
+        foreach (WebAccessPolicy::MODULES['operations_admin'] as $module) $this->assertTrue($policy->allows($user, $module));
+        $this->assertTrue($policy->allows($user, 'geospatial_analytics', 'manage_hazards'));
+        $this->assertTrue($policy->allows($user, 'resources_requests', 'approve'));
+        $this->assertTrue($policy->allows($user, 'response_operations', 'publish_alert'));
+        $this->assertTrue($policy->allows($user, 'response_operations', 'create_dispatch'));
+        $user->is_active = false;
+        $this->assertSame([], $policy->modulesFor($user));
         $this->assertFalse($policy->allows($user, 'resources_requests', 'approve'));
     }
 

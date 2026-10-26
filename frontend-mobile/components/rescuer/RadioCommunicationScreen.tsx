@@ -1,5 +1,6 @@
+import { createRefreshQueue } from '@/utils/networkScheduling';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
@@ -77,6 +78,7 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
   const [error, setError] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const secondsRef = useRef(0);
+  const feedQueue = useRef(createRefreshQueue());
   const playedLogIdsRef = useRef<Set<string | number>>(new Set());
 
   const profile = overview?.profile || {};
@@ -113,7 +115,7 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
     loadRadioFeed(1, true);
 
     const feedTimer = setInterval(() => {
-      loadRadioFeed(1, true, true);
+      if (AppState.currentState === 'active') void loadRadioFeed(1, true, true);
     }, 4000);
 
     return () => {
@@ -123,31 +125,33 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
   }, []);
 
   async function loadRadioFeed(nextPage = 1, replace = true, silent = false) {
-    if (!silent && replace) {
-      setIsLoadingLogs(true);
-    }
-
-    try {
-      const data = await getRadioFeed({
-        channel: 'team',
-        page: nextPage,
-        per_page: 20,
-      });
-      const nextLogs = data?.logs?.data || [];
-
-      setLogs((current) => (replace ? nextLogs : [...current, ...nextLogs]));
-      setTeamMembers(data?.team_members || []);
-      setActiveTransmission(data?.active_transmission || null);
-      setPage(data?.logs?.current_page || nextPage);
-      setHasMore(Boolean(data?.logs?.has_more));
-      setError('');
-    } catch (radioError: any) {
-      setError(radioError?.response?.data?.message || 'Radio feed cannot be loaded.');
-    } finally {
+    return feedQueue.current.run(async () => {
       if (!silent && replace) {
-        setIsLoadingLogs(false);
+        setIsLoadingLogs(true);
       }
-    }
+
+      try {
+        const data = await getRadioFeed({
+          channel: 'team',
+          page: nextPage,
+          per_page: 20,
+        });
+        const nextLogs = data?.logs?.data || [];
+
+        setLogs((current) => (replace ? nextLogs : [...current, ...nextLogs]));
+        setTeamMembers(data?.team_members || []);
+        setActiveTransmission(data?.active_transmission || null);
+        setPage(data?.logs?.current_page || nextPage);
+        setHasMore(Boolean(data?.logs?.has_more));
+        setError('');
+      } catch (radioError: any) {
+        setError(radioError?.response?.data?.message || 'Radio feed cannot be loaded.');
+      } finally {
+        if (!silent && replace) {
+          setIsLoadingLogs(false);
+        }
+      }
+    }, !silent);
   }
 
   async function playMemberNextClip(member: TeamMember) {

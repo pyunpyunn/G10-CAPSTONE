@@ -15,7 +15,8 @@
       "android": { "buildType": "apk" },
       "env": {
         "EXPO_PUBLIC_ONESIGNAL_APP_ID": "bc6266ac-90a4-4bfe-b4d5-59c57939e7a5",
-        "EXPO_PUBLIC_API_BASE_URL": "http://100.121.155.55:8000/api/v1"
+        "EXPO_PUBLIC_API_BASE_URL": "http://100.121.155.55:8000/api/v1",
+        "EXPO_PUBLIC_API_FALLBACK_URLS": "https://sturdily-morse-sitter.ngrok-free.dev/api/v1,http://100.121.155.55:8000/api/v1,http://10.90.159.87:8000/api/v1"
       }
     },
     "store": {

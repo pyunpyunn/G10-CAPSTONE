@@ -18,6 +18,16 @@ class HouseholdMember extends Model
 
     protected $keyType = 'string';
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $member): void {
+            $prefix = \App\Services\Shared\HouseholdMemberIdentity::prefix((string) $member->household_id);
+            if (! $member->member_id || ! preg_match('/^'.preg_quote($prefix, '/').'[1-9]\d*$/', $member->member_id)) {
+                $member->member_id = app(\App\Services\Shared\HouseholdMemberIdentity::class)->next((string) $member->household_id);
+            }
+        });
+    }
+
     protected $fillable = ['household_id', 'first_name', 'middle_name', 'last_name', 'birth_date', 'gender_id', 'relationship_id', 'is_household_head', 'can_report_for_household', 'contact_number', 'civil_status_id', 'occupation', 'education_level_id', 'is_graduate', 'is_pwd', 'is_senior', 'is_pregnant'];
 
     protected function casts(): array

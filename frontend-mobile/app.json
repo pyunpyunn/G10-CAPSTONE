@@ -17,6 +17,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true,
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         },

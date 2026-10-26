@@ -19,6 +19,7 @@ class RescuerAccountPresenterTest extends TestCase
             'duty_status' => 'on_scene', 'is_deployed' => 1, 'is_validated' => 1, 'is_active' => 1,
             'last_active_at' => null, 'created_at' => '2026-09-30 10:00:00', 'email' => 'alex@example.test',
             'date_of_birth' => '1990-01-01', 'gender' => 'female', 'must_change_password' => 0,
+            'password_hash' => 'private-responder-hash', 'password' => 'private-user-password',
         ];
 
         $payload = app(RescuerAccountPresenter::class)->formatResponder($row, true);
@@ -28,6 +29,21 @@ class RescuerAccountPresenterTest extends TestCase
         $this->assertTrue($payload['training_due']);
         $this->assertSame('alex@example.test', $payload['email']);
         $this->assertFalse($payload['must_change_password']);
+        $this->assertArrayNotHasKey('password_hash', $payload);
+        $this->assertArrayNotHasKey('password', $payload);
+        $this->assertArrayNotHasKey('temp_password', $payload);
+        $row->responder_code = 'HFAPS-3000';
+        $corrected = app(RescuerAccountPresenter::class)->formatResponder($row, true);
+        $this->assertSame('HFAPS-3000', $corrected['account_id']);
+        $this->assertSame('alex.responder', $corrected['username']);
+        $this->assertSame('BDRRM-SAR-012', $row->username);
+    }
+
+    public function test_responder_model_hides_password_hash_when_serialized(): void
+    {
+        $responder = new \App\Models\Responder(['password_hash' => 'private-responder-hash']);
+
+        $this->assertArrayNotHasKey('password_hash', $responder->toArray());
     }
 
     public function test_disabled_status_overrides_deployment_status_and_middle_name_is_normalized(): void
@@ -38,5 +54,4 @@ class RescuerAccountPresenterTest extends TestCase
         $this->assertFalse($presenter->hasTrainingDue((object) ['training_notes' => 'Current', 'certification_reference' => 'Valid']));
     }
 }
-
 

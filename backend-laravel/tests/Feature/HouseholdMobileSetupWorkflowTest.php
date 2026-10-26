@@ -156,6 +156,10 @@ class HouseholdMobileSetupWorkflowTest extends TestCase
     {
         parent::setUp();
         Schema::create('households', fn (Blueprint $table) => $table->string('household_id')->primary());
+        Schema::create('household_members', function (Blueprint $table): void {
+            $table->string('member_id')->primary(); $table->string('household_id'); $table->string('name');
+        });
+        DB::table('household_members')->insert(['member_id' => 'HM-1-1', 'household_id' => 'HH-1', 'name' => 'Device owner']);
         Schema::create('geotagged_locations', function (Blueprint $table): void {
             $table->integer('location_id')->primary();
             $table->string('household_id');
@@ -172,6 +176,7 @@ class HouseholdMobileSetupWorkflowTest extends TestCase
             $table->integer('id')->primary();
             $table->string('household_id');
             $table->string('user_id')->nullable();
+            $table->string('member_id')->nullable();
             $table->string('device_uuid');
             $table->string('device_name')->nullable();
             $table->string('platform')->nullable();
@@ -206,26 +211,30 @@ class HouseholdMobileSetupWorkflowTest extends TestCase
 
     public function test_complete_setup_preserves_response_and_saves_geotag_device_and_track(): void
     {
+        $this->registeredAddress();
         $request = $this->householdRequest('/api/v1/household/setup', 'POST', [
-            'latitude' => 10.2,
-            'longitude' => 123.8,
-            'address_label' => 'Zone 4, Cebu City',
+            'latitude' => 10.287,
+            'longitude' => 123.88,
+            'is_apartment' => false,
+            'house_number' => '42',
+            'unit_number' => 'Ignore for a non-apartment household',
+            'address_label' => 'Untrusted address text',
             'relationship_to_family' => 'daughter',
             'device_uuid' => 'device-uuid-4',
         ]);
-        $response = app(HouseholdMobileSetupWorkflow::class)->completeSetup($request);
+        $response = app(\App\Http\Controllers\Api\HouseholdMobileController::class)->completeSetup($request);
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame([
-            'message' => 'Household mobile setup saved.',
-            'data' => ['device_token_id' => 1, 'geographic_classification' => ['status' => 'outside_barangay']],
-        ], $response->getData(true));
+        $payload = $response->getData(true);
+        $this->assertFalse($payload['data']['reused_geotag']);
+        $this->assertSame(['status' => 'registered_address', 'sitio_id' => 1, 'purok_id' => 2], $payload['data']['geographic_classification']);
         $this->assertDatabaseHas('geotagged_locations', [
-            'household_id' => 'HH-1', 'latitude' => 10.2, 'longitude' => 123.8,
-            'location_label' => 'Zone 4, Cebu City', 'geotag_source' => 'household_mobile',
+            'household_id' => 'HH-1', 'latitude' => 10.287, 'longitude' => 123.88,
+            'location_label' => '42, Sample Street, Purok 2, Registered Sitio, Mambaling', 'geotag_source' => 'household_mobile',
         ]);
+        $this->assertDatabaseHas('addresses', ['address_id' => 1, 'sitio_id' => 1, 'purok_id' => 2, 'house_number' => '42', 'unit_number' => null]);
         $this->assertDatabaseHas('device_tokens', [
-            'id' => 1, 'household_id' => 'HH-1', 'device_uuid' => 'device-uuid-4',
+            'id' => 1, 'household_id' => 'HH-1', 'device_uuid' => 'device-uuid-4', 'member_id' => 'HM-1-1',
             'app_role' => 'household', 'location_permission_status' => 'granted',
         ]);
         $this->assertDatabaseHas('device_tracking_logs', [
@@ -293,10 +302,134 @@ class HouseholdMobileSetupWorkflowTest extends TestCase
         $this->assertSame(99, $preparedTracking['tracking_id']);
     }
 
+    private function registeredAddress(): void
+    {
+        Schema::table('households', fn (Blueprint $t) => $t->integer('address_id')->nullable());
+        Schema::create('addresses', function (Blueprint $t): void {
+            $t->integer('address_id')->primary(); $t->integer('barangay_id'); $t->integer('sitio_id'); $t->integer('purok_id');
+            $t->string('barangay_name')->nullable(); $t->string('purok_sitio')->nullable();
+            $t->string('street')->nullable(); $t->string('house_number')->nullable(); $t->text('full_address')->nullable(); $t->timestamps();
+        });
+        Schema::create('barangays', function (Blueprint $t): void { $t->integer('barangay_id'); $t->string('barangay_name'); });
+        Schema::create('sitios', function (Blueprint $t): void { $t->integer('sitio_id'); $t->integer('barangay_id'); $t->string('sitio_name'); });
+        Schema::create('puroks', function (Blueprint $t): void { $t->integer('purok_id'); $t->integer('sitio_id'); $t->string('purok_name'); });
+        DB::table('barangays')->insert(['barangay_id' => 396, 'barangay_name' => 'Mambaling']);
+        DB::table('sitios')->insert(['sitio_id' => 1, 'barangay_id' => 396, 'sitio_name' => 'Registered Sitio']);
+        DB::table('puroks')->insert(['purok_id' => 2, 'sitio_id' => 1, 'purok_name' => 'Purok 2']);
+        DB::table('addresses')->insert(['address_id' => 1, 'barangay_id' => 396, 'sitio_id' => 99, 'purok_id' => 2, 'street' => 'Sample Street']);
+        DB::table('households')->insert(['household_id' => 'HH-1', 'address_id' => 1]);
+        $migration = require database_path('migrations/2026_10_26_000002_add_household_apartment_address_details.php');
+        $migration->up();
+        $this->mock(\App\Services\Shared\BarangayProfileService::class, function ($mock): void {
+            $mock->shouldReceive('mambalingMapFocus')->andReturn([
+                'barangay_id' => 396,
+                'boundary' => ['type' => 'Polygon', 'coordinates' => [[[123.87,10.28],[123.90,10.28],[123.90,10.30],[123.87,10.30],[123.87,10.28]]]],
+            ]);
+        });
+    }
+
+    public function test_location_preview_uses_registered_ids_and_does_not_save_a_partial_geotag(): void
+    {
+        $this->registeredAddress();
+        $workflow = app(HouseholdMobileSetupWorkflow::class);
+        $response = $workflow->previewSetupLocation($this->householdRequest('/setup/location', 'POST', ['latitude' => 10.287, 'longitude' => 123.88]));
+        $address = $response->getData(true)['data']['address'];
+        $this->assertSame(1, $address['sitio_id']);
+        $this->assertSame(2, $address['purok_id']);
+        $this->assertSame('registered_address', $address['source']);
+        $this->assertDatabaseCount('geotagged_locations', 0);
+        $this->assertDatabaseHas('addresses', ['sitio_id' => 99]);
+    }
+
+    public function test_existing_household_geotag_is_reused_without_repinning_or_address_changes(): void
+    {
+        $this->registeredAddress();
+        DB::table('geotagged_locations')->insert(['location_id' => 8, 'household_id' => 'HH-1', 'latitude' => 10.287, 'longitude' => 123.88, 'location_label' => 'Shared home']);
+        $response = app(HouseholdMobileSetupWorkflow::class)->completeSetup($this->householdRequest('/setup', 'POST', [
+            'device_uuid' => 'new-member-phone', 'latitude' => 0, 'longitude' => 0, 'house_number' => 'Must not overwrite',
+        ]));
+        $this->assertTrue($response->getData(true)['data']['reused_geotag']);
+        $this->assertDatabaseHas('geotagged_locations', ['location_id' => 8, 'latitude' => 10.287, 'longitude' => 123.88, 'location_label' => 'Shared home']);
+        $this->assertDatabaseCount('geotagged_locations', 1);
+        $this->assertDatabaseHas('addresses', ['address_id' => 1, 'house_number' => null]);
+        $this->assertDatabaseHas('device_tokens', ['device_uuid' => 'new-member-phone', 'member_id' => 'HM-1-1']);
+    }
+
+    public function test_apartment_unit_is_required_and_details_are_saved_with_official_ids(): void
+    {
+        $this->registeredAddress();
+        $workflow = app(HouseholdMobileSetupWorkflow::class);
+        $payload = ['device_uuid' => 'apt-phone', 'latitude' => 10.287, 'longitude' => 123.88, 'is_apartment' => true];
+        try {
+            $workflow->completeSetup($this->householdRequest('/setup', 'POST', $payload));
+            $this->fail('An apartment requires a unit number.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('unit_number', $error->errors());
+        }
+        $this->assertDatabaseCount('geotagged_locations', 0);
+        $response = $workflow->completeSetup($this->householdRequest('/setup', 'POST', array_merge($payload, [
+            'unit_number' => '12B', 'building_name' => 'Building A', 'floor_number' => '3', 'room_number' => '2', 'landmark' => 'School',
+            'sitio_id' => 999, 'purok_id' => 999,
+        ])));
+        $this->assertFalse($response->getData(true)['data']['reused_geotag']);
+        $this->assertDatabaseHas('addresses', ['address_id' => 1, 'sitio_id' => 1, 'purok_id' => 2, 'is_apartment' => true, 'unit_number' => '12B', 'floor_number' => '3', 'building_name' => 'Building A', 'room_number' => '2', 'landmark' => 'School']);
+        $this->assertStringContainsString('Unit 12B', DB::table('addresses')->value('full_address'));
+        $this->assertStringContainsString('Unit 12B', app(\App\Queries\HouseholdAddressQuery::class)->forHouseholds(['HH-1'])->get('HH-1'));
+    }
+
+    public function test_new_setup_rejects_an_outside_pin_and_requires_an_apartment_choice(): void
+    {
+        $this->registeredAddress();
+        $workflow = app(HouseholdMobileSetupWorkflow::class);
+        foreach ([
+            ['latitude' => 10.287, 'longitude' => 123.88],
+            ['latitude' => 10.2, 'longitude' => 123.8, 'is_apartment' => false],
+        ] as $details) {
+            try {
+                $workflow->completeSetup($this->householdRequest('/setup', 'POST', array_merge(['device_uuid' => 'phone'], $details)));
+                $this->fail('Invalid setup must not be saved.');
+            } catch (ValidationException $error) {
+                $this->assertNotEmpty($error->errors());
+            }
+        }
+        $this->assertDatabaseCount('geotagged_locations', 0);
+        $this->assertDatabaseCount('device_tokens', 0);
+    }
+
+    public function test_another_households_location_does_not_bypass_setup(): void
+    {
+        $this->registeredAddress();
+        DB::table('geotagged_locations')->insert(['location_id' => 5, 'household_id' => 'HH-OTHER', 'latitude' => 10.287, 'longitude' => 123.88]);
+        $this->expectException(ValidationException::class);
+        app(HouseholdMobileSetupWorkflow::class)->completeSetup($this->householdRequest('/setup', 'POST', ['device_uuid' => 'phone']));
+    }
+
+    public function test_missing_official_purok_cannot_be_replaced_by_client_supplied_ids(): void
+    {
+        $this->registeredAddress();
+        DB::table('addresses')->update(['purok_id' => 999]);
+        $this->expectException(ValidationException::class);
+        app(HouseholdMobileSetupWorkflow::class)->previewSetupLocation($this->householdRequest('/setup/location', 'POST', [
+            'latitude' => 10.287, 'longitude' => 123.88, 'sitio_id' => 1, 'purok_id' => 2,
+        ]));
+    }
+
+    public function test_incomplete_location_record_is_completed_instead_of_creating_a_duplicate(): void
+    {
+        $this->registeredAddress();
+        DB::table('geotagged_locations')->insert(['location_id' => 5, 'household_id' => 'HH-1']);
+        $response = app(HouseholdMobileSetupWorkflow::class)->completeSetup($this->householdRequest('/setup', 'POST', [
+            'device_uuid' => 'phone', 'latitude' => 10.287, 'longitude' => 123.88, 'is_apartment' => false,
+        ]));
+        $this->assertFalse($response->getData(true)['data']['reused_geotag']);
+        $this->assertDatabaseCount('geotagged_locations', 1);
+        $this->assertDatabaseHas('geotagged_locations', ['location_id' => 5, 'latitude' => 10.287, 'longitude' => 123.88]);
+    }
+
     private function householdRequest(string $uri, string $method, array $input): Request
     {
         $request = Request::create($uri, $method, $input);
-        $request->setUserResolver(fn () => (object) ['household_id' => 'HH-1', 'user_id' => 'USR-1']);
+        $request->setUserResolver(fn () => (object) ['household_id' => 'HH-1', 'user_id' => 'USR-1', 'member_id' => 'HM-1-1']);
         return $request;
     }
 }

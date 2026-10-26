@@ -9,7 +9,7 @@ class WebAccessPolicy
 {
     public const MODULES = [
         'chair' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
-        'operations_admin' => ['personnel_access', 'profile', 'notifications', 'inquiries'],
+        'operations_admin' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'personnel_access', 'profile', 'notifications', 'inquiries'],
         'mitigation_prevention' => ['dashboard', 'geospatial_analytics', 'reports_documentation', 'profile', 'notifications'],
         'preparedness' => ['dashboard', 'geospatial_analytics', 'reports_documentation', 'profile', 'notifications'],
         'response' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
@@ -27,6 +27,7 @@ class WebAccessPolicy
         $roleKey = $user->roleKey();
         $role = $user->relationLoaded('role') ? $user->getRelation('role') : null;
         $allowedModules = self::MODULES[$roleKey] ?? [];
+        if ($roleKey === 'operations_admin') return $allowedModules;
         if ($role?->web_modules !== null) return array_values(array_intersect((array) $role->web_modules, $allowedModules));
         return $allowedModules;
     }
@@ -45,6 +46,7 @@ class WebAccessPolicy
         if (! in_array($module, $modules, true)) {
             return false;
         }
+        if ($roleKey === 'operations_admin') return true;
 
         if ($action === 'manage_hazards' && $module === 'geospatial_analytics') return in_array($roleKey, ['chair', 'mitigation_prevention', 'preparedness'], true);
 

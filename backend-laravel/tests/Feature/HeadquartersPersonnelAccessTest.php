@@ -174,7 +174,7 @@ class HeadquartersPersonnelAccessTest extends TestCase
         $this->assertTrue($policy->allows($chair->fresh(), 'resources_requests', 'approve'));
         $this->assertSame('operations_admin', $operationsAdmin->fresh()->roleKey());
         $this->assertTrue($operationsAdmin->fresh()->canManagePersonnel());
-        $this->assertFalse($policy->allows($operationsAdmin->fresh(), 'response_operations'));
-        $this->assertFalse($policy->allows($operationsAdmin->fresh(), 'resources_requests', 'approve'));
+        $this->assertTrue($policy->allows($operationsAdmin->fresh(), 'response_operations'));
+        $this->assertTrue($policy->allows($operationsAdmin->fresh(), 'resources_requests', 'approve'));
     }
 }

@@ -9,9 +9,11 @@ export type HouseholdOverview = {
     is_setup_complete: boolean;
     has_geotag: boolean;
     has_device: boolean;
+    address?: any;
   };
   active_event: any;
   recent_alerts?: { broadcast_id: number | string; title: string; message: string; estimated_duration?: string | null; sent_at: string | null }[];
+  member_status: any;
   current_status: any;
   status_options: any[];
   status_history: any[];
@@ -30,14 +32,20 @@ export type HouseholdOverview = {
   qr: any;
 };
 
-export async function getHouseholdOverview() {
-  const response = await api.get<{ data: HouseholdOverview }>('/household/overview');
+export async function getHouseholdOverview(refresh = false) {
+  const config = { timeout: 12000, cache: !refresh };
+  const response = await api.get<{ data: HouseholdOverview }>('/household/overview', config);
   return response.data.data;
 }
 
 export async function completeHouseholdSetup(payload: any) {
   const response = await api.post('/household/setup', payload);
   return response.data;
+}
+
+export async function previewHouseholdSetupLocation(latitude: number, longitude: number) {
+  const response = await api.post('/household/setup/location', { latitude, longitude });
+  return response.data.data;
 }
 
 export async function updateHouseholdDeviceLocation(payload: any) {

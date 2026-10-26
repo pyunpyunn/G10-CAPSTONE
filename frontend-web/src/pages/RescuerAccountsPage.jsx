@@ -8,16 +8,21 @@ import { AccountDialog,AccountEditor } from '../components/rescuers/AccountRefer
 import AccountReferenceTeamEditor from '../components/rescuers/AccountReferenceTeamEditor'
 import LegacyTeamManagementPage from './LegacyTeamManagementPage'
 import '../styles/account-html.css'
+import { canOpenWebPage } from '../utils/personnelAccess'
+import PersonnelProfilePage from './PersonnelProfilePage'
 
 export default function RescuerAccountsPage() {
   const location=useLocation()
+  const { user }=useOutletContext()
+  const profileId=location.state?.selectedProfileId || new URLSearchParams(location.search).get('id')
+  if(!canOpenWebPage(user,'/rescuers')) return <PersonnelProfilePage requestedId={profileId} />
   if (location.pathname === '/rescuers/teams') return <LegacyTeamManagementPage />
-  return <AccountsWorkspace key={`${location.pathname}${location.search}`} />
+  return <AccountsWorkspace key={`${location.pathname}${location.search}:${profileId || ''}`} />
 }
 function AccountsWorkspace() {
   const {onUserChange}=useOutletContext(),location=useLocation(),navigate=useNavigate()
   const route=location.pathname.split('/').pop(),params=new URLSearchParams(location.search)
-  const requestedId=params.get('id') || location.state?.rescuer?.responder_id
+  const requestedId=location.state?.selectedProfileId || params.get('id') || location.state?.rescuer?.responder_id
   const view=route==='teams' ? 'teams' : params.get('manage')==='roles' ? 'roles' : 'accounts'
   const [category,setCategory]=useState(location.state?.category==='headquarters' || params.get('type')==='command_center' ? 'command_center' : 'rescuer')
   const initialRoster=getCachedRescuers({page:1,per_page:8,team:'all',account_type:category})
