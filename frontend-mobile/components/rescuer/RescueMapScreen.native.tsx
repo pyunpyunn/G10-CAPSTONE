@@ -1,12 +1,11 @@
 import { statusColor } from '@/constants/statusPalette';
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { hasActiveRescuerTracking } from '@/utils/rescuerLiveLocation';
 import { useMapGps } from '@/hooks/useMapGps';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
-import { formatPhilippineTime } from '@/utils/time';
 import { ActionButton, EmptyState, SectionHeader } from './RescuerUI';
 
 type RescueMapProps = {
@@ -14,7 +13,6 @@ type RescueMapProps = {
   evacuationCenters: any[];
   activeAssignment: any;
   selectedAssignment?: any;
-  onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
   showNavigationButton?: boolean;
   onOpenNavigation?: () => void;
 };
@@ -31,42 +29,18 @@ export function RescueMapScreen({
   evacuationCenters = [],
   activeAssignment,
   selectedAssignment,
-  onSendLocation,
   showNavigationButton = false,
   onOpenNavigation,
 }: RescueMapProps) {
+  const isFocused = useIsFocused();
   const [tracking, setTracking] = useState(true);
-  const { position, error: gpsError } = useMapGps(tracking);
-  const sendLocation = useRef(onSendLocation);
-  sendLocation.current = onSendLocation;
-  const sending = useRef(false);
-  const lastRouteRefresh = useRef(0);
-  const gpsAssignment = selectedAssignment || activeAssignment;
-  const [lastUpdated, setLastUpdated] = useState('');
-  const [locError, setLocError] = useState('');
-  const [syncing, setSyncing] = useState(false);
+  const { position, error: gpsError } = useMapGps(tracking, !activeAssignment?.assignment_id);
   const [showEvacuationCenters, setShowEvacuationCenters] = useState(true);
   const [showAssignedRoutes, setShowAssignedRoutes] = useState(true);
   const [expandedLayer, setExpandedLayer] = useState<'centers' | 'routes' | null>(null);
 
-  useEffect(() => {
-    if (!tracking || !position) return;
-    setLastUpdated(formatPhilippineTime());
-    if (hasActiveRescuerTracking() && lastRouteRefresh.current > 0) return;
-    if (!gpsAssignment?.assignment_id || !['dispatched','accepted','en_route','on_scene'].includes(gpsAssignment.status_key) || sending.current) return;
-    sending.current = true;
-    setSyncing(true);
-    const refreshRoute = Date.now() - lastRouteRefresh.current > 20000;
-    if (refreshRoute) lastRouteRefresh.current = Date.now();
-    void sendLocation.current(gpsAssignment.assignment_id, { ...position, refresh_route: refreshRoute })
-      .then(() => setLocError(''))
-      .catch(error => { lastRouteRefresh.current = 0; setLocError(error.message || 'Location sync unavailable.'); })
-      .finally(() => { sending.current = false; setSyncing(false); });
-  }, [position, tracking, gpsAssignment?.assignment_id, gpsAssignment?.status_key]);
-
   function stopTracking() {
     setTracking(false);
-    setLastUpdated('');
   }
 
   function handleTrackPress() {
@@ -82,15 +56,15 @@ export function RescueMapScreen({
     setTracking(true);
   }
 
-  const activeAssignments = assignments.filter((item) =>
+  const activeAssignments = useMemo(() => assignments.filter((item) =>
     ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(String(item.status_key || '').replaceAll('-', '_').toLowerCase())
-  );
+  ), [assignments]);
   const focusedAssignment = selectedAssignment || activeAssignment;
-  const mappedAssignments = activeAssignments.filter((item) => item.latitude && item.longitude);
-  const visibleCenters = showEvacuationCenters
+  const mappedAssignments = useMemo(() => activeAssignments.filter((item) => item.latitude && item.longitude), [activeAssignments]);
+  const visibleCenters = useMemo(() => showEvacuationCenters
     ? evacuationCenters.filter((center) => center.latitude && center.longitude)
-    : [];
-  const mapMarkers = [
+    : [], [evacuationCenters, showEvacuationCenters]);
+  const mapMarkers = useMemo(() => [
     ...visibleCenters.map((center) => ({
       latitude: center.latitude,
       longitude: center.longitude,
@@ -105,27 +79,27 @@ export function RescueMapScreen({
       description: assignment.status_label || 'Active dispatch',
       color: statusColor(assignment.status_key),
     })) : []),
-  ];
-  const mapRoutes = showAssignedRoutes ? mappedAssignments.flatMap((assignment) => {
-    const route = assignment.route || {};
-    const planned = normalizeCoordinates(route.coordinates);
-    const trail = normalizeCoordinates(route.trail_coordinates);
+  ], [visibleCenters, mappedAssignments, showAssignedRoutes]);
+  const mapRoutes = useMemo(() => showAssignedRoutes ? mappedAssignments.flatMap((assignment) => {
+      const route = assignment.route || {};
+      const planned = normalizeCoordinates(route.coordinates);
+      const trail = normalizeCoordinates(route.trail_coordinates);
 
-    return [
-      ...(planned.length > 1 ? [{
-        id: `dispatch-${assignment.assignment_id}`,
-        label: `${assignment.assigned_area || assignment.household_id || 'Dispatch'} · planned route`,
-        coordinates: planned,
-        color: statusColor(assignment.status_key),
-      }] : []),
-      ...(trail.length > 1 ? [{
-        id: `dispatch-trail-${assignment.assignment_id}`,
-        label: `${assignment.assigned_area || assignment.household_id || 'Dispatch'} · GPS trail`,
-        coordinates: trail,
-        color: palette.navActive,
-      }] : []),
-    ];
-  }) : [];
+      return [
+        ...(planned.length > 1 ? [{
+          id: `dispatch-${assignment.assignment_id}`,
+          label: `${assignment.assigned_area || assignment.household_id || 'Dispatch'} · planned route`,
+          coordinates: planned,
+          color: statusColor(assignment.status_key),
+        }] : []),
+        ...(trail.length > 1 ? [{
+          id: `dispatch-trail-${assignment.assignment_id}`,
+          label: `${assignment.assigned_area || assignment.household_id || 'Dispatch'} · GPS trail`,
+          coordinates: trail,
+          color: palette.navActive,
+        }] : []),
+      ];
+    }) : [], [mappedAssignments, showAssignedRoutes]);
 
   return (
     <View style={styles.stack}>
@@ -218,30 +192,23 @@ export function RescueMapScreen({
           </View>
         </View>
 
-        {locError || gpsError ? (
+        {gpsError ? (
           <View style={styles.errorStrip}>
             <Ionicons name="alert-circle-outline" size={18} color={palette.unsafe} />
-            <Text style={styles.errorText}>{gpsError || locError}</Text>
+            <Text style={styles.errorText}>{gpsError}</Text>
           </View>
         ) : null}
 
-        {tracking ? (
-          <View style={styles.syncStrip}>
-            <Ionicons name="radio-outline" size={18} color={palette.evacuated} />
-            <Text style={styles.syncText}>
-              {syncing ? 'Syncing location...' : `Tracking active${lastUpdated ? ` · ${lastUpdated}` : ''}`}
-            </Text>
-          </View>
+        {isFocused ? (
+          <MobileLeafletMap
+            markers={mapMarkers}
+            routes={mapRoutes}
+            followPosition={tracking ? position : null}
+            center={(focusedAssignment?.latitude && focusedAssignment?.longitude
+              ? { latitude: Number(focusedAssignment.latitude), longitude: Number(focusedAssignment.longitude) }
+              : defaultRegion)}
+          />
         ) : null}
-
-        <MobileLeafletMap
-          markers={mapMarkers}
-          routes={mapRoutes}
-          followPosition={tracking ? position : null}
-          center={(focusedAssignment?.latitude && focusedAssignment?.longitude
-            ? { latitude: Number(focusedAssignment.latitude), longitude: Number(focusedAssignment.longitude) }
-            : defaultRegion)}
-        />
 
         {mappedAssignments.length === 0 ? (
           <EmptyState
@@ -326,19 +293,6 @@ const styles = StyleSheet.create({
   errorText: {
     flex: 1,
     color: palette.unsafe,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  syncStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    backgroundColor: palette.secondary,
-  },
-  syncText: {
-    color: palette.textSoft,
     fontSize: 12,
     fontWeight: '800',
   },

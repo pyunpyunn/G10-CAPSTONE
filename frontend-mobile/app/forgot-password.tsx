@@ -62,7 +62,7 @@ export default function ForgotPasswordScreen() {
       const response = await lookupHouseholdRecoveryContact(accountLogin);
       setMaskedContact(response.masked_contact_number);
     } catch (error: any) {
-      setAccountError(authErrorMessage(error, 'Could not find an active system account with a registered phone number. Check the account ID and try again.'));
+      setAccountError(authErrorMessage(error, 'Could not verify this account ID. Check the account ID and try again.'));
     } finally {
       setLoading(false);
     }

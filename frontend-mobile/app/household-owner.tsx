@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { type Href, useRouter } from 'expo-router';
 import { getHouseholdOwnerOptions, logoutMobile, selectHouseholdDeviceOwner } from '@/api/auth';
 import { getViewState } from '@/state/apiStore';
+import { MobileLogoutOverlay } from '@/components/MobileLogoutOverlay';
 import { HouseholdButton, HouseholdLoading } from '@/components/household/HouseholdUI';
 import { askStandardMobilePermissions } from '@/utils/mobilePermissions';
 import { palette, radius, spacing } from '@/constants/resqTheme';
@@ -45,8 +46,14 @@ export default function HouseholdOwnerScreen() {
     if (submitting.current) return;
     submitting.current = true;
     setBusy('logout');
-    try { await logoutMobile(); router.replace('/' as Href); }
-    finally { submitting.current = false; setBusy(''); }
+    try {
+      await logoutMobile();
+      router.replace('/' as Href);
+    } catch (failure: any) {
+      Alert.alert('Unable to log out', failure?.message || 'Please try again.');
+      submitting.current = false;
+      setBusy('');
+    }
   }
 
   return <SafeAreaView style={styles.safe}>
@@ -66,7 +73,8 @@ export default function HouseholdOwnerScreen() {
         <Text style={styles.name}>{item.name}</Text><Text style={styles.help}>{busy === item.member_id ? 'Saving phone owner...' : item.relationship}</Text>
       </Pressable>}
       ListEmptyComponent={!loading && !error ? <Text style={styles.help}>No active household members are available. Contact HQ/Admin.</Text> : null}
-      ListFooterComponent={<View style={styles.footer}><HouseholdButton label={busy === 'logout' ? 'Signing out...' : 'Sign out'} tone="light" disabled={!!busy} onPress={signOut} /></View>} />
+      ListFooterComponent={<View style={styles.footer}><HouseholdButton label={busy === 'logout' ? 'Logging out...' : 'Sign out'} tone="light" disabled={!!busy} onPress={signOut} /></View>} />
+    <MobileLogoutOverlay visible={busy === 'logout'} />
   </SafeAreaView>;
 }
 

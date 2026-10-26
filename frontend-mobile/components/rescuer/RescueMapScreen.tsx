@@ -5,7 +5,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Location from 'expo-location';
 import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
 import { palette, radius, spacing } from '@/constants/resqTheme';
-import { formatPhilippineTime } from '@/utils/time';
 import { ActionButton, EmptyState, SectionHeader } from './RescuerUI';
 
 type RescueMapProps = {
@@ -13,7 +12,6 @@ type RescueMapProps = {
   evacuationCenters?: any[];
   activeAssignment: any;
   selectedAssignment?: any;
-  onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
   showNavigationButton?: boolean;
   onOpenNavigation?: () => void;
 };
@@ -25,14 +23,12 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
-export function RescueMapScreen({ assignments, activeAssignment, selectedAssignment, onSendLocation, showNavigationButton = false, onOpenNavigation }: RescueMapProps) {
+export function RescueMapScreen({ assignments, activeAssignment, selectedAssignment, showNavigationButton = false, onOpenNavigation }: RescueMapProps) {
   const watcher = useRef<Location.LocationSubscription | null>(null);
   const autoStartedAssignment = useRef<number | null>(null);
   const [tracking, setTracking] = useState(false);
   const [position, setPosition] = useState<any>(null);
-  const [lastUpdated, setLastUpdated] = useState('');
   const [locError, setLocError] = useState('');
-  const [syncing, setSyncing] = useState(false);
   const mapAssignment = selectedAssignment || activeAssignment;
   const routeCoordinates = useMemo(() => normalizeRoute(mapAssignment?.route?.coordinates), [mapAssignment?.route?.coordinates]);
   const trailCoordinates = useMemo(() => normalizeRoute(mapAssignment?.route?.trail_coordinates), [mapAssignment?.route?.trail_coordinates]);
@@ -77,7 +73,7 @@ export function RescueMapScreen({ assignments, activeAssignment, selectedAssignm
         timeInterval: 5000,
         distanceInterval: 3,
       },
-      async (location) => {
+      (location) => {
         const nextPosition = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
@@ -85,22 +81,9 @@ export function RescueMapScreen({ assignments, activeAssignment, selectedAssignm
         };
 
         setPosition(nextPosition);
-        setLastUpdated(formatPhilippineTime());
-
-        if (activeAssignment?.assignment_id) {
-          try {
-            setSyncing(true);
-            await onSendLocation(activeAssignment.assignment_id, nextPosition);
-            setLocError('');
-          } catch {
-            setLocError('GPS is active, but the latest location could not be saved to the backend.');
-          } finally {
-            setSyncing(false);
-          }
-        }
       }
     );
-  }, [activeAssignment?.assignment_id, onSendLocation, tracking]);
+  }, [tracking]);
 
   useEffect(() => {
     const shouldAutoTrack = activeAssignment?.assignment_id
@@ -118,7 +101,6 @@ export function RescueMapScreen({ assignments, activeAssignment, selectedAssignm
     watcher.current = null;
     setTracking(false);
     setPosition(null);
-    setLastUpdated('');
   }
 
   function handleTrackPress() {
@@ -163,15 +145,6 @@ export function RescueMapScreen({ assignments, activeAssignment, selectedAssignm
           <View style={styles.errorStrip}>
             <Ionicons name="alert-circle-outline" size={18} color={palette.unsafe} />
             <Text style={styles.errorText}>{locError}</Text>
-          </View>
-        ) : null}
-
-        {tracking ? (
-          <View style={styles.syncStrip}>
-            <Ionicons name="radio-outline" size={18} color={palette.evacuated} />
-            <Text style={styles.syncText}>
-              {syncing ? 'Syncing location...' : `Tracking active${lastUpdated ? ` · ${lastUpdated}` : ''}`}
-            </Text>
           </View>
         ) : null}
 
@@ -312,19 +285,6 @@ const styles = StyleSheet.create({
   errorText: {
     flex: 1,
     color: palette.unsafe,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  syncStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    backgroundColor: palette.secondary,
-  },
-  syncText: {
-    color: palette.textSoft,
     fontSize: 12,
     fontWeight: '800',
   },

@@ -10,7 +10,6 @@ type RescueMapProps = {
   evacuationCenters: any[];
   activeAssignment: any;
   selectedAssignment?: any;
-  onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
   showNavigationButton?: boolean;
   onOpenNavigation?: () => void;
 };

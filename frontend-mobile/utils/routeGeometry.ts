@@ -1,6 +1,16 @@
 export type Coordinate = [number, number];
 export type RouteStep = { instruction: string; distance_m: number; maneuver_type: number; polyline_index: number };
 
+export function downsampleRouteCoordinates(points: Coordinate[], maxPoints = 1200): Coordinate[] {
+  if (points.length <= maxPoints || maxPoints < 2) return points;
+  const sampled: Coordinate[] = [];
+  const step = (points.length - 1) / (maxPoints - 1);
+  for (let index = 0; index < maxPoints; index++) {
+    sampled.push(points[Math.round(index * step)]);
+  }
+  return sampled;
+}
+
 export function decodePolyline6(encoded: string): Coordinate[] {
   let index = 0, latitude = 0, longitude = 0;
   const points: Coordinate[] = [];
