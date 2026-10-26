@@ -46,7 +46,7 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
         $controller = app(\App\Http\Controllers\Api\HouseholdMobileController::class);
         $this->assertSame(201, $controller->storeMemberStatus($this->householdRequest(['status_key' => 'unsafe']), 'M2')->getStatusCode());
         $this->assertDatabaseMissing('member_disaster_statuses', ['member_id' => 'M1']);
-        $this->assertSame(201, $controller->storeMemberStatus($this->householdRequest(['status_key' => 'safe']), 'M1')->getStatusCode());
+        $this->assertSame(201, $controller->storeStatus($this->householdRequest(['status_key' => 'safe']))->getStatusCode());
         $this->assertDatabaseHas('member_disaster_statuses', ['member_id' => 'M1', 'status_id' => 1]);
         $this->assertDatabaseHas('member_disaster_statuses', ['member_id' => 'M2', 'status_id' => 2]);
         $this->assertDatabaseHas('household_disasters', ['household_id' => 'HH-1', 'current_status_id' => 3, 'needs_dispatch' => 1]);
@@ -56,6 +56,8 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
         $this->assertDatabaseHas('member_disaster_statuses', ['member_id' => 'M1', 'status_id' => 1]);
         $this->assertSame(1, \App\Queries\HouseholdEventStatusQuery::latestReports('EVT-1')->first()->status_id);
         $this->assertDatabaseHas('household_disasters', ['current_status_id' => 1, 'needs_dispatch' => 0]);
+        $statuses = app(\App\Queries\HouseholdMobileReadQuery::class)->memberStatusRows('HH-1', 'EVT-1');
+        $this->assertSame('safe', $statuses['M2']['status_key']);
     }
 
     public function test_mobile_options_match_the_broadcast_order_labels_and_safety_basis(): void
@@ -83,7 +85,7 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
         app(\App\Http\Controllers\Api\HouseholdMobileController::class)->storeStatus($this->householdRequest(['status_key' => 'all_clear']));
         $this->assertDatabaseHas('household_status_logs', ['status_id' => 1]);
         $this->assertDatabaseHas('household_disasters', ['current_status_id' => 1, 'needs_dispatch' => 0]);
-        $notes = json_decode(DB::table('household_disasters')->value('last_status_notes'), true);
+        $notes = json_decode(DB::table('household_status_logs')->where('source', 'household_member_mobile')->orderBy('status_log_id')->value('notes'), true);
         $this->assertSame('all_clear', $notes['mobile_status_key']);
         $this->assertSame('All Clear', $notes['mobile_status_label']);
         $this->assertSame('safe', $notes['safety_basis']);
@@ -280,14 +282,14 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
 
         $this->assertSame(201, $response->getStatusCode());
         $payload = $response->getData(true);
-        $this->assertSame('Household status update saved.', $payload['message']);
+        $this->assertSame('Your status update saved.', $payload['message']);
         $this->assertSame(['status_log_id' => 1], $payload['data']);
         $this->assertDatabaseHas('household_status_logs', [
             'status_log_id' => 1, 'household_id' => 'HH-1', 'disaster_id' => 'EVT-1',
-            'status_id' => 2, 'source' => 'household_mobile',
+            'status_id' => 2, 'source' => 'household_member_mobile',
         ]);
         $this->assertDatabaseHas('household_disasters', [
-            'household_id' => 'HH-1', 'disaster_id' => 'EVT-1', 'current_status_id' => 2,
+            'household_id' => 'HH-1', 'disaster_id' => 'EVT-1', 'current_status_id' => 3,
             'priority_level' => 'urgent', 'needs_dispatch' => 1,
         ]);
     }
@@ -349,8 +351,43 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
 
     private function householdRequest(array $input): Request
     {
+        if (! Schema::hasTable('household_members')) {
+            Schema::create('household_members', function (Blueprint $t): void {
+                $t->string('member_id')->primary(); $t->string('household_id'); $t->string('name')->nullable(); $t->softDeletes();
+            });
+        }
+        if (! Schema::hasColumn('household_members', 'deleted_at')) Schema::table('household_members', fn (Blueprint $t) => $t->softDeletes());
+        DB::table('household_members')->insertOrIgnore(['member_id' => 'M1', 'household_id' => 'HH-1', 'name' => 'Account owner']);
+        if (! Schema::hasTable('responder_assignments')) {
+            Schema::create('responder_assignments', function (Blueprint $t): void {
+                $t->increments('assignment_id'); $t->string('disaster_id'); $t->string('household_id'); $t->string('status');
+            });
+        }
+        if (! Schema::hasTable('member_statuses')) {
+            Schema::create('member_statuses', function (Blueprint $t): void {
+                $t->increments('status_id'); $t->string('status_key'); $t->boolean('is_active')->default(true);
+            });
+            DB::table('member_statuses')->insert([['status_key' => 'safe'], ['status_key' => 'unsafe'], ['status_key' => 'needs_help']]);
+        }
+        if (! Schema::hasTable('member_disaster_statuses')) {
+            Schema::create('member_disaster_statuses', function (Blueprint $t): void {
+                $t->id();
+                foreach (['disaster_id', 'household_id', 'member_id', 'report_source', 'reported_by_user_id', 'location_label', 'notes'] as $c) $t->string($c)->nullable();
+                $t->integer('status_id');
+                foreach (['device_token_id', 'latitude', 'longitude', 'location_accuracy_m', 'battery_level', 'signal_strength'] as $c) $t->float($c)->nullable();
+                $t->timestamp('reported_at')->nullable(); $t->timestamps();
+            });
+        }
+        if (! Schema::hasTable('status_reminders')) {
+            Schema::create('status_reminders', function (Blueprint $t): void {
+                $t->string('event_id'); $t->string('member_id'); $t->string('status'); $t->timestamp('stopped_at')->nullable(); $t->timestamps();
+            });
+        }
+        if (! DB::table('household_statuses')->where('status_key', 'unsafe')->exists()) {
+            DB::table('household_statuses')->insert(['status_id' => 3, 'status_key' => 'unsafe', 'status_label' => 'Unsafe']);
+        }
         $request = Request::create('/api/v1/household/status', 'POST', $input);
-        $request->setUserResolver(fn () => (object) ['household_id' => 'HH-1', 'user_id' => 'USR-1']);
+        $request->setUserResolver(fn () => (object) ['household_id' => 'HH-1', 'user_id' => 'USR-1', 'member_id' => 'M1']);
         return $request;
     }
 }

@@ -135,6 +135,7 @@ class HouseholdMobileStatusWorkflow
                 $deviceId,
                 $now
             );
+            $this->writer->saveLatestDeviceForStatus($householdId, $deviceId, $validated, $now);
 
             $this->support->writeAuditLog($request, 'mobile_member_status', 'household_status_logs', (string) $statusLogId, array_merge($validated, [
                 'member_id' => $memberId,
@@ -163,99 +164,12 @@ class HouseholdMobileStatusWorkflow
 
     public function storeStatus(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $householdId = $this->support->householdId($user);
-
-        if (! $householdId) {
-            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
-        }
-
-        foreach (['household_status_logs', 'household_statuses', 'household_disasters'] as $table) {
-            if (! Schema::hasTable($table)) {
-                return $this->support->missingTableResponse($table);
-            }
-        }
-
-        $activeEvent = $this->readQuery->activeEvent();
-
-        if (! $activeEvent) {
-            return response()->json([
-                'message' => 'Status updates can only be saved during an active disaster event.',
-            ], 409);
-        }
-
-        $options = $this->readQuery->statusOptions($householdId, $activeEvent['event_id']);
-        $validated = $request->validate([
-            'status_key' => ['required', Rule::in(array_column($options, 'key'))],
-            'device_uuid' => ['nullable', 'string', 'max:150'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'location_label' => ['nullable', 'string', 'max:255'],
-            'location_accuracy_m' => ['nullable', 'numeric', 'min:0'],
-            'battery_level' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'signal_strength' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:1000'],
-        ], [
-            'status_key.required' => 'Choose your household status first.',
-            'status_key.in' => 'Choose a valid household status.',
-        ]);
-
-        $status = $this->readQuery->resolveStatus($validated['status_key'], collect($options)->firstWhere('key', $validated['status_key']));
-
-        if (! $status) {
-            throw ValidationException::withMessages([
-                'status_key' => ['Selected status is not available in the shared database.'],
-            ]);
-        }
-
-        $validated['notes'] = $this->presenter->statusNotesJson($validated['status_key'], $validated['notes'] ?? null, $status['status_label'], $status['safety_basis'] ?? null);
-
-        $validated['safety_basis'] = $status['safety_basis'] ?? null;
-        $validated['canonical_status_key'] = $status['status_key'];
-        $validated['selected_status_label'] = $status['status_label'];
-        $now = now();
-        $statusLogId = null;
-        $deviceId = $this->writer->deviceIdForUuid($householdId, $validated['device_uuid'] ?? null);
-
-        DB::transaction(function () use ($request, $householdId, $user, $activeEvent, $validated, $status, $now, &$statusLogId, $deviceId): void {
-            $data = $this->support->filterColumns('household_status_logs', [
-                'disaster_id' => $activeEvent['event_id'],
-                'household_id' => $householdId,
-                'status_id' => $status['status_id'],
-                'source' => 'household_mobile',
-                'submitted_by_user_id' => $user?->user_id,
-                'device_token_id' => $deviceId,
-                'latitude' => $validated['latitude'] ?? null,
-                'longitude' => $validated['longitude'] ?? null,
-                'location_label' => $validated['location_label'] ?? null,
-                'location_accuracy_m' => $validated['location_accuracy_m'] ?? null,
-                'battery_level' => $validated['battery_level'] ?? null,
-                'signal_strength' => $validated['signal_strength'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'submitted_at' => $now,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-
-            $statusLogId = DB::table('household_status_logs')->insertGetId($data, 'status_log_id');
-            $this->writer->saveLatestDisasterStatus($activeEvent['event_id'], $householdId, $status['status_id'], $validated, $user?->user_id, $deviceId, $now);
-            $this->writer->saveLatestDeviceForStatus($householdId, $deviceId, $validated, $now);
-            $this->support->writeAuditLog($request, 'mobile_household_status', 'household_status_logs', (string) $statusLogId, $validated);
-        });
-
+        $response = $this->storeMemberStatus($request, $this->support->authenticatedMemberId($request->user()));
+        if ($response->getStatusCode() !== 201) return $response;
         return response()->json([
-            'message' => 'Household status update saved.',
-            'data' => [
-                'status_log_id' => $statusLogId,
-            ],
+            'message' => 'Your status update saved.',
+            'data' => ['status_log_id' => $response->getData(true)['data']['status_log_id']],
         ], 201);
     }
 
 }
-
-
-
-
-
-
-

@@ -302,6 +302,50 @@ class AuthApiTest extends TestCase
         $this->assertFalse((bool) $user->fresh()->must_change_password);
     }
 
+    public function test_profile_password_change_rejects_invalid_inputs_without_changing_password(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        $user = \App\Models\User::findOrFail('USR-RESCUER-BDRRM-SAR-001');
+        \Laravel\Sanctum\Sanctum::actingAs($user);
+        $payload = $this->passwordChangePayload();
+        foreach ([
+            ['current_password' => 'wrong-password'],
+            ['password_confirmation' => 'mismatch'],
+            ['password' => 'short', 'password_confirmation' => 'short'],
+            ['password' => 'password', 'password_confirmation' => 'password'],
+            ['current_password' => ''],
+            ['password_confirmation' => ''],
+            ['password' => str_repeat('x', 129), 'password_confirmation' => str_repeat('x', 129)],
+        ] as $invalid) {
+            $this->patchJson('/api/v1/profile/password', array_replace($payload, $invalid))->assertUnprocessable();
+            $this->assertTrue(Hash::check('password', $user->fresh()->password));
+        }
+    }
+
+    public function test_profile_password_change_requires_authentication(): void
+    {
+        $this->patchJson('/api/v1/profile/password', $this->passwordChangePayload())->assertUnauthorized();
+    }
+
+    public function test_all_profile_roles_can_change_password_and_only_other_tokens_are_revoked(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        foreach ([4, 5, 6] as $roleId) {
+            $user = \App\Models\User::findOrFail('USR-RESCUER-BDRRM-SAR-001');
+            $user->forceFill(['role_id' => $roleId, 'password' => Hash::make('password')])->save();
+            $current = $user->createToken('current-device');
+            $other = $user->createToken('other-device');
+            $this->app['auth']->forgetGuards();
+            $this->withToken($current->plainTextToken)
+                ->patchJson('/api/v1/profile/password', $this->passwordChangePayload())->assertOk();
+            $this->assertTrue(Hash::check('new-secure-password', $user->fresh()->password));
+            $this->assertDatabaseHas('personal_access_tokens', ['id' => $current->accessToken->id]);
+            $this->assertDatabaseMissing('personal_access_tokens', ['id' => $other->accessToken->id]);
+            $this->app['auth']->forgetGuards();
+            $this->withToken($current->plainTextToken)->getJson('/api/v1/auth/me')->assertOk();
+        }
+    }
+
     public function test_password_change_verification_checks_database_account_then_old_password(): void
     {
         $this->postJson('/api/v1/auth/password-recovery/verify', ['login' => 'unknown-account'])
@@ -327,16 +371,16 @@ class AuthApiTest extends TestCase
     public function test_household_recovery_masks_and_validates_the_registered_household_contact(): void
     {
         $this->postJson('/api/v1/auth/password-recovery/household/lookup', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
         ])->assertOk()->assertExactJson(['masked_contact_number' => '*********12']);
 
         $this->postJson('/api/v1/auth/password-recovery/household/validate-contact', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
             'contact_number' => '09170000000',
         ])->assertUnprocessable()->assertJsonValidationErrors('contact_number');
 
         $this->postJson('/api/v1/auth/password-recovery/household/validate-contact', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
             'contact_number' => '+63 917 123 4512',
         ])->assertOk()->assertJsonPath('message', 'Registered contact number verified.');
     }
@@ -358,7 +402,7 @@ class AuthApiTest extends TestCase
         $user = \App\Models\User::findOrFail('USR-HOUSEHOLD-OTP-001');
         $user->createToken('household-old-session');
         $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
             'contact_number' => '09171234512',
         ])->assertOk();
 
@@ -366,7 +410,7 @@ class AuthApiTest extends TestCase
         Http::assertSent(fn ($request) => $request['phoneNumbers'] === ['+639171234512']);
 
         $response = $this->postJson('/api/v1/auth/password-recovery/household/reset', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
             'contact_number' => '09171234512',
             'code' => $sentCode,
             'password' => 'new-household-password',
@@ -388,13 +432,13 @@ class AuthApiTest extends TestCase
         Http::fake(['sms.test/*' => Http::response(['id' => 'sms-test-2'], 200)]);
 
         $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
             'contact_number' => '09171234512',
         ])->assertOk();
 
         for ($attempt = 0; $attempt < 5; $attempt++) {
             $this->postJson('/api/v1/auth/password-recovery/household/reset', [
-                'login' => 'household.otp.001',
+                'login' => 'HH-OTP-001',
                 'contact_number' => '09171234512',
                 'code' => '000000',
                 'password' => 'new-household-password',
@@ -419,7 +463,7 @@ class AuthApiTest extends TestCase
         Http::fake();
 
         $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
             'contact_number' => '09171234512',
         ])->assertStatus(503)->assertJsonPath(
             'message',
@@ -463,7 +507,7 @@ class AuthApiTest extends TestCase
         ]);
 
         $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
             'contact_number' => '09171234512',
         ])->assertOk();
 
@@ -483,7 +527,7 @@ class AuthApiTest extends TestCase
         $this->assertTrue(Hash::check($sentCode, $recovery->code_hash));
 
         $this->postJson('/api/v1/auth/password-recovery/household/reset', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
             'contact_number' => '09171234512',
             'code' => $sentCode,
             'password' => 'new-semaphore-password',
@@ -519,7 +563,7 @@ class AuthApiTest extends TestCase
         ]);
 
         $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
             'contact_number' => '09171234512',
         ])->assertOk();
 
@@ -555,7 +599,7 @@ class AuthApiTest extends TestCase
         ]);
 
         $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
-            'login' => 'household.otp.001',
+            'login' => 'HH-OTP-001',
             'contact_number' => '09171234512',
         ])->assertStatus(503)->assertJsonPath(
             'message',

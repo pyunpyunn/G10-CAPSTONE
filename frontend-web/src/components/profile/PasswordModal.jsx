@@ -20,7 +20,7 @@ export default function PasswordModal({
     <Modal
       title="Change password"
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={isSaving ? () => {} : onClose}
       className="profile-modal"
       footer={
         <>
@@ -38,13 +38,14 @@ export default function PasswordModal({
       <form id="profile-password-form" className="profile-form-grid" onSubmit={onSubmit} noValidate>
 
         <label className="full">
-          <span>Old password</span>
+          <span>Current password</span>
           <input
             type="password"
             value={form.current_password}
             onChange={(event) => updateField('current_password', event.target.value)}
-            placeholder="Enter old password"
+            placeholder="Enter current password"
             required
+            disabled={isSaving}
             autoComplete="current-password"
           />
         </label>
@@ -57,6 +58,7 @@ export default function PasswordModal({
             onChange={(event) => updateField('password', event.target.value)}
             placeholder="At least 8 characters"
             required
+            disabled={isSaving}
             minLength={8}
             maxLength={128}
             autoComplete="new-password"
@@ -64,13 +66,14 @@ export default function PasswordModal({
         </label>
 
         <label>
-          <span>Confirm password</span>
+          <span>Confirm new password</span>
           <input
             type="password"
             value={form.password_confirmation}
             onChange={(event) => updateField('password_confirmation', event.target.value)}
             placeholder="Repeat new password"
             required
+            disabled={isSaving}
             minLength={8}
             maxLength={128}
             autoComplete="new-password"

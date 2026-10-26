@@ -24,6 +24,13 @@ function dashboard(overview, historyOpen = false) {
       if (name === '@expo/vector-icons/Ionicons') return 'Icon';
       if (name === '@/constants/resqTheme') return { palette: {}, radius: {}, shadow: {}, spacing: {} };
       if (name === '@/utils/time') return { formatPhilippineDateTime: (value) => value };
+      if (name === './DisasterBroadcastBanner') return {
+        DisasterBroadcastBanner: ({ event, broadcast }) => ({
+          type: 'View',
+          props: { children: [event?.name, broadcast?.title, broadcast?.message, broadcast?.sent_at]
+            .filter(Boolean).map((value) => ({ type: 'Text', props: { children: value } })) },
+        }),
+      };
       if (name === './HouseholdUI') return {
         HouseholdBadge: 'Badge', HouseholdButton: 'Button', HouseholdEmpty: 'Empty',
         HouseholdSection: 'Section', statusColor: () => '#000',
@@ -38,14 +45,18 @@ function text(node) {
   if (Array.isArray(node)) return node.map(text).join(' ');
   if (typeof node === 'string') return node;
   if (node?.type === 'Modal' && !node.props.visible) return '';
+  if (typeof node?.type === 'function') return text(node.type(node.props));
   return node?.props ? text(node.props.children) : '';
 }
 
 test('household dashboard renders the server broadcast title, message and date', () => {
-  const screen = dashboard({ recent_alerts: [{
-    broadcast_id: 4, title: 'Signal No. 4', message: 'Please evacuate to nearest site',
-    sent_at: 'Oct 20, 2026 12:39 AM',
-  }] });
+  const screen = dashboard({
+    active_event: { name: 'Typhoon' },
+    recent_alerts: [{
+      broadcast_id: 4, title: 'Signal No. 4', message: 'Please evacuate to nearest site',
+      sent_at: 'Oct 20, 2026 12:39 AM',
+    }],
+  });
   const content = text(screen);
   assert.match(content, /Signal No. 4/);
   assert.match(content, /Please evacuate to nearest site/);
@@ -60,7 +71,7 @@ test('only the latest alert appears on the dashboard and earlier broadcasts appe
   const overview = { recent_alerts: [
     { broadcast_id: 6, title: 'Newest broadcast', message: 'Current instruction' },
     { broadcast_id: 5, title: 'Earlier broadcast', message: 'Previous instruction' },
-  ] };
+  ], active_event: { name: 'Typhoon' } };
   assert.match(text(dashboard(overview)), /Newest broadcast/);
   assert.doesNotMatch(text(dashboard(overview)), /Earlier broadcast/);
   assert.match(text(dashboard(overview, true)), /Earlier broadcast/);

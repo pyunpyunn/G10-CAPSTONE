@@ -1,6 +1,32 @@
 # Standalone Android APK
 
-## Verified release — version 1.0.0, build 6
+## Current local release — version 1.0.0, build 33
+
+Local APK: `releases/RESQPERATION-build33.apk`.
+
+- Download: **22,489,601 bytes (22.5 MB / 21.45 MiB)**.
+- Version code 33; release build completed successfully and passed APK package,
+  version, signing-certificate and signature verification.
+- APK Signature Scheme v2; SHA-256:
+  `00be7a2c7a37b11779a420c8c68f1c6c63c86ef9061894ba21127adc5d069088`.
+- This local build is not uploaded to GitHub. The link below remains the
+  latest GitHub-published APK.
+
+Slow-network behavior in this build:
+
+- Redux-backed response caching and request coalescing avoid duplicate screen
+  reads; warm dashboard snapshots stay visible while refreshes are pending.
+- Failed dashboard refreshes retain the displayed data and surface the error.
+- Household background refresh backs off from 30 seconds to at most 5 minutes
+  after failures. Active rescuer refresh backs off from 15 to at most 60 seconds.
+  A successful refresh resets each interval; foreground/manual refresh remains
+  available.
+- Configured API routes are raced for readiness so an unavailable route does
+  not have to time out before a healthy fallback is tried. The app still needs
+  at least one reachable, ready backend; no client change can eliminate latency
+  or outages in the server, Tailscale, or network.
+
+## Latest GitHub-published release — version 1.0.0, build 6
 
 [Download the signed APK from GitHub](https://github.com/pyunpyunn/G10-CAPSTONE/releases/download/v1.0.0-build6/RESQPERATION.apk)
 

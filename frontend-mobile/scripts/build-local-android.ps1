@@ -67,6 +67,10 @@ android {
     if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect APK metadata.' }
     if (!($metadata -match "package: name='com.kathlnbarro.resqperationmobile' versionCode='$VersionCode'")) { throw 'Unexpected APK identity or version code.' }
     if ($metadata -match '^application-debuggable') { throw 'APK is debuggable.' }
-    Get-FileHash -LiteralPath $output -Algorithm SHA256
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = [BitConverter]::ToString($sha256.ComputeHash([System.IO.File]::ReadAllBytes($output))).Replace('-', '')
+    } finally { $sha256.Dispose() }
+    Write-Host "SHA-256: $digest"
     Write-Host "Release APK: $output"
 } finally { Pop-Location }

@@ -47,8 +47,8 @@ export function HouseholdDashboardScreen({
   onSaveMemberStatus,
 }: DashboardProps) {
   const activeEvent = overview.active_event;
-  const currentStatus = overview.current_status;
-  const members = overview.members || [];
+  const currentStatus = overview.member_status;
+  const members = (overview.members || []).filter((member: any) => String(member.member_id) !== String(overview.profile?.user?.member_id));
   const statusOptions = overview.status_options?.length ? overview.status_options : defaultStatusOptions;
   const hasStatusChanged = !currentStatus || pendingStatus !== currentStatus.status_key;
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -87,7 +87,7 @@ export function HouseholdDashboardScreen({
       {activeEvent ? (
         <View style={styles.card}>
           <HouseholdSection
-            title="Household status"
+            title="Your status"
             action={
               <Pressable style={styles.historyButton} onPress={onToggleHistory}>
                 <Ionicons name="time-outline" size={18} color={palette.navActive} />
@@ -97,7 +97,7 @@ export function HouseholdDashboardScreen({
           <View style={styles.lastSaved}>
             <Text style={styles.lastSavedLabel}>Last saved status</Text>
             <Text style={styles.lastSavedValue}>
-              {currentStatus ? `${currentStatus.status_label} · ${currentStatus.last_saved_label}` : 'No saved status yet'}
+              {currentStatus ? `${currentStatus.status_label} · ${(currentStatus.submitted_label || currentStatus.last_saved_label)}` : 'No saved status yet'}
             </Text>
           </View>
 

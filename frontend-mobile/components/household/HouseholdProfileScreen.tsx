@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ChangePasswordSection } from '@/components/ChangePasswordSection';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Path } from 'react-native-svg';
 import * as Location from 'expo-location';
@@ -11,30 +12,60 @@ type ProfileProps = {
   overview: any;
   onUpdateGeotag: (payload: any) => Promise<any>;
   onLogout: () => void;
+  onSaveContact: (contactNumber: string) => Promise<void>;
+  onResetDeviceOwner: () => Promise<void>;
 };
 
 export function HouseholdProfileScreen({
   overview,
   onUpdateGeotag,
+  onSaveContact,
+  onResetDeviceOwner,
   onLogout,
 }: ProfileProps) {
   const household = overview.profile?.household || {};
   const user = overview.profile?.user || {};
   const members = useMemo(() => overview.members || [], [overview.members]);
   const geotag = overview.geotag || null;
-  const currentStatus = overview.current_status || null;
-  const selectedMemberId = String(user.member_id || members[0]?.member_id || '');
+  const currentStatus = overview.member_status || null;
+  const selectedMemberId = String(user.member_id || '');
   const [geotagMapVisible, setGeotagMapVisible] = useState(false);
+  const [editingGeotag, setEditingGeotag] = useState(false);
+  const editorStartPoint = useRef<{ latitude: number; longitude: number } | null>(null);
   const [savingGeotag, setSavingGeotag] = useState(false);
   const [geotagMessage, setGeotagMessage] = useState(
     household.sitio_id
       ? `Saved in ${household.sitio_name || 'your registered sitio'}.`
       : 'Sitio will be identified automatically when verified boundary data is available.'
   );
+  const [contactNumber, setContactNumber] = useState(user.contact_number || '');
+  const [savingContact, setSavingContact] = useState(false);
+  const [editingContact, setEditingContact] = useState(false);
+  const [resettingOwner, setResettingOwner] = useState(false);
+  const ownerResetPending = useRef(false);
+  const contactSubmitting = useRef(false);
+  useEffect(() => { setContactNumber(user.contact_number || ''); }, [user.contact_number]);
+
+  async function saveContact() {
+    if (contactSubmitting.current) return;
+    contactSubmitting.current = true;
+    setSavingContact(true);
+    try {
+      await onSaveContact(contactNumber.trim());
+      setEditingContact(false);
+      Alert.alert('Contact saved', 'Your contact number was saved.');
+    } catch (error: any) {
+      Alert.alert('Unable to save contact', error?.response?.data?.message || 'Please try again.');
+    } finally {
+      contactSubmitting.current = false;
+      setSavingContact(false);
+    }
+  }
+
   const geotagVersion = useRef(0);
   const geotagSaveQueue = useRef<Promise<void>>(Promise.resolve());
   const selectedMember = useMemo(() => {
-    return members.find((member: any) => String(member.member_id) === String(selectedMemberId)) || members[0] || null;
+    return members.find((member: any) => String(member.member_id) === String(selectedMemberId)) || null;
   }, [members, selectedMemberId]);
 
   const householdMembers = useMemo(() => {
@@ -96,6 +127,7 @@ export function HouseholdProfileScreen({
       return;
     }
 
+    setGeotagMapVisible(false);
     setSavingGeotag(true);
 
     try {
@@ -113,7 +145,7 @@ export function HouseholdProfileScreen({
   }
 
   return (
-    <View style={styles.stack}>
+    <View style={styles.stack} pointerEvents={resettingOwner ? 'none' : 'auto'}>
       <View style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.avatar}>
@@ -149,6 +181,9 @@ export function HouseholdProfileScreen({
             />
           </View>
         </View>
+
+        <Text style={styles.panelLabel}>Member ID: {user.member_id}</Text>
+        <Text style={styles.panelMeta}>Your contact: {user.contact_number || 'Not recorded'}</Text>
 
         {householdMembers.length ? (
           <View style={styles.memberProfilePanel}>
@@ -201,13 +236,45 @@ export function HouseholdProfileScreen({
         ) : (
           <HouseholdEmpty icon="location-outline" title="No geotag saved yet" />
         )}
+      </View>
+
+      <View style={styles.card}>
+        <HouseholdSection title="Household details" />
+        <InfoRow icon="business-outline" label="Barangay" value={household.barangay || 'Not recorded'} />
+        <InfoRow icon="location-outline" label="Sitio" value={household.sitio_name || 'Not recorded'} />
+        <InfoRow icon="home-outline" label="Address" value={household.address || 'Not recorded'} />
+        <InfoRow icon="people-outline" label="Members" value={String(memberCount)} />
+        <InfoRow icon="call-outline" label="Contact" value={household.contact_number || user.contact_number || 'Not recorded'} />
+      </View>
+
+      <View style={styles.card}>
+        <HouseholdSection title="Profile settings" />
+        <HouseholdButton label={editingContact ? 'Cancel contact update' : 'Update contact number'} icon="call-outline" tone="light"
+          disabled={savingContact || resettingOwner} onPress={() => setEditingContact((value) => !value)} />
+        {editingContact ? <>
+        <Text style={styles.panelLabel}>Your contact number</Text>
+        <TextInput accessibilityLabel="Your contact number" value={contactNumber} onChangeText={setContactNumber}
+          keyboardType="phone-pad" maxLength={30} editable={!savingContact && !resettingOwner}
+          style={{ minHeight: 44, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: palette.border, borderRadius: radius.md, color: palette.text }} />
+        <HouseholdButton label={savingContact ? 'Saving...' : 'Save contact number'} icon="save-outline"
+          disabled={savingContact || resettingOwner || contactNumber.trim() === (user.contact_number || '')} onPress={saveContact} />
+
+        </> : null}
+        <HouseholdButton label={editingGeotag ? 'Close geotag update' : 'Update geotag'} icon="location-outline" tone="light"
+          disabled={savingGeotag || resettingOwner} onPress={() => {
+            editorStartPoint.current = geotag ? { latitude: geotag.latitude, longitude: geotag.longitude } : null;
+            setGeotagMapVisible(false);
+            setEditingGeotag((value) => !value);
+          }} />
+        {editingGeotag ? <>
+          <Text style={styles.panelMeta}>Update the saved home location for everyone in this household. Use GPS while at home or choose your home on the map.</Text>
         <View style={styles.mapActions}>
           <View style={styles.gpsButton}>
             <HouseholdButton
               label={savingGeotag ? 'Saving geotag...' : 'Update geotag from GPS'}
               icon="locate-outline"
               tone="light"
-              disabled={savingGeotag}
+              disabled={savingGeotag || resettingOwner}
               onPress={handleUpdateGeotag}
             />
           </View>
@@ -215,7 +282,7 @@ export function HouseholdProfileScreen({
             accessibilityRole="button"
             accessibilityState={{ expanded: geotagMapVisible }}
             style={[styles.mapOptionButton, geotagMapVisible && styles.mapOptionButtonActive]}
-            disabled={savingGeotag}
+            disabled={savingGeotag || resettingOwner}
             onPress={() => setGeotagMapVisible((visible) => !visible)}
           >
             <Ionicons name="map-outline" size={18} color={geotagMapVisible ? '#fff' : palette.nav} />
@@ -229,6 +296,8 @@ export function HouseholdProfileScreen({
             <MobileLeafletMap
               markers={[]}
               routes={[]}
+              center={editorStartPoint.current || undefined}
+              selectedPoint={editorStartPoint.current}
               geotagPicker
               geotagMode="center"
               onMapPress={handleMapPoint}
@@ -238,16 +307,23 @@ export function HouseholdProfileScreen({
           </>
         ) : null}
         <Text style={styles.geotagMessage} accessibilityLiveRegion="polite">{geotagMessage}</Text>
+        </> : null}
+        <HouseholdButton label={resettingOwner ? 'Resetting owner...' : 'Reset device owner'} icon="person-circle-outline" tone="light"
+          disabled={resettingOwner || savingContact || savingGeotag} onPress={() => Alert.alert('Reset this phone’s owner?',
+            'You will choose a household member again for this phone. Other phones will keep their owners.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Reset owner', onPress: async () => {
+                if (ownerResetPending.current) return;
+                ownerResetPending.current = true;
+                setResettingOwner(true);
+                try { await onResetDeviceOwner(); }
+                catch (error: any) { Alert.alert('Unable to reset owner', error?.response?.data?.message || 'Check your connection and retry.'); }
+                finally { ownerResetPending.current = false; setResettingOwner(false); }
+              } },
+            ])} />
       </View>
 
-      <View style={styles.card}>
-        <HouseholdSection title="Household details" />
-        <InfoRow icon="business-outline" label="Barangay" value={household.barangay || 'Not recorded'} />
-        <InfoRow icon="location-outline" label="Sitio" value={household.sitio_name || 'Not recorded'} />
-        <InfoRow icon="home-outline" label="Address" value={household.address || 'Not recorded'} />
-        <InfoRow icon="people-outline" label="Members" value={String(memberCount)} />
-        <InfoRow icon="call-outline" label="Contact" value={household.contact_number || user.contact_number || 'Not recorded'} />
-      </View>
+      <ChangePasswordSection accountIdentifiers={[household.household_id]} />
 
       <HouseholdButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
     </View>

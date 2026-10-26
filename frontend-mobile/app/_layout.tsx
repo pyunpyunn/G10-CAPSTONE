@@ -19,7 +19,7 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const pathname = usePathname();
-  const hasBrandedHeader = pathname === '/household' || pathname.startsWith('/household/') || pathname === '/rescuer' || pathname.startsWith('/rescuer/');
+  const hasBrandedHeader = pathname === '/household-owner' || pathname === '/household' || pathname.startsWith('/household/') || pathname === '/rescuer' || pathname.startsWith('/rescuer/');
 
   useEffect(() => {
     configureNotificationHandler();
@@ -31,6 +31,7 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+        <Stack.Screen name="household-owner" options={{ headerShown: false }} />
         <Stack.Screen name="household/index" options={{ headerShown: false }} />
         <Stack.Screen name="rescuer/index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

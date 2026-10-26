@@ -1,3 +1,4 @@
+import { saveViewState } from '@/state/apiStore';
 import { api, clearToken, saveToken } from './client';
 import { logoutPushIdentity } from '@/utils/pushNotifications';
 import { getMobileDeviceUuid } from '@/utils/mobileDeviceRegistration';
@@ -17,15 +18,25 @@ export type AuthUser = {
   user_id: string;
   full_name: string;
   username: string;
+  household_id?: string;
+  member_id?: string;
+  owner_selection_required?: boolean;
   role: Role;
 };
 
 type LoginResponse = {
   token: string;
   user: AuthUser;
+  owner_selection_required?: boolean;
+  owner_options?: any;
 };
 
 const sessionRoleKey = 'resqperation_mobile_role';
+const ownerRequiredKey = 'resq_household_owner_required';
+
+export async function householdOwnerSelectionRequired() {
+  return await getStoredItem(ownerRequiredKey) === '1';
+}
 const mobileRoles = ['household_resident', 'rescuer', 'tl', 'tm'];
 
 export async function restoreMobileSession(): Promise<string | null> {
@@ -39,15 +50,19 @@ export async function restoreMobileSession(): Promise<string | null> {
     const role = response.data?.data?.role?.role_key || response.data?.role?.role_key;
     if (mobileRoles.includes(role)) {
       await setStoredItem(sessionRoleKey, role);
+      const user = response.data?.data || response.data;
+      await setStoredItem(ownerRequiredKey, user.owner_selection_required ? '1' : '0');
       return role;
     }
     await clearToken();
     await deleteStoredItem(sessionRoleKey);
+    await deleteStoredItem(ownerRequiredKey);
     return null;
   } catch (error: any) {
     if (error.response?.status === 401) {
       await clearToken();
       await deleteStoredItem(sessionRoleKey);
+      await deleteStoredItem(ownerRequiredKey);
       return null;
     }
 
@@ -57,15 +72,18 @@ export async function restoreMobileSession(): Promise<string | null> {
 
     await clearToken();
     await deleteStoredItem(sessionRoleKey);
+    await deleteStoredItem(ownerRequiredKey);
     return null;
   }
 }
 
 export async function loginMobile(login: string, password: string) {
+  const householdDeviceUuid = await getMobileDeviceUuid('household_resident');
   const response = await api.post<LoginResponse>('/auth/login', {
     login,
     password,
     device_name: 'resqperation-mobile',
+    device_uuid: householdDeviceUuid,
   });
 
   let token = response.data.token;
@@ -101,8 +119,34 @@ export async function loginMobile(login: string, password: string) {
     await setStoredItem(sessionRoleKey, response.data.user.role?.role_key || '');
   }
   await saveToken(token);
+  await setStoredItem(ownerRequiredKey, response.data.user.owner_selection_required ? '1' : '0');
+  if (response.data.owner_options) saveViewState('mobile:household-owner', response.data.owner_options);
 
   return response.data.user;
+}
+
+async function acceptHouseholdSession(data: LoginResponse) {
+  await saveToken(data.token);
+  await setStoredItem(sessionRoleKey, 'household_resident');
+  await setStoredItem(ownerRequiredKey, data.user.owner_selection_required ? '1' : '0');
+  if (data.owner_options) saveViewState('mobile:household-owner', data.owner_options);
+  if (Platform.OS !== 'web') await selectNavigationAccount(String(data.user.user_id));
+  return data.user;
+}
+
+export async function getHouseholdOwnerOptions() {
+  return (await api.get('/household/device-owner/options')).data.data;
+}
+
+export async function selectHouseholdDeviceOwner(memberId: string) {
+  const response = await api.post<LoginResponse>('/household/device-owner/select', { member_id: memberId });
+  return acceptHouseholdSession(response.data);
+}
+
+export async function resetHouseholdDeviceOwner() {
+  const device_uuid = await getMobileDeviceUuid('household_resident');
+  const response = await api.post<LoginResponse>('/household/device-owner/reset', { device_uuid });
+  return acceptHouseholdSession(response.data);
 }
 
 export async function logoutMobile() {
@@ -126,6 +170,7 @@ export async function logoutMobile() {
         await clearToken();
       } finally {
         await deleteStoredItem(sessionRoleKey);
+        await deleteStoredItem(ownerRequiredKey);
       }
     }
   }

@@ -66,8 +66,9 @@ class ProfileWorkflow
     public function changePassword(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'current_password' => ['required', 'string'],
+            'current_password' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string', 'min:8', 'max:128', 'confirmed'],
+            'password_confirmation' => ['required', 'string', 'max:128'],
         ], [
             'current_password.required' => 'Current password is required.',
             'password.required' => 'New password is required.',
@@ -76,26 +77,33 @@ class ProfileWorkflow
         ]);
 
         $user = $request->user();
+        $credential = $user->roleKey() === 'household_resident'
+            ? app(\App\Services\Mobile\HouseholdAccessService::class)->credentialUser($user) : $user;
 
-        if (! Hash::check($validated['current_password'], $user->password)) {
+        if (! $credential->password || ! Hash::check($validated['current_password'], $credential->password)) {
             return response()->json([
                 'message' => 'Current password is incorrect.',
             ], 422);
         }
 
-        if (Hash::check($validated['password'], $user->password)) {
+        if (Hash::check($validated['password'], $credential->password)) {
             return response()->json(['message' => 'Choose a different new password.'], 422);
         }
 
-        DB::transaction(function () use ($request, $user, $validated): void {
-            User::query()->where($user->getKeyName(), $user->getKey())->update([
+        DB::transaction(function () use ($request, $user, $credential, $validated): void {
+            $updates = [
                 'password' => Hash::make($validated['password']),
-                'password_changed_at' => now(),
-                'must_change_password' => 0,
                 'updated_at' => now(),
-            ]);
+            ];
+            if (Schema::hasColumn('users', 'password_changed_at')) $updates['password_changed_at'] = now();
+            if (Schema::hasColumn('users', 'must_change_password')) $updates['must_change_password'] = 0;
+            User::query()->whereKey($credential->getKey())->update($updates);
             if (Schema::hasTable('personal_access_tokens')) {
-                $user->tokens()->where('id', '!=', $user->currentAccessToken()?->id)->delete();
+                if ($user->roleKey() === 'household_resident' && $user->household_id) {
+                    app(\App\Services\Mobile\HouseholdAccessService::class)->revokeHouseholdSessions($user->household_id, $user->currentAccessToken()?->id);
+                } else {
+                    $user->tokens()->where('id', '!=', $user->currentAccessToken()?->id)->delete();
+                }
             }
             $this->writeAuditLog($request, 'change_password', null, [
                 'user_id' => $user->user_id,

@@ -34,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            'household.owner' => \App\Http\Middleware\RequireHouseholdDeviceOwner::class,
             'web.access' => \App\Http\Middleware\EnsureWebModuleAccess::class,
             'web.module' => \App\Http\Middleware\EnsureWebModuleAccess::class,
             'personnel.access' => \App\Http\Middleware\EnsurePersonnelAccess::class,

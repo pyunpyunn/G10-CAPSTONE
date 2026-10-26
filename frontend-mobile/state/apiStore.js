@@ -10,7 +10,7 @@ const cache = createSlice({
     reset(state) { state.generation++; state.session++; state.queries = {}; state.views = {} },
     invalidate(state, { payload: paths }) {
       state.generation++
-      state.views = {}
+      if (!paths) state.views = {}
       for (const [key, entry] of Object.entries(state.queries)) {
         if (!paths || paths.some(path => entry.path.includes(path))) delete state.queries[key]
       }
@@ -41,6 +41,10 @@ export const store = configureStore({ reducer: { serverData: cache.reducer }, de
 export const resetApiState = () => store.dispatch(cache.actions.reset())
 export const invalidateApiState = (paths) => store.dispatch(cache.actions.invalidate(paths))
 export const saveViewState = (key, value) => store.dispatch(cache.actions.savedView({ key, value }))
+export const getViewState = (key) => {
+  const view = store.getState().serverData.views[key]
+  return view && Date.now() - view.savedAt < 120000 ? view : null
+}
 export const removeViewState = (prefix) => store.dispatch(cache.actions.removedView(prefix))
 
 function canonical(value) {
