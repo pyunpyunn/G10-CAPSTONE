@@ -6,13 +6,15 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useOutletContext,
 } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import HouseholdReviewPage from './pages/HouseholdReviewPage'
-import { getCurrentUser, loginUser, logoutUser } from './api/authApi'
+import { getCurrentUser, loginUser, logoutUser, saveRememberedPassword } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
+import { canOpenWebPage, hasWebAccess, webHomeForUser } from './utils/personnelAccess'
 import './App.css'
 import './styles/foundation.css'
 import './styles/index.css'
@@ -34,8 +36,14 @@ import './styles/dispatch.css'
 import './styles/situation.css'
 import './styles/responsive.css'
 import './styles/mapmate-reference.css'
-
-const webRoles = ['super_admin', 'admin']
+import './styles/map-enhancements.css'
+import './styles/household-prototype.css'
+import './styles/mapping-reference.css'
+import './styles/weather-reference.css'
+import './styles/status-colors.css'
+import './styles/situation-reference.css'
+import './styles/situation-workspace.css'
+import './styles/annex-h.css'
 
 const pageComponents = {
   '/super-admin': lazy(() => import('./pages/SuperAdminPage')),
@@ -44,6 +52,12 @@ const pageComponents = {
   '/weather': lazy(() => import('./pages/WeatherPage')),
   '/mapping': lazy(() => import('./pages/MappingPage')),
   '/households': lazy(() => import('./pages/HouseholdStatusPage')),
+  '/households/_household-list': lazy(() => import('./pages/HouseholdPurokListPage')),
+  '/rescue-management': lazy(() => import('./pages/RescueManagementPage')),
+  '/field-reports': lazy(() => import('./pages/FieldReportsPage')),
+  '/dispatch/communication': lazy(() => import('./pages/FieldCommunicationPage')),
+  '/request-types': lazy(() => import('./pages/RequestTypesPage')),
+  '/external-requests': lazy(() => import('./pages/RequestWorkflowPage')),
   '/dispatch': lazy(() => import('./pages/RescueDispatchPage')),
   '/dispatch/new': lazy(() => import('./pages/NewDispatchPage')),
   '/rescuers': lazy(() => import('./pages/RescuerAccountsPage')),
@@ -51,10 +65,11 @@ const pageComponents = {
   '/rescuers/teams': lazy(() => import('./pages/RescuerAccountsPage')),
   '/rescuers/view': lazy(() => import('./pages/RescuerAccountsPage')),
   '/rescuers/edit': lazy(() => import('./pages/RescuerAccountsPage')),
-  '/resources-requests': lazy(() => import('./pages/ResourcesRequestsPage')),
+  '/resources-requests': lazy(() => import('./pages/RequestWorkflowPage')),
   '/resources-requests/new': lazy(() => import('./pages/ResourceRequestEditorPage')),
   '/resources-requests/edit': lazy(() => import('./pages/ResourceRequestEditorPage')),
   '/situation': lazy(() => import('./pages/SituationReportPage')),
+  '/situation/external-reports': lazy(() => import('./pages/ExternalReportsPage')),
   '/archive': lazy(() => import('./pages/ArchivePage')),
   '/notifications': lazy(() => import('./pages/NotificationsPage')),
   '/profile': lazy(() => import('./pages/ProfilePage')),
@@ -64,8 +79,8 @@ const modulePages = [
   {
     path: '/super-admin',
     title: 'Inquiries',
-    kicker: 'Super Admin',
-    summary: 'Review landing page inquiries and manage command-level account access.',
+    kicker: 'Operations/Admin',
+    summary: 'Review public inquiries and manage technical account access.',
     superOnly: true,
     navHidden: true,
   },
@@ -80,6 +95,7 @@ const modulePages = [
     title: 'Disaster Broadcasting',
     kicker: 'Alerts',
     summary: 'Create disaster events and send official barangay or purok-specific instructions.',
+    navHidden: true,
   },
   {
     path: '/weather',
@@ -101,21 +117,46 @@ const modulePages = [
   },
   {
     path: '/dispatch',
-    title: 'Rescue Dispatch',
+    title: 'Dispatch Dashboard',
     kicker: 'Operations',
     summary: 'Assign teams, monitor progress, and record field outcomes from rescuer updates.',
   },
   {
-    path: '/rescuers',
-    title: 'Rescuer Accounts',
-    kicker: 'Verified accounts',
-    summary: 'Create and manage HQ-created rescuer accounts, teams, duty status, and contact details.',
-  },
-  {
     path: '/resources-requests',
-    title: 'Resources & Requests',
+    title: 'Request Monitoring',
     kicker: 'Validation queue',
     summary: 'Validate EvaTrack/manual requests before forwarding verified records to TrackingAid/HQ.',
+  },
+  {
+    path: '/rescuers',
+    title: 'Account Management',
+    kicker: 'Verified accounts',
+    summary: 'Manage field-team and BDRRMC committee accounts.',
+  },
+  {
+    path: '/rescuers/teams',
+    title: 'Team Management',
+    summary: 'Configure rescue teams and their members.',
+  },
+  {
+    path: '/rescue-management',
+    title: 'Rescue Management',
+    summary: 'Review and manage saved operational records.',
+  },
+  {
+    path: '/field-reports',
+    title: 'Field Reports',
+    summary: 'Review and manage saved operational records.',
+  },
+  {
+    path: '/request-types',
+    title: 'Request Types',
+    summary: 'Review and manage saved operational records.',
+  },
+  {
+    path: '/external-requests',
+    title: 'External Requests',
+    summary: 'Review and manage saved operational records.',
   },
   {
     path: '/situation',
@@ -123,6 +164,7 @@ const modulePages = [
     kicker: 'Reports',
     summary: 'Generate saved event snapshots for household, dispatch, resources, weather, and casualty summaries.',
   },
+  { path: '/situation/external-reports', title: 'External Reports', kicker: 'Reports', summary: 'Request reports from connected systems and review incoming section requests.' },
   {
     path: '/archive',
     title: 'Archive',
@@ -144,6 +186,55 @@ function AuthRoutes() {
   const [checkingSession, setCheckingSession] = useState(true)
   const [loginError, setLoginError] = useState('')
   const navigate = useNavigate()
+  const sessionUserId = user?.user_id || user?.id
+
+  useEffect(() => {
+    if (!sessionUserId) return undefined
+    let disposed = false
+    let inFlight = false
+    let queued = false
+    async function refreshAccess() {
+      if (disposed || !getToken()) return
+      if (inFlight) { queued = true; return }
+      inFlight = true
+      const token = getToken()
+      try {
+        const nextUser = await getCurrentUser()
+        if (disposed || token !== getToken()) return
+        if (isWebUser(nextUser)) {
+          setUser(current => JSON.stringify(current) === JSON.stringify(nextUser) ? current : nextUser)
+        } else {
+          clearToken()
+          setUser(null)
+          setLoginError('Your role access changed. Please sign in again.')
+          navigate('/login', { replace: true })
+        }
+      } catch (error) {
+        if (!disposed && token === getToken() && [401, 403].includes(error.response?.status)) {
+          clearToken(); setUser(null); navigate('/login', { replace: true })
+        }
+      } finally {
+        inFlight = false
+        if (queued && !disposed) { queued = false; refreshAccess() }
+      }
+    }
+    const onVisible = () => { if (!document.hidden) refreshAccess() }
+    const onOperations = event => { if (event.detail?.topics?.includes('accounts')) refreshAccess() }
+    const interval = window.setInterval(onVisible, 3000)
+    window.addEventListener('personnel-access:changed', refreshAccess)
+    window.addEventListener('operations:changed', onOperations)
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
+    refreshAccess()
+    return () => {
+      disposed = true
+      window.clearInterval(interval)
+      window.removeEventListener('personnel-access:changed', refreshAccess)
+      window.removeEventListener('operations:changed', onOperations)
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [sessionUserId, navigate])
 
   useEffect(() => {
     async function loadSession() {
@@ -167,7 +258,8 @@ function AuthRoutes() {
       }
     }
 
-    loadSession()
+    const sessionCheck = window.setTimeout(() => loadSession(), 0)
+    return () => window.clearTimeout(sessionCheck)
   }, [])
 
   async function handleLogin(form) {
@@ -179,15 +271,15 @@ function AuthRoutes() {
 
       if (!isWebUser(nextUser)) {
         clearToken()
-        setLoginError('Household and rescuer accounts should use the mobile app.')
-        return
+        throw new Error('Household and rescuer accounts should use the mobile app.')
       }
 
+      await saveRememberedPassword(form.login, form.password, form.rememberPassword)
       saveToken(data.token)
       setUser(nextUser)
-      navigate('/dashboard', { replace: true })
+      navigate(webHomeForUser(nextUser), { replace: true })
     } catch (error) {
-      setLoginError(getLoginMessage(error))
+      throw new Error(error.message === 'Household and rescuer accounts should use the mobile app.' ? error.message : getLoginMessage(error), { cause: error })
     }
   }
 
@@ -195,6 +287,16 @@ function AuthRoutes() {
     try {
       await logoutUser()
     } finally {
+      clearToken()
+      setUser(null)
+      navigate('/login', { replace: true })
+    }
+  }
+
+  function handleUserChange(nextUser) {
+    if (isWebUser(nextUser)) {
+      setUser(nextUser)
+    } else {
       clearToken()
       setUser(null)
       navigate('/login', { replace: true })
@@ -211,7 +313,7 @@ function AuthRoutes() {
         path="/login"
         element={
           user ? (
-            <Navigate to="/dashboard" replace />
+            <Navigate to={webHomeForUser(user)} replace />
           ) : (
             <LoginPage onLogin={handleLogin} error={loginError} />
           )
@@ -222,14 +324,16 @@ function AuthRoutes() {
         path="/"
         element={
           <ProtectedRoute user={user}>
-            <AppShell user={user} pages={pagesForUser(user)} onLogout={handleLogout} onUserChange={setUser} />
+            <AppShell user={user} pages={pagesForUser(user)} onLogout={handleLogout} onUserChange={handleUserChange} />
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={<Navigate to={webHomeForUser(user)} replace />} />
+        <Route path="dispatch/communication" element={<LazyPage page={{ path: '/dispatch/communication' }} />} />
+        <Route path="rescue-management/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
+        <Route path="rescue-management/:assignmentId/edit" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
         <Route path="dispatch/new" element={<LazyPage page={{ path: '/dispatch/new' }} />} />
         <Route path="rescuers/new" element={<LazyPage page={{ path: '/rescuers/new' }} />} />
-        <Route path="rescuers/teams" element={<LazyPage page={{ path: '/rescuers/teams' }} />} />
         <Route path="rescuers/view" element={<LazyPage page={{ path: '/rescuers/view' }} />} />
         <Route path="rescuers/edit" element={<LazyPage page={{ path: '/rescuers/edit' }} />} />
         <Route path="resources-requests/new" element={<LazyPage page={{ path: '/resources-requests/new' }} />} />
@@ -241,18 +345,24 @@ function AuthRoutes() {
             element={<LazyPage page={page} />}
           />
         ))}
-        <Route path="households/:householdId" element={<HouseholdReviewPage />} />
+        <Route path="households/_household-list" element={<LazyPage page={{ path: '/households/_household-list' }} />} />
+        <Route path="households/:householdId" element={<GuardedHouseholdReviewPage />} />
         <Route path="notifications" element={<LazyPage page={{ path: '/notifications' }} />} />
         <Route path="profile" element={<LazyPage page={{ path: '/profile' }} />} />
       </Route>
 
-      <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={user ? webHomeForUser(user) : '/login'} replace />} />
     </Routes>
   )
 }
 
 function LazyPage({ page }) {
+  const { user } = useOutletContext()
   const PageComponent = pageComponents[page.path]
+
+  if (!canOpenWebPage(user, page.path)) {
+    return <Navigate to={webHomeForUser(user)} replace />
+  }
 
   if (!PageComponent) {
     return <PlaceholderPage page={page} />
@@ -263,6 +373,12 @@ function LazyPage({ page }) {
       <PageComponent />
     </Suspense>
   )
+}
+
+function GuardedHouseholdReviewPage() {
+  const { user } = useOutletContext()
+  if (!canOpenWebPage(user, '/households')) return <Navigate to={webHomeForUser(user)} replace />
+  return <HouseholdReviewPage />
 }
 
 function ProtectedRoute({ user, children }) {
@@ -276,13 +392,13 @@ function ProtectedRoute({ user, children }) {
 }
 
 function isWebUser(user) {
-  return webRoles.includes(user?.role?.role_key)
+  return hasWebAccess(user)
 }
 
 function pagesForUser(user) {
   const roleKey = user?.role?.role_key
 
-  return modulePages.filter((page) => !page.superOnly || roleKey === 'super_admin')
+  return modulePages.filter((page) => canOpenWebPage(user, page.path) && (!page.superOnly || roleKey === 'operations_admin'))
 }
 
 function getLoginMessage(error) {

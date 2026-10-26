@@ -31,6 +31,11 @@ class HouseholdMobileController extends Controller
         return $this->service->updateDeviceLocation($request);
     }
 
+    public function updateGeotag(Request $request, \App\Services\Mobile\HouseholdMobileSetupWorkflow $workflow): JsonResponse
+    {
+        return $workflow->updateGeotag($request);
+    }
+
     public function updateMember(Request $request, string $memberId): JsonResponse
     {
         return $this->service->updateMember($request, $memberId);
@@ -38,12 +43,17 @@ class HouseholdMobileController extends Controller
 
     public function storeMemberStatus(Request $request, string $memberId): JsonResponse
     {
-        return $this->service->storeMemberStatus($request, $memberId);
+        return app(\App\Services\Mobile\HouseholdMobileStatusWorkflow::class)->storeMemberStatus($request, $memberId);
+    }
+
+    public function storeTrustedMemberStatus(Request $request, string $connectionId, string $memberId): JsonResponse
+    {
+        return $this->service->storeTrustedMemberStatus($request, $connectionId, $memberId);
     }
 
     public function storeStatus(Request $request): JsonResponse
     {
-        return $this->service->storeStatus($request);
+        return app(\App\Services\Mobile\HouseholdMobileStatusWorkflow::class)->storeStatus($request);
     }
 
     public function statusHistory(Request $request): JsonResponse
@@ -61,6 +71,16 @@ class HouseholdMobileController extends Controller
         return $this->service->trustedHouseholds($request);
     }
 
+    public function saveTrustedPin(Request $request): JsonResponse
+    {
+        return $this->service->saveTrustedPin($request);
+    }
+
+    public function verifyTrustedPin(Request $request): JsonResponse
+    {
+        return $this->service->verifyTrustedPin($request);
+    }
+
     public function lookupTrustedHousehold(Request $request, string $householdId): JsonResponse
     {
         return $this->service->lookupTrustedHousehold($request, $householdId);
@@ -69,5 +89,15 @@ class HouseholdMobileController extends Controller
     public function storeTrustedHousehold(Request $request): JsonResponse
     {
         return $this->service->storeTrustedHousehold($request);
+    }
+
+    public function deleteTrustedHousehold(Request $request, string $connectionId): JsonResponse
+    {
+        return $this->service->deleteTrustedHousehold($request, $connectionId);
+    }
+
+    public function respondToTrustedHousehold(Request $request, string $connectionId): JsonResponse
+    {
+        return $this->service->respondToTrustedHousehold($request, $connectionId);
     }
 }

@@ -1,233 +1,45 @@
-import { useEffect, useState } from 'react'
-import {
-  Download,
-  FileDown,
-  RefreshCcw,
-} from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { getHouseholds } from '../api/householdApi'
-import HouseholdFilters from '../components/households/HouseholdFilters'
-import HouseholdOpsPanels from '../components/households/HouseholdOpsPanels'
-import HouseholdSummary from '../components/households/HouseholdSummary'
-import HouseholdTable from '../components/households/HouseholdTable'
-import LoadingState from '../components/ui/LoadingState'
-import RefreshOverlay from '../components/ui/RefreshOverlay'
-import {
-  emptySummary,
-} from '../utils/householdStatusHelpers'
-import {
-  downloadExcelWorkbook,
-  downloadPdfReport,
-} from '../utils/exportFileHelpers'
-
-const PAGE_SIZE = 25
+import { bandColor } from '../utils/householdPrototype'
+import { useCallback, useState } from 'react'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { canOpenWebPage } from '../utils/personnelAccess'
+import { getDispatchDashboard, getSitioPriorities } from '../api/dispatchApi'
+import { useModuleData } from '../utils/useModuleData'
+import { HouseholdChart } from '../components/households/HouseholdPrototype'
 
 export default function HouseholdStatusPage() {
+  const { user } = useOutletContext()
   const navigate = useNavigate()
-  const [payload, setPayload] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [searchText, setSearchText] = useState('')
-  const [search, setSearch] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [status, setStatus] = useState('all')
-  const [page, setPage] = useState(1)
-
-  const summary = payload?.summary || emptySummary()
-  const households = payload?.households?.data || []
-  const meta = payload?.households?.meta || {}
-  const puroks = payload?.filters?.puroks || []
-  const hasActiveEvent = Boolean(payload?.active_event)
-  const isInitialLoading = isLoading && !payload
-  const isRefreshing = isLoading && Boolean(payload)
-  const hasBlockingError = error && !payload
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setSearch(searchText.trim())
-      setPage(1)
-    }, 300)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [searchText])
-
-  useEffect(() => {
-    let ignore = false
-
-    async function loadPage() {
-      setIsLoading(true)
-      setError('')
-
-      try {
-        const data = await getHouseholds({
-          search,
-          purok,
-          status,
-          page,
-          per_page: PAGE_SIZE,
-        })
-
-        if (!ignore) {
-          setPayload(data)
-        }
-      } catch {
-        if (!ignore) {
-          setError('Household status records cannot be loaded right now. Please check the backend or database connection.')
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadPage()
-
-    return () => {
-      ignore = true
-    }
-  }, [search, purok, status, page])
-
-  async function loadHouseholds() {
-    setIsLoading(true)
-    setError('')
-
-    try {
-      const data = await getHouseholds({
-        search,
-        purok,
-        status,
-        page,
-        per_page: PAGE_SIZE,
-      })
-      setPayload(data)
-    } catch {
-      setError('Household status records cannot be loaded right now. Please check the backend or database connection.')
-    } finally {
-      setIsLoading(false)
-    }
+  const [mode, setMode] = useState('status')
+  const [selected, setSelected] = useState(null)
+  const loader = useCallback(async () => {
+    const [rows, workspace] = await Promise.all([getSitioPriorities(), getDispatchDashboard({ per_page: 1 })])
+    return { rows, event: workspace.active_event, sitioCoverage: workspace.sitio_coverage || [] }
+  }, [])
+  const { data, error, loading } = useModuleData(loader, ['households', 'disasters'])
+  const rows = data?.rows || []
+  const assignedSitios = new Set((data?.sitioCoverage || []).filter(item => item.is_assigned).map(item => String(item.sitio_id)))
+  const rankingGroups = [
+    { title: 'Awaiting assignment', rows: rows.filter(row => !assignedSitios.has(String(row.sitio_id))) },
+    { title: 'Already assigned sitios', rows: rows.filter(row => assignedSitios.has(String(row.sitio_id))) },
+  ]
+  function select(row) {
+    setSelected(row.sitio_id)
+    navigate(`/households/_household-list?${new URLSearchParams({ sitio_id: String(row.sitio_id) })}`)
   }
-
-  function changeStatusFilter(nextStatus) {
-    setStatus(nextStatus)
-    setPage(1)
-  }
-
-  function changePurok(nextPurok) {
-    setPurok(nextPurok)
-    setPage(1)
-  }
-
-  function openHousehold(householdId) {
-    navigate(`/households/${householdId}`)
-  }
-
-  function exportCurrentPage(type) {
-    if (households.length === 0) {
-      return
-    }
-
-    const rows = householdExportRows(households)
-    const title = `Household Status - Page ${page}`
-
-    if (type === 'pdf') {
-      downloadPdfReport(`household-status-page-${page}.pdf`, title, rows)
-      return
-    }
-
-    downloadExcelWorkbook(`household-status-page-${page}.xls`, title, rows)
-  }
-
-  return (
-    <main className="ops-page household-page">
-      <header className="household-status-page-header">
-        <div className="household-status-header-copy">
-          <h1>Household Status</h1>
-          <p>Barangay Mambaling, Cebu City</p>
-        </div>
-        <div className="weather-page-actions household-status-page-actions">
-          <div className="weather-live-status">
-            <strong>{hasActiveEvent ? 'Live' : 'Standby'}</strong>
-            <span>{hasActiveEvent ? 'Monitoring active event' : 'Waiting for active event'}</span>
-          </div>
-          <button className="button secondary" type="button" onClick={loadHouseholds}>
-            <RefreshCcw size={16} />
-            Refresh
-          </button>
-          <button className="button secondary" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('excel')}>
-            <Download size={16} />
-            Export
-          </button>
-          <button className="button secondary" type="button" disabled={households.length === 0} onClick={() => exportCurrentPage('pdf')}>
-            <FileDown size={16} />
-            PDF
-          </button>
-        </div>
-      </header>
-
-      {isInitialLoading && <LoadingState />}
-      {error && <div className="form-error">{error}</div>}
-
-      {!isInitialLoading && !hasBlockingError && payload && (
-        <div className="workspace-grid">
-          <section className="household-workspace" aria-label="Household rescue list">
-            <div className="filter-bar household-filter-shell">
-              <HouseholdFilters
-                searchText={searchText}
-                purok={purok}
-                status={status}
-                summary={summary}
-                puroks={puroks}
-                onSearchTextChange={setSearchText}
-                onPurokChange={changePurok}
-                onStatusChange={changeStatusFilter}
-              />
-            </div>
-
-            <div className="data-panel">
-              <RefreshOverlay active={isRefreshing}>
-                <HouseholdTable
-                  households={households}
-                  meta={meta}
-                  selectedPurok={purok}
-                  onOpen={openHousehold}
-                  onPageChange={setPage}
-                  onDispatchPurok={() => navigate('/dispatch')}
-                />
-              </RefreshOverlay>
-            </div>
-          </section>
-
-          <aside className="side-panel" aria-label="Household operations summary">
-            {!hasActiveEvent && (
-              <div className="standby-strip hh-standby-strip">
-                <strong>No active disaster event</strong>
-                <span>Household reporting starts after HQ/Admin broadcasts an active event.</span>
-              </div>
-            )}
-            <HouseholdSummary summary={summary} />
-            <HouseholdOpsPanels rows={payload?.purok_summary || []} />
-          </aside>
-        </div>
-      )}
-    </main>
-  )
-}
-
-function householdExportRows(households) {
-  const headers = ['Household ID', 'Household', 'Purok', 'People', 'Status', 'Source', 'Report Time', 'Devices', 'Battery', 'Last Location']
-  const rows = households.map((household) => [
-    household.household_id,
-    household.household_name,
-    household.purok,
-    household.people,
-    household.status?.label,
-    household.source?.label,
-    household.source?.datetime,
-    `${household.device?.active || 0}/${household.device?.total || 0}`,
-    household.device?.lowest_battery !== null && household.device?.lowest_battery !== undefined ? `${household.device.lowest_battery}%` : '',
-    household.location?.label,
-  ])
-
-  return [headers, ...rows]
+  return <section className="hh-prototype" aria-label="Household status">
+    {error && <div className="emp" role="alert">{error}</div>}
+    {loading ? <div className="cd sby" role="status">Loading household status…</div> : data && !data.event ? <div className="cd sby"><div>Standby<small>Household reporting starts after HQ/Admin broadcasts an active event.</small></div></div> : data && <div className="ovg">
+      <HouseholdChart rows={rows} mode={mode} setMode={setMode} selected={selected} onSelect={select} />
+      <div className="cd"><div className="ch">Ranking</div><div className="cb">
+        {!rows.length && <div className="emp">No sitio ranking available</div>}
+        {rankingGroups.filter(group => group.rows.length).map(group => <section className="sitio-priority-list" key={group.title} aria-label={group.title}>
+          <h3>{group.title}<span>{group.rows.length}</span></h3>
+          {group.rows.map(row => <div key={row.sitio_id} className={`rk ${row.sitio_id === selected ? 'on' : ''}`}>
+            <button type="button" className="rh" onClick={() => select(row)} aria-label={`View ${row.sitio} households`}><span className="rn">{row.rank}</span><b>{row.sitio}</b><span className="sc"><i style={{ width: `${row.priority_score}%`, background: bandColor(row.band) }} /></span><em>{Math.round(row.priority_score)}%</em>{!assignedSitios.has(String(row.sitio_id)) && <span className="pl" style={{ '--c': bandColor(row.band) }}>{row.band?.label || 'Low'}</span>}</button>
+            <div className="rx"><div><div className="mts"><span>Households <b>{row.households}</b></span><span>Unsafe <b>{row.impacted_households}</b></span><span>Special needs <b>{row.special_needs_members}</b></span><span>Unchecked members <b>{row.unchecked_members}</b></span><span>No mobile / geotag <b>{row.no_contact_households}</b></span>{canOpenWebPage(user, '/rescue-management/new') && data.event && row.households > 0 && <Link className="bt p sm sitio-dispatch" to={`/rescue-management/new?sitio_id=${row.sitio_id}`} aria-label={`Dispatch to ${row.sitio}`}>Dispatch →</Link>}</div></div></div>
+          </div>)}
+        </section>)}
+      </div></div>
+    </div>}
+  </section>
 }

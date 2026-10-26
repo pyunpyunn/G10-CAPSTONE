@@ -1,4 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, spacing, typography } from '@/constants/resqTheme';
 
@@ -8,7 +9,7 @@ type HeaderProps = {
 
 export function RescuerHeader({ onOpenRadio }: HeaderProps) {
   return (
-    <View style={styles.header}>
+    <SafeAreaView edges={['top']} style={styles.header}>
       <View style={styles.brandRow}>
         <Image
           source={require('@/assets/images/resqperation-logo.png')}
@@ -27,7 +28,7 @@ export function RescuerHeader({ onOpenRadio }: HeaderProps) {
           ) : null}
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -66,6 +67,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
   },
   actions: {
+    flexShrink: 0,
     marginLeft: 'auto',
     flexDirection: 'row',
     gap: spacing.sm,

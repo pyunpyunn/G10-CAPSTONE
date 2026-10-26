@@ -36,31 +36,7 @@ export function percent(value, total) {
   return Math.min(100, Math.max(0, (Number(value) / Number(total)) * 100))
 }
 
-export function statusTone(statusKey) {
-  const key = statusKey || ''
-
-  if (['active', 'safe', 'returned', 'validated', 'released'].includes(key)) {
-    return 'green'
-  }
-
-  if (['evacuated', 'relocated'].includes(key)) {
-    return 'blue'
-  }
-
-  if (['not-evacuated', 'unsafe', 'missing', 'displaced'].includes(key)) {
-    return 'red'
-  }
-
-  if (['dispatched', 'assigned', 'accepted', 'en-route'].includes(key)) {
-    return 'purple'
-  }
-
-  if (['needs-validation', 'pending'].includes(key)) {
-    return 'amber'
-  }
-
-  return 'gray'
-}
+export { statusTone } from './statusPalette'
 
 export function eventTone(severityKey) {
   if (['critical', 'high'].includes(severityKey)) {

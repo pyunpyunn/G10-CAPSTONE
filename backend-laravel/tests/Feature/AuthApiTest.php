@@ -43,6 +43,7 @@ class AuthApiTest extends TestCase
             Schema::create('responders', function (Blueprint $table) {
                 $table->unsignedBigInteger('responder_id')->primary();
                 $table->string('user_id');
+                $table->integer('team_id')->nullable();
                 $table->string('responder_code');
                 $table->string('username');
                 $table->string('password_hash');
@@ -64,6 +65,17 @@ class AuthApiTest extends TestCase
                 $table->text('abilities')->nullable();
                 $table->timestamp('last_used_at')->nullable();
                 $table->timestamp('expires_at')->nullable();
+                $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('devices')) {
+            Schema::create('devices', function (Blueprint $table): void {
+                $table->id();
+                $table->string('user_id');
+                $table->integer('team_id');
+                $table->string('device_uuid')->unique();
+                $table->timestamp('last_sync_at')->nullable();
                 $table->timestamps();
             });
         }
@@ -95,6 +107,7 @@ class AuthApiTest extends TestCase
             'responder_code' => 'BDRRM-SAR-001',
         ], [
             'responder_id' => 2024035502,
+            'team_id' => 1,
             'user_id' => 'USR-RESCUER-BDRRM-SAR-001',
             'username' => 'BDRRM-SAR-001',
             'password_hash' => Hash::make('password'),
@@ -132,4 +145,125 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('user.user_id', 'USR-RESCUER-BDRRM-SAR-001')
             ->assertJsonPath('message', 'Login successful.');
     }
+
+    public function test_device_bound_mobile_login_registers_team_and_issues_scoped_token(): void
+    {
+        $response = $this->postJson('/api/v1/mobile/login', [
+            'login' => 'BDRRM-SAR-001',
+            'password' => 'password',
+            'device_uuid' => 'device-rescuer-1',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('device_uuid', 'device-rescuer-1')
+            ->assertJsonPath('team_id', 1);
+        $this->assertDatabaseHas('devices', [
+            'device_uuid' => 'device-rescuer-1',
+            'user_id' => 'USR-RESCUER-BDRRM-SAR-001',
+            'team_id' => 1,
+        ]);
+
+        $token = \App\Models\User::findOrFail('USR-RESCUER-BDRRM-SAR-001')->tokens()->latest('id')->first();
+        $this->assertSame('mobile-device:device-rescuer-1', $token->name);
+        $this->assertContains('mobile:rescuer', $token->abilities);
+        $this->assertContains('team:1', $token->abilities);
+    }
+
+    public function test_device_bound_mobile_login_rejects_device_uuid_owned_by_another_user(): void
+    {
+        DB::table('devices')->insert([
+            'user_id' => 'OTHER-USER',
+            'team_id' => 1,
+            'device_uuid' => 'shared-device',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/mobile/login', [
+            'login' => 'BDRRM-SAR-001',
+            'password' => 'password',
+            'device_uuid' => 'shared-device',
+        ])->assertConflict();
+    }
+
+    private function passwordChangePayload(): array
+    {
+        return ['login' => 'BDRRM-SAR-001', 'current_password' => 'password',
+            'password' => 'new-secure-password', 'password_confirmation' => 'new-secure-password'];
+    }
+
+    public function test_old_password_change_requires_no_security_questions_and_revokes_sessions(): void
+    {
+        $user = \App\Models\User::findOrFail('USR-RESCUER-BDRRM-SAR-001');
+        $user->createToken('old-session');
+        $this->postJson('/api/v1/auth/password-recovery/reset', $this->passwordChangePayload())->assertOk();
+        $this->assertTrue(Hash::check('new-secure-password', $user->fresh()->password));
+        $this->assertSame(0, $user->tokens()->count());
+        $this->postJson('/api/v1/auth/login', ['login' => 'BDRRM-SAR-001', 'password' => 'password'])->assertUnprocessable();
+        $this->postJson('/api/v1/auth/login', ['login' => 'BDRRM-SAR-001', 'password' => 'new-secure-password'])
+            ->assertOk()->assertJsonPath('user.user_id', $user->user_id);
+
+    }
+
+    public function test_wrong_old_password_or_unknown_account_cannot_change_password(): void
+    {
+        $payload = $this->passwordChangePayload();
+        $payload['current_password'] = 'incorrect';
+        $this->postJson('/api/v1/auth/password-recovery/reset', $payload)->assertUnprocessable();
+        $payload['login'] = 'unknown-account';
+        $this->postJson('/api/v1/auth/password-recovery/reset', $payload)->assertUnprocessable();
+        $this->assertTrue(Hash::check('password', \App\Models\User::findOrFail('USR-RESCUER-BDRRM-SAR-001')->password));
+    }
+
+    public function test_password_change_rejects_mismatch_and_unchanged_password(): void
+    {
+        $payload = $this->passwordChangePayload();
+        $payload['password_confirmation'] = 'mismatch';
+        $this->postJson('/api/v1/auth/password-recovery/reset', $payload)->assertUnprocessable();
+        $payload['password'] = $payload['password_confirmation'] = 'password';
+        $this->postJson('/api/v1/auth/password-recovery/reset', $payload)->assertUnprocessable();
+    }
+
+    public function test_inactive_account_cannot_change_password(): void
+    {
+        DB::table('users')->where('user_id', 'USR-RESCUER-BDRRM-SAR-001')->update(['is_active' => false]);
+        $this->postJson('/api/v1/auth/password-recovery/reset', $this->passwordChangePayload())->assertForbidden();
+    }
+
+    public function test_mobile_role_can_change_password_through_authenticated_profile_endpoint(): void
+    {
+        Schema::table('users', function (Blueprint $table): void {
+            $table->timestamp('password_changed_at')->nullable();
+            $table->boolean('must_change_password')->default(true);
+        });
+        $user = \App\Models\User::findOrFail('USR-RESCUER-BDRRM-SAR-001');
+        \Laravel\Sanctum\Sanctum::actingAs($user);
+        $this->patchJson('/api/v1/profile/password', $this->passwordChangePayload())->assertOk();
+        $this->assertTrue(Hash::check('new-secure-password', $user->fresh()->password));
+        $this->assertFalse((bool) $user->fresh()->must_change_password);
+    }
+
+    public function test_password_change_verification_checks_database_account_then_old_password(): void
+    {
+        $this->postJson('/api/v1/auth/password-recovery/verify', ['login' => 'unknown-account'])
+            ->assertUnprocessable()->assertJsonValidationErrors('login');
+        $this->postJson('/api/v1/auth/password-recovery/verify', ['login' => 'BDRRM-SAR-001'])->assertOk();
+        $this->postJson('/api/v1/auth/password-recovery/verify', ['login' => 'BDRRM-SAR-001', 'current_password' => 'incorrect'])
+            ->assertUnprocessable()->assertJsonValidationErrors('current_password');
+        $response = $this->postJson('/api/v1/auth/password-recovery/verify', ['login' => 'BDRRM-SAR-001', 'current_password' => 'password']);
+        $response->assertOk()->assertExactJson(['message' => 'Old password verified.']);
+        $this->assertTrue(Hash::check('password', \App\Models\User::findOrFail('USR-RESCUER-BDRRM-SAR-001')->password));
+    }
+
+    public function test_direct_password_change_still_checks_account_and_password_without_preverification(): void
+    {
+        $payload = $this->passwordChangePayload();
+        $payload['login'] = 'unknown-account';
+        $this->postJson('/api/v1/auth/password-recovery/reset', $payload)->assertUnprocessable()->assertJsonValidationErrors('login');
+        $payload['login'] = 'BDRRM-SAR-001';
+        $payload['current_password'] = 'wrong-password';
+        $this->postJson('/api/v1/auth/password-recovery/reset', $payload)->assertUnprocessable()->assertJsonValidationErrors('current_password');
+    }
 }
+
+

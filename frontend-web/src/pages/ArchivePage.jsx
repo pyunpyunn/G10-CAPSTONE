@@ -1,35 +1,37 @@
 import { useEffect, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import {
+  exportArchive,
   createSavedArchiveGroup,
   deleteArchiveRecords,
   deleteSavedArchiveGroup,
   deleteSavedArchiveGroupRecord,
-  exportArchive,
   getArchiveRecords,
   getSavedArchiveGroups,
 } from '../api/archiveApi'
+import InquiryLogsView from './InquiryLogsView'
 import ArchiveDownloadMenu from '../components/archive/ArchiveDownloadMenu'
+import ArchiveFilters from '../components/archive/ArchiveFilters'
 import ArchiveRecordModal from '../components/archive/ArchiveRecordModal'
 import ArchiveSavedLogsModal from '../components/archive/ArchiveSavedLogsModal'
 import ArchiveSelectionTools from '../components/archive/ArchiveSelectionTools'
 import ArchiveTable from '../components/archive/ArchiveTable'
 import ArchiveTabs from '../components/archive/ArchiveTabs'
+import EvaTrackReportsPanel from '../components/archive/EvaTrackReportsPanel'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   ARCHIVE_TABS,
   archiveErrorMessage,
-  archiveFileName,
   archiveParams,
 } from '../utils/archiveHelpers'
-import {
-  detailsToRows,
-  downloadExcelWorkbook,
-  downloadPdfReport,
-  parseCsvText,
-} from '../utils/exportFileHelpers'
+
 
 export default function ArchivePage() {
+  const { user } = useOutletContext()
+  const isSuperAdmin = user?.role?.role_key === 'operations_admin'
+  const [isExporting, setIsExporting] = useState(false)
   const [activeCategory, setActiveCategory] = useState('disaster-events')
   const [payload, setPayload] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -54,6 +56,7 @@ export default function ArchivePage() {
     let ignore = false
 
     async function loadRecords() {
+      if (['inquiry-logs', 'evatrack-reports'].includes(activeCategory)) return
       setIsLoading(true)
       setError('')
 
@@ -111,6 +114,7 @@ export default function ArchivePage() {
   }
 
   function changeCategory(category) {
+    if (category === 'inquiry-logs' && !isSuperAdmin) return
     setActiveCategory(category)
     setSelectedRecord(null)
     setSelectedRecordCategory(category)
@@ -123,37 +127,27 @@ export default function ArchivePage() {
   }
 
   async function downloadCategory(type) {
-    setMessage('')
+    if (isExporting) return
+    setIsExporting(true)
+    setMessage('Generating report. Large exports may take a moment.')
 
     try {
-      const blob = await exportArchive(activeCategory, 'csv', currentParams())
-      const rows = parseCsvText(await blob.text())
-
-      if (type === 'pdf') {
-        downloadPdfReport(archiveFileName(activeCategory, 'pdf'), `${categoryLabel} archive`, rows)
-        setMessage('Archive PDF downloaded.')
-        return
-      }
-
-      downloadExcelWorkbook(archiveFileName(activeCategory, 'xls'), `${categoryLabel} archive`, rows)
-      setMessage('Archive Excel downloaded.')
+      await exportArchive(activeCategory, type, currentParams())
+      setMessage('Archive export generated.')
     } catch (downloadError) {
       setMessage(archiveErrorMessage(downloadError, 'Archive export cannot be downloaded right now.'))
+    } finally {
+      setIsExporting(false)
     }
   }
 
-  function downloadSelectedRecord(type) {
-    const rows = detailsToRows(selectedRecord?.details || [])
-    const fileBase = `resqperation-archive-record-${selectedRecord?.id || 'details'}`
-
-    if (type === 'pdf') {
-      downloadPdfReport(`${fileBase}.pdf`, recordExportTitle(selectedRecord, categoryLabel), rows)
-      setMessage('Archive record PDF downloaded.')
-      return
+  async function downloadSelectedRecord(type) {
+    try {
+      await exportArchive(selectedRecordCategory, type, { ids: [String(selectedRecord.id)] })
+      setMessage('Archive record export generated.')
+    } catch (downloadError) {
+      setMessage(archiveErrorMessage(downloadError, 'Archive record cannot be exported.'))
     }
-
-    downloadExcelWorkbook(`${fileBase}.xls`, recordExportTitle(selectedRecord, categoryLabel), rows)
-    setMessage('Archive record Excel downloaded.')
   }
 
   function selectedIds() {
@@ -360,6 +354,21 @@ export default function ArchivePage() {
   const filters = payload?.filters || {}
   const counts = { [activeCategory]: pagination.total || 0 }
 
+  if (activeCategory === 'evatrack-reports') {
+    return <section className="page active archive-page"><div className="archive-workspace-body">
+      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} isSuperAdmin={isSuperAdmin} />
+      <EvaTrackReportsPanel />
+    </div></section>
+  }
+
+  if (activeCategory === 'inquiry-logs') {
+    if (!isSuperAdmin) return null
+    return <section className="page active archive-page"><div className="archive-workspace-body">
+      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} isSuperAdmin={isSuperAdmin} />
+      <InquiryLogsView />
+    </div></section>
+  }
+
   return (
     <section className="page active archive-page">
       <div className="archive-workspace-body">
@@ -369,31 +378,34 @@ export default function ArchivePage() {
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen((value) => !value)}
           counts={counts}
+          isSuperAdmin={isSuperAdmin}
         />
         <div className="archive-workspace-main">
-          <div className="archive-section-head">
-            <div className="archive-section-title">
-              <h1>{categoryLabel}</h1>
-              <span>{pagination.total || 0} records</span>
-            </div>
-            <div className="archive-inline-filters">
-              <label className="archive-filter-search">
-                <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search records..." aria-label="Search records" />
-              </label>
-              <select aria-label="Purok" value={purok} onChange={(event) => { setPurok(event.target.value); setPage(1) }}>
-                <option value="all">All puroks</option>
-                {(filters.puroks || []).map((item) => <option value={item} key={item}>{item}</option>)}
-              </select>
-              <select aria-label="Event" value={eventId} onChange={(event) => { setEventId(event.target.value); setPage(1) }}>
-                <option value="all">All events</option>
-                {(filters.events || []).map((item) => <option value={item.event_id} key={item.event_id}>{item.label || item.name}</option>)}
-              </select>
-              <select aria-label="Status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }}>
-                <option value="all">All statuses</option>
-                {(filters.statuses || []).map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}
-              </select>
-            </div>
-          </div>
+          <PageHeader
+            title={categoryLabel}
+            subtitle={`${pagination.total || 0} records`}
+            actions={<ArchiveDownloadMenu disabled={isExporting || isLoading || !payload} onDownload={downloadCategory} />}
+            filters={(
+              <ArchiveFilters
+              search={search}
+              onSearchChange={(value) => { setSearch(value); setPage(1) }}
+              purok={purok}
+              onPurokChange={(value) => { setPurok(value); setPage(1) }}
+              eventId={eventId}
+              onEventChange={(value) => { setEventId(value); setPage(1) }}
+              status={status}
+              onStatusChange={(value) => { setStatus(value); setPage(1) }}
+              onReset={() => {
+                setSearch('')
+                setPurok('all')
+                setEventId('all')
+                setStatus('all')
+                setPage(1)
+              }}
+              filters={filters}
+              />
+            )}
+          />
 
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
@@ -454,8 +466,4 @@ export default function ArchivePage() {
       </div>
     </section>
   )
-}
-
-function recordExportTitle(record, categoryLabel) {
-  return `${categoryLabel} - ${record?.id || 'Record details'}`
 }

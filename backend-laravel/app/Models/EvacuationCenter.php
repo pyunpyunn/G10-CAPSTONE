@@ -15,3 +15,5 @@ class EvacuationCenter extends Model
     public function units(): HasMany { return $this->hasMany(AccommodationUnit::class, 'center_id', 'evacuation_center_id'); }
     public function records(): HasMany { return $this->hasMany(EvacuationRecord::class, 'center_id', 'evacuation_center_id'); }
 }
+
+

@@ -57,11 +57,6 @@ class ResourceRequest extends Model
         return $this->belongsTo(ResourceRequestStatus::class, 'status_id', 'status_id');
     }
 
-    public function urgency(): BelongsTo
-    {
-        return $this->belongsTo(UrgencyLevel::class, 'urgency_id', 'urgency_id');
-    }
-
     public function evacuationCenter(): BelongsTo
     {
         return $this->belongsTo(EvacuationCenter::class, 'evacuation_center_id', 'evacuation_center_id');
@@ -82,3 +77,4 @@ class ResourceRequest extends Model
         return $this->hasMany(RequestValidation::class, 'request_id', 'request_id');
     }
 }
+

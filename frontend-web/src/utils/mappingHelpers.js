@@ -1,33 +1,35 @@
+import { statusColor } from './statusPalette'
 export const markerGroups = {
   green: {
-    label: 'Safe or evacuated',
-    color: '#3a7d57',
+    label: 'Safe',
+    color: statusColor('safe'),
   },
+  blue: { label: 'Evacuated', color: statusColor('evacuated') },
   red: {
     label: 'Unsafe or needs help',
-    color: '#962020',
+    color: statusColor('unsafe'),
   },
   gray: {
     label: 'Unchecked',
-    color: '#6a7f94',
+    color: statusColor('unchecked'),
   },
 }
 
 export const defaultWorkspace = {
   active_event: null,
   barangay: {
-    name: 'Barangay Mambaling',
+    name: 'Shared database map',
     center: {
-      latitude: 10.2922,
-      longitude: 123.8763,
+      latitude: null,
+      longitude: null,
     },
-    bounds: [
-      [10.2820, 123.8700],
-      [10.2972, 123.8842],
-    ],
+    bounds: null,
+    boundary: null,
+    boundary_source: null,
     zoom: 17,
     tile_provider: 'OpenStreetMap Standard',
     tile_url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    basemaps: {},
   },
   summary: {
     gps_tagged_households: 0,
@@ -37,17 +39,14 @@ export const defaultWorkspace = {
   },
   filters: {
     puroks: [],
-    statuses: [
-      { key: 'all', label: 'All GPS-verified statuses' },
-      { key: 'green', label: 'Green - safe / evacuated / checked' },
-      { key: 'red', label: 'Red - unsafe / missing / injured' },
-      { key: 'gray', label: 'Grey - unchecked' },
-    ],
+    statuses: [],
   },
   households: [],
   evacuation_sites: [],
   rescue_teams: [],
   dispatch_routes: [],
+  rescue_offices: [],
+  hazard_layers: [],
   map_rules: [],
 }
 
@@ -73,10 +72,12 @@ export function normalizeWorkspaceData(data = {}) {
       puroks: Array.isArray(data?.filters?.puroks) ? data.filters.puroks : defaultWorkspace.filters.puroks,
       statuses: Array.isArray(data?.filters?.statuses) ? data.filters.statuses : defaultWorkspace.filters.statuses,
     },
+    hazard_layers: Array.isArray(data?.hazard_layers) ? data.hazard_layers : [],
     households: Array.isArray(data?.households) ? data.households : [],
     evacuation_sites: Array.isArray(data?.evacuation_sites) ? data.evacuation_sites : [],
     rescue_teams: Array.isArray(data?.rescue_teams) ? data.rescue_teams : [],
     dispatch_routes: Array.isArray(data?.dispatch_routes) ? data.dispatch_routes : [],
+    rescue_offices: Array.isArray(data?.rescue_offices) ? data.rescue_offices : [],
   }
 }
 
@@ -105,7 +106,8 @@ export function isHouseholdRouteAllowed(household) {
 
 export function defaultRules() {
   return [
-    { color: 'green', title: 'Green marker', text: 'Safe, evacuated, or checked household with GPS coordinates.' },
+    { color: 'green', title: 'Green marker', text: 'Safe or checked household with GPS coordinates.' },
+    { color: 'blue', title: 'Blue marker', text: 'Evacuated household with GPS coordinates.' },
     { color: 'red', title: 'Red marker', text: 'Unsafe, missing, injured, or needs-help household with GPS coordinates.' },
     { color: 'gray', title: 'Grey marker', text: 'Unchecked household with GPS coordinates.' },
     { color: 'hidden', title: 'No coordinates, no marker', text: 'Households without latitude and longitude stay hidden from the map.' },

@@ -554,7 +554,7 @@
 
 /* Reference workspace geometry and compact archive treatment. */
 .main:has(.archive-page) {
-  top: var(--topbar-height, var(--header-height)) !important;
+  top: var(--topbar-offset, var(--topbar-height, var(--header-height))) !important;
   padding: 0 !important;
 }
 

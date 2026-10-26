@@ -159,17 +159,12 @@ export function ResourceRequestScreen({
       return;
     }
 
-    if (!isPersonnelRequest && (!Number.isInteger(quantityValue) || quantityValue < 1)) {
+    if (!Number.isInteger(quantityValue) || quantityValue < 1) {
       Alert.alert('Invalid quantity', 'Quantity must be a whole number greater than zero.');
       return;
     }
 
-    if (isPersonnelRequest && (!Number.isInteger(personnelCountValue) || personnelCountValue < 1)) {
-      Alert.alert('Invalid personnel count', 'Enter the whole number of rescuers needed.');
-      return;
-    }
-
-    if (!isPersonnelRequest && !cleanUnit) {
+    if (!cleanUnit) {
       Alert.alert('Missing unit', 'Enter the unit, such as packs, kits, liters, or persons.');
       return;
     }
@@ -406,32 +401,38 @@ export function ResourceRequestScreen({
           </View>
         </Modal>
 
-        {isPersonnelRequest && (
-          <TextInput
-            style={styles.input}
-            value={cluster}
-            onChangeText={setCluster}
-            placeholder="Purok or cluster"
-            placeholderTextColor="#7d8da0"
-          />
-        )}
-
         {isPersonnelRequest ? (
           <>
             <TextInput
               style={styles.input}
-              value={resourceType}
-              onChangeText={setResourceType}
-              placeholder="Type of rescuer needed"
+              value={cluster}
+              onChangeText={setCluster}
+              placeholder="Purok or cluster"
               placeholderTextColor="#7d8da0"
             />
+
+            <View style={styles.twoColumn}>
+              <TextInput
+                style={[styles.input, styles.flexInput]}
+                value={resourceType}
+                onChangeText={setResourceType}
+                placeholder="Need type"
+                placeholderTextColor="#7d8da0"
+              />
+              <TextInput
+                style={[styles.input, styles.flexInput]}
+                value={itemName}
+                onChangeText={setItemName}
+                placeholder="Role or position"
+                placeholderTextColor="#7d8da0"
+              />
+            </View>
 
             <QuantityStepper
               value={personnelCount}
               onChange={setPersonnelCount}
               placeholder="Number of personnel needed"
             />
-
           </>
         ) : (
           <>
@@ -462,7 +463,6 @@ export function ResourceRequestScreen({
                 placeholderTextColor="#7d8da0"
               />
             </View>
-
           </>
         )}
 

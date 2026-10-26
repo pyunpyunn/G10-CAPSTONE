@@ -16,6 +16,9 @@ web-build/
 public/build/
 public/hot
 
+# Generated offline map data
+data/
+
 # Laravel runtime files
 backend-laravel/storage/*.key
 backend-laravel/storage/logs/*.log

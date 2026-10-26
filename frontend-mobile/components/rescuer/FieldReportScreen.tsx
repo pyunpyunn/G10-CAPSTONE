@@ -64,7 +64,10 @@ export function FieldReportScreen({
   const [submitError, setSubmitError] = useState('');
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const idempotencyKey = useRef(`field-report-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  const householdHeadName = members.find((member) => member.isHouseholdHead)?.name || household?.household_name || '';
+  const householdHeadName = household?.household_head_name
+    || members.find((member) => member.isHouseholdHead)?.name
+    || household?.household_name
+    || '';
   const householdAddress = household?.address || household?.location?.label || household?.purok || '';
   const membersAssessed = members.length > 0 && members.every((member) => Boolean(member.condition));
   const canShowReportDetails = membersAssessed
@@ -384,7 +387,7 @@ export function FieldReportScreen({
           <EmptyState icon="document-text-outline" title="No field reports yet" />
         ) : (
           reports.map((report) => (
-            <View key={report.status_log_id} style={styles.reportRow}>
+            <View key={report.report_id || report.status_log_id} style={styles.reportRow}>
               <View style={styles.reportIcon}>
                 <Ionicons name="document-text-outline" size={18} color={palette.navActive} />
               </View>
@@ -468,6 +471,47 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 14,
     fontWeight: '700',
+  },
+  selectedOption: {
+    borderColor: palette.navActive,
+    backgroundColor: palette.navActive,
+  },
+  sectionLabel: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  helperText: {
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  errorText: {
+    color: palette.unsafe,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  successText: {
+    color: palette.safe,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  householdSummary: {
+    gap: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: palette.navActive,
+    paddingLeft: spacing.md,
+  },
+  householdName: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  memberCard: {
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    paddingTop: spacing.md,
   },
   input: {
     minHeight: 46,

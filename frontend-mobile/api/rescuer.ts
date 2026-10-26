@@ -1,4 +1,6 @@
 import { api } from './client';
+import { submitReport } from './reportSubmission';
+import { cachedMobileRead } from '@/utils/mobileReadCache';
 
 export type RescuerOverview = {
   profile: {
@@ -13,21 +15,25 @@ export type RescuerOverview = {
     urgent_assignments: number;
   };
   assignments: any[];
+  evacuation_centers: any[];
   field_reports: any[];
   resource_requests: any[];
   status_options: any[];
   category_options: any[];
 };
 
-export async function getRescuerOverview() {
-  const response = await api.get<{ data: RescuerOverview }>('/rescuer/overview');
-  return response.data.data;
+export async function getRescuerOverview(refresh = false) {
+  return cachedMobileRead('rescuer/overview', async () => {
+    const response = await api.get<{ data: RescuerOverview }>('/rescuer/overview');
+    return response.data.data;
+  }, refresh);
 }
 
 export async function getAssignedHousehold(assignmentId: number) {
   const response = await api.get(`/rescuer/assignments/${assignmentId}/household`);
   return response.data.data;
 }
+
 
 export async function getRescuerProfile() {
   const response = await api.get('/rescuer/profile');
@@ -44,7 +50,7 @@ export async function updateAssignmentStatus(
   status: string,
   payload: any = {}
 ) {
-  const response = await api.patch(`/rescuer/assignments/${assignmentId}/status`, {
+  const response = await submitReport('patch', `/rescuer/assignments/${assignmentId}/status`, {
     status,
     ...payload,
   });
@@ -58,12 +64,12 @@ export async function sendAssignmentLocation(assignmentId: number, payload: any)
 }
 
 export async function createFieldReport(payload: any) {
-  const response = await api.post('/rescuer/field-reports', payload);
+  const response = await submitReport('post', '/rescuer/field-reports', payload);
   return response.data;
 }
 
 export async function createResourceRequest(payload: any) {
-  const response = await api.post('/rescuer/resource-requests', payload);
+  const response = await submitReport('post', '/rescuer/resource-requests', payload);
   return response.data;
 }
 

@@ -11,8 +11,9 @@ function getApiBaseUrl() {
       const parsedUrl = new URL(configuredUrl)
 
       if (!isLocalBrowser && ['localhost', '127.0.0.1', '0.0.0.0'].includes(parsedUrl.hostname)) {
-        parsedUrl.hostname = browserHost
-        return parsedUrl.toString().replace(/\/$/, '')
+        // A LAN browser cannot reach the developer machine's loopback-only
+        // Laravel listener. Vite proxies this same-origin path during development.
+        return parsedUrl.pathname.replace(/\/$/, '')
       }
 
       return configuredUrl
@@ -22,7 +23,7 @@ function getApiBaseUrl() {
   }
 
   if (!isLocalBrowser) {
-    return `${window.location.protocol}//${browserHost}:8000/api/v1`
+    return '/api/v1'
   }
 
   return 'http://127.0.0.1:8000/api/v1'
@@ -47,8 +48,28 @@ api.interceptors.request.use((config) => {
 })
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const method = String(response.config?.method || 'get').toLowerCase()
+    const path = response.config?.url || ''
+    if (['post', 'patch', 'put', 'delete'].includes(method)
+      && (/^\/(dispatches|resource-requests)(\/|$)/.test(path)
+        || /^\/disaster-events\/[^/]+\/broadcasts?$/.test(path))) {
+      window.dispatchEvent(new Event('notifications:changed'))
+    }
+    if (['post', 'patch', 'put', 'delete'].includes(method) && /^\/(rescuers|headquarters-accounts)(\/|$)/.test(path)) {
+      window.dispatchEvent(new Event('personnel-access:changed'))
+    }
+    if (['post', 'patch', 'put', 'delete'].includes(method)
+      && (/^\/(households|household|dispatches|broadcast|disaster-events|trusted-households|members)(\/|$)/.test(path)
+        || path === '/dashboard/active-event/close')) {
+      window.dispatchEvent(new Event('rescue-criteria:changed'))
+    }
+    return response
+  },
   (error) => {
+    if ([401, 403].includes(error.response?.status) && !String(error.config?.url || '').startsWith('/auth/')) {
+      window.dispatchEvent(new Event('personnel-access:changed'))
+    }
     if (error.code === 'ECONNABORTED' || String(error.message || '').toLowerCase().includes('timeout')) {
       error.friendlyMessage = 'The server took too long to respond. Please check if Laravel and the shared database are running, then try again.'
     }

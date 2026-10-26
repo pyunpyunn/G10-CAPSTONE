@@ -1,17 +1,28 @@
-# EAS Build is only for frontend-mobile.
-# Keep backend/web/docs out of the upload so Laravel symlinks and local files do not break the mobile build archive.
-backend-laravel/
-frontend-web/
-docs/
-FOR DEV/
-prototype/
-.dist/
-.sixth/
-
-# Local/generated files
-.git/
-.expo/
-node_modules/
+# EAS builds only the mobile app in this repository.
+/*
+!/.easignore
+!/frontend-mobile
+node_modules
+.git
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.key
+*.pem
+*.p8
+*.p12
+*.mobileprovision
 *.log
-*.docx
-*.zip
+/frontend-mobile/android
+/frontend-mobile/ios
+/frontend-mobile/.expo
+/frontend-mobile/.claude
+/frontend-mobile/.vscode
+/frontend-mobile/dist
+/frontend-mobile/dist-release-check
+/frontend-mobile/releases
+/frontend-mobile/tests
+/frontend-mobile/AGENTS.md
+/frontend-mobile/CLAUDE.md

@@ -10,6 +10,46 @@ export async function getRescueTeams() {
   return response.data.data
 }
 
+export async function getWelfareChecks(params = {}) {
+  const response = await api.get('/dispatches/welfare-checks', { params })
+  return response.data
+}
+
+export async function getRescuePriorities(params = {}) {
+  const response = await api.get('/dispatches/priorities', { params })
+  return response.data
+}
+
+export async function getPurokPriorities() {
+  const response = await api.get('/dispatches/purok-priorities')
+  return response.data.data
+}
+
+export async function getSitioPriorities() {
+  const response = await api.get('/dispatches/sitio-priorities')
+  return response.data.data
+}
+
+export async function getRescueCriteriaTimeline() {
+  const response = await api.get('/dispatches/criteria-timeline')
+  return response.data.data
+}
+
+export async function getRescueCriteriaFeed(options = {}) {
+  const response = await api.get('/dispatches/criteria-timeline', options)
+  return response.data
+}
+
+export async function getRescuePrioritySettings() {
+  const response = await api.get('/dispatches/priority-settings')
+  return response.data.data
+}
+
+export async function getMemberCheckQueue(params = {}) {
+  const response = await api.get('/dispatches/member-check-queue', { params })
+  return response.data
+}
+
 export async function createDispatch(payload) {
   const response = await api.post('/dispatches', payload)
   return response.data.data
@@ -22,5 +62,20 @@ export async function updateDispatch(assignmentId, payload) {
 
 export async function completeDispatch(assignmentId, payload) {
   const response = await api.post(`/dispatches/${assignmentId}/complete`, payload)
+  return response.data.data
+}
+
+export async function getDispatch(assignmentId) {
+  const response = await api.get(`/dispatches/${assignmentId}`)
+  return response.data.data
+}
+
+export async function getFieldCommunications(params = {}) {
+  const response = await api.get('/dispatches/communications', { params })
+  return response.data.data
+}
+
+export async function getFieldReports(params = {}) {
+  const response = await api.get('/field-reports', { params })
   return response.data.data
 }

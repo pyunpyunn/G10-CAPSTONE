@@ -1,246 +1,117 @@
-import { useEffect, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { completeDispatch, createDispatch, getDispatchDashboard, updateDispatch } from '../api/dispatchApi'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { X, ArrowRight } from 'lucide-react'
+import { completeDispatch, createDispatch, getDispatchDashboard, getDispatch, getSitioPriorities, updateDispatch } from '../api/dispatchApi'
 import DispatchModalForm from '../components/dispatch/DispatchModalForm'
-import LoadingState from '../components/ui/LoadingState'
-import {
-  buildRequestBody,
-  defaultForm,
-  firstAssignmentOption,
-  getSaveMessage,
-} from '../utils/dispatchHelpers'
+import RescueManagementPage from './RescueManagementPage'
+import { useModuleData } from '../utils/useModuleData'
+import { buildDispatchAreaGroups, defaultForm, getSaveMessage, planSelectedAreaResponders, shuffleDispatchItems, splitCoverageHouseholds } from '../utils/dispatchHelpers'
 
 export default function NewDispatchPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [payload, setPayload] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [selectedRiskId, setSelectedRiskId] = useState('')
-  const [assignmentOption, setAssignmentOption] = useState('')
-  const [form, setForm] = useState(defaultForm())
-  const [formError, setFormError] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
-  const editingDispatch = location.state?.dispatch || null
-
+  const { assignmentId } = useParams()
+  const id = assignmentId || location.state?.dispatch?.assignment_id
+  const sitioParam = new URLSearchParams(location.search).get('sitio_id')
+  const initialSitio = /^[1-9]\d*$/.test(sitioParam || '') ? sitioParam : location.state?.selectedSitio?.sitio_id
+  const loader = useCallback(async () => {
+    const [workspace, priorities, detail] = await Promise.all([getDispatchDashboard({ status:'active', per_page:100, ...(initialSitio ? { sitio_id:initialSitio } : {}) }), getSitioPriorities(), id ? getDispatch(id) : null])
+    const groups = buildDispatchAreaGroups(Array.isArray(priorities) ? priorities : [], workspace?.risk_areas || [])
+    return { workspace, groups, detail }
+  }, [id, initialSitio])
+  const { data, error, loading, refresh } = useModuleData(loader, ['dispatch', 'households', 'disasters'])
+  const close = useCallback(() => navigate('/rescue-management'), [navigate])
   useEffect(() => {
-    let ignore = false
-
-    async function loadPage() {
-      setIsLoading(true)
-      setError('')
-
-      try {
-        const data = await getDispatchDashboard({ status: 'all', per_page: 20 })
-        if (!ignore) {
-          setPayload(data)
-        }
-      } catch {
-        if (!ignore) {
-          setError('New dispatch cannot be loaded right now. Please check the backend or database connection.')
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadPage()
-
-    return () => {
-      ignore = true
-    }
-  }, [])
-
-  const teams = payload?.teams || []
-  const responders = payload?.responders || []
-  const riskAreas = payload?.risk_areas || []
-  const hasActiveEvent = Boolean(payload?.active_event)
-
-  useEffect(() => {
-    if (!payload || isInitialized) {
-      return
-    }
-
-    const selectedHousehold = location.state?.selectedHousehold
-    const selectedTeam = location.state?.team
-    const existingDispatch = editingDispatch
-    const selectedAreaName = selectedHousehold?.purok || existingDispatch?.assigned_area
-    const matchingArea = selectedAreaName
-      ? riskAreas.find((area) => {
-          const areaName = String(area.area_name || '').toLowerCase()
-          const targetArea = String(selectedAreaName || '').toLowerCase()
-          return areaName === targetArea || targetArea.includes(areaName) || areaName.includes(targetArea)
-        })
-      : null
-    const firstHousehold = matchingArea?.households?.find((household) => household.household_id === existingDispatch?.household_id)
-      || (matchingArea ? firstDispatchableHousehold(matchingArea) : null)
-    const teamOption = existingDispatch?.team_id
-      ? `team:${existingDispatch.team_id}`
-      : selectedTeam?.team_id && selectedTeam.is_available
-      ? `team:${selectedTeam.team_id}`
-      : selectedTeam?.available_responder_id
-        ? `responder:${selectedTeam.available_responder_id}`
-        : firstAssignmentOption(teams)
-
-    setAssignmentOption(teamOption)
-    setSelectedRiskId(matchingArea?.id || '')
-    setForm({
-      ...defaultForm(),
-      target_household: selectedHousehold || firstHousehold,
-      assigned_area: matchingArea?.area_name || selectedHousehold?.purok || existingDispatch?.assigned_area || '',
-      household_id: selectedHousehold?.household_id || selectedHousehold?.id || firstHousehold?.household_id || existingDispatch?.household_id || '',
-      households_to_cover: matchingArea?.to_cover || (selectedHousehold ? 1 : existingDispatch?.households_to_cover || 0),
-      priority_level: selectedHousehold?.priority_level || matchingArea?.priority || existingDispatch?.priority_level || 'high',
-      status: existingDispatch?.status?.key || 'dispatched',
-      selected_responder_ids: existingDispatch?.selected_responder_ids || [],
-      responder_count: existingDispatch?.responder_count || 1,
-      dispatch_notes: existingDispatch?.dispatch_notes || '',
-      route_notes: existingDispatch?.route_notes || '',
-      safe_count: existingDispatch?.outcomes?.safe || 0,
-      evacuated_count: existingDispatch?.outcomes?.evacuated || 0,
-      unsafe_count: existingDispatch?.outcomes?.unsafe || 0,
-      pending_count: existingDispatch?.outcomes?.pending || 0,
-      outcome_notes: existingDispatch?.outcomes?.notes || '',
-    })
-    setIsInitialized(true)
-  }, [location.state, payload, riskAreas, teams, isInitialized, editingDispatch])
-
-  function selectRiskArea(area) {
-    const firstHousehold = firstDispatchableHousehold(area)
-
-    setSelectedRiskId(area.id)
-    setForm((current) => ({
-      ...current,
-      assigned_area: area.area_name,
-      household_id: firstHousehold?.household_id || '',
-      households_to_cover: area.to_cover,
-      safe_count: area.safe_households || 0,
-      unsafe_count: area.unsafe_households || 0,
-      pending_count: area.unchecked_households || 0,
-      priority_level: area.priority,
-    }))
-  }
-
-  function selectRiskHousehold(area, household) {
-    setSelectedRiskId(area.id)
-    setForm((current) => ({
-      ...current,
-      assigned_area: area.area_name,
-      household_id: household.household_id,
-      target_household: household,
-      households_to_cover: Math.max(1, current.households_to_cover || area.to_cover || 1),
-      priority_level: household.priority_level || area.priority || current.priority_level,
-    }))
-  }
-
-  async function submitDispatch(event) {
-    event.preventDefault()
-    setFormError('')
-
-    if (!hasActiveEvent) {
-      setFormError('Dispatch assignment requires an active disaster event.')
-      return
-    }
-
-    if (!assignmentOption) {
-      setFormError('Select an available team first.')
-      return
-    }
-
-    if (!form.assigned_area.trim()) {
-      setFormError('Assigned area is required.')
-      return
-    }
-
-    if (!form.household_id) {
-      setFormError('Select a household with GPS from the affected area list. This is required for routed dispatch.')
-      return
-    }
-
-    if (!form.selected_responder_ids || form.selected_responder_ids.length === 0) {
-      setFormError('Select at least one available responder from the selected team.')
-      return
-    }
-
-    setIsSaving(true)
-
-    try {
-      const requestBody = buildRequestBody(assignmentOption, form)
-      if (editingDispatch && form.status === 'completed') {
-        await completeDispatch(editingDispatch.assignment_id, requestBody)
-      } else if (editingDispatch) {
-        await updateDispatch(editingDispatch.assignment_id, requestBody)
-      } else {
-        await createDispatch(requestBody)
-      }
-      navigate('/dispatch', { replace: true })
-    } catch (saveError) {
-      setFormError(getSaveMessage(saveError))
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  if (isLoading) {
-    return <main className="ops-page new-dispatch-page"><LoadingState /></main>
-  }
-
-  return (
-    <main className="ops-page new-dispatch-page">
-      <header className="household-status-page-header dispatch-page-header">
-        <div className="new-dispatch-header-row">
-          <div className="household-status-header-copy">
-            <h1>{editingDispatch ? 'Update dispatch' : 'New dispatch'}</h1>
-          </div>
-          <button className="new-dispatch-back" type="button" onClick={() => navigate('/dispatch')}>
-            <ArrowLeft size={16} />
-            Back to dispatch
-          </button>
-        </div>
-      </header>
-
-      {error && <div className="form-error">{error}</div>}
-      {!hasActiveEvent && (
-        <div className="standby-strip">
-          <strong>No active disaster event</strong>
-          <span>New dispatch assignments are disabled until HQ/Admin declares an active event.</span>
-        </div>
-      )}
-
-      <section className="new-dispatch-shell" aria-label="New dispatch form">
-        <DispatchModalForm
-          editingDispatch={editingDispatch}
-          form={form}
-          setForm={setForm}
-          formError={formError}
-          assignmentOption={assignmentOption}
-          setAssignmentOption={setAssignmentOption}
-          teams={teams}
-          responders={responders}
-          riskAreas={riskAreas}
-          selectedRiskId={selectedRiskId}
-          onSelectRiskArea={selectRiskArea}
-          onSelectRiskHousehold={selectRiskHousehold}
-          onSubmit={submitDispatch}
-          showOutcomeUpdate={Boolean(editingDispatch)}
-        />
-        <div className="new-dispatch-actions">
-          <button className="btn btn-secondary" type="button" disabled={isSaving} onClick={() => navigate('/dispatch')}>Cancel</button>
-          <button className="btn btn-primary" type="submit" form="dispatchForm" disabled={isSaving || !hasActiveEvent}>
-            {isSaving ? 'Saving...' : editingDispatch ? 'Save update' : 'Dispatch responders'}
-          </button>
-        </div>
-      </section>
-    </main>
-  )
+    const keyboard = (event) => { if (event.key === 'Escape' && !document.querySelector('.detail-overlay')) close() }
+    document.addEventListener('keydown', keyboard)
+    return () => document.removeEventListener('keydown', keyboard)
+  }, [close])
+  return <><RescueManagementPage />{createPortal(<div className="ro-reference ro-overlay" onClick={(event) => { if (event.currentTarget === event.target) close() }}>
+    {loading || error ? <div className="md"><div className="mh2"><h3>{id ? 'Update Dispatch' : 'New Dispatch'}</h3><span className="sp" /><button className="x" type="button" aria-label="Close assignment editor" onClick={close}><X size={16} /></button></div><div className="as">{loading ? <div className="empty-reference">Loading assignment…</div> : <div className="form-error" role="alert">{error}<button className="bt" type="button" onClick={refresh}>Retry</button></div>}</div></div>
+      : <AssignmentEditor key={`${id || 'new'}-${location.key}`} workspace={data.workspace} groups={data.groups} detail={data.detail} initialSitio={initialSitio} initialHousehold={location.state?.selectedHousehold} close={close} />}
+  </div>, document.body)}</>
 }
 
-function firstDispatchableHousehold(area) {
-  return area?.recommended_households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
-    || area?.households?.find((household) => household.is_available_for_dispatch && household.has_geotag)
-    || null
+function AssignmentEditor({ workspace, groups, detail, initialSitio, initialHousehold, close }) {
+  const dispatch = detail?.dispatch
+  const [groupId, setGroupId] = useState(initialSitio ? `sitio:${initialSitio}` : groups.find((group) => group.cards.some((card) => card.households?.some((household) => String(household.household_id) === String(initialHousehold?.household_id))))?.id || groups[0]?.id || '')
+  const [selections, setSelections] = useState({})
+  const [teamId, setTeamId] = useState('')
+  const [additionalFor, setAdditionalFor] = useState(null)
+  const [form, setForm] = useState({ ...defaultForm(), status:dispatch?.status?.key || 'dispatched', dispatch_notes:dispatch?.dispatch_notes || '', safe_count:dispatch?.outcomes?.safe || 0, evacuated_count:dispatch?.outcomes?.evacuated || 0, unsafe_count:dispatch?.outcomes?.unsafe || 0, pending_count:dispatch?.outcomes?.pending || 0 })
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const group = groups.find((item) => item.id === groupId)
+  const coverage = workspace?.sitio_coverage?.find(item => String(item.sitio_id) === String(group?.sitio_id))
+  const coverageMissing = !dispatch && Boolean(group?.sitio_id) && !coverage
+  const allowAssignment = !coverageMissing && (!coverage?.is_assigned || (coverage.can_add_team && additionalFor === groupId))
+  const cards = useMemo(() => (group?.cards || []).map(card => {
+    if (!coverage) return card
+    const eligible = new Set(coverage.dispatchable_household_ids)
+    const households = (card.households || []).filter(household => eligible.has(household.household_id) && household.is_available_for_dispatch)
+    return { ...card, households, total_households: households.length }
+  }), [group, coverage])
+  const plans = useMemo(() => planSelectedAreaResponders(cards, selections, workspace?.responders || [], teamId), [cards, selections, workspace, teamId])
+  const householdPlans = useMemo(() => Object.fromEntries(cards.filter((card) => plans[card.id]).map((card) => [card.id, Object.fromEntries(splitCoverageHouseholds(shuffleDispatchItems((card.households || []).filter((household) => household.is_available_for_dispatch)), plans[card.id].length).map((items, index) => [plans[card.id][index].responder_id, items.map((household) => household.household_id)]))])), [cards, plans])
+  const selected = cards.filter((card) => selections[card.id]?.some(Boolean))
+  const closed = ['completed','cancelled'].includes(dispatch?.status?.key)
+  const canDispatch = Boolean(workspace?.active_event && allowAssignment && selected.length && selected.every((card) => plans[card.id] && card.households?.some((household) => household.is_available_for_dispatch)))
+  function autoAssign() {
+    const teams = (workspace.teams || []).filter((team) => (workspace.responders || []).some((member) => member.is_available && String(member.team_id) === String(team.team_id)))
+    const chosenTeam = teamId || String(shuffleDispatchItems(teams)[0]?.team_id || '')
+    if (!chosenTeam) { setError('No team has available rescuers.'); return }
+    const available = shuffleDispatchItems((workspace.responders || []).filter((member) => member.is_available && String(member.team_id) === chosenTeam))
+    const next = {}
+    const eligibleCards = cards.filter((card) => card.households?.some((household) => household.is_available_for_dispatch))
+    // Cover as many puroks as possible before assigning a second rescuer.
+    for (const card of shuffleDispatchItems(eligibleCards)) {
+      if (available.length) next[card.id] = [String(available.shift().responder_id)]
+    }
+    for (const card of shuffleDispatchItems(eligibleCards)) {
+      if (next[card.id] && available.length && card.households.filter((household) => household.is_available_for_dispatch).length > 1) next[card.id].push(String(available.shift().responder_id))
+    }
+    setTeamId(chosenTeam)
+    setSelections(next)
+    setError('')
+  }
+  async function syncOutcomes() {
+    setError('');setSyncing(true)
+    try {
+      const response = await getDispatch(dispatch.assignment_id)
+      if (!response?.report_outcomes) throw new Error('Field report outcomes are currently unavailable.')
+      if (!response.report_outcomes.report_count) throw new Error('No saved field reports are available for this assignment’s households.')
+      setForm((current) => ({ ...current, ...Object.fromEntries(['safe_count','evacuated_count','unsafe_count','pending_count'].map((key) => [key, Number(response.report_outcomes[key]) || 0])) }))
+    } catch (failure) { setError(failure.response?.data?.message || failure.message || 'Reports could not be synced.') }
+    finally { setSyncing(false) }
+  }
+  async function submit(event) {
+    event.preventDefault();setError('')
+    if (closed || (!dispatch && !canDispatch)) return
+    setSaving(true)
+    try {
+      if (dispatch) {
+        const body = { status:form.status, dispatch_notes:form.dispatch_notes, safe_count:Number(form.safe_count), evacuated_count:Number(form.evacuated_count), unsafe_count:Number(form.unsafe_count), pending_count:Number(form.pending_count) }
+        if (form.status === 'completed') await completeDispatch(dispatch.assignment_id, body)
+        else await updateDispatch(dispatch.assignment_id, body)
+      } else {
+        const assignments = selected.map((card) => {
+          const households = card.households.filter((household) => household.is_available_for_dispatch)
+          const members = plans[card.id]
+          return { ...(group.sitio_id ? { sitio_id:Number(group.sitio_id) } : {}), ...(card.purok_id ? { purok_id:Number(card.purok_id) } : {}), team_id:Number(teamId), selected_responder_ids:members.map((member) => member.responder_id), assigned_area:card.area_name, household_id:null, household_ids:households.map((household) => household.household_id), household_groups:members.map((member) => householdPlans[card.id][member.responder_id]), households_to_cover:households.length, responder_count:members.length, dispatch_type:'rescue', priority_level:card.priority || 'high', status:'dispatched', dispatch_notes:'' }
+        })
+        await createDispatch({ assignments })
+      }
+      close()
+    } catch (failure) { setError(getSaveMessage(failure)) }
+    finally { setSaving(false) }
+  }
+  return <div className="md" role="dialog" aria-modal="true" aria-label={dispatch ? 'Update Dispatch Assignment' : 'New Dispatch'}>
+    <div className="mh2"><h3>{dispatch?.assignment_code || 'New Dispatch'}</h3>{dispatch && <div className="ln"><span>Area <b>{dispatch.assigned_area}</b></span><span>Team <b>{dispatch.team_name}</b></span><span>Households <b>{dispatch.households_to_cover}</b></span></div>}<span className="sp" /><button className="x" type="button" disabled={saving} aria-label="Close assignment editor" onClick={close}><X size={16} /></button></div>
+    <form className="editor-form" onSubmit={submit}>
+      <DispatchModalForm editingDispatch={dispatch} groups={groups} group={group} coverage={coverage} sitioCoverage={workspace?.sitio_coverage || []} onAddTeam={() => { setAdditionalFor(groupId); setSelections({}); setTeamId('') }} allowAssignment={allowAssignment} onGroupChange={(id) => { setGroupId(id);setAdditionalFor(null);setTeamId('');setSelections({});setError('') }} selections={selections} teamId={teamId} onTeamChange={(team) => { setTeamId(team);setSelections({});setError('') }} onMemberChange={(id, slot, member) => setSelections((current) => { const members = [...(current[id] || ['',''])];members[slot] = member;return { ...current, [id]:members } })} householdPlans={householdPlans} plans={plans} teams={workspace?.teams || []} responders={workspace?.responders || []} dispatches={workspace?.active_dispatches || []} coveredHouseholds={detail?.covered_households || []} form={form} setForm={setForm} error={error || (coverageMissing ? 'Rescue coverage could not be verified. Refresh before dispatching.' : initialSitio && !group ? 'The selected sitio is unavailable. Select another sitio explicitly to continue.' : '')} saving={saving} closed={closed} syncing={syncing} onSync={syncOutcomes} onAutoAssign={autoAssign} hasActiveEvent={Boolean(workspace?.active_event)} />
+      <div className="mf">{!dispatch && <span className="mu" style={{ marginRight:'auto', alignSelf:'center' }}>{selected.length} puroks · {selected.reduce((sum, card) => sum + (plans[card.id]?.length || 0), 0)} rescuers · {selected.reduce((sum, card) => sum + (card.households || []).filter((household) => household.is_available_for_dispatch).length, 0)} HH</span>}<button className="bt" type="button" disabled={saving} onClick={close}>Cancel</button><button className="bt p" type="submit" disabled={saving || closed || (!dispatch && !canDispatch)}>{saving ? 'Saving…' : dispatch ? 'Save update' : coverage?.is_assigned ? 'Dispatch additional team' : 'Dispatch responders'}<i><ArrowRight size={15} /></i></button></div>
+    </form>
+  </div>
 }

@@ -1,18 +1,11 @@
-export const teamFilters = [
-  { key: 'all', label: 'All' },
-  { key: 'on_scene', label: 'On-scene' },
-  { key: 'dispatched', label: 'Dispatched' },
-  { key: 'standby', label: 'Stand-by' },
-]
-
 export const dispatchStatuses = [
-  { value: 'standby', label: 'Stand-by' },
   { value: 'dispatched', label: 'Assigned / waiting acceptance' },
   { value: 'accepted', label: 'Accepted' },
   { value: 'en_route', label: 'En route' },
   { value: 'on_scene', label: 'On-scene (working)' },
   { value: 'returning', label: 'Returning to base' },
   { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 export const priorityOptions = [
@@ -23,15 +16,12 @@ export const priorityOptions = [
 ]
 
 export function buildRequestBody(option, form) {
-  const selectedResponderIds = Array.isArray(form.selected_responder_ids)
-    ? form.selected_responder_ids.map((id) => Number(id)).filter(Boolean)
-    : []
-
   const body = {
     assigned_area: form.assigned_area,
     household_id: form.household_id || null,
     households_to_cover: Number(form.households_to_cover) || 0,
-    responder_count: selectedResponderIds.length || Number(form.responder_count) || 1,
+    responder_count: Number(form.responder_count) || 1,
+    dispatch_type: form.dispatch_type || 'rescue',
     priority_level: form.priority_level,
     status: form.status,
     dispatch_notes: form.dispatch_notes,
@@ -43,10 +33,6 @@ export function buildRequestBody(option, form) {
     missing_count: Number(form.missing_count) || 0,
     pending_count: Number(form.pending_count) || 0,
     outcome_notes: form.outcome_notes,
-  }
-
-  if (selectedResponderIds.length > 0) {
-    body.selected_responder_ids = selectedResponderIds
   }
 
   const [type, id] = option.split(':')
@@ -76,6 +62,7 @@ export function defaultForm() {
     household_id: '',
     households_to_cover: 0,
     responder_count: 1,
+    dispatch_type: 'rescue',
     selected_responder_ids: [],
     priority_level: 'high',
     status: 'dispatched',
@@ -106,7 +93,7 @@ export function emptySummary() {
     total_teams: 0,
     dispatched: 0,
     on_scene: 0,
-    standby: 0,
+    available: 0,
     completed: 0,
     response_rate: 0,
     active_units: 0,
@@ -139,4 +126,82 @@ export function getSaveMessage(error) {
   }
 
   return data?.message || 'Dispatch could not be saved. Please check the form and try again.'
+}
+
+export function buildDispatchAreaGroups(priorities = [], areas = []) {
+  const used = new Set()
+  const groups = priorities.map((sitio) => {
+    const cards = (sitio.puroks || []).map((purok) => {
+      const matches = areas.filter((area) => area.sitio_id != null && area.purok_id != null && String(area.sitio_id) === String(sitio.sitio_id) && String(area.purok_id) === String(purok.purok_id))
+      matches.forEach((area) => used.add(area.id))
+      const households = matches.flatMap((area) => area.households || [])
+      return { purok_id: purok.purok_id, sitio_id: sitio.sitio_id, id: `purok:${purok.purok_id}`, name: purok.purok_name, area_name: matches[0]?.area_name || `${purok.purok_name}, ${sitio.sitio}`, households, total_households: purok.household_count ?? households.length, priority: matches[0]?.priority || 'monitor' }
+    })
+    for (const area of areas.filter((item) => !used.has(item.id) && String(item.sitio_id) === String(sitio.sitio_id))) {
+      used.add(area.id); cards.push({ ...area, name: area.area_name })
+    }
+    return { sitio_id: sitio.sitio_id, id: `sitio:${sitio.sitio_id}`, name: sitio.sitio, rank: sitio.rank, band: sitio.band, cards }
+  })
+  for (const area of areas.filter((item) => !used.has(item.id))) groups.push({ id: `area:${area.id}`, name: area.area_name, rank: groups.length + 1, band: { label: label(area.priority), key: ['critical','high'].includes(area.priority) ? 'high' : 'low' }, cards: [{ ...area, name: area.area_name }] })
+  return groups
+}
+
+export function planAreaResponders(cards, selections, responders, count = 2) {
+  const available = responders.filter((member) => member.is_available).sort((left, right) => Number(left.last_active_timestamp || 0) - Number(right.last_active_timestamp || 0) || Number(left.responder_id) - Number(right.responder_id))
+  const used = new Set()
+  const plans = {}
+  for (const card of cards) {
+    const teamId = selections[card.id]
+    if (!teamId) continue
+    const selected = available.filter((member) => String(member.team_id) === String(teamId) && !used.has(member.responder_id)).slice(0, count)
+    plans[card.id] = selected.length === count ? selected : null
+    selected.forEach((member) => used.add(member.responder_id))
+  }
+  return plans
+}
+
+export function splitCoverageHouseholds(households, count = 2) {
+  const groups = Array.from({ length: count }, () => [])
+  const weights = Array(count).fill(0)
+  for (const household of [...households].sort((a, b) => Number(b.reported_unsafe_count || 0) - Number(a.reported_unsafe_count || 0))) {
+    const index = weights.indexOf(Math.min(...weights))
+    groups[index].push(household)
+    weights[index] += Number(household.reported_unsafe_count || 0) * 3 + 1
+  }
+  return groups
+}
+
+export function shuffleDispatchItems(items) {
+  const shuffled = [...items]
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const other = Math.floor(Math.random() * (index + 1))
+    ;[shuffled[index], shuffled[other]] = [shuffled[other], shuffled[index]]
+  }
+  return shuffled
+}
+
+export function planSelectedAreaResponders(cards, selections, responders, teamId) {
+  const available = new Map(responders.filter((member) => member.is_available && String(member.team_id) === String(teamId)).map((member) => [String(member.responder_id), member]))
+  const used = new Set()
+  const plans = {}
+  for (const card of cards) {
+    const ids = (selections[card.id] || []).filter(Boolean).map(String)
+    if (!ids.length) continue
+    plans[card.id] = ids.every((id) => available.has(id) && !used.has(id)) && new Set(ids).size === ids.length ? ids.map((id) => available.get(id)) : null
+    ids.forEach((id) => used.add(id))
+  }
+  return plans
+}
+
+export function groupSitioDeployments(priorities, areas, assignments) {
+  const normalize = (value) => String(value || '').trim().toLowerCase()
+  const groups = buildDispatchAreaGroups(priorities, areas)
+  const active = assignments.filter((assignment) => ['dispatched','accepted','en_route','on_scene','onscene','returning'].includes(assignment.status?.key))
+  return priorities.map((sitio) => {
+    const group = groups.find((item) => item.id === `sitio:${sitio.sitio_id}`)
+    const labels = new Set([sitio.sitio, ...(sitio.address_labels || []).map((item) => item.label), ...(group?.cards || []).map((card) => card.area_name)].map(normalize))
+    const households = new Set((group?.cards || []).flatMap((card) => card.households || []).map((household) => String(household.household_id)))
+    const dispatches = active.filter((assignment) => labels.has(normalize(assignment.assigned_area)) || [assignment.household_id, ...(assignment.household_ids || [])].filter(Boolean).some((id) => households.has(String(id))))
+    return { ...sitio, activeDispatches:dispatches }
+  })
 }

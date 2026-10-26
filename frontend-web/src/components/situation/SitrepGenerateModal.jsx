@@ -56,11 +56,11 @@ export default function SitrepGenerateModal({
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="srPreparedBy">Prepared by</label>
-                <input id="srPreparedBy" type="text" value={form.prepared_by} onChange={(event) => setField('prepared_by', event.target.value)} />
+                <input id="srPreparedBy" type="text" value={form.prepared_by} required onChange={(event) => setField('prepared_by', event.target.value)} />
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="srApprovedBy">Reviewed by</label>
-                <input id="srApprovedBy" type="text" value={form.reviewed_by} onChange={(event) => setField('reviewed_by', event.target.value)} />
+                <input id="srApprovedBy" type="text" value={form.reviewed_by} required onChange={(event) => setField('reviewed_by', event.target.value)} />
               </div>
             </div>
             {formError && <div className="form-error sr-form-error">{formError}</div>}

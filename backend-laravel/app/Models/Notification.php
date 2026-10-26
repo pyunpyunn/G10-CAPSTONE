@@ -44,3 +44,5 @@ class Notification extends Model
         return $this->belongsTo(User::class, 'sent_by', 'user_id');
     }
 }
+
+

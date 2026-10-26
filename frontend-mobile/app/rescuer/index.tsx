@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import {
   Alert,
+  AppState,
   Platform,
   Pressable,
   RefreshControl,
@@ -9,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
@@ -37,6 +39,7 @@ import { LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing, typography } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
+import { mountNavigationSync } from '@/utils/navigationRuntime';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 const deviceUuidKey = 'resq_rescuer_device_uuid';
@@ -56,6 +59,7 @@ export default function RescuerHomeScreen() {
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => Platform.OS === 'web' ? undefined : mountNavigationSync(), []);
 
   const loadOverview = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -65,7 +69,7 @@ export default function RescuerHomeScreen() {
     }
 
     try {
-      const data = await getRescuerOverview();
+      const data = await getRescuerOverview(isRefresh);
       setOverview(data);
     } catch (error: any) {
       Alert.alert('Unable to load rescuer data', errorMessage(error));
@@ -74,6 +78,14 @@ export default function RescuerHomeScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  useEffect(() => {
+    const removeBroadcast = onDisasterBroadcast(() => { void loadOverview(true); });
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void loadOverview(true);
+    });
+    return () => { removeBroadcast(); subscription.remove(); };
+  }, [loadOverview]);
 
   useEffect(() => {
     loadOverview();
@@ -121,8 +133,10 @@ export default function RescuerHomeScreen() {
   );
 
   async function handleLogout() {
-    await logoutMobile();
-    router.replace('/' as Href);
+    try {
+      await logoutMobile();
+      router.replace('/' as Href);
+    } catch (error: any) { Alert.alert('Unable to log out', errorMessage(error)); }
   }
 
   async function handleStatusChange(assignmentId: number, status: string) {
@@ -137,14 +151,7 @@ export default function RescuerHomeScreen() {
       );
 
       if (!hasSubmittedFieldReport) {
-        Alert.alert(
-          'Field report required',
-          'Submit the household field report before completing this assignment.',
-          [
-            { text: 'Fill report', onPress: () => openReport(assignment) },
-            { text: 'Cancel', style: 'cancel' },
-          ],
-        );
+        openReport(assignment);
         return;
       }
       setSelectedAssignment(assignment);
@@ -287,6 +294,7 @@ export default function RescuerHomeScreen() {
       return (
         <RescueMapScreen
           assignments={assignments}
+          evacuationCenters={overview.evacuation_centers || []}
           activeAssignment={activeAssignment}
           selectedAssignment={selectedAssignment}
           onSendLocation={handleSendLocation}
@@ -325,7 +333,7 @@ export default function RescuerHomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
       <RescuerHeader
         onOpenRadio={() => setActiveTab('radio')}
       />
@@ -343,6 +351,11 @@ export default function RescuerHomeScreen() {
           />
         }
       >
+        {Platform.OS !== 'web' && <Pressable style={{ padding: 16, backgroundColor: '#e8f1ff', borderRadius: 12 }}
+          onPress={() => router.push({ pathname: '/rescuer/navigation' as any,
+            params: { dispatchId: String(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || '') } })}>
+          <Text style={{ color: '#1358a4', fontWeight: '700' }}>View directions / Offline navigation</Text>
+        </Pressable>}
         {renderContent()}
       </ScrollView>
 

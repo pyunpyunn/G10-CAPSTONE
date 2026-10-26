@@ -34,3 +34,13 @@ export async function returnResourceRequest(requestId, payload) {
   const response = await api.post(`/resource-requests/${requestId}/return`, payload)
   return response.data.data
 }
+
+export async function getResourceRequestTypes(params = {}) {
+  const response = await api.get('/resource-request-types', { params })
+  return response.data.data
+}
+
+export async function createResourceRequestType(payload) {
+  const response = await api.post('/resource-request-types', payload)
+  return response.data
+}

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Presenters\UserRolePresenter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,9 +10,12 @@ class UserResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        if (!$this->resource->exists && !$this->resource->relationLoaded('role')) $this->resource->setRelation('role', null);
+        else $this->resource->loadMissing('role');
         $loadedRole = $this->resource->relationLoaded('role') ? $this->resource->getRelation('role') : null;
-        $roleKey = method_exists($this->resource, 'roleKey') ? $this->resource->roleKey() : $loadedRole?->role_key;
-        $roleName = method_exists($this->resource, 'roleName') ? $this->resource->roleName() : $loadedRole?->role_name;
+        $roles = app(UserRolePresenter::class);
+        $roleKey = $roles->key($loadedRole, $this->resource->getAttributes());
+        $roleName = $roles->name($loadedRole, $this->resource->getAttributes(), $roleKey);
 
         return [
             'user_id' => $this->user_id ?? $this->id,
@@ -24,11 +28,21 @@ class UserResource extends JsonResource
             'assigned_center_id' => $this->assigned_center_id,
             'household_id' => $this->household_id,
             'is_active' => (bool) $this->is_active,
+            'is_hqcc_leader' => $this->resource->isHqccLeader(),
+            'permissions' => [
+                'can_manage_hazard_maps' => app(\App\Services\Web\WebAccessPolicy::class)->allows($this->resource, 'geospatial_analytics', 'manage_hazards'),
+                'can_approve_requests' => app(\App\Services\Web\WebAccessPolicy::class)->allows($this->resource, 'resources_requests', 'approve'),
+                'can_manage_personnel' => $this->resource->canManagePersonnel(),
+                'web_modules' => app(\App\Services\Web\WebAccessPolicy::class)->modulesFor($this->resource),
+            ],
             'role' => [
                 'role_id' => $loadedRole?->role_id ?? $roleKey,
                 'role_key' => $roleKey,
+                'assigned_role_key' => $this->resource->assignedRoleKey(),
                 'role_name' => $roleName,
+                'base_role_key' => $loadedRole?->base_role_key,
             ],
         ];
     }
 }
+

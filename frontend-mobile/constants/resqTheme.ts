@@ -4,6 +4,7 @@ export const palette = {
   navHover: '#2a4f72',
   navText: '#e8eef5',
   navMuted: '#a0b4c8',
+  brandRed: '#c72e32',
   page: '#f2f4f7',
   card: '#ffffff',
   secondary: '#edf1f6',
@@ -14,6 +15,7 @@ export const palette = {
   safe: '#3a7d57',
   evacuated: '#2a5a90',
   unsafe: '#962020',
+  unchecked: '#6a7f94',
   warning: '#8f5c18',
   dispatch: '#240e6a',
 };

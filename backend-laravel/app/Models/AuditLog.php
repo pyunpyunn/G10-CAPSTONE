@@ -24,6 +24,7 @@ class AuditLog extends Model
         'new_values',
         'ip_address',
         'user_agent',
+        'created_at',
     ];
 
     protected function casts(): array
@@ -40,3 +41,5 @@ class AuditLog extends Model
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 }
+
+

@@ -9,12 +9,16 @@ export const statusFilters = [
 ]
 
 export function makeProgress(summary) {
-  return [
-    { label: 'Safe only', percent: percent(summary.safe_only, summary.total), className: 'safe' },
-    { label: 'Evacuated', percent: percent(summary.evacuated, summary.total), className: 'evacuated' },
-    { label: 'Unsafe', percent: percent(summary.unsafe, summary.total), className: 'unsafe' },
-    { label: 'Unchecked', percent: percent(summary.unchecked, summary.total), className: 'unchecked' },
+  const total = Math.max(0, Number(summary.total) || 0)
+  const values = [
+    { label: 'Safe only', count: Number(summary.safe_only) || 0, className: 'safe' },
+    { label: 'Evacuated', count: Number(summary.evacuated) || 0, className: 'evacuated' },
+    { label: 'Unsafe', count: Number(summary.unsafe) || 0, className: 'unsafe' },
+    { label: 'Unchecked', count: Number(summary.unchecked) || 0, className: 'unchecked' },
   ]
+  const remaining = Math.max(0, total - values.reduce((sum, item) => sum + item.count, 0))
+  if (remaining > 0) values.push({ label: 'Other reported', count: remaining, className: 'other' })
+  return values.map((item) => ({ ...item, percent: total > 0 ? Math.round(item.count / total * 1000) / 10 : 0, width: total > 0 ? item.count / total * 100 : 0 }))
 }
 
 export function percent(value, total) {

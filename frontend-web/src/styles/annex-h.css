@@ -1,0 +1,494 @@
+.annex-h-view-switch {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 4px;
+  border: 1px solid #d7dee8;
+  border-radius: 9px;
+  background: #f5f7fa;
+  width: fit-content;
+}
+
+.annex-h-view-switch button {
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #52657a;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.annex-h-view-switch button.on {
+  background: #fff;
+  color: #173a60;
+  box-shadow: 0 1px 3px rgb(15 28 45 / 12%);
+}
+
+.annex-h-view-switch button:focus-visible {
+  outline: 2px solid #2a5a90;
+  outline-offset: 2px;
+}
+
+.annex-h-page {
+  display: grid;
+  gap: 14px;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 20px clamp(14px, 2vw, 28px) 32px;
+  color: #0f1c2d;
+}
+
+.annex-h-page-head,
+.annex-h-command-heading,
+.annex-h-node-heading,
+.annex-h-selected-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.annex-h-page-head h1,
+.annex-h-command h2,
+.annex-h-level-label h2,
+.annex-h-node-heading h2,
+.annex-h-selected h2 {
+  margin: 2px 0;
+  color: #0f1c2d;
+}
+
+.annex-h-page-head h1 {
+  font-size: clamp(22px, 3vw, 30px);
+}
+
+.annex-h-page-head p,
+.annex-h-command-heading p,
+.annex-h-unclassified > p {
+  margin: 4px 0 0;
+  color: #52657a;
+}
+
+.annex-h-eyebrow,
+.annex-h-level,
+.annex-h-rank {
+  color: #536a82;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.annex-h-policy-note {
+  padding: 12px 16px;
+  border: 1px solid #b8cce0;
+  border-left: 4px solid #2a5a90;
+  border-radius: 10px;
+  background: #edf4fb;
+  color: #203950;
+  line-height: 1.55;
+}
+
+.annex-h-command,
+.annex-h-committee,
+.annex-h-selected {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #c6d1e0;
+  border-radius: 14px;
+  background: #f7f9fc;
+  box-shadow: 0 2px 8px rgb(15 28 45 / 4%);
+}
+
+.annex-h-command {
+  border-top: 4px solid #0f1c2d;
+}
+
+.annex-h-command-heading {
+  justify-content: flex-start;
+}
+
+.annex-h-command-heading h2,
+.annex-h-level-label h2,
+.annex-h-selected h2 {
+  font-size: 18px;
+}
+
+.annex-h-chair-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.annex-h-chair-card,
+.annex-h-roster-card,
+.annex-h-technical-card {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #cbd6e2;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.annex-h-chair-card {
+  border-color: #b9c8da;
+  background: #f0f4f9;
+}
+
+.annex-h-technical-card {
+  border-color: #ead4ad;
+  background: #fff9ee;
+}
+
+.annex-h-chair-card > b,
+.annex-h-roster-card > b,
+.annex-h-technical-card > b {
+  font-size: 14px;
+}
+
+.annex-h-chair-card small,
+.annex-h-roster-card small,
+.annex-h-technical-card small,
+.annex-h-technical-card > span:last-child {
+  color: #52657a;
+  line-height: 1.45;
+}
+
+.annex-h-level-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 0;
+}
+
+.annex-h-subcommittees {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.annex-h-committee {
+  display: grid;
+  align-content: start;
+  gap: 11px;
+  border-top: 3px solid #2a5a90;
+}
+
+.annex-h-node-heading {
+  align-items: flex-start;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #d7e0ea;
+}
+
+.annex-h-node-heading h2 {
+  font-size: 16px;
+}
+
+.annex-h-count,
+.annex-h-muted {
+  color: #607388;
+  font-size: 12px;
+}
+
+.annex-h-account-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.annex-h-account {
+  display: grid;
+  gap: 2px;
+  min-width: 140px;
+  padding: 7px 10px;
+  border: 1px solid #d2dce7;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.annex-h-account b {
+  font-size: 12px;
+}
+
+.annex-h-account small {
+  color: #607388;
+  font-size: 10px;
+}
+
+.annex-h-team-group {
+  display: grid;
+  gap: 6px;
+}
+
+.annex-h-group-title {
+  color: #41576d;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.annex-h-team {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #cbd6e2;
+  border-radius: 9px;
+  background: #fff;
+  color: #0f1c2d;
+  text-align: left;
+  cursor: pointer;
+}
+
+.annex-h-team:hover,
+.annex-h-team.on {
+  border-color: #2a5a90;
+  background: #edf4fb;
+}
+
+.annex-h-team-missing {
+  border-style: dashed;
+  color: #536a82;
+}
+
+.annex-h-team-missing:hover {
+  border-color: #2a5a90;
+  background: #f0f5fa;
+}
+
+.annex-h-team-nested,
+.annex-h-team-missing.nested {
+  margin-left: 18px;
+  width: calc(100% - 18px);
+  position: relative;
+}
+
+.annex-h-team-nested::before,
+.annex-h-team-missing.nested::before {
+  position: absolute;
+  top: -6px;
+  left: -10px;
+  height: 50%;
+  border-left: 1px solid #9eb2c7;
+  content: '';
+}
+
+.annex-h-team-nested::after,
+.annex-h-team-missing.nested::after {
+  position: absolute;
+  top: 50%;
+  left: -10px;
+  width: 10px;
+  border-top: 1px solid #9eb2c7;
+  content: '';
+}
+
+.annex-h-team:focus-visible,
+.annex-h-page button:focus-visible {
+  outline: 2px solid #2a5a90;
+  outline-offset: 2px;
+}
+
+.annex-h-team > span:first-child,
+.annex-h-member > span:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.annex-h-team b,
+.annex-h-member b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annex-h-team small,
+.annex-h-member small {
+  color: #607388;
+}
+
+.annex-h-status {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: #e5f3eb;
+  color: #276144;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.annex-h-status.off {
+  background: #edf0f4;
+  color: #5a6c7e;
+}
+
+.annex-h-section-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.annex-h-unclassified {
+  border-top-color: #b67a25;
+}
+
+.annex-h-technical {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #ead4ad;
+  border-radius: 10px;
+  background: #fff9ee;
+}
+
+.annex-h-technical > b {
+  color: #684716;
+}
+
+.annex-h-person {
+  display: grid;
+  gap: 1px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+}
+
+.annex-h-person small {
+  color: #607388;
+}
+
+.annex-h-selected {
+  border-top: 3px solid #4a6f92;
+}
+
+.annex-h-selected-head {
+  align-items: flex-start;
+}
+
+.annex-h-selected h2 small {
+  color: #607388;
+  font-size: 12px;
+}
+
+.annex-h-legacy-label {
+  margin: 4px 0 0;
+  color: #607388;
+  font-size: 11px;
+}
+
+.annex-h-selected-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.annex-h-facts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 18px;
+}
+
+.annex-h-facts > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px;
+  border-radius: 8px;
+  background: #eaf0f6;
+  color: #607388;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.annex-h-facts b {
+  overflow-wrap: anywhere;
+  color: #0f1c2d;
+  font-size: 12px;
+  text-transform: none;
+}
+
+.annex-h-selected h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.annex-h-members {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.annex-h-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #d2dce7;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.annex-h-hint {
+  color: #607388;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  .annex-h-subcommittees {
+    grid-template-columns: 1fr;
+  }
+
+  .annex-h-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .annex-h-page {
+    padding: 12px 10px 24px;
+  }
+
+  .annex-h-page-head,
+  .annex-h-node-heading,
+  .annex-h-selected-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .annex-h-page-head > button {
+    align-self: stretch;
+  }
+
+  .annex-h-chair-row,
+  .annex-h-facts,
+  .annex-h-members {
+    grid-template-columns: 1fr;
+  }
+
+  .annex-h-level-label {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .annex-h-command,
+  .annex-h-committee,
+  .annex-h-selected {
+    padding: 12px;
+  }
+}

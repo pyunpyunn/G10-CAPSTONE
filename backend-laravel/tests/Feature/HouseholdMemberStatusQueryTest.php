@@ -2,12 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\Household;
-use App\Repositories\HouseholdRepository;
-use App\Services\HouseholdStatusService;
+use App\Presenters\HouseholdStatusPresenter;
+use App\Queries\HouseholdStatusQuery;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use ReflectionMethod;
 use Tests\TestCase;
 
 class HouseholdMemberStatusQueryTest extends TestCase
@@ -22,15 +20,21 @@ class HouseholdMemberStatusQueryTest extends TestCase
 
     public function test_member_statuses_are_loaded_per_member_for_the_active_disaster_event(): void
     {
-        $service = new HouseholdStatusService(new HouseholdRepository(new Household()));
-        $method = new ReflectionMethod(HouseholdStatusService::class, 'getMembers');
-        $method->setAccessible(true);
-
-        $members = $method->invoke($service, 'hh-1', 'evt-1', collect());
+        $query = new HouseholdStatusQuery(new HouseholdStatusPresenter());
+        $members = $query->getMembers('hh-1', 'evt-1', collect());
 
         $this->assertCount(2, $members);
         $this->assertSame('Safe', $members[0]['status']['label']);
         $this->assertSame('Unsafe', $members[1]['status']['label']);
+    }
+
+    public function test_household_head_is_the_registered_head_and_not_another_family_member(): void
+    {
+        $query = new HouseholdStatusQuery(new HouseholdStatusPresenter());
+        $this->assertSame(['member_id' => 11, 'name' => 'Ana Dela Cruz'], $query->householdHead('hh-1'));
+        $this->assertNull($query->householdHead('missing-household'));
+        DB::table('household_members')->where('member_id', 11)->update(['deleted_at' => now()]);
+        $this->assertNull($query->householdHead('hh-1'));
     }
 
     protected function createMemberStatusTables(): void
@@ -142,3 +146,5 @@ class HouseholdMemberStatusQueryTest extends TestCase
         ]);
     }
 }
+
+

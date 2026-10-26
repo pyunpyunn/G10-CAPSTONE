@@ -58,3 +58,5 @@ class BarangayProfile extends Model
         return $this->belongsTo(User::class, 'configured_by_user_id', 'user_id');
     }
 }
+
+

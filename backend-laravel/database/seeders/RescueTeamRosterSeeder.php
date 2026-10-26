@@ -2,67 +2,67 @@
 
 namespace Database\Seeders;
 
+use Faker\Factory as FakerFactory;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class RescueTeamRosterSeeder extends Seeder
 {
-    private const DEFAULT_PASSWORD = 'password';
-
     private array $teamDefaults = [
-        'SAR' => [
-            'team_name' => 'Search & Rescue',
-            'team_type' => 'SAR',
+        'SRR' => [
+            'team_name' => 'Search, Rescue and Retrieval Team',
+            'team_type' => 'SRR',
             'skills' => 'search and rescue, rope rescue, water rescue, stretcher handling',
             'equipment' => 'PPE, handheld radio, rescue rope, stretcher, rescue vest',
         ],
-        'MED' => [
-            'team_name' => 'Medical / First Aid',
-            'team_type' => 'Medical',
+        'HFAPS' => [
+            'team_name' => 'Health, First Aid and Psychosocial Support Team',
+            'team_type' => 'HFAPS',
             'skills' => 'basic life support, first aid, triage, patient transport',
             'equipment' => 'PPE, first aid kit, trauma kit, BP apparatus, stretcher',
         ],
-        'EVC' => [
-            'team_name' => 'Evacuation',
-            'team_type' => 'Evacuation',
+        'ECM' => [
+            'team_name' => 'Evacuation and Camp Management Team',
+            'team_type' => 'ECM',
             'skills' => 'evacuation assistance, crowd guidance, vulnerable sector support',
             'equipment' => 'PPE, handheld radio, megaphone, flashlight, evacuation checklist',
         ],
-        'LOG' => [
-            'team_name' => 'Relief & Transport',
-            'team_type' => 'Relief / Transport',
+        'RDT' => [
+            'team_name' => 'Relief Distribution Team',
+            'team_type' => 'RDT',
             'skills' => 'relief distribution, vehicle coordination, inventory handling',
             'equipment' => 'PPE, handheld radio, delivery checklist, vehicle access, inventory sheets',
         ],
-        'COM' => [
-            'team_name' => 'Communication',
-            'team_type' => 'Communication',
+        'CWT' => [
+            'team_name' => 'Communication and Warning Team',
+            'team_type' => 'CWT',
             'skills' => 'radio operation, message relay, incident logging',
             'equipment' => 'PPE, handheld radio, charging kit, incident logbook, power bank',
         ],
-        'FIR' => [
-            'team_name' => 'Fire Brigade',
-            'team_type' => 'Fire Brigade',
+        'FMT' => [
+            'team_name' => 'Fire Management Team',
+            'team_type' => 'FMT',
             'skills' => 'fire suppression support, hose handling, scene safety',
             'equipment' => 'PPE, fire extinguisher, hose support kit, helmet, gloves',
         ],
-        'DANA' => [
-            'team_name' => 'DANA',
-            'team_type' => 'Damage Assessment',
+        'RDANA' => [
+            'team_name' => 'Rapid Damage Assessment and Needs Analysis Team',
+            'team_type' => 'RDANA',
             'skills' => 'damage assessment, needs analysis, report writing',
             'equipment' => 'PPE, handheld radio, assessment forms, measuring tape, camera phone',
         ],
-        'SEC' => [
-            'team_name' => 'Security',
-            'team_type' => 'Security',
+        'SST' => [
+            'team_name' => 'Security and Safety Team',
+            'team_type' => 'SST',
             'skills' => 'site security, crowd control, perimeter safety',
             'equipment' => 'PPE, handheld radio, flashlight, whistle, checkpoint logbook',
         ],
     ];
 
     private array $roster = [
-        'SAR' => [
+        'SRR' => [
             ['Miguel', 'A.', 'Reyes', 'M', 'O+', '09170001001', 'Rosa Reyes', '09180001001'],
             ['Vince', 'A.', 'Pacillan', 'M', 'A+', '09170001002', 'Marlon Pacillan', '09180001002'],
             ['Carlo', 'M.', 'Dizon', 'M', 'B+', '09170001003', 'Lorna Dizon', '09180001003'],
@@ -70,7 +70,7 @@ class RescueTeamRosterSeeder extends Seeder
             ['Adrian', 'L.', 'Flores', 'M', 'O-', '09170001005', 'Nestor Flores', '09180001005'],
             ['Jerome', 'P.', 'Salazar', 'M', 'A-', '09170001006', 'Marites Salazar', '09180001006'],
         ],
-        'MED' => [
+        'HFAPS' => [
             ['Vinzon', 'D.', 'Arellano', 'M', 'B+', '09170002001', 'Lilia Arellano', '09180002001'],
             ['Lea', 'M.', 'Santos', 'F', 'O+', '09170002002', 'Noel Santos', '09180002002'],
             ['Mark', 'J.', 'Bautista', 'M', 'A+', '09170002003', 'Cora Bautista', '09180002003'],
@@ -78,7 +78,7 @@ class RescueTeamRosterSeeder extends Seeder
             ['Noel', 'R.', 'Villanueva', 'M', 'O-', '09170002005', 'Teresita Villanueva', '09180002005'],
             ['Patricia', 'G.', 'Ramos', 'F', 'A-', '09170002006', 'Edgar Ramos', '09180002006'],
         ],
-        'EVC' => [
+        'ECM' => [
             ['Hannah', 'P.', 'Garcia', 'F', 'O+', '09170003001', 'Mario Garcia', '09180003001'],
             ['Eric', 'N.', 'Lopez', 'M', 'B+', '09170003002', 'Cecilia Lopez', '09180003002'],
             ['Samuel', 'B.', 'Navarro', 'M', 'A+', '09170003003', 'Mila Navarro', '09180003003'],
@@ -86,7 +86,7 @@ class RescueTeamRosterSeeder extends Seeder
             ['Patrick', 'C.', 'Gonzales', 'M', 'O-', '09170003005', 'Susan Gonzales', '09180003005'],
             ['Liza', 'T.', 'Mercado', 'F', 'A-', '09170003006', 'Rodolfo Mercado', '09180003006'],
         ],
-        'LOG' => [
+        'RDT' => [
             ['Dennis', 'M.', 'Uy', 'M', 'O+', '09170004001', 'Grace Uy', '09180004001'],
             ['Marco', 'V.', 'Tan', 'M', 'B+', '09170004002', 'Aida Tan', '09180004002'],
             ['Abigail', 'S.', 'Cruz', 'F', 'A+', '09170004003', 'Rene Cruz', '09180004003'],
@@ -94,7 +94,7 @@ class RescueTeamRosterSeeder extends Seeder
             ['Janine', 'R.', 'Rivera', 'F', 'O-', '09170004005', 'Victor Rivera', '09180004005'],
             ['Timothy', 'C.', 'Yu', 'M', 'A-', '09170004006', 'Carmen Yu', '09180004006'],
         ],
-        'COM' => [
+        'CWT' => [
             ['Ryan', 'D.', 'Aquino', 'M', 'O+', '09170005001', 'Elvie Aquino', '09180005001'],
             ['Mae', 'L.', 'Castillo', 'F', 'B+', '09170005002', 'Dante Castillo', '09180005002'],
             ['Gabriel', 'T.', 'Serrano', 'M', 'A+', '09170005003', 'Perla Serrano', '09180005003'],
@@ -102,7 +102,7 @@ class RescueTeamRosterSeeder extends Seeder
             ['Nathan', 'C.', 'Villamor', 'M', 'O-', '09170005005', 'Lourdes Villamor', '09180005005'],
             ['Alyssa', 'P.', 'Domingo', 'F', 'A-', '09170005006', 'Ben Domingo', '09180005006'],
         ],
-        'FIR' => [
+        'FMT' => [
             ['Francis', 'L.', 'Aguilar', 'M', 'O+', '09170006001', 'Leticia Aguilar', '09180006001'],
             ['Orlando', 'P.', 'Villacorta', 'M', 'B+', '09170006002', 'Myrna Villacorta', '09180006002'],
             ['Martin', 'J.', 'Enriquez', 'M', 'A+', '09170006003', 'Estrella Enriquez', '09180006003'],
@@ -110,7 +110,7 @@ class RescueTeamRosterSeeder extends Seeder
             ['Joel', 'B.', 'Magbanua', 'M', 'O-', '09170006005', 'Luz Magbanua', '09180006005'],
             ['Bianca', 'R.', 'Manalo', 'F', 'A-', '09170006006', 'Fernando Manalo', '09180006006'],
         ],
-        'DANA' => [
+        'RDANA' => [
             ['Grace', 'N.', 'Velasco', 'F', 'O+', '09170007001', 'Ernesto Velasco', '09180007001'],
             ['Ramon', 'C.', 'Padilla', 'M', 'B+', '09170007002', 'Norma Padilla', '09180007002'],
             ['Nicole', 'F.', 'Abad', 'F', 'A+', '09170007003', 'Hector Abad', '09180007003'],
@@ -118,7 +118,7 @@ class RescueTeamRosterSeeder extends Seeder
             ['Elaine', 'T.', 'Yap', 'F', 'O-', '09170007005', 'Tony Yap', '09180007005'],
             ['Julius', 'R.', 'Ledesma', 'M', 'A-', '09170007006', 'Remedios Ledesma', '09180007006'],
         ],
-        'SEC' => [
+        'SST' => [
             ['Victor', 'P.', 'Cruz', 'M', 'O+', '09170008001', 'Fe Cruz', '09180008001'],
             ['Marina', 'L.', 'Gomez', 'F', 'B+', '09170008002', 'Oscar Gomez', '09180008002'],
             ['Allan', 'D.', 'Villarin', 'M', 'A+', '09170008003', 'Evelyn Villarin', '09180008003'],
@@ -130,43 +130,74 @@ class RescueTeamRosterSeeder extends Seeder
 
     public function run(): void
     {
-        $rescuerRoleId = DB::table('roles')->where('role_key', 'rescuer')->value('role_id');
+        $rescuerRoleId = DB::table('roles')->where('role_key', 'tm')->value('role_id');
+        $leaderRoleId = DB::table('roles')->where('role_key', 'tl')->value('role_id');
 
-        if (! $rescuerRoleId) {
+        if (! $rescuerRoleId || ! $leaderRoleId) {
             $this->command?->warn('Rescuer roster was not seeded because the rescuer role is missing.');
 
             return;
         }
 
-        $mambalingPurokId = DB::table('addresses')
-            ->where('barangay_name', 'Mambaling')
-            ->orderBy('address_id')
-            ->value('address_id');
+        $teamsWereEmpty = ! DB::table('rescue_teams')->exists();
+        $faker = FakerFactory::create('en_PH');
+        $faker->seed(20260929);
 
-        DB::transaction(function () use ($rescuerRoleId, $mambalingPurokId): void {
+        DB::transaction(function () use ($rescuerRoleId, $leaderRoleId, $teamsWereEmpty, $faker): void {
             foreach ($this->teamDefaults as $teamCode => $team) {
-                $teamId = $this->ensureTeam($teamCode, $team, $mambalingPurokId);
-                $leaderResponderId = null;
+                $teamRow = $teamsWereEmpty
+                    ? null
+                    : DB::table('rescue_teams')
+                        ->where(fn ($query) => $query->where('team_code', $teamCode)->orWhere('team_name', $team['team_name']))
+                        ->first();
 
-                foreach ($this->roster[$teamCode] as $index => $person) {
-                    $responderId = $this->ensureResponder($teamCode, $teamId, $person, $index + 1, $rescuerRoleId);
-
-                    if ($index === 0) {
-                        $leaderResponderId = $responderId;
-                    }
+                if (! $teamsWereEmpty && ! $teamRow) {
+                    $this->command?->warn("Roster skipped for {$teamCode}: no matching database team exists.");
+                    continue;
                 }
 
-                DB::table('rescue_teams')
+                $teamId = $teamsWereEmpty
+                    ? $this->ensureTeam($teamCode, $team)
+                    : (int) $teamRow->team_id;
+                $memberCount = DB::table('responders')
                     ->where('team_id', $teamId)
-                    ->update([
-                        'leader_responder_id' => $leaderResponderId,
-                        'updated_at' => now(),
-                    ]);
+                    ->whereNull('deleted_at')
+                    ->count();
+                $sequence = 1;
+                $firstResponderId = null;
+
+                while ($memberCount < 6 && $sequence <= 99) {
+                    $person = $this->randomizedPerson($faker, $teamCode, $sequence);
+                    $responderId = $this->ensureResponder($teamCode, $teamId, $person, $sequence, $rescuerRoleId);
+                    $firstResponderId ??= $responderId;
+                    $memberCount = DB::table('responders')
+                        ->where('team_id', $teamId)
+                        ->whereNull('deleted_at')
+                        ->count();
+                    $sequence++;
+                }
+
+                if ($firstResponderId) {
+                    DB::table('rescue_teams')
+                        ->where('team_id', $teamId)
+                        ->whereNull('leader_responder_id')
+                        ->update([
+                            'leader_responder_id' => $firstResponderId,
+                            'updated_at' => now(),
+                        ]);
+                    $leaderUserId = DB::table('responders')->where('responder_id', $firstResponderId)->value('user_id');
+                    if ($leaderUserId) {
+                        DB::table('users')->where('user_id', $leaderUserId)->update([
+                            'role_id' => $leaderRoleId,
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
             }
         });
     }
 
-    private function ensureTeam(string $teamCode, array $team, ?int $mambalingPurokId): int
+    private function ensureTeam(string $teamCode, array $team): int
     {
         $existing = DB::table('rescue_teams')
             ->where('team_code', $teamCode)
@@ -177,16 +208,10 @@ class RescueTeamRosterSeeder extends Seeder
             'team_code' => $teamCode,
             'team_name' => $team['team_name'],
             'team_type' => $team['team_type'],
-            'assigned_purok_id' => $mambalingPurokId,
             'duty_status' => 'standby',
-            'updated_at' => now(),
         ];
 
         if ($existing) {
-            DB::table('rescue_teams')
-                ->where('team_id', $existing->team_id)
-                ->update($data);
-
             return (int) $existing->team_id;
         }
 
@@ -200,27 +225,41 @@ class RescueTeamRosterSeeder extends Seeder
         return $teamId;
     }
 
+    private function randomizedPerson(object $faker, string $teamCode, int $sequence): array
+    {
+        $person = $this->roster[$teamCode][$sequence - 1];
+        $person[0] = $faker->unique()->firstName();
+        $person[1] = $faker->randomElement(range('A', 'Z')).'.';
+        $person[2] = $faker->unique()->lastName();
+        $person[5] = sprintf('DEMO-%s-%02d', $teamCode, $sequence);
+        $person[6] = $faker->name();
+        $person[7] = sprintf('DEMO-ICE-%s-%02d', $teamCode, $sequence);
+
+        return $person;
+    }
+
     private function ensureResponder(string $teamCode, int $teamId, array $person, int $sequence, int $rescuerRoleId): int
     {
         [$firstName, $middleInitial, $lastName, $gender, $bloodType, $mobile, $iceName, $iceMobile] = $person;
 
-        $accountId = sprintf('BDRRM-%s-%03d', $teamCode, $sequence);
+        $accountId = $teamCode.'-'.str_pad((string) ($this->teamIdBase($teamCode) + $sequence - 1), 4, '0', STR_PAD_LEFT);
         $fullName = trim($firstName.' '.$middleInitial.' '.$lastName);
-        $displayUsername = $this->uniqueDisplayUsername($firstName, $lastName, $accountId);
 
         $existing = DB::table('responders')
             ->where('username', $accountId)
             ->orWhere('responder_code', $accountId)
             ->first();
 
-        $userId = $existing?->user_id ?: 'USR-RESCUER-'.$accountId;
+        $userId = $existing?->user_id ?: 'USR-'.$accountId;
         $existingUser = DB::table('users')->where('user_id', $userId)->first();
+        $passwordHash = Hash::make(Str::random(40));
         $userData = [
             'first_name' => $firstName,
             'last_name' => $lastName,
             'name' => $fullName,
-            'username' => $displayUsername,
-            'email' => strtolower(str_replace(' ', '.', $firstName.'.'.$lastName)).'@resqperation.local',
+            'username' => $accountId,
+            'login_id' => $accountId,
+            'email' => strtolower($accountId).'@example.invalid',
             'role_id' => $rescuerRoleId,
             'contact_number' => $mobile,
             'is_active' => 1,
@@ -233,9 +272,8 @@ class RescueTeamRosterSeeder extends Seeder
         } else {
             DB::table('users')->insert(array_merge($userData, [
                 'user_id' => $userId,
-                'password' => Hash::make(self::DEFAULT_PASSWORD),
+                'password' => $passwordHash,
                 'must_change_password' => 1,
-                'temp_password' => self::DEFAULT_PASSWORD,
                 'created_at' => now(),
             ]));
         }
@@ -243,11 +281,11 @@ class RescueTeamRosterSeeder extends Seeder
         $responderData = [
             'user_id' => $userId,
             'responder_code' => $accountId,
-            'created_by_admin_id' => 'USR-HQ-2024035500',
+            'created_by_admin_id' => null,
             'team_id' => $teamId,
             'username' => $accountId,
             'full_name' => $fullName,
-            'title' => 'Responder',
+            'title' => 'Team Member',
             'contact_number' => $mobile,
             'emergency_contact_name' => $iceName,
             'emergency_contact_number' => $iceMobile,
@@ -278,7 +316,7 @@ class RescueTeamRosterSeeder extends Seeder
 
         DB::table('responders')->insert(array_merge($responderData, [
             'responder_id' => $responderId,
-            'password_hash' => Hash::make(self::DEFAULT_PASSWORD),
+            'password_hash' => $passwordHash,
             'created_at' => now(),
         ]));
 
@@ -294,6 +332,23 @@ class RescueTeamRosterSeeder extends Seeder
         while ($this->displayUsernameExists($username, $accountId)) {
             $username = $base.$counter;
             $counter++;
+        }
+
+        private function teamIdBase(string $teamCode): int
+        {
+            return match ($teamCode) {
+                'SRR' => 1000,
+                'ECM' => 2000,
+                'HFAPS' => 3000,
+                'SST' => 4000,
+                'FMT' => 5000,
+                'RDT' => 6000,
+                'TRT' => 7000,
+                'CLT' => 8000,
+                'RDANA' => 9000,
+                'PDANA' => 10000,
+                default => 11000,
+            };
         }
 
         return $username;

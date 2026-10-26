@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { ActionButton, SectionHeader } from './RescuerUI';
 
@@ -76,7 +76,7 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Edit profile"
-              style={styles.editButton}
+              style={({ pressed }) => [styles.editButton, pressed && styles.editButtonPressed]}
               onPress={() => setIsEditing(true)}
               disabled={saving}
             >
@@ -186,7 +186,15 @@ function ProfileInput({
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
+function InfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+}) {
   return (
     <View style={styles.infoRow}>
       <View style={styles.infoIcon}>
@@ -353,6 +361,10 @@ const styles = StyleSheet.create({
     borderColor: '#ffffff55',
     borderRadius: radius.md,
     backgroundColor: '#ffffff18',
+  },
+  editButtonPressed: {
+    backgroundColor: '#ffffff3d',
+    transform: [{ scale: 0.94 }],
   },
   card: {
     gap: spacing.sm,

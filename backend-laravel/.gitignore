@@ -20,8 +20,10 @@
 /public/hot
 /public/storage
 /storage/*.key
+/storage/**/*.sql
 /storage/pail
 /vendor
+/debug_auth.php
 _ide_helper.php
 Homestead.json
 Homestead.yaml

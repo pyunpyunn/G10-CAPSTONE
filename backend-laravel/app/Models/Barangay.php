@@ -14,3 +14,5 @@ class Barangay extends Model
 
     protected $fillable = ['barangay_code', 'barangay_name', 'city_id'];
 }
+
+

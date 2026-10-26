@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\DashboardService;
+use App\Services\Web\DashboardService;
+use App\Http\Resources\DashboardSnapshotResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,37 +19,48 @@ class DashboardController extends Controller
 
     public function index(): JsonResponse
     {
-        return $this->service->index();
+        return (new DashboardSnapshotResource($this->service->index()))->response();
     }
 
     /** Lightweight first-paint payload for the dashboard shell. */
     public function summary(): JsonResponse
     {
-        return $this->service->summary();
+        return (new DashboardSnapshotResource($this->service->summary()))->response();
     }
 
     public function dispatch(): JsonResponse
     {
-        return $this->service->dispatch();
+        return response()->json(['data' => $this->service->dispatch()]);
     }
 
     public function weather(): JsonResponse
     {
-        return $this->service->weather();
+        return response()->json(['data' => $this->service->weather()]);
     }
 
     public function requests(): JsonResponse
     {
-        return $this->service->requests();
+        return response()->json(['data' => $this->service->requests()]);
     }
 
     public function activity(): JsonResponse
     {
-        return $this->service->activity();
+        return response()->json(['data' => $this->service->activity()]);
     }
 
     public function closeActiveEvent(Request $request): JsonResponse
     {
-        return $this->service->closeActiveEvent($request);
+        $result = $this->service->closeActiveEvent($request);
+        if (! $result) return response()->json(['message' => 'There is no active disaster event to close.'], 404);
+        return response()->json([
+            'message' => 'Active event closed, saved to the Disaster Event Log, and queued for SitRep/archive.',
+            'data' => [
+                'closed_event' => $result['closed_event'],
+                'dashboard' => new DashboardSnapshotResource($result['dashboard']),
+            ],
+        ]);
     }
 }
+
+
+

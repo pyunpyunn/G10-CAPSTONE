@@ -11,16 +11,21 @@ export type HouseholdOverview = {
     has_device: boolean;
   };
   active_event: any;
+  recent_alerts?: { broadcast_id: number | string; title: string; message: string; estimated_duration?: string | null; sent_at: string | null }[];
   current_status: any;
   status_options: any[];
   status_history: any[];
   members: any[];
   devices: any[];
   geotag: any;
+  sitio_options: { sitio_id: number; sitio_name: string }[];
   evacuation_centers: any[];
   trusted: {
     is_available: boolean;
+    pin_configured: boolean;
     households: any[];
+    incoming_requests: any[];
+    notifications?: any[];
   };
   qr: any;
 };
@@ -40,6 +45,10 @@ export async function updateHouseholdDeviceLocation(payload: any) {
   return response.data;
 }
 
+export async function saveHouseholdGeotag(payload: any) {
+  return (await api.put('/household/geotag', payload)).data;
+}
+
 export async function updateHouseholdMember(memberId: string, payload: any) {
   const response = await api.patch(`/household/members/${memberId}`, payload);
   return response.data.data;
@@ -47,6 +56,11 @@ export async function updateHouseholdMember(memberId: string, payload: any) {
 
 export async function saveHouseholdMemberStatus(memberId: string, payload: any) {
   const response = await api.post(`/household/members/${memberId}/status`, payload);
+  return response.data.data;
+}
+
+export async function saveTrustedHouseholdMemberStatus(connectionId: string, memberId: string, payload: any) {
+  const response = await api.post(`/household/trusted-households/${connectionId}/members/${memberId}/status`, payload);
   return response.data.data;
 }
 
@@ -60,6 +74,16 @@ export async function getHouseholdQr() {
   return response.data.data;
 }
 
+export async function saveTrustedPin(payload: { pin: string; pin_confirmation: string; current_pin?: string }) {
+  const response = await api.put('/household/trusted-pin', payload);
+  return response.data;
+}
+
+export async function verifyTrustedPin(pin: string) {
+  const response = await api.post('/household/trusted-pin/verify', { pin });
+  return response.data;
+}
+
 export async function lookupTrustedHousehold(householdId: string) {
   const response = await api.get(`/household/trusted-households/lookup/${householdId}`);
   return response.data.data;
@@ -67,5 +91,15 @@ export async function lookupTrustedHousehold(householdId: string) {
 
 export async function createTrustedHousehold(payload: any) {
   const response = await api.post('/household/trusted-households', payload);
+  return response.data;
+}
+
+export async function deleteTrustedHousehold(connectionId: string) {
+  const response = await api.delete(`/household/trusted-households/${connectionId}`);
+  return response.data;
+}
+
+export async function respondToTrustedHousehold(connectionId: string, decision: 'accept' | 'reject') {
+  const response = await api.patch(`/household/trusted-households/${connectionId}`, { decision });
   return response.data;
 }

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { palette, radius, shadow, spacing, typography } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
 import { ActionButton, EmptyState, SectionHeader, StatTile, StatusBadge } from './RescuerUI';
@@ -30,10 +30,11 @@ export function RescuerDashboardScreen({
     ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(item.status_key)
   );
   const activeEventId = overview?.active_event?.event_id;
+  const assignmentEventId = activeAssignment?.event_id || activeEventId;
   const hasSubmittedFieldReport = !activeAssignment?.household_id || (overview?.field_reports || []).some((report: any) =>
     String(report.assignment_id) === String(activeAssignment.assignment_id)
     && String(report.household_id) === String(activeAssignment.household_id)
-    && (!activeEventId || String(report.event_id) === String(activeEventId))
+    && (!assignmentEventId || String(report.event_id) === String(assignmentEventId))
   );
 
   return (
@@ -54,8 +55,8 @@ export function RescuerDashboardScreen({
         </View>
 
         {activeEvent ? (
-          <View style={[styles.eventStrip, styles.activeEventStrip]}>
-            <Ionicons name="warning" size={24} color={palette.warning} />
+          <View style={styles.eventStrip}>
+            <Ionicons name="warning-outline" size={18} color={palette.warning} />
             <View style={styles.eventCopy}>
               <Text style={styles.eventTitle}>{activeEvent.name}</Text>
               <Text style={styles.eventMeta}>
@@ -93,12 +94,17 @@ export function RescuerDashboardScreen({
           {activeAssignment.dispatch_notes ? (
             <Text style={styles.note}>{activeAssignment.dispatch_notes}</Text>
           ) : null}
+          {activeAssignment.household_id ? (
+            <View style={styles.assignmentActions}>
+              <ActionButton label="Map" icon="map-outline" tone="light" onPress={() => onOpenMap(activeAssignment)} />
+              <ActionButton label="Field report" icon="document-text-outline" tone="light" onPress={() => onOpenReport(activeAssignment)} />
+            </View>
+          ) : null}
           <View style={styles.buttonGrid}>
             {activeAssignment.status_key === 'dispatched' ? (
               <ActionButton
                 label="Accept"
                 icon="checkmark-outline"
-                tone="light"
                 onPress={() => onStatusChange(activeAssignment.assignment_id, 'accepted')}
               />
             ) : null}
@@ -106,7 +112,6 @@ export function RescuerDashboardScreen({
               <ActionButton
                 label="En route"
                 icon="navigate-outline"
-                tone="light"
                 onPress={() => onStatusChange(activeAssignment.assignment_id, 'en_route')}
               />
             ) : null}
@@ -129,7 +134,7 @@ export function RescuerDashboardScreen({
             <ActionButton
               label="Complete"
               icon="flag-outline"
-              disabled={!['en_route', 'on_scene'].includes(activeAssignment.status_key) || !hasSubmittedFieldReport}
+              disabled={!['en_route', 'on_scene'].includes(activeAssignment.status_key)}
               onPress={() => onStatusChange(activeAssignment.assignment_id, 'completed')}
             />
           </View>
@@ -275,6 +280,12 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
     letterSpacing: -0.3,
   },
+  name: {
+    marginTop: 4,
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '900',
+  },
   meta: {
     marginTop: 4,
     color: palette.navMuted,
@@ -289,11 +300,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
     backgroundColor: '#ffffff12',
-  },
-  activeEventStrip: {
-    borderWidth: 1,
-    borderColor: `${palette.warning}88`,
-    backgroundColor: `${palette.warning}20`,
   },
   eventCopy: {
     flex: 1,

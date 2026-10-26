@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  AppState,
   Platform,
   Pressable,
   RefreshControl,
@@ -9,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
@@ -19,18 +20,25 @@ import { savePushRegistration } from '@/api/device';
 import {
   completeHouseholdSetup,
   createTrustedHousehold,
+  deleteTrustedHousehold,
   getHouseholdOverview,
   lookupTrustedHousehold,
   saveHouseholdMemberStatus,
+  saveHouseholdGeotag,
+  saveTrustedHouseholdMemberStatus,
   saveHouseholdStatus,
+  saveTrustedPin,
+  respondToTrustedHousehold,
   updateHouseholdDeviceLocation,
   updateHouseholdMember,
+  verifyTrustedPin,
 } from '@/api/household';
 import type { HouseholdOverview } from '@/api/household';
 import { HouseholdDashboardScreen, HouseholdTrustedScreen } from '@/components/household/HouseholdDashboardScreen';
 import { HouseholdHeader } from '@/components/household/HouseholdHeader';
 import {
   AddTrustedHouseholdModal,
+  HouseholdNotificationsModal,
   HouseholdQrModal,
   TrustedPinModal,
 } from '@/components/household/HouseholdModals';
@@ -41,9 +49,9 @@ import { HouseholdLoading } from '@/components/household/HouseholdUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
+import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 
 const deviceUuidKey = 'resq_household_device_uuid';
-const trustedPinKey = 'resq_household_trusted_pin';
 type TabKey = 'home' | 'route' | 'trusted' | 'profile';
 type TabButtonKey = TabKey | 'qr';
 
@@ -69,20 +77,29 @@ export default function HouseholdHomeScreen() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showQr, setShowQr] = useState(false);
-  const [trustedPin, setTrustedPin] = useState('');
+  const [trustedPinConfigured, setTrustedPinConfigured] = useState(false);
   const [pinError, setPinError] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
   const [showPin, setShowPin] = useState(false);
-  const [pinAction, setPinAction] = useState<'open' | 'add'>('open');
+  const [pinAction, setPinAction] = useState<'open' | 'change'>('open');
   const [selectedTrusted, setSelectedTrusted] = useState<any>(null);
   const [viewingTrusted, setViewingTrusted] = useState<any>(null);
   const [showAddTrusted, setShowAddTrusted] = useState(false);
   const [trustedLookup, setTrustedLookup] = useState<any>(null);
   const [trustedLoading, setTrustedLoading] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationBusyId, setNotificationBusyId] = useState('');
+  const statusOptionsSignature = JSON.stringify(overview?.status_options || []);
+
+  useEffect(() => {
+    const options: { key: string }[] = JSON.parse(statusOptionsSignature);
+    if (!options.length) return;
+    setPendingStatus((current) => options.some((option) => option.key === current) ? current : options[0].key);
+    setEditingStatus(true);
+  }, [statusOptionsSignature]);
 
   const loadLocalKeys = useCallback(async () => {
     const existingDeviceUuid = await getStoredItem(deviceUuidKey);
-    const existingPin = await getStoredItem(trustedPinKey);
-
     if (existingDeviceUuid) {
       setDeviceUuid(existingDeviceUuid);
     } else {
@@ -91,11 +108,12 @@ export default function HouseholdHomeScreen() {
       setDeviceUuid(nextUuid);
     }
 
-    setTrustedPin(existingPin || '');
   }, []);
 
-  const loadOverview = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
+  const loadOverview = useCallback(async (isRefresh = false, silent = false) => {
+    if (silent) {
+      // Incoming alerts must not interrupt an unfinished household status edit.
+    } else if (isRefresh) {
       setRefreshing(true);
     } else {
       setLoading(true);
@@ -104,16 +122,51 @@ export default function HouseholdHomeScreen() {
     try {
       const data = await getHouseholdOverview();
       setOverview(data);
+      setTrustedPinConfigured(Boolean(data.trusted?.pin_configured));
+      setViewingTrusted((current: any) =>
+        current
+          ? data.trusted?.households?.find((household: any) =>
+              household.connection_id === current.connection_id
+              && ['active', 'validated'].includes(household.validation_status)
+            ) || null
+          : null
+      );
       const savedStatus = data.current_status?.status_key || data.status_options?.[0]?.key || 'safe';
-      setPendingStatus(savedStatus);
-      setEditingStatus(true);
+      if (!silent) {
+        setPendingStatus(savedStatus);
+        setEditingStatus(true);
+      }
     } catch (error: any) {
-      Alert.alert('Unable to load household data', errorMessage(error));
+      if (!silent) Alert.alert('Unable to load household data', errorMessage(error));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!silent) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
+
+  useEffect(() => {
+    let pending = false;
+    let disposed = false;
+    const refreshAlerts = async () => {
+      if (disposed || pending || AppState.currentState !== 'active') return;
+      pending = true;
+      try { await loadOverview(true, true); } finally { pending = false; }
+    };
+    const unsubscribe = onDisasterBroadcast(() => { void refreshAlerts(); });
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshAlerts();
+    });
+    // Small foreground-only fallback when Android push delivery is delayed.
+    const timer = setInterval(() => { void refreshAlerts(); }, 30000);
+    return () => {
+      disposed = true;
+      unsubscribe();
+      subscription.remove();
+      clearInterval(timer);
+    };
+  }, [loadOverview]);
 
   const refreshDeviceSensors = useCallback(async () => {
     try {
@@ -157,6 +210,12 @@ export default function HouseholdHomeScreen() {
     loadOverview();
     refreshDeviceSensors();
   }, [loadLocalKeys, loadOverview, refreshDeviceSensors]);
+
+  useEffect(() => {
+    if (activeTab === 'trusted') {
+      void loadOverview(true);
+    }
+  }, [activeTab, loadOverview]);
 
   useEffect(() => {
     refreshDeviceSensors();
@@ -234,14 +293,9 @@ export default function HouseholdHomeScreen() {
 
   async function handleUpdateGeotag(payload: any) {
     try {
-      await completeHouseholdSetup({
-        ...payload,
-        device_uuid: deviceUuid,
-        device_name: 'Household mobile',
-        platform: 'expo',
-        photo_uri: null,
-      });
+      const response = await saveHouseholdGeotag(payload);
       await loadOverview(true);
+      return response;
     } catch (error: any) {
       Alert.alert('Unable to update geotag', errorMessage(error));
       throw error;
@@ -328,14 +382,42 @@ export default function HouseholdHomeScreen() {
     }
   }
 
-  function openTrusted(household: any) {
-    const status = String(household.validation_status || '').toLowerCase();
+  async function handleSaveTrustedMemberStatus(connectionId: string, memberId: string, statusKey: string) {
+    if (!overview?.active_event) {
+      Alert.alert('No active disaster', 'Family member status can only be saved during an active disaster event.');
+      return;
+    }
 
-    if (!['validated', 'approved'].includes(status)) {
-      Alert.alert(
-        'Trusted household pending',
-        'This connection must be validated before you can open its member and status details.'
-      );
+    const locationPayload: any = {};
+
+    if (currentDevice?.latitude && currentDevice?.longitude) {
+      locationPayload.latitude = currentDevice.latitude;
+      locationPayload.longitude = currentDevice.longitude;
+      locationPayload.location_label = currentDevice.last_location_label;
+    } else if (overview?.geotag?.latitude && overview?.geotag?.longitude) {
+      locationPayload.latitude = overview.geotag.latitude;
+      locationPayload.longitude = overview.geotag.longitude;
+      locationPayload.location_label = overview.geotag.location_label;
+      locationPayload.location_accuracy_m = overview.geotag.accuracy_m;
+    }
+
+    try {
+      await saveTrustedHouseholdMemberStatus(connectionId, memberId, {
+        status_key: statusKey,
+        device_uuid: deviceUuid,
+        battery_level: realBatteryLevel ?? undefined,
+        ...locationPayload,
+      });
+      await loadOverview(true);
+    } catch (error: any) {
+      Alert.alert('Unable to save trusted member status', errorMessage(error));
+      throw error;
+    }
+  }
+
+  function openTrusted(household: any) {
+    if (!['active', 'validated'].includes(household.validation_status)) {
+      Alert.alert('Pending confirmation', 'This household must accept your request before you can view its members or statuses.');
       return;
     }
 
@@ -346,55 +428,91 @@ export default function HouseholdHomeScreen() {
   }
 
   function openAddTrusted() {
-    setPinAction('add');
+    setTrustedLookup(null);
+    setShowAddTrusted(true);
+  }
+
+  function openChangeTrustedPin() {
+    setPinAction('change');
     setPinError('');
-
-    if (trustedPin) {
-      setShowAddTrusted(true);
-      return;
-    }
-
     setShowPin(true);
   }
 
-  async function handlePinConfirm(pin: string) {
-    if (pin.length !== 4) {
-      setPinError('Enter a 4-digit PIN.');
-      return;
-    }
-
-    if (!trustedPin) {
-      await setStoredItem(trustedPinKey, pin);
-      setTrustedPin(pin);
-      setShowPin(false);
-
-      if (pinAction === 'add') {
-        setShowAddTrusted(true);
-      } else if (selectedTrusted) {
-        setViewingTrusted(selectedTrusted);
-      }
-
-      return;
-    }
-
-    if (pin !== trustedPin) {
-      setPinError('PIN did not match.');
-      return;
-    }
-
-    setShowPin(false);
+  async function handlePinConfirm({ pin, currentPin }: { pin: string; currentPin?: string }) {
+    setPinSaving(true);
     setPinError('');
 
-    if (pinAction === 'add') {
-      setShowAddTrusted(true);
-    } else if (selectedTrusted) {
-      setViewingTrusted(selectedTrusted);
+    try {
+      if (!trustedPinConfigured || pinAction === 'change') {
+        await saveTrustedPin({
+          pin,
+          pin_confirmation: pin,
+          current_pin: pinAction === 'change' ? currentPin : undefined,
+        });
+        setTrustedPinConfigured(true);
+      } else {
+        await verifyTrustedPin(pin);
+      }
+
+      if (pinAction === 'open' && selectedTrusted) {
+        setShowPin(false);
+        setViewingTrusted(selectedTrusted);
+      } else if (pinAction === 'change') {
+        setShowPin(false);
+        Alert.alert('Household PIN', 'Your household PIN was changed.');
+      }
+    } catch (error: any) {
+      setPinError(errorMessage(error));
+    } finally {
+      setNotificationBusyId('');
+      setPinSaving(false);
     }
+  }
+
+  async function handleAcceptTrustedRequest(request: any) {
+    const connectionId = String(request.connection_id);
+    setNotificationBusyId(connectionId);
+    try {
+      await respondToTrustedHousehold(connectionId, 'accept');
+      setShowNotifications(false);
+      await loadOverview(true);
+      Alert.alert('Trusted household accepted', 'The household request was accepted and added to Trusted Household.');
+    } catch (error: any) {
+      Alert.alert('Unable to accept request', errorMessage(error));
+    } finally {
+      setNotificationBusyId('');
+    }
+  }
+
+  function handleRejectTrustedRequest(request: any) {
+    const connectionId = String(request.connection_id);
+    Alert.alert(
+      'Reject trusted household request?',
+      `${request.household_name || request.family_name || 'This household'} (${request.requesting_household_id}) will not be added to your trusted households.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            setNotificationBusyId(connectionId);
+            try {
+              await respondToTrustedHousehold(connectionId, 'reject');
+              await loadOverview(true);
+            } catch (error: any) {
+              Alert.alert('Unable to reject request', errorMessage(error));
+            } finally {
+              setNotificationBusyId('');
+            }
+          },
+        },
+      ]
+    );
   }
 
   async function handleLookupTrusted(householdId: string) {
     if (!householdId) {
-      Alert.alert('Missing household ID', 'Enter the household ID first.');
+      Alert.alert('Missing household details', 'Enter the household ID or username first.');
       return;
     }
 
@@ -411,8 +529,8 @@ export default function HouseholdHomeScreen() {
   }
 
   async function handleCreateTrusted(payload: any) {
-    if (!payload.trusted_household_id || !payload.reason) {
-      Alert.alert('Missing details', 'Enter the household ID and reason.');
+    if (!payload.trusted_household_id || !payload.relationshipID || !payload.relationshipLabel || !payload.pin) {
+      Alert.alert('Missing details', 'Complete the household, relationship, and PIN steps first.');
       return;
     }
 
@@ -420,7 +538,12 @@ export default function HouseholdHomeScreen() {
 
     try {
       const response = await createTrustedHousehold(payload);
-      Alert.alert('Trusted household', response.message || 'This trusted household request is pending validation.');
+      const targetHousehold = trustedLookup?.household_name || trustedLookup?.household_id;
+      const responseMessage = response.message || 'Trusted household request sent.';
+      Alert.alert(
+        'Trusted household',
+        targetHousehold ? `${responseMessage}\nHousehold: ${targetHousehold}` : responseMessage
+      );
       setShowAddTrusted(false);
       setTrustedLookup(null);
       await loadOverview(true);
@@ -428,6 +551,59 @@ export default function HouseholdHomeScreen() {
       Alert.alert('Unable to save trusted household', errorMessage(error));
     } finally {
       setTrustedLoading(false);
+    }
+  }
+
+  function handleDeleteTrusted(household: any) {
+    const householdName = household.household_name || household.family_name || 'this trusted household';
+    const isPending = household.validation_status === 'pending';
+
+    Alert.alert(
+      isPending ? 'Cancel pending request?' : 'Trusted household options',
+      isPending
+        ? `Cancel your pending request to ${householdName}?`
+        : householdName,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: isPending ? 'Cancel request' : 'Delete',
+          style: 'destructive',
+          onPress: () => isPending ? void deleteTrusted(household) : confirmDeleteTrusted(household),
+        },
+      ]
+    );
+  }
+
+  function confirmDeleteTrusted(household: any) {
+    const householdName = household.household_name || household.family_name || 'this trusted household';
+
+    Alert.alert(
+      'Delete trusted household?',
+      `Remove ${householdName} from your trusted households? This only removes the trusted connection.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete household',
+          style: 'destructive',
+          onPress: () => {
+            void deleteTrusted(household);
+          },
+        },
+      ]
+    );
+  }
+
+  async function deleteTrusted(household: any) {
+    try {
+      const response = await deleteTrustedHousehold(household.connection_id);
+      setViewingTrusted(null);
+      await loadOverview(true);
+      Alert.alert(
+        household.validation_status === 'pending' ? 'Request cancelled' : 'Trusted household removed',
+        response.message || (household.validation_status === 'pending' ? 'Your trusted household request was cancelled.' : 'The trusted household was removed successfully.')
+      );
+    } catch (error: any) {
+      Alert.alert('Unable to delete trusted household', errorMessage(error));
     }
   }
 
@@ -454,10 +630,17 @@ export default function HouseholdHomeScreen() {
         <HouseholdTrustedScreen
           overview={overview}
           viewingTrusted={viewingTrusted}
-          onOpenQr={() => setShowQr(true)}
           onAddTrusted={openAddTrusted}
+          onChangeTrustedPin={openChangeTrustedPin}
           onOpenTrusted={openTrusted}
+          onDeleteTrusted={handleDeleteTrusted}
           onBackFamily={() => setViewingTrusted(null)}
+          respondingConnectionId={notificationBusyId || null}
+          onRespondToIncomingRequest={(request, decision) => {
+            if (decision === 'accept') void handleAcceptTrustedRequest(request);
+            else handleRejectTrustedRequest(request);
+          }}
+          onSaveTrustedMemberStatus={handleSaveTrustedMemberStatus}
         />
       );
     }
@@ -498,8 +681,15 @@ export default function HouseholdHomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <HouseholdHeader isDisasterMode={Boolean(overview.active_event)} />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
+      <HouseholdHeader
+        isDisasterMode={Boolean(overview.active_event)}
+        notificationCount={(overview.trusted?.incoming_requests?.length || 0) + (overview.trusted?.notifications?.length || 0)}
+        onOpenNotifications={() => {
+          setShowNotifications(true);
+          void loadOverview(true);
+        }}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -547,10 +737,20 @@ export default function HouseholdHomeScreen() {
         </View>
       ) : null}
 
-      <HouseholdQrModal visible={showQr} qr={overview.qr} onClose={() => setShowQr(false)} />
+      <HouseholdQrModal visible={showQr} householdId={overview.profile.household?.household_id} qr={overview.qr} onClose={() => setShowQr(false)} />
+      <HouseholdNotificationsModal
+        visible={showNotifications}
+        requests={overview.trusted?.incoming_requests || []}
+        notices={overview.trusted?.notifications || []}
+        busyId={notificationBusyId}
+        onClose={() => setShowNotifications(false)}
+        onAccept={handleAcceptTrustedRequest}
+        onReject={handleRejectTrustedRequest}
+      />
       <TrustedPinModal
         visible={showPin}
-        hasPin={Boolean(trustedPin)}
+        mode={pinAction === 'change' ? 'change' : trustedPinConfigured ? 'verify' : 'set'}
+        saving={pinSaving}
         error={pinError}
         onClose={() => setShowPin(false)}
         onConfirm={handlePinConfirm}

@@ -1,5 +1,10 @@
 import Constants from 'expo-constants';
-import { Alert, Platform } from 'react-native';
+import { Alert, AppState, Linking, Platform } from 'react-native';
+import { notifyDisasterBroadcast } from '@/utils/mobileReadCache';
+import { api } from '@/api/client';
+import { savePushRegistration } from '@/api/device';
+import { handleForegroundNotification } from './foregroundNotification';
+import { router, type Href } from 'expo-router';
 
 export type PushRegistration = {
   playerId: string | null;
@@ -10,6 +15,8 @@ export type PushRegistration = {
 };
 
 let oneSignalReady = false;
+let pushSyncContext: { deviceUuid: string; userId: string } | null = null;
+let syncingSubscription = false;
 let unsupportedNoticeShown = false;
 let settingsNoticeShown = false;
 
@@ -17,7 +24,29 @@ export async function configureNotificationHandler() {
   await initializeOneSignal();
 }
 
-export async function getPushRegistration(externalUserId?: string): Promise<PushRegistration> {
+export async function readNotificationPermission(): Promise<boolean | null> {
+  if (!supportsRemotePushNotifications() || !oneSignalAppIdFromConfig()) return null;
+  await initializeOneSignal();
+  if (!oneSignalReady) return null;
+  const { OneSignal } = await import('react-native-onesignal');
+  return OneSignal.Notifications.getPermissionAsync();
+}
+
+export async function enableNotifications(): Promise<boolean> {
+  await initializeOneSignal();
+  if (!oneSignalReady) return false;
+  const { OneSignal } = await import('react-native-onesignal');
+  if (!await OneSignal.Notifications.canRequestPermission() && !await OneSignal.Notifications.getPermissionAsync()) {
+    await Linking.openSettings();
+    return false;
+  }
+  const granted = await OneSignal.Notifications.requestPermission(true);
+  if (granted) OneSignal.User.pushSubscription.optIn();
+  await syncCurrentSubscription();
+  return granted;
+}
+
+export async function getPushRegistration(_deviceUuid?: string): Promise<PushRegistration> {
   const oneSignalAppId = oneSignalAppIdFromConfig();
 
   if (!supportsRemotePushNotifications()) {
@@ -30,7 +59,24 @@ export async function getPushRegistration(externalUserId?: string): Promise<Push
     return emptyOneSignalRegistration('error');
   }
 
-  return getOneSignalRegistration(oneSignalAppId, externalUserId);
+  try {
+    const identity = await api.get('/auth/me');
+    const user = identity.data.user ?? identity.data.data;
+    if (!user?.user_id) return emptyOneSignalRegistration('error');
+    if (_deviceUuid) pushSyncContext = { deviceUuid: _deviceUuid, userId: String(user.user_id) };
+    await initializeOneSignal();
+    return getOneSignalRegistration(oneSignalAppId, String(user.user_id));
+  } catch {
+    return emptyOneSignalRegistration('error');
+  }
+}
+
+export async function logoutPushIdentity() {
+  pushSyncContext = null;
+  if (!oneSignalReady || !supportsRemotePushNotifications()) return;
+  const { OneSignal } = await import('react-native-onesignal');
+  OneSignal.User.pushSubscription.optOut();
+  OneSignal.logout();
 }
 
 async function initializeOneSignal() {
@@ -43,6 +89,18 @@ async function initializeOneSignal() {
   try {
     const { OneSignal } = await import('react-native-onesignal');
     OneSignal.initialize(appId);
+    OneSignal.User.pushSubscription.addEventListener('change', () => { void syncCurrentSubscription(); });
+    AppState.addEventListener('change', (state) => { if (state === 'active') void syncCurrentSubscription(); });
+    OneSignal.Notifications.addEventListener('foregroundWillDisplay', handleForegroundNotification);
+    OneSignal.Notifications.addEventListener('click', (event: { notification: { additionalData?: { type?: string; assignment_id?: string } } }) => {
+      if (event.notification.additionalData?.type === 'disaster_broadcast') notifyDisasterBroadcast();
+      const data = event.notification.additionalData;
+      if (data?.type === 'rescue_dispatch' && data.assignment_id) {
+        router.push({ pathname: '/rescuer/navigation' as any, params: { dispatchId: data.assignment_id } } as Href);
+      } else if (data?.type === 'rescuer_broadcast') {
+        router.push('/rescuer');
+      }
+    });
     oneSignalReady = true;
   } catch {
     oneSignalReady = false;
@@ -64,7 +122,6 @@ async function getOneSignalRegistration(
     if (externalUserId) {
       OneSignal.login(externalUserId);
       OneSignal.User.addTags({
-        resqperation_device_uuid: externalUserId,
         app_role: 'mobile',
       });
     }
@@ -103,6 +160,7 @@ async function getOneSignalRegistration(
     }
 
     if (!accepted) {
+      await explainNotificationSettingsRequired();
       return {
         pushToken: null,
         playerId: await OneSignal.User.pushSubscription.getIdAsync(),
@@ -121,10 +179,44 @@ async function getOneSignalRegistration(
       playerId: subscription.playerId,
       oneSignalUserId: await OneSignal.User.getOnesignalId(),
       pushProvider: 'onesignal',
-      permissionStatus: 'granted',
+      permissionStatus: subscription.playerId && subscription.token ? 'granted' : 'undetermined',
     };
   } catch {
     return emptyOneSignalRegistration('error');
+  }
+}
+
+// A subscription can arrive after login, rotate, or change when Firebase is configured.
+// Keep the database current without displaying another permission prompt.
+async function syncCurrentSubscription() {
+  const context = pushSyncContext;
+  if (!context || !oneSignalReady || syncingSubscription) return;
+  syncingSubscription = true;
+  try {
+    const { OneSignal } = await import('react-native-onesignal');
+    const identity = await api.get('/auth/me');
+    const user = identity.data.user ?? identity.data.data;
+    if (pushSyncContext !== context || String(user?.user_id) !== context.userId ||
+        await OneSignal.User.getExternalId() !== context.userId) return;
+    const playerId = await OneSignal.User.pushSubscription.getIdAsync();
+    const token = await OneSignal.User.pushSubscription.getTokenAsync();
+    const permission = await OneSignal.Notifications.getPermissionAsync();
+    const optedIn = await OneSignal.User.pushSubscription.getOptedInAsync();
+    if (pushSyncContext !== context) return;
+    await savePushRegistration({
+      device_uuid: context.deviceUuid,
+      device_name: user.role_key === 'rescuer' ? 'Rescuer mobile' : 'Household mobile',
+      platform: Platform.OS === 'ios' ? 'ios' : 'android',
+      player_id: playerId,
+      push_token: token,
+      one_signal_user_id: await OneSignal.User.getOnesignalId(),
+      push_provider: 'onesignal',
+      notification_permission_status: !permission ? 'denied' : playerId && token && optedIn ? 'granted' : 'undetermined',
+    });
+  } catch {
+    // Retry while the authenticated app is active or when its subscription changes.
+  } finally {
+    syncingSubscription = false;
   }
 }
 
@@ -137,7 +229,7 @@ async function readOneSignalSubscription() {
     playerId = await OneSignal.User.pushSubscription.getIdAsync();
     token = await OneSignal.User.pushSubscription.getTokenAsync();
 
-    if (playerId || token) {
+    if (playerId && token) {
       break;
     }
 
@@ -237,11 +329,16 @@ function explainNotificationSettingsRequired(): Promise<void> {
   return new Promise((resolve) => {
     Alert.alert(
       'Notifications are blocked',
-      'Notification permission cannot be requested again from inside the app. Enable notifications for RESQPERATION in your device settings, then open the app again.',
+      'Turn on notifications to receive disaster broadcasts and rescue assignments. Open Settings, choose Notifications, and enable Allow notifications for RESQPERATION.',
       [
         {
-          text: 'OK',
+          text: 'Later',
+          style: 'cancel',
           onPress: () => resolve(),
+        },
+        {
+          text: 'Open Settings',
+          onPress: () => { void Linking.openSettings().catch(() => {}); resolve(); },
         },
       ],
       {

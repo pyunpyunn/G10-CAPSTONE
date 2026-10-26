@@ -1,6 +1,7 @@
+import { statusColor } from '@/constants/statusPalette';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Location from 'expo-location';
 import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
@@ -9,6 +10,7 @@ import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerU
 
 type RescueMapProps = {
   assignments: any[];
+  evacuationCenters?: any[];
   activeAssignment: any;
   selectedAssignment?: any;
   onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
@@ -21,12 +23,7 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
-export function RescueMapScreen({
-  assignments,
-  activeAssignment,
-  selectedAssignment,
-  onSendLocation,
-}: RescueMapProps) {
+export function RescueMapScreen({ assignments, activeAssignment, selectedAssignment, onSendLocation }: RescueMapProps) {
   const watcher = useRef<Location.LocationSubscription | null>(null);
   const autoStartedAssignment = useRef<number | null>(null);
   const [tracking, setTracking] = useState(false);
@@ -196,7 +193,7 @@ export function RescueMapScreen({
               }}
               title={assignment.assigned_area || assignment.household_id || 'Assignment'}
               description={assignment.destination_label || assignment.status_label}
-              pinColor={assignment.priority_level === 'urgent' ? palette.unsafe : palette.evacuated}
+              pinColor={statusColor(assignment.status_key)}
             />
           ))}
 
@@ -226,12 +223,12 @@ export function RescueMapScreen({
           <EmptyState icon="location-outline" title="No mapped assignments" />
         ) : null}
 
-        {activeAssignment ? (
+        {mapAssignment ? (
           <View style={styles.routeInfo}>
             <Ionicons name="navigate-outline" size={18} color={palette.evacuated} />
             <Text style={styles.routeInfoText}>
               {routeCoordinates.length >= 2
-                ? `${activeAssignment.route?.distance_km || '-'} km · ${activeAssignment.route?.duration_min || '-'} min road route`
+                ? `${mapAssignment.route?.distance_km || '-'} km · ${mapAssignment.route?.duration_min || '-'} min road route`
                 : activeTarget
                   ? 'Waiting for road route. Tap Track Me or Accept/En route with GPS enabled.'
                   : 'This assignment has no household geotag target yet.'}

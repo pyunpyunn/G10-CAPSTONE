@@ -15,7 +15,7 @@ class DisasterEvent extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['event_id', 'name', 'type_id', 'severity_level_id', 'started_at', 'ended_at'];
+    protected $fillable = ['event_id', 'name', 'type_id', 'severity_level_id', 'started_at', 'ended_at', 'rescue_priority_version'];
 
     protected function casts(): array
     {
@@ -53,8 +53,15 @@ class DisasterEvent extends Model
         return $this->hasMany(WeatherLog::class, 'disaster_id', 'event_id');
     }
 
+    public function broadcasts(): HasMany
+    {
+        return $this->hasMany(DisasterBroadcast::class, 'disaster_id', 'event_id');
+    }
+
     public function scopeActive($query)
     {
         return $query->whereNotNull('started_at')->whereNull('ended_at');
     }
 }
+
+

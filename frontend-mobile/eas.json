@@ -4,22 +4,24 @@
     "appVersionSource": "remote"
   },
   "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    },
-    "development-simulator": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "simulator": true
-      }
-    },
     "preview": {
-      "distribution": "internal"
+      "extends": "production"
     },
     "production": {
-      "autoIncrement": true
+      "developmentClient": false,
+      "distribution": "internal",
+      "environment": "production",
+      "autoIncrement": true,
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_ONESIGNAL_APP_ID": "bc6266ac-90a4-4bfe-b4d5-59c57939e7a5",
+        "EXPO_PUBLIC_API_BASE_URL": "http://100.121.155.55:8000/api/v1"
+      }
+    },
+    "store": {
+      "extends": "production",
+      "distribution": "store",
+      "android": { "buildType": "app-bundle" }
     }
   }
 }

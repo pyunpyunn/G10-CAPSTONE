@@ -42,3 +42,15 @@ export async function getRouteToSite(startPoint, endPoint) {
     duration_min: Math.round(route.duration / 60),
   }
 }
+
+export async function getHouseholdRoute(householdId) {
+  const response = await api.get(`/map/households/${encodeURIComponent(householdId)}/route`)
+  return response.data.data
+}
+
+export async function importHazardLayer(payload) { return (await api.post('/map/hazard-layers', payload)).data }
+export async function deleteHazardLayer(id) { return (await api.delete(`/map/hazard-layers/${id}`)).data }
+
+export async function getEvacuationRoute(siteId) {
+  return (await api.get(`/map/evacuation-sites/${encodeURIComponent(siteId)}/route`)).data.data
+}

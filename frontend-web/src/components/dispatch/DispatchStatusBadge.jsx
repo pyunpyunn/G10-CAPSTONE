@@ -1,3 +1,5 @@
+import { statusColor } from '../../utils/statusPalette'
+
 export default function DispatchStatusBadge({ status }) {
-  return <span className={`badge b-${status?.tone || 'gray'}`}>{status?.label || 'Stand-by'}</span>
+  return <span className="bg" style={{ '--c': statusColor(status?.key) }}>{status?.label || 'Status unavailable'}</span>
 }

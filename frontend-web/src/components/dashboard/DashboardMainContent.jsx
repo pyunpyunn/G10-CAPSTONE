@@ -1,18 +1,15 @@
-import {
-  Radio,
-  TriangleAlert,
-} from 'lucide-react'
+import { X } from 'lucide-react'
+import { useState } from 'react'
+import RescueCriteriaChart from './RescueCriteriaChart'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import Badge from '../ui/Badge'
-import EmptyState from '../ui/EmptyState'
 import Panel from '../ui/Panel'
 import StatCard from '../ui/StatCard'
 import {
   eventTone,
   makeAxis,
   percent,
-  statusTone,
 } from '../../utils/dashboardHelpers'
 
 export default function DashboardMainContent({
@@ -21,16 +18,29 @@ export default function DashboardMainContent({
   hasActiveEvent,
   onOpenModule,
 }) {
+  const [isStandbyStripVisible, setIsStandbyStripVisible] = useState(true)
+
   return (
     <div className="dashboard-main">
       {hasActiveEvent && (
-        <ActiveEventBanner activeEvent={dashboard.active_event} onOpenBroadcast={() => onOpenModule('/broadcast')} />
+        <ActiveEventBanner
+          activeEvent={dashboard.active_event}
+          onOpenBroadcast={(eventId) => onOpenModule(`/broadcast?event_id=${encodeURIComponent(eventId)}`)}
+        />
       )}
 
-      {!hasActiveEvent && (
+      {!hasActiveEvent && isStandbyStripVisible && (
         <div className="standby-strip">
-          <strong>Standby mode</strong>
-          <span>Household reporting, dispatch charts, weather snapshots, and activity logs will appear after an active disaster event is declared.</span>
+          <strong>NO ACTIVE DISASTER</strong>
+          <button
+            className="standby-strip-close"
+            type="button"
+            aria-label="Dismiss no active disaster message"
+            title="Dismiss"
+            onClick={() => setIsStandbyStripVisible(false)}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
         </div>
       )}
 
@@ -47,35 +57,19 @@ export default function DashboardMainContent({
           <ChartCard
             title="Household status"
             bars={dashboard.households.bars}
-            emptyTitle="No household reports yet"
-            emptyMessage="Reports will come from household mobile users or authenticated responder field reports."
+            alwaysShowChart
             onManage={() => onOpenModule('/households')}
           />
           <ChartCard
             title="Dispatch status - team count"
             bars={dashboard.dispatch.counts}
-            emptyTitle="No dispatch yet"
-            emptyMessage="Teams will appear after HQ assigns responders to an active event."
+            alwaysShowChart
             onManage={() => onOpenModule('/dispatch')}
           />
         </div>
       </Panel>
 
-      <Panel
-        title="Team dispatch overview"
-        action={
-          <button className="panel-link" type="button" onClick={() => onOpenModule('/dispatch')}>
-            Full dispatch <FontAwesomeIcon icon={faArrowRight} />
-          </button>
-        }
-      >
-        <TeamDispatchTable teams={dashboard.dispatch.teams} />
-      </Panel>
-
-      <div className="sep">
-        Recent activity log <span>showing latest event reports only</span>
-      </div>
-      <ActivityLog activities={dashboard.recent_activity} onViewAll={() => onOpenModule('/archive')} />
+      <RescueCriteriaChart eventId={dashboard.active_event?.event_id} />
     </div>
   )
 }
@@ -85,7 +79,7 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
     return (
       <div 
         className="event-banner standby" 
-        onClick={onOpenBroadcast}
+        onClick={() => onOpenBroadcast()}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast()}
@@ -108,10 +102,10 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
   return (
     <div 
       className={`event-banner active-state tone-${tone}`}
-      onClick={onOpenBroadcast}
+      onClick={() => onOpenBroadcast(activeEvent.event_id)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast()}
+      onKeyDown={(e) => e.key === 'Enter' && onOpenBroadcast(activeEvent.event_id)}
     >
       {/* Left Section: White/Light Event Info */}
       <div className="event-main-col">
@@ -172,7 +166,7 @@ function ReportingProgress({ households, hasActiveEvent }) {
   )
 }
 
-function ChartCard({ title, bars = [], emptyTitle, emptyMessage, onManage }) {
+function ChartCard({ title, bars = [], alwaysShowChart = false, onManage }) {
   const hasValues = bars.some((bar) => Number(bar.value) > 0)
   const axis = makeAxis(bars)
 
@@ -184,7 +178,7 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, onManage }) {
           <FontAwesomeIcon icon={faArrowRight} />
         </button>
       </div>
-      {hasValues ? (
+      {hasValues || alwaysShowChart ? (
         <div className="team-count-chart" role="img" aria-label={title}>
           <div className="chart-y-axis" aria-hidden="true">
             {axis.map((item) => <span key={item}>{item}</span>)}
@@ -199,74 +193,8 @@ function ChartCard({ title, bars = [], emptyTitle, emptyMessage, onManage }) {
             ))}
           </div>
         </div>
-      ) : (
-        <EmptyState title={emptyTitle} message={emptyMessage} />
-      )}
+      ) : null}
     </div>
   )
 }
 
-function TeamDispatchTable({ teams = [] }) {
-  if (teams.length === 0) {
-    return <EmptyState title="No team assignments yet" message="Dispatch rows will appear after HQ assigns a team to an active event." />
-  }
-
-  return (
-    <div className="tbl-wrap compact-table">
-      <table className="dispatch-overview-table">
-        <thead>
-          <tr>
-            <th>Team</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th>Assigned area</th>
-            <th>Assigned at</th>
-          </tr>
-        </thead>
-        <tbody>
-          {teams.map((team) => (
-            <tr key={`${team.team_name}-${team.assigned_time}`}>
-              <td><span className="team-dot" />{team.team_name}</td>
-              <td>{team.team_type}</td>
-              <td><Badge tone={statusTone(team.status_key)}>{team.status}</Badge></td>
-              <td>{team.assigned_area}</td>
-              <td>{team.assigned_time || '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function ActivityLog({ activities = [], onViewAll }) {
-  if (activities.length === 0) {
-    return (
-      <div className="tbl-wrap">
-        <EmptyState title="No recent event activity" message="Household reports and responder field reports will appear here after an active event receives updates." />
-      </div>
-    )
-  }
-
-  return (
-    <div className="tbl-wrap">
-      <div className="log-list">
-        {activities.map((activity) => (
-          <div className="log-item" key={`${activity.time}-${activity.household_name}-${activity.status}`}>
-            <span className="log-time">{activity.time || '-'}</span>
-            <span className={`log-dot log-${statusTone(activity.status_key)}`} />
-            <div className="log-msg">
-              {activity.household_name} - <Badge tone={statusTone(activity.status_key)}>{activity.status}</Badge>
-              {activity.location_label ? <span className="log-extra"> {activity.location_label}</span> : null}
-              {activity.battery_level !== null ? <span className="log-extra"> Battery {activity.battery_level}%</span> : null}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="table-footer">
-        <span>Only the latest records load first to keep 1,000+ household operations fast.</span>
-        <button className="btn btn-secondary btn-sm" type="button" onClick={onViewAll}>View all logs</button>
-      </div>
-    </div>
-  )
-}

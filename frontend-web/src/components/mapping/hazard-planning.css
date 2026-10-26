@@ -1,0 +1,61 @@
+.hazard-planning{margin-bottom:12px;border:1px solid #cbd5e1;border-radius:10px;background:white;color:#18334b}.hazard-planning>button{width:100%;text-align:left;padding:12px;font-weight:700}.hazard-planning-body{padding:0 16px 16px;max-height:60vh;overflow:auto}.hazard-planning p{font-size:13px;line-height:1.6}.hazard-legend,.hazard-source{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}.hazard-legend span{display:flex;align-items:center;gap:5px;text-transform:capitalize;font-size:12px}.hazard-legend i{width:12px;height:12px;border-radius:3px}.hazard-source{padding:10px;background:#f1f5f9;border-radius:6px;font-size:13px}.hazard-planning button,.hazard-upload{cursor:pointer;border:1px solid #cbd5e1;border-radius:5px;padding:7px 10px;background:white;color:#18334b}.hazard-upload{display:inline-block;margin-left:10px}.hazard-upload input{display:block;margin-top:6px}.hazard-table{overflow:auto}.hazard-table table{width:100%;border-collapse:collapse;font-size:13px}.hazard-table td,.hazard-table th{text-align:left;padding:8px;border-bottom:1px solid #e2e8f0}.hazard-table caption{text-align:left;font-weight:bold;padding:8px}.hazard-planning select{padding:6px;margin-left:8px}
+
+.mapping-reference{display:flex;flex-direction:column}.mapping-reference .mapw{flex:1;min-height:340px}.mapping-reference .hazard-planning{flex-shrink:0}.mapping-reference.mapping-fullscreen .mapw.full{position:relative;inset:auto;order:0;flex:1 1 0;min-height:0;height:auto;z-index:0}.mapping-fullscreen .hazard-planning{position:relative;order:1;flex:0 0 auto;width:100%;margin:0;border-radius:0;box-shadow:none}.mapping-fullscreen .hazard-planning-body{max-height:min(42dvh,420px)}
+
+/* Mapping page cards and page-level scrolling. */
+.app-shell.monitoring-shell.mapping-shell > .main{overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
+.mapping-shell .main-view{height:auto;min-height:100%}
+.mapping-reference:not(.mapping-fullscreen){height:auto;min-height:100%;--ln:#355577;--tx:#fff;--mu:#fff;--cd:#102d50;--in:#17385f}
+.mapping-reference:not(.mapping-fullscreen) .mapw{flex:none;height:max(720px,calc(100dvh - 110px));min-height:720px}
+.mapping-reference:not(.mapping-fullscreen) .hazard-planning-body{max-height:none;overflow:visible}
+.mapping-reference .hazard-planning,.mapping-reference .fl{background:#102d50;border-color:#355577;color:#fff}
+.mapping-reference .hazard-source{background:#17385f;color:#fff}
+.mapping-reference .hazard-planning :is(p,a,b,label,summary,caption,th,td,span),
+.mapping-reference .fl :is(span,em,b,label,button,select,option){color:#fff}
+.mapping-reference .hazard-planning :is(button,select,input),.mapping-reference .hazard-upload,
+.mapping-reference :is(.ev,.ib,.tr select,.sg2,.bt.l){background-color:#17385f;color:#fff;border-color:#355577}
+.mapping-reference .hazard-planning button:hover,.mapping-reference :is(.ib,.it,.ly,.zm button):hover{background-color:#254b74}
+.mapping-reference .sg2 button.on,.mapping-reference .bt{background:#28588a;color:#fff}
+.mapping-reference .ly.on .sw{background:#397cb9}
+.mapping-reference .hazard-table :is(th,td),.mapping-reference .dr{border-color:#355577}
+.mapping-reference .hazard-planning summary{cursor:pointer}
+.mapping-reference .hazard-planning a{text-decoration:underline;text-underline-offset:3px}
+.mapping-reference :is(.leaflet-tooltip,.leaflet-popup-content-wrapper,.leaflet-popup-tip,.map-coordinate-readout){background:#102d50;color:#fff;border-color:#355577}
+.mapping-reference .leaflet-popup-close-button,.mapping-reference .leaflet-control-attribution a{color:#fff}
+.mapping-reference .leaflet-control-attribution{background:#102d50;color:#fff}
+.mapping-reference .tr select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23ffffff' stroke-width='2'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E")}
+.mapping-reference .lst,.mapping-reference .hazard-table,.mapping-fullscreen .hazard-planning-body{scrollbar-width:thin;scrollbar-color:#6582a4 #102d50}
+.mapping-fullscreen .hazard-planning-body{overflow:auto}
+
+.mapping-reference.mapping-fullscreen{--mu:#fff;--tx:#fff;--ln:#355577}
+.mapping-reference .it.on{background:#28588a}
+
+/* Keep the hazard controls in the existing left-hand footprint. */
+.mapping-reference .lay{max-height:calc(100% - 160px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#6582a4 #102d50}
+.mapping-reference .map-hazard-controls{margin:8px 4px 4px;padding:10px 6px 4px;border-top:1px solid #355577;display:grid;gap:8px;color:#fff}
+.mapping-reference .map-hazard-label{font-size:12px;font-weight:600}
+.mapping-reference .map-hazard-controls select,.mapping-reference .map-hazard-fit{width:100%;min-width:0;min-height:30px;border:1px solid #527193;border-radius:6px;background:#17385f;color:#fff;padding:5px 7px;font:inherit;font-size:12px}
+.mapping-reference .map-hazard-fit:hover:not(:disabled){background:#28588a}
+.mapping-reference .map-hazard-fit:disabled{opacity:.55;cursor:not-allowed}
+.mapping-reference .map-hazard-legend{display:grid;gap:7px;margin:2px 0 0;padding:0;list-style:none}
+.mapping-reference .map-hazard-legend li{display:flex;gap:7px;align-items:flex-start;font-size:11px;line-height:1.4;color:#fff}
+.mapping-reference .map-hazard-legend i{width:10px;height:10px;flex:none;margin-top:2px;border:1px solid #ffffff66;border-radius:2px}
+.mapping-reference .map-hazard-legend span{overflow-wrap:anywhere}
+@media(max-width:900px){.mapping-reference .lay{max-height:calc(66% - 30px)}}
+
+/* Only the Hazard Planning launcher and its portaled modal use light cards. */
+.mapping-reference .hazard-planning,
+.mapping-reference .hazard-planning > button{background:#fff;border-color:#cbd5e1;color:#18334b}
+.mapping-reference .hazard-planning > button span{color:#18334b}
+.mapping-reference .hazard-planning > button:hover{background:#f7f9fc}
+.hazard-planning-modal{margin:0;border:0;background:#fff;color:#18334b}
+.hazard-planning-modal .hazard-planning-body{padding:0;max-height:none;overflow:visible}
+.hazard-planning-modal summary{cursor:pointer;font-weight:600}
+.hazard-planning-modal a{color:#2a5a90;text-underline-offset:3px}
+.hazard-planning-modal .hazard-source{border:1px solid #d0d9e4;background:#f7f9fc}
+
+.mapping-reference:not(.mapping-fullscreen) > .hazard-planning{margin:12px 0 0}
+
+.mapping-reference .hazard-planning > button[aria-haspopup="dialog"]{background:#1f3e5a;border-color:#1f3e5a;color:#fff}
+.mapping-reference .hazard-planning > button[aria-haspopup="dialog"] span{color:#fff}
+.mapping-reference .hazard-planning > button[aria-haspopup="dialog"]:hover{background:#2a4f72;border-color:#2a4f72}

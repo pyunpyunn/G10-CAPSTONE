@@ -1,4 +1,4 @@
-import SearchInput from '../ui/SearchInput'
+import DataFilterBar from '../ui/DataFilterBar'
 
 export default function ArchiveFilters({
   search,
@@ -9,36 +9,30 @@ export default function ArchiveFilters({
   onEventChange,
   status,
   onStatusChange,
+  onReset,
   filters = {},
 }) {
   return (
-    <div className="filter-bar archive-filter-bar">
-      <SearchInput
-        value={search}
-        onChange={onSearchChange}
-        placeholder="Search event, household, team, request, date..."
-      />
-
-      <select className="filter-select" value={purok} onChange={(event) => onPurokChange(event.target.value)}>
-        <option value="all">All puroks</option>
-        {(filters.puroks || []).map((item) => (
-          <option value={item} key={item}>{item}</option>
-        ))}
-      </select>
-
-      <select className="filter-select" value={eventId} onChange={(event) => onEventChange(event.target.value)}>
-        <option value="all">All events</option>
-        {(filters.events || []).map((item) => (
-          <option value={item.event_id} key={item.event_id}>{item.label || item.name}</option>
-        ))}
-      </select>
-
-      <select className="filter-select" value={status} onChange={(event) => onStatusChange(event.target.value)}>
-        <option value="all">All statuses</option>
-        {(filters.statuses || []).map((item) => (
-          <option value={item.key} key={item.key}>{item.label}</option>
-        ))}
-      </select>
-    </div>
+    <DataFilterBar
+      className="archive-filter-bar page-heading-filter"
+      search={search}
+      onSearchChange={onSearchChange}
+      searchPlaceholder="Search event, household, team, request, date..."
+      filters={[
+        {
+          id: 'purok', label: 'Area', value: purok, onChange: onPurokChange,
+          options: [{ value: 'all', label: 'All puroks' }, ...(filters.puroks || []).map((item) => ({ value: item, label: item }))],
+        },
+        {
+          id: 'event', label: 'Event', value: eventId, onChange: onEventChange,
+          options: [{ value: 'all', label: 'All events' }, ...(filters.events || []).map((item) => ({ value: item.event_id, label: item.label || item.name }))],
+        },
+        {
+          id: 'status', label: 'Status', value: status, onChange: onStatusChange,
+          options: [{ value: 'all', label: 'All statuses' }, ...(filters.statuses || []).map((item) => ({ value: item.key, label: item.label }))],
+        },
+      ]}
+      onReset={onReset}
+    />
   )
 }

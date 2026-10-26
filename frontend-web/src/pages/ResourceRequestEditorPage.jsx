@@ -1,6 +1,6 @@
-import { ArrowLeft, RefreshCcw } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import {
   createResourceRequest,
   forwardResourceRequest,
@@ -12,6 +12,7 @@ import {
 } from '../api/resourceRequestApi'
 import ResourceValidationModal from '../components/resources/ResourceValidationModal'
 import LoadingState from '../components/ui/LoadingState'
+import PageHeader from '../components/ui/PageHeader'
 import {
   buildCreatePayload,
   buildForwardPayload,
@@ -22,8 +23,11 @@ import {
   formFromResourceRequest,
   resourceRequestErrorMessage,
 } from '../utils/resourceRequestHelpers'
+import { canApproveRequests } from '../utils/personnelAccess'
 
 export default function ResourceRequestEditorPage() {
+  const { user } = useOutletContext()
+  const canApprove = canApproveRequests(user)
   const navigate = useNavigate()
   const location = useLocation()
   const { requestId, mode = 'create' } = useParams()
@@ -47,7 +51,7 @@ export default function ResourceRequestEditorPage() {
         if (!requestId) {
           const workspace = await workspacePromise
           if (!ignore) {
-            setPayload({ options: workspace.options || {} })
+            setPayload({ options: workspace.options || {}, area_label: workspace.area_label })
             setForm(emptyResourceRequestForm(workspace || {}))
           }
           return
@@ -66,7 +70,7 @@ export default function ResourceRequestEditorPage() {
         }
 
         if (!ignore) {
-          setPayload({ ...data, options: workspace.options || {} })
+          setPayload({ ...data, options: workspace.options || {}, area_label: workspace.area_label })
           setForm(nextForm)
         }
       } catch (loadError) {
@@ -85,9 +89,13 @@ export default function ResourceRequestEditorPage() {
   }, [requestId, mode])
 
   const options = payload?.options || {}
+  const returnTo = location.state?.returnTo === '/external-requests' ? '/external-requests' : '/resources-requests'
+  if (requestId && ['validate', 'return', 'forward'].includes(mode) && !canApprove) {
+    return <Navigate to={returnTo} replace />
+  }
 
   function closePage() {
-    navigate('/resources-requests')
+    navigate(returnTo)
   }
 
   function openReturnPage() {
@@ -169,21 +177,16 @@ export default function ResourceRequestEditorPage() {
 
   return (
     <section className="page active resources-page resource-request-editor">
-      <header className="household-status-page-header">
-        <div className="household-status-header-copy">
-          <h1>{editorTitle(mode)}</h1>
-          <p>Barangay Mambaling, Cebu City</p>
-        </div>
-        <div className="weather-page-actions household-status-page-actions">
-          <div className="weather-live-status"><strong>Requests</strong><span>Validation and handoff records</span></div>
-          <button className="button secondary" type="button" onClick={closePage}><ArrowLeft size={16} />Back to requests</button>
-          {requestId && <button className="button secondary" type="button" onClick={() => window.location.reload()}><RefreshCcw size={16} />Reload</button>}
-        </div>
-      </header>
+      <PageHeader
+        title={editorTitle(mode)}
+        subtitle={payload?.area_label || 'Shared database records'}
+        actions={<button className="button secondary" type="button" onClick={closePage}><ArrowLeft size={15} />Back to requests</button>}
+      />
 
       {isLoading ? <LoadingState /> : error ? <div className="form-error">{error}</div> : (
         <ResourceValidationModal
           mode={mode}
+          canApprove={canApprove}
           form={form}
           setForm={setForm}
           options={options}

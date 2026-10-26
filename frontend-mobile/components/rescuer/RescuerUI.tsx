@@ -2,6 +2,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View
 import { Ionicons } from '@expo/vector-icons';
 import { useState, type ReactNode } from 'react';
 import { palette, radius, spacing, typography } from '@/constants/resqTheme';
+import { statusColor as unifiedStatusColor } from '@/constants/statusPalette';
 
 type ButtonProps = {
   label: string;
@@ -37,12 +38,12 @@ export function ActionButton({ label, icon, tone = 'primary', disabled = false, 
   );
 }
 
-export function StatusBadge({ label, tone = 'neutral', textColor }: { label: string; tone?: string; textColor?: string }) {
+export function StatusBadge({ label, tone = 'neutral' }: { label: string; tone?: string }) {
   const color = toneColor(tone);
 
   return (
     <View style={[styles.badge, { backgroundColor: `${color}18`, borderColor: `${color}55` }]}>
-      <Text style={[styles.badgeText, { color: textColor || color }]}>{label}</Text>
+      <Text style={[styles.badgeText, { color }]}>{label}</Text>
     </View>
   );
 }
@@ -98,7 +99,11 @@ export function RescuerSelect({
   return (
     <View style={style}>
       <Pressable
-        style={[styles.selectTrigger, disabled && styles.selectDisabled]}
+        style={({ pressed }) => [
+          styles.selectTrigger,
+          disabled && styles.selectDisabled,
+          pressed && !disabled && styles.selectTriggerPressed,
+        ]}
         onPress={() => setVisible(true)}
         disabled={disabled}
         accessibilityRole="button"
@@ -201,11 +206,7 @@ export function EmptyState({ icon, title, body }: { icon: keyof typeof Ionicons.
 }
 
 function toneColor(tone: string) {
-  if (['safe', 'completed', 'available'].includes(tone)) return palette.safe;
-  if (['evacuated', 'en_route', 'dispatched', 'accepted'].includes(tone)) return palette.evacuated;
-  if (['unsafe', 'urgent', 'cancelled', 'danger'].includes(tone)) return palette.unsafe;
-  if (['warning', 'pending', 'needs_validation'].includes(tone)) return palette.warning;
-  return palette.textSoft;
+  return unifiedStatusColor(tone);
 }
 
 const styles = StyleSheet.create({
@@ -241,8 +242,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   pressed: {
-    transform: [{ scale: 0.98 }],
-    opacity: 0.96,
+    transform: [{ scale: 0.97 }],
+    opacity: 0.78,
   },
   buttonText: {
     color: '#fff',
@@ -312,6 +313,10 @@ const styles = StyleSheet.create({
   },
   selectDisabled: {
     opacity: 0.55,
+  },
+  selectTriggerPressed: {
+    borderColor: palette.navActive,
+    backgroundColor: palette.secondary,
   },
   selectValueWrap: {
     flex: 1,

@@ -1,15 +1,6 @@
-export const requestChips = [
-  { key: 'all', label: 'All', params: {} },
-  { key: 'needs_validation', label: 'Needs validation', params: { status: 'needs_validation' } },
-  { key: 'verified', label: 'Verified', params: { status: 'verified' } },
-  { key: 'forwarded', label: 'Forwarded', params: { status: 'forwarded' } },
-  { key: 'personnel', label: 'Personnel', params: { category: 'personnel' } },
-  { key: 'resource', label: 'Resource', params: { category: 'resource' } },
-]
-
 export function emptyResourceRequestForm(payload = {}) {
-  const firstUrgency = payload.options?.urgencies?.find((item) => item.key === 'medium') || payload.options?.urgencies?.[0]
-
+  const urgencies = payload.options?.urgencies || []
+  const mediumUrgency = urgencies.find((urgency) => urgency.key === 'medium')
   return {
     request_source: 'hq_desk',
     source_reference: payload.active_event?.event_id || '',
@@ -18,9 +9,9 @@ export function emptyResourceRequestForm(payload = {}) {
     item_name: '',
     quantity: 1,
     unit: '',
+    urgency_id: Number(mediumUrgency?.urgency_id || 2),
     requested_by: '',
     evacuation_center_id: '',
-    urgency_id: firstUrgency?.urgency_id || '',
     description: '',
     validation_status: 'needs_validation',
     validation_notes: '',
@@ -39,9 +30,9 @@ export function formFromResourceRequest(request) {
     item_name: request.need?.item_name || '',
     quantity: request.need?.quantity || 1,
     unit: request.need?.unit || '',
+    urgency_id: Number(request.urgency?.urgency_id || 2),
     requested_by: request.requested_by || '',
     evacuation_center_id: request.area?.evacuation_center_id || '',
-    urgency_id: '',
     description: request.description || '',
     validation_status: request.validation?.key || 'needs_validation',
     validation_notes: request.validation_notes || '',
@@ -60,15 +51,19 @@ export function buildCreatePayload(form) {
     item_name: emptyToNull(form.item_name),
     quantity: Number(form.quantity) || 1,
     unit: emptyToNull(form.unit),
+    urgency_id: Number(form.urgency_id) || 2,
     requested_by: form.requested_by,
     evacuation_center_id: emptyToNull(form.evacuation_center_id),
-    urgency_id: form.urgency_id ? Number(form.urgency_id) : null,
     description: emptyToNull(form.description),
   }
 }
 
 export function buildUpdatePayload(form) {
-  return buildCreatePayload(form)
+  return {
+    ...buildCreatePayload(form),
+    validation_notes: emptyToNull(form.validation_notes),
+    validation_status: emptyToNull(form.validation_status),
+  }
 }
 
 export function buildValidationPayload(form) {
@@ -89,14 +84,14 @@ export function buildForwardPayload(form) {
 
 export function buildReturnPayload(form) {
   return {
-    validation_notes: form.validation_notes || 'Returned for missing information or duplicate check.',
+    validation_notes: form.validation_notes || '',
     missing_information: emptyToNull(form.missing_information),
     duplicate_request_id: emptyToNull(form.duplicate_request_id),
   }
 }
 
 export function filterParams(search, purok, activeChip, page = 1, period = 'week') {
-  const chip = requestChips.find((item) => item.key === activeChip)
+  const [filterType, filterValue] = String(activeChip).split(':', 2)
 
   return {
     search: search.trim(),
@@ -104,7 +99,8 @@ export function filterParams(search, purok, activeChip, page = 1, period = 'week
     page,
     per_page: 5,
     period,
-    ...(chip?.params || {}),
+    ...(filterType === 'status' && filterValue ? { status: filterValue } : {}),
+    ...(filterType === 'category' && filterValue ? { category: filterValue } : {}),
   }
 }
 
@@ -116,7 +112,7 @@ export function resourceRequestErrorMessage(error, fallback = 'Unable to save th
     return Array.isArray(firstError) ? firstError[0] : 'Please check the request form.'
   }
 
-  return data?.message || fallback
+  return data?.message || error?.message || fallback
 }
 
 export function displayText(value, fallback = '-') {

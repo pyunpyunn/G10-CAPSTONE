@@ -1,12 +1,17 @@
+import { statusColor } from '../../utils/statusPalette'
 import { MapPin } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
 
-export default function HouseholdTable({ households, meta, selectedPurok, onOpen, onPageChange, onDispatchPurok }) {
+export default function HouseholdTable({ households, meta, selectedPurok, onOpen, onPageChange, onDispatchPurok, actions }) {
   const hasPurokFilter = selectedPurok && selectedPurok !== 'all'
 
   if (households.length === 0) {
     return (
       <div className="hh-tbl-wrap">
+        <div className="hh-tbl-topbar">
+          <span className="hh-tbl-label">Households</span>
+          <div className="hh-tbl-tools">{actions}</div>
+        </div>
         <EmptyState title="No households found" message="Try another search, purok, status, or device filter." />
       </div>
     )
@@ -16,11 +21,14 @@ export default function HouseholdTable({ households, meta, selectedPurok, onOpen
     <div className="hh-tbl-wrap">
       <div className="hh-tbl-topbar">
         <span className="hh-tbl-label">Households</span>
-        {hasPurokFilter && (
-          <button className="btn btn-primary btn-sm" type="button" onClick={() => onDispatchPurok(selectedPurok)}>
-            Dispatch team to this purok
-          </button>
-        )}
+        <div className="hh-tbl-tools">
+          {actions}
+          {hasPurokFilter && (
+            <button className="btn btn-primary btn-sm" type="button" onClick={() => onDispatchPurok(selectedPurok)}>
+              Dispatch team to this purok
+            </button>
+          )}
+        </div>
       </div>
       <div className="table-scroll">
         <table className="household-table">
@@ -64,13 +72,13 @@ export default function HouseholdTable({ households, meta, selectedPurok, onOpen
 }
 
 export function StatusBadge({ status }) {
-  const key = status?.key || 'unchecked'
-  const label = status?.label || 'Unchecked'
-  return <span className={`status-badge ${key}`}>{label}</span>
+  const key = status?.key || 'unknown'
+  const label = status?.label || 'Status unavailable'
+  return <span className={`status-badge ${key}`} style={{ '--status-color': statusColor(key) }}>{label}</span>
 }
 
 export function PriorityPill({ priority }) {
-  return <span className={`risk-pill ${priority?.key || 'stable'}`}>{priority?.label || 'Stable'}</span>
+  return <span className={`risk-pill ${priority?.key || 'unknown'}`}>{priority?.label || 'Priority unavailable'}</span>
 }
 
 function Pagination({ meta, onPageChange }) {
