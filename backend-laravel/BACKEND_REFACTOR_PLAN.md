@@ -92,7 +92,7 @@ flowchart LR
 | Presenter | computed display output shared by API/export/report where appropriate | persistence or HTTP validation |
 | Integration adapter/job | SMS, OneSignal, weather/routing/TrackingAid calls and retry policy | operational DB transaction spanning a network call |
 
-Do not create one Resource/Presenter for every service as a goal. Create one when there is a stable response boundary worth naming. Do not add repositories for every model; retain the current `HouseholdRepository` and add a repository only when it establishes a concrete persistence boundary.
+Do not create one Resource/Presenter for every service as a goal. Create one when there is a stable response boundary worth naming. Use Eloquent models and focused query classes directly by default. Add a domain repository only when it establishes a concrete persistence boundary that is used by the application; avoid generic CRUD wrappers that only duplicate Eloquent.
 
 ## 4. Execution sequence and gates
 

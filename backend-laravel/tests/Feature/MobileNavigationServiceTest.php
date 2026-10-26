@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Api\MobileNavigationController;
 use App\Services\Navigation\MobileNavigationService;
+use App\Services\Shared\ValhallaRoutingService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -120,6 +122,47 @@ class MobileNavigationServiceTest extends TestCase
         $this->assertSame('HH-C',$next['dispatches'][0]->household_id);
         $this->assertSame(['HH-C'],$next['dispatches'][0]->household_ids);
         $this->assertSame(['HH-C'],$next['households']->pluck('household_id')->all());
+    }
+
+    public function test_rescuer_can_request_a_road_route_to_an_active_evacuation_center(): void
+    {
+        Schema::create('responders', function (Blueprint $table): void {
+            $table->integer('responder_id');
+            $table->string('user_id');
+            $table->integer('team_id');
+        });
+        DB::table('responders')->insert(['responder_id' => 5, 'user_id' => 'rescuer-5', 'team_id' => 7]);
+        DB::table('evacuation_centers')->insert([
+            'evacuation_center_id' => 'EC-1',
+            'name' => 'Evacuation site',
+            'latitude' => 10.3,
+            'longitude' => 123.9,
+            'status' => 'active',
+        ]);
+
+        $routing = \Mockery::mock(ValhallaRoutingService::class);
+        $routing->shouldReceive('routeBetween')
+            ->once()
+            ->with(
+                ['latitude' => 10.29, 'longitude' => 123.88, 'profile' => 'pedestrian'],
+                ['latitude' => 10.3, 'longitude' => 123.9],
+                'pedestrian',
+            )
+            ->andReturn(['polyline6' => 'encoded-route', 'steps' => [], 'distance_m' => 420, 'duration_s' => 90]);
+        $request = Request::create('/api/v1/rescuer/evacuation-centers/EC-1/route', 'POST', [
+            'latitude' => 10.29,
+            'longitude' => 123.88,
+            'profile' => 'pedestrian',
+        ]);
+        $request->setUserResolver(fn () => (object) ['user_id' => 'rescuer-5']);
+
+        $response = app(MobileNavigationController::class)->evacuationCenterRoadRoute($request, 'EC-1', $routing);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('encoded-route', $response->getData(true)['data']['polyline6']);
+        $this->assertSame('EC-1', $response->getData(true)['data']['evacuation_center_id']);
+        $this->assertSame('Evacuation site', $response->getData(true)['data']['destination_label']);
+        $this->assertSame('ready', $response->getData(true)['data']['status']);
     }
 
     private function createBootstrapTables(): void
