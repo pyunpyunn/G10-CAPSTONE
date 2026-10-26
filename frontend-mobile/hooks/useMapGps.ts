@@ -9,7 +9,14 @@ export function useMapGps(enabled: boolean) {
     setPosition(null);
     setError('');
     if (!enabled) return;
-    const unsubscribe = subscribeRescuerPosition(fix => setPosition({ latitude: fix.coords.latitude, longitude: fix.coords.longitude, accuracy_m: fix.coords.accuracy }), setError);
+    const unsubscribe = subscribeRescuerPosition(fix => {
+      if (fix.coords.accuracy != null && fix.coords.accuracy > 75) {
+        setError('GPS accuracy is limited. Move to an open area.');
+        return;
+      }
+      setError('');
+      setPosition({ latitude: fix.coords.latitude, longitude: fix.coords.longitude, accuracy_m: fix.coords.accuracy });
+    }, setError);
     const stop = hasActiveRescuerTracking() ? () => {} : watchForegroundMapGps(point => { if (!hasActiveRescuerTracking()) setPosition(point); }, problem => { if (!hasActiveRescuerTracking()) setError(problem); });
     return () => { unsubscribe(); stop(); };
   }, [enabled]);

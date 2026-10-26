@@ -17,6 +17,7 @@ let removeForeground: (() => void) | null = null;
 let controller: AbortController | null = null;
 let latest: Location.LocationObject | null = null;
 let pending: Location.LocationObject | null = null;
+let lastUploaded: Location.LocationObject | null = null;
 let sending = false;
 let lastRouteAt = 0;
 let watchdog: ReturnType<typeof setInterval> | null = null;
@@ -24,6 +25,24 @@ let acquiring = false;
 const listeners = new Set<(fix: Location.LocationObject) => void>();
 const errors = new Set<(message: string) => void>();
 const report = (message: string) => errors.forEach(fn => fn(message));
+
+function distanceMeters(first: Location.LocationObject, second: Location.LocationObject): number {
+  const radians = Math.PI / 180;
+  const latitudeDelta = (second.coords.latitude - first.coords.latitude) * radians;
+  const longitudeDelta = (second.coords.longitude - first.coords.longitude) * radians;
+  const latitude1 = first.coords.latitude * radians;
+  const latitude2 = second.coords.latitude * radians;
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(longitudeDelta / 2) ** 2;
+  return 12742000 * Math.atan2(Math.sqrt(haversine), Math.sqrt(Math.max(0, 1 - haversine)));
+}
+
+function shouldUpload(fix: Location.LocationObject): boolean {
+  if (!lastUploaded) return true;
+  const elapsedMs = Date.now() - lastUploaded.timestamp;
+  if (elapsedMs >= 60000) return true;
+  return elapsedMs >= 15000 && distanceMeters(lastUploaded, fix) >= 15;
+}
 
 export function validLiveFix(fix: Location.LocationObject): boolean {
   const c = fix?.coords;
@@ -42,6 +61,11 @@ async function publish(fix: Location.LocationObject, expected = generation) {
   if (paused || !target || expected !== generation || !validLiveFix(fix) || (latest && fix.timestamp < latest.timestamp)) return;
   latest = fix;
   listeners.forEach(fn => fn(fix));
+  if (fix.coords.accuracy != null && fix.coords.accuracy > 75) {
+    report('GPS accuracy is limited. Move to an open area.');
+    return;
+  }
+  if (!shouldUpload(fix)) return;
   pending = fix;
   if (sending) return;
   sending = true;
@@ -51,12 +75,13 @@ async function publish(fix: Location.LocationObject, expected = generation) {
       const owner = target;
       if (await getStoredItem(tokenKey) !== owner.session || expected !== generation) return;
       controller = new AbortController();
-      const refresh = Date.now() - lastRouteAt > 20000;
+      const refresh = Date.now() - lastRouteAt > 60000;
       try {
         await api.post(`/rescuer/assignments/${owner.assignmentId}/location`, {
           latitude: point.coords.latitude, longitude: point.coords.longitude, accuracy_m: point.coords.accuracy,
           recorded_at: new Date(point.timestamp).toISOString(), refresh_route: refresh,
         }, { signal: controller.signal });
+        lastUploaded = point;
         if (refresh) lastRouteAt = Date.now();
         if (expected === generation) report(point.coords.accuracy != null && point.coords.accuracy > 75 ? 'GPS accuracy is limited.' : '');
       } catch (error: any) {
@@ -71,7 +96,7 @@ async function publish(fix: Location.LocationObject, expected = generation) {
 async function acquireCurrent(expected: number) {
   if (acquiring || expected !== generation || !target) return;
   acquiring = true;
-  try { await publish(await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest }), expected); }
+  try { await publish(await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }), expected); }
   catch { if (expected === generation) report('Waiting for current GPS. Check device location settings.'); }
   finally { acquiring = false; }
 }
@@ -94,7 +119,7 @@ export function configureRescuerTracking(assignmentId: number | null) {
   paused = true;
   controller?.abort(); watcher?.remove(); watcher = null;
   removeForeground?.(); removeForeground = null;
-  target = null; pending = null; latest = null;
+  target = null; pending = null; latest = null; lastUploaded = null;
   if (watchdog) clearInterval(watchdog); watchdog = null;
   setup = setup.catch(() => {}).then(async () => {
     if (Platform.OS !== 'web' && await Location.hasStartedLocationUpdatesAsync(task)) await Location.stopLocationUpdatesAsync(task);
@@ -112,7 +137,7 @@ export function configureRescuerTracking(assignmentId: number | null) {
       if (!(await Location.requestForegroundPermissionsAsync()).granted) { report('Enable precise location for active rescue tracking.'); return; }
       if (requestGeneration !== generation) return;
       void acquireCurrent(requestGeneration);
-      const subscription = await Location.watchPositionAsync({ accuracy: Location.Accuracy.Highest, timeInterval: 3000, distanceInterval: 0, mayShowUserSettingsDialog: true }, fix => { void publish(fix, requestGeneration); });
+      const subscription = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 5, mayShowUserSettingsDialog: true }, fix => { void publish(fix, requestGeneration); });
       if (requestGeneration !== generation) subscription.remove(); else watcher = subscription;
     };
     const appState = AppState.addEventListener('change', state => {
@@ -127,7 +152,7 @@ export function configureRescuerTracking(assignmentId: number | null) {
     if (Platform.OS !== 'web') {
       try {
         if ((await Location.requestBackgroundPermissionsAsync()).granted && requestGeneration === generation) {
-          await Location.startLocationUpdatesAsync(task, { accuracy: Location.Accuracy.Highest, timeInterval: 5000, distanceInterval: 0,
+          await Location.startLocationUpdatesAsync(task, { accuracy: Location.Accuracy.High, timeInterval: 10000, distanceInterval: 10,
             pausesUpdatesAutomatically: false, showsBackgroundLocationIndicator: true,
             foregroundService: { notificationTitle: 'RESQPERATION · Active rescue GPS', notificationBody: 'Your current location is shared with HQ during this assignment.', killServiceOnDestroy: false } });
         } else if (requestGeneration === generation) report('Allow background location to update HQ while the screen is locked.');

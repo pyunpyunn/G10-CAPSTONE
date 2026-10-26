@@ -17,6 +17,43 @@ use Illuminate\Support\Facades\DB;
 
 class MobileNavigationController extends Controller
 {
+    public function evacuationCenterRoadRoute(Request $request, string $centerId, ValhallaRoutingService $routing): JsonResponse
+    {
+        $origin = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'profile' => ['nullable', 'in:auto,pedestrian'],
+        ]);
+        abort_unless(DB::table('responders')->where('user_id', $request->user()->user_id)->exists(), 403, 'This account has no rescuer profile.');
+
+        $center = DB::table('evacuation_centers')
+            ->where('evacuation_center_id', $centerId)
+            ->where('status', 'active')
+            ->whereNull('deleted_at')
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->first(['evacuation_center_id', 'name', 'latitude', 'longitude']);
+        abort_unless($center, 404, 'This evacuation center is unavailable or has no mapped location.');
+
+        try {
+            $route = $routing->routeBetween(
+                $origin,
+                ['latitude' => (float) $center->latitude, 'longitude' => (float) $center->longitude],
+                $origin['profile'] ?? 'auto',
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+            abort(503, 'Road routing is unavailable. Keep the map open and retry when the connection improves.');
+        }
+        abort_unless($route, 422, 'No road route is available to this evacuation center.');
+
+        return response()->json(['data' => $route + [
+            'evacuation_center_id' => $center->evacuation_center_id,
+            'destination_label' => $center->name,
+            'status' => 'ready',
+        ]]);
+    }
+
     public function assignedRoadRoute(Request $request, int $assignmentId): JsonResponse
     {
         $payload = $request->validate([

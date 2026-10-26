@@ -1,10 +1,35 @@
 # Standalone Android APK
 
-## Verified release — version 1.0.0, build 6
+## Latest verified local APK — version 1.0.0, build 39
+
+Local copy: [`releases/RESQPERATION-build39.apk`](./releases/RESQPERATION-build39.apk).
+
+- Download: **22,422,497 bytes**.
+- Package: `com.kathlnbarro.resqperationmobile`; version code **39**; not debuggable.
+- APK Signature Scheme v2 verification passed using the existing release certificate.
+- SHA-256:
+  `A95B50AE93F037CDC87AB4C6A4A03098D0FECA59B73A2491EA50291FC7664464`.
+- The rescuer’s native map now uses MapLibre instead of the embedded Leaflet map.
+  It draws only the selected evacuation-center road route, requested from the
+  rescuer’s current GPS position. Deploy the matching backend before using this
+  route button.
+- Foreground GPS samples every 5 seconds / 5 meters; background samples every
+  10 seconds / 10 meters. HQ uploads are limited to meaningful movement or a
+  60-second stationary heartbeat; road-route recalculation is limited to once
+  per minute and inaccurate fixes are not uploaded.
+- Type-check, focused GPS/map tests, backend route tests, production build, APK
+  identity and signature checks passed. The full mobile suite had 73 passing
+  tests and four unrelated `householdAlerts` test-fixture failures. Physical
+  device performance and live routing still need to be checked on target phones.
+
+## Historical GitHub release — version 1.0.0, build 6
 
 [Download the signed APK from GitHub](https://github.com/pyunpyunn/G10-CAPSTONE/releases/download/v1.0.0-build6/RESQPERATION.apk)
 
 Local copy: `releases/RESQPERATION.apk`.
+
+The build 6 release details below are retained as historical documentation;
+build 39 above is the latest local APK.
 
 - Download: **24,303,289 bytes (24.3 MB / 23.18 MiB)**.
 - Previous development APK: 227,634,757 bytes; this release is **89.3% smaller**.

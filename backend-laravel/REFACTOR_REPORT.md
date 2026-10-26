@@ -260,7 +260,7 @@ No index migration files were added. The audit shows common join/filter candidat
 - Existing route URLs, HTTP methods, field names, and JSON response shapes are compatibility constraints.
 - `resq_local` is the operational connection; `trackingaid` is a separate integration connection.
 - SQL dump working copies must remain on disk but must not remain tracked.
-- Keep `RepositoryInterface` and `HouseholdRepository`; do not add repositories for every model.
+- Updated 2026-10-27: removed the unused generic repository scaffold and unconsumed `HouseholdRepository`; use Eloquent or a focused query class by default, adding a domain repository only for a concrete persistence boundary.
 - No before/after query count is claimed without repeatable local fixtures.
 
 ## Before / after service line counts

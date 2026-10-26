@@ -8,6 +8,10 @@ The architecture target remains incomplete. A source scan still finds **205 `res
 
 **Verdict: partially implemented; not ready to mark A1, A2, or A3 complete.** This audit supersedes the earlier completion statements in `REFACTOR_REPORT.md`. Application PHP code was not changed during this audit. No shared database or external delivery API was contacted.
 
+## Laravel-native cleanup — 2026-10-27
+
+Removed the unused generic `RepositoryInterface`/`EloquentRepository`, the unconsumed `HouseholdRepository`, and their provider registration. No application code referenced these classes. Eloquent models and focused query classes remain the default persistence/read tools; a domain repository should be introduced only for a real, consumed persistence boundary. This is a small cleanup and does not complete the broader A1–A3 work below.
+
 ## Evidence and limits
 
 - The existing SQLite in-memory suite passes: **55 tests, 201 assertions** (`php artisan test --compact`).
@@ -28,7 +32,7 @@ The architecture target remains incomplete. A source scan still finds **205 `res
 | A1: no accidental relationship queries from Resources | Partial | RescuerMobileUserResource uses `whenLoaded()`. UserResource calls roleKey/roleName, and User::roleKey invokes loadMissing when the role is absent. |
 | A2: scopes/eager loading/Query Objects | Partial | 19 Query classes exist; Household::scopeSearch and DisasterEvent::scopeActive exist. GlobalSearchService and WeatherSnapshotService still construct reads; DashboardQuery and MappingQuery return presentation data. |
 | A2: eliminate hidden N+1, measure before/after | Not demonstrated | MappingQuery invokes a member-status query per household needing fallback; ResourceRequestPresenter calls TrackingAid lookup per row. No count comparison was found. |
-| A2: avoid repositories for every model | Met in current layout | RepositoryInterface, EloquentRepository, and HouseholdRepository remain the only repository classes/interfaces. |
+| A2: avoid repositories for every model | Met | No repository abstraction remains. Eloquent models and focused query classes are used directly; add a domain repository only for a concrete persistence boundary. |
 | A3: replace persistence JSON helpers with casts | Not met | 32 json_encode and 4 json_decode call sites remain under Services. Some are request/text encodings and need boundary handling rather than a model cast. |
 | A3: remove/cache schema checks outside request work | Not met | 199 direct Schema::has* calls plus 6 connection-specific calls remain under Services alone; queries/models/presenters add more. |
 | A3: one owner for archive-group persistence, validation, payloads, sequence | Partial | ArchiveSavedGroupWorkflow owns much of the lifecycle, but decoding/filtering also remains in ArchivePresenter and ArchiveQuery. ArchiveGroupManager does not exist. A rename alone would not resolve the split. |

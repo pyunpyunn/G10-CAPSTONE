@@ -39,7 +39,7 @@ import { ActionButton, EmptyState, LoadingState } from '@/components/rescuer/Res
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
-import { configureRescuerTracking, stopRescuerTracking, subscribeRescuerPosition } from '@/utils/rescuerLiveLocation';
+import { configureRescuerTracking, stopRescuerTracking } from '@/utils/rescuerLiveLocation';
 import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
@@ -141,17 +141,14 @@ export default function RescuerHomeScreen() {
     [assignments]
   );
 
-  const [gpsStatus, setGpsStatus] = useState('');
   const trackingAssignmentId = activeAssignment?.assignment_id || null;
   useEffect(() => {
     if (Platform.OS === 'web') return;
-    setGpsStatus(trackingAssignmentId ? 'GPS · Acquiring location' : '');
-    void configureRescuerTracking(trackingAssignmentId).catch(() => setGpsStatus('GPS · Enable location access'));
+    void configureRescuerTracking(trackingAssignmentId).catch((error) => {
+      console.error('Rescuer GPS tracking could not start.', error);
+    });
     return () => { void stopRescuerTracking(); };
   }, [trackingAssignmentId]);
-  useEffect(() => subscribeRescuerPosition(fix => {
-    setGpsStatus(`GPS · ${new Date(fix.timestamp).toLocaleTimeString()} · ±${Math.round(fix.coords.accuracy || 0)} m`);
-  }, problem => { if (problem) setGpsStatus(problem); }), []);
   useEffect(() => {
     if (!trackingAssignmentId) return;
     const timer = setInterval(() => {
@@ -216,12 +213,6 @@ export default function RescuerHomeScreen() {
     }
   }
 
-  async function handleSendLocation(assignmentId: number, payload: any) {
-    const result = await sendAssignmentLocation(assignmentId, payload);
-    if (payload.refresh_route && result.data) setOverview(current => current ? { ...current, assignments: current.assignments.map(item => Number(item.assignment_id) === Number(assignmentId) ? { ...item, route: result.data.route } : item) } : current);
-    if (payload.refresh_route && result.data && !result.data.route) throw new Error('GPS saved. Current directions unavailable.');
-  }
-
   async function currentLocationPayload() {
     const permission = await Location.requestForegroundPermissionsAsync();
 
@@ -239,6 +230,18 @@ export default function RescuerHomeScreen() {
       longitude: location.coords.longitude,
       accuracy_m: location.coords.accuracy,
     };
+  }
+
+  async function handleSendLocation(assignmentId: number, payload: any) {
+    const result = await sendAssignmentLocation(assignmentId, payload);
+    if (payload.refresh_route && result.data) setOverview(current => current ? {
+      ...current,
+      assignments: current.assignments.map(item => Number(item.assignment_id) === Number(assignmentId)
+        ? { ...item, route: result.data.route } : item),
+    } : current);
+    if (payload.refresh_route && result.data && !result.data.route) {
+      throw new Error('GPS saved. Current directions unavailable.');
+    }
   }
 
   async function handleSubmitFieldReport(payload: any) {
@@ -382,7 +385,6 @@ export default function RescuerHomeScreen() {
             </Pressable>
           </View>
         ) : null}
-        {!!trackingAssignmentId && !!gpsStatus && <Text accessibilityRole="text" style={{ color: palette.textSoft, fontSize: 12 }}>{gpsStatus}</Text>}
         {renderContent()}
       </ScrollView>
 
