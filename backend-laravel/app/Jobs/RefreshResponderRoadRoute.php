@@ -17,6 +17,6 @@ class RefreshResponderRoadRoute implements ShouldQueue
 
     public function handle(RescuerAssignmentWorkflow $workflow): void
     {
-        $workflow->refreshPlannedRoadRoute($this->assignmentId, $this->start);
+        $workflow->refreshPlannedRoadRoute($this->assignmentId, $this->start + ['_latest_location_only' => true]);
     }
 }

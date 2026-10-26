@@ -16,12 +16,12 @@ class HealthEndpointsTest extends TestCase
 
     public function test_health_routes_are_public_and_preserve_their_success_contracts(): void
     {
-        config(['database.default' => 'resq_local']);
-        config(['database.connections.resq_local' => array_merge(
+        config(['database.default' => 'mysql']);
+        config(['database.connections.mysql' => array_merge(
             config('database.connections.sqlite'),
             ['database' => ':memory:'],
         )]);
-        DB::purge('resq_local');
+        DB::purge('mysql');
 
         $this->getJson('/api/v1/health/live')
             ->assertOk()
@@ -35,12 +35,12 @@ class HealthEndpointsTest extends TestCase
 
     public function test_readiness_checks_only_the_operational_database_connection(): void
     {
-        config(['database.default' => 'resq_local']);
-        config(['database.connections.resq_local' => array_merge(
+        config(['database.default' => 'mysql']);
+        config(['database.connections.mysql' => array_merge(
             config('database.connections.sqlite'),
             ['database' => ':memory:'],
         )]);
-        DB::purge('resq_local');
+        DB::purge('mysql');
 
         $this->getJson('/api/v1/health/ready')
             ->assertOk()
@@ -48,10 +48,10 @@ class HealthEndpointsTest extends TestCase
             ->assertHeader('X-Request-ID');
     }
 
-    public function test_readiness_returns_safe_503_when_local_database_connection_fails(): void
+    public function test_readiness_returns_safe_503_when_operational_database_connection_fails(): void
     {
-        config(['database.default' => 'resq_local']);
-        config(['database.connections.resq_local' => array_merge(
+        config(['database.default' => 'mysql']);
+        config(['database.connections.mysql' => array_merge(
             config('database.connections.mysql'),
             [
                 'host' => '127.0.0.1',
@@ -62,13 +62,32 @@ class HealthEndpointsTest extends TestCase
                 'options' => [\PDO::ATTR_TIMEOUT => 1],
             ],
         )]);
-        DB::purge('resq_local');
+        DB::purge('mysql');
 
         $response = $this->getJson('/api/v1/health/ready');
 
         $response->assertStatus(503)
             ->assertJsonStructure(['status', 'message', 'request_id'])
             ->assertJsonPath('status', 'unavailable')
+            ->assertJsonPath('message', 'Database unreachable.')
+            ->assertHeader('X-Request-ID');
+    }
+
+    public function test_database_backed_api_requests_fail_fast_when_mysql_is_unreachable(): void
+    {
+        config(['database.default' => 'mysql']);
+        config(['database.connections.mysql' => array_merge(
+            config('database.connections.mysql'),
+            [
+                'host' => '127.0.0.1',
+                'port' => 1,
+                'database' => 'preflight_test',
+            ],
+        )]);
+
+        $this->getJson('/api/v1/health/ready')
+            ->assertStatus(503)
+            ->assertJsonStructure(['message', 'request_id'])
             ->assertJsonPath('message', 'Database unreachable.')
             ->assertHeader('X-Request-ID');
     }
@@ -88,5 +107,3 @@ class HealthEndpointsTest extends TestCase
             ->assertHeader('X-Request-ID');
     }
 }
-
-

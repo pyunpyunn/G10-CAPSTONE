@@ -5,6 +5,7 @@ import { searchGlobalRecords } from '../../api/globalSearchApi'
 import { markNotificationsRead, subscribeNotifications } from '../../api/notificationApi'
 import { notificationErrorMessage } from '../../utils/notificationHelpers'
 import { canOpenWebPage, hasWebAccess } from '../../utils/personnelAccess'
+import { searchResultDestination } from '../../utils/personnelNavigation'
 
 const searchTypes = [
   { id: 'pages', label: 'Pages' },
@@ -204,7 +205,8 @@ export default function Topbar({ user, onMouseEnter, onMouseLeave, onFocusCaptur
     setIsSearchOpen(false)
     setIsFilterOpen(false)
     setSearchTerm('')
-    navigate(result.href)
+    const destination = searchResultDestination(result)
+    navigate(destination.to, { state: destination.state })
   }
 
   function toggleSearchType(typeId) {
@@ -447,12 +449,10 @@ function getPageTitle(pathname, state) {
   }
 
   if (/^\/rescue-management\/[^/]+\/edit$/.test(normalizedPath)) return 'Update Dispatch Assignment'
-
   if (navigationTitles[normalizedPath]) return navigationTitles[normalizedPath]
-
   const page = searchablePages.find((item) => item.href === normalizedPath)
-
   if (page) return page.title
+  if (normalizedPath === '/households/_data-directory') return 'Household Data Directory'
   if (normalizedPath === '/households/_household-list') return 'Household List'
   if (normalizedPath.startsWith('/households/')) return 'Household Account View'
   if (normalizedPath === '/dispatch/new') return state?.dispatch ? 'Update Dispatch Assignment' : 'Create New Dispatch Assignment'

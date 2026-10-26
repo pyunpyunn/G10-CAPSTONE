@@ -9,9 +9,9 @@ OneSignal configuration, device requirements, and measured build sizes.
 
 [**Download Android APK — 24.3 MB (version 1.0.0, build 6)**](https://github.com/pyunpyunn/G10-CAPSTONE/releases/download/v1.0.0-build6/RESQPERATION.apk)
 
-For 64-bit Android 7.0+. Follow [FIRST_RUN_SETUP.md](./FIRST_RUN_SETUP.md) and
-save your Tailscale/LAN address in **Server settings** before signing in. The
-original default in this APK uses the retired ngrok tunnel.
+For 64-bit Android 7.0+. Follow [FIRST_RUN_SETUP.md](./FIRST_RUN_SETUP.md).
+Build 6 uses one manually saved API address; new builds support the automatic
+ngrok → Tailscale → LAN fallback described in [TAILSCALE_LAN.md](./TAILSCALE_LAN.md).
 
 ## Build the downloadable APK
 
@@ -27,17 +27,11 @@ an APK; `npm run build:android:store` builds an AAB for Google Play.
 
 ## Server connection
 
-**Current setup:** use [Tailscale or LAN](./TAILSCALE_LAN.md). The ngrok tunnel
-below is historical; it has been stopped. Future builds default to Tailscale.
-
-The current HTTPS API is
-`https://sturdily-morse-sitter.ngrok-free.dev/api/v1`. It uses an ngrok tunnel to
-the development computer, so Laravel, MySQL, ngrok and the computer must stay
-online. This is not permanent cloud hosting.
-
-Open **Server settings** on sign-in to save another HTTPS API address without
-rebuilding. The mobile app connects to Laravel, which connects to MySQL. It
-never connects directly to the database.
+New builds try the configured ngrok, Tailscale, and LAN routes automatically.
+The ngrok tunnel still must be started on the backend computer. All routes reach
+the same Laravel backend; Laravel's environment configuration determines the
+database. The mobile app never connects directly to the database. See
+[automatic fallback setup](./TAILSCALE_LAN.md).
 
 ## Rescuer field reports and requests
 

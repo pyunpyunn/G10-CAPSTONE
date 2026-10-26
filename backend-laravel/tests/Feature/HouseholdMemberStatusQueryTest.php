@@ -37,6 +37,27 @@ class HouseholdMemberStatusQueryTest extends TestCase
         $this->assertNull($query->householdHead('hh-1'));
     }
 
+    public function test_household_report_does_not_supply_an_unassessed_members_status(): void
+    {
+        Schema::create('household_statuses', function ($table) {
+            $table->integer('status_id')->primary(); $table->string('status_key'); $table->string('status_label');
+        });
+        Schema::create('household_status_logs', function ($table) {
+            $table->integer('status_log_id')->primary(); $table->string('household_id'); $table->string('disaster_id');
+            $table->integer('status_id'); $table->text('notes')->nullable(); $table->timestamp('submitted_at'); $table->timestamp('created_at');
+        });
+        DB::table('household_statuses')->insert(['status_id' => 9, 'status_key' => 'unsafe', 'status_label' => 'Unsafe']);
+        DB::table('household_status_logs')->insert(['status_log_id' => 1, 'household_id' => 'hh-1', 'disaster_id' => 'evt-1', 'status_id' => 9, 'submitted_at' => now(), 'created_at' => now()]);
+        DB::table('member_disaster_statuses')->where('member_id', 12)->delete();
+        $members = app(HouseholdStatusQuery::class)->getMembers('hh-1', 'evt-1', collect());
+        $this->assertSame('Safe', $members[0]['status']['label']);
+        $this->assertSame('member', $members[0]['status_scope']);
+        $this->assertSame('No report', $members[1]['status']['label']);
+        $this->assertNull($members[1]['status_scope']);
+        $otherEvent = app(HouseholdStatusQuery::class)->getMembers('hh-1', 'evt-other', collect());
+        $this->assertSame('No report', $otherEvent[1]['status']['label']);
+    }
+
     protected function createMemberStatusTables(): void
     {
         Schema::dropIfExists('device_tracking_logs');

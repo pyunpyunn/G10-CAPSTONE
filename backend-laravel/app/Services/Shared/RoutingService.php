@@ -24,7 +24,7 @@ class RoutingService
                 ->get($baseUrl.'/route/v1/driving/'.$coordinates, [
                     'overview' => 'full',
                     'geometries' => 'geojson',
-                    'steps' => 'false',
+                    'steps' => 'true',
                 ]);
 
             if (! $response->successful()) {
@@ -50,7 +50,29 @@ class RoutingService
                 return null;
             }
 
+            $steps = [];
+            $cursor = 0;
+            foreach ($route['legs'] ?? [] as $leg) {
+                foreach ($leg['steps'] ?? [] as $step) {
+                    $location = $step['maneuver']['location'] ?? null;
+                    if (! is_array($location)) continue;
+                    $best = INF;
+                    for ($i = $cursor; $i < count($points); $i++) {
+                        $delta = ($points[$i]['lat'] - $location[1]) ** 2 + ($points[$i]['lng'] - $location[0]) ** 2;
+                        if ($delta < $best) { $best = $delta; $index = $i; }
+                    }
+                    $cursor = $index ?? $cursor;
+                    $maneuver = $step['maneuver'];
+                    $instruction = ucfirst(str_replace('_', ' ', $maneuver['type'] ?? 'continue'));
+                    if (! empty($maneuver['modifier'])) $instruction .= ' '.$maneuver['modifier'];
+                    if (! empty($step['name'])) $instruction .= ' onto '.$step['name'];
+                    $steps[] = ['instruction' => $instruction, 'distance_m' => (int) round($step['distance'] ?? 0),
+                        'maneuver_type' => 0, 'polyline_index' => $cursor];
+                }
+            }
+
             return [
+                'steps' => $steps,
                 'provider' => 'OSRM / OpenStreetMap',
                 'distance_km' => round(((float) ($route['distance'] ?? 0)) / 1000, 2),
                 'duration_min' => max(1, (int) round(((float) ($route['duration'] ?? 0)) / 60)),

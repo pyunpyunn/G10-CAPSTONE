@@ -19,6 +19,22 @@ use Tests\TestCase;
 
 class RescuerMobileResourcesTest extends TestCase
 {
+    public function test_field_report_notes_show_only_the_rescuers_text_and_preserve_legacy_notes(): void
+    {
+        foreach ([
+            [json_encode(['report_type' => 'rescuer_field_report', 'user_notes' => "test notes\nSecond line", 'members' => [['status_key' => 'safe']]]), "test notes\nSecond line"],
+            [json_encode(['report_type' => 'rescuer_field_report', 'user_notes' => null]), null],
+            [json_encode(['report_type' => 'rescuer_field_report']), null],
+            ['Older plain text report', 'Older plain text report'],
+            [null, null],
+        ] as [$stored, $expected]) {
+            $row = (object) ['status_log_id' => 1, 'household_id' => 'HH-1', 'latitude' => null,
+                'longitude' => null, 'battery_level' => null, 'notes' => $stored, 'submitted_at' => null];
+            $data = (new \App\Http\Resources\RescuerMobileFieldReportResource($row))->resolve(Request::create('/'));
+            $this->assertSame($expected, $data['notes']);
+        }
+    }
+
     public function test_profile_resource_preserves_the_existing_nested_profile_contract(): void
     {
         $user = new User;
@@ -334,6 +350,9 @@ class RescuerMobileResourcesTest extends TestCase
     {
         $response = (new RescuerMobileRouteResource((object) [
             'route_id' => 4,
+            'responder_id' => 5,
+            'household_id' => 'HH-A',
+            'navigation_steps' => '[{"instruction":"Turn right","polyline_index":1}]',
             'route_status' => null,
             'route_name' => null,
             'estimated_distance_km' => '1.25',
@@ -346,6 +365,9 @@ class RescuerMobileResourcesTest extends TestCase
 
         $this->assertSame(['data' => [
             'route_id' => 4,
+            'responder_id' => 5,
+            'household_id' => 'HH-A',
+            'steps' => [['instruction' => 'Turn right', 'polyline_index' => 1]],
             'route_status' => 'active',
             'route_name' => 'Road route',
             'distance_km' => '1.25',

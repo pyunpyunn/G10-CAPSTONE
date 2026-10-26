@@ -34,10 +34,15 @@ export function MobileLeafletMap({
   followPosition?: { latitude: number; longitude: number } | null;
 }) {
   const webView = useRef<import('react-native-webview').WebView>(null);
-  const html = geotagPicker
-    ? mobileLeafletHtml({ markers: [], routes: [], geotagPicker: true, geotagMode })
-    : mobileLeafletHtml({ markers, routes, center, interactive: !!onMapPress });
+  const initialMap = useRef<string | null>(null);
+  if (initialMap.current === null) initialMap.current = mobileLeafletHtml({ markers, routes, center, interactive: !!onMapPress });
+  const html = geotagPicker ? mobileLeafletHtml({ markers: [], routes: [], geotagPicker: true, geotagMode }) : initialMap.current;
   const source = useMemo(() => ({ html }), [html]);
+  const layerPayload = JSON.stringify({ markers, routes }).replace(/</g, '\\u003c');
+  const updateLayers = useCallback(() => {
+    if (!geotagPicker) webView.current?.injectJavaScript(`window.updateRescueData?.(${layerPayload}); true;`);
+  }, [geotagPicker, layerPayload]);
+  useEffect(updateLayers, [updateLayers]);
   const latitude = selectedPoint?.latitude;
   const longitude = selectedPoint?.longitude;
   const updatePin = useCallback(() => {
@@ -78,7 +83,7 @@ export function MobileLeafletMap({
         ref={webView}
         originWhitelist={['*']}
         source={source}
-        onLoadEnd={() => { updatePin(); updateGps(); }}
+        onLoadEnd={() => { updateLayers(); updatePin(); updateGps(); }}
         onMessage={(event) => {
           try {
             const point = JSON.parse(event.nativeEvent.data);

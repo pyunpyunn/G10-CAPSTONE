@@ -17,6 +17,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true,
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         },
@@ -34,6 +36,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO",
@@ -90,6 +93,16 @@
             "enableBundleCompression": true,
             "useLegacyPackaging": true
           }
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow RESQPERATION to track your active rescue location.",
+          "locationAlwaysAndWhenInUsePermission": "Allow RESQPERATION to keep HQ updated during an active rescue, including while the screen is locked.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
         }
       ]
     ],

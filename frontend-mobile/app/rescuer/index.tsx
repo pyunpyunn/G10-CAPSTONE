@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMobileOverview } from '@/hooks/useMobileOverview';
+import { useEffect, useMemo, useState } from 'react';
 import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import {
   Alert,
@@ -35,11 +36,13 @@ import { RadioCommunicationScreen } from '@/components/rescuer/RadioCommunicatio
 import { RescueMapScreen } from '@/components/rescuer/RescueMapScreen';
 import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScreen';
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
-import { LoadingState } from '@/components/rescuer/RescuerUI';
+import { ActionButton, EmptyState, LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing, typography } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
-import { mountNavigationSync } from '@/utils/navigationRuntime';
+import { configureRescuerTracking, stopRescuerTracking, subscribeRescuerPosition } from '@/utils/rescuerLiveLocation';
+import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
+import { createAdaptivePoller } from '@/utils/networkScheduling';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 const deviceUuidKey = 'resq_rescuer_device_uuid';
@@ -55,34 +58,16 @@ const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; 
 export default function RescuerHomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
-  const [overview, setOverview] = useState<RescuerOverview | null>(null);
+  const { overview, setOverview, loading, refreshing, fetching, error: overviewError, lastUpdated, loadOverview }
+    = useMobileOverview<RescuerOverview>('rescuer', getRescuerOverview);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   useEffect(() => Platform.OS === 'web' ? undefined : mountNavigationSync(), []);
 
-  const loadOverview = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      const data = await getRescuerOverview(isRefresh);
-      setOverview(data);
-    } catch (error: any) {
-      Alert.alert('Unable to load rescuer data', errorMessage(error));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
 
   useEffect(() => {
     const removeBroadcast = onDisasterBroadcast(() => { void loadOverview(true); });
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void loadOverview(true);
+      if (state === 'active') void loadOverview(true, true);
     });
     return () => { removeBroadcast(); subscription.remove(); };
   }, [loadOverview]);
@@ -127,10 +112,29 @@ export default function RescuerHomeScreen() {
   const activeAssignment = useMemo(
     () =>
       assignments.find((assignment) =>
-        ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(assignment.status_key)
+        ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(assignment.status_key) && (assignment.household_id || !assignment.route_notes?.assigned_household_count)
       ),
     [assignments]
   );
+
+  const [gpsStatus, setGpsStatus] = useState('');
+  const trackingAssignmentId = activeAssignment?.assignment_id || null;
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    setGpsStatus(trackingAssignmentId ? 'GPS · Acquiring location' : '');
+    void configureRescuerTracking(trackingAssignmentId).catch(() => setGpsStatus('GPS · Enable location access'));
+    return () => { void stopRescuerTracking(); };
+  }, [trackingAssignmentId]);
+  useEffect(() => subscribeRescuerPosition(fix => {
+    setGpsStatus(`GPS · ${new Date(fix.timestamp).toLocaleTimeString()} · ±${Math.round(fix.coords.accuracy || 0)} m`);
+  }, problem => { if (problem) setGpsStatus(problem); }), []);
+  useEffect(() => {
+    if (!trackingAssignmentId) return;
+    return createAdaptivePoller(
+      () => AppState.currentState === 'active' ? loadOverview(true, true) : null,
+      { intervalMs: 15000, maxIntervalMs: 60000 },
+    ).start();
+  }, [trackingAssignmentId, loadOverview]);
 
   async function handleLogout() {
     try {
@@ -140,43 +144,46 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleStatusChange(assignmentId: number, status: string) {
+    let completionStatus: 'safe' | 'evacuated' | null = null;
     if (status === 'completed') {
-      const assignment = overview?.assignments.find((item: any) => item.assignment_id === assignmentId);
-      const householdId = assignment?.household_id;
-      const hasSubmittedFieldReport = !householdId || (overview?.field_reports || []).some((report: any) =>
-        String(report.assignment_id) === String(assignmentId)
-        &&
-        String(report.household_id) === String(householdId)
-        && String(report.event_id) === String(assignment?.event_id)
-      );
-
-      if (!hasSubmittedFieldReport) {
-        openReport(assignment);
+      const current = assignments.find((item) => Number(item.assignment_id) === Number(assignmentId));
+      if (current?.status_key !== 'on_scene') {
+        Alert.alert('Arrival required', 'Accept this household, start En route, and mark Arrived before confirming its final status.');
         return;
       }
-      setSelectedAssignment(assignment);
+      completionStatus = await new Promise<'safe' | 'evacuated' | null>((resolve) => {
+        Alert.alert('Complete current household', 'Confirm the household’s official status. This updates HQ records and advances your queue. A detailed field report is optional.', [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+          { text: 'Safe', onPress: () => resolve('safe') },
+          { text: 'Evacuated', onPress: () => resolve('evacuated') },
+        ], { cancelable: true, onDismiss: () => resolve(null) });
+      });
+      if (!completionStatus) return;
     }
 
     try {
       const payload = ['accepted', 'en_route'].includes(status)
         ? await currentLocationPayload()
-        : {};
+        : status === 'completed' ? { household_id: assignments.find((item) => Number(item.assignment_id) === Number(assignmentId))?.household_id, household_status_key: completionStatus } : {};
 
       if (payload === null) {
         return;
       }
 
-      if (status === 'en_route') {
-        await updateAssignmentStatus(assignmentId, 'en_route', payload);
-        await updateAssignmentStatus(assignmentId, 'on_scene', payload);
-      } else {
-        await updateAssignmentStatus(assignmentId, status, payload);
+      await updateAssignmentStatus(assignmentId, status, payload);
+      if (status === 'completed' && Platform.OS !== 'web') {
+        await endNavigationTrip().catch(() => Alert.alert('Household saved', 'The household was completed, but trip recording could not be stopped. Open navigation to stop the trip.'));
       }
 
-      await loadOverview(true);
+      void loadOverview(true, true, true);
+      if (status === 'completed') { setSelectedAssignment(null); setActiveTab('dashboard'); }
 
       if (['accepted', 'en_route'].includes(status)) {
+        setSelectedAssignment(null);
         setActiveTab('map');
+        if (Platform.OS !== 'web') {
+          router.push({ pathname: '/rescuer/navigation' as any, params: { dispatchId: String(assignmentId) } });
+        }
       }
     } catch (error: any) {
       Alert.alert('Unable to update assignment', errorMessage(error));
@@ -184,7 +191,9 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleSendLocation(assignmentId: number, payload: any) {
-    await sendAssignmentLocation(assignmentId, payload);
+    const result = await sendAssignmentLocation(assignmentId, payload);
+    if (payload.refresh_route && result.data) setOverview(current => current ? { ...current, assignments: current.assignments.map(item => Number(item.assignment_id) === Number(assignmentId) ? { ...item, route: result.data.route } : item) } : current);
+    if (payload.refresh_route && result.data && !result.data.route) throw new Error('GPS saved. Current directions unavailable.');
   }
 
   async function currentLocationPayload() {
@@ -208,7 +217,7 @@ export default function RescuerHomeScreen() {
 
   async function handleSubmitFieldReport(payload: any) {
     await createFieldReport(payload);
-    await loadOverview(true);
+    void loadOverview(true, true, true);
   }
 
   async function handleSubmitResourceRequest(payload: any) {
@@ -220,7 +229,7 @@ export default function RescuerHomeScreen() {
     try {
       await createResourceRequest(payload);
       Alert.alert('Request submitted', 'Your request is waiting for HQ validation.');
-      await loadOverview(true);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to submit request', errorMessage(error));
     }
@@ -229,7 +238,7 @@ export default function RescuerHomeScreen() {
   async function handleCancelResourceRequest(requestId: string) {
     try {
       await cancelResourceRequest(requestId);
-      await loadOverview(true);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to cancel request', errorMessage(error));
     }
@@ -267,7 +276,7 @@ export default function RescuerHomeScreen() {
     try {
       await updateRescuerProfile(payload);
       Alert.alert('Profile updated', 'Your profile changes were saved.');
-      await loadOverview(true);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to update profile', errorMessage(error));
       throw error;
@@ -275,8 +284,17 @@ export default function RescuerHomeScreen() {
   }
 
   function renderContent() {
-    if (loading || !overview) {
+    if (loading && !overview) {
       return <LoadingState label="Loading rescuer console..." />;
+    }
+
+    if (!overview) {
+      return (
+        <View style={styles.loadFailure}>
+          <EmptyState icon="cloud-offline-outline" title="Unable to load rescuer data" body={overviewError || 'Check your connection, then try again.'} />
+          <ActionButton label="Try again" icon="refresh-outline" onPress={() => { void loadOverview(); }} />
+        </View>
+      );
     }
 
     if (activeTab === 'dashboard') {
@@ -298,6 +316,11 @@ export default function RescuerHomeScreen() {
           activeAssignment={activeAssignment}
           selectedAssignment={selectedAssignment}
           onSendLocation={handleSendLocation}
+          showNavigationButton={Platform.OS !== 'web'}
+          onOpenNavigation={() => router.push({
+            pathname: '/rescuer/navigation' as any,
+            params: { dispatchId: String(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || '') },
+          })}
         />
       );
     }
@@ -309,6 +332,7 @@ export default function RescuerHomeScreen() {
           assignmentId={Number(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || 0)}
           householdId={String(selectedAssignment?.household_id || activeAssignment?.household_id || '')}
           onSubmitReport={handleSubmitFieldReport}
+          onCompleteHousehold={() => handleStatusChange(Number(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || 0), 'completed')}
         />
       );
     }
@@ -351,11 +375,18 @@ export default function RescuerHomeScreen() {
           />
         }
       >
-        {Platform.OS !== 'web' && <Pressable style={{ padding: 16, backgroundColor: '#e8f1ff', borderRadius: 12 }}
-          onPress={() => router.push({ pathname: '/rescuer/navigation' as any,
-            params: { dispatchId: String(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || '') } })}>
-          <Text style={{ color: '#1358a4', fontWeight: '700' }}>View directions / Offline navigation</Text>
-        </Pressable>}
+        {fetching && overview ? <Text style={styles.refreshErrorText} accessibilityLiveRegion="polite">
+          Updating data. You can keep using the app.{lastUpdated ? ` Last updated ${new Date(lastUpdated).toLocaleTimeString()}.` : ''}
+        </Text> : null}
+        {!!overviewError && overview ? (
+          <View style={styles.refreshError}>
+            <Text style={styles.refreshErrorText}>Could not refresh. Showing previously loaded data. {overviewError}</Text>
+            <Pressable onPress={() => { void loadOverview(true); }} accessibilityRole="button">
+              <Text style={styles.refreshErrorAction}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {!!trackingAssignmentId && !!gpsStatus && <Text accessibilityRole="text" style={{ color: palette.textSoft, fontSize: 12 }}>{gpsStatus}</Text>}
         {renderContent()}
       </ScrollView>
 
@@ -426,6 +457,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: 100,
+  },
+  loadFailure: {
+    gap: spacing.md,
+    alignItems: 'stretch',
+    paddingTop: spacing.xl,
+  },
+  refreshError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: '#96202012',
+  },
+  refreshErrorText: {
+    flex: 1,
+    color: palette.unsafe,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  refreshErrorAction: {
+    color: palette.navActive,
+    fontWeight: '900',
   },
   tabBar: {
     position: 'absolute',

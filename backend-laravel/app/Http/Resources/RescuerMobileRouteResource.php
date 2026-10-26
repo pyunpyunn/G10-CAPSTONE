@@ -14,6 +14,9 @@ class RescuerMobileRouteResource extends JsonResource
 
         return [
             'route_id' => $route->route_id,
+            'responder_id' => $route->responder_id ?? null,
+            'household_id' => $route->household_id ?? null,
+            'steps' => json_decode($route->navigation_steps ?? '[]', true) ?: [],
             'route_status' => $route->route_status ?? 'active',
             'route_name' => $route->route_name ?? 'Road route',
             'distance_km' => $route->estimated_distance_km ?? null,

@@ -107,8 +107,11 @@ class RescuerFieldReportWorkflow
                     : null,
             ])->values();
 
+        $household->full_address = app(\App\Queries\HouseholdAddressQuery::class)->forHouseholds([$household->household_id])->get($household->household_id);
         $head = $members->firstWhere('is_household_head', true);
         $memberStatusOptions = $this->memberStatusOptions();
+        $defaultStatus = collect($memberStatusOptions)->first(fn ($option) => in_array($option['key'], ['unknown','unchecked','unreported'], true));
+        $members = $members->map(fn ($member) => array_merge($member, ['member_status' => $member['member_status'] ?? $defaultStatus]));
         if ($memberStatusOptions === []) {
             return response()->json(['message' => 'No active member status options are configured for field reports.'], 503);
         }
@@ -128,6 +131,8 @@ class RescuerFieldReportWorkflow
             ],
             'members' => $members,
             'member_status_options' => $memberStatusOptions,
+            'saved_property_damage' => Schema::hasColumn('responder_field_reports','property_damage') ? DB::table('responder_field_reports')->where('assignment_id',$assignmentId)->where('responder_id',$responder->responder_id)->where('household_id',$household->household_id)->value('property_damage') : null,
+            'property_damage_options' => Schema::hasTable('property_damage_levels') ? DB::table('property_damage_levels')->where('is_active',true)->orderBy('sort_order')->get(['damage_key as key','label'])->all() : [],
         ]]);
     }
 
@@ -161,8 +166,8 @@ class RescuerFieldReportWorkflow
 
         return [
             'active_event' => $activeEvent,
-            'status_options' => $this->query->statusOptions(),
-            'summary' => $this->query->summary($eventId),
+            'status_options' => $this->query->assignmentStatusOptions(),
+            'summary' => $request->boolean('include_summary', true) ? $this->query->assignmentSummary($eventId) : ['rows' => []],
             'reports' => collect($reports->items()),
             'reports_meta' => ['current_page' => $reports->currentPage(), 'per_page' => $reports->perPage(),
                 'total' => $reports->total(), 'last_page' => $reports->lastPage(),
@@ -268,7 +273,7 @@ class RescuerFieldReportWorkflow
         foreach ([
             'household_status_logs', 'responder_field_reports', 'responder_field_report_members',
             'households', 'household_members', 'member_statuses', 'member_disaster_statuses',
-            'household_statuses', 'responder_assignments',
+            'household_statuses', 'responder_assignments', 'property_damage_levels',
         ] as $table) {
             if (! Schema::hasTable($table)) {
                 return $this->missingTableResponse($table);
@@ -285,11 +290,11 @@ class RescuerFieldReportWorkflow
             'assignment_id' => ['required', 'integer', 'min:1'],
             'household_id' => ['required', 'string', 'max:255'],
             'idempotency_key' => ['required', 'string', 'max:100'],
-            'incident_type' => ['required', Rule::in(['flood', 'fire', 'earthquake', 'landslide', 'typhoon_strong_winds', 'other'])],
+            'incident_type' => ['nullable', 'string', 'max:80'],
             'incident_type_other' => ['nullable', 'string', 'max:255', 'required_if:incident_type,other'],
-            'property_damage' => ['required', Rule::in(['no_damage', 'minor_damage', 'major_damage', 'completely_destroyed', 'not_yet_assessed'])],
-            'death_count' => ['required', 'integer', 'min:0', 'max:4294967295'],
-            'injured_count' => ['required', 'integer', 'min:0', 'max:4294967295'],
+            'property_damage' => ['required', 'string', 'max:80'],
+            'death_count' => ['sometimes', 'integer', 'min:0', 'max:4294967295'],
+            'injured_count' => ['sometimes', 'integer', 'min:0', 'max:4294967295'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -347,6 +352,13 @@ class RescuerFieldReportWorkflow
             ]);
         }
 
+        if (Schema::hasTable('property_damage_levels') && !DB::table('property_damage_levels')->where('damage_key',$validated['property_damage'])->where('is_active',true)->exists()) {
+            throw ValidationException::withMessages(['property_damage'=>['Select an available damage level.']]);
+        }
+        $validated['incident_type'] ??= null;
+        $catalog = collect($this->memberStatusOptions())->keyBy('key');
+        $validated['death_count'] = $submittedMembers->filter(fn ($member) => $catalog->get($member['status_key'])['counts_as_death'] ?? false)->count();
+        $validated['injured_count'] = $submittedMembers->filter(fn ($member) => $catalog->get($member['status_key'])['counts_as_injury'] ?? false)->count();
         $members = $submittedMembers->all();
         $incidentTypeOther = $validated['incident_type'] === 'other' ? trim((string) ($validated['incident_type_other'] ?? '')) : null;
         $payloadHash = hash('sha256', json_encode([
@@ -361,7 +373,7 @@ class RescuerFieldReportWorkflow
             'members' => $members,
         ], JSON_UNESCAPED_SLASHES));
 
-        $statusKey = $this->householdStatusFromMemberAssessments($members);
+        $statusKey = $this->householdStatusFromMemberAssessments($members, $validated['death_count'] > 0 || $validated['injured_count'] > 0);
         $statusId = $statusKey ? $this->support->resolveHouseholdStatusId($statusKey) : null;
         if (! $statusId) {
             throw ValidationException::withMessages([
@@ -395,7 +407,7 @@ class RescuerFieldReportWorkflow
 
             if (! $lockedAssignment
                 || ! $this->assignmentBelongsToResponder($lockedAssignment, (int) $responder->responder_id)
-                || (string) $lockedAssignment->household_id !== (string) $assignment->household_id
+                || (string) \App\Support\RescuerHouseholdQueue::target($lockedAssignment, (int) $responder->responder_id) !== (string) $assignment->household_id
                 || (string) $lockedAssignment->disaster_id !== (string) $activeEvent->event_id
                 || ! $this->assignmentIsActive($lockedAssignment)) {
                 throw ValidationException::withMessages([
@@ -411,6 +423,8 @@ class RescuerFieldReportWorkflow
 
             $existing = DB::table('responder_field_reports')
                 ->where('assignment_id', $assignment->assignment_id)
+                ->where('household_id', $assignment->household_id)
+                ->where('responder_id', $responder->responder_id)
                 ->lockForUpdate()
                 ->first();
             if ($existing) {
@@ -550,18 +564,18 @@ class RescuerFieldReportWorkflow
         return in_array($status, ['dispatched', 'accepted', 'en_route', 'on_scene'], true);
     }
 
-    private function householdStatusFromMemberAssessments(array $members): ?string
+    private function householdStatusFromMemberAssessments(array $members, bool $hasCasualties = false): ?string
     {
         $keys = collect($members)->pluck('status_key');
-        $candidates = $keys->contains(fn (string $key): bool => in_array($key, [
-            'injured', 'missing', 'needs_help', 'need_help', 'needs_assistance', 'unsafe', 'trapped', 'unreachable', 'deceased',
-        ], true))
-            ? ['needs_help', 'needs_assistance', 'unsafe', 'not_evacuated']
-            : ($keys->contains(fn (string $key): bool => in_array($key, ['evacuated', 'relocated'], true))
-                ? ['evacuated', 'relocated', 'safe', 'active']
-                : ($keys->every(fn (string $key): bool => in_array($key, ['unknown', 'unchecked'], true))
-                    ? ['unknown', 'unchecked']
-                    : ['safe', 'safe_at_home', 'active']));
+        if ($hasCasualties || $keys->contains(fn ($key) => in_array($key, ['injured','missing','needs_help','need_help','needs_assistance','unsafe','trapped','unreachable','deceased','dead'], true))) {
+            $candidates = ['needs_help','needs_assistance','unsafe','not_evacuated'];
+        } elseif ($keys->contains(fn ($key) => in_array($key, ['unknown','unchecked','unreported'], true))) {
+            $candidates = ['unknown','unchecked'];
+        } elseif ($keys->contains(fn ($key) => in_array($key, ['evacuated','relocated'], true))) {
+            $candidates = ['evacuated','relocated'];
+        } else {
+            $candidates = ['safe','safe_at_home','active'];
+        }
 
         foreach ($candidates as $candidate) {
             if ($this->support->resolveHouseholdStatusId($candidate)) {
@@ -586,11 +600,11 @@ class RescuerFieldReportWorkflow
             $query->orderBy('sort_order');
         }
 
-        return $query->orderBy('status_id')->get([
-            'status_id', 'status_key', $this->firstExistingColumn('member_statuses', ['status_label'], 'status_label'),
-        ])->map(fn (object $status): array => [
+        return $query->orderBy('status_id')->get()->map(fn (object $status): array => [
             'status_id' => $status->status_id,
             'key' => $status->status_key,
+            'counts_as_death' => (bool) ($status->counts_as_death ?? in_array($status->status_key, ['deceased','dead'], true)),
+            'counts_as_injury' => (bool) ($status->counts_as_injury ?? $status->status_key === 'injured'),
             'label' => $status->status_key === 'unknown' ? 'Unchecked' : ($status->status_label ?: ucwords(str_replace('_', ' ', $status->status_key))),
         ])->values()->all();
     }

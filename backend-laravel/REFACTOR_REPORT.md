@@ -4,6 +4,13 @@ Branch: `refactor/backend-hardening`
 
 Scope: Local backend refactoring and characterization. No remote/shared database was connected, migrated, seeded, or modified in the B1/B2 work.
 
+## Shared database connection update (2026-10-24)
+
+The operational default is now Laravel's `mysql` connection, configured through
+`DB_*` environment variables for the shared `klint` database. This connection
+change does not apply migrations or establish schema compatibility; those must
+be verified separately before deploying schema changes.
+
 ## Phase C local update (2026-10-02)
 
 - Follow-up: TrackingAid writes from resource-request transactions now enqueue a job in the operational database's `jobs` table; the queue worker processes the other connection after commit. A rollback test proves the queued row disappears when the local transaction fails. This requires the Laravel scheduler or a dedicated `trackingaid_outbox` worker in deployment; it does not make two database commits atomic. Daily tracking references, numeric IDs used by the major writers, and formatted evacuation IDs now use locked sequence rows. Per-route coordinate order locks the assignment row. Account-code allocation and some mobile multi-table writes still need separate handling.
@@ -1035,4 +1042,3 @@ Read-only service calls against the configured shared MySQL connection exposed r
 The Rescuer Accounts summary and all eight account ID suggestions were compared with the previous logic against the current shared data and matched. Operations and TrackingAid queue workers were started locally. The `composer dev` script now starts those two named workers; the previous default-queue listener did not process these jobs. These measurements do not guarantee a fixed response time for every endpoint or under a shared database outage. Continue using request profiling and investigate any remaining slow route by its query count and slowest SQL.
 
 A later sequential sample ranked the sampled reads as Resource Requests (672 ms, 13 queries), Dispatch (418 ms, 15 queries), Dashboard summary (365 ms, 7 queries), Broadcast workspace (253 ms, 15 queries), Rescuer Accounts (213 ms, 8 queries), and Weather workspace (178 ms, 4 queries). These are service-level read timings without browser rendering or authentication middleware. They are not a production latency guarantee.
-

@@ -1,441 +1,77 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { palette, radius, shadow, spacing, typography } from '@/constants/resqTheme';
+import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
+import { getRescuerDispatchHistory } from '@/api/rescuer';
 import { ActionButton, EmptyState, SectionHeader, StatTile, StatusBadge } from './RescuerUI';
 
-type DashboardProps = {
-  overview: any;
-  onOpenMap: (assignment?: any) => void;
-  onOpenReport: (assignment?: any) => void;
-  onStatusChange: (assignmentId: number, status: string) => void;
-};
-
-export function RescuerDashboardScreen({
-  overview,
-  onOpenMap,
-  onOpenReport,
-  onStatusChange,
-}: DashboardProps) {
-  const [isQuickLinkHovered, setIsQuickLinkHovered] = useState(false);
-  const [isQuickLinkPressed, setIsQuickLinkPressed] = useState(false);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
-  const profile = overview?.profile || {};
-  const responder = profile.responder || {};
-  const activeEvent = overview?.active_event;
-  const summary = overview?.summary || {};
+type Props = { overview: any; onOpenMap: (assignment?: any) => void; onOpenReport: (assignment?: any) => void; onStatusChange: (id: number, status: string) => void };
+export function RescuerDashboardScreen({ overview, onOpenMap, onOpenReport, onStatusChange }: Props) {
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [revision, setRevision] = useState(0);
   const assignments = overview?.assignments || [];
-  const activeAssignment = assignments.find((item: any) =>
-    ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(item.status_key)
-  );
-  const activeEventId = overview?.active_event?.event_id;
-  const assignmentEventId = activeAssignment?.event_id || activeEventId;
-  const hasSubmittedFieldReport = !activeAssignment?.household_id || (overview?.field_reports || []).some((report: any) =>
-    String(report.assignment_id) === String(activeAssignment.assignment_id)
-    && String(report.household_id) === String(activeAssignment.household_id)
-    && (!assignmentEventId || String(report.event_id) === String(assignmentEventId))
-  );
-
-  return (
-    <View style={styles.stack}>
-      <View style={styles.identityCard}>
-        <View style={styles.identityTop}>
-          <View style={styles.identityText}>
-            <Text style={styles.kicker}>RESPONDER CONSOLE</Text>
-            <Text style={styles.welcomeTitle}>{responder.full_name || profile.user?.full_name || 'Rescuer'}</Text>
-            <Text style={styles.meta}>
-              {responder.responder_code || profile.user?.username || 'Mobile account'} ·{' '}
-              {responder.team_name || 'No team assigned'}
-            </Text>
-          </View>
-          <View style={styles.statusWrap}>
-            <StatusBadge label={responder.duty_status || 'Stand-by'} tone={responder.duty_status || 'neutral'} />
-          </View>
-        </View>
-
-        {activeEvent ? (
-          <View style={styles.eventStrip}>
-            <Ionicons name="warning-outline" size={18} color={palette.warning} />
-            <View style={styles.eventCopy}>
-              <Text style={styles.eventTitle}>{activeEvent.name}</Text>
-              <Text style={styles.eventMeta}>
-                {activeEvent.type} · {activeEvent.severity} · {formatDate(activeEvent.started_at)}
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.eventStrip}>
-            <Ionicons name="shield-checkmark-outline" size={18} color={palette.safe} />
-            <View style={styles.eventCopy}>
-              <Text style={styles.eventTitle}>No active disaster event</Text>
-              <Text style={styles.eventMeta}>Stand by for HQ dispatch or monitoring instructions.</Text>
-            </View>
-          </View>
-        )}
+  const responder = overview?.profile?.responder || {};
+  const summary = overview?.summary || {};
+  const current = assignments.find((item: any) => ['dispatched','accepted','en_route','on_scene'].includes(item.status_key) && item.household_id);
+  const queue = assignments.filter((item: any) => !['cancelled','completed'].includes(item.status_key));
+  const household = current?.route_notes?.assigned_households?.find((item: any) => item.household_id === current.household_id);
+  useEffect(() => {
+    if (!historyOpen) return;
+    let active = true;
+    setLoading(true); setHistoryError('');
+    getRescuerDispatchHistory(page).then(data => {
+      if (!active) return;
+      setHistory(rows => page === 1 ? data.assignments : [...rows.filter(row => !data.assignments.some((item: any) => item.assignment_id === row.assignment_id)), ...data.assignments]);
+      setLastPage(data.pagination.last_page);
+    }).catch(() => { if (active) setHistoryError('History unavailable.'); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [historyOpen, page, revision]);
+  function openHistory() { setHistory([]); setPage(1); setHistoryOpen(true); }
+  const next = current?.status_key === 'dispatched' ? ['Accept','accepted'] : current?.status_key === 'accepted' ? ['En route','en_route'] : current?.status_key === 'en_route' ? ['Arrived','on_scene'] : null;
+  return <View style={styles.stack}>
+    <View style={styles.identity}><View style={styles.flex}><Text style={styles.name}>{responder.full_name || overview?.profile?.user?.full_name || 'Rescuer'}</Text><Text style={styles.meta}>{responder.team_name || 'No team'}</Text></View><StatusBadge label={responder.duty_status || 'Standby'} tone={responder.duty_status} /></View>
+    {overview?.active_event && <Text style={styles.event}>{overview.active_event.name}</Text>}
+    <View style={styles.stats}><StatTile label="Assigned" value={summary.total_assignments || 0} /><StatTile label="Active" value={summary.active_assignments || 0} /><StatTile label="Done" value={summary.completed_assignments || 0} tone="completed" /></View>
+    {current ? <View style={styles.card}>
+      <SectionHeader title="Current assignment" action={<StatusBadge label={current.status_label} tone={current.status_key} />} />
+      <Text style={styles.household}>{household?.household_name || current.household_id}</Text>
+      <View style={styles.info}><Text style={styles.meta}>Household <Text style={styles.data}>{current.household_id}</Text></Text><StatusBadge label={current.priority_level || 'medium'} tone={current.priority_level} /></View>
+      {next && <ActionButton label={next[0]} icon="navigate-outline" onPress={() => onStatusChange(current.assignment_id,next[1])} />}
+      <View style={styles.actions}>
+        <TaskAction label="Map" icon="map-outline" onPress={() => onOpenMap(current)} />
+        <TaskAction label="Field report" icon="document-text-outline" onPress={() => onOpenReport(current)} />
+        <TaskAction label="Complete household" icon="checkmark-circle-outline" primary onPress={() => onStatusChange(current.assignment_id,'completed')} />
       </View>
-
-      <View style={styles.statsRow}>
-        <StatTile label="Assigned" value={summary.total_assignments || 0} tone="neutral" />
-        <StatTile label="Active" value={summary.active_assignments || 0} tone="en_route" />
-        <StatTile label="Done" value={summary.completed_assignments || 0} tone="completed" />
-      </View>
-
-      {activeAssignment ? (
-        <View style={styles.card}>
-          <SectionHeader title="Current assignment" action={<StatusBadge label={activeAssignment.status_label} tone={activeAssignment.status_key} />} />
-          <Text style={styles.assignmentTitle}>{activeAssignment.assigned_area || activeAssignment.household_id || 'Assigned area'}</Text>
-          {activeAssignment.destination_label ? (
-            <Text style={styles.destinationText}>{activeAssignment.destination_label}</Text>
-          ) : null}
-          <Text style={styles.assignmentMeta}>
-            {activeAssignment.event_name} · {activeAssignment.priority_level || 'medium'} priority
-          </Text>
-          {activeAssignment.dispatch_notes ? (
-            <Text style={styles.note}>{activeAssignment.dispatch_notes}</Text>
-          ) : null}
-          {activeAssignment.household_id ? (
-            <View style={styles.assignmentActions}>
-              <ActionButton label="Map" icon="map-outline" tone="light" onPress={() => onOpenMap(activeAssignment)} />
-              <ActionButton label="Field report" icon="document-text-outline" tone="light" onPress={() => onOpenReport(activeAssignment)} />
-            </View>
-          ) : null}
-          <View style={styles.buttonGrid}>
-            {activeAssignment.status_key === 'dispatched' ? (
-              <ActionButton
-                label="Accept"
-                icon="checkmark-outline"
-                onPress={() => onStatusChange(activeAssignment.assignment_id, 'accepted')}
-              />
-            ) : null}
-            {activeAssignment.status_key === 'accepted' ? (
-              <ActionButton
-                label="En route"
-                icon="navigate-outline"
-                onPress={() => onStatusChange(activeAssignment.assignment_id, 'en_route')}
-              />
-            ) : null}
-            {activeAssignment.household_id ? (
-              <>
-                <ActionButton
-                  label="Map"
-                  icon="map-outline"
-                  tone="light"
-                  onPress={() => onOpenMap(activeAssignment)}
-                />
-                <ActionButton
-                  label="Field Report"
-                  icon="document-text-outline"
-                  tone="light"
-                  onPress={() => onOpenReport(activeAssignment)}
-                />
-              </>
-            ) : null}
-            <ActionButton
-              label="Complete"
-              icon="flag-outline"
-              disabled={!['en_route', 'on_scene'].includes(activeAssignment.status_key)}
-              onPress={() => onStatusChange(activeAssignment.assignment_id, 'completed')}
-            />
-          </View>
-          {activeAssignment.household_id && !hasSubmittedFieldReport ? (
-            <Pressable style={styles.reportRequiredButton} onPress={() => onOpenReport(activeAssignment)}>
-              <Ionicons name="document-text-outline" size={16} color={palette.navActive} />
-              <Text style={styles.reportRequiredText}>Submit field report to enable completion</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : (
-        <EmptyState
-          icon="radio-outline"
-          title="No active assignment"
-        />
-      )}
-
-      <View style={styles.card}>
-        <SectionHeader title="Mission queue" />
-        {assignments.length === 0 ? (
-          <EmptyState icon="file-tray-outline" title="No assignments yet" />
-        ) : (
-          assignments.map((assignment: any) => (
-            <View key={assignment.assignment_id} style={styles.queueEntry}>
-              <Pressable
-                style={styles.queueItem}
-                onPress={() => setSelectedAssignmentId((current) =>
-                  current === assignment.assignment_id ? null : assignment.assignment_id
-                )}
-              >
-                <View style={styles.queueIcon}>
-                  <Ionicons name="trail-sign-outline" size={18} color={palette.navActive} />
-                </View>
-                <View style={styles.queueText}>
-                  <Text style={styles.queueTitle}>{assignment.assigned_area || assignment.household_id || 'Assigned location'}</Text>
-                  <Text style={styles.queueMeta}>
-                    {assignment.destination_label || assignment.assignment_code || `Assignment ${assignment.assignment_id}`} · {formatDate(assignment.assigned_at)}
-                  </Text>
-                  <Text style={styles.queueMeta}>Household {assignment.household_id || 'not linked'}</Text>
-                </View>
-                <StatusBadge label={assignment.status_label} tone={assignment.status_key} />
-              </Pressable>
-              {selectedAssignmentId === assignment.assignment_id
-                && assignment.household_id
-                && ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(assignment.status_key) ? (
-                <View style={styles.assignmentActions}>
-                  <ActionButton
-                    label="Map"
-                    icon="map-outline"
-                    tone="light"
-                    onPress={() => onOpenMap(assignment)}
-                  />
-                  <ActionButton
-                    label="Field Report"
-                    icon="document-text-outline"
-                    onPress={() => onOpenReport(assignment)}
-                  />
-                </View>
-              ) : null}
-              {selectedAssignmentId === assignment.assignment_id
-                && !['dispatched', 'accepted', 'en_route', 'on_scene'].includes(assignment.status_key) ? (
-                <Text style={styles.queueMeta}>This assignment is no longer active.</Text>
-              ) : null}
-              {selectedAssignmentId === assignment.assignment_id
-                && !assignment.household_id
-                && ['dispatched', 'accepted', 'en_route', 'on_scene'].includes(assignment.status_key) ? (
-                <Text style={styles.queueMeta}>This assignment has no linked household.</Text>
-              ) : null}
-            </View>
-          ))
-        )}
-      </View>
-
-      <View style={styles.quickRow}>
-        <Pressable
-          style={[styles.quickLink, (isQuickLinkHovered || isQuickLinkPressed) && styles.quickLinkActive]}
-          onPress={() => onOpenMap(activeAssignment)}
-          onHoverIn={() => setIsQuickLinkHovered(true)}
-          onHoverOut={() => setIsQuickLinkHovered(false)}
-          onPressIn={() => setIsQuickLinkPressed(true)}
-          onPressOut={() => setIsQuickLinkPressed(false)}
-        >
-          <Ionicons name="map-outline" size={18} color={palette.navActive} />
-          <Text style={styles.quickText}>Open map</Text>
-        </Pressable>
-        {activeAssignment?.household_id ? (
-          <Pressable
-            style={[styles.quickLink, (isQuickLinkHovered || isQuickLinkPressed) && styles.quickLinkActive]}
-            onPress={() => onOpenReport(activeAssignment)}
-            onHoverIn={() => setIsQuickLinkHovered(true)}
-            onHoverOut={() => setIsQuickLinkHovered(false)}
-            onPressIn={() => setIsQuickLinkPressed(true)}
-            onPressOut={() => setIsQuickLinkPressed(false)}
-          >
-            <Ionicons name="create-outline" size={18} color={palette.navActive} />
-            <Text style={styles.quickText}>Send field report</Text>
-          </Pressable>
-        ) : null}
-      </View>
+    </View> : <EmptyState icon="radio-outline" title="No current household" />}
+    <View style={styles.card}>
+      <SectionHeader title="Household queue" action={<Pressable accessibilityRole="button" accessibilityLabel="Dispatch history" style={styles.iconButton} onPress={openHistory}><Ionicons name="time-outline" size={22} color={palette.navActive} /></Pressable>} />
+      {queue.flatMap((assignment: any) => (assignment.route_notes?.assigned_households || []).map((item: any) => {
+        const done = !(assignment.route_notes?.pending_household_ids || []).includes(item.household_id);
+        return <View style={styles.queueRow} key={`${assignment.assignment_id}-${item.household_id}`}><View style={styles.flex}><Text style={styles.queueName}>{item.household_name || item.household_id}</Text><Text style={styles.meta}>{item.address || item.household_id}</Text></View><StatusBadge label={done ? 'Completed' : item.household_id === current?.household_id ? 'Current' : 'Waiting'} tone={done ? 'completed' : 'neutral'} /></View>;
+      }))}
+      {!queue.length && <Text style={styles.meta}>No queued households</Text>}
     </View>
-  );
+    <Modal visible={historyOpen} animationType="slide" transparent onRequestClose={() => setHistoryOpen(false)}><View style={styles.overlay}><View style={styles.history}>
+      <SectionHeader title="Dispatch history" action={<Pressable accessibilityRole="button" accessibilityLabel="Close dispatch history" style={styles.iconButton} onPress={() => setHistoryOpen(false)}><Ionicons name="close" size={24} color={palette.text} /></Pressable>} />
+      <FlatList data={history} keyExtractor={item => String(item.assignment_id)} onEndReached={() => { if (!loading && !historyError && page < lastPage) setPage(value => value + 1); }} onEndReachedThreshold={0.4}
+        renderItem={({ item }) => <View style={styles.queueRow}><View style={styles.flex}><Text style={styles.queueName}>{item.assignment_code}</Text><Text style={styles.meta}>{item.assigned_area}</Text><Text style={styles.meta}>{formatPhilippineDateTime(item.assigned_at)}</Text></View><StatusBadge label={item.status_label} tone={item.status_key} /></View>}
+        ListEmptyComponent={!loading && !historyError ? <Text style={styles.meta}>No dispatch history</Text> : null}
+        ListFooterComponent={<>{loading && <Text style={styles.meta}>Loading…</Text>}{historyError ? <><Text style={styles.error}>{historyError}</Text><ActionButton label="Retry" onPress={() => setRevision(value => value + 1)} /></> : null}</>} />
+    </View></View></Modal>
+  </View>;
 }
-
-function formatDate(value?: string) {
-  return formatPhilippineDateTime(value);
+function TaskAction({ label, icon, primary, onPress }: { label: string; icon: keyof typeof Ionicons.glyphMap; primary?: boolean; onPress: () => void }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={[styles.task, primary && styles.primary]}><Ionicons name={icon} size={20} color={primary ? '#fff' : palette.navActive} /><Text style={[styles.taskText, primary && styles.white]} numberOfLines={2}>{label}</Text></Pressable>;
 }
-
 const styles = StyleSheet.create({
-  stack: {
-    gap: spacing.md,
-  },
-  identityCard: {
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    backgroundColor: palette.nav,
-    ...shadow,
-  },
-  identityTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  identityText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  statusWrap: {
-    maxWidth: 120,
-    flexShrink: 0,
-    alignItems: 'flex-end',
-  },
-  kicker: {
-    color: palette.navMuted,
-    fontSize: typography.sizes.caption,
-    fontWeight: typography.weights.medium,
-    letterSpacing: 1,
-  },
-  welcomeTitle: {
-    marginTop: spacing.xs,
-    color: '#fff',
-    fontSize: typography.sizes.heading,
-    fontWeight: typography.weights.semibold,
-    letterSpacing: -0.3,
-  },
-  name: {
-    marginTop: 4,
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  meta: {
-    marginTop: 4,
-    color: palette.navMuted,
-    fontSize: typography.sizes.small,
-    fontWeight: typography.weights.regular,
-  },
-  eventStrip: {
-    marginTop: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: '#ffffff12',
-  },
-  eventCopy: {
-    flex: 1,
-  },
-  eventTitle: {
-    color: '#fff',
-    fontSize: typography.sizes.subtitle,
-    fontWeight: typography.weights.semibold,
-  },
-  eventMeta: {
-    marginTop: 2,
-    color: palette.navMuted,
-    fontSize: typography.sizes.small,
-    fontWeight: typography.weights.regular,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  card: {
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    backgroundColor: palette.card,
-    ...shadow,
-  },
-  assignmentTitle: {
-    color: palette.text,
-    fontSize: typography.sizes.heading,
-    fontWeight: typography.weights.semibold,
-    letterSpacing: -0.2,
-  },
-  assignmentMeta: {
-    color: palette.textSoft,
-    fontSize: typography.sizes.small,
-    fontWeight: typography.weights.medium,
-  },
-  destinationText: {
-    color: palette.text,
-    fontSize: typography.sizes.body,
-    fontWeight: typography.weights.medium,
-    lineHeight: 18,
-  },
-  note: {
-    borderRadius: radius.md,
-    padding: spacing.md,
-    color: palette.textSoft,
-    fontSize: typography.sizes.body,
-    fontWeight: typography.weights.regular,
-    lineHeight: 19,
-    backgroundColor: palette.secondary,
-  },
-  buttonGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  reportRequiredButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-  },
-  reportRequiredText: {
-    color: palette.navActive,
-    fontSize: typography.sizes.small,
-    fontWeight: typography.weights.medium,
-  },
-  queueItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-    paddingTop: spacing.md,
-  },
-  queueEntry: {
-    gap: spacing.sm,
-  },
-  assignmentActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingLeft: 46,
-  },
-  queueIcon: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    backgroundColor: palette.secondary,
-  },
-  queueText: {
-    flex: 1,
-  },
-  queueTitle: {
-    color: palette.text,
-    fontSize: typography.sizes.body,
-    fontWeight: typography.weights.semibold,
-  },
-  queueMeta: {
-    marginTop: 3,
-    color: palette.textSoft,
-    fontSize: typography.sizes.small,
-    fontWeight: typography.weights.regular,
-  },
-  quickRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  quickLink: {
-    flex: 1,
-    minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    backgroundColor: palette.card,
-  },
-  quickLinkActive: {
-    borderColor: palette.navActive,
-    backgroundColor: palette.secondary,
-    shadowColor: palette.navActive,
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  quickText: {
-    color: palette.nav,
-    fontSize: typography.sizes.small,
-    fontWeight: typography.weights.semibold,
-  },
+  stack: { gap: spacing.md }, identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, flex: { flex: 1, minWidth: 0 }, name: { color: palette.text, fontSize: 20, fontWeight: '700' }, meta: { color: palette.textSoft, fontSize: 12, lineHeight: 18 }, event: { color: palette.text, fontSize: 14, fontWeight: '600' },
+  stats: { flexDirection: 'row', gap: spacing.sm }, card: { backgroundColor: palette.card, borderColor: palette.border, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm }, household: { color: palette.text, fontSize: 19, fontWeight: '700' }, info: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }, data: { color: palette.text, fontWeight: '600' },
+  actions: { flexDirection: 'row', gap: 8 }, task: { flex: 1, minWidth: 0, minHeight: 64, padding: 6, justifyContent: 'center', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: palette.border, borderRadius: radius.md }, taskText: { fontSize: 12, fontWeight: '600', color: palette.text, textAlign: 'center' }, primary: { backgroundColor: palette.navActive, borderColor: palette.navActive }, white: { color: '#fff' },
+  queueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 10, borderBottomWidth: 1, borderColor: palette.border }, queueName: { color: palette.text, fontSize: 14, fontWeight: '600' }, iconButton: { padding: 10, minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }, overlay: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: '#0008' }, history: { backgroundColor: palette.card, borderRadius: radius.lg, padding: spacing.md, height: '80%' }, error: { color: palette.unsafe },
 });

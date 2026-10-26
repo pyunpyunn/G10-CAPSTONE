@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import RescueTeamConfigModal from '../components/rescuers/RescueTeamConfigModal'
-import { createRescueTeam, deleteRescueTeam, getRescueTeamConfig, updateRescueTeam } from '../api/rescuerApi'
+import { createRescueTeam, deleteRescueTeam, getCachedRescueTeamConfig, getRescueTeamConfig, updateRescueTeam } from '../api/rescuerApi'
 import { getCurrentUser } from '../api/authApi'
 import { rescuerErrorMessage } from '../utils/rescuerHelpers'
 import {
@@ -15,13 +15,13 @@ import {
 export default function LegacyTeamManagementPage() {
   const navigate = useNavigate()
   const { onUserChange } = useOutletContext()
-  const [workspace, setWorkspace] = useState(null)
+  const [workspace, setWorkspace] = useState(getCachedRescueTeamConfig)
   const [activeView, setActiveView] = useState('hierarchy')
   const [revision, setRevision] = useState(0)
   const [, setSelectedId] = useState(null)
   const [editor, setEditor] = useState(null)
   const [reload, setReload] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!getCachedRescueTeamConfig())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -130,7 +130,7 @@ export default function LegacyTeamManagementPage() {
     </> : <>
       {error && <div className="tm-feedback" role="alert">{error}<button className="bt" onClick={() => {setLoading(true); setError(''); setReload(value => value + 1)}}>Retry</button></div>}
       {notice && <div className="tm-feedback" role="status">{notice}</div>}
-      {loading ? <div role="status">Loading Annex H team structure…</div> : workspace && <AnnexHierarchyChart workspace={workspace} onAccounts={account => navigate(account?.responder_id ? `/rescuers?id=${encodeURIComponent(account.responder_id)}&type=${account.account_type === 'command_center' || ['chair','operations_admin','mitigation_prevention','preparedness','response','recovery_rehabilitation'].includes(account.role_key) ? 'command_center' : 'rescuer'}` : '/rescuers')} onTeams={() => setActiveView('teams')} />}
+      {loading ? <div role="status">Loading Annex H team structure…</div> : workspace && <AnnexHierarchyChart workspace={workspace} onAccounts={account => navigate('/rescuers', { state: { selectedProfileId: account?.responder_id } })} onTeams={() => setActiveView('teams')} />}
     </>}
     {editor && editorWorkspace && <RescueTeamConfigModal
       key={`${editor.team?.team_id || 'new'}-${editor.committeeKey || ''}`}

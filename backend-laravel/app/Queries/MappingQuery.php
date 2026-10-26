@@ -131,7 +131,7 @@ class MappingQuery
         }
 
         $latestLogs = ResponderLocationLog::query()
-            ->select('responder_id', DB::raw('MAX(logged_at) as latest_logged_at'))
+            ->select('responder_id', DB::raw('MAX(log_id) as latest_log_id'))
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->groupBy('responder_id');
@@ -140,12 +140,14 @@ class MappingQuery
             ->from('responder_location_logs as rll')
             ->joinSub($latestLogs, 'latest', function ($join): void {
                 $join->on('latest.responder_id', '=', 'rll.responder_id')
-                    ->on('latest.latest_logged_at', '=', 'rll.logged_at');
+                    ->on('latest.latest_log_id', '=', 'rll.log_id');
             })
             ->leftJoin('responders as r', 'r.responder_id', '=', 'rll.responder_id')
             ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'r.team_id')
             ->leftJoin('responder_assignments as ra', function ($join) use ($eventId): void {
-                $join->on('ra.responder_id', '=', 'rll.responder_id')
+                $join->on(function ($member) {
+                    $member->on('ra.responder_id', '=', 'rll.responder_id')->orWhereJsonContains('ra.route_notes->selected_responder_ids', DB::raw(DB::connection()->getDriverName() === 'sqlite' ? 'rll.responder_id' : 'CAST(rll.responder_id AS CHAR)'));
+                })
                     ->where('ra.disaster_id', '=', $eventId);
             })
             ->whereNotNull('rll.latitude')
@@ -156,10 +158,11 @@ class MappingQuery
         }
 
         return $query
-            ->select($this->teamSelectColumns())
+            ->select(array_merge($this->teamSelectColumns(), ['ra.route_notes']))
             ->orderByDesc('rll.logged_at')
-            ->limit(80)
-            ->get()
+                        ->get()
+            ->filter(fn ($row) => !in_array(\App\Support\RescuerHouseholdQueue::status($row, (int)$row->responder_id), ['completed','cancelled'], true))
+            ->unique('responder_id')
             ->map(fn (object $row): array => $this->presenter->formatTeamMarker($row))
             ->values()
             ->all();
@@ -174,18 +177,20 @@ class MappingQuery
         $query = ResponderRoute::query()
             ->from('responder_routes as rr')
             ->leftJoin('responder_assignments as ra', 'ra.assignment_id', '=', 'rr.assignment_id')
-            ->leftJoin('responders as r', 'r.responder_id', '=', 'ra.responder_id')
-            ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'r.team_id');
+            ->leftJoin('responders as r', 'r.responder_id', '=', DB::raw($this->hasColumn('responder_routes','responder_id') ? 'COALESCE(rr.responder_id, ra.responder_id)' : 'ra.responder_id'))
+            ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', DB::raw($this->hasColumn('responder_assignments','team_id') ? 'COALESCE(ra.team_id, r.team_id)' : 'r.team_id'));
 
         if ($eventId) {
             $query->where('ra.disaster_id', $eventId);
         }
 
+        $query->whereNotIn('ra.status',['completed','cancelled','returned','ended','closed','failed']);
+        if ($this->hasColumn('responder_routes','route_status')) $query->where(fn ($q) => $q->whereNull('rr.route_status')->orWhereNotIn('rr.route_status',['completed','cancelled','returned','ended','closed','failed']));
+
         $routes = $query
             ->select($this->routeSelectColumns())
             ->orderByDesc('rr.created_at')
-            ->limit(50)
-            ->get()
+                        ->get()
             ->map(fn (object $route): array => $this->presenter->formatRoute($route, $this->routeCoordinates($route)))
             ->filter(fn (array $route): bool => $this->isActiveDispatchRoute($route['status']) && $this->isActiveDispatchRoute($route['route_status'] ?? null) && count($route['coordinates']) >= 2)
             ->values()
@@ -391,7 +396,7 @@ class MappingQuery
             'rt.team_name',
         ];
 
-        foreach (['route_status', 'start_latitude', 'start_longitude', 'end_latitude', 'end_longitude', 'estimated_distance_km', 'estimated_duration_min', 'route_polyline', 'updated_at'] as $column) {
+        foreach (['household_id', 'responder_id', 'route_status', 'start_latitude', 'start_longitude', 'end_latitude', 'end_longitude', 'estimated_distance_km', 'estimated_duration_min', 'route_polyline', 'updated_at'] as $column) {
             if ($this->hasColumn('responder_routes', $column)) {
                 $columns[] = "rr.$column";
             }

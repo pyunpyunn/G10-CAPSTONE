@@ -1,5 +1,9 @@
 import api from './client'
 import { disableBrowserPush } from './browserPush'
+import { getToken } from './token'
+
+let currentUserRequest = null
+let currentUserToken = null
 
 export async function loginUser(form) {
   const response = await api.post('/auth/login', {
@@ -11,9 +15,19 @@ export async function loginUser(form) {
   return response.data
 }
 
-export async function getCurrentUser() {
-  const response = await api.get('/auth/me')
-  return response.data.data
+export function getCurrentUser() {
+  const token = getToken()
+  if (currentUserRequest && currentUserToken === token) return currentUserRequest
+
+  currentUserToken = token
+  const request = api.get('/auth/me').then(response => response.data.data).finally(() => {
+    if (currentUserRequest === request) {
+      currentUserRequest = null
+      currentUserToken = null
+    }
+  })
+  currentUserRequest = request
+  return request
 }
 
 export async function logoutUser() {
@@ -29,6 +43,28 @@ export async function verifyPasswordChange(login, currentPassword) {
   const payload = { login: login.trim() }
   if (currentPassword !== undefined) payload.current_password = currentPassword
   return (await api.post('/auth/password-recovery/verify', payload)).data
+}
+
+export async function lookupHouseholdRecoveryContact(login) {
+  return (await api.post('/auth/password-recovery/household/lookup', { login: login.trim() })).data
+}
+
+export async function validateHouseholdRecoveryContact(login, contact_number) {
+  return (await api.post('/auth/password-recovery/household/validate-contact', {
+    login: login.trim(),
+    contact_number: contact_number.trim(),
+  })).data
+}
+
+export async function sendHouseholdRecoveryCode(login, contact_number) {
+  return (await api.post('/auth/password-recovery/household/send-code', {
+    login: login.trim(),
+    contact_number: contact_number.trim(),
+  })).data
+}
+
+export async function resetHouseholdPassword(payload) {
+  return (await api.post('/auth/password-recovery/household/reset', payload)).data
 }
 
 // Errors stay in a separate popup; textContent keeps server messages as plain text.

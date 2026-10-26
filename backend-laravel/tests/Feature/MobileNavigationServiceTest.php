@@ -85,6 +85,43 @@ class MobileNavigationServiceTest extends TestCase
         $this->assertSame(304, $notModified->getStatusCode());
     }
 
+    public function test_regular_authenticated_session_gets_only_its_own_group_dispatch_destination(): void
+    {
+        Schema::create('responders', function (Blueprint $table): void {
+            $table->integer('responder_id'); $table->string('user_id'); $table->integer('team_id');
+        });
+        Schema::table('responder_assignments', fn (Blueprint $table) => $table->integer('responder_id')->nullable());
+        DB::table('rescue_teams')->insert(['team_id'=>7,'team_name'=>'Rescue','team_code'=>'SAR','team_type'=>'rescue']);
+        DB::table('responders')->insert(['responder_id'=>5,'user_id'=>'rescuer-5','team_id'=>7]);
+        DB::table('households')->insert([
+            ['household_id'=>'HH-A','household_name'=>'Assigned to five'],
+            ['household_id'=>'HH-B','household_name'=>'Assigned to six'],
+        ]);
+        DB::table('responder_assignments')->insert([
+            ['assignment_id'=>12,'responder_id'=>5,'team_id'=>7,'status'=>'accepted','assigned_at'=>now(),
+                'route_notes'=>json_encode(['selected_responder_ids'=>[5,6],'responder_households'=>[5=>['HH-A'],6=>['HH-B']]])],
+            ['assignment_id'=>13,'responder_id'=>6,'team_id'=>7,'status'=>'accepted','assigned_at'=>now(),'route_notes'=>null],
+        ]);
+        $request = Request::create('/api/v1/mobile/bootstrap');
+        $request->setUserResolver(fn () => (object) ['user_id'=>'rescuer-5']);
+        $data = app(MobileNavigationService::class)->bootstrap($request);
+        $this->assertSame([12],$data['dispatches']->pluck('assignment_id')->all());
+        $this->assertSame(['HH-A'],$data['dispatches'][0]->household_ids);
+        $this->assertSame(['HH-A'],$data['households']->pluck('household_id')->all());
+        DB::table('households')->insert(['household_id'=>'HH-C','household_name'=>'Next household']);
+        DB::table('responder_assignments')->where('assignment_id',12)->update([
+            'status'=>'en_route',
+            'route_notes'=>json_encode(['selected_responder_ids'=>[5,6],
+                'responder_households'=>[5=>['HH-A','HH-C'],6=>['HH-B']],
+                'completed_households'=>[5=>['HH-A']], 'responder_statuses'=>[5=>'dispatched',6=>'en_route']]),
+        ]);
+        $next = app(MobileNavigationService::class)->bootstrap($request);
+        $this->assertSame('dispatched',$next['dispatches'][0]->status);
+        $this->assertSame('HH-C',$next['dispatches'][0]->household_id);
+        $this->assertSame(['HH-C'],$next['dispatches'][0]->household_ids);
+        $this->assertSame(['HH-C'],$next['households']->pluck('household_id')->all());
+    }
+
     private function createBootstrapTables(): void
     {
         Schema::create('household_statuses', function (Blueprint $table): void {

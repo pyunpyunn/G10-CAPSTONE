@@ -15,9 +15,9 @@ class RescuerAccountSupport
         'SST' => 4000, 'FMT' => 5000, 'RDT' => 6000, 'TRT' => 7000,
         'CLT' => 8000, 'RDANA' => 9000, 'PDANA' => 10000,
     ];
-    public function validatePayload(Request $request, bool $isUpdate = false): array
+    public function validatePayload(Request $request, bool $isUpdate = false, ?object $existing = null): array
     {
-        $validated = app(\App\Http\Requests\RescuerAccountPayloadValidator::class)->validate($request, $isUpdate);
+        $validated = app(\App\Http\Requests\RescuerAccountPayloadValidator::class)->validate($request, $isUpdate, $existing);
         $validated['account_status'] = $validated['account_status'] ?? config('rescuers.account_defaults.account_status');
 
         if (! empty($validated['account_id'])) {
@@ -198,28 +198,57 @@ class RescuerAccountSupport
     public function nextAccountId(?string $teamCode = null): string
     {
         $teamCode = $this->normalizeTeamCode($teamCode ?: 'SAR');
-        $base = self::TEAM_ID_BASES[$teamCode] ?? 11000;
-        $pattern = '^'.$teamCode.'-[0-9]{4,}$';
+        return $this->nextAccountIds([$teamCode])[$teamCode];
+    }
 
-        $usernames = DB::table('users')
-            ->where('username', 'regexp', $pattern)
-            ->pluck('username');
+    /**
+     * @param  list<string>  $teamCodes
+     * @return array<string, string>
+     */
+    public function nextAccountIds(array $teamCodes): array
+    {
+        $teamCodes = array_values(array_unique(array_map(
+            fn (string $teamCode): string => $this->normalizeTeamCode($teamCode),
+            $teamCodes,
+        )));
+        if ($teamCodes === []) {
+            return [];
+        }
 
-        $responderUsernames = DB::table('responders')
-            ->where('username', 'regexp', $pattern)
-            ->pluck('username');
+        $accountIdsForCodes = fn (string $column) => static function ($query) use ($teamCodes, $column): void {
+            foreach ($teamCodes as $index => $teamCode) {
+                $method = $index === 0 ? 'where' : 'orWhere';
+                $query->{$method}($column, 'like', $teamCode.'-%');
+            }
+        };
+        $accountIds = DB::table('users')
+            ->where($accountIdsForCodes('username'))
+            ->pluck('username')
+            ->merge(DB::table('responders')->where($accountIdsForCodes('username'))->pluck('username'))
+            ->merge(DB::table('responders')->where($accountIdsForCodes('responder_code'))->pluck('responder_code'));
+        $sequences = array_fill_keys($teamCodes, 0);
 
-        $responderCodes = DB::table('responders')
-            ->where('responder_code', 'regexp', $pattern)
-            ->pluck('responder_code');
+        foreach ($accountIds as $accountId) {
+            $teamCode = $this->normalizeTeamCode(explode('-', (string) $accountId, 2)[0]);
+            if (array_key_exists($teamCode, $sequences)) {
+                $sequences[$teamCode] = max(
+                    $sequences[$teamCode],
+                    $this->accountSequence((string) $accountId, $teamCode),
+                );
+            }
+        }
 
-        $maxSequence = collect($usernames)
-            ->merge($responderUsernames)
-            ->merge($responderCodes)
-            ->map(fn (?string $value): int => $this->accountSequence($value, $teamCode))
-            ->max() ?: ($base - 1);
+        foreach ($sequences as $teamCode => $sequence) {
+            $base = self::TEAM_ID_BASES[$teamCode] ?? 11000;
+            $sequences[$teamCode] = $teamCode.'-'.str_pad(
+                (string) (max($sequence, $base - 1) + 1),
+                4,
+                '0',
+                STR_PAD_LEFT,
+            );
+        }
 
-        return $teamCode.'-'.str_pad((string) ($maxSequence + 1), 4, '0', STR_PAD_LEFT);
+        return $sequences;
     }
 
     public function accountSequence(?string $accountId, string $teamCode): int
@@ -324,4 +353,3 @@ class RescuerAccountSupport
         return array_key_exists($this->normalizeTeamCode($teamCode), self::TEAM_ID_BASES);
     }
 }
-

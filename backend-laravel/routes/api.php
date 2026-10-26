@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DisasterBroadcastController;
 use App\Http\Controllers\Api\EvacuationCheckInController;
 use App\Http\Controllers\Api\GlobalSearchController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\HouseholdDirectoryController;
 use App\Http\Controllers\Api\HouseholdMobileController;
 use App\Http\Controllers\Api\HouseholdStatusController;
 use App\Http\Controllers\Api\InquiryController;
@@ -60,21 +61,33 @@ Route::prefix('v1')->group(function () {
         ->middleware(['signed', 'throttle:20,1'])
         ->name('mobile.packs.download');
 
-    Route::middleware(['auth:sanctum', 'mobile.device', 'role:rescuer', 'throttle:120,1'])->prefix('mobile')->group(function (): void {
-        Route::get('/bootstrap', [MobileNavigationController::class, 'bootstrap']);
+    // Route reads use the authenticated rescuer's own assignment scope; trip writes remain device-bound.
+    Route::get('/mobile/bootstrap', [MobileNavigationController::class, 'bootstrap'])
+        ->middleware(['auth:sanctum', 'role:rescuer,tl,tm', 'throttle:120,1']);
+    Route::middleware(['auth:sanctum', 'mobile.device', 'role:rescuer,tl,tm', 'throttle:120,1'])->prefix('mobile')->group(function (): void {
         Route::post('/sync', [MobileNavigationController::class, 'sync']);
         Route::get('/packs/{version}', [MobileNavigationController::class, 'packManifest']);
     });
+    Route::post('/rescuer/assignments/{assignmentId}/route', [MobileNavigationController::class, 'assignedRoadRoute'])
+        ->middleware(['auth:sanctum', 'role:rescuer,tl,tm', 'throttle:12,1']);
     Route::post('/dispatches/{id}/route', [MobileNavigationController::class, 'freshRoute'])
-        ->middleware(['auth:sanctum', 'mobile.device', 'role:rescuer', 'throttle:6,1']);
+        ->middleware(['auth:sanctum', 'mobile.device', 'role:rescuer,tl,tm', 'throttle:6,1']);
     Route::get('/auth/password-recovery/questions', [AuthController::class, 'recoveryQuestions'])
         ->middleware('throttle:10,1');
     Route::post('/auth/password-recovery/verify', [AuthController::class, 'verifyPasswordChange'])
         ->middleware('throttle:10,1,password-verify');
     Route::post('/auth/password-recovery/reset', [AuthController::class, 'resetPassword'])
         ->middleware('throttle:5,1,password-change');
+    Route::post('/auth/password-recovery/household/lookup', [AuthController::class, 'lookupHouseholdRecoveryContact'])
+        ->middleware('throttle:10,1');
+    Route::post('/auth/password-recovery/household/validate-contact', [AuthController::class, 'validateHouseholdRecoveryContact'])
+        ->middleware('throttle:10,1');
+    Route::post('/auth/password-recovery/household/send-code', [AuthController::class, 'sendHouseholdRecoveryCode'])
+        ->middleware('throttle:3,1');
+    Route::post('/auth/password-recovery/household/reset', [AuthController::class, 'resetHouseholdPassword'])
+        ->middleware('throttle:5,1,password-change');
 
-    Route::middleware(['auth:sanctum', 'throttle:300,1', 'realtime.atomic'])->group(function () {
+    Route::middleware(['auth:sanctum', 'household.owner', 'throttle:300,1', 'realtime.atomic'])->group(function () {
         Route::get('/realtime/health', \App\Http\Controllers\Api\RealtimeHealthController::class)->middleware('role:operations_admin');
         Route::patch('/profile/password', [ProfileController::class, 'changePassword'])->middleware('throttle:5,1,password-change');
         Route::get('/auth/me', [AuthController::class, 'me']);
@@ -90,6 +103,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('web.access')->group(function () {
             Route::get('/global-search', [GlobalSearchController::class, 'index']);
+            Route::get('/personnel-profiles/{responderId}', [\App\Http\Controllers\Api\PersonnelProfileController::class, 'show'])->whereNumber('responderId');
             Route::get('/dashboard', [DashboardController::class, 'index']);
             Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
             Route::get('/dashboard/dispatch', [DashboardController::class, 'dispatch']);
@@ -132,6 +146,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/map/evacuation-sites', [MappingController::class, 'evacuationSites']);
             Route::get('/map/dispatch-routes', [MappingController::class, 'dispatchRoutes']);
             Route::get('/map/households/{householdId}/route', [MappingController::class, 'householdRoute']);
+            Route::get('/households/directory', [HouseholdDirectoryController::class, 'index']);
             Route::get('/households', [HouseholdStatusController::class, 'index']);
             Route::get('/households/{householdId}', [HouseholdStatusController::class, 'show']);
             Route::get('/households/{householdId}/status-logs', [HouseholdStatusController::class, 'statusLogs']);
@@ -219,8 +234,12 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::middleware('role:household_resident')->group(function () {
+            Route::get('/household/device-owner/options', [HouseholdMobileController::class, 'ownerOptions']);
+            Route::post('/household/device-owner/select', [HouseholdMobileController::class, 'selectOwner']);
+            Route::post('/household/device-owner/reset', [HouseholdMobileController::class, 'resetOwner']);
             Route::get('/household/overview', [HouseholdMobileController::class, 'overview']);
             Route::post('/household/setup', [HouseholdMobileController::class, 'completeSetup']);
+            Route::post('/household/setup/location', [HouseholdMobileController::class, 'previewSetupLocation']);
             Route::put('/household/geotag', [HouseholdMobileController::class, 'updateGeotag']);
             Route::post('/household/device-location', [HouseholdMobileController::class, 'updateDeviceLocation']);
             Route::patch('/household/members/{memberId}', [HouseholdMobileController::class, 'updateMember']);
@@ -247,6 +266,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:rescuer')->group(function () {
             Route::patch('/dispatches/{assignmentId}/location', [RescueDispatchController::class, 'updateLocation']);
 
+            Route::get('/rescuer/assignments/history', [\App\Http\Controllers\Api\RescuerDispatchHistoryController::class, 'index']);
             Route::get('/rescuer/profile', [RescuerMobileController::class, 'profile']);
             Route::patch('/rescuer/profile', [RescuerMobileController::class, 'updateProfile']);
             Route::get('/rescuer/overview', [RescuerMobileController::class, 'overview']);
@@ -269,7 +289,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/rescuer/radio/clip', [RescuerMobileController::class, 'storeRadioClip']);
             Route::post('/rescuer/radio/signal', [RescuerMobileController::class, 'storeRadioSignal']);
         });
-        Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport'])->middleware('role:tl');
+        Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport'])->middleware('role:rescuer,tl,tm');
         Route::post('/rescuer/resource-requests', [RescuerMobileController::class, 'storeResourceRequest'])->middleware('role:tl');
     });
 });

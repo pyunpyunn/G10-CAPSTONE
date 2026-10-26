@@ -1,0 +1,83 @@
+
+> frontend-web@0.0.0 build
+> vite build
+
+vite v8.0.16 building client environment for production...
+[2K
+transforming...✓ 2051 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                       0.63 kB │ gzip:   0.36 kB
+dist/assets/PlanningModal-BCtYDXHF.css                1.48 kB │ gzip:   0.64 kB
+dist/assets/WeatherPage-DfRI11Pn.css                  2.53 kB │ gzip:   0.75 kB
+dist/assets/MappingPage-Djd5oIac.css                  6.37 kB │ gzip:   1.79 kB
+dist/assets/SuperAdminPage-D6klszLo.css               9.54 kB │ gzip:   2.30 kB
+dist/assets/situation-html-_9jr66nC.css              10.69 kB │ gzip:   2.54 kB
+dist/assets/boundaryMask-vh-t_kPv.css                15.09 kB │ gzip:   6.36 kB
+dist/assets/RescuerAccountsPage-CZNcCEoA.css         24.51 kB │ gzip:   5.07 kB
+dist/assets/ExternalReportsPage-CZUUovx_.css         26.55 kB │ gzip:   5.19 kB
+dist/assets/index-bJeEyeQr.css                      459.14 kB │ gzip:  77.16 kB
+dist/assets/plus-D1BZW0Bd.js                          0.14 kB │ gzip:   0.14 kB
+dist/assets/arrow-left-Ddh_nbnd.js                    0.15 kB │ gzip:   0.15 kB
+dist/assets/arrow-right-CltZNkG0.js                   0.15 kB │ gzip:   0.15 kB
+dist/assets/arrow-up-right-BHkiN4Pj.js                0.15 kB │ gzip:   0.15 kB
+dist/assets/user-xhGhuvKK.js                          0.18 kB │ gzip:   0.17 kB
+dist/assets/rotate-cw-DltbLXJF.js                     0.19 kB │ gzip:   0.17 kB
+dist/assets/DispatchStatusBadge-CZfxVMHS.js           0.20 kB │ gzip:   0.18 kB
+dist/assets/Badge-sdJ2Q_zS.js                         0.20 kB │ gzip:   0.18 kB
+dist/assets/dashboardApi-BGru2uS6.js                  0.20 kB │ gzip:   0.15 kB
+dist/assets/EmptyState-zKr1WZ8M.js                    0.22 kB │ gzip:   0.18 kB
+dist/assets/map-pin-0O1rXM12.js                       0.24 kB │ gzip:   0.21 kB
+dist/assets/triangle-alert-D8AKNzo1.js                0.25 kB │ gzip:   0.20 kB
+dist/assets/PersonnelProfileLink-DbK7dfPe.js          0.26 kB │ gzip:   0.22 kB
+dist/assets/pencil-DXxF7bHN.js                        0.26 kB │ gzip:   0.21 kB
+dist/assets/send-CCl_X33V.js                          0.28 kB │ gzip:   0.22 kB
+dist/assets/check-DsTqwxC2.js                         0.29 kB │ gzip:   0.23 kB
+dist/assets/refresh-cw-Bos-EJSX.js                    0.31 kB │ gzip:   0.21 kB
+dist/assets/save-D7LWeKFh.js                          0.31 kB │ gzip:   0.21 kB
+dist/assets/trash-2-DP9dUv0X.js                       0.31 kB │ gzip:   0.20 kB
+dist/assets/weatherApi-EUjAMAmB.js                    0.32 kB │ gzip:   0.19 kB
+dist/assets/shield-alert-CkltGjOn.js                  0.34 kB │ gzip:   0.25 kB
+dist/assets/LoadingState-Cbp7JZo4.js                  0.35 kB │ gzip:   0.23 kB
+dist/assets/package-BOZCB-1Z.js                       0.36 kB │ gzip:   0.25 kB
+dist/assets/FieldCommunicationPage-C1J87FJj.js        0.44 kB │ gzip:   0.29 kB
+dist/assets/reportApi-0shxikQL.js                     0.63 kB │ gzip:   0.43 kB
+dist/assets/dispatchApi-WWJUcaHd.js                   0.74 kB │ gzip:   0.27 kB
+dist/assets/resourceRequestApi-C2CGH211.js            0.86 kB │ gzip:   0.26 kB
+dist/assets/PlanningModal-Q2tQaTjq.js                 1.10 kB │ gzip:   0.58 kB
+dist/assets/PaginationBar-DMDXvC0X.js                 1.31 kB │ gzip:   0.56 kB
+dist/assets/PersonnelProfilePage-CxVOqaxQ.js          2.08 kB │ gzip:   1.02 kB
+dist/assets/rescuerApi-B37n8HE7.js                    2.08 kB │ gzip:   0.76 kB
+dist/assets/Modal-BsV9Xqaq.js                         2.20 kB │ gzip:   0.89 kB
+dist/assets/resourceRequestHelpers-epYAgovo.js        2.37 kB │ gzip:   0.74 kB
+dist/assets/dispatchHelpers-zCtSDABy.js               2.55 kB │ gzip:   1.16 kB
+dist/assets/RescueManagementPage-CTViBBk7.js          3.07 kB │ gzip:   1.16 kB
+dist/assets/HouseholdPurokListPage-C7UPqLpc.js        3.58 kB │ gzip:   1.44 kB
+dist/assets/HouseholdStatusPage-Bc5o0YT1.js           3.58 kB │ gzip:   1.32 kB
+dist/assets/FieldReportsPage-DuSUyhXA.js              4.62 kB │ gzip:   1.61 kB
+dist/assets/NotificationsPage-CEVIYdXE.js             5.78 kB │ gzip:   2.03 kB
+dist/assets/SuperAdminPage-DzaKbCy-.js                6.68 kB │ gzip:   2.56 kB
+dist/assets/HouseholdDataDirectoryPage-BcFCkRIY.js   10.43 kB │ gzip:   2.47 kB
+dist/assets/ResourceRequestEditorPage-J3g4Q4_l.js    11.12 kB │ gzip:   3.27 kB
+dist/assets/situation-html-sgnqL114.js               11.18 kB │ gzip:   4.08 kB
+dist/assets/EvaTrackReportsPanel-CFEfFb3J.js         12.15 kB │ gzip:   4.28 kB
+dist/assets/ProfilePage-Dtu-e64d.js                  13.38 kB │ gzip:   4.09 kB
+dist/assets/SituationReportPage-CHHVCSMo.js          13.72 kB │ gzip:   4.53 kB
+dist/assets/WeatherPage-Bj7ZzTJx.js                  13.89 kB │ gzip:   4.54 kB
+dist/assets/RescueDispatchPage-BzfYUuKX.js           15.73 kB │ gzip:   4.91 kB
+dist/assets/ExternalReportsPage-Bnayg95m.js          18.65 kB │ gzip:   5.74 kB
+dist/assets/NewDispatchPage-BLwmBYH_.js              18.82 kB │ gzip:   6.04 kB
+dist/assets/BroadcastPage-CPmmOz6f.js                25.13 kB │ gzip:   7.23 kB
+dist/assets/ArchivePage-C3MaCSeQ.js                  25.20 kB │ gzip:   7.06 kB
+dist/assets/RequestWorkflowPage-Cu8t1fpt.js          30.65 kB │ gzip:   7.04 kB
+dist/assets/MappingPage-BeJ8oj5q.js                  38.96 kB │ gzip:  12.49 kB
+dist/assets/RequestTypesPage-Cgb81uhh.js             44.45 kB │ gzip:  11.46 kB
+dist/assets/DataFilterBar-MgCN94_k.js                47.60 kB │ gzip:  12.58 kB
+dist/assets/client-DlZXd8HD.js                       48.00 kB │ gzip:  18.34 kB
+dist/assets/RescuerAccountsPage-DWklE7A3.js          64.63 kB │ gzip:  17.05 kB
+dist/assets/operationsApi-CnNBtWtF.js                83.11 kB │ gzip:  28.07 kB
+dist/assets/boundaryMask-BiDEfUTn.js                157.00 kB │ gzip:  46.27 kB
+dist/assets/DashboardPage-Cvp0QL8A.js               280.27 kB │ gzip:  88.53 kB
+dist/assets/index-sMYIMqDv.js                       422.75 kB │ gzip: 130.26 kB
+
+✓ built in 987ms

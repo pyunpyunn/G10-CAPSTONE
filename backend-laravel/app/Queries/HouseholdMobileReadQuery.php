@@ -60,7 +60,9 @@ class HouseholdMobileReadQuery
             $columns[] = DB::raw('NULL as sitio_name');
         }
 
-        return $query->first($columns);
+        $record = $query->first($columns);
+        if ($record) $record->full_address = app(HouseholdAddressQuery::class)->forHouseholds([$householdId])->get($householdId);
+        return $record;
     }
 
     public function mambalingSitioOptions(): array
@@ -229,7 +231,9 @@ class HouseholdMobileReadQuery
         $query = DB::table('geotagged_locations')
             ->where('household_id', $householdId)
             ->whereNotNull('latitude')
-            ->whereNotNull('longitude');
+            ->whereNotNull('longitude')
+            ->whereBetween('latitude', [-90, 90])->whereBetween('longitude', [-180, 180])
+            ->when(Schema::hasColumn('geotagged_locations', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
 
         if (Schema::hasColumn('geotagged_locations', 'updated_at')) {
             $query->orderByDesc('updated_at');
@@ -513,6 +517,7 @@ class HouseholdMobileReadQuery
 
         return $query
             ->orderByDesc($orderColumn)
+            ->orderByDesc('hsl.status_log_id')
             ->limit(200)
             ->get($columns)
             ->reduce(function (array $statuses, object $log): array {
@@ -916,12 +921,14 @@ class HouseholdMobileReadQuery
 
         return DB::table('household_members')
             ->where($memberKeyColumn, $user->member_id)
+            ->where('household_id', $user->household_id)
             ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->first([
                 $this->firstExistingColumnSelect('household_members', ['name', 'full_name'], 'name'),
                 $this->optionalColumnSelect('household_members', 'first_name', 'first_name'),
                 $this->optionalColumnSelect('household_members', 'middle_name', 'middle_name'),
                 $this->optionalColumnSelect('household_members', 'last_name', 'last_name'),
+                $this->optionalColumnSelect('household_members', 'contact_number', 'contact_number'),
             ]);
     }
 

@@ -2,11 +2,12 @@ import { statusColor } from '@/constants/statusPalette';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { hasActiveRescuerTracking } from '@/utils/rescuerLiveLocation';
 import { useMapGps } from '@/hooks/useMapGps';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineTime } from '@/utils/time';
-import { ActionButton, EmptyState, SectionHeader, StatusBadge } from './RescuerUI';
+import { ActionButton, EmptyState, SectionHeader } from './RescuerUI';
 
 type RescueMapProps = {
   assignments: any[];
@@ -14,6 +15,8 @@ type RescueMapProps = {
   activeAssignment: any;
   selectedAssignment?: any;
   onSendLocation: (assignmentId: number, payload: any) => Promise<void>;
+  showNavigationButton?: boolean;
+  onOpenNavigation?: () => void;
 };
 
 const defaultRegion = {
@@ -23,29 +26,43 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
-export function RescueMapScreen({ assignments, evacuationCenters = [], activeAssignment, selectedAssignment, onSendLocation }: RescueMapProps) {
-  const [tracking, setTracking] = useState(false);
+export function RescueMapScreen({
+  assignments,
+  evacuationCenters = [],
+  activeAssignment,
+  selectedAssignment,
+  onSendLocation,
+  showNavigationButton = false,
+  onOpenNavigation,
+}: RescueMapProps) {
+  const [tracking, setTracking] = useState(true);
   const { position, error: gpsError } = useMapGps(tracking);
   const sendLocation = useRef(onSendLocation);
   sendLocation.current = onSendLocation;
   const sending = useRef(false);
+  const lastRouteRefresh = useRef(0);
+  const gpsAssignment = selectedAssignment || activeAssignment;
   const [lastUpdated, setLastUpdated] = useState('');
   const [locError, setLocError] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [showEvacuationCenters, setShowEvacuationCenters] = useState(true);
   const [showAssignedRoutes, setShowAssignedRoutes] = useState(true);
+  const [expandedLayer, setExpandedLayer] = useState<'centers' | 'routes' | null>(null);
 
   useEffect(() => {
     if (!tracking || !position) return;
     setLastUpdated(formatPhilippineTime());
-    if (!activeAssignment?.assignment_id || sending.current) return;
+    if (hasActiveRescuerTracking() && lastRouteRefresh.current > 0) return;
+    if (!gpsAssignment?.assignment_id || !['dispatched','accepted','en_route','on_scene'].includes(gpsAssignment.status_key) || sending.current) return;
     sending.current = true;
     setSyncing(true);
-    void sendLocation.current(activeAssignment.assignment_id, position)
+    const refreshRoute = Date.now() - lastRouteRefresh.current > 20000;
+    if (refreshRoute) lastRouteRefresh.current = Date.now();
+    void sendLocation.current(gpsAssignment.assignment_id, { ...position, refresh_route: refreshRoute })
       .then(() => setLocError(''))
-      .catch(() => setLocError('GPS is active, but the latest location could not be saved to the backend.'))
+      .catch(error => { lastRouteRefresh.current = 0; setLocError(error.message || 'Location sync unavailable.'); })
       .finally(() => { sending.current = false; setSyncing(false); });
-  }, [position, tracking, activeAssignment?.assignment_id]);
+  }, [position, tracking, gpsAssignment?.assignment_id, gpsAssignment?.status_key]);
 
   function stopTracking() {
     setTracking(false);
@@ -73,8 +90,6 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
   const visibleCenters = showEvacuationCenters
     ? evacuationCenters.filter((center) => center.latitude && center.longitude)
     : [];
-  const urgentCount = activeAssignments.filter((item) => item.priority_level === 'urgent').length;
-  const activeCount = activeAssignments.length;
   const mapMarkers = [
     ...visibleCenters.map((center) => ({
       latitude: center.latitude,
@@ -114,12 +129,16 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
 
   return (
     <View style={styles.stack}>
-      <View style={styles.summaryRow}>
-        <StatusBadge label={`${assignments.length} assigned`} tone="neutral" />
-        <StatusBadge label={`${activeCount} active`} tone="en_route" />
-        <StatusBadge label={`${urgentCount} urgent`} tone={urgentCount > 0 ? 'urgent' : 'neutral'} />
-      </View>
-
+      {showNavigationButton && onOpenNavigation ? (
+        <Pressable
+          style={({ pressed }) => [styles.navigationButton, pressed && styles.navigationButtonPressed]}
+          onPress={onOpenNavigation}
+          accessibilityRole="button"
+        >
+          <Ionicons name="navigate-outline" size={20} color="#fff" />
+          <Text style={styles.navigationButtonText}>View directions / Offline navigation</Text>
+        </Pressable>
+      ) : null}
       <View style={styles.card}>
         <SectionHeader
           title="Barangay rescue map"
@@ -134,26 +153,69 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
         />
 
         <View style={styles.mapFilters}>
-          <Pressable
-            style={[styles.mapFilter, showEvacuationCenters && styles.mapFilterActive]}
-            onPress={() => setShowEvacuationCenters((value) => !value)}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: showEvacuationCenters }}
-          >
-            <Ionicons name="business-outline" size={16} color={showEvacuationCenters ? palette.navActive : palette.textSoft} />
-            <Text style={styles.mapFilterText}>Evacuation centers</Text>
-            {showEvacuationCenters ? <Ionicons name="checkmark-circle" size={16} color={palette.safe} /> : null}
-          </Pressable>
-          <Pressable
-            style={[styles.mapFilter, showAssignedRoutes && styles.mapFilterActive]}
-            onPress={() => setShowAssignedRoutes((value) => !value)}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: showAssignedRoutes }}
-          >
-            <Ionicons name="git-branch-outline" size={16} color={showAssignedRoutes ? palette.navActive : palette.textSoft} />
-            <Text style={styles.mapFilterText}>Assigned dispatch routes</Text>
-            {showAssignedRoutes ? <Ionicons name="checkmark-circle" size={16} color={palette.safe} /> : null}
-          </Pressable>
+          <View style={styles.layerDropdown}>
+            <Pressable
+              style={styles.layerHeader}
+              onPress={() => setExpandedLayer((value) => value === 'centers' ? null : 'centers')}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: expandedLayer === 'centers' }}
+            >
+              <Ionicons name="business-outline" size={18} color={palette.navActive} />
+              <Text style={styles.layerTitle}>Evacuation centers</Text>
+              <Text style={styles.layerCount}>{evacuationCenters.length}</Text>
+              <Ionicons name={expandedLayer === 'centers' ? 'chevron-up' : 'chevron-down'} size={18} color={palette.textSoft} />
+            </Pressable>
+            {expandedLayer === 'centers' ? (
+              <View style={styles.layerContent}>
+                <Pressable
+                  style={styles.layerToggle}
+                  onPress={() => setShowEvacuationCenters((value) => !value)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: showEvacuationCenters }}
+                >
+                  <Text style={styles.layerMeta}>Show on map</Text>
+                  <Ionicons name={showEvacuationCenters ? 'checkbox' : 'square-outline'} size={20} color={palette.navActive} />
+                </Pressable>
+                {evacuationCenters.length ? evacuationCenters.map((center: any, index: number) => (
+                  <View key={String(center.center_id || center.evacuation_center_id || center.name || index)} style={styles.layerItem}>
+                    <Text style={styles.rowTitle}>{center.name || center.center_name || 'Evacuation center'}</Text>
+                    <Text style={styles.rowMeta}>{center.status_label || center.status || 'Available'}</Text>
+                  </View>
+                )) : <Text style={styles.smallText}>No evacuation centers available.</Text>}
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.layerDropdown}>
+            <Pressable
+              style={styles.layerHeader}
+              onPress={() => setExpandedLayer((value) => value === 'routes' ? null : 'routes')}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: expandedLayer === 'routes' }}
+            >
+              <Ionicons name="git-branch-outline" size={18} color={palette.navActive} />
+              <Text style={styles.layerTitle}>Assigned dispatch routes</Text>
+              <Text style={styles.layerCount}>{activeAssignments.length}</Text>
+              <Ionicons name={expandedLayer === 'routes' ? 'chevron-up' : 'chevron-down'} size={18} color={palette.textSoft} />
+            </Pressable>
+            {expandedLayer === 'routes' ? (
+              <View style={styles.layerContent}>
+                <Pressable
+                  style={styles.layerToggle}
+                  onPress={() => setShowAssignedRoutes((value) => !value)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: showAssignedRoutes }}
+                >
+                  <Text style={styles.layerMeta}>Show on map</Text>
+                  <Ionicons name={showAssignedRoutes ? 'checkbox' : 'square-outline'} size={20} color={palette.navActive} />
+                </Pressable>
+                {activeAssignments.length ? activeAssignments.map((assignment: any) => (
+                  <View key={assignment.assignment_id} style={styles.layerItem}>
+                    <Text style={styles.rowTitle}>{assignment.assigned_area || assignment.household_id || 'Assigned location'}</Text>
+                  </View>
+                )) : <Text style={styles.smallText}>No active dispatch routes.</Text>}
+              </View>
+            ) : null}
+          </View>
         </View>
 
         {locError || gpsError ? (
@@ -189,27 +251,6 @@ export function RescueMapScreen({ assignments, evacuationCenters = [], activeAss
         ) : null}
       </View>
 
-      <View style={styles.card}>
-        <SectionHeader title="Active dispatches" />
-        {activeAssignments.length === 0 ? (
-          <Text style={styles.smallText}>No active dispatch assignments.</Text>
-        ) : (
-          activeAssignments.map((assignment) => (
-            <View key={assignment.assignment_id} style={styles.assignmentRow}>
-              <View style={styles.rowIcon}>
-                <Ionicons name="pin-outline" size={17} color={palette.navActive} />
-              </View>
-              <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>{assignment.assigned_area || assignment.household_id || 'Assigned location'}</Text>
-                <Text style={styles.rowMeta}>
-                  {assignment.latitude && assignment.longitude ? 'Geotag available' : 'No household geotag yet'}
-                </Text>
-              </View>
-              <StatusBadge label={assignment.status_label} tone={assignment.status_key} />
-            </View>
-          ))
-        )}
-      </View>
     </View>
   );
 }
@@ -218,29 +259,54 @@ const styles = StyleSheet.create({
   stack: {
     gap: spacing.md,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  mapFilters: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  mapFilter: {
-    minHeight: 40,
+  navigationButton: {
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: palette.nav,
+  },
+  navigationButtonPressed: {
+    opacity: 0.85,
+  },
+  navigationButtonText: {
+    color: palette.navText,
+    fontWeight: '800',
+  },
+  mapFilters: {
+    gap: spacing.xs,
+  },
+  layerDropdown: {
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.sm,
     backgroundColor: palette.card,
   },
-  mapFilterActive: { backgroundColor: palette.secondary, borderColor: palette.navActive },
-  mapFilterText: { color: palette.text, fontSize: 12, fontWeight: '800' },
+  layerHeader: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: palette.secondary,
+  },
+  layerTitle: { flex: 1, color: palette.text, fontSize: 13, fontWeight: '800' },
+  layerCount: { color: palette.textSoft, fontSize: 12, fontWeight: '800' },
+  layerContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  layerToggle: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+  },
+  layerMeta: { color: palette.textSoft, fontSize: 12, fontWeight: '700' },
+  layerItem: { paddingTop: spacing.sm },
   card: {
     gap: spacing.md,
     borderWidth: 1,
@@ -280,22 +346,6 @@ const styles = StyleSheet.create({
     color: palette.textSoft,
     fontSize: 13,
     fontWeight: '800',
-  },
-  assignmentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-    paddingTop: spacing.md,
-  },
-  rowIcon: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    backgroundColor: palette.secondary,
   },
   rowText: {
     flex: 1,

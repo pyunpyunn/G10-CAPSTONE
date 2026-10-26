@@ -2,7 +2,7 @@
 
 return [
     'durable' => (bool) env('REALTIME_DURABLE', false),
-    'connection' => env('REALTIME_DB_CONNECTION', env('DB_CONNECTION', 'resq_local')),
+    'connection' => env('REALTIME_DB_CONNECTION', env('DB_CONNECTION', 'mysql')),
     'queue_connection' => env('REALTIME_QUEUE_CONNECTION', 'realtime_database'),
     'batch_size' => (int) env('REALTIME_BATCH_SIZE', 500),
     'read_cache' => (bool) env('REALTIME_READ_CACHE', false),
@@ -16,8 +16,8 @@ return [
         'households' => ['households', 'mapping', 'dispatch'],
         'household_members' => ['households', 'dispatch'],
         'responder_assignments' => ['dispatch', 'mapping', 'field-reports'],
-        'responder_location_logs' => ['mapping', 'dispatch'],
-        'responder_routes' => ['mapping', 'dispatch'],
+        'responder_location_logs' => ['mapping'],
+        'responder_routes' => ['mapping'],
         'route_coordinates' => ['mapping'],
         'responder_communication_logs' => ['communications'],
         'geotagged_locations' => ['mapping', 'households'],

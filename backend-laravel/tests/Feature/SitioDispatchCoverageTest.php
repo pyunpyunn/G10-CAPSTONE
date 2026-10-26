@@ -75,6 +75,23 @@ class SitioDispatchCoverageTest extends TestCase
             ['household_id' => $id, 'is_available_for_dispatch' => true], ['HH-1', 'HH-2', 'HH-3'])]];
     }
 
+    public function test_overview_groups_active_assignments_without_loading_all_households_or_returning_queues(): void
+    {
+        $priorities = [['sitio_id'=>1,'sitio'=>'Sitio A','address_labels'=>[['label'=>'Purok 1, Sitio A']]],
+            ['sitio_id'=>2,'sitio'=>'Sitio B','address_labels'=>[['label'=>'Purok 1, Sitio B']]]];
+        DB::enableQueryLog(); DB::flushQueryLog();
+        $rows = app(SitioDispatchCoverageQuery::class)->withActiveAssignments($priorities, [$this->assignment(['HH-1']),$this->assignment(['HH-2'],'completed')]);
+        $this->assertCount(1,$rows[0]['activeDispatches']);
+        $this->assertSame([], $rows[1]['activeDispatches']);
+        $this->assertArrayNotHasKey('household_ids',$rows[0]['activeDispatches'][0]);
+        $this->assertCount(0,DB::getQueryLog());
+        $legacy = $this->assignment([]); unset($legacy['sitio_id']);
+        $legacy['responder_households'] = [5=>['HH-B']];
+        $rows = app(SitioDispatchCoverageQuery::class)->withActiveAssignments($priorities,[$legacy]);
+        $this->assertSame([], $rows[0]['activeDispatches']);
+        $this->assertCount(1,$rows[1]['activeDispatches']);
+    }
+
     public function test_partial_coverage_offers_another_team_only_for_uncovered_households(): void
     {
         $rows = app(SitioDispatchCoverageQuery::class)->forEvent('EVT-1', $this->areas(), [$this->assignment(['HH-1'])]);

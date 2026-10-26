@@ -3,13 +3,17 @@ import * as TaskManager from 'expo-task-manager';
 import * as Network from 'expo-network';
 import { AppState } from 'react-native';
 import { api } from '@/api/client';
+import { assignmentNavigationSnapshot } from './assignmentNavigationSnapshot';
 import { activeLocalTrip, addLocalTripPoint, acknowledgeOutbox, completeLocalTrip, createLocalTrip, getLocalTrip,
-  getPendingOutboxEvents, saveBootstrap } from './navigationStore';
+  getPendingOutboxEvents, getActivePack, saveBootstrap } from './navigationStore';
 
 const taskName = 'resq-active-dispatch-navigation';
 let work: Promise<unknown> = Promise.resolve();
 let syncing: Promise<void> | null = null;
 let retryAfter = 0, failures = 0;
+let sessionGeneration = 0;
+let syncPaused = false;
+let syncController: AbortController | null = null;
 export let lastNavigationError = '';
 const listeners = new Set<(location: Location.LocationObject) => void>();
 
@@ -37,14 +41,29 @@ export function subscribeNavigationPosition(listener: (location: Location.Locati
 }
 
 export async function refreshNavigation() {
-  // A complete team snapshot also removes households/routes that were reassigned.
-  const response = await api.get('/mobile/bootstrap');
-  await saveBootstrap(response.data.data);
+  if (syncPaused) return;
+  const generation = sessionGeneration;
+  const overview = await api.get('/rescuer/overview');
+  let bootstrap: any = { pack: await getActivePack() };
+  try {
+    const response = await api.get('/mobile/bootstrap');
+    bootstrap = response.data.data;
+  } catch (error: any) {
+    // Ordinary rescuer sessions can view their own route. Keep offline packs and
+    // trip synchronization behind the existing device-bound authorization.
+    if (![401, 403].includes(error.response?.status)) lastNavigationError = error.userMessage || error.message;
+  }
+  if (syncPaused || generation !== sessionGeneration) return;
+  await saveBootstrap(assignmentNavigationSnapshot(overview.data.data, bootstrap));
 }
 
 export async function syncNavigation() {
+  if (syncPaused) return;
   if (syncing) return syncing;
   if (Date.now() < retryAfter) return;
+  const generation = sessionGeneration;
+  syncController = new AbortController();
+  const signal = syncController.signal;
   syncing = (async () => {
     try {
       const network = await Network.getNetworkStateAsync();
@@ -52,6 +71,7 @@ export async function syncNavigation() {
       // Send in order: a trip.start acknowledgement must persist its server ID
       // before any dependent point/end event can be sent, including after restart.
       for (let batch = 0; batch < 20; batch++) {
+        if (syncPaused || generation !== sessionGeneration) return;
         const events = await getPendingOutboxEvents(25);
         if (!events.length) break;
         const ready = [];
@@ -67,7 +87,7 @@ export async function syncNavigation() {
           } else ready.push(event);
         }
         if (!ready.length) break;
-        const response = await api.post('/mobile/sync', { events: ready });
+        const response = await api.post('/mobile/sync', { events: ready }, { signal });
         await acknowledgeOutbox(response.data.data.acks);
         if (response.data.data.acks.some((ack: any) => ack.status !== 'processed')) {
           throw new Error('A trip event was rejected. Its dependent events remain on this phone.');
@@ -75,6 +95,7 @@ export async function syncNavigation() {
       }
       failures = 0; retryAfter = 0; lastNavigationError = '';
     } catch (error: any) {
+      if (syncPaused || generation !== sessionGeneration) return;
       lastNavigationError = error.message;
       retryAfter = Date.now() + Math.min(300000, 2000 * 2 ** Math.min(failures++, 8));
     }
@@ -105,19 +126,28 @@ export async function startNavigationTrip(dispatchId: number, profile: 'auto' | 
   return trip;
 }
 
-export async function endNavigationTrip() {
+export async function endNavigationTrip({ sync = true } = {}) {
   if (await Location.hasStartedLocationUpdatesAsync(taskName)) await Location.stopLocationUpdatesAsync(taskName);
   await serial(async () => {
     const trip = await activeLocalTrip();
     if (!trip) return;
     await completeLocalTrip(trip.localTripId);
   });
-  void syncNavigation();
+  if (sync) void syncNavigation();
+}
+
+export async function suspendNavigationSync() {
+  syncPaused = true;
+  sessionGeneration++;
+  syncController?.abort();
+  await syncing;
 }
 
 let syncMounts = 0;
 let stopSync: (() => void) | null = null;
 export function mountNavigationSync() {
+  syncPaused = false;
+  retryAfter = 0; failures = 0;
   syncMounts++;
   if (stopSync) return () => { if (--syncMounts === 0) { stopSync?.(); stopSync = null; } };
   const foreground = AppState.addEventListener('change', (state) => {

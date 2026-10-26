@@ -190,7 +190,11 @@ export function mobileLeafletHtml({
         }));
       });
     }
-    data.markers.forEach((point) => {
+    let renderedLayers = [];
+    window.updateRescueData = (next) => {
+      renderedLayers.forEach(layer => map.removeLayer(layer));
+      renderedLayers = [];
+    (next.markers || []).forEach((point) => {
       const latitude = Number(point.latitude);
       const longitude = Number(point.longitude);
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
@@ -211,22 +215,26 @@ export function mobileLeafletHtml({
         description.textContent = point.description;
         popup.appendChild(description);
       }
+      renderedLayers.push(marker);
       marker.bindPopup(popup);
       bounds.extend([latitude, longitude]);
     });
-    data.routes.forEach((route) => {
+    (next.routes || []).forEach((route) => {
       const coordinates = (route.coordinates || []).map((point) => [Number(point.latitude), Number(point.longitude)])
         .filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
       if (coordinates.length < 2) return;
-      L.polyline(coordinates, {
+      const routeLine = L.polyline(coordinates, {
         color: route.color || '#267b75',
         weight: 5,
         opacity: 0.9,
         lineCap: 'round',
         lineJoin: 'round'
       }).addTo(map).bindPopup(route.label || 'Route');
+      renderedLayers.push(routeLine);
       coordinates.forEach((point) => bounds.extend(point));
     });
+    };
+    window.updateRescueData(data);
     if (!data.geotagPicker && bounds.isValid()) map.fitBounds(bounds.pad(0.18), { maxZoom: 16 });
     let gpsMarker = null;
     let gpsPosition = null;

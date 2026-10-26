@@ -1,8 +1,9 @@
 import axios from 'axios'
-import { getToken } from './token'
+import { getToken } from './token.js'
+import { installReduxTransport, invalidateApiState, invalidateTransportCache, resetApiState } from '../state/apiStore.js'
 
 function getApiBaseUrl() {
-  const configuredUrl = import.meta.env.VITE_API_BASE_URL
+  const configuredUrl = import.meta.env?.VITE_API_BASE_URL
   const browserHost = window.location.hostname
   const isLocalBrowser = ['localhost', '127.0.0.1', '0.0.0.0'].includes(browserHost)
 
@@ -31,11 +32,29 @@ function getApiBaseUrl() {
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
-  timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || 10000),
+  timeout: Number(import.meta.env?.VITE_API_TIMEOUT_MS || 10000),
   headers: {
     Accept: 'application/json',
   },
 })
+
+installReduxTransport(api)
+window.addEventListener('operations:changed', event => {
+  const changes = event.detail?.topics
+  const paths = {
+    mapping: ['/map/', '/dashboard'],
+    dispatch: ['/dispatch', '/rescue-teams', '/field-reports', '/dashboard', '/notifications'],
+    households: ['/household', '/dispatch', '/field-reports', '/dashboard', '/map/', '/situation'],
+    'field-reports': ['/field-reports', '/household', '/dispatch', '/situation'],
+    requests: ['/resource-request', '/notifications', '/dashboard', '/situation'],
+    communications: ['/communications', '/radio'], weather: ['/weather', '/dashboard'],
+    inquiries: ['/inquiries', '/archive'],
+  }
+  invalidateApiState(changes?.length && changes.every(topic => paths[topic]) ? changes.flatMap(topic => paths[topic]) : undefined)
+})
+window.addEventListener('online', () => invalidateTransportCache())
+window.addEventListener('focus', () => invalidateTransportCache())
+window.addEventListener('personnel-access:changed', () => invalidateApiState(['/auth/', '/profile', '/rescuers']))
 
 api.interceptors.request.use((config) => {
   const token = getToken()
@@ -67,6 +86,7 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
+    if (error.response?.status === 401) resetApiState()
     if ([401, 403].includes(error.response?.status) && !String(error.config?.url || '').startsWith('/auth/')) {
       window.dispatchEvent(new Event('personnel-access:changed'))
     }

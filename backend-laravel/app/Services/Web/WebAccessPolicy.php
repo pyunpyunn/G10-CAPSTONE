@@ -9,7 +9,7 @@ class WebAccessPolicy
 {
     public const MODULES = [
         'chair' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
-        'operations_admin' => ['personnel_access', 'profile', 'notifications', 'inquiries'],
+        'operations_admin' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'personnel_access', 'profile', 'notifications', 'inquiries'],
         'mitigation_prevention' => ['dashboard', 'geospatial_analytics', 'reports_documentation', 'profile', 'notifications'],
         'preparedness' => ['dashboard', 'geospatial_analytics', 'reports_documentation', 'profile', 'notifications'],
         'response' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
@@ -27,6 +27,7 @@ class WebAccessPolicy
         $roleKey = $user->roleKey();
         $role = $user->relationLoaded('role') ? $user->getRelation('role') : null;
         $allowedModules = self::MODULES[$roleKey] ?? [];
+        if ($roleKey === 'operations_admin') return $allowedModules;
         if ($role?->web_modules !== null) return array_values(array_intersect((array) $role->web_modules, $allowedModules));
         return $allowedModules;
     }
@@ -39,12 +40,13 @@ class WebAccessPolicy
 
         $roleKey = $user->roleKey();
         $modules = $this->modulesFor($user);
-        if ($module === 'global_search') {
-            return $modules !== [];
+        if ($module === 'global_search' || $module === 'personnel_profiles') {
+            return $modules !== [] && ($module !== 'personnel_profiles' || $action === 'view');
         }
         if (! in_array($module, $modules, true)) {
             return false;
         }
+        if ($roleKey === 'operations_admin') return true;
 
         if ($action === 'manage_hazards' && $module === 'geospatial_analytics') return in_array($roleKey, ['chair', 'mitigation_prevention', 'preparedness'], true);
 
@@ -68,6 +70,7 @@ class WebAccessPolicy
         if ($path === 'profile') return 'profile';
         if (str_starts_with($path, 'notifications')) return 'notifications';
         if (str_starts_with($path, 'rescuers') || str_starts_with($path, 'headquarters-accounts')) return 'personnel_access';
+        if (str_starts_with($path, 'personnel-profiles/')) return 'personnel_profiles';
         if ($path === 'global-search') return 'global_search';
         if (str_starts_with($path, 'dashboard')) {
             return str_starts_with($path, 'dashboard/active-event') ? 'response_operations' : 'dashboard';

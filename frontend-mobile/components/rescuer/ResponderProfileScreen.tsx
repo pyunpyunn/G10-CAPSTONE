@@ -1,3 +1,4 @@
+import { ChangePasswordSection } from '@/components/ChangePasswordSection';
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -140,19 +141,12 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
             <InfoRow icon="person-outline" label="Name" value={responder.emergency_contact_name || 'Not recorded'} />
             <InfoRow icon="call-outline" label="Mobile" value={responder.emergency_contact_number || 'Not recorded'} />
           </View>
-
-          <ActionButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
         </>
       ) : null}
-    </View>
-  );
-}
 
-function FormSectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
-  return (
-    <View style={styles.formSectionHeader}>
-      <Ionicons name={icon} size={16} color={palette.navActive} />
-      <Text style={styles.formSectionTitle}>{title}</Text>
+      <ChangePasswordSection accountIdentifiers={[user.user_id, user.username, user.email, responder.responder_code]} />
+
+      <ActionButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
     </View>
   );
 }
@@ -182,6 +176,15 @@ function ProfileInput({
         style={[styles.input, multiline && styles.textArea]}
         placeholderTextColor={palette.textSoft}
       />
+    </View>
+  );
+}
+
+function FormSectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
+  return (
+    <View style={styles.formSectionHeader}>
+      <Ionicons name={icon} size={16} color={palette.navActive} />
+      <Text style={styles.formSectionTitle}>{title}</Text>
     </View>
   );
 }

@@ -1,0 +1,40 @@
+✔ opening navigation directly selects an active dispatch and its ready vehicle route (1.8044ms)
+✔ explicit dispatch or resumed trip takes precedence over first active assignment (0.4205ms)
+✔ missing assignment never falls back to another household route (0.2799ms)
+✔ walking profile selects only its matching ready route (0.2476ms)
+✔ no active dispatch returns no assignment (0.3148ms)
+✔ another dispatch to the same household does not replace the selected dispatch route (0.2765ms)
+✔ advancing the household queue cannot reuse the previous households route (0.3276ms)
+✔ accepted dashboard assignment and its actual road geometry are available without device bootstrap (1.5603ms)
+✔ live dispatch road route takes precedence over team-base route; walking cache is retained (0.4055ms)
+✔ closed or mismatched household routes never overwrite active directions (0.2438ms)
+✔ member dropdowns preserve database statuses including Unchecked and use database damage options (196.1782ms)
+✔ deaths and injuries change automatically with member selections (49.5738ms)
+✔ submission sends selected statuses and calculated counts without an incident type (34.3181ms)
+✔ GPS stops in the background, resumes once and cleans up on close (142.8769ms)
+✔ denied permission preserves the map without starting GPS (32.2605ms)
+✔ late GPS subscription is removed when the screen closes while starting (23.147ms)
+✔ invalid and inaccurate fixes are ignored (15.0996ms)
+✔ opening a map requests a fresh fix and rejects stale watch locations (22.3432ms)
+✔ older APK opens the map screen without importing the missing native module (155.7199ms)
+✔ APK with WebView renders the embedded map and handles only valid map presses (32.2792ms)
+✔ route refresh replaces layers without moving or reloading the map (17.4848ms)
+✔ GPS zooms once, moves one marker, permits panning and recenters on demand (14.5723ms)
+✔ household picker fits Mambaling borders and publishes the draggable pin on release (11.5716ms)
+✔ center pin publishes the map center on every pan end for server validation and toggles satellite imagery (12.7054ms)
+✔ household GPS reminder waits for confirmation and allows cancellation (9.0154ms)
+✔ a household can be completed without a detailed field report and the queue remains visible (195.8247ms)
+✔ the next household displays fresh acceptance and completed/current queue badges (44.6779ms)
+✔ accepted and en-route tasks expose the appropriate next action (53.3127ms)
+✔ history is behind the queue icon and duplicate quick actions are removed (21.012ms)
+✔ precision-six geometry decodes longitude first and rejects truncated data (2.1902ms)
+✔ a one kilometer path measures correctly and snaps to a segment midpoint (1.3041ms)
+✔ progress clamps at route ends and detects an off-route fix (0.4284ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 811.989

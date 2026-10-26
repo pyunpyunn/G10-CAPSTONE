@@ -70,64 +70,93 @@ class HouseholdMobileSetupWorkflow
         return response()->json(['message' => 'Household geotag saved.', 'data' => ['geographic_classification' => $classification]]);
     }
 
+    public function previewSetupLocation(Request $request): JsonResponse
+    {
+        $householdId = $this->support->householdId($request->user());
+        abort_unless($householdId, 403, 'This account is not linked to a household.');
+        $this->support->authenticatedMemberId($request->user());
+        $geotag = app(\App\Queries\HouseholdMobileReadQuery::class)->geotag($householdId);
+        if ($geotag) return response()->json(['data' => ['reused_geotag' => true, 'geotag' => $geotag]]);
+        $coordinates = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+        return response()->json(['data' => [
+            'reused_geotag' => false,
+            'address' => app(HouseholdSetupAddress::class)->resolve($householdId, (float) $coordinates['latitude'], (float) $coordinates['longitude']),
+        ]]);
+    }
+
     public function completeSetup(Request $request): JsonResponse
     {
         $user = $request->user();
         $householdId = $this->support->householdId($user);
-
-        if (! $householdId) {
-            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
-        }
-
+        abort_unless($householdId, 403, 'This account is not linked to a household record.');
         foreach (['households', 'geotagged_locations', 'device_tokens'] as $table) {
-            if (! Schema::hasTable($table)) {
-                return $this->support->missingTableResponse($table);
-            }
+            if (! Schema::hasTable($table)) return $this->support->missingTableResponse($table);
         }
-
-        $validated = $request->validate([
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy_m' => ['nullable', 'numeric', 'min:0'],
-            'address_label' => ['required', 'string', 'max:255'],
-            'house_number' => ['nullable', 'string', 'max:80'],
-            'unit_number' => ['nullable', 'string', 'max:80'],
-            'street' => ['nullable', 'string', 'max:150'],
-            'barangay' => ['nullable', 'string', 'max:120'],
-            'city' => ['nullable', 'string', 'max:120'],
-            'province' => ['nullable', 'string', 'max:120'],
-            'member_id' => ['nullable', 'string', 'max:255'],
-            'relationship_to_family' => ['required', 'string', 'max:80'],
+        $device = $request->validate([
             'device_uuid' => ['required', 'string', 'max:150'],
             'device_name' => ['nullable', 'string', 'max:100'],
             'platform' => ['nullable', 'string', 'max:30'],
-            'photo_uri' => ['nullable', 'string', 'max:1000'],
-        ], [
-            'latitude.required' => 'Enable location or pin your household on the map.',
-            'longitude.required' => 'Enable location or pin your household on the map.',
-            'address_label.required' => 'Confirm the household address.',
-            'relationship_to_family.required' => 'Select your relationship to the family.',
-            'device_uuid.required' => 'Device identifier is required.',
         ]);
-
-        $now = now();
-        $deviceId = null;
-
-        DB::transaction(function () use ($householdId, $user, $validated, $now, &$deviceId): void {
-            $this->saveGeotag($householdId, $user?->user_id, $validated, $now);
-            $deviceId = $this->saveDevice($householdId, $user?->user_id, $validated, $now);
-            $this->saveTrackingLog($householdId, $deviceId, $validated, 'setup_pin', $now);
-            $this->support->writeAuditLog(request(), 'mobile_household_setup', 'households', $householdId, $validated);
-        });
-        $this->queueRouteRecompute($householdId);
-
-        return response()->json([
-            'message' => 'Household mobile setup saved.',
-            'data' => [
-                'device_token_id' => $deviceId,
-                'geographic_classification' => app(\App\Services\Shared\HouseholdGeographicClassifier::class)->resolve((float) $validated['latitude'], (float) $validated['longitude']),
-            ],
-        ]);
+        $device['member_id'] = $this->support->authenticatedMemberId($user);
+        $result = DB::transaction(function () use ($request, $user, $householdId, $device): array {
+            $household = DB::table('households')->where('household_id', $householdId)->lockForUpdate()->first();
+            abort_unless($household && empty($household->deleted_at), 404, 'Household record was not found.');
+            $existing = app(\App\Queries\HouseholdMobileReadQuery::class)->geotag($householdId);
+            if ($existing) {
+                $deviceId = $this->saveDevice($householdId, $user->user_id, $device, now());
+                return ['device_token_id' => $deviceId, 'reused_geotag' => true, 'geotag' => $existing];
+            }
+            $apartment = $request->boolean('is_apartment');
+            $validated = $request->validate([
+                'latitude' => ['required', 'numeric', 'between:-90,90'],
+                'longitude' => ['required', 'numeric', 'between:-180,180'],
+                'accuracy_m' => ['nullable', 'numeric', 'min:0'],
+                'is_apartment' => ['required', 'boolean'],
+                'house_number' => ['nullable', 'string', 'max:80'],
+                'building_name' => [Rule::excludeIf(! $apartment), 'nullable', 'string', 'max:120'],
+                'floor_number' => [Rule::excludeIf(! $apartment), 'nullable', 'string', 'max:30'],
+                'unit_number' => [Rule::excludeIf(! $apartment), Rule::requiredIf($apartment), 'string', 'max:80'],
+                'room_number' => [Rule::excludeIf(! $apartment), 'nullable', 'string', 'max:80'],
+                'landmark' => ['nullable', 'string', 'max:255'],
+            ], ['unit_number.required' => 'Enter your apartment unit number.']);
+            $addresses = app(HouseholdSetupAddress::class);
+            $area = $addresses->resolve($householdId, (float) $validated['latitude'], (float) $validated['longitude']);
+            $validated['address_label'] = mb_substr($addresses->save($householdId, $area, $validated), 0, 255);
+            $now = now();
+            $locationData = $this->support->filterColumns('geotagged_locations', [
+                'household_id' => $householdId, 'latitude' => $validated['latitude'], 'longitude' => $validated['longitude'],
+                'location_label' => $validated['address_label'], 'accuracy_m' => $validated['accuracy_m'] ?? null,
+                'geotag_source' => 'household_mobile', 'is_verified' => false,
+                'created_by_user_id' => $user->user_id, 'created_at' => $now, 'updated_at' => $now,
+            ]);
+            $invalidLocation = DB::table('geotagged_locations')->where('household_id', $householdId)->first();
+            if ($invalidLocation) {
+                unset($locationData['created_at']);
+                if (Schema::hasColumn('geotagged_locations', 'deleted_at')) $locationData['deleted_at'] = null;
+                DB::table('geotagged_locations')->where('location_id', $invalidLocation->location_id)->update($locationData);
+            } else {
+                DB::table('geotagged_locations')->insert($this->support->withGeneratedKey('geotagged_locations', 'location_id', $locationData,
+                    $this->support->nextId('geotagged_locations', 'location_id')));
+            }
+            $classification = [
+                'status' => $area['source'] === 'boundary' ? 'matched' : 'registered_address',
+                'sitio_id' => $area['sitio_id'], 'purok_id' => $area['purok_id'],
+            ];
+            if (Schema::hasTable('household_geographic_classifications')) {
+                DB::table('household_geographic_classifications')->updateOrInsert(['household_id' => $householdId], array_merge($classification, [
+                    'latitude' => $validated['latitude'], 'longitude' => $validated['longitude'], 'updated_at' => $now, 'created_at' => $now,
+                ]));
+            }
+            $deviceId = $this->saveDevice($householdId, $user->user_id, array_merge($device, $validated), $now);
+            $this->saveTrackingLog($householdId, $deviceId, array_merge($device, $validated), 'setup_pin', $now);
+            $this->support->writeAuditLog($request, 'mobile_household_setup', 'households', $householdId, $validated);
+            return ['device_token_id' => $deviceId, 'reused_geotag' => false, 'geographic_classification' => $classification];
+        }, 3);
+        if (! $result['reused_geotag']) $this->queueRouteRecompute($householdId);
+        return response()->json(['message' => 'Household mobile setup saved.', 'data' => $result]);
     }
 
     public function updateDeviceLocation(Request $request): JsonResponse
@@ -155,6 +184,7 @@ class HouseholdMobileSetupWorkflow
             'location_permission_status' => ['nullable', 'string', 'max:30'],
         ]);
 
+        $validated['member_id'] = $this->support->authenticatedMemberId($user);
         $now = now();
         $deviceId = null;
 

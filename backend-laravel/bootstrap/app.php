@@ -26,13 +26,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(fn (Request $request) => null);
 
-        $middleware->api(append: [
+        $middleware->api(prepend: [\App\Http\Middleware\GuardApiHeaders::class], append: [
             SecurityHeaders::class,
+            \App\Http\Middleware\EnsureOperationalDatabaseReachable::class,
             ProfileLocalQueries::class,
         ]);
 
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            'household.owner' => \App\Http\Middleware\RequireHouseholdDeviceOwner::class,
             'web.access' => \App\Http\Middleware\EnsureWebModuleAccess::class,
             'web.module' => \App\Http\Middleware\EnsureWebModuleAccess::class,
             'personnel.access' => \App\Http\Middleware\EnsurePersonnelAccess::class,
