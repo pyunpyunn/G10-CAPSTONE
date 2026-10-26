@@ -268,7 +268,10 @@ class AuthService
         $details = $this->householdRecoveryDetails(trim($values['login']));
 
         if (! $details) {
-            throw ValidationException::withMessages(['login' => ['This system account was not found or has no registered recovery phone number. Check the account ID and try again.']]);
+            throw ValidationException::withMessages(['login' => ['No active account matches this ID. Check the household or rescuer ID and try again.']]);
+        }
+        if (! $details['contact_number']) {
+            throw ValidationException::withMessages(['login' => ['This account exists, but no valid registered recovery phone number is on file. Contact an administrator to update it before requesting an OTP.']]);
         }
 
         return response()->json([
@@ -284,7 +287,17 @@ class AuthService
         ]);
         $details = $this->householdRecoveryDetails(trim($values['login']));
 
-        if (! $details || ! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
+        if (! $details) {
+            throw ValidationException::withMessages([
+                'login' => ['No active account matches this ID. Check the household or rescuer ID and try again.'],
+            ]);
+        }
+        if (! $details['contact_number']) {
+            throw ValidationException::withMessages([
+                'contact_number' => ['This account exists, but no valid registered recovery phone number is on file. Contact an administrator to update it before requesting an OTP.'],
+            ]);
+        }
+        if (! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
             throw ValidationException::withMessages([
                 'contact_number' => ['This number does not match a phone number registered to this account.'],
             ]);
@@ -301,7 +314,17 @@ class AuthService
         ]);
         $details = $this->householdRecoveryDetails(trim($values['login']));
 
-        if (! $details || ! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
+        if (! $details) {
+            throw ValidationException::withMessages([
+                'login' => ['No active account matches this ID. Check the household or rescuer ID and try again.'],
+            ]);
+        }
+        if (! $details['contact_number']) {
+            throw ValidationException::withMessages([
+                'contact_number' => ['This account exists, but no valid registered recovery phone number is on file. Contact an administrator to update it before requesting an OTP.'],
+            ]);
+        }
+        if (! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
             throw ValidationException::withMessages([
                 'contact_number' => ['This number does not match a phone number registered to this account.'],
             ]);
@@ -369,7 +392,17 @@ class AuthService
         ]);
         $details = $this->householdRecoveryDetails(trim($values['login']));
 
-        if (! $details || ! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
+        if (! $details) {
+            throw ValidationException::withMessages([
+                'login' => ['No active account matches this ID. Check the household or rescuer ID and try again.'],
+            ]);
+        }
+        if (! $details['contact_number']) {
+            throw ValidationException::withMessages([
+                'contact_number' => ['This account exists, but no valid registered recovery phone number is on file. Contact an administrator to update it before requesting an OTP.'],
+            ]);
+        }
+        if (! $this->phoneNumbersMatch($values['contact_number'], $details['contact_number'])) {
             throw ValidationException::withMessages([
                 'contact_number' => ['This number does not match a phone number registered to this account.'],
             ]);
@@ -440,6 +473,9 @@ class AuthService
         ]);
     }
 
+    /**
+     * @return array{user: User, household_id: string, account_identifier: string, contact_number: ?string}|null
+     */
     private function householdRecoveryDetails(string $login): ?array
     {
         $user = $this->accounts->userFromLogin($login);
@@ -489,9 +525,6 @@ class AuthService
 
         $contactNumber = collect($contactNumbers)
             ->first(fn (string $number): bool => $this->normalizePhoneNumber($number) !== null);
-        if (! $contactNumber) {
-            return null;
-        }
 
         $accountIdentifier = $householdId !== '' ? $householdId : trim((string) ($user->username ?: ($user->login_id ?? $user->user_id)));
         $recoveryScopeId = $householdId !== '' ? $householdId : (string) $user->user_id;

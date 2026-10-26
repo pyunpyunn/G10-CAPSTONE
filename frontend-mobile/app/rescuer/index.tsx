@@ -1,5 +1,5 @@
 import { useMobileOverview } from '@/hooks/useMobileOverview';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import {
   Alert,
@@ -24,7 +24,6 @@ import {
   createFieldReport,
   createResourceRequest,
   getRescuerOverview,
-  sendAssignmentLocation,
   updateAssignmentStatus,
   updateRescuerProfile,
 } from '@/api/rescuer';
@@ -35,12 +34,13 @@ import { RescuerHeader } from '@/components/rescuer/RescuerHeader';
 import { RadioCommunicationScreen } from '@/components/rescuer/RadioCommunicationScreen';
 import { RescueMapScreen } from '@/components/rescuer/RescueMapScreen';
 import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScreen';
+import { MobileLogoutOverlay } from '@/components/MobileLogoutOverlay';
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
 import { ActionButton, EmptyState, LoadingState } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing, typography } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
-import { configureRescuerTracking, stopRescuerTracking, subscribeRescuerPosition } from '@/utils/rescuerLiveLocation';
+import { configureRescuerTracking, stopRescuerTracking } from '@/utils/rescuerLiveLocation';
 import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
 import { createAdaptivePoller } from '@/utils/networkScheduling';
 
@@ -58,9 +58,11 @@ const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; 
 export default function RescuerHomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
-  const { overview, setOverview, loading, refreshing, fetching, error: overviewError, lastUpdated, loadOverview }
+  const { overview, loading, refreshing, error: overviewError, loadOverview }
     = useMobileOverview<RescuerOverview>('rescuer', getRescuerOverview);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const logoutPending = useRef(false);
   useEffect(() => Platform.OS === 'web' ? undefined : mountNavigationSync(), []);
 
 
@@ -117,17 +119,12 @@ export default function RescuerHomeScreen() {
     [assignments]
   );
 
-  const [gpsStatus, setGpsStatus] = useState('');
   const trackingAssignmentId = activeAssignment?.assignment_id || null;
   useEffect(() => {
     if (Platform.OS === 'web') return;
-    setGpsStatus(trackingAssignmentId ? 'GPS · Acquiring location' : '');
-    void configureRescuerTracking(trackingAssignmentId).catch(() => setGpsStatus('GPS · Enable location access'));
+    void configureRescuerTracking(trackingAssignmentId).catch(() => {});
     return () => { void stopRescuerTracking(); };
   }, [trackingAssignmentId]);
-  useEffect(() => subscribeRescuerPosition(fix => {
-    setGpsStatus(`GPS · ${new Date(fix.timestamp).toLocaleTimeString()} · ±${Math.round(fix.coords.accuracy || 0)} m`);
-  }, problem => { if (problem) setGpsStatus(problem); }), []);
   useEffect(() => {
     if (!trackingAssignmentId) return;
     return createAdaptivePoller(
@@ -137,10 +134,17 @@ export default function RescuerHomeScreen() {
   }, [trackingAssignmentId, loadOverview]);
 
   async function handleLogout() {
+    if (logoutPending.current) return;
+    logoutPending.current = true;
+    setLoggingOut(true);
     try {
       await logoutMobile();
       router.replace('/' as Href);
-    } catch (error: any) { Alert.alert('Unable to log out', errorMessage(error)); }
+    } catch (error: any) {
+      logoutPending.current = false;
+      setLoggingOut(false);
+      Alert.alert('Unable to log out', errorMessage(error));
+    }
   }
 
   async function handleStatusChange(assignmentId: number, status: string) {
@@ -188,12 +192,6 @@ export default function RescuerHomeScreen() {
     } catch (error: any) {
       Alert.alert('Unable to update assignment', errorMessage(error));
     }
-  }
-
-  async function handleSendLocation(assignmentId: number, payload: any) {
-    const result = await sendAssignmentLocation(assignmentId, payload);
-    if (payload.refresh_route && result.data) setOverview(current => current ? { ...current, assignments: current.assignments.map(item => Number(item.assignment_id) === Number(assignmentId) ? { ...item, route: result.data.route } : item) } : current);
-    if (payload.refresh_route && result.data && !result.data.route) throw new Error('GPS saved. Current directions unavailable.');
   }
 
   async function currentLocationPayload() {
@@ -315,7 +313,6 @@ export default function RescuerHomeScreen() {
           evacuationCenters={overview.evacuation_centers || []}
           activeAssignment={activeAssignment}
           selectedAssignment={selectedAssignment}
-          onSendLocation={handleSendLocation}
           showNavigationButton={Platform.OS !== 'web'}
           onOpenNavigation={() => router.push({
             pathname: '/rescuer/navigation' as any,
@@ -375,9 +372,6 @@ export default function RescuerHomeScreen() {
           />
         }
       >
-        {fetching && overview ? <Text style={styles.refreshErrorText} accessibilityLiveRegion="polite">
-          Updating data. You can keep using the app.{lastUpdated ? ` Last updated ${new Date(lastUpdated).toLocaleTimeString()}.` : ''}
-        </Text> : null}
         {!!overviewError && overview ? (
           <View style={styles.refreshError}>
             <Text style={styles.refreshErrorText}>Could not refresh. Showing previously loaded data. {overviewError}</Text>
@@ -386,7 +380,6 @@ export default function RescuerHomeScreen() {
             </Pressable>
           </View>
         ) : null}
-        {!!trackingAssignmentId && !!gpsStatus && <Text accessibilityRole="text" style={{ color: palette.textSoft, fontSize: 12 }}>{gpsStatus}</Text>}
         {renderContent()}
       </ScrollView>
 
@@ -416,6 +409,7 @@ export default function RescuerHomeScreen() {
           );
         })}
       </View>
+      <MobileLogoutOverlay visible={loggingOut} />
     </SafeAreaView>
   );
 }

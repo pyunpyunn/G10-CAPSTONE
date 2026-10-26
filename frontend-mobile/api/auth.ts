@@ -150,30 +150,42 @@ export async function resetHouseholdDeviceOwner() {
 }
 
 export async function logoutMobile() {
+  const token = await getStoredItem('resqperation_mobile_token');
+  if (token && api.defaults.baseURL) {
+    void axios.post(`${api.defaults.baseURL}/auth/logout`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 3000,
+    }).catch(() => {
+      console.warn('Could not revoke the server token during local logout.');
+    });
+  }
+
+  await Promise.all([
+    clearToken(),
+    deleteStoredItem(sessionRoleKey),
+    deleteStoredItem(ownerRequiredKey),
+  ]);
+
   if (Platform.OS !== 'web') {
-    const { stopRescuerTracking } = await import('@/utils/rescuerLiveLocation');
-    await stopRescuerTracking().catch(() => {});
-    const { endNavigationTrip, suspendNavigationSync } = await import('@/utils/navigationRuntime');
-    // Stop recording before revoking the session. The account's saved outbox is
-    // retained if the phone is offline and resumes after this account signs in.
-    try { await suspendNavigationSync(); await endNavigationTrip({ sync: false }); } catch { /* Keep saved events. */ }
-  }
-  try {
-    await api.post('/auth/logout', {}, { timeout: 5000 });
-  } catch {
-    // Local logout must also work when the server is unreachable.
-  } finally {
-    try {
-      await logoutPushIdentity().catch(() => {});
-    } finally {
+    void (async () => {
       try {
-        await clearToken();
-      } finally {
-        await deleteStoredItem(sessionRoleKey);
-        await deleteStoredItem(ownerRequiredKey);
+        const { stopRescuerTracking } = await import('@/utils/rescuerLiveLocation');
+        await stopRescuerTracking();
+      } catch {
+        console.warn('Could not stop rescuer location tracking during logout.');
       }
-    }
+      try {
+        const { endNavigationTrip, suspendNavigationSync } = await import('@/utils/navigationRuntime');
+        await suspendNavigationSync();
+        await endNavigationTrip({ sync: false });
+      } catch {
+        console.warn('Could not finish local navigation cleanup during logout.');
+      }
+    })();
   }
+  void logoutPushIdentity().catch(() => {
+    console.warn('Could not clear the push notification identity during logout.');
+  });
 }
 
 export async function lookupHouseholdRecoveryContact(login: string) {

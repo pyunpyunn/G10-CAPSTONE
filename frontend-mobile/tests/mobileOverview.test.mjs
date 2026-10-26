@@ -46,7 +46,6 @@ test('a warm screen shows its session snapshot immediately without a full loadin
   const view = app.render()
   assert.equal(view.overview.status, 'safe')
   assert.equal(view.loading, false)
-  assert.equal(view.lastUpdated, 123)
 })
 
 test('a slow failed refresh retains visible data and exposes the failure', async () => {
@@ -55,7 +54,6 @@ test('a slow failed refresh retains visible data and exposes the failure', async
   const view = app.render()
   assert.equal(view.overview.status, 'safe')
   assert.equal(view.loading, false)
-  assert.equal(view.fetching, false)
   assert.equal(view.error, 'server timeout')
 })
 

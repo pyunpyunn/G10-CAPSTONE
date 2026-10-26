@@ -6,7 +6,7 @@ import { activeLocalTrip, getActivePack, getLocalNavigationSnapshot, getLocalTri
 import * as Crypto from 'expo-crypto';
 import { endNavigationTrip, lastNavigationError, mountNavigationSync, refreshNavigation, startNavigationTrip, syncNavigation } from '@/utils/navigationRuntime';
 import { navigationPackStatus, prepareNavigationPack } from '@/utils/navigationPacks';
-import { bearingDegrees, decodePolyline6, distanceMeters, routeProgress, type Coordinate, type RouteStep } from '@/utils/routeGeometry';
+import { bearingDegrees, decodePolyline6, distanceMeters, downsampleRouteCoordinates, routeProgress, type Coordinate, type RouteStep } from '@/utils/routeGeometry';
 import type { LocationObject } from 'expo-location';
 import { api } from '@/api/client';
 import * as Location from 'expo-location';
@@ -39,6 +39,7 @@ export default function OfflineNavigationScreen() {
   const firstGps = useRef(true);
   const rerouteAt = useRef(0), rerouting = useRef(false);
   const points = useMemo<Coordinate[]>(() => { try { return route?.polyline6 ? decodePolyline6(route.polyline6) : (route?.coordinates || []).map((point: any) => [Number(point.longitude), Number(point.latitude)] as Coordinate).filter((point: Coordinate) => Number.isFinite(point[0]) && Number.isFinite(point[1])); } catch { return []; } }, [route]);
+  const displayPoints = useMemo(() => downsampleRouteCoordinates(points), [points]);
   const steps: RouteStep[] = useMemo(() => { try { return typeof route?.steps === 'string' ? JSON.parse(route.steps) : route?.steps || []; } catch { return []; } }, [route]);
   const dispatch = snapshot?.dispatches.find((item: any) => Number(item.assignment_id) === Number(trip?.dispatchId || chosenDispatch));
   const householdIds: string[] = (dispatch?.household_id ? [dispatch.household_id] : []).map(String);
@@ -85,8 +86,11 @@ export default function OfflineNavigationScreen() {
   useEffect(() => mountNavigationSync(), []);
   useEffect(() => {
     if (!mapReady || points.length < 2) return;
-    camera.current?.fitBounds([Math.min(...points.map((p) => p[0])), Math.min(...points.map((p) => p[1])),
-      Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1]))], { duration: 0, padding: { top: 140, right: 40, bottom: 100, left: 40 } });
+    const bounds = points.reduce<[number, number, number, number]>((value, point) => [
+      Math.min(value[0], point[0]), Math.min(value[1], point[1]),
+      Math.max(value[2], point[0]), Math.max(value[3], point[1]),
+    ], [Infinity, Infinity, -Infinity, -Infinity]);
+    camera.current?.fitBounds(bounds, { duration: 0, padding: { top: 140, right: 40, bottom: 100, left: 40 } });
   }, [mapReady, points]);
   useEffect(() => {
     if (mapReady && gpsFix && firstGps.current) { firstGps.current = false; camera.current?.jumpTo({ center: [gpsFix.coords.longitude, gpsFix.coords.latitude], zoom: 17 }); }
@@ -137,13 +141,12 @@ export default function OfflineNavigationScreen() {
     <Stack.Screen options={{ title: 'Rescue navigation', headerStyle: { backgroundColor: palette.nav }, headerTintColor: palette.navText }} />
     <Map style={{ flex: 1 }} mapStyle={pack?.style_url || streetStyle} onDidFinishLoadingMap={() => setMapReady(true)}>
       <Camera ref={camera} initialViewState={{ center: [123.8854, 10.3157], zoom: 11 }} />
-      {points.length >= 2 && <RouteLine points={points} />}
+      {displayPoints.length >= 2 && <RouteLine points={displayPoints} />}
       {gpsFix && <Marker ref={marker} lngLat={[gpsFix.coords.longitude, gpsFix.coords.latitude]}><View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: palette.navActive, borderColor: '#fff', borderWidth: 3 }} /></Marker>}
       {points.length > 1 && <Marker lngLat={points[points.length - 1]}><View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: palette.brandRed, borderColor: '#fff', borderWidth: 3 }} /></Marker>}
     </Map>
     <View style={{ position: 'absolute', top: 16, left: 16, right: 16, padding: 16, borderRadius: 14, backgroundColor: palette.nav, elevation: 5 }}>
       <Text style={{ fontSize: 19, fontWeight: '700', color: palette.navText }}>{points.length >= 2 ? guidance : !loaded ? 'Loading assigned route…' : message || (dispatch ? 'Waiting for your assigned route.' : 'No active dispatch assigned.')}</Text>
-      <Text style={{ color: palette.navMuted, marginTop: 6 }}>{gpsFix ? `GPS · ±${Math.round(gpsFix.coords.accuracy || 0)} m` : 'Acquiring current GPS'}</Text>
       {points.length >= 2 && !!message && <Text accessibilityRole="alert" style={{ marginTop: 8, color: palette.brandRed }}>{message}</Text>}
       {points.length >= 2 && <Text style={{ marginTop: 8, color: palette.navText }}>{(remaining / 1000).toFixed(1)} km remaining · {Math.ceil((route?.duration_s || 0) * (remaining / Math.max(1, route?.distance_m || 1)) / 60)} min</Text>}
     </View>

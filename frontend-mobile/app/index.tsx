@@ -192,7 +192,7 @@ export default function MobileLoginScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>User ID</Text>
+              <Text style={styles.label}>Household ID / Rescuer ID</Text>
               <View style={styles.inputShell}>
                 <Ionicons name="person-outline" size={19} color={palette.navMuted} />
                 <TextInput
@@ -200,7 +200,7 @@ export default function MobileLoginScreen() {
                   value={login}
                   onFocus={(event) => focusInput(event.nativeEvent.target)}
                   onChangeText={value => { edited.current = true; setLogin(value); }}
-                  placeholder="Household ID or rescuer account ID"
+                  placeholder="Enter your household ID or rescuer ID"
                   placeholderTextColor={palette.navMuted}
                   autoCapitalize="none"
                   autoCorrect={false}

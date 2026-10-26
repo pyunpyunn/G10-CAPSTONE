@@ -1,5 +1,5 @@
 import { useMobileOverview } from '@/hooks/useMobileOverview';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   AppState,
@@ -44,6 +44,7 @@ import {
   TrustedPinModal,
 } from '@/components/household/HouseholdModals';
 import { HouseholdProfileScreen } from '@/components/household/HouseholdProfileScreen';
+import { MobileLogoutOverlay } from '@/components/MobileLogoutOverlay';
 import { HouseholdRouteScreen } from '@/components/household/HouseholdRouteScreen';
 import { HouseholdSetupScreen } from '@/components/household/HouseholdSetupScreen';
 import { HouseholdButton, HouseholdEmpty, HouseholdLoading } from '@/components/household/HouseholdUI';
@@ -69,7 +70,7 @@ export default function HouseholdHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
-  const { overview, setOverview, loading, refreshing, fetching, error: overviewError, lastUpdated, loadOverview: refreshOverview }
+  const { overview, setOverview, loading, refreshing, error: overviewError, loadOverview: refreshOverview }
     = useMobileOverview<HouseholdOverview>('household', getHouseholdOverview);
   const [deviceUuid, setDeviceUuid] = useState('');
   const [realBatteryLevel, setRealBatteryLevel] = useState<number | null>(null);
@@ -90,6 +91,8 @@ export default function HouseholdHomeScreen() {
   const [trustedLoading, setTrustedLoading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationBusyId, setNotificationBusyId] = useState('');
+  const [loggingOut, setLoggingOut] = useState(false);
+  const logoutPending = useRef(false);
   const statusOptionsSignature = JSON.stringify(overview?.status_options || []);
 
   useEffect(() => {
@@ -260,8 +263,17 @@ export default function HouseholdHomeScreen() {
   }, [deviceUuid, overview?.devices]);
 
   async function handleLogout() {
-    await logoutMobile();
-    router.replace('/' as Href);
+    if (logoutPending.current) return;
+    logoutPending.current = true;
+    setLoggingOut(true);
+    try {
+      await logoutMobile();
+      router.replace('/' as Href);
+    } catch (error: any) {
+      logoutPending.current = false;
+      setLoggingOut(false);
+      Alert.alert('Unable to log out', error?.message || 'Please try again.');
+    }
   }
 
   async function handleSetupComplete(payload: any) {
@@ -701,12 +713,11 @@ export default function HouseholdHomeScreen() {
         ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
-        {(fetching || overviewError) ? <View style={{ padding: spacing.sm, gap: spacing.xs }}>
+        {overviewError ? <View style={{ padding: spacing.sm, gap: spacing.xs }}>
           <Text accessibilityLiveRegion="polite" style={{ color: palette.textSoft }}>
-            {overviewError ? 'Could not refresh. Showing previously loaded data.' : 'Updating data. You can keep using the app.'}
-            {lastUpdated ? ` Last updated ${new Date(lastUpdated).toLocaleTimeString()}.` : ''}
+            Could not refresh. Showing previously loaded data.
           </Text>
-          {overviewError ? <HouseholdButton label="Retry refresh" tone="light" onPress={() => { void loadOverview(true); }} /> : null}
+          <HouseholdButton label="Retry refresh" tone="light" onPress={() => { void loadOverview(true); }} />
         </View> : null}
         {renderContent()}
       </ScrollView>
@@ -772,6 +783,7 @@ export default function HouseholdHomeScreen() {
         onLookup={handleLookupTrusted}
         onSubmit={handleCreateTrusted}
       />
+      <MobileLogoutOverlay visible={loggingOut} />
     </SafeAreaView>
   );
 }
