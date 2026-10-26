@@ -64,12 +64,20 @@ class AuthService
             return response()->json(['message' => 'This account is inactive. Please contact HQ/Admin.'], 403);
         }
 
+        if ($user->roleKey() === 'household_resident' && strcasecmp($login, (string) $user->household_id) !== 0) {
+            throw ValidationException::withMessages(['login' => ['Sign in using your household ID and household password.']]);
+        }
+
         if ($this->isUnvalidatedResponder($user)) {
             return response()->json(['message' => 'This rescuer account is pending HQ validation. Please wait for approval before logging in.'], 403);
         }
 
         if (! $this->isHouseholdAccountReady($user)) {
             return response()->json(['message' => 'This household account is not linked to a registered household record. Please contact SafeTrack or HQ/Admin.'], 409);
+        }
+
+        if ($user->roleKey() === 'household_resident' && ! $deviceBound) {
+            return app(\App\Services\Mobile\HouseholdAccessService::class)->login($request, $user);
         }
 
         $deviceUuid = null;
@@ -135,7 +143,9 @@ class AuthService
 
     public function me(Request $request): UserResource
     {
-        return new UserResource($request->user()->refresh()->load('role'));
+        $user = $request->user()->refresh()->load('role');
+        if ($user->roleKey() === 'household_resident') app(\App\Services\Mobile\HouseholdAccessService::class)->confirm($user);
+        return new UserResource($user);
     }
 
     public function logout(Request $request): JsonResponse
@@ -244,7 +254,10 @@ class AuthService
             if (Schema::hasColumn('users', 'password_changed_at')) $updates['password_changed_at'] = now();
             if (Schema::hasColumn('users', 'must_change_password')) $updates['must_change_password'] = 0;
             User::query()->whereKey($user->getKey())->update($updates);
-            if (Schema::hasTable('personal_access_tokens')) $user->tokens()->delete();
+            if (Schema::hasTable('personal_access_tokens')) {
+                if ($user->roleKey() === 'household_resident') app(\App\Services\Mobile\HouseholdAccessService::class)->revokeHouseholdSessions($user->household_id);
+                else $user->tokens()->delete();
+            }
         });
         return response()->json(['message' => 'Password changed successfully. Sign in with your new password.']);
     }
@@ -408,7 +421,8 @@ class AuthService
             }
             User::query()->whereKey($details['user']->user_id)->update($updates);
             if (Schema::hasTable('personal_access_tokens')) {
-                $details['user']->tokens()->delete();
+                if ($details['user']->roleKey() === 'household_resident') app(\App\Services\Mobile\HouseholdAccessService::class)->revokeHouseholdSessions($details['user']->household_id);
+                else $details['user']->tokens()->delete();
             }
             $table->where('user_id', $details['user']->user_id)->delete();
 
@@ -435,9 +449,15 @@ class AuthService
             return null;
         }
         $user->loadMissing('role');
+        if ($user->roleKey() === 'household_resident' && strcasecmp($login, (string) $user->household_id) !== 0) return null;
 
         $householdId = Schema::hasColumn('users', 'household_id') ? (string) ($user->household_id ?? '') : '';
         $contactNumbers = [];
+        if ($user->roleKey() === 'household_resident' && $user->member_id) {
+            $member = app(\App\Queries\HouseholdMobileReadQuery::class)->memberForUser($user);
+            if ($member?->contact_number) $contactNumbers[] = (string) $member->contact_number;
+            if ($user->contact_number) $contactNumbers[] = (string) $user->contact_number;
+        }
         if ($householdId !== ''
             && Schema::hasTable('households')
             && Schema::hasColumn('households', 'household_id')
@@ -473,9 +493,7 @@ class AuthService
             return null;
         }
 
-        $accountIdentifier = $householdId !== ''
-            ? $householdId
-            : trim((string) ($user->username ?: ($user->login_id ?? $user->user_id)));
+        $accountIdentifier = $householdId !== '' ? $householdId : trim((string) ($user->username ?: ($user->login_id ?? $user->user_id)));
         $recoveryScopeId = $householdId !== '' ? $householdId : (string) $user->user_id;
 
         return [

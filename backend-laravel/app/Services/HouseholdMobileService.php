@@ -59,11 +59,13 @@ class HouseholdMobileService
                     'household' => $this->formatHousehold($household, $members->count()),
                 ],
                 'setup' => [
-                    'is_setup_complete' => $this->isSetupComplete($householdId, $user?->user_id),
-                    'has_geotag' => $this->hasGeotag($householdId),
+                    'is_setup_complete' => $geotag !== null,
+                    'has_geotag' => $geotag !== null,
                     'has_device' => $this->hasDevice($householdId, $user?->user_id),
+                    'address' => app(\App\Services\Mobile\HouseholdSetupAddress::class)->registered($householdId),
                 ],
                 'active_event' => $activeEvent,
+                'member_status' => $members->firstWhere('member_id', $user->member_id)['current_status'] ?? null,
                 'current_status' => $this->currentStatus($householdId, $activeEvent['event_id'] ?? null),
                 'status_options' => app(\App\Queries\HouseholdMobileReadQuery::class)->statusOptions($householdId, $activeEvent['event_id'] ?? null),
                 'status_history' => $this->statusHistoryRows($householdId, $activeEvent['event_id'] ?? null),
@@ -86,61 +88,7 @@ class HouseholdMobileService
 
     public function completeSetup(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $householdId = $this->householdId($user);
-
-        if (! $householdId) {
-            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
-        }
-
-        foreach (['households', 'geotagged_locations', 'device_tokens'] as $table) {
-            if (! Schema::hasTable($table)) {
-                return $this->missingTableResponse($table);
-            }
-        }
-
-        $validated = $request->validate([
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy_m' => ['nullable', 'numeric', 'min:0'],
-            'address_label' => ['required', 'string', 'max:255'],
-            'house_number' => ['nullable', 'string', 'max:80'],
-            'unit_number' => ['nullable', 'string', 'max:80'],
-            'street' => ['nullable', 'string', 'max:150'],
-            'barangay' => ['nullable', 'string', 'max:120'],
-            'city' => ['nullable', 'string', 'max:120'],
-            'province' => ['nullable', 'string', 'max:120'],
-            'member_id' => ['nullable', 'string', 'max:255'],
-            'relationship_to_family' => ['required', 'string', 'max:80'],
-            'device_uuid' => ['required', 'string', 'max:150'],
-            'device_name' => ['nullable', 'string', 'max:100'],
-            'platform' => ['nullable', 'string', 'max:30'],
-            'photo_uri' => ['nullable', 'string', 'max:1000'],
-        ], [
-            'latitude.required' => 'Enable location or pin your household on the map.',
-            'longitude.required' => 'Enable location or pin your household on the map.',
-            'address_label.required' => 'Confirm the household address.',
-            'relationship_to_family.required' => 'Select your relationship to the family.',
-            'device_uuid.required' => 'Device identifier is required.',
-        ]);
-
-        $now = now();
-        $deviceId = null;
-
-        DB::transaction(function () use ($householdId, $user, $validated, $now, &$deviceId): void {
-            $this->saveGeotag($householdId, $user?->user_id, $validated, $now);
-            $deviceId = $this->saveDevice($householdId, $user?->user_id, $validated, $now);
-            $this->saveTrackingLog($householdId, $deviceId, $validated, 'setup_pin', $now);
-            $this->writeAuditLog(request(), 'mobile_household_setup', 'households', $householdId, $validated);
-        });
-
-        return response()->json([
-            'message' => 'Household mobile setup saved.',
-            'data' => [
-                'device_token_id' => $deviceId,
-                'geographic_classification' => app(\App\Services\Shared\HouseholdGeographicClassifier::class)->resolve((float) $validated['latitude'], (float) $validated['longitude']),
-            ],
-        ]);
+        return app(\App\Services\Mobile\HouseholdMobileSetupWorkflow::class)->completeSetup($request);
     }
 
     public function updateDeviceLocation(Request $request): JsonResponse
@@ -168,6 +116,7 @@ class HouseholdMobileService
             'location_permission_status' => ['nullable', 'string', 'max:30'],
         ]);
 
+        $validated['member_id'] = app(\App\Services\Mobile\HouseholdMobileSupport::class)->authenticatedMemberId($user);
         $now = now();
         $deviceId = null;
 
@@ -184,93 +133,7 @@ class HouseholdMobileService
 
     public function updateMember(Request $request, string $memberId): JsonResponse
     {
-        $user = $request->user();
-        $householdId = $this->householdId($user);
-
-        if (! $householdId) {
-            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
-        }
-
-        if (! Schema::hasTable('household_members')) {
-            return $this->missingTableResponse('household_members');
-        }
-
-        $memberKeyColumn = $this->memberKeyColumn();
-
-        if (! $memberKeyColumn) {
-            return response()->json(['message' => 'The household member ID column is not available.'], 503);
-        }
-
-        $member = DB::table('household_members')
-            ->where('household_id', $householdId)
-            ->where($memberKeyColumn, $memberId)
-            ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
-            ->first();
-
-        if (! $member) {
-            return response()->json(['message' => 'Household member was not found.'], 404);
-        }
-
-        $validated = $request->validate([
-            'first_name' => ['required', 'string', 'max:80'],
-            'middle_name' => ['nullable', 'string', 'max:80'],
-            'last_name' => ['required', 'string', 'max:80'],
-            'relationship' => ['required', 'string', 'max:80'],
-            'gender' => ['nullable', 'string', 'max:30'],
-            'age' => ['nullable', 'integer', 'min:0', 'max:120'],
-            'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
-            'special_needs' => ['nullable', 'string', 'max:500'],
-        ], [
-            'first_name.required' => 'Enter the member first name.',
-            'last_name.required' => 'Enter the member last name.',
-            'relationship.required' => 'Enter the member relationship.',
-        ]);
-
-        $now = now();
-        $fullName = trim(collect([
-            $validated['first_name'],
-            $validated['middle_name'] ?? '',
-            $validated['last_name'],
-        ])->filter()->implode(' '));
-
-        $age = $validated['age'] ?? null;
-
-        if (! $age && ! empty($validated['birth_date'])) {
-            $age = Carbon::parse($validated['birth_date'])->age;
-        }
-
-        DB::table('household_members')
-            ->where('household_id', $householdId)
-            ->where($memberKeyColumn, $memberId)
-            ->update($this->filterColumns('household_members', [
-                'first_name' => $validated['first_name'],
-                'middle_name' => $validated['middle_name'] ?? null,
-                'last_name' => $validated['last_name'],
-                'name' => $fullName,
-                'relation' => $validated['relationship'],
-                'relationship_id' => $this->relationshipId($validated['relationship']),
-                'gender' => $validated['gender'] ?? null,
-                'sex' => $this->sexFromGender($validated['gender'] ?? null),
-                'gender_id' => $this->genderId($validated['gender'] ?? null),
-                'age' => $age,
-                'birth_date' => $validated['birth_date'] ?? null,
-                'special_needs' => $validated['special_needs'] ?? null,
-                'updated_at' => $now,
-            ]));
-
-        $this->writeAuditLog($request, 'mobile_update_household_member', 'household_members', $memberId, $validated);
-
-        $devices = $this->devices($householdId);
-        $members = $this->members($householdId, $devices, $user);
-        $updatedMember = $members->first(fn (array $item): bool => (string) $item['member_id'] === (string) $memberId);
-
-        return response()->json([
-            'message' => 'Household member information saved.',
-            'data' => [
-                'member' => $updatedMember,
-                'members' => $members->values(),
-            ],
-        ]);
+        return app(\App\Services\Mobile\HouseholdMemberProfileWorkflow::class)->updateMember($request, $memberId);
     }
 
     public function storeMemberStatus(Request $request, string $memberId): JsonResponse
@@ -464,134 +327,7 @@ class HouseholdMobileService
 
     public function storeStatus(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $householdId = $this->householdId($user);
-
-        if (! $householdId) {
-            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
-        }
-
-        foreach (['household_status_logs', 'household_statuses', 'household_disasters'] as $table) {
-            if (! Schema::hasTable($table)) {
-                return $this->missingTableResponse($table);
-            }
-        }
-
-        $activeEvent = $this->activeEvent();
-
-        if (! $activeEvent) {
-            return response()->json([
-                'message' => 'Status updates can only be saved during an active disaster event.',
-            ], 409);
-        }
-
-        $validated = $request->validate([
-            'status_key' => ['required', Rule::in(['safe', 'evacuated', 'unsafe', 'needs_help'])],
-            'device_uuid' => ['nullable', 'string', 'max:150'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'location_label' => ['nullable', 'string', 'max:255'],
-            'location_accuracy_m' => ['nullable', 'numeric', 'min:0'],
-            'battery_level' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'signal_strength' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:1000'],
-        ], [
-            'status_key.required' => 'Choose your household status first.',
-            'status_key.in' => 'Choose a valid household status.',
-        ]);
-
-        $status = $this->resolveStatus($validated['status_key']);
-
-        if (! $status) {
-            throw ValidationException::withMessages([
-                'status_key' => ['Selected status is not available in the shared database.'],
-            ]);
-        }
-
-        $validated['notes'] = $this->statusNotesJson($validated['status_key'], $validated['notes'] ?? null);
-
-        $now = now();
-        $statusLogId = null;
-        $deviceId = $this->deviceIdForUuid($householdId, $validated['device_uuid'] ?? null);
-        $reportingMember = ! empty($user?->member_id)
-            ? $this->householdMember($householdId, (string) $user->member_id)
-            : null;
-
-        DB::transaction(function () use ($request, $householdId, $user, $activeEvent, $validated, $status, $now, &$statusLogId, $deviceId, $reportingMember): void {
-            $data = $this->filterColumns('household_status_logs', [
-                'disaster_id' => $activeEvent['event_id'],
-                'household_id' => $householdId,
-                'status_id' => $status['status_id'],
-                'source' => 'household_mobile',
-                'submitted_by_user_id' => $user?->user_id,
-                'device_token_id' => $deviceId,
-                'latitude' => $validated['latitude'] ?? null,
-                'longitude' => $validated['longitude'] ?? null,
-                'location_label' => $validated['location_label'] ?? null,
-                'location_accuracy_m' => $validated['location_accuracy_m'] ?? null,
-                'battery_level' => $validated['battery_level'] ?? null,
-                'signal_strength' => $validated['signal_strength'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'submitted_at' => $now,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-
-            $statusLogId = DB::table('household_status_logs')->insertGetId($data, 'status_log_id');
-            $this->saveLatestDisasterStatus($activeEvent['event_id'], $householdId, $status['status_id'], $validated, $user?->user_id, $deviceId, $now);
-
-            if ($reportingMember) {
-                $memberId = (string) $reportingMember->member_id;
-                $memberName = $this->personName($reportingMember->name ?? null, $reportingMember->first_name ?? null, $reportingMember->last_name ?? null, 'Household member');
-                $householdNotes = $this->decodeJson($validated['notes'] ?? null);
-
-                DB::table('household_status_logs')->insert($this->filterColumns('household_status_logs', [
-                    'disaster_id' => $activeEvent['event_id'],
-                    'household_id' => $householdId,
-                    'status_id' => $status['status_id'],
-                    'source' => 'household_member_mobile',
-                    'submitted_by_user_id' => $user?->user_id,
-                    'device_token_id' => $deviceId,
-                    'latitude' => $validated['latitude'] ?? null,
-                    'longitude' => $validated['longitude'] ?? null,
-                    'location_label' => $validated['location_label'] ?? null,
-                    'location_accuracy_m' => $validated['location_accuracy_m'] ?? null,
-                    'battery_level' => $validated['battery_level'] ?? null,
-                    'signal_strength' => $validated['signal_strength'] ?? null,
-                    'notes' => json_encode([
-                        'report_type' => 'member_status',
-                        'member_id' => $memberId,
-                        'member_name' => $memberName,
-                        'mobile_status_key' => $validated['status_key'],
-                        'mobile_status_label' => $this->mobileStatusLabel($validated['status_key'], null),
-                        'member_notes' => $householdNotes['user_notes'] ?? null,
-                    ], JSON_UNESCAPED_SLASHES),
-                    'submitted_at' => $now,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]));
-
-                $this->saveMemberDisasterStatus(
-                    $activeEvent['event_id'],
-                    $householdId,
-                    $memberId,
-                    $validated,
-                    $user?->user_id,
-                    $deviceId,
-                    $now
-                );
-            }
-
-            $this->saveLatestDeviceForStatus($householdId, $deviceId, $validated, $now);
-            $this->writeAuditLog($request, 'mobile_household_status', 'household_status_logs', (string) $statusLogId, $validated);
-        });
-
-        return response()->json([
-            'message' => 'Household status update saved.',
-            'data' => [
-                'status_log_id' => $statusLogId,
-            ],
-        ], 201);
+        return app(\App\Services\Mobile\HouseholdMobileStatusWorkflow::class)->storeStatus($request);
     }
 
     public function statusHistory(Request $request): JsonResponse
@@ -1355,7 +1091,9 @@ class HouseholdMobileService
         $query = DB::table('geotagged_locations')
             ->where('household_id', $householdId)
             ->whereNotNull('latitude')
-            ->whereNotNull('longitude');
+            ->whereNotNull('longitude')
+            ->whereBetween('latitude', [-90, 90])->whereBetween('longitude', [-180, 180])
+            ->when(Schema::hasColumn('geotagged_locations', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
 
         if (Schema::hasColumn('geotagged_locations', 'updated_at')) {
             $query->orderByDesc('updated_at');
@@ -1655,6 +1393,7 @@ class HouseholdMobileService
 
         return $query
             ->orderByDesc($orderColumn)
+            ->orderByDesc('hsl.status_log_id')
             ->limit(200)
             ->get($columns)
             ->reduce(function (array $statuses, object $log): array {
@@ -2322,7 +2061,7 @@ class HouseholdMobileService
 
     private function isSetupComplete(string $householdId, ?string $userId): bool
     {
-        return $this->hasGeotag($householdId) && $this->hasDevice($householdId, $userId);
+        return $this->hasGeotag($householdId);
     }
 
     private function hasGeotag(string $householdId): bool
@@ -2368,6 +2107,7 @@ class HouseholdMobileService
         if ($memberKeyColumn && ! empty($user->member_id)) {
             $memberQuery = DB::table('household_members')
                 ->where($memberKeyColumn, $user->member_id)
+                ->where('household_members.household_id', $user->household_id)
                 ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'));
 
             if (Schema::hasTable('relationships')
@@ -2382,6 +2122,7 @@ class HouseholdMobileService
                     $this->optionalColumnSelect('household_members', 'first_name', 'first_name'),
                     $this->optionalColumnSelect('household_members', 'middle_name', 'middle_name'),
                     $this->optionalColumnSelect('household_members', 'last_name', 'last_name'),
+                    $this->optionalColumnSelect('household_members', 'contact_number', 'contact_number'),
                     $this->firstExistingColumnSelect('household_members', ['relation', 'relationship'], 'relation'),
                     $this->optionalColumnSelect('relationships', 'relationship_label', 'relationship_title'),
                 ]);
@@ -2400,7 +2141,7 @@ class HouseholdMobileService
             'full_name' => $memberFullName ?: ($member?->name ?? null) ?: ($user->full_name ?? trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: $user->username),
             'username' => $user->username,
             'email' => $user->email,
-            'contact_number' => $user->contact_number,
+            'contact_number' => $member?->contact_number ?? $user->contact_number,
             'role' => [
                 'role_key' => $user->role?->role_key,
                 'role_name' => $user->role?->role_name,

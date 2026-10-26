@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import axios from 'axios'
-import { installReduxTransport, invalidateApiState, resetApiState, store } from '../state/apiStore.js'
+import { getViewState, installReduxTransport, invalidateApiState, resetApiState, saveViewState, store } from '../state/apiStore.js'
 
 function client(load) {
   resetApiState()
@@ -104,4 +104,28 @@ test('GPS writes invalidate map reads while retaining unrelated cached directory
   await api.post('/rescuer/assignments/12/location', { latitude: 10, longitude: 123 })
   await api.get('/households'); await api.get('/map/overview')
   assert.equal(calls, 4)
+})
+
+test('session snapshots survive GPS heartbeats but clear after other writes and account changes', async () => {
+  const api = client(async config => response(config))
+  await api.get('/household/overview')
+  saveViewState('mobile:household', { household: 'own-household' })
+  await api.post('/household/device-location', { latitude: 10, longitude: 123 })
+  assert.equal(getViewState('mobile:household').value.household, 'own-household')
+  await api.post('/household/status', { status_key: 'safe' })
+  assert.equal(getViewState('mobile:household'), null)
+  saveViewState('mobile:household', { household: 'own-household' })
+  resetApiState()
+  assert.equal(getViewState('mobile:household'), null)
+})
+
+test('snapshots older than two minutes are not shown on remount', () => {
+  resetApiState()
+  saveViewState('mobile:rescuer', { assignments: [] })
+  const clock = Date.now
+  const savedAt = clock()
+  try {
+    Date.now = () => savedAt + 120001
+    assert.equal(getViewState('mobile:rescuer'), null)
+  } finally { Date.now = clock }
 })

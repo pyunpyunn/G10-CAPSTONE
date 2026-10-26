@@ -27,6 +27,8 @@ class UserResource extends JsonResource
             'contact_number' => $this->contact_number,
             'assigned_center_id' => $this->assigned_center_id,
             'household_id' => $this->household_id,
+            'member_id' => $this->member_id,
+            'owner_selection_required' => (bool) ($this->resource->getAttribute('owner_selection_required') ?? \App\Services\Mobile\HouseholdAccessService::pending($this->resource)),
             'is_active' => (bool) $this->is_active,
             'is_hqcc_leader' => $this->resource->isHqccLeader(),
             'permissions' => [

@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { clearToken, getApiServerUrl, setApiServerUrl } from '@/api/client';
 import { getRememberedCredentials, saveRememberedCredentials, getStoredItem } from '@/utils/secureStorage';
 import { navigationMetadata } from '@/utils/navigationStore';
-import { loginMobile, restoreMobileSession } from '@/api/auth';
+import { householdOwnerSelectionRequired, loginMobile, restoreMobileSession } from '@/api/auth';
 import { palette, spacing } from '@/constants/resqTheme';
 import { askStandardMobilePermissions } from '@/utils/mobilePermissions';
 import ResQperationLogo from '@/components/ResQperationLogo';
@@ -88,7 +88,7 @@ export default function MobileLoginScreen() {
         const role = await restoreMobileSession();
         if (!active) return;
         if (role === 'household_resident') {
-          router.replace('/household' as Href);
+          router.replace((await householdOwnerSelectionRequired() ? '/household-owner' : '/household') as Href);
           return;
         }
         if (role === 'rescuer' || role === 'tl' || role === 'tm') {
@@ -122,6 +122,7 @@ export default function MobileLoginScreen() {
       }
 
       if (role === 'household_resident') {
+        if (user.owner_selection_required) { router.replace('/household-owner' as Href); return; }
         await askStandardMobilePermissions('household_resident');
         router.replace('/household' as Href);
         return;
@@ -199,7 +200,7 @@ export default function MobileLoginScreen() {
                   value={login}
                   onFocus={(event) => focusInput(event.nativeEvent.target)}
                   onChangeText={value => { edited.current = true; setLogin(value); }}
-                  placeholder="Enter your account ID"
+                  placeholder="Household ID or rescuer account ID"
                   placeholderTextColor={palette.navMuted}
                   autoCapitalize="none"
                   autoCorrect={false}

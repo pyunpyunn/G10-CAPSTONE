@@ -1,4 +1,5 @@
-import axios, { isAxiosError } from 'axios';
+import axios, { CanceledError, create, isAxiosError, isCancel } from 'axios';
+import { firstSuccessful } from '@/utils/networkScheduling';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
@@ -7,7 +8,7 @@ import { installReduxTransport, resetApiState } from '@/state/apiStore';
 const tokenKey = 'resqperation_mobile_token';
 const rescuerDeviceUuidKey = 'resq_rescuer_device_uuid';
 const serverUrlKey = 'resqperation_server_url';
-const serverHealthCacheMs = 20_000;
+const serverHealthCacheMs = 60_000;
 const serverProbeTimeoutMs = 2_500;
 
 type FailoverRequestConfig = {
@@ -15,6 +16,8 @@ type FailoverRequestConfig = {
   _resqForcedServerUrl?: string;
 };
 
+const serverSelections = new Map<string, Promise<string>>();
+let serverSelectionGeneration = 0;
 let activeServerUrl: string | null = null;
 let activeServerCheckedAt = 0;
 
@@ -36,6 +39,8 @@ export async function setApiServerUrl(value: string) {
   await logoutPushIdentity();
   await clearToken();
   await setStoredItem(serverUrlKey, next);
+  serverSelectionGeneration++;
+  serverSelections.clear();
   activeServerUrl = null;
   activeServerCheckedAt = 0;
   api.defaults.baseURL = next;
@@ -98,38 +103,48 @@ function ngrokHeaders(url: string) {
     : {};
 }
 
-async function selectReadyServer(forceCheck = false, excludedUrls: string[] = []) {
-  if (!forceCheck && activeServerUrl && Date.now() - activeServerCheckedAt < serverHealthCacheMs) {
-    return activeServerUrl;
-  }
-
-  const excluded = new Set(excludedUrls);
-  const candidates = (await getApiServerCandidates()).filter((url) => !excluded.has(url));
-  let databaseUnavailable = false;
-  for (const url of candidates) {
+async function selectReadyServer(forceCheck = false, excludedUrls: string[] = []): Promise<string> {
+  if (!forceCheck && activeServerUrl && Date.now() - activeServerCheckedAt < serverHealthCacheMs) return activeServerUrl;
+  const key = [...excludedUrls].sort().join('|');
+  const existing = serverSelections.get(key);
+  if (existing) return existing;
+  const generation = serverSelectionGeneration;
+  const selection = (async () => {
+    const excluded = new Set(excludedUrls);
+    const candidates = (await getApiServerCandidates()).filter((url) => !excluded.has(url));
+    let databaseUnavailable = false;
     try {
-      const response = await axios.get(`${url}/health/ready`, {
-        timeout: serverProbeTimeoutMs,
-        headers: { Accept: 'application/json', ...ngrokHeaders(url) },
-      });
-      if (response.data?.status !== 'ready') continue;
+      const url: string = await firstSuccessful(candidates.map((candidate) => async (signal: AbortSignal) => {
+        try {
+          const response = await axios.get(`${candidate}/health/ready`, {
+            timeout: serverProbeTimeoutMs, signal,
+            headers: { Accept: 'application/json', ...ngrokHeaders(candidate) },
+          });
+          if (response.data?.status !== 'ready') throw new Error('Server is not ready.');
+          return candidate;
+        } catch (error) {
+          if (isAxiosError(error) && error.response?.status === 503) databaseUnavailable = true;
+          throw error;
+        }
+      }));
+      if (generation !== serverSelectionGeneration) throw new CanceledError('The server configuration changed.');
       activeServerUrl = url;
       activeServerCheckedAt = Date.now();
       api.defaults.baseURL = url;
       return url;
     } catch (error) {
-      if (isAxiosError(error) && error.response?.status === 503) {
-        databaseUnavailable = true;
-      }
+      if (isCancel(error)) throw error;
+      activeServerUrl = null;
+      activeServerCheckedAt = 0;
+      throw new Error(databaseUnavailable
+        ? 'The API is reachable, but its database is not ready. Check the Laravel server database.'
+        : 'No configured API route is reachable. Check the connection and try again.');
     }
-  }
-
-  activeServerUrl = null;
-  activeServerCheckedAt = 0;
-  if (databaseUnavailable) {
-    throw new Error('The API is reachable, but its database is not ready. Check the database configured on the Laravel server.');
-  }
-  throw new Error('No configured API route is reachable. Check ngrok, Tailscale, the local network, and that Laravel is running.');
+  })();
+  serverSelections.set(key, selection);
+  const cleanup = () => { if (serverSelections.get(key) === selection) serverSelections.delete(key); };
+  selection.then(cleanup, cleanup);
+  return selection;
 }
 
 function isLocalhostUrl(url: string) {
@@ -146,7 +161,7 @@ function getExpoHost() {
   return typeof hostUri === 'string' ? hostUri.split(':')[0] : '';
 }
 
-export const api = axios.create({
+export const api = create({
   baseURL: getApiBaseUrl(),
   timeout: 12000,
   headers: {
@@ -162,8 +177,7 @@ api.interceptors.request.use(async (config) => {
   config.baseURL = serverUrl;
   api.defaults.baseURL = serverUrl;
   Object.assign(config.headers, ngrokHeaders(serverUrl));
-  const token = await getStoredItem(tokenKey);
-  const deviceUuid = await getStoredItem(rescuerDeviceUuidKey);
+  const [token, deviceUuid] = await Promise.all([getStoredItem(tokenKey), getStoredItem(rescuerDeviceUuidKey)]);
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -180,6 +194,7 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    if (isCancel(error)) return Promise.reject(error);
     if (error.response?.status === 401) resetApiState();
     const config = error.config as (typeof error.config & FailoverRequestConfig) | undefined;
     const method = String(config?.method || 'get').toLowerCase();

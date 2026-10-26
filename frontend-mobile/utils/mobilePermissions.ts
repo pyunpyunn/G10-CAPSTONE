@@ -9,14 +9,10 @@ export async function askStandardMobilePermissions(role: MobileRole) {
     return;
   }
 
-  try {
-    await registerOneSignalDevice(
-      role,
-      role === 'rescuer' ? 'Rescuer mobile' : 'Household mobile'
-    );
-  } catch {
-    // Notification registration retries when the authenticated role screen opens.
-  }
+  void registerOneSignalDevice(
+    role,
+    role === 'rescuer' ? 'Rescuer mobile' : 'Household mobile'
+  ).catch(() => {});
 
   await askLocationPermission(role);
 }

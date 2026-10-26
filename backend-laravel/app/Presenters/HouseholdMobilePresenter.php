@@ -32,7 +32,7 @@ class HouseholdMobilePresenter
             'full_name' => $memberFullName ?: ($member?->name ?? null) ?: ($user->full_name ?? trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: $user->username),
             'username' => $user->username,
             'email' => $user->email,
-            'contact_number' => $user->contact_number,
+            'contact_number' => $member?->contact_number ?? $user->contact_number,
             'role' => [
                 'role_key' => $user->role?->role_key,
                 'role_name' => $user->role?->role_name,

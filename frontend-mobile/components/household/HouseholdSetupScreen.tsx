@@ -1,10 +1,9 @@
-import { confirmHouseholdGps } from '@/utils/confirmHouseholdGps';
-import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as Location from 'expo-location';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
-import { reverseGeocodeAddress } from '@/utils/geocoding';
+import { useHouseholdSetup } from '@/hooks/useHouseholdSetup';
+import { HouseholdSetupAddressForm } from './HouseholdSetupAddressForm';
 import { HouseholdBadge, HouseholdButton, HouseholdSection } from './HouseholdUI';
 
 type SetupProps = {
@@ -13,132 +12,18 @@ type SetupProps = {
   onComplete: (payload: any) => Promise<void>;
 };
 
-const relationships = [
-  'Head of household',
-  'Spouse / Partner',
-  'Son / Daughter',
-  'Father / Mother',
-  'Brother / Sister',
-  'Grandparent',
-  'Grandchild',
-  'Guardian',
-  'Relative',
-  'Other',
-];
-
 export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: SetupProps) {
-  const household = overview.profile?.household || {};
-  const members = overview.members || [];
-  const [pin, setPin] = useState<any>(null);
-  const [locationLabel, setLocationLabel] = useState<string>(household.address || '');
-  const [houseNumber, setHouseNumber] = useState<string>('');
-  const [buildingName, setBuildingName] = useState<string>('');
-  const [floorNumber, setFloorNumber] = useState<string>('');
-  const [unitNumber, setUnitNumber] = useState<string>('');
-  const [roomNumber, setRoomNumber] = useState<string>('');
-  const [street, setStreet] = useState<string>('');
-  const [barangay, setBarangay] = useState<string>(household.barangay === 'Not recorded' ? '' : household.barangay || '');
-  const [city, setCity] = useState<string>(household.city === 'Not recorded' ? '' : household.city || '');
-  const [province, setProvince] = useState<string>(household.province === 'Not recorded' ? '' : household.province || '');
-  const [memberId, setMemberId] = useState(members[0]?.member_id || '');
-  const [relationship, setRelationship] = useState('Head of household');
+  const user = overview.profile?.user || {};
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [findingAddress, setFindingAddress] = useState(false);
+  const { pin, address, details, setDetails, saving, findingAddress, geotagMessage,
+    requestGpsLocation, handleSave } = useHouseholdSetup({ overview, deviceUuid, onComplete });
 
-  const selectedAddress = useMemo(() => {
-    return [buildingName, floorNumber, unitNumber, roomNumber, houseNumber, street, barangay, city, province]
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .join(', ');
-  }, [buildingName, floorNumber, unitNumber, roomNumber, houseNumber, street, barangay, city, province]);
-
-  const rescueAddress = useMemo(() => {
-    return buildRescueAddress(selectedAddress, locationLabel);
-  }, [selectedAddress, locationLabel]);
-
-  async function applyPinnedCoordinate(coordinate: any) {
-    setPin(coordinate);
-    setFindingAddress(true);
-    setLocationLabel('Finding address...');
-
-    try {
-      const address = await reverseGeocodeAddress(coordinate.latitude, coordinate.longitude);
-
-      setLocationLabel(address.label);
-      setStreet(address.street);
-      setBarangay(address.barangay);
-      setCity(address.city);
-      setProvince(address.province);
-    } catch {
-      setLocationLabel('Selected GPS location');
-    } finally {
-      setFindingAddress(false);
-    }
-  }
-
-  async function useCurrentLocation() {
-    if (!await confirmHouseholdGps()) return;
-    const permission = await Location.requestForegroundPermissionsAsync();
-
-    if (permission.status !== 'granted') {
-      Alert.alert('Location required', 'Allow location access on mobile, or open the app in Expo Go to pin on the native map.');
-      return;
-    }
-
-    const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-    await applyPinnedCoordinate({
-      latitude: current.coords.latitude,
-      longitude: current.coords.longitude,
-      accuracy_m: current.coords.accuracy,
-    });
-  }
-
-  async function handleSave() {
-    if (!pin) {
-      Alert.alert('Location required', 'Use GPS on this device or complete setup in Expo Go on Android/iPhone.');
-      return;
-    }
-
-    if (!rescueAddress.trim()) {
-      Alert.alert('Address required', 'Confirm the household address before saving setup.');
-      return;
-    }
-
-    if (!memberId) {
-      Alert.alert('Member required', 'Select which family member is using this device.');
-      return;
-    }
-
+  function completeSetup() {
     if (!privacyAccepted) {
-      Alert.alert('Agreement required', 'Confirm that this geotag and address may be used by HQ and assigned rescuers during disaster response.');
+      Alert.alert('Agreement required', 'Confirm that this household location may be used for disaster response.');
       return;
     }
-
-    setSaving(true);
-
-    try {
-      await onComplete({
-        latitude: pin.latitude,
-        longitude: pin.longitude,
-        accuracy_m: pin.accuracy_m,
-        address_label: rescueAddress,
-        house_number: houseNumber.trim(),
-        unit_number: [buildingName, floorNumber, unitNumber, roomNumber].map((part) => part.trim()).filter(Boolean).join(' / '),
-        street: street.trim(),
-        barangay: barangay.trim(),
-        city: city.trim(),
-        province: province.trim(),
-        member_id: memberId,
-        relationship_to_family: relationship,
-        device_uuid: deviceUuid,
-        device_name: 'Household mobile',
-        platform: 'expo',
-        photo_uri: null,
-      });
-    } finally {
-      setSaving(false);
-    }
+    void handleSave();
   }
 
   return (
@@ -147,116 +32,32 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
         <HouseholdBadge label="Required setup" tone="warning" />
         <Text style={styles.heroTitle}>Pin your household location</Text>
       </View>
-
       <View style={styles.card}>
-        <HouseholdSection
-          title="Location"
-          action={<HouseholdButton label="Use GPS" icon="locate-outline" tone="light" onPress={useCurrentLocation} />}
-        />
+        <HouseholdSection title="Location" action={<HouseholdButton label="Use GPS" icon="locate-outline" tone="light"
+          disabled={saving || findingAddress} onPress={requestGpsLocation} />} />
         <View style={styles.webMapFallback}>
           <Ionicons name="map-outline" size={30} color={palette.navActive} />
-          <Text style={styles.fallbackTitle}>Map pinning is mobile-only</Text>
-          <Text style={styles.fallbackText}>
-            Open this setup screen in Expo Go on Android or iPhone to tap the native map. Web can use GPS only.
-          </Text>
-          <HouseholdBadge label={findingAddress ? 'Finding address...' : pin ? 'GPS selected' : 'No GPS selected'} tone={pin ? 'info' : 'neutral'} />
+          <Text style={styles.fallbackText}>Use GPS here, or open the mobile app to choose the household location on the map.</Text>
+          <HouseholdBadge label={findingAddress ? 'Checking address...' : pin ? 'Location selected' : 'No location selected'} tone={pin ? 'info' : 'neutral'} />
         </View>
+        <Text style={styles.helperText}>{geotagMessage}</Text>
       </View>
-
-      <View style={styles.card}>
-        <HouseholdSection title="Address confirmation" />
-        <TextInput
-          style={styles.input}
-          value={locationLabel}
-          onChangeText={setLocationLabel}
-          placeholder="Selected address / landmark"
-          placeholderTextColor="#7d8da0"
-        />
-        <TextInput
-          style={styles.input}
-          value={buildingName}
-          onChangeText={setBuildingName}
-          placeholder="Building / apartment / boarding house"
-          placeholderTextColor="#7d8da0"
-        />
-        <View style={styles.twoColumn}>
-          <TextInput style={[styles.input, styles.flexInput]} value={floorNumber} onChangeText={setFloorNumber} placeholder="Floor" placeholderTextColor="#7d8da0" />
-          <TextInput style={[styles.input, styles.flexInput]} value={unitNumber} onChangeText={setUnitNumber} placeholder="Unit" placeholderTextColor="#7d8da0" />
-        </View>
-        <View style={styles.twoColumn}>
-          <TextInput style={[styles.input, styles.flexInput]} value={roomNumber} onChangeText={setRoomNumber} placeholder="Room" placeholderTextColor="#7d8da0" />
-          <TextInput style={[styles.input, styles.flexInput]} value={houseNumber} onChangeText={setHouseNumber} placeholder="House no." placeholderTextColor="#7d8da0" />
-        </View>
-        <TextInput style={styles.input} value={street} onChangeText={setStreet} placeholder="Street / purok" placeholderTextColor="#7d8da0" />
-        <View style={styles.twoColumn}>
-          <TextInput style={[styles.input, styles.flexInput]} value={barangay} onChangeText={setBarangay} placeholder="Barangay" placeholderTextColor="#7d8da0" />
-          <TextInput style={[styles.input, styles.flexInput]} value={city} onChangeText={setCity} placeholder="City" placeholderTextColor="#7d8da0" />
-        </View>
-        <TextInput style={styles.input} value={province} onChangeText={setProvince} placeholder="Province" placeholderTextColor="#7d8da0" />
-        <View style={styles.previewBox}>
-          <Text style={styles.label}>Saved rescue address</Text>
-          <Text style={styles.previewText}>{rescueAddress || 'Complete the address fields above.'}</Text>
-        </View>
-      </View>
-
+      <HouseholdSetupAddressForm address={address} details={details} setDetails={setDetails} disabled={saving} />
       <View style={styles.card}>
         <HouseholdSection title="Device user" />
-        <Text style={styles.helperText}>Choose the member using this phone so HQ can see the correct device, battery, and last location.</Text>
-        <View style={styles.choiceGrid}>
-          {members.map((member: any) => (
-            <Pressable
-              key={member.member_id}
-              style={[styles.choice, memberId === member.member_id && styles.choiceActive]}
-              onPress={() => setMemberId(member.member_id)}
-            >
-              <Text style={[styles.choiceTitle, memberId === member.member_id && styles.choiceTextActive]}>{member.name}</Text>
-              <Text style={[styles.choiceSub, memberId === member.member_id && styles.choiceTextActive]}>{member.relationship}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={styles.label}>Relationship to family</Text>
-        <View style={styles.choiceGrid}>
-          {relationships.map((item) => (
-            <Pressable
-              key={item}
-              style={[styles.smallChoice, relationship === item && styles.choiceActive]}
-              onPress={() => setRelationship(item)}
-            >
-              <Text style={[styles.choiceTitle, relationship === item && styles.choiceTextActive]}>{item}</Text>
-            </Pressable>
-          ))}
-        </View>
+        <Text style={styles.previewText}>{user.full_name || 'Member unavailable'}</Text>
+        <Text style={styles.helperText}>Member ID: {user.member_id}</Text>
       </View>
-
       <Pressable style={styles.privacyRow} onPress={() => setPrivacyAccepted((value) => !value)}>
         <View style={[styles.checkBox, privacyAccepted && styles.checkBoxActive]}>
           {privacyAccepted ? <Ionicons name="checkmark" size={15} color="#fff" /> : null}
         </View>
-        <Text style={styles.privacyText}>
-          I agree that RESQPERATION may securely store this household geotag and exact address for disaster response, HQ monitoring, and assigned rescuer access only.
-        </Text>
+        <Text style={styles.privacyText}>I agree that this household location may be used by HQ and assigned rescuers during disaster response.</Text>
       </Pressable>
-
-      <HouseholdButton
-        label={saving ? 'Saving setup...' : 'Complete setup'}
-        icon="checkmark-circle-outline"
-        disabled={saving}
-        onPress={handleSave}
-      />
+      <HouseholdButton label={saving ? 'Saving setup...' : 'Complete setup'} icon="checkmark-circle-outline"
+        disabled={saving || findingAddress} onPress={completeSetup} />
     </View>
   );
-}
-
-function buildRescueAddress(selectedAddress: string, locationLabel: string) {
-  const cleanSelected = selectedAddress.trim();
-  const cleanLabel = locationLabel.trim();
-
-  if (cleanSelected && cleanLabel && !cleanLabel.toLowerCase().includes(cleanSelected.toLowerCase())) {
-    return `${cleanSelected} - ${cleanLabel}`.slice(0, 255);
-  }
-
-  return (cleanSelected || cleanLabel).slice(0, 255);
 }
 
 const styles = StyleSheet.create({

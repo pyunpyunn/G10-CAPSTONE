@@ -104,7 +104,7 @@ export default function ProfilePage() {
     setIsSaving(true)
 
     try {
-      if (!passwordValues.current_password) throw new Error('Enter your old password.')
+      if (!passwordValues.current_password) throw new Error('Enter your current password.')
       if (passwordValues.password.length < 8 || passwordValues.password.length > 128) throw new Error('New password must contain 8 to 128 characters.')
       if (passwordValues.password !== passwordValues.password_confirmation) throw new Error('New password and confirmation do not match.')
       const data = await changePassword(passwordValues)

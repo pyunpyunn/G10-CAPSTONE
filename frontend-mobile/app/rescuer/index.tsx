@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMobileOverview } from '@/hooks/useMobileOverview';
+import { useEffect, useMemo, useState } from 'react';
 import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import {
   Alert,
@@ -41,6 +42,7 @@ import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
 import { configureRescuerTracking, stopRescuerTracking, subscribeRescuerPosition } from '@/utils/rescuerLiveLocation';
 import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
+import { createAdaptivePoller } from '@/utils/networkScheduling';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 const deviceUuidKey = 'resq_rescuer_device_uuid';
@@ -56,37 +58,11 @@ const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; 
 export default function RescuerHomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
-  const [overview, setOverview] = useState<RescuerOverview | null>(null);
+  const { overview, setOverview, loading, refreshing, fetching, error: overviewError, lastUpdated, loadOverview }
+    = useMobileOverview<RescuerOverview>('rescuer', getRescuerOverview);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [overviewError, setOverviewError] = useState('');
-  const overviewRequest = useRef(false);
   useEffect(() => Platform.OS === 'web' ? undefined : mountNavigationSync(), []);
 
-  const loadOverview = useCallback(async (isRefresh = false, silent = false) => {
-    if (overviewRequest.current) return;
-    overviewRequest.current = true;
-
-    if (!silent) {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-    }
-
-    try {
-      const data = await getRescuerOverview(isRefresh);
-      setOverview(data);
-      setOverviewError('');
-    } catch (error: any) {
-      setOverviewError(errorMessage(error));
-    } finally {
-      overviewRequest.current = false;
-      if (!silent) {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }
-  }, []);
 
   useEffect(() => {
     const removeBroadcast = onDisasterBroadcast(() => { void loadOverview(true); });
@@ -154,12 +130,10 @@ export default function RescuerHomeScreen() {
   }, problem => { if (problem) setGpsStatus(problem); }), []);
   useEffect(() => {
     if (!trackingAssignmentId) return;
-    const timer = setInterval(() => {
-      if (AppState.currentState === 'active') {
-        void loadOverview(true, true);
-      }
-    }, 15000);
-    return () => clearInterval(timer);
+    return createAdaptivePoller(
+      () => AppState.currentState === 'active' ? loadOverview(true, true) : null,
+      { intervalMs: 15000, maxIntervalMs: 60000 },
+    ).start();
   }, [trackingAssignmentId, loadOverview]);
 
   async function handleLogout() {
@@ -201,7 +175,7 @@ export default function RescuerHomeScreen() {
         await endNavigationTrip().catch(() => Alert.alert('Household saved', 'The household was completed, but trip recording could not be stopped. Open navigation to stop the trip.'));
       }
 
-      await loadOverview(true);
+      void loadOverview(true, true, true);
       if (status === 'completed') { setSelectedAssignment(null); setActiveTab('dashboard'); }
 
       if (['accepted', 'en_route'].includes(status)) {
@@ -243,7 +217,7 @@ export default function RescuerHomeScreen() {
 
   async function handleSubmitFieldReport(payload: any) {
     await createFieldReport(payload);
-    await loadOverview(true);
+    void loadOverview(true, true, true);
   }
 
   function openMap(assignment?: any) {
@@ -265,7 +239,7 @@ export default function RescuerHomeScreen() {
     try {
       await createResourceRequest(payload);
       Alert.alert('Request submitted', 'Your request is waiting for HQ validation.');
-      await loadOverview(true);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to submit request', errorMessage(error));
     }
@@ -274,7 +248,7 @@ export default function RescuerHomeScreen() {
   async function handleCancelResourceRequest(requestId: string) {
     try {
       await cancelResourceRequest(requestId);
-      await loadOverview(true);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to cancel request', errorMessage(error));
     }
@@ -284,7 +258,7 @@ export default function RescuerHomeScreen() {
     try {
       await updateRescuerProfile(payload);
       Alert.alert('Profile updated', 'Your profile changes were saved.');
-      await loadOverview(true);
+      void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to update profile', errorMessage(error));
       throw error;
@@ -374,9 +348,12 @@ export default function RescuerHomeScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
+        {fetching && overview ? <Text style={styles.refreshErrorText} accessibilityLiveRegion="polite">
+          Updating data. You can keep using the app.{lastUpdated ? ` Last updated ${new Date(lastUpdated).toLocaleTimeString()}.` : ''}
+        </Text> : null}
         {!!overviewError && overview ? (
           <View style={styles.refreshError}>
-            <Text style={styles.refreshErrorText}>Unable to refresh data: {overviewError}</Text>
+            <Text style={styles.refreshErrorText}>Could not refresh. Showing previously loaded data. {overviewError}</Text>
             <Pressable onPress={() => { void loadOverview(true); }} accessibilityRole="button">
               <Text style={styles.refreshErrorAction}>Retry</Text>
             </Pressable>
