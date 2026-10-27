@@ -16,6 +16,11 @@ class GuardApiHeaders
         $limiter = new RateLimiter(Cache::store(config('api_security.rate_limit_store', 'file')));
         $key = 'api-edge:'.hash('sha256', (string) $request->ip());
         $limit = config('api_security.requests_per_minute', 6000);
+        // A clock change or stale cache must not turn a one-minute limit into
+        // a prolonged outage for every client behind the same API proxy.
+        if ($limiter->availableIn($key) > 60) {
+            $limiter->clear($key);
+        }
         if ($limiter->tooManyAttempts($key, $limit)) {
             return response()->json(['message' => 'Too many API requests. Try again shortly.'], 429)
                 ->header('Retry-After', $limiter->availableIn($key));

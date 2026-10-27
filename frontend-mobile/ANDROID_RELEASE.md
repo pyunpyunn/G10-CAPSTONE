@@ -1,6 +1,17 @@
 # Standalone Android APK
 
-## Latest local APK — version 2.0.0, build 44
+## Latest local APK — version 2.0.0, build 45
+
+Installable file: [`releases/RESQPERATION-build45.apk`](./releases/RESQPERATION-build45.apk).
+
+- 22,577,153 bytes; version code 45; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified with APK Signature Scheme v2.
+- Release API configuration requires HTTPS; previously saved HTTP API addresses are rejected in release mode. The packaged Android manifest explicitly disables cleartext traffic and the APK is not debuggable.
+- TypeScript checks and all 130 mobile tests passed during release verification, including six transport-security tests. The earlier handoff reports 39 focused backend tests passing; backend tests were not rerun during artifact verification.
+- SHA-256: `2B97935AEFD4A33C618C80CA898313F21F61E04C55FEC59BF668140FA8523AFD`.
+- Physical-device installation, login, background location, dispatch alarms, and push delivery remain to be verified for this APK.
+- The existing API listener was still bound to `0.0.0.0:8000` during verification. The new loopback startup default takes effect only after that service is safely restarted; this release verification did not restart it.
+
+## Previous local APK — version 2.0.0, build 44
 
 Installable file: [`releases/RESQPERATION-build44.apk`](./releases/RESQPERATION-build44.apk).
 
@@ -51,7 +62,7 @@ Local copy: [`releases/RESQPERATION-build40.apk`](./releases/RESQPERATION-build4
 Local copy: `releases/RESQPERATION.apk`.
 
 The build 6 release details below are retained as historical documentation;
-build 39 above is the latest local APK.
+build 45 above is the latest local APK.
 
 - Download: **24,303,289 bytes (24.3 MB / 23.18 MiB)**.
 - Previous development APK: 227,634,757 bytes; this release is **89.3% smaller**.

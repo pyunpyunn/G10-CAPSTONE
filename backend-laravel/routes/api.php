@@ -63,15 +63,15 @@ Route::prefix('v1')->group(function () {
 
     // Route reads use the authenticated rescuer's own assignment scope; trip writes remain device-bound.
     Route::get('/mobile/bootstrap', [MobileNavigationController::class, 'bootstrap'])
-        ->middleware(['auth:sanctum', 'role:rescuer,tl,tm', 'throttle:120,1']);
+        ->middleware(['auth:sanctum', 'mobile.device:if-bound', 'role:rescuer,tl,tm', 'throttle:120,1']);
     Route::middleware(['auth:sanctum', 'mobile.device', 'role:rescuer,tl,tm', 'throttle:120,1'])->prefix('mobile')->group(function (): void {
         Route::post('/sync', [MobileNavigationController::class, 'sync']);
         Route::get('/packs/{version}', [MobileNavigationController::class, 'packManifest']);
     });
     Route::post('/rescuer/assignments/{assignmentId}/route', [MobileNavigationController::class, 'assignedRoadRoute'])
-        ->middleware(['auth:sanctum', 'role:rescuer,tl,tm', 'throttle:12,1']);
+        ->middleware(['auth:sanctum', 'mobile.device:if-bound', 'role:rescuer,tl,tm', 'throttle:12,1']);
     Route::post('/rescuer/evacuation-centers/{centerId}/route', [MobileNavigationController::class, 'evacuationCenterRoadRoute'])
-        ->middleware(['auth:sanctum', 'role:rescuer,tl,tm', 'throttle:12,1']);
+        ->middleware(['auth:sanctum', 'mobile.device:if-bound', 'role:rescuer,tl,tm', 'throttle:12,1']);
     Route::post('/dispatches/{id}/route', [MobileNavigationController::class, 'freshRoute'])
         ->middleware(['auth:sanctum', 'mobile.device', 'role:rescuer,tl,tm', 'throttle:6,1']);
     Route::get('/auth/password-recovery/questions', [AuthController::class, 'recoveryQuestions'])
@@ -259,13 +259,13 @@ Route::prefix('v1')->group(function () {
             Route::patch('/household/trusted-households/{connectionId}', [HouseholdMobileController::class, 'respondToTrustedHousehold']);
         });
 
-        Route::middleware('role:operations_admin,chair,mitigation_prevention,preparedness,response,recovery_rehabilitation,rescuer')->group(function () {
+        Route::middleware(['role:operations_admin,chair,mitigation_prevention,preparedness,response,recovery_rehabilitation,rescuer', 'mobile.device:if-bound'])->group(function () {
             Route::patch('/dispatches/{assignmentId}', [RescueDispatchController::class, 'update']);
             Route::post('/evacuation/check-in', [EvacuationCheckInController::class, 'store']);
             Route::post('/evacuation/verify-qr', [EvacuationCheckInController::class, 'verifyQr']);
         });
 
-        Route::middleware('role:rescuer')->group(function () {
+        Route::middleware(['role:rescuer', 'mobile.device:if-bound'])->group(function () {
             Route::patch('/dispatches/{assignmentId}/location', [RescueDispatchController::class, 'updateLocation']);
 
             Route::get('/rescuer/assignments/history', [\App\Http\Controllers\Api\RescuerDispatchHistoryController::class, 'index']);
@@ -289,7 +289,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/rescuer/radio/clip', [RescuerMobileController::class, 'storeRadioClip']);
             Route::post('/rescuer/radio/signal', [RescuerMobileController::class, 'storeRadioSignal']);
         });
-        Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport'])->middleware('role:rescuer,tl,tm');
+        Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport'])->middleware(['role:rescuer,tl,tm', 'mobile.device:if-bound']);
         Route::post('/rescuer/resource-requests', [RescuerMobileController::class, 'storeResourceRequest'])->middleware('role:tl');
     });
 });

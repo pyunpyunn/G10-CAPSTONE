@@ -75,7 +75,7 @@ try {
                 # run PHP directly so there is only one server process to manage.
                 $publicPath = Join-Path $backendPath 'public'
                 $router = Join-Path $backendPath 'vendor\laravel\framework\src\Illuminate\Foundation\resources\server.php'
-                $arguments = @('-d', 'display_errors=stderr', '-S', '0.0.0.0:8000', '-t', ('"{0}"' -f $publicPath), ('"{0}"' -f $router))
+                $arguments = @('-d', 'display_errors=stderr', '-S', '127.0.0.1:8000', '-t', ('"{0}"' -f $publicPath), ('"{0}"' -f $router))
                 $workingDirectory = $publicPath
             } else {
                 $arguments = @(('"{0}"' -f (Join-Path $backendPath 'artisan')), 'queue:work', 'operations_outbox', '--queue=broadcasts,operations,navigation', '--sleep=1', '--tries=3', '--timeout=120')

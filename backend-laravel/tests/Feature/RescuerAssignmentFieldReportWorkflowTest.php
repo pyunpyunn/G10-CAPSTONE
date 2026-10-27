@@ -103,7 +103,9 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
     {
         $route = app('router')->getRoutes()->match(Request::create('/api/v1/rescuer/field-reports', 'POST'));
         $roleMiddleware = array_values(array_filter($route->gatherMiddleware(), fn ($middleware) => str_starts_with($middleware, 'role:')));
+        $deviceMiddleware = array_values(array_filter($route->gatherMiddleware(), fn ($middleware) => str_starts_with($middleware, 'mobile.device:')));
         $this->assertCount(1, $roleMiddleware);
+        $this->assertContains('mobile.device:if-bound', $deviceMiddleware);
         $roles = explode(',', substr($roleMiddleware[0], 5));
         foreach (['rescuer', 'tl', 'tm', 'household_resident'] as $role) {
             $request = $this->request($this->validPayload());
