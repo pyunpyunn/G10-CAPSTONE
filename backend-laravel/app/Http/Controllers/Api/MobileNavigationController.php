@@ -7,6 +7,7 @@ use App\Http\Requests\MobileLoginRequest;
 use App\Services\Navigation\MobileNavigationService;
 use App\Services\Navigation\MobileSyncService;
 use App\Services\Shared\AuthService;
+use App\Services\Shared\RoutingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -17,7 +18,12 @@ use Illuminate\Support\Facades\DB;
 
 class MobileNavigationController extends Controller
 {
-    public function evacuationCenterRoadRoute(Request $request, string $centerId, ValhallaRoutingService $routing): JsonResponse
+    public function evacuationCenterRoadRoute(
+        Request $request,
+        string $centerId,
+        RoutingService $roadRouting,
+        ValhallaRoutingService $walkingRouting,
+    ): JsonResponse
     {
         $origin = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
@@ -35,17 +41,39 @@ class MobileNavigationController extends Controller
             ->first(['evacuation_center_id', 'name', 'latitude', 'longitude']);
         abort_unless($center, 404, 'This evacuation center is unavailable or has no mapped location.');
 
+        $profile = $origin['profile'] ?? 'auto';
         try {
-            $route = $routing->routeBetween(
-                $origin,
-                ['latitude' => (float) $center->latitude, 'longitude' => (float) $center->longitude],
-                $origin['profile'] ?? 'auto',
-            );
+            if ($profile === 'auto') {
+                $roadRoute = $roadRouting->drivingRoute(
+                    (float) $origin['latitude'],
+                    (float) $origin['longitude'],
+                    (float) $center->latitude,
+                    (float) $center->longitude,
+                );
+                $coordinates = collect($roadRoute['coordinates'] ?? [])
+                    ->map(fn (array $point): array => [
+                        'latitude' => (float) $point['lat'],
+                        'longitude' => (float) $point['lng'],
+                    ])->values()->all();
+                $route = $roadRoute && count($coordinates) >= 2 ? [
+                    'profile' => 'auto',
+                    'polyline6' => \App\Support\NavigationPolyline::encode($coordinates),
+                    'steps' => $roadRoute['steps'] ?? [],
+                    'distance_m' => (int) round(((float) $roadRoute['distance_km']) * 1000),
+                    'duration_s' => (int) round(((float) $roadRoute['duration_min']) * 60),
+                ] : null;
+            } else {
+                $route = $walkingRouting->routeBetween(
+                    $origin,
+                    ['latitude' => (float) $center->latitude, 'longitude' => (float) $center->longitude],
+                    $profile,
+                );
+            }
         } catch (\Throwable $exception) {
             report($exception);
             abort(503, 'Road routing is unavailable. Keep the map open and retry when the connection improves.');
         }
-        abort_unless($route, 422, 'No road route is available to this evacuation center.');
+        abort_unless($route, 503, 'No road route is available to this evacuation center. Keep the saved route and retry when connected.');
 
         return response()->json(['data' => $route + [
             'evacuation_center_id' => $center->evacuation_center_id,

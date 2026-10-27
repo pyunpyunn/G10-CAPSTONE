@@ -4,12 +4,11 @@ import { Camera, GeoJSONSource, Layer, Map, Marker, type CameraRef, type MarkerR
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { activeLocalTrip, getActivePack, getLocalNavigationSnapshot, getLocalTrip, queueOutboxEvent, type LocalTrip } from '@/utils/navigationStore';
 import * as Crypto from 'expo-crypto';
-import { endNavigationTrip, lastNavigationError, mountNavigationSync, refreshNavigation, startNavigationTrip, syncNavigation } from '@/utils/navigationRuntime';
+import { endNavigationTrip, lastNavigationError, refreshNavigation, startNavigationTrip, syncNavigation } from '@/utils/navigationRuntime';
 import { navigationPackStatus, prepareNavigationPack } from '@/utils/navigationPacks';
 import { bearingDegrees, decodePolyline6, distanceMeters, downsampleRouteCoordinates, routeProgress, type Coordinate, type RouteStep } from '@/utils/routeGeometry';
 import type { LocationObject } from 'expo-location';
 import { api } from '@/api/client';
-import * as Location from 'expo-location';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { configureRescuerTracking, hasActiveRescuerTracking, subscribeRescuerPosition } from '@/utils/rescuerLiveLocation';
 import { selectNavigationAssignment, selectAssignedRoute } from '@/utils/assignedNavigationRoute';
@@ -35,9 +34,10 @@ export default function OfflineNavigationScreen() {
   const [busy, setBusy] = useState(false), [packMessage, setPackMessage] = useState('Map has not been downloaded.');
   const camera = useRef<CameraRef>(null), marker = useRef<MarkerRef>(null);
   const [gpsFix, setGpsFix] = useState<LocationObject | null>(null);
-  const latest = useRef<LocationObject | null>(null), arrivalShown = useRef(false), lastStep = useRef(0);
+  const arrivalShown = useRef(false), lastStep = useRef(0), lastProcessedFix = useRef(0);
   const firstGps = useRef(true);
   const rerouteAt = useRef(0), rerouting = useRef(false);
+  const rerouteRequest = useRef<AbortController | null>(null);
   const points = useMemo<Coordinate[]>(() => { try { return route?.polyline6 ? decodePolyline6(route.polyline6) : (route?.coordinates || []).map((point: any) => [Number(point.longitude), Number(point.latitude)] as Coordinate).filter((point: Coordinate) => Number.isFinite(point[0]) && Number.isFinite(point[1])); } catch { return []; } }, [route]);
   const displayPoints = useMemo(() => downsampleRouteCoordinates(points), [points]);
   const steps: RouteStep[] = useMemo(() => { try { return typeof route?.steps === 'string' ? JSON.parse(route.steps) : route?.steps || []; } catch { return []; } }, [route]);
@@ -60,30 +60,21 @@ export default function OfflineNavigationScreen() {
     setPackMessage(status?.state === 'complete' ? 'Map saved for offline use.' : status ? `Map ${Math.round(status.percentage)}% downloaded. Resume on Wi-Fi.` : 'Download the map on Wi-Fi before going offline.');
   }
 
-  useEffect(() => { void action(async () => { await load(); try { await refreshNavigation(); } finally { await load(); } }); }, [dispatchId]);
-  useEffect(() => {
-    if (!loaded || !dispatch?.household_id || ['completed','cancelled'].includes(dispatch.status)) return;
-    let active = true;
-    void (async () => {
-      if (!(await Location.requestForegroundPermissionsAsync()).granted) throw new Error('Location permission required.');
-      const fix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      if (!active) return;
-      latest.current = fix; setGpsFix(fix);
-      const response = await api.post(`/rescuer/assignments/${dispatch.assignment_id}/route`, { latitude: fix.coords.latitude, longitude: fix.coords.longitude, household_id: dispatch.household_id, profile });
-      if (active) { setRoute(response.data.data); setMessage(''); }
-    })().catch(() => { if (active) setMessage('Current directions unavailable. Showing saved route.'); });
-    return () => { active = false; };
-  }, [loaded, dispatch?.assignment_id, dispatch?.household_id, dispatch?.status, profile]);
+  useEffect(() => { void action(load); }, [dispatchId]);
   useEffect(() => {
     setRemaining(Number(route?.distance_m || 0));
     setGuidance(steps[0]?.instruction || 'Follow the highlighted route.');
-    lastStep.current = 0; arrivalShown.current = false;
+    lastStep.current = 0; lastProcessedFix.current = 0; arrivalShown.current = false;
   }, [route, steps]);
   useEffect(() => {
     if (dispatch?.assignment_id && !hasActiveRescuerTracking()) void configureRescuerTracking(Number(dispatch.assignment_id)).catch(() => setMessage('Enable location for live navigation.'));
   }, [dispatch?.assignment_id]);
-  useEffect(() => subscribeRescuerPosition(fix => { latest.current = fix; setGpsFix(fix); }, problem => { if (problem) setMessage(problem); }), []);
-  useEffect(() => mountNavigationSync(), []);
+  useEffect(() => subscribeRescuerPosition(fix => setGpsFix(fix), problem => { if (problem) setMessage(problem); }), []);
+  useEffect(() => () => {
+    rerouteRequest.current?.abort();
+    rerouteRequest.current = null;
+    rerouting.current = false;
+  }, []);
   useEffect(() => {
     if (!mapReady || points.length < 2) return;
     const bounds = points.reduce<[number, number, number, number]>((value, point) => [
@@ -96,41 +87,56 @@ export default function OfflineNavigationScreen() {
     if (mapReady && gpsFix && firstGps.current) { firstGps.current = false; camera.current?.jumpTo({ center: [gpsFix.coords.longitude, gpsFix.coords.latitude], zoom: 17 }); }
   }, [mapReady, gpsFix]);
   useEffect(() => {
-    const timer = setInterval(() => {
-      const fix = latest.current;
-      latest.current = null;
-      if (!fix || points.length < 2 || Date.now() - fix.timestamp > 30000 || (fix.coords.accuracy != null && fix.coords.accuracy > 75)) return;
-      const position: Coordinate = [fix.coords.longitude, fix.coords.latitude];
-      const progress = routeProgress(points, position), offRoute = progress.offRouteM > 40;
-      if (offRoute && dispatch && route?.household_id && !rerouting.current && Date.now() > rerouteAt.current) {
-        rerouting.current = true; rerouteAt.current = Date.now() + 60000;
-        void api.post(`/rescuer/assignments/${dispatch.assignment_id}/route`, { latitude: position[1], longitude: position[0], profile, household_id: route.household_id })
-          .then((response) => { setRoute(response.data.data); lastStep.current = 0; })
-          .catch(() => { /* Keep the cached line and destination bearing when disconnected. */ })
-          .finally(() => { rerouting.current = false; });
-      }
-      const center = position;
-      camera.current?.jumpTo({ center, zoom: profile === 'auto' ? 17 : 18, pitch: 50,
-        bearing: fix.coords.heading !== null && fix.coords.heading >= 0 ? fix.coords.heading : bearingDegrees(points[progress.segment], points[progress.segment + 1]) });
-      marker.current?.getAnimatableRef()?.setNativeProps({ lngLat: center });
-      const next = steps.findIndex((step, index) => index >= lastStep.current && (progress.cumulative[step.polyline_index] ?? 0) > progress.alongM + 8);
-      if (!offRoute && next >= 0) lastStep.current = next;
-      const step = steps[lastStep.current];
-      const toStep = Math.max(0, (progress.cumulative[step?.polyline_index] ?? 0) - progress.alongM);
-      const destination = points[points.length - 1];
-      setGuidance(offRoute ? `Off route: ${Math.round(distanceMeters(position, destination))} m, bearing ${Math.round(bearingDegrees(position, destination))}° to destination. Follow the highlighted route.`
-        : step ? `${Math.round(toStep)} m — ${step.instruction}` : 'Continue to the destination.');
-      setRemaining(progress.remainingM);
-      if (trip) void getLocalTrip(trip.localTripId).then((value) => { if (value) setDistance(value.distanceM); });
-      const radius = Number(process.env.EXPO_PUBLIC_NAVIGATION_ARRIVAL_RADIUS_M || 25);
-      if (!arrivalShown.current && distanceMeters(position, destination) <= radius && (fix.coords.accuracy ?? Infinity) <= radius) {
-        arrivalShown.current = true;
-        setShowStatuses(true);
-        Alert.alert('Destination reached', 'Confirm the household’s status in the dispatch report. End the trip when travel is finished.');
-      }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [points, steps, trip, profile, route, dispatch]);
+    const fix = gpsFix;
+    if (!fix || fix.timestamp === lastProcessedFix.current || points.length < 2
+      || Date.now() - fix.timestamp > 30000 || (fix.coords.accuracy != null && fix.coords.accuracy > 75)) return;
+    lastProcessedFix.current = fix.timestamp;
+    const position: Coordinate = [fix.coords.longitude, fix.coords.latitude];
+    const progress = routeProgress(points, position), offRoute = progress.offRouteM > 40;
+    if (offRoute && dispatch && route?.household_id && !rerouting.current && Date.now() > rerouteAt.current) {
+      rerouting.current = true;
+      rerouteAt.current = Date.now() + 60000;
+      const controller = new AbortController();
+      rerouteRequest.current = controller;
+      void api.post(`/rescuer/assignments/${dispatch.assignment_id}/route`, {
+        latitude: position[1], longitude: position[0], profile, household_id: route.household_id,
+      }, { signal: controller.signal })
+        .then((response) => { setRoute(response.data.data); lastStep.current = 0; })
+        .catch(() => { /* Keep the cached line and destination bearing when disconnected. */ })
+        .finally(() => {
+          if (rerouteRequest.current === controller) rerouteRequest.current = null;
+          rerouting.current = false;
+        });
+    }
+    if (mapReady) {
+      camera.current?.jumpTo({
+        center: position,
+        zoom: profile === 'auto' ? 17 : 18,
+        pitch: 50,
+        bearing: fix.coords.heading !== null && fix.coords.heading >= 0
+          ? fix.coords.heading : bearingDegrees(points[progress.segment], points[progress.segment + 1]),
+      });
+      marker.current?.getAnimatableRef()?.setNativeProps({ lngLat: position });
+    }
+    const next = steps.findIndex((step, index) =>
+      index >= lastStep.current && (progress.cumulative[step.polyline_index] ?? 0) > progress.alongM + 8
+    );
+    if (!offRoute && next >= 0) lastStep.current = next;
+    const step = steps[lastStep.current];
+    const toStep = Math.max(0, (progress.cumulative[step?.polyline_index] ?? 0) - progress.alongM);
+    const destination = points[points.length - 1];
+    setGuidance(offRoute
+      ? `Off route: ${Math.round(distanceMeters(position, destination))} m, bearing ${Math.round(bearingDegrees(position, destination))}° to destination. Follow the highlighted route.`
+      : step ? `${Math.round(toStep)} m — ${step.instruction}` : 'Continue to the destination.');
+    setRemaining(progress.remainingM);
+    if (trip) void getLocalTrip(trip.localTripId).then((value) => { if (value) setDistance(value.distanceM); });
+    const radius = Number(process.env.EXPO_PUBLIC_NAVIGATION_ARRIVAL_RADIUS_M || 25);
+    if (!arrivalShown.current && distanceMeters(position, destination) <= radius && (fix.coords.accuracy ?? Infinity) <= radius) {
+      arrivalShown.current = true;
+      setShowStatuses(true);
+      Alert.alert('Destination reached', 'Confirm the household’s status in the dispatch report. End the trip when travel is finished.');
+    }
+  }, [gpsFix, mapReady, points, steps, trip, profile, route, dispatch]);
 
   async function action(operation: () => Promise<unknown>) {
     setBusy(true); setMessage('');
@@ -174,10 +180,10 @@ export default function OfflineNavigationScreen() {
       title={`Directions: ${snapshot?.households.find((h: any) => String(h.household_id) === String(item.household_id))?.household_name || snapshot?.evacuation_centers.find((c: any) => String(c.evacuation_center_id) === String(item.evac_center_id))?.name || item.household_id || item.evac_center_id}`}
       onPress={() => { setRoute(item); lastStep.current = 0; arrivalShown.current = false; }} />)}
     {!eligible.length && <Text>No cached routes available for this profile. Refresh while online; ask HQ to precompute missing routes.</Text>}
-    {!trip && householdIds.map((id) => <NavButton key={`live-${id}`} disabled={busy} title={`Route from my GPS: ${snapshot?.households.find((h: any) => String(h.household_id) === id)?.household_name || id}`}
+    {!trip && householdIds.map((id) => <NavButton key={`live-${id}`} disabled={busy || !gpsFix} title={`Route from my GPS: ${snapshot?.households.find((h: any) => String(h.household_id) === id)?.household_name || id}`}
       onPress={() => void action(async () => {
-        if (!(await Location.requestForegroundPermissionsAsync()).granted) throw new Error('Location permission is required.');
-        const fix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        const fix = gpsFix;
+        if (!fix) throw new Error('Waiting for a current GPS fix.');
         const response = await api.post(`/rescuer/assignments/${dispatch.assignment_id}/route`, {
           latitude: fix.coords.latitude, longitude: fix.coords.longitude, profile, household_id: id,
         });

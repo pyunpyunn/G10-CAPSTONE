@@ -1,79 +1,26 @@
 # Standalone Android APK
 
+## Latest verified local APK — version 1.0.0, build 40
 
-## Current local release — version 1.0.0, build 37
+Local copy: [`releases/RESQPERATION-build40.apk`](./releases/RESQPERATION-build40.apk).
 
-Local APK: `releases/RESQPERATION-build37.apk`.
-
-- Download: **22,489,893 bytes (22.5 MB / 21.45 MiB)**.
-- Version code 37; release build completed successfully and passed APK package,
-  version, signing-certificate and signature verification.
-- APK Signature Scheme v2; SHA-256:
-  `2d6e773773133f6aec99e75b3864177becdafde787a1c2774e73268152319fa2`.
-- This local build is not uploaded to GitHub. The link below remains the
-  latest GitHub-published APK.
-
-Mobile behavior in this build:
-
-- Redux-backed response caching and request coalescing avoid duplicate screen
-  reads; warm dashboard snapshots stay visible while refreshes are pending.
-  Background "updating" and last-updated status text and the rescuer dashboard
-  GPS status line are not displayed.
-- Household background refresh backs off from 30 seconds to at most 5 minutes
-  after failures. Active rescuer refresh backs off from 15 to at most 60 seconds.
-  A successful refresh resets each interval; foreground/manual refresh remains
-  available.
-- Sign-out clears the local session immediately and shows a progress overlay;
-  server token revocation and tracking cleanup run in the background.
-- Household sign-in uses the household ID and keeps the first-time device owner
-  selection step. Rescuer and household credential login tests pass.
-- Rescuer map and offline navigation keep GPS tracking active without showing
-  GPS accuracy, acquisition or background sync status lines.
-- Foreground GPS sampling uses a 10-second interval and 10-meter distance
-  threshold; background sampling uses 15 seconds and 15 meters. HQ uploads are
-  limited to meaningful movement (at least 15 meters after 15 seconds) or a
-  one-minute stationary heartbeat, and planned routes refresh no more than once
-  per minute.
-- The shared household/rescuer map no longer rebuilds its route layers for each
-  GPS fix. Its WebView is released while rescuer-only MapLibre navigation is
-  open. Navigation keeps full route geometry for guidance but draws at most
-  1,200 evenly sampled points.
-- Configured API routes are raced for readiness so an unavailable route does
-  not have to time out before a healthy fallback is tried. The app still needs
-  at least one reachable, ready backend; no client change can eliminate latency
-  or outages in the server, Tailscale, or network.
-
-The backend route service already asks OSRM/OpenStreetMap to snap route
-endpoints to the street network. If it specifically reports `NoRoute` or
-`NoSegment`, the backend requests at most five nearby street candidates, sorts
-them by snap distance, and retries from the closest candidate within 500 m.
-The mobile client does not fetch or sort a road graph. Rescuer map responses
-include only the latest 300 GPS trail points. Deploy the backend changes for
-these fallback and response-size limits to take effect on the server.
-
-## Latest GitHub-published release — version 1.0.0, build 6
-=======
-## Latest verified local APK — version 1.0.0, build 39
-
-Local copy: [`releases/RESQPERATION-build39.apk`](./releases/RESQPERATION-build39.apk).
-
-- Download: **22,422,497 bytes**.
-- Package: `com.kathlnbarro.resqperationmobile`; version code **39**; not debuggable.
+- Download: **22,492,501 bytes**.
+- Package: `com.kathlnbarro.resqperationmobile`; version code **40**; not debuggable.
 - APK Signature Scheme v2 verification passed using the existing release certificate.
 - SHA-256:
-  `A95B50AE93F037CDC87AB4C6A4A03098D0FECA59B73A2491EA50291FC7664464`.
-- The rescuer’s native map now uses MapLibre instead of the embedded Leaflet map.
-  It draws only the selected evacuation-center road route, requested from the
-  rescuer’s current GPS position. Deploy the matching backend before using this
-  route button.
-- Foreground GPS samples every 5 seconds / 5 meters; background samples every
-  10 seconds / 10 meters. HQ uploads are limited to meaningful movement or a
-  60-second stationary heartbeat; road-route recalculation is limited to once
-  per minute and inaccurate fixes are not uploaded.
-- Type-check, focused GPS/map tests, backend route tests, production build, APK
-  identity and signature checks passed. The full mobile suite had 73 passing
-  tests and four unrelated `householdAlerts` test-fixture failures. Physical
-  device performance and live routing still need to be checked on target phones.
+  `88E0F8951C7A029ABBC0BC15EA02E0EB23E4E7EFB58743FFFC1BFD51C519DA98`.
+- Evacuation-center vehicle routes now use the same OSRM road-routing service as
+  dispatch routes; successful center routes are cached locally and reused when
+  the rescuer's origin and center destination remain nearby. The backend change
+  must be deployed for this routing behavior to be available.
+- The MapLibre map is released while its screen is unfocused; route rendering is
+  capped at 800 points on the center map and 1,200 points in dispatch
+  navigation. GPS sampling and HQ uploads remain movement/time limited. Route
+  refresh requests are cancelled when navigation is left.
+- TypeScript checks, focused map/cache/GPS tests, rescuer/household login-flow
+  tests, backend login/navigation tests, production APK build, and APK identity
+  and signing-certificate verification passed. Physical device performance and
+  live routing still need to be checked on target phones.
 
 ## Historical GitHub release — version 1.0.0, build 6
 

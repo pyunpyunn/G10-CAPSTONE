@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\Api\MobileNavigationController;
 use App\Services\Navigation\MobileNavigationService;
+use App\Services\Shared\RoutingService;
 use App\Services\Shared\ValhallaRoutingService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
@@ -140,8 +141,10 @@ class MobileNavigationServiceTest extends TestCase
             'status' => 'active',
         ]);
 
-        $routing = \Mockery::mock(ValhallaRoutingService::class);
-        $routing->shouldReceive('routeBetween')
+        $roadRouting = \Mockery::mock(RoutingService::class);
+        $roadRouting->shouldNotReceive('drivingRoute');
+        $walkingRouting = \Mockery::mock(ValhallaRoutingService::class);
+        $walkingRouting->shouldReceive('routeBetween')
             ->once()
             ->with(
                 ['latitude' => 10.29, 'longitude' => 123.88, 'profile' => 'pedestrian'],
@@ -156,13 +159,67 @@ class MobileNavigationServiceTest extends TestCase
         ]);
         $request->setUserResolver(fn () => (object) ['user_id' => 'rescuer-5']);
 
-        $response = app(MobileNavigationController::class)->evacuationCenterRoadRoute($request, 'EC-1', $routing);
+        $response = app(MobileNavigationController::class)->evacuationCenterRoadRoute($request, 'EC-1', $roadRouting, $walkingRouting);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('encoded-route', $response->getData(true)['data']['polyline6']);
         $this->assertSame('EC-1', $response->getData(true)['data']['evacuation_center_id']);
         $this->assertSame('Evacuation site', $response->getData(true)['data']['destination_label']);
         $this->assertSame('ready', $response->getData(true)['data']['status']);
+    }
+
+    public function test_vehicle_evacuation_center_route_uses_the_same_osrm_service_as_dispatch_routes(): void
+    {
+        Schema::create('responders', function (Blueprint $table): void {
+            $table->integer('responder_id');
+            $table->string('user_id');
+            $table->integer('team_id');
+        });
+        DB::table('responders')->insert(['responder_id' => 5, 'user_id' => 'rescuer-5', 'team_id' => 7]);
+        DB::table('evacuation_centers')->insert([
+            'evacuation_center_id' => 'EC-1',
+            'name' => 'Evacuation site',
+            'latitude' => 10.3,
+            'longitude' => 123.9,
+            'status' => 'active',
+        ]);
+        $roadRouting = \Mockery::mock(RoutingService::class);
+        $roadRouting->shouldReceive('drivingRoute')
+            ->once()
+            ->with(10.29, 123.88, 10.3, 123.9)
+            ->andReturn([
+                'coordinates' => [
+                    ['lat' => 10.29, 'lng' => 123.88],
+                    ['lat' => 10.3, 'lng' => 123.9],
+                ],
+                'steps' => [['instruction' => 'Turn onto the access road', 'polyline_index' => 1]],
+                'distance_km' => 1.25,
+                'duration_min' => 4,
+            ]);
+        $walkingRouting = \Mockery::mock(ValhallaRoutingService::class);
+        $walkingRouting->shouldNotReceive('routeBetween');
+        $request = Request::create('/api/v1/rescuer/evacuation-centers/EC-1/route', 'POST', [
+            'latitude' => 10.29,
+            'longitude' => 123.88,
+            'profile' => 'auto',
+        ]);
+        $request->setUserResolver(fn () => (object) ['user_id' => 'rescuer-5']);
+
+        $response = app(MobileNavigationController::class)->evacuationCenterRoadRoute($request, 'EC-1', $roadRouting, $walkingRouting);
+        $data = $response->getData(true)['data'];
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('auto', $data['profile']);
+        $this->assertSame('EC-1', $data['evacuation_center_id']);
+        $this->assertSame(1250, $data['distance_m']);
+        $this->assertSame(240, $data['duration_s']);
+        $this->assertSame(
+            \App\Support\NavigationPolyline::encode([
+                ['latitude' => 10.29, 'longitude' => 123.88],
+                ['latitude' => 10.3, 'longitude' => 123.9],
+            ]),
+            $data['polyline6'],
+        );
     }
 
     private function createBootstrapTables(): void

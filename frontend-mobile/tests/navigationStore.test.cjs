@@ -117,6 +117,27 @@ test('a failed database initialization can be retried without restarting or clea
   assert.equal(fixture.opens(), 2);
 });
 
+test('evacuation-center routes persist independently from refreshed team navigation snapshots', async (t) => {
+  const { store } = storeFixture(t);
+  const route = { polyline6: 'encoded-road-route', distance_m: 450, duration_s: 80, status: 'ready' };
+  const origin = { latitude: 10.29, longitude: 123.88 };
+  const destination = { latitude: 10.3, longitude: 123.9 };
+
+  await store.saveBootstrap(snapshot('initial'));
+  await store.saveCachedCenterRoute('EC-1', 'auto', origin, destination, route);
+  await store.saveBootstrap(snapshot('refresh'));
+
+  const cached = await store.getCachedCenterRoute('EC-1', 'auto');
+  assert.equal(cached.route.polyline6, route.polyline6);
+  assert.equal(cached.route.distance_m, route.distance_m);
+  assert.equal(cached.origin.latitude, origin.latitude);
+  assert.equal(cached.origin.longitude, origin.longitude);
+  assert.equal(cached.destination.latitude, destination.latitude);
+  assert.equal(cached.destination.longitude, destination.longitude);
+  assert.equal(cached.centerId, 'EC-1');
+  assert.equal(await store.getCachedCenterRoute('EC-1', 'pedestrian'), null);
+});
+
 test('numeric account identity and switching accounts preserve and isolate pending trip events', async (t) => {
   const { store } = storeFixture(t);
   await store.navigationMetadata('owner', '123');
