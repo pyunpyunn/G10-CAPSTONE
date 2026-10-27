@@ -499,6 +499,35 @@ class AuthApiTest extends TestCase
         $this->assertDatabaseMissing('household_password_recovery_otps', ['user_id' => $user->user_id]);
     }
 
+    public function test_sms_code_requests_allow_three_sends_then_return_a_friendly_cooldown(): void
+    {
+        config([
+            'services.sms_gateway.base_url' => 'https://sms.test',
+            'services.sms_gateway.username' => 'test-user',
+            'services.sms_gateway.password' => 'test-password',
+        ]);
+        Http::fake(['sms.test/*' => Http::response(['id' => 'sms-test-cooldown'], 200)]);
+
+        $payload = [
+            'login' => 'HH-OTP-001',
+            'contact_number' => '09171234512',
+        ];
+
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            $this->postJson('/api/v1/auth/password-recovery/household/send-code', $payload)
+                ->assertOk()
+                ->assertJsonPath('message', 'A password reset code was sent by SMS.');
+        }
+
+        $this->postJson('/api/v1/auth/password-recovery/household/send-code', $payload)
+            ->assertOk()
+            ->assertJsonPath('cooldown', true)
+            ->assertJsonPath('message', 'Please wait before requesting another verification code.')
+            ->assertJsonPath('cooldown_seconds', 60);
+
+        Http::assertSentCount(3);
+    }
+
     public function test_household_otp_is_required_and_limited_to_five_attempts(): void
     {
         config([

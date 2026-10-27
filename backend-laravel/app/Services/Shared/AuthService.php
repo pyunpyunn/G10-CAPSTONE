@@ -356,13 +356,6 @@ class AuthService
             return response()->json(['message' => 'Password recovery is not configured. Run the latest database migration.'], 503);
         }
 
-        $existing = DB::table('household_password_recovery_otps')
-            ->where('user_id', $details['user']->user_id)
-            ->first(['sent_at']);
-        if ($existing && now()->lt(\Illuminate\Support\Carbon::parse($existing->sent_at)->addSeconds(60))) {
-            return response()->json(['message' => 'Please wait before requesting another code.'], 429);
-        }
-
         $code = (string) random_int(100000, 999999);
         $smsMessage = "Your ResQperation password reset code is {$code}. It expires in 10 minutes.";
         $smsProviders = [];

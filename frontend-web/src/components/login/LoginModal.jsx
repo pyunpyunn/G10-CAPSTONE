@@ -27,10 +27,30 @@ export default function LoginModal({ onClose, onLogin }) {
   const [recoveryError, setRecoveryError] = useState('')
   const [recoveryNotice, setRecoveryNotice] = useState('')
   const [codeSent, setCodeSent] = useState(false)
+  const [sendCooldownSeconds, setSendCooldownSeconds] = useState(0)
   const [showPassword, setShowPassword] = useState(false)
   const dialog = useRef(null)
   const currentForm = useRef(form)
   const checkVersion = useRef(0)
+  const sendAttempts = useRef(0)
+  const sendInFlight = useRef(false)
+
+  useEffect(() => {
+    if (sendCooldownSeconds <= 0) {
+      sendAttempts.current = 0
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setSendCooldownSeconds(seconds => Math.max(0, seconds - 1))
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [sendCooldownSeconds])
+
+  function resetSendCooldown() {
+    sendAttempts.current = 0
+    setSendCooldownSeconds(0)
+  }
 
   useEffect(() => {
     const previous = document.activeElement
@@ -80,6 +100,7 @@ export default function LoginModal({ onClose, onLogin }) {
     checkVersion.current += 1
     setForm(next)
     if (recovering && event.target.name === 'login') {
+      resetSendCooldown()
       setMaskedContact('')
       setValidatedContact('')
       setCodeSent(false)
@@ -116,6 +137,7 @@ export default function LoginModal({ onClose, onLogin }) {
   }
 
   function updateContact(event) {
+    resetSendCooldown()
     setContactNumber(event.target.value)
     setValidatedContact('')
     setCodeSent(false)
@@ -154,20 +176,37 @@ export default function LoginModal({ onClose, onLogin }) {
   }
 
   async function requestCode() {
+    if (sendInFlight.current || sendCooldownSeconds > 0) return
     if (!validatedContact || validatedContact !== contactNumber.trim()) {
       setRecoveryError('Verify your registered phone number before requesting a code.')
       return
     }
+    sendInFlight.current = true
+    const attempt = ++sendAttempts.current
+    if (attempt >= 3) setSendCooldownSeconds(60)
     setBusy(true)
     setRecoveryError('')
     setRecoveryNotice('')
     try {
-      await sendHouseholdRecoveryCode(currentForm.current.login.trim(), validatedContact)
+      const response = await sendHouseholdRecoveryCode(currentForm.current.login.trim(), validatedContact)
+      if (response.cooldown) {
+        setSendCooldownSeconds(Math.max(1, Number(response.cooldown_seconds) || 60))
+        setRecoveryNotice('Please wait before requesting another verification code.')
+        return
+      }
       setCodeSent(true)
-      setRecoveryNotice('A verification code was sent by SMS. You can request another code if it does not arrive.')
+      setRecoveryNotice(attempt >= 3
+        ? 'A verification code was sent. Please wait one minute before requesting another code.'
+        : 'A verification code was sent by SMS.')
     } catch (failure) {
-      setRecoveryError(errorMessage(failure))
+      if (failure?.response?.status === 429) {
+        setSendCooldownSeconds(60)
+        setRecoveryNotice('Please wait one minute before requesting another verification code.')
+      } else {
+        setRecoveryError(errorMessage(failure))
+      }
     } finally {
+      sendInFlight.current = false
       setBusy(false)
     }
   }
@@ -247,6 +286,7 @@ export default function LoginModal({ onClose, onLogin }) {
     setNewPassword('')
     setConfirmation('')
     setCodeSent(false)
+    resetSendCooldown()
     if (currentForm.current.login.trim()) void lookupAccount()
   }
 
@@ -304,11 +344,13 @@ export default function LoginModal({ onClose, onLogin }) {
               disabled={!maskedContact || busy}
               required
             />
-            {validatedContact && <button className="login-recovery-button" type="button" onClick={() => { void requestCode() }} disabled={busy}>
-              {busy ? 'Please wait...' : 'Get code via SMS'}
+            {validatedContact && !codeSent && <button className="login-recovery-button" type="button" onClick={() => { void requestCode() }} disabled={busy || sendCooldownSeconds > 0}>
+              {busy ? 'Please wait...' : sendCooldownSeconds > 0 ? `Try again in ${sendCooldownSeconds}s` : 'Get code via SMS'}
             </button>}
             {codeSent && <>
-              <button className="login-recovery-resend" type="button" onClick={() => { void requestCode() }} disabled={busy}>Get code</button>
+              <button className="login-recovery-resend" type="button" onClick={() => { void requestCode() }} disabled={busy || sendCooldownSeconds > 0}>
+                {sendCooldownSeconds > 0 ? `Try again in ${sendCooldownSeconds}s` : 'Get code'}
+              </button>
               <input
                 type="text"
                 inputMode="numeric"

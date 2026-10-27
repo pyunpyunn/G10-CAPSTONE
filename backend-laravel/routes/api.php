@@ -85,7 +85,7 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/password-recovery/household/validate-contact', [AuthController::class, 'validateHouseholdRecoveryContact'])
         ->middleware('throttle:10,1');
     Route::post('/auth/password-recovery/household/send-code', [AuthController::class, 'sendHouseholdRecoveryCode'])
-        ->middleware('throttle:3,1');
+        ->middleware('throttle:otp-send');
     Route::post('/auth/password-recovery/household/reset', [AuthController::class, 'resetHouseholdPassword'])
         ->middleware('throttle:5,1,password-change');
 
