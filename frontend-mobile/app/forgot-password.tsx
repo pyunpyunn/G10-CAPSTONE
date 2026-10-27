@@ -154,9 +154,12 @@ export default function ForgotPasswordScreen() {
         return;
       }
       setCodeSent(true);
+      const deliveryMessage = response.delivery_channel === 'push'
+        ? 'A verification code was sent to your registered ResQperation app.'
+        : 'A verification code was sent by SMS.';
       setRequestError(attempt >= 3
-        ? 'A verification code was sent. Please wait one minute before requesting another code.'
-        : 'A verification code was sent by SMS.');
+        ? `${deliveryMessage} Please wait one minute before requesting another code.`
+        : deliveryMessage);
     } catch (error: any) {
       if (error?.response?.status === 429) {
         setSendCooldownSeconds(60);
@@ -173,7 +176,7 @@ export default function ForgotPasswordScreen() {
   async function handleResetPassword() {
     setRequestError('');
     if (!/^\d{6}$/.test(code)) {
-      setRequestError('Enter the 6-digit code from the SMS.');
+      setRequestError('Enter the 6-digit code from your notification or SMS.');
       return;
     }
     if (password.length < 8 || password.length > 128) {
@@ -279,7 +282,7 @@ export default function ForgotPasswordScreen() {
                     <Ionicons name="chatbubble-ellipses-outline" size={19} color="#fff" />
                     <Text style={styles.buttonText}>{sendCooldownSeconds > 0
                       ? `Try again in ${sendCooldownSeconds}s`
-                      : 'Get code via SMS'}</Text>
+                      : 'Send recovery code'}</Text>
                   </>
                 )}
               </Pressable>
@@ -297,7 +300,7 @@ export default function ForgotPasswordScreen() {
                     : 'Get code'}</Text>
                 </Pressable>
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>SMS verification code</Text>
+                  <Text style={styles.label}>Verification code</Text>
                   <View style={styles.inputShell}>
                     <Ionicons name="shield-checkmark-outline" size={19} color={palette.navMuted} />
                     <TextInput
@@ -308,7 +311,7 @@ export default function ForgotPasswordScreen() {
                       placeholder="Enter 6-digit code"
                       placeholderTextColor={palette.navMuted}
                       keyboardType="number-pad"
-                      autoComplete="sms-otp"
+                      autoComplete="one-time-code"
                       textContentType="oneTimeCode"
                       maxLength={6}
                     />

@@ -195,9 +195,12 @@ export default function LoginModal({ onClose, onLogin }) {
         return
       }
       setCodeSent(true)
+      const deliveryMessage = response.delivery_channel === 'push'
+        ? 'A verification code was sent to your registered ResQperation app.'
+        : 'A verification code was sent by SMS.'
       setRecoveryNotice(attempt >= 3
-        ? 'A verification code was sent. Please wait one minute before requesting another code.'
-        : 'A verification code was sent by SMS.')
+        ? `${deliveryMessage} Please wait one minute before requesting another code.`
+        : deliveryMessage)
     } catch (failure) {
       if (failure?.response?.status === 429) {
         setSendCooldownSeconds(60)
@@ -247,7 +250,7 @@ export default function LoginModal({ onClose, onLogin }) {
     setRecoveryError('')
     try {
       if (recovering) {
-        if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit code from the SMS.')
+        if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit code from your notification or SMS.')
         if (newPassword.length < 8 || newPassword.length > 128) throw new Error('Your new password must contain 8 to 128 characters.')
         if (newPassword !== confirmation) throw new Error('The new passwords do not match.')
         const response = await resetHouseholdPassword({
@@ -345,7 +348,7 @@ export default function LoginModal({ onClose, onLogin }) {
               required
             />
             {validatedContact && !codeSent && <button className="login-recovery-button" type="button" onClick={() => { void requestCode() }} disabled={busy || sendCooldownSeconds > 0}>
-              {busy ? 'Please wait...' : sendCooldownSeconds > 0 ? `Try again in ${sendCooldownSeconds}s` : 'Get code via SMS'}
+              {busy ? 'Please wait...' : sendCooldownSeconds > 0 ? `Try again in ${sendCooldownSeconds}s` : 'Send recovery code'}
             </button>}
             {codeSent && <>
               <button className="login-recovery-resend" type="button" onClick={() => { void requestCode() }} disabled={busy || sendCooldownSeconds > 0}>
@@ -357,8 +360,8 @@ export default function LoginModal({ onClose, onLogin }) {
                 autoComplete="one-time-code"
                 value={code}
                 onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="6-digit SMS code"
-                aria-label="SMS verification code"
+                placeholder="6-digit verification code"
+                aria-label="Verification code"
                 maxLength={6}
                 disabled={busy}
                 required

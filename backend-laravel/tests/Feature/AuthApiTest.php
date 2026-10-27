@@ -15,6 +15,10 @@ class AuthApiTest extends TestCase
     {
         parent::setUp();
 
+        if (Schema::hasTable('device_tokens')) {
+            DB::table('device_tokens')->delete();
+        }
+
         if (! Schema::hasTable('roles')) {
             Schema::create('roles', function (Blueprint $table) {
                 $table->increments('role_id');
@@ -556,7 +560,7 @@ class AuthApiTest extends TestCase
         $this->assertTrue(Hash::check('old-password', \App\Models\User::findOrFail('USR-HOUSEHOLD-OTP-001')->password));
     }
 
-    public function test_password_recovery_does_not_use_onesignal_without_semaphore_or_gateway(): void
+    public function test_password_recovery_requires_a_push_device_or_sms_provider(): void
     {
         config([
             'services.sms_gateway.base_url' => '',
@@ -573,13 +577,96 @@ class AuthApiTest extends TestCase
             'contact_number' => '09171234512',
         ])->assertStatus(503)->assertJsonPath(
             'message',
-            'SMS delivery is not configured. Start the Android SMS Gateway local server and configure its URL and credentials, or configure a Semaphore API key.'
+            'No push notification was accepted, and SMS fallback is not configured. Enable app notifications or configure an SMS provider.'
         );
 
         Http::assertNothingSent();
         $this->assertDatabaseMissing('household_password_recovery_otps', [
             'user_id' => 'USR-HOUSEHOLD-OTP-001',
         ]);
+    }
+
+    public function test_password_recovery_sends_code_to_the_registered_app_before_using_sms(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        config([
+            'services.sms_gateway.base_url' => '',
+            'services.sms_gateway.username' => '',
+            'services.sms_gateway.password' => '',
+            'services.semaphore.api_key' => '',
+            'services.onesignal.app_id' => 'test-app-id',
+            'services.onesignal.api_key' => 'test-api-key',
+            'services.onesignal.base_url' => 'https://onesignal.test',
+        ]);
+        Schema::dropIfExists('device_tokens');
+        Schema::create('device_tokens', function (Blueprint $table): void {
+            $table->string('player_id');
+            $table->string('user_id');
+            $table->string('platform');
+            $table->string('push_provider');
+            $table->string('notification_permission_status');
+            $table->boolean('is_active');
+        });
+        DB::table('device_tokens')->insert([
+            'player_id' => 'household-recovery-device',
+            'user_id' => 'USR-HOUSEHOLD-OTP-001',
+            'platform' => 'android',
+            'push_provider' => 'onesignal',
+            'notification_permission_status' => 'granted',
+            'is_active' => true,
+        ]);
+        DB::table('device_tokens')->insert([
+            'player_id' => 'another-account-device',
+            'user_id' => 'USR-OTHER-ACCOUNT',
+            'platform' => 'android',
+            'push_provider' => 'onesignal',
+            'notification_permission_status' => 'granted',
+            'is_active' => true,
+        ]);
+        DB::table('household_password_recovery_otps')
+            ->where('user_id', 'USR-HOUSEHOLD-OTP-001')
+            ->delete();
+        Http::fake(['onesignal.test/*' => Http::response(['id' => 'push-recovery-otp'], 200)]);
+
+        $this->postJson('/api/v1/auth/password-recovery/household/send-code', [
+            'login' => 'HH-OTP-001',
+            'contact_number' => '09171234512',
+        ])->assertOk()
+            ->assertJsonPath('delivery_channel', 'push')
+            ->assertJsonPath('message', 'A password reset code was sent to your registered ResQperation app.');
+
+        Http::assertSent(fn ($request): bool =>
+            str_contains($request->url(), 'onesignal.test/notifications')
+            && $request['include_subscription_ids'] === ['household-recovery-device']
+            && $request['headings']['en'] === 'Password reset code'
+            && preg_match('/code is (\d{6})/', $request['contents']['en']) === 1
+            && ($request['data']['type'] ?? null) === 'password_recovery_otp'
+        );
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'sms'));
+
+        $sentCode = null;
+        Http::assertSent(function ($request) use (&$sentCode): bool {
+            if (! str_contains($request->url(), 'onesignal.test/notifications')) return false;
+            preg_match('/code is (\d{6})/', $request['contents']['en'], $matches);
+            $sentCode = $matches[1] ?? null;
+            return $sentCode !== null;
+        });
+        $recovery = DB::table('household_password_recovery_otps')
+            ->where('user_id', 'USR-HOUSEHOLD-OTP-001')
+            ->first();
+        $this->assertTrue(Hash::check($sentCode, $recovery->code_hash));
+
+        $this->postJson('/api/v1/auth/password-recovery/household/reset', [
+            'login' => 'HH-OTP-001',
+            'contact_number' => '09171234512',
+            'code' => $sentCode,
+            'password' => 'new-push-password',
+            'password_confirmation' => 'new-push-password',
+        ])->assertOk();
+        $this->assertTrue(Hash::check(
+            'new-push-password',
+            DB::table('users')->where('user_id', 'USR-HOUSEHOLD-OTP-001')->value('password')
+        ));
     }
 
     public function test_password_recovery_sends_the_same_otp_through_semaphore_and_stores_only_its_hash(): void
@@ -685,7 +772,7 @@ class AuthApiTest extends TestCase
         $this->assertTrue(Hash::check($sentCode, $recovery->code_hash));
     }
 
-    public function test_gateway_rejection_is_reported_instead_of_using_onesignal(): void
+    public function test_gateway_rejection_is_reported_when_no_push_device_is_registered(): void
     {
         $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
         config([
