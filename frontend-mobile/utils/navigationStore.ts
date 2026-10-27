@@ -59,6 +59,18 @@ async function database() {
             center_id TEXT PRIMARY KEY NOT NULL,
             payload_json TEXT NOT NULL
           );
+          CREATE TABLE IF NOT EXISTS center_route_cache (
+            center_id TEXT NOT NULL,
+            profile TEXT NOT NULL,
+            origin_latitude REAL NOT NULL,
+            origin_longitude REAL NOT NULL,
+            destination_latitude REAL NOT NULL,
+            destination_longitude REAL NOT NULL,
+            route_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (center_id, profile)
+          );
+          CREATE INDEX IF NOT EXISTS center_route_cache_updated_idx ON center_route_cache(updated_at);
           CREATE TABLE IF NOT EXISTS outbox (
             client_event_id TEXT PRIMARY KEY NOT NULL,
             type TEXT NOT NULL,
@@ -188,6 +200,50 @@ async function getLocalTeamStored(): Promise<any | null> {
   const db = await database();
   const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM metadata WHERE key = ?', 'team');
   return row?.value ? JSON.parse(row.value) : null;
+}
+
+async function getCachedCenterRouteStored(centerId: string, profile: 'auto' | 'pedestrian') {
+  const db = await database();
+  const row = await db.getFirstAsync<{
+    center_id: string;
+    profile: 'auto' | 'pedestrian';
+    origin_latitude: number;
+    origin_longitude: number;
+    destination_latitude: number;
+    destination_longitude: number;
+    route_json: string;
+    updated_at: string;
+  }>('SELECT * FROM center_route_cache WHERE center_id = ? AND profile = ?', centerId, profile);
+  if (!row) return null;
+  return {
+    centerId: row.center_id,
+    profile: row.profile,
+    origin: { latitude: Number(row.origin_latitude), longitude: Number(row.origin_longitude) },
+    destination: { latitude: Number(row.destination_latitude), longitude: Number(row.destination_longitude) },
+    route: JSON.parse(row.route_json),
+    updatedAt: row.updated_at,
+  };
+}
+
+async function saveCachedCenterRouteStored(
+  centerId: string,
+  profile: 'auto' | 'pedestrian',
+  origin: { latitude: number; longitude: number },
+  destination: { latitude: number; longitude: number },
+  route: Record<string, unknown>,
+) {
+  if (!centerId || !Number.isFinite(origin.latitude) || !Number.isFinite(origin.longitude)
+    || !Number.isFinite(destination.latitude) || !Number.isFinite(destination.longitude)) {
+    throw new Error('Cannot cache an evacuation-center route with invalid coordinates.');
+  }
+  const db = await database();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO center_route_cache
+      (center_id, profile, origin_latitude, origin_longitude, destination_latitude, destination_longitude, route_json, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    centerId, profile, origin.latitude, origin.longitude, destination.latitude, destination.longitude,
+    JSON.stringify(route), new Date().toISOString(),
+  );
 }
 
 async function getLocalNavigationSnapshotStored() {
@@ -429,6 +485,8 @@ export const saveBootstrap = serializeStoreOperation(saveBootstrapStored);
 export const getBootstrapCursor = serializeStoreOperation(getBootstrapCursorStored);
 export const getActivePack = serializeStoreOperation(getActivePackStored);
 export const getLocalTeam = serializeStoreOperation(getLocalTeamStored);
+export const getCachedCenterRoute = serializeStoreOperation(getCachedCenterRouteStored);
+export const saveCachedCenterRoute = serializeStoreOperation(saveCachedCenterRouteStored);
 export const getLocalNavigationSnapshot = serializeStoreOperation(getLocalNavigationSnapshotStored);
 export const queueOutboxEvent = serializeStoreOperation(queueOutboxEventStored);
 export const getPendingOutboxEvents = serializeStoreOperation(getPendingOutboxEventsStored);
