@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getToken } from './token.js'
+import { assertApiDestination } from './requestSecurity.js'
 import { installReduxTransport, invalidateApiState, invalidateTransportCache, resetApiState } from '../state/apiStore.js'
 
 function getApiBaseUrl() {
@@ -57,6 +58,7 @@ window.addEventListener('focus', () => invalidateTransportCache())
 window.addEventListener('personnel-access:changed', () => invalidateApiState(['/auth/', '/profile', '/rescuers']))
 
 api.interceptors.request.use((config) => {
+  assertApiDestination(api.getUri(config), api.defaults.baseURL, window.location.href, import.meta.env.PROD)
   const token = getToken()
 
   if (token) {

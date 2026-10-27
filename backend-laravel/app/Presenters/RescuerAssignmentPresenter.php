@@ -13,14 +13,7 @@ class RescuerAssignmentPresenter
 
     public function statusLabel(string $status): string
     {
-        return match ($status) {
-            'accepted' => 'Accepted',
-            'en_route' => 'En route',
-            'on_scene' => 'On-scene',
-            'completed' => 'Completed',
-            'cancelled' => 'Cancelled',
-            default => 'Dispatched',
-        };
+        return app(\App\Queries\DispatchStatusQuery::class)->label($status) ?? ucwords(str_replace('_', ' ', $status));
     }
 
     public function summary(Collection $assignments): array
@@ -29,7 +22,7 @@ class RescuerAssignmentPresenter
             'total_assignments' => $assignments->count(),
             'active_assignments' => $assignments->filter(fn (object $assignment): bool => in_array(
                 $this->statusKey($assignment->status ?? 'dispatched'),
-                ['accepted', 'dispatched', 'en_route', 'on_scene'],
+                app(\App\Queries\DispatchStatusQuery::class)->keys(true),
                 true,
             ))->count(),
             'completed_assignments' => $assignments->filter(fn (object $assignment): bool => $this->statusKey($assignment->status ?? null) === 'completed')->count(),
