@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Responder;
 use App\Models\Household;
 use App\Queries\AuthAccountQuery;
+use App\Services\OneSignalNotificationService;
 use App\Services\Shared\SmsGatewayService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -26,6 +27,7 @@ class AuthService
         private AuthAccountQuery $accounts,
         private SmsGatewayService $smsGateway,
         private SemaphoreSmsService $semaphore,
+        private OneSignalNotificationService $oneSignal,
     ) {}
     private const RECOVERY_QUESTIONS = [
         'first_pet' => "What was your first pet's name?",
@@ -357,29 +359,41 @@ class AuthService
         }
 
         $code = (string) random_int(100000, 999999);
-        $smsMessage = "Your ResQperation password reset code is {$code}. It expires in 10 minutes.";
-        $smsProviders = [];
-        $smsProviders[] = fn (): array => $this->smsGateway->sendDirectSms($details['contact_number'], $smsMessage);
-        if ($this->semaphore->isConfigured()) {
-            $smsProviders[] = fn (): array => $this->semaphore->sendDirectSms($details['contact_number'], $smsMessage);
-        }
-        $sms = null;
-        $lastFailure = null;
-        foreach ($smsProviders as $sendSms) {
-            $smsResult = $sendSms();
-            if ($smsResult['status'] === 'accepted') {
-                $sms = $smsResult;
-                break;
-            }
-            if ($smsResult['status'] !== 'not_configured') {
-                $lastFailure = $smsResult;
-            }
-        }
-        if ($sms === null) {
-            $message = $lastFailure['message']
-                ?? 'SMS delivery is not configured. Start the Android SMS Gateway local server and configure its URL and credentials, or configure a Semaphore API key.';
+        $deliveryMessage = "Your ResQperation password reset code is {$code}. It expires in 10 minutes.";
+        $push = $this->oneSignal->sendToMobileDevices(
+            'Password reset code',
+            $deliveryMessage,
+            [
+                'platforms' => ['android', 'ios'],
+                'user_ids' => [(string) $details['user']->user_id],
+                'data' => ['type' => 'password_recovery_otp'],
+            ]
+        );
+        $deliveryChannel = (int) ($push['sent_count'] ?? 0) > 0 ? 'push' : null;
 
-            return response()->json(['message' => $message], 503);
+        if ($deliveryChannel === null) {
+            $smsProviders = [];
+            $smsProviders[] = fn (): array => $this->smsGateway->sendDirectSms($details['contact_number'], $deliveryMessage);
+            if ($this->semaphore->isConfigured()) {
+                $smsProviders[] = fn (): array => $this->semaphore->sendDirectSms($details['contact_number'], $deliveryMessage);
+            }
+            $lastFailure = null;
+            foreach ($smsProviders as $sendSms) {
+                $smsResult = $sendSms();
+                if ($smsResult['status'] === 'accepted') {
+                    $deliveryChannel = 'sms';
+                    break;
+                }
+                if ($smsResult['status'] !== 'not_configured') {
+                    $lastFailure = $smsResult;
+                }
+            }
+            if ($deliveryChannel === null) {
+                $message = $lastFailure['message']
+                    ?? 'No push notification was accepted, and SMS fallback is not configured. Enable app notifications or configure an SMS provider.';
+
+                return response()->json(['message' => $message], 503);
+            }
         }
 
         DB::table('household_password_recovery_otps')->updateOrInsert(
@@ -395,7 +409,12 @@ class AuthService
             ]
         );
 
-        return response()->json(['message' => 'A password reset code was sent by SMS.']);
+        return response()->json([
+            'message' => $deliveryChannel === 'push'
+                ? 'A password reset code was sent to your registered ResQperation app.'
+                : 'A password reset code was sent by SMS.',
+            'delivery_channel' => $deliveryChannel,
+        ]);
     }
 
     public function resetHouseholdPassword(Request $request): JsonResponse

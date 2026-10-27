@@ -1,6 +1,17 @@
 # Standalone Android APK
 
-## Latest local APK — version 2.0.0, build 47
+## Latest local APK — version 2.0.0, build 48
+
+Installable file: [`releases/RESQPERATION-build48.apk`](./releases/RESQPERATION-build48.apk).
+
+- 22,585,189 bytes; version code 48; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `A122086CE09A0E7F8540151C9B923D1E3023844067B6065CC9256FD5C0625E7A`.
+- Password recovery now reports whether its code was sent by OneSignal push or SMS. Backend delivery targets active Android/iOS subscriptions registered to the account first, then falls back to the Android SMS Gateway and Semaphore. The Laravel backend change must be deployed and OneSignal configured for push recovery to work.
+- Mobile TypeScript check, mobile recovery-screen lint, web recovery-screen lint, and backend auth tests (29 tests, 179 assertions) passed.
+- Android production build, APK identity and release-signature verification passed. Build 48 retains the existing signing identity so it updates earlier builds without uninstalling.
+- Physical-device push/SMS delivery and password recovery remain to be verified.
+
+## Previous local APK — version 2.0.0, build 47
 
 Installable file: [`releases/RESQPERATION-build47.apk`](./releases/RESQPERATION-build47.apk).
 
