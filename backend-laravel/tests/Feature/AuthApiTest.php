@@ -245,6 +245,22 @@ class AuthApiTest extends TestCase
         ])->assertConflict();
     }
 
+    public function test_device_bound_rescuer_tokens_cannot_use_legacy_routes_without_the_device_identifier(): void
+    {
+        $login = $this->postJson('/api/v1/mobile/login', [
+            'login' => 'BDRRM-SAR-001',
+            'password' => 'password',
+            'device_uuid' => 'device-rescuer-bound',
+        ])->assertOk();
+
+        $this->withToken($login->json('token'))
+            ->getJson('/api/v1/rescuer/overview')
+            ->assertForbidden()
+            ->assertJson([
+                'message' => 'The device identifier does not match this access token.',
+            ]);
+    }
+
     private function passwordChangePayload(): array
     {
         return ['login' => 'BDRRM-SAR-001', 'current_password' => 'password',

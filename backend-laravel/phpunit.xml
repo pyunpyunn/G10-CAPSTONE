@@ -26,6 +26,7 @@
         <env name="REALTIME_DURABLE" value="false" force="true"/>
         <env name="REALTIME_READ_CACHE" value="false" force="true"/>
         <env name="CACHE_STORE" value="array"/>
+        <env name="API_RATE_LIMIT_STORE" value="array" force="true"/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>

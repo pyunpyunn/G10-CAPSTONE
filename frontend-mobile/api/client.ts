@@ -3,6 +3,7 @@ import { firstSuccessful } from '@/utils/networkScheduling';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
+import { normalizeApiServerUrl as normalizeServerUrl } from '@/utils/normalizeApiServerUrl';
 import { installReduxTransport, resetApiState } from '@/state/apiStore';
 
 const tokenKey = 'resqperation_mobile_token';
@@ -48,14 +49,7 @@ export async function setApiServerUrl(value: string) {
 }
 
 function normalizeApiServerUrl(value: string) {
-  const parsed = new URL(value.trim());
-  if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) {
-    throw new Error('Enter a server URL beginning with https://, without passwords or query parameters.');
-  }
-  let path = parsed.pathname.replace(/\/+$/, '');
-  if (!path) path = '/api/v1';
-  if (!path.endsWith('/api/v1')) throw new Error('The server address must end with /api/v1.');
-  return `${parsed.origin}${path}`;
+  return normalizeServerUrl(value, !__DEV__);
 }
 
 function getApiBaseUrl() {
@@ -93,9 +87,10 @@ async function getApiServerCandidates() {
   }
 
   const uniqueConfigured = [...new Set(configured)];
-  const savedUrl = await getStoredItem(serverUrlKey);
-  if (!savedUrl || uniqueConfigured.includes(savedUrl)) return uniqueConfigured;
-  return [savedUrl, ...uniqueConfigured];
+  const savedUrl = (await getStoredItem(serverUrlKey))?.trim();
+  const normalizedSavedUrl = savedUrl ? normalizeApiServerUrl(savedUrl) : null;
+  if (!normalizedSavedUrl || uniqueConfigured.includes(normalizedSavedUrl)) return uniqueConfigured;
+  return [normalizedSavedUrl, ...uniqueConfigured];
 }
 
 function ngrokHeaders(url: string) {

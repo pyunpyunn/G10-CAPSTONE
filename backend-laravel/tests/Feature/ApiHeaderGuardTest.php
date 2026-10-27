@@ -53,4 +53,28 @@ class ApiHeaderGuardTest extends TestCase
         $request = Request::create('https://api.resqperation.test/api/v1/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'text/plain'], 'malformed');
         $this->assertSame(415, app(GuardApiHeaders::class)->handle($request, fn () => response('unexpected'))->getStatusCode());
     }
+
+    public function test_invalid_future_timer_is_recovered_without_disabling_rate_limits(): void
+    {
+        config(['api_security.requests_per_minute' => 1]);
+        $limiter = new \Illuminate\Cache\RateLimiter(\Illuminate\Support\Facades\Cache::store('array'));
+        $key = 'api-edge:'.hash('sha256', '127.0.0.1');
+        $limiter->hit($key, 60 * 60 * 24 * 60);
+
+        $this->assertSame(200, $this->check());
+        $this->assertLessThanOrEqual(60, $limiter->availableIn($key));
+        $this->assertSame(429, $this->check());
+    }
+
+    public function test_valid_limit_expires_after_one_minute(): void
+    {
+        config(['api_security.requests_per_minute' => 1]);
+        $this->assertSame(200, $this->check());
+        $this->assertSame(429, $this->check());
+
+        $this->travel(61)->seconds();
+        $this->assertSame(200, $this->check());
+        $this->assertSame(429, $this->check());
+        $this->travelBack();
+    }
 }

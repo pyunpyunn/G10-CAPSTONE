@@ -16,9 +16,20 @@ $env:RESQ_ANDROID_VERSION_CODE = "$VersionCode"
 $env:RESQ_ANDROID_CXX_DIR = Join-Path (Split-Path $AndroidSdk -Parent) 'cxx'
 $env:CI = '1'
 $env:NODE_ENV = 'production'
+$env:RESQ_ANDROID_RELEASE = '1'
 Push-Location $project
 try {
     $production = (Get-Content eas.json -Raw | ConvertFrom-Json).build.production.env
+    $apiUrls = @($production.EXPO_PUBLIC_API_BASE_URL) + @($production.EXPO_PUBLIC_API_FALLBACK_URLS -split ',' | Where-Object { $_ })
+    if (!$production.RESQ_ANDROID_RELEASE -or !$production.EXPO_PUBLIC_API_BASE_URL) {
+        throw 'Release configuration must enable secure Android release settings and provide an HTTPS API URL.'
+    }
+    foreach ($apiUrl in $apiUrls) {
+        $parsedApiUrl = $null
+        if (![Uri]::TryCreate($apiUrl.Trim(), [UriKind]::Absolute, [ref]$parsedApiUrl) -or $parsedApiUrl.Scheme -ne 'https' -or !$parsedApiUrl.AbsolutePath.TrimEnd('/').EndsWith('/api/v1')) {
+            throw "Release API URLs must use HTTPS and end with /api/v1: $apiUrl"
+        }
+    }
     $production.PSObject.Properties | ForEach-Object { [Environment]::SetEnvironmentVariable($_.Name, $_.Value, 'Process') }
     & npx.cmd expo prebuild --platform android --no-install
     if ($LASTEXITCODE -ne 0) { throw 'Android prebuild failed.' }
@@ -65,8 +76,12 @@ android {
     if (!$expectedCertificate -or $actualCertificate -ine $expectedCertificate) { throw 'APK does not match the existing release certificate.' }
     $metadata = & "$AndroidSdk\build-tools\36.0.0\aapt.exe" dump badging $output
     if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect APK metadata.' }
-    if (!($metadata -match "package: name='com.kathlnbarro.resqperationmobile' versionCode='$VersionCode'")) { throw 'Unexpected APK identity or version code.' }
+    $expectedVersion = (Get-Content app.json -Raw | ConvertFrom-Json).expo.version
+    if (!($metadata -match "package: name='com.kathlnbarro.resqperationmobile' versionCode='$VersionCode' versionName='$([regex]::Escape($expectedVersion))'")) { throw 'Unexpected APK identity or version.' }
     if ($metadata -match '^application-debuggable') { throw 'APK is debuggable.' }
+    $manifest = & "$AndroidSdk\build-tools\36.0.0\aapt.exe" dump xmltree $output AndroidManifest.xml
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect the APK manifest.' }
+    if ($manifest -match 'android:usesCleartextTraffic.*\(type 0x12\)0xffffffff') { throw 'Release APK allows cleartext network traffic.' }
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
     try {
         $digest = [BitConverter]::ToString($sha256.ComputeHash([System.IO.File]::ReadAllBytes($output))).Replace('-', '')

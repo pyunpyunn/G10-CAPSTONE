@@ -9,11 +9,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureBoundMobileDevice
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string ...$modes): Response
     {
         $user = $request->user();
         $token = $user?->currentAccessToken();
         $tokenName = is_string($token?->name ?? null) ? $token->name : '';
+
+        if (in_array('if-bound', $modes, true) && ! str_starts_with($tokenName, 'mobile-device:')) {
+            return $next($request);
+        }
 
         if (! $user || ! str_starts_with($tokenName, 'mobile-device:')) {
             return response()->json(['message' => 'A device-bound mobile token is required.'], 401);
