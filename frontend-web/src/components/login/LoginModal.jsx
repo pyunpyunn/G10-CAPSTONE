@@ -13,6 +13,8 @@ import {
 } from '../../api/authApi'
 import ResQperationLogo from '../layout/ResQperationLogo'
 
+const RECOVERY_RESEND_COOLDOWN_SECONDS = 5 * 60
+
 export default function LoginModal({ onClose, onLogin }) {
   const [recovering, setRecovering] = useState(false)
   const [rememberPassword, setRememberPassword] = useState(() => Boolean(getRememberedLogin()))
@@ -32,25 +34,16 @@ export default function LoginModal({ onClose, onLogin }) {
   const dialog = useRef(null)
   const currentForm = useRef(form)
   const checkVersion = useRef(0)
-  const sendAttempts = useRef(0)
   const sendInFlight = useRef(false)
 
   useEffect(() => {
-    if (sendCooldownSeconds <= 0) {
-      sendAttempts.current = 0
-      return
-    }
+    if (sendCooldownSeconds <= 0) return
 
     const timer = setTimeout(() => {
       setSendCooldownSeconds(seconds => Math.max(0, seconds - 1))
     }, 1000)
     return () => clearTimeout(timer)
   }, [sendCooldownSeconds])
-
-  function resetSendCooldown() {
-    sendAttempts.current = 0
-    setSendCooldownSeconds(0)
-  }
 
   useEffect(() => {
     const previous = document.activeElement
@@ -100,7 +93,6 @@ export default function LoginModal({ onClose, onLogin }) {
     checkVersion.current += 1
     setForm(next)
     if (recovering && event.target.name === 'login') {
-      resetSendCooldown()
       setMaskedContact('')
       setValidatedContact('')
       setCodeSent(false)
@@ -137,7 +129,6 @@ export default function LoginModal({ onClose, onLogin }) {
   }
 
   function updateContact(event) {
-    resetSendCooldown()
     setContactNumber(event.target.value)
     setValidatedContact('')
     setCodeSent(false)
@@ -182,30 +173,32 @@ export default function LoginModal({ onClose, onLogin }) {
       return
     }
     sendInFlight.current = true
-    const attempt = ++sendAttempts.current
-    if (attempt >= 3) setSendCooldownSeconds(60)
+    setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS)
     setBusy(true)
     setRecoveryError('')
     setRecoveryNotice('')
     try {
       const response = await sendHouseholdRecoveryCode(currentForm.current.login.trim(), validatedContact)
       if (response.cooldown) {
-        setSendCooldownSeconds(Math.max(1, Number(response.cooldown_seconds) || 60))
+        setSendCooldownSeconds(Math.max(
+          RECOVERY_RESEND_COOLDOWN_SECONDS,
+          Number(response.cooldown_seconds) || 0
+        ))
         setRecoveryNotice('Please wait before requesting another verification code.')
         return
       }
       setCodeSent(true)
-      const deliveryMessage = response.delivery_channel === 'push'
-        ? 'A verification code was sent to your registered ResQperation app.'
-        : 'A verification code was sent by SMS.'
-      setRecoveryNotice(attempt >= 3
-        ? `${deliveryMessage} Please wait one minute before requesting another code.`
-        : deliveryMessage)
+      setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS)
+      const deliveryMessage = response.delivery_channel === 'onesignal_sms'
+        ? 'OneSignal accepted your SMS code request.'
+        : 'The SMS fallback provider accepted your code request.'
+      setRecoveryNotice(`${deliveryMessage} Delivery can take a few minutes. Check your SMS inbox and wait before requesting another code; a new request replaces this code.`)
     } catch (failure) {
       if (failure?.response?.status === 429) {
-        setSendCooldownSeconds(60)
-        setRecoveryNotice('Please wait one minute before requesting another verification code.')
+        setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS)
+        setRecoveryNotice('Please wait before requesting another verification code.')
       } else {
+        setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS)
         setRecoveryError(errorMessage(failure))
       }
     } finally {
@@ -289,8 +282,13 @@ export default function LoginModal({ onClose, onLogin }) {
     setNewPassword('')
     setConfirmation('')
     setCodeSent(false)
-    resetSendCooldown()
     if (currentForm.current.login.trim()) void lookupAccount()
+  }
+
+  function recoveryCooldownLabel() {
+    const minutes = Math.floor(sendCooldownSeconds / 60)
+    const seconds = String(sendCooldownSeconds % 60).padStart(2, '0')
+    return `${minutes}:${seconds}`
   }
 
   function passwordField() {
@@ -348,11 +346,11 @@ export default function LoginModal({ onClose, onLogin }) {
               required
             />
             {validatedContact && !codeSent && <button className="login-recovery-button" type="button" onClick={() => { void requestCode() }} disabled={busy || sendCooldownSeconds > 0}>
-              {busy ? 'Please wait...' : sendCooldownSeconds > 0 ? `Try again in ${sendCooldownSeconds}s` : 'Send recovery code'}
+              {busy ? 'Please wait...' : sendCooldownSeconds > 0 ? `Wait ${recoveryCooldownLabel()}` : 'Send recovery code'}
             </button>}
             {codeSent && <>
               <button className="login-recovery-resend" type="button" onClick={() => { void requestCode() }} disabled={busy || sendCooldownSeconds > 0}>
-                {sendCooldownSeconds > 0 ? `Try again in ${sendCooldownSeconds}s` : 'Get code'}
+                {sendCooldownSeconds > 0 ? `Resend in ${recoveryCooldownLabel()}` : 'Get code'}
               </button>
               <input
                 type="text"
