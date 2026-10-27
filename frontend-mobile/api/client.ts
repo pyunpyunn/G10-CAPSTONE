@@ -1,5 +1,4 @@
 import axios, { CanceledError, create, isAxiosError, isCancel } from 'axios';
-import { firstSuccessful } from '@/utils/networkScheduling';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
@@ -76,21 +75,22 @@ function getApiBaseUrl() {
 }
 
 async function getApiServerCandidates() {
-  const configured = (process.env.EXPO_PUBLIC_API_FALLBACK_URLS || '')
+  const fallbacks = (process.env.EXPO_PUBLIC_API_FALLBACK_URLS || '')
     .split(',')
     .map((url) => url.trim())
     .filter(Boolean)
     .map((url) => normalizeApiServerUrl(url));
   const baseUrl = getApiBaseUrl();
-  if (baseUrl) {
-    configured.push(normalizeApiServerUrl(baseUrl));
-  }
+  const configured = [
+    ...(baseUrl ? [normalizeApiServerUrl(baseUrl)] : []),
+    ...fallbacks,
+  ];
 
   const uniqueConfigured = [...new Set(configured)];
   const savedUrl = (await getStoredItem(serverUrlKey))?.trim();
   const normalizedSavedUrl = savedUrl ? normalizeApiServerUrl(savedUrl) : null;
   if (!normalizedSavedUrl || uniqueConfigured.includes(normalizedSavedUrl)) return uniqueConfigured;
-  return [normalizedSavedUrl, ...uniqueConfigured];
+  return [...uniqueConfigured, normalizedSavedUrl];
 }
 
 function ngrokHeaders(url: string) {
@@ -110,19 +110,22 @@ async function selectReadyServer(forceCheck = false, excludedUrls: string[] = []
     const candidates = (await getApiServerCandidates()).filter((url) => !excluded.has(url));
     let databaseUnavailable = false;
     try {
-      const url: string = await firstSuccessful(candidates.map((candidate) => async (signal: AbortSignal) => {
+      let url: string | null = null;
+      for (const candidate of candidates) {
         try {
           const response = await axios.get(`${candidate}/health/ready`, {
-            timeout: serverProbeTimeoutMs, signal,
+            timeout: serverProbeTimeoutMs,
             headers: { Accept: 'application/json', ...ngrokHeaders(candidate) },
           });
           if (response.data?.status !== 'ready') throw new Error('Server is not ready.');
-          return candidate;
+          url = candidate;
+          break;
         } catch (error) {
+          if (isCancel(error)) throw error;
           if (isAxiosError(error) && error.response?.status === 503) databaseUnavailable = true;
-          throw error;
         }
-      }));
+      }
+      if (!url) throw new Error('No configured API route is ready.');
       if (generation !== serverSelectionGeneration) throw new CanceledError('The server configuration changed.');
       activeServerUrl = url;
       activeServerCheckedAt = Date.now();

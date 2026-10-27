@@ -1,6 +1,17 @@
 # Standalone Android APK
 
-## Latest local APK — version 2.0.0, build 45
+## Latest local APK — version 2.0.0, build 46
+
+Installable file: [`releases/RESQPERATION-build46.apk`](./releases/RESQPERATION-build46.apk).
+
+- 22,584,069 bytes; version code 46; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `BBE7B084B0799504E92CBF56B609E16019DAAF2F9985C21495FA787B861BAAB0`.
+- API routes are checked in order: the configured ngrok base URL first, followed by any configured HTTPS fallbacks. Ngrok is currently the only configured route.
+- Mobile TypeScript checks and all seven focused transport tests passed. Android production build, APK identity and signing-certificate verification passed.
+- Backend authentication feature tests passed (27 tests, 159 assertions). Accounts with unsupported legacy password values now receive password-reset guidance instead of an HTTP 500; those accounts must reset their password before they can sign in.
+- Physical-device installation and login remain to be verified.
+
+## Previous local APK — version 2.0.0, build 45
 
 Installable file: [`releases/RESQPERATION-build45.apk`](./releases/RESQPERATION-build45.apk).
 
@@ -112,16 +123,17 @@ npm run build:android:store
 
 ## API hosting
 
-**Updated:** See [automatic API connection fallback](./TAILSCALE_LAN.md). New
-APK builds check ngrok, Tailscale, then LAN for a ready Laravel API. The ngrok
-tunnel must be started on the backend computer; the computer and Laravel must
-stay online. The backend's Laravel `.env` chooses its database, so all routes
-must reach that same backend and database. Do not expose the database port.
+**Updated:** See [automatic API connection fallback](./TAILSCALE_LAN.md). Build
+21 contains API readiness probing, but its production configuration includes
+only the ngrok URL; it has no configured Tailscale or LAN fallback. The mobile
+client now probes the base URL first, followed by fallback URLs in the order
+listed in `EXPO_PUBLIC_API_FALLBACK_URLS`.
 
-The current release APK does not contain automatic fallback; build and install
-a new APK for this behavior. The fallback URLs are configured in
-`EXPO_PUBLIC_API_FALLBACK_URLS` in `eas.json`. Update them if the ngrok domain,
-Tailscale address, or LAN IP changes. Never embed Laravel secrets or the
+The current Tailscale Serve feature is disabled by the tailnet administrator,
+and the backend has no HTTPS listener on its LAN address. Release APKs reject
+HTTP API URLs. Add these routes only after valid, phone-trusted HTTPS endpoints
+are available and tested. All routes must reach the same Laravel backend and
+database. Never expose the database port or embed Laravel secrets or the
 OneSignal REST API key into the app.
 
 ## OneSignal
