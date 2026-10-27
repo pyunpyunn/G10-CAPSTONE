@@ -1,4 +1,4 @@
-import { createElement, useCallback, useEffect, useRef } from 'react';
+import { createElement, useCallback, useEffect, useMemo, useRef } from 'react';
 import { mobileLeafletHtml, type LeafletPoint, type LeafletRoute } from '@/utils/mobileLeafletHtml';
 
 export function MobileLeafletMap({ markers, routes, center, height = 340, geotagPicker = false, geotagMode = 'drag', selectedPoint, onMapPress, onPinMoving }: {
@@ -10,7 +10,14 @@ export function MobileLeafletMap({ markers, routes, center, height = 340, geotag
   onPinMoving?: () => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const html = geotagPicker ? mobileLeafletHtml({ markers: [], routes: [], geotagPicker: true, geotagMode }) : mobileLeafletHtml({ markers, routes, center });
+  const initialMap = useRef<string | null>(null);
+  if (initialMap.current === null) initialMap.current = mobileLeafletHtml({ markers, routes, center, interactive: !!onMapPress });
+  const html = useMemo(() => geotagPicker ? mobileLeafletHtml({ markers: [], routes: [], geotagPicker: true, geotagMode }) : initialMap.current!, [geotagPicker, geotagMode]);
+  const layers = useMemo(() => ({ type: 'updateRescueData', markers, routes }), [markers, routes]);
+  const updateLayers = useCallback(() => {
+    if (!geotagPicker) frame.current?.contentWindow?.postMessage(layers, '*');
+  }, [geotagPicker, layers]);
+  useEffect(updateLayers, [updateLayers]);
   const latitude = selectedPoint?.latitude, longitude = selectedPoint?.longitude;
   const updatePin = useCallback(() => {
     if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
@@ -31,7 +38,7 @@ export function MobileLeafletMap({ markers, routes, center, height = 340, geotag
     return () => window.removeEventListener('message', receive);
   }, [onMapPress, onPinMoving]);
   return createElement('iframe', {
-    ref: frame, title: 'Household location map', srcDoc: html, onLoad: updatePin,
+    ref: frame, title: 'Household location map', srcDoc: html, onLoad: () => { updateLayers(); updatePin(); },
     style: { width: '100%', height, border: 0, borderRadius: 8, backgroundColor: '#e8eef0' },
   });
 }

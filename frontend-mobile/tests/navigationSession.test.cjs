@@ -7,6 +7,7 @@ const ts = require('typescript');
 function fixture(api) {
   const writes = [];
   const mocks = {
+    './rescuerLiveLocation': { subscribeRescuerPosition() {} },
     'expo-location': {}, 'expo-task-manager': { defineTask() {} },
     'expo-network': { async getNetworkStateAsync() { return { isConnected: true }; } },
     'react-native': { AppState: {} }, '@/api/client': { api },
@@ -50,4 +51,17 @@ test('a navigation refresh started before logout cannot write into the next acco
   resolveOverview({ data: { data: { assignments: [{ assignment_id: 12 }] } } });
   await refreshing;
   assert.equal(writes.length, 0);
+});
+
+test('navigation bootstrap starts while the overview is still loading', async () => {
+  const requests = []; let finish;
+  const overview = new Promise(resolve => { finish = resolve; });
+  const { runtime } = fixture({ get(url) {
+    requests.push(url);
+    return url === '/rescuer/overview' ? overview : Promise.resolve({ data: { data: {} } });
+  } });
+  const pending = runtime.refreshNavigation();
+  assert.deepEqual(requests, ['/rescuer/overview', '/mobile/bootstrap']);
+  finish({ data: { data: {} } });
+  await pending;
 });

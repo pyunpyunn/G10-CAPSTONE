@@ -70,6 +70,7 @@ function getApiBaseUrl() {
   }
 
   if (!__DEV__ && Platform.OS !== 'web') return '';
+  if (Platform.OS === 'web' && typeof window !== 'undefined') return `${window.location.origin}/api/v1`;
 
   const expoHost = getExpoHost();
 

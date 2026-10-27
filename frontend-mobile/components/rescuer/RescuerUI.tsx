@@ -9,10 +9,11 @@ type ButtonProps = {
   icon?: keyof typeof Ionicons.glyphMap;
   tone?: 'primary' | 'light' | 'danger';
   disabled?: boolean;
+  loading?: boolean;
   onPress: () => void;
 };
 
-export function ActionButton({ label, icon, tone = 'primary', disabled = false, onPress }: ButtonProps) {
+export function ActionButton({ label, icon, tone = 'primary', disabled = false, loading = false, onPress }: ButtonProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
 
@@ -30,9 +31,11 @@ export function ActionButton({ label, icon, tone = 'primary', disabled = false, 
       onPressOut={() => setIsPressed(false)}
       onHoverIn={() => setIsHovered(true)}
       onHoverOut={() => setIsHovered(false)}
-      disabled={disabled}
+      disabled={disabled || loading}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      android_ripple={{ color: '#ffffff33' }}
     >
-      {icon ? <Ionicons name={icon} size={17} color={tone === 'light' ? palette.nav : '#fff'} /> : null}
+      {loading ? <ActivityIndicator size="small" color={tone === 'light' ? palette.nav : '#fff'} /> : icon ? <Ionicons name={icon} size={17} color={tone === 'light' ? palette.nav : '#fff'} /> : null}
       <Text style={[styles.buttonText, tone === 'light' && styles.lightText]}>{label}</Text>
     </Pressable>
   );

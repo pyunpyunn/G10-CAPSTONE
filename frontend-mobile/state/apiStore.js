@@ -74,6 +74,8 @@ export function installReduxTransport(client) {
     if (method !== 'get') {
       const response = await adapter(config)
       if (session !== store.getState().serverData.session) throw new CanceledError('The account session changed.')
+      // Route calculations use POST but do not mutate household or form data.
+      if (/\/route$/.test(path)) return response
       store.dispatch(cache.actions.wrote())
       // Frequent location and radio heartbeats must not evict unrelated forms.
       invalidateApiState(/\/location$|device-location$/.test(path) ? ['map/', '/route', '/dispatch']

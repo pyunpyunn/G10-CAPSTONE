@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as Network from 'expo-network';
 import { useIsFocused } from '@react-navigation/native';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,6 +8,7 @@ import { api } from '@/api/client';
 import { useMapGps } from '@/hooks/useMapGps';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getActivePack, getCachedCenterRoute, saveCachedCenterRoute } from '@/utils/navigationStore';
+import { navigationPackStatus } from '@/utils/navigationPacks';
 import { decodePolyline6, downsampleRouteCoordinates, type Coordinate } from '@/utils/routeGeometry';
 import { ActionButton, EmptyState, SectionHeader } from './RescuerUI';
 
@@ -46,8 +48,8 @@ export function RescueMapScreen({
   onOpenNavigation,
 }: RescueMapProps) {
   const isFocused = useIsFocused();
-  const [tracking, setTracking] = useState(true);
-  const { position, error: gpsError } = useMapGps(tracking && isFocused, !activeAssignment?.assignment_id);
+  const [tracking, setTracking] = useState(false);
+  const { position, error: gpsError } = useMapGps(tracking && isFocused, !activeAssignment?.assignment_id, true);
   const [selectedCenterId, setSelectedCenterId] = useState<string | null>(null);
   const [routePoints, setRoutePoints] = useState<Coordinate[]>([]);
   const [cachedRoute, setCachedRoute] = useState<CachedRoute>(null);
@@ -90,8 +92,10 @@ export function RescueMapScreen({
 
   useEffect(() => {
     let active = true;
-    void getActivePack().then((pack) => {
-      if (active && pack?.style_url) setMapStyle(pack.style_url);
+    void Promise.all([getActivePack(), navigationPackStatus(), Network.getNetworkStateAsync()]).then(([pack, status, network]) => {
+      // Do not replace a visible online map with a stale pack's remote style.
+      const offline = network.isConnected === false || network.isInternetReachable === false;
+      if (active && offline && status?.state === 'complete' && pack?.style_url) setMapStyle(pack.style_url);
     }).catch((error) => {
       console.error('Saved MapLibre style could not be loaded.', error);
     });
@@ -164,7 +168,7 @@ export function RescueMapScreen({
 
   async function routeToSelectedCenter() {
     if (!selectedCenter || !position) {
-      setRouteError('Waiting for a usable GPS fix before routing.');
+      setRouteError('No saved GPS position yet. Tap Follow GPS once to save your location, then retry.');
       return;
     }
     if (position.accuracy_m != null && position.accuracy_m > 75) {
@@ -199,7 +203,7 @@ export function RescueMapScreen({
       const saved = { centerId, profile: 'auto' as const, origin, destination, route, updatedAt: new Date().toISOString() };
       setCachedRoute(saved);
       setRoutePoints(coordinates);
-      setRouteSource('Current road route');
+      setRouteSource(tracking ? 'Current road route' : 'Road route from last saved GPS');
       void saveCachedCenterRoute(centerId, 'auto', origin, destination, route).catch((error) => {
         console.error('Evacuation-center route could not be saved for offline reuse.', error);
       });
@@ -224,7 +228,54 @@ export function RescueMapScreen({
     setTracking((value) => !value);
   }
 
-  const initialViewState = { center: initialCenter, zoom: position ? 15 : 12 };
+  const initialViewState = useRef({ center: initialCenter, zoom: position ? 15 : 12 }).current;
+  const onMapReady = useCallback(() => setMapReady(true), []);
+  const onMapFailure = useCallback(() => {
+    if (mapStyle !== streetStyle) setMapStyle(streetStyle);
+    else setRouteError('Map tiles could not load. Check your connection and retry.');
+  }, [mapStyle]);
+  const assignmentLatitude = focusedAssignment?.latitude;
+  const assignmentLongitude = focusedAssignment?.longitude;
+  const assignmentId = focusedAssignment?.assignment_id;
+  const positionLatitude = position?.latitude;
+  const positionLongitude = position?.longitude;
+  const mapCanvas = useMemo(() => isFocused ? (
+    <View collapsable={false} style={styles.map}>
+      <Map
+        style={StyleSheet.absoluteFill}
+        androidView="texture"
+        preferredFramesPerSecond={30}
+        mapStyle={mapStyle}
+        onDidFinishLoadingMap={onMapReady}
+        onDidFailLoadingMap={onMapFailure}
+      >
+        <Camera ref={camera} initialViewState={initialViewState} />
+        {routeFeature.geometry.coordinates.length > 1 ? (
+          <GeoJSONSource id="evacuation-center-route" data={routeFeature}>
+            <Layer id="evacuation-center-route-line" type="line" paint={{ 'line-color': palette.navActive, 'line-width': 5 }} />
+          </GeoJSONSource>
+        ) : null}
+        {visibleCenters.map((center: any, index: number) => (
+          <Marker key={String(center.evacuation_center_id || center.center_id || index)} lngLat={[Number(center.longitude), Number(center.latitude)]}>
+            <View style={[styles.centerMarker, selectedCenterId === String(center.evacuation_center_id || center.center_id) && styles.selectedCenterMarker]}>
+              <Ionicons name="business" size={13} color="#fff" />
+            </View>
+          </Marker>
+        ))}
+        {assignmentLatitude != null && assignmentLongitude != null
+          && Number.isFinite(Number(assignmentLatitude)) && Math.abs(Number(assignmentLatitude)) <= 90
+          && Number.isFinite(Number(assignmentLongitude)) && Math.abs(Number(assignmentLongitude)) <= 180 ? (
+            <Marker key={assignmentId} lngLat={[Number(assignmentLongitude), Number(assignmentLatitude)]}>
+              <View style={styles.assignmentMarker}><Ionicons name="alert" size={14} color="#fff" /></View>
+            </Marker>
+          ) : null}
+        {positionLatitude != null && positionLongitude != null ? (
+          <Marker lngLat={[positionLongitude, positionLatitude]}><View style={styles.gpsMarker} /></Marker>
+        ) : null}
+      </Map>
+    </View>
+  ) : null, [isFocused, mapStyle, onMapReady, onMapFailure, initialViewState, routeFeature, visibleCenters,
+    selectedCenterId, assignmentId, assignmentLatitude, assignmentLongitude, positionLatitude, positionLongitude]);
 
   return (
     <View style={styles.stack}>
@@ -291,6 +342,7 @@ export function RescueMapScreen({
               </Pressable>
             ) : null}
             {!!routeSource && <Text style={styles.rowMeta}>{routeSource}</Text>}
+            {!tracking && position && <Text style={styles.rowMeta}>Using last saved device GPS. Tap Follow GPS to update your position.</Text>}
           </View>
         </View>
 
@@ -301,51 +353,7 @@ export function RescueMapScreen({
           </View>
         ) : null}
 
-        {isFocused ? (
-          <View style={styles.map}>
-            <Map
-              style={StyleSheet.absoluteFill}
-              mapStyle={mapStyle}
-              onDidFinishLoadingMap={() => setMapReady(true)}
-            >
-              <Camera ref={camera} initialViewState={initialViewState} />
-              {routePoints.length > 1 ? (
-                <GeoJSONSource id="evacuation-center-route" data={routeFeature}>
-                  <Layer
-                    id="evacuation-center-route-line"
-                    type="line"
-                    paint={{ 'line-color': palette.navActive, 'line-width': 5 }}
-                  />
-                </GeoJSONSource>
-              ) : null}
-              {visibleCenters.map((center: any, index: number) => (
-                <Marker
-                  key={String(center.evacuation_center_id || center.center_id || index)}
-                  lngLat={[Number(center.longitude), Number(center.latitude)]}
-                >
-                  <View style={[
-                    styles.centerMarker,
-                    selectedCenterId === String(center.evacuation_center_id || center.center_id) && styles.selectedCenterMarker,
-                  ]}>
-                    <Ionicons name="business" size={13} color="#fff" />
-                  </View>
-                </Marker>
-              ))}
-              {focusedAssignment && Number.isFinite(Number(focusedAssignment.longitude)) && Number.isFinite(Number(focusedAssignment.latitude)) ? (
-                <Marker key={focusedAssignment.assignment_id} lngLat={[Number(focusedAssignment.longitude), Number(focusedAssignment.latitude)]}>
-                  <View style={styles.assignmentMarker}>
-                    <Ionicons name="alert" size={14} color="#fff" />
-                  </View>
-                </Marker>
-              ) : null}
-              {position ? (
-                <Marker lngLat={[position.longitude, position.latitude]}>
-                  <View style={styles.gpsMarker} />
-                </Marker>
-              ) : null}
-            </Map>
-          </View>
-        ) : null}
+        {mapCanvas}
         {activeAssignments.length === 0 ? (
           <EmptyState icon="location-outline" title="No active dispatch assignments" />
         ) : null}
@@ -358,7 +366,8 @@ function routeCoordinates(route: any): Coordinate[] {
   if (typeof route?.polyline6 === 'string') {
     try { return downsampleRouteCoordinates(decodePolyline6(route.polyline6), 800); } catch { return []; }
   }
-  const points = (route?.coordinates || [])
+  const points = (Array.isArray(route?.coordinates) ? route.coordinates : [])
+    .filter((point: any) => point != null)
     .map((point: any) => [
       Number(point.longitude ?? point.lng ?? point[0]),
       Number(point.latitude ?? point.lat ?? point[1]),

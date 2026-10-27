@@ -6,8 +6,8 @@ import { formatPhilippineDateTime } from '@/utils/time';
 import { getRescuerDispatchHistory } from '@/api/rescuer';
 import { ActionButton, EmptyState, SectionHeader, StatTile, StatusBadge } from './RescuerUI';
 
-type Props = { overview: any; onOpenMap: (assignment?: any) => void; onOpenReport: (assignment?: any) => void; onStatusChange: (id: number, status: string) => void };
-export function RescuerDashboardScreen({ overview, onOpenMap, onOpenReport, onStatusChange }: Props) {
+type Props = { overview: any; pendingAssignmentId?: number | null; onOpenMap: (assignment?: any) => void; onOpenReport: (assignment?: any) => void; onStatusChange: (id: number, status: string) => void };
+export function RescuerDashboardScreen({ overview, pendingAssignmentId, onOpenMap, onOpenReport, onStatusChange }: Props) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -34,6 +34,7 @@ export function RescuerDashboardScreen({ overview, onOpenMap, onOpenReport, onSt
   }, [historyOpen, page, revision]);
   function openHistory() { setHistory([]); setPage(1); setHistoryOpen(true); }
   const next = current?.status_key === 'dispatched' ? ['Accept','accepted'] : current?.status_key === 'accepted' ? ['En route','en_route'] : current?.status_key === 'en_route' ? ['Arrived','on_scene'] : null;
+  const updating = pendingAssignmentId != null && Number(pendingAssignmentId) === Number(current?.assignment_id);
   return <View style={styles.stack}>
     <View style={styles.identity}><View style={styles.flex}><Text style={styles.name}>{responder.full_name || overview?.profile?.user?.full_name || 'Rescuer'}</Text><Text style={styles.meta}>{responder.team_name || 'No team'}</Text></View><StatusBadge label={responder.duty_status || 'Standby'} tone={responder.duty_status} /></View>
     {overview?.active_event && <Text style={styles.event}>{overview.active_event.name}</Text>}
@@ -42,11 +43,11 @@ export function RescuerDashboardScreen({ overview, onOpenMap, onOpenReport, onSt
       <SectionHeader title="Current assignment" action={<StatusBadge label={current.status_label} tone={current.status_key} />} />
       <Text style={styles.household}>{household?.household_name || current.household_id}</Text>
       <View style={styles.info}><Text style={styles.meta}>Household <Text style={styles.data}>{current.household_id}</Text></Text><StatusBadge label={current.priority_level || 'medium'} tone={current.priority_level} /></View>
-      {next && <ActionButton label={next[0]} icon="navigate-outline" onPress={() => onStatusChange(current.assignment_id,next[1])} />}
+      {next && <ActionButton label={updating ? 'Updating…' : next[0]} loading={updating} icon="navigate-outline" onPress={() => onStatusChange(current.assignment_id,next[1])} />}
       <View style={styles.actions}>
         <TaskAction label="Map" icon="map-outline" onPress={() => onOpenMap(current)} />
         <TaskAction label="Field report" icon="document-text-outline" onPress={() => onOpenReport(current)} />
-        <TaskAction label="Complete household" icon="checkmark-circle-outline" primary onPress={() => onStatusChange(current.assignment_id,'completed')} />
+        <TaskAction label="Complete household" icon="checkmark-circle-outline" primary disabled={updating} onPress={() => onStatusChange(current.assignment_id,'completed')} />
       </View>
     </View> : <EmptyState icon="radio-outline" title="No current household" />}
     <View style={styles.card}>
@@ -66,8 +67,8 @@ export function RescuerDashboardScreen({ overview, onOpenMap, onOpenReport, onSt
     </View></View></Modal>
   </View>;
 }
-function TaskAction({ label, icon, primary, onPress }: { label: string; icon: keyof typeof Ionicons.glyphMap; primary?: boolean; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={[styles.task, primary && styles.primary]}><Ionicons name={icon} size={20} color={primary ? '#fff' : palette.navActive} /><Text style={[styles.taskText, primary && styles.white]} numberOfLines={2}>{label}</Text></Pressable>;
+function TaskAction({ label, icon, primary, disabled, onPress }: { label: string; icon: keyof typeof Ionicons.glyphMap; primary?: boolean; disabled?: boolean; onPress: () => void }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} android_ripple={{ color: '#236a7333' }} onPress={onPress} style={[styles.task, primary && styles.primary, disabled && { opacity: 0.5 }]}><Ionicons name={icon} size={20} color={primary ? '#fff' : palette.navActive} /><Text style={[styles.taskText, primary && styles.white]} numberOfLines={2}>{label}</Text></Pressable>;
 }
 const styles = StyleSheet.create({
   stack: { gap: spacing.md }, identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, flex: { flex: 1, minWidth: 0 }, name: { color: palette.text, fontSize: 20, fontWeight: '700' }, meta: { color: palette.textSoft, fontSize: 12, lineHeight: 18 }, event: { color: palette.text, fontSize: 14, fontWeight: '600' },

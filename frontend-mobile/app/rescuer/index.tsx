@@ -40,9 +40,10 @@ import { ActionButton, EmptyState, LoadingState } from '@/components/rescuer/Res
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
-import { configureRescuerTracking, stopRescuerTracking } from '@/utils/rescuerLiveLocation';
+import { configureRescuerTracking, stopRescuerTracking, trackingAssignmentFor } from '@/utils/rescuerLiveLocation';
 import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
 import { createAdaptivePoller } from '@/utils/networkScheduling';
+import { rescueActionGps } from '@/utils/rescueActionGps';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 const deviceUuidKey = 'resq_rescuer_device_uuid';
@@ -63,6 +64,8 @@ export default function RescuerHomeScreen() {
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const logoutPending = useRef(false);
+  const statusPending = useRef(false);
+  const [pendingAssignment, setPendingAssignment] = useState<number | null>(null);
   useEffect(() => Platform.OS === 'web' ? undefined : mountNavigationSync(), []);
 
 
@@ -119,7 +122,8 @@ export default function RescuerHomeScreen() {
     [assignments]
   );
 
-  const trackingAssignmentId = activeAssignment?.assignment_id || null;
+  const trackingAssignmentId = trackingAssignmentFor(activeAssignment);
+  const queueAssignmentId = activeAssignment?.assignment_id || null;
   useEffect(() => {
     if (Platform.OS === 'web') return;
     void configureRescuerTracking(trackingAssignmentId).catch((error) => {
@@ -128,12 +132,12 @@ export default function RescuerHomeScreen() {
     return () => { void stopRescuerTracking(); };
   }, [trackingAssignmentId]);
   useEffect(() => {
-    if (!trackingAssignmentId) return;
+    if (!queueAssignmentId) return;
     return createAdaptivePoller(
       () => AppState.currentState === 'active' ? loadOverview(true, true) : null,
-      { intervalMs: 15000, maxIntervalMs: 60000 },
+      { intervalMs: 30000, maxIntervalMs: 60000 },
     ).start();
-  }, [trackingAssignmentId, loadOverview]);
+  }, [queueAssignmentId, loadOverview]);
 
   async function handleLogout() {
     if (logoutPending.current) return;
@@ -150,6 +154,14 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleStatusChange(assignmentId: number, status: string) {
+    if (statusPending.current) return;
+    statusPending.current = true;
+    setPendingAssignment(assignmentId);
+    try { await performStatusChange(assignmentId, status); }
+    finally { statusPending.current = false; setPendingAssignment(null); }
+  }
+
+  async function performStatusChange(assignmentId: number, status: string) {
     let completionStatus: 'safe' | 'evacuated' | null = null;
     if (status === 'completed') {
       const current = assignments.find((item) => Number(item.assignment_id) === Number(assignmentId));
@@ -204,14 +216,11 @@ export default function RescuerHomeScreen() {
       return null;
     }
 
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
-    });
-
+    const location = await rescueActionGps();
     return {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-      accuracy_m: location.coords.accuracy,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      accuracy_m: location.accuracy_m,
     };
   }
 
@@ -273,7 +282,7 @@ export default function RescuerHomeScreen() {
     if (!overview) {
       return (
         <View style={styles.loadFailure}>
-          <EmptyState icon="cloud-offline-outline" title="Unable to load rescuer data" body={overviewError || 'Check your connection, then try again.'} />
+          <EmptyState icon="cloud-offline-outline" title="OFFLINE MODE" />
           <ActionButton label="Try again" icon="refresh-outline" onPress={() => { void loadOverview(); }} />
         </View>
       );
@@ -282,6 +291,7 @@ export default function RescuerHomeScreen() {
     if (activeTab === 'dashboard') {
       return (
         <RescuerDashboardScreen
+          pendingAssignmentId={pendingAssignment}
           overview={overview}
           onOpenMap={openMap}
           onOpenReport={openReport}
@@ -343,6 +353,7 @@ export default function RescuerHomeScreen() {
       />
 
       <ScrollView
+        removeClippedSubviews={false}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
@@ -367,6 +378,7 @@ export default function RescuerHomeScreen() {
               key={tab.key}
               style={[styles.tabButton, tab.special && styles.specialTab, isActive && styles.activeTab]}
               onPress={() => setActiveTab(tab.key)}
+              android_ripple={{ color: '#ffffff33' }}
             >
               <Ionicons
                 name={tab.icon}

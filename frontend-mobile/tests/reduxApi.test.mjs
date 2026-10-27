@@ -13,6 +13,17 @@ function response(config, data = { value: 1 }) {
   return { config, data, status: 200, statusText: 'OK', headers: {} }
 }
 
+test('calculating a route preserves cached screens and forms', async () => {
+  let reads = 0
+  const api = client(async config => { if (config.method === 'get') reads++; return response(config) })
+  await api.get('/rescuer/overview')
+  saveViewState('mobile:rescuer', { assignments: [] })
+  await api.post('/rescuer/evacuation-centers/center-1/route', { latitude: 10.29, longitude: 123.88 })
+  await api.get('/rescuer/overview')
+  assert.equal(reads, 1)
+  assert.ok(getViewState('mobile:rescuer'))
+})
+
 test('ten concurrent screen reads use one request and Redux serves subsequent reads', async () => {
   let calls = 0
   const api = client(async config => { calls++; await new Promise(resolve => setTimeout(resolve, 5)); return response(config) })

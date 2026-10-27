@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as Network from 'expo-network';
 import { AppState } from 'react-native';
+import { configureRescuerTracking, hasActiveRescuerTracking, subscribeRescuerPosition } from './rescuerLiveLocation';
 import { api } from '@/api/client';
 import { assignmentNavigationSnapshot } from './assignmentNavigationSnapshot';
 import { activeLocalTrip, addLocalTripPoint, acknowledgeOutbox, completeLocalTrip, createLocalTrip, getLocalTrip,
@@ -40,19 +41,28 @@ export function subscribeNavigationPosition(listener: (location: Location.Locati
   return () => { listeners.delete(listener); };
 }
 
+// Trip recording and HQ sharing consume the same native GPS service.
+subscribeRescuerPosition(async (location) => {
+  const generation = sessionGeneration;
+  await serial(async () => {
+    if (syncPaused || generation !== sessionGeneration) return;
+    const trip = await activeLocalTrip();
+    if (!trip || syncPaused || generation !== sessionGeneration) return;
+    await addLocalTripPoint(trip.localTripId, { ...location.coords, recordedAt: new Date(location.timestamp).toISOString() });
+    listeners.forEach(listener => listener(location));
+  });
+});
+
 export async function refreshNavigation() {
   if (syncPaused) return;
   const generation = sessionGeneration;
-  const overview = await api.get('/rescuer/overview');
-  let bootstrap: any = { pack: await getActivePack() };
-  try {
-    const response = await api.get('/mobile/bootstrap');
-    bootstrap = response.data.data;
-  } catch (error: any) {
-    // Ordinary rescuer sessions can view their own route. Keep offline packs and
-    // trip synchronization behind the existing device-bound authorization.
-    if (![401, 403].includes(error.response?.status)) lastNavigationError = error.userMessage || error.message;
-  }
+  const [overview, bootstrap] = await Promise.all([
+    api.get('/rescuer/overview'),
+    api.get('/mobile/bootstrap').then(response => response.data.data).catch(async (error: any) => {
+      if (![401, 403].includes(error.response?.status)) lastNavigationError = error.userMessage || error.message;
+      return { pack: await getActivePack() };
+    }),
+  ]);
   if (syncPaused || generation !== sessionGeneration) return;
   await saveBootstrap(assignmentNavigationSnapshot(overview.data.data, bootstrap));
 }
@@ -111,13 +121,9 @@ export async function startNavigationTrip(dispatchId: number, profile: 'auto' | 
     return createLocalTrip(dispatchId, profile, new Date().toISOString());
   });
   try {
-    await Location.startLocationUpdatesAsync(taskName, {
-      accuracy: Location.Accuracy.High, timeInterval: profile === 'pedestrian' ? 4000 : 3000,
-      distanceInterval: profile === 'pedestrian' ? 5 : 10,
-      pausesUpdatesAutomatically: true, activityType: profile === 'pedestrian' ? Location.ActivityType.Fitness : Location.ActivityType.AutomotiveNavigation,
-      showsBackgroundLocationIndicator: true,
-      foregroundService: { notificationTitle: 'RESQPERATION trip recording', notificationBody: 'Location is recorded during your active dispatch.', killServiceOnDestroy: false },
-    });
+    // Stop the separate recorder used by older builds before reusing live GPS.
+    if (await Location.hasStartedLocationUpdatesAsync(taskName)) await Location.stopLocationUpdatesAsync(taskName);
+    if (!hasActiveRescuerTracking(dispatchId)) await configureRescuerTracking(dispatchId);
   } catch (error) {
     await endNavigationTrip();
     throw error;
@@ -150,10 +156,16 @@ export function mountNavigationSync() {
   retryAfter = 0; failures = 0;
   syncMounts++;
   if (stopSync) return () => { if (--syncMounts === 0) { stopSync?.(); stopSync = null; } };
+  void Location.hasStartedLocationUpdatesAsync(taskName).then(async started => {
+    if (started) await Location.stopLocationUpdatesAsync(taskName);
+  }).catch(error => { lastNavigationError = error.message; });
   const foreground = AppState.addEventListener('change', (state) => {
     if (state === 'active') { void syncNavigation(); void refreshNavigation().catch(() => {}); }
   });
-  const timer = setInterval(() => { void activeLocalTrip().then((trip) => { if (trip) void syncNavigation(); }); }, 60000);
+  const timer = setInterval(() => {
+    void activeLocalTrip().then((trip) => { if (trip) void syncNavigation(); })
+      .catch(error => { lastNavigationError = error.message; });
+  }, 60000);
   void syncNavigation();
   void refreshNavigation().catch(() => {});
   stopSync = () => { foreground.remove(); clearInterval(timer); };

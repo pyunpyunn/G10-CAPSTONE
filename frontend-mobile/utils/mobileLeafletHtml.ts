@@ -183,6 +183,9 @@ export function mobileLeafletHtml({
         }
       });
     }
+    window.addEventListener('message', (event) => {
+      if (event.source === window.parent && event.data?.type === 'updateRescueData') window.updateRescueData?.(event.data);
+    });
     if (data.interactive && !data.geotagPicker) {
       map.on('click', (event) => {
         if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({

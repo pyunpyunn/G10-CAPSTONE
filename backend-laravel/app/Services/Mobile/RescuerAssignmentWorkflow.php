@@ -227,15 +227,15 @@ class RescuerAssignmentWorkflow
             }
             $logId = $this->saveResponderLocation($responder, $validated, $now);
             $this->routeWriter()->saveRouteCoordinate($assignmentId, $validated, $now);
-            RefreshResponderRoadRoute::dispatch($assignmentId, $validated)
-                ->onConnection('operations_outbox')->onQueue('operations');
+            if (!empty($validated['refresh_route'])) {
+                RefreshResponderRoadRoute::dispatch($assignmentId, $validated)
+                    ->onConnection('operations_outbox')->onQueue('operations');
+            }
             $this->updateResponderDuty($responder->responder_id, $responder->team_id, 'deployed');
             $this->support->writeAuditLog($request, 'mobile_location_update', 'responder_location_logs', (string) $logId, $validated);
         }, 3);
 
-        if (!empty($validated['refresh_route'])) $this->refreshPlannedRoadRoute($assignmentId, $validated);
         $route = $this->assignmentQuery->routeForAssignment($assignmentId, (int)$responder->responder_id);
-        if (!empty($validated['refresh_route']) && $route && (abs((float)$route->start_latitude - (float)$validated['latitude']) > 0.00002 || abs((float)$route->start_longitude - (float)$validated['longitude']) > 0.00002)) $route = null;
         return response()->json([
             'message' => 'Location updated.',
             'data' => ['route' => $route ? (new \App\Http\Resources\RescuerMobileRouteResource($route))->resolve($request) : null],

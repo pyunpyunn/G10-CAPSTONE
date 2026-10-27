@@ -12,6 +12,7 @@ import { api } from '@/api/client';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { configureRescuerTracking, hasActiveRescuerTracking, subscribeRescuerPosition } from '@/utils/rescuerLiveLocation';
 import { selectNavigationAssignment, selectAssignedRoute } from '@/utils/assignedNavigationRoute';
+import { useAppActive } from '@/hooks/useAppActive';
 
 const streetStyle = { version: 8 as const, sources: { osm: { type: 'raster' as const, tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '© OpenStreetMap contributors', maxzoom: 19 } }, layers: [{ id: 'streets', type: 'raster' as const, source: 'osm' }] };
 
@@ -21,6 +22,7 @@ const RouteLine = memo(function RouteLine({ points }: { points: Coordinate[] }) 
 });
 
 export default function OfflineNavigationScreen() {
+  const appActive = useAppActive();
   const { dispatchId } = useLocalSearchParams<{ dispatchId?: string }>();
   const [chosenDispatch, setChosenDispatch] = useState(dispatchId || '');
   const [showSettings, setShowSettings] = useState(false);
@@ -31,6 +33,7 @@ export default function OfflineNavigationScreen() {
   const [route, setRoute] = useState<any>(null), [trip, setTrip] = useState<LocalTrip | null>(null);
   const [message, setMessage] = useState(''), [guidance, setGuidance] = useState('');
   const [remaining, setRemaining] = useState(0), [distance, setDistance] = useState(0), [mapReady, setMapReady] = useState(false);
+  useEffect(() => { if (!appActive) setMapReady(false); }, [appActive]);
   const [busy, setBusy] = useState(false), [packMessage, setPackMessage] = useState('Map has not been downloaded.');
   const camera = useRef<CameraRef>(null), marker = useRef<MarkerRef>(null);
   const [gpsFix, setGpsFix] = useState<LocationObject | null>(null);
@@ -48,7 +51,7 @@ export default function OfflineNavigationScreen() {
 
   async function load() {
     const [data, manifest, active] = await Promise.all([getLocalNavigationSnapshot(), getActivePack(), activeLocalTrip()]);
-    setSnapshot(data); setPack(manifest); setTrip(active);
+    setSnapshot(data); setTrip(active);
     const selectedProfile = active?.profile || profile;
     if (active) { setProfile(active.profile); setDistance(active.distanceM); }
     const selectedId = active?.dispatchId || dispatchId || chosenDispatch;
@@ -57,6 +60,7 @@ export default function OfflineNavigationScreen() {
     setRoute(selectAssignedRoute(data.routes, selected, selectedProfile));
     setLoaded(true);
     const status = await navigationPackStatus();
+    setPack(status?.state === 'complete' ? manifest : null);
     setPackMessage(status?.state === 'complete' ? 'Map saved for offline use.' : status ? `Map ${Math.round(status.percentage)}% downloaded. Resume on Wi-Fi.` : 'Download the map on Wi-Fi before going offline.');
   }
 
@@ -67,9 +71,12 @@ export default function OfflineNavigationScreen() {
     lastStep.current = 0; lastProcessedFix.current = 0; arrivalShown.current = false;
   }, [route, steps]);
   useEffect(() => {
-    if (dispatch?.assignment_id && !hasActiveRescuerTracking()) void configureRescuerTracking(Number(dispatch.assignment_id)).catch(() => setMessage('Enable location for live navigation.'));
-  }, [dispatch?.assignment_id]);
-  useEffect(() => subscribeRescuerPosition(fix => setGpsFix(fix), problem => { if (problem) setMessage(problem); }), []);
+    if (dispatch?.assignment_id && ['accepted', 'en_route', 'on_scene'].includes(dispatch.status) && !hasActiveRescuerTracking()) void configureRescuerTracking(Number(dispatch.assignment_id)).catch(() => setMessage('Enable location for live navigation.'));
+  }, [dispatch?.assignment_id, dispatch?.status]);
+  useEffect(() => {
+    if (!appActive) return;
+    return subscribeRescuerPosition(fix => setGpsFix(fix), problem => { if (problem) setMessage(problem); });
+  }, [appActive]);
   useEffect(() => () => {
     rerouteRequest.current?.abort();
     rerouteRequest.current = null;
@@ -145,7 +152,11 @@ export default function OfflineNavigationScreen() {
 
   return <View style={{ flex: 1, backgroundColor: palette.page }}>
     <Stack.Screen options={{ title: 'Rescue navigation', headerStyle: { backgroundColor: palette.nav }, headerTintColor: palette.navText }} />
-    <Map style={{ flex: 1 }} mapStyle={pack?.style_url || streetStyle} onDidFinishLoadingMap={() => setMapReady(true)}>
+    <Map style={{ flex: 1 }} preferredFramesPerSecond={30} mapStyle={pack?.style_url || streetStyle} onDidFinishLoadingMap={() => setMapReady(true)}
+      onDidFailLoadingMap={() => {
+        if (pack?.style_url) { setPack(null); setMessage('Saved map style is unavailable. Using the street map.'); }
+        else setMessage('Map tiles could not load. Check your connection and reopen navigation.');
+      }}>
       <Camera ref={camera} initialViewState={{ center: [123.8854, 10.3157], zoom: 11 }} />
       {displayPoints.length >= 2 && <RouteLine points={displayPoints} />}
       {gpsFix && <Marker ref={marker} lngLat={[gpsFix.coords.longitude, gpsFix.coords.latitude]}><View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: palette.navActive, borderColor: '#fff', borderWidth: 3 }} /></Marker>}

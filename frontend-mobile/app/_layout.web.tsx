@@ -5,6 +5,10 @@ import { useEffect } from 'react';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { configureNotificationHandler } from '@/utils/pushNotifications';
+import { registerPwa } from '@/utils/registerPwa.web';
+import { Provider } from 'react-redux';
+import { store } from '@/state/apiStore';
+export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -15,12 +19,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     configureNotificationHandler();
+    registerPwa();
   }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <Provider store={store}><ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Slot />
       <StatusBar style="auto" />
-    </ThemeProvider>
+    </ThemeProvider></Provider>
   );
 }
