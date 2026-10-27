@@ -63,6 +63,20 @@ test('APK with WebView renders the embedded map and handles only valid map press
   assert.equal(points[0].longitude, 123);
 });
 
+test('embedded map blocks external navigation and out-of-range coordinates', () => {
+  const { Map } = loadMap(true);
+  const points = [];
+  const props = Map({ markers: [], routes: [], onMapPress: point => points.push(point) }).props.children.props;
+  assert.equal(props.onShouldStartLoadWithRequest({ url: 'about:blank' }), true);
+  for (const url of ['https://evil.example/', 'file:///etc/passwd', 'javascript:alert(1)', 'intent://example']) {
+    assert.equal(props.onShouldStartLoadWithRequest({ url }), false);
+  }
+  for (const [latitude, longitude] of [[91, 123], [10, 181], [-91, 123], [10, -181]]) {
+    props.onMessage({ nativeEvent: { data: JSON.stringify({ type: 'mapPress', latitude, longitude }) } });
+  }
+  assert.equal(points.length, 0);
+});
+
 function loadMapHtml() {
   const source = fs.readFileSync(path.join(__dirname, '../utils/mobileLeafletHtml.ts'), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;

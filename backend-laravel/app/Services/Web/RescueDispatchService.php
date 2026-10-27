@@ -144,7 +144,7 @@ class RescueDispatchService
     {
         $event = $this->query->activeEvent();
         $eventId = $request->query('event_id') ?: $event?->event_id;
-        $data = ['active_event' => $event ? $this->presenter->activeEvent($event) : null];
+        $data = ['active_event' => $event ? $this->presenter->activeEvent($event) : null, 'dispatch_statuses' => app(\App\Queries\DispatchStatusQuery::class)->options()];
         if ($request->query('view') === 'coverage') {
             return response()->json(['data' => $data + ['teams' => $this->query->teamCoverage($eventId), 'responders' => $this->query->responders($eventId)]]);
         }
@@ -346,9 +346,10 @@ class RescueDispatchService
             'responder_count' => [$isCreate ? 'required' : 'sometimes', 'integer', 'min:1', 'max:100'],
             'dispatch_type' => ['sometimes', 'string', 'in:rescue,welfare_check'],
             'priority_level' => [$required, 'string', 'in:critical,high,watch,monitor'],
-            'status' => [$required, 'string', $isCreate
-                ? 'in:dispatched,accepted,en_route,on_scene,onscene,returning'
-                : 'in:dispatched,accepted,en_route,on_scene,onscene,returning,completed,cancelled'],
+            'status' => [$required, 'string', \Illuminate\Validation\Rule::exists('dispatch_statuses', 'status_key')->where(function ($query) use ($isCreate): void {
+                $query->where('is_active', true);
+                if ($isCreate) $query->where('allow_create', true);
+            })],
             'dispatch_notes' => ['nullable', 'string', 'max:1000'],
             'route_notes' => ['nullable', 'string', 'max:1000'],
             'safe_count' => ['nullable', 'integer', 'min:0'],

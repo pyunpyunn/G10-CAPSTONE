@@ -52,6 +52,9 @@ function normalizeApiServerUrl(value: string) {
   if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) {
     throw new Error('Enter a server URL beginning with https://, without passwords or query parameters.');
   }
+  if (!__DEV__ && parsed.protocol !== 'https:') {
+    throw new Error('HTTPS is required for production API connections.');
+  }
   let path = parsed.pathname.replace(/\/+$/, '');
   if (!path) path = '/api/v1';
   if (!path.endsWith('/api/v1')) throw new Error('The server address must end with /api/v1.');
@@ -94,7 +97,7 @@ async function getApiServerCandidates() {
   const uniqueConfigured = [...new Set(configured)];
   const savedUrl = await getStoredItem(serverUrlKey);
   if (!savedUrl || uniqueConfigured.includes(savedUrl)) return uniqueConfigured;
-  return [savedUrl, ...uniqueConfigured];
+  return [normalizeApiServerUrl(savedUrl), ...uniqueConfigured];
 }
 
 function ngrokHeaders(url: string) {
@@ -175,6 +178,11 @@ api.interceptors.request.use(async (config) => {
   const failoverConfig = config as typeof config & FailoverRequestConfig;
   const serverUrl = failoverConfig._resqForcedServerUrl || await selectReadyServer();
   config.baseURL = serverUrl;
+  const trusted = new URL(normalizeApiServerUrl(serverUrl));
+  const destination = new URL(api.getUri(config));
+  if (destination.origin !== trusted.origin || destination.username || destination.password) {
+    throw new CanceledError('Blocked a request outside the selected API server.');
+  }
   api.defaults.baseURL = serverUrl;
   Object.assign(config.headers, ngrokHeaders(serverUrl));
   const [token, deviceUuid] = await Promise.all([getStoredItem(tokenKey), getStoredItem(rescuerDeviceUuidKey)]);

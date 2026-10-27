@@ -93,6 +93,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/realtime/health', \App\Http\Controllers\Api\RealtimeHealthController::class)->middleware('role:operations_admin');
         Route::patch('/profile/password', [ProfileController::class, 'changePassword'])->middleware('throttle:5,1,password-change');
         Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::get('/dispatch-statuses', fn () => response()->json(['data' => app(\App\Queries\DispatchStatusQuery::class)->options()]));
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/security-questions', [AuthController::class, 'recoveryQuestions']);
         Route::put('/auth/security-questions', [AuthController::class, 'saveRecoveryQuestions']);
@@ -112,6 +113,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/dashboard/weather', [DashboardController::class, 'weather']);
             Route::get('/dashboard/requests', [DashboardController::class, 'requests']);
             Route::get('/dashboard/activity', [DashboardController::class, 'activity']);
+            Route::get('/dashboard/impact-history', [DashboardController::class, 'impactHistory']);
             Route::get('/notifications', [NotificationController::class, 'index']);
             Route::get('/notifications/push/config', [\App\Http\Controllers\Api\BrowserPushController::class, 'configuration']);
             Route::post('/notifications/push/subscription', [\App\Http\Controllers\Api\BrowserPushController::class, 'store'])->middleware('throttle:15,1');

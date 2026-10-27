@@ -21,7 +21,7 @@ class RescuerAssignmentWorkflow
         }
 
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['accepted', 'en_route', 'on_scene', 'completed', 'cancelled'])],
+            'status' => ['required', Rule::exists('dispatch_statuses', 'status_key')->where('is_active', true)->where('allow_mobile', true)],
             'outcome_notes' => ['nullable', 'string', 'max:1000'],
             'household_id' => ['nullable', 'string', 'max:100'],
             'household_status_key' => ['nullable', Rule::in(['safe', 'evacuated'])],
@@ -103,7 +103,7 @@ class RescuerAssignmentWorkflow
             $allowed = ['accepted' => ['dispatched', 'accepted'], 'en_route' => ['accepted', 'en_route'],
                 'on_scene' => ['en_route', 'on_scene'], 'completed' => ['on_scene'],
                 'cancelled' => ['dispatched', 'accepted', 'en_route', 'on_scene']];
-            if (!in_array($previous, $allowed[$status], true)) {
+            if (!isset($allowed[$status]) || !in_array($previous, $allowed[$status], true)) {
                 abort(409, 'Invalid task transition. Accept the household, start navigation, and mark arrival before completing it.');
             }
             if ($status === 'completed' && $target) {
@@ -156,7 +156,7 @@ class RescuerAssignmentWorkflow
                 foreach ($selectedIds as $id) {
                     if ((int) $id === $actorId) continue;
                     $hasOtherWork = DB::table('responder_assignments')->where('assignment_id', '<>', $assignmentId)
-                        ->whereIn('status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'])
+                        ->whereIn('status', app(\App\Queries\DispatchStatusQuery::class)->keys(true))
                         ->where(fn ($query) => $query->where('responder_id', (int) $id)
                             ->orWhereJsonContains('route_notes->selected_responder_ids', (int) $id))->exists();
                     if (! $hasOtherWork) $this->updateResponderDuty((int) $id, $current->team_id, 'completed');
