@@ -40,6 +40,9 @@ export default function ForgotPasswordScreen() {
   const [requestError, setRequestError] = useState('');
   const [loading, setLoading] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
+  const [sendCooldownSeconds, setSendCooldownSeconds] = useState(0);
+  const sendAttempts = useRef(0);
+  const sendInFlight = useRef(false);
 
   function scrollToFocusedInput(target: number) {
     requestAnimationFrame(() => {
@@ -50,6 +53,23 @@ export default function ForgotPasswordScreen() {
   useEffect(() => {
     if (initialLogin.trim()) void lookupAccount(initialLogin.trim());
   }, [initialLogin]);
+
+  useEffect(() => {
+    if (sendCooldownSeconds <= 0) {
+      sendAttempts.current = 0;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setSendCooldownSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [sendCooldownSeconds]);
+
+  function resetSendCooldown() {
+    sendAttempts.current = 0;
+    setSendCooldownSeconds(0);
+  }
 
   async function lookupAccount(accountLogin: string) {
     setLoading(true);
@@ -69,6 +89,7 @@ export default function ForgotPasswordScreen() {
   }
 
   function handleLoginChange(value: string) {
+    resetSendCooldown();
     setLogin(value);
     setMaskedContact('');
     setValidatedNumber('');
@@ -78,6 +99,7 @@ export default function ForgotPasswordScreen() {
   }
 
   function handleContactChange(value: string) {
+    resetSendCooldown();
     setContactNumber(value);
     setValidatedNumber('');
     setCodeSent(false);
@@ -114,19 +136,36 @@ export default function ForgotPasswordScreen() {
   }
 
   async function requestCode() {
+    if (sendInFlight.current || sendCooldownSeconds > 0) return;
     if (!validatedNumber || validatedNumber !== contactNumber.trim()) {
       setContactError('Verify your registered phone number before requesting a code.');
       return;
     }
+    sendInFlight.current = true;
+    const attempt = ++sendAttempts.current;
+    if (attempt >= 3) setSendCooldownSeconds(60);
     setLoading(true);
     setRequestError('');
     try {
-      await sendHouseholdRecoveryCode(login.trim(), validatedNumber);
+      const response = await sendHouseholdRecoveryCode(login.trim(), validatedNumber);
+      if (response.cooldown) {
+        setSendCooldownSeconds(Math.max(1, Number(response.cooldown_seconds) || 60));
+        setRequestError('Please wait before requesting another verification code.');
+        return;
+      }
       setCodeSent(true);
-      setRequestError('A verification code was sent by SMS. You can request another code if it does not arrive.');
+      setRequestError(attempt >= 3
+        ? 'A verification code was sent. Please wait one minute before requesting another code.'
+        : 'A verification code was sent by SMS.');
     } catch (error: any) {
-      setRequestError(authErrorMessage(error, 'Unable to send the code. Please try again later.'));
+      if (error?.response?.status === 429) {
+        setSendCooldownSeconds(60);
+        setRequestError('Please wait one minute before requesting another verification code.');
+      } else {
+        setRequestError(authErrorMessage(error, 'Unable to send the code. Please try again later.'));
+      }
     } finally {
+      sendInFlight.current = false;
       setLoading(false);
     }
   }
@@ -229,16 +268,18 @@ export default function ForgotPasswordScreen() {
               {!!contactError && <Text accessibilityLiveRegion="polite" style={styles.error}>{contactError}</Text>}
             </View>
 
-            {validatedNumber ? (
+            {validatedNumber && !codeSent ? (
               <Pressable
-                style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, loading && styles.buttonDisabled]}
+                style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, (loading || sendCooldownSeconds > 0) && styles.buttonDisabled]}
                 onPress={() => { void requestCode(); }}
-                disabled={loading}
+                disabled={loading || sendCooldownSeconds > 0}
               >
                 {loading ? <ActivityIndicator color="#fff" /> : (
                   <>
                     <Ionicons name="chatbubble-ellipses-outline" size={19} color="#fff" />
-                    <Text style={styles.buttonText}>Get code via SMS</Text>
+                    <Text style={styles.buttonText}>{sendCooldownSeconds > 0
+                      ? `Try again in ${sendCooldownSeconds}s`
+                      : 'Get code via SMS'}</Text>
                   </>
                 )}
               </Pressable>
@@ -246,8 +287,14 @@ export default function ForgotPasswordScreen() {
 
             {codeSent ? (
               <>
-                <Pressable style={styles.resendButton} onPress={() => { void requestCode(); }} disabled={loading}>
-                  <Text style={styles.resendText}>Get code</Text>
+                <Pressable
+                  style={[styles.resendButton, (loading || sendCooldownSeconds > 0) && styles.buttonDisabled]}
+                  onPress={() => { void requestCode(); }}
+                  disabled={loading || sendCooldownSeconds > 0}
+                >
+                  <Text style={styles.resendText}>{sendCooldownSeconds > 0
+                    ? `Try again in ${sendCooldownSeconds}s`
+                    : 'Get code'}</Text>
                 </Pressable>
                 <View style={styles.fieldGroup}>
                   <Text style={styles.label}>SMS verification code</Text>

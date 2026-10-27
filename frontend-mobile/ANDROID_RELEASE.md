@@ -1,6 +1,17 @@
 # Standalone Android APK
 
-## Latest local APK — version 2.0.0, build 46
+## Latest local APK — version 2.0.0, build 47
+
+Installable file: [`releases/RESQPERATION-build47.apk`](./releases/RESQPERATION-build47.apk).
+
+- 22,584,813 bytes; version code 47; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `5762BF850F1114549B0B24F7E89BCB9592EF1B5286D69812033499CB89A61ADF`.
+- Mobile and web password-recovery screens prevent duplicate sends while an SMS request is in flight and show a one-minute countdown after three code-send attempts. The backend change must also be running for account-scoped cooldowns and informational responses to requests during cooldown.
+- Mobile TypeScript check, focused mobile auth/transport tests (19), web/mobile lint, and backend authentication tests (28 tests, 170 assertions) passed.
+- Android production build, APK identity and release-signature verification passed. Build 47 retains the existing signing identity so it updates Build 21/45/46 without uninstalling.
+- Physical-device SMS delivery and login remain to be verified.
+
+## Previous local APK — version 2.0.0, build 46
 
 Installable file: [`releases/RESQPERATION-build46.apk`](./releases/RESQPERATION-build46.apk).
 
