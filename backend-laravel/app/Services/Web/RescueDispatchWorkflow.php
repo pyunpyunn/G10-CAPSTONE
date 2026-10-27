@@ -181,7 +181,7 @@ class RescueDispatchWorkflow
         }
     }
 
-    private function activeStatuses():array{return['dispatched','accepted','en_route','on_scene','onscene','returning'];}
+    private function activeStatuses():array{return app(\App\Queries\DispatchStatusQuery::class)->keys(true);}
     private function ensureHouseholdCanReceive(?string $id, string $eventId): void
     {
         if (!$id) return;

@@ -48,6 +48,12 @@ class DashboardController extends Controller
         return response()->json(['data' => $this->service->activity()]);
     }
 
+    public function impactHistory(Request $request): JsonResponse
+    {
+        $validated = $request->validate(['period' => ['required', 'in:weekly,monthly,yearly']]);
+        return response()->json(['data' => app(\App\Queries\DashboardImpactQuery::class)->history($validated['period'])]);
+    }
+
     public function closeActiveEvent(Request $request): JsonResponse
     {
         $result = $this->service->closeActiveEvent($request);

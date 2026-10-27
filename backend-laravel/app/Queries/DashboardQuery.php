@@ -117,9 +117,11 @@ class DashboardQuery
 
     public function getDispatchSummary(?string $eventId): array
     {
+        $teamSummary = $this->getTeamCounts($eventId);
         if (! $eventId || ! Schema::hasTable('responder_assignments')) {
             return [
                 'counts' => $this->presenter->dispatchBars(0, 0, 0),
+                ...$teamSummary,
                 'teams' => [],
             ];
         }
@@ -163,8 +165,38 @@ class DashboardQuery
 
         return [
             'counts' => $this->presenter->dispatchBars($dispatched, $onScene, $standby),
+            ...$teamSummary,
             'teams' => $teams,
         ];
+    }
+
+    public function getTeamCounts(?string $eventId): array
+    {
+        $counts = ['en-route' => 0, 'on-scene' => 0, 'completed' => 0, 'available' => 0, 'other' => 0];
+        $teams = Schema::hasTable('rescue_teams') ? DB::table('rescue_teams')
+            ->when(Schema::hasColumn('rescue_teams', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
+            ->get(['team_id', 'duty_status']) : collect();
+        $assignments = $eventId && Schema::hasTable('responder_assignments')
+            ? DB::table('responder_assignments')->where('disaster_id', $eventId)->orderByDesc('assigned_at')->orderByDesc('assignment_id')->get(['team_id', 'status'])->groupBy('team_id') : collect();
+        $catalogGroups = DB::table('dispatch_statuses')->pluck('dashboard_group', 'status_key');
+        $openKeys = app(DispatchStatusQuery::class)->keys(true);
+        foreach ($teams as $team) {
+            $statuses = $assignments->get($team->team_id, collect())->pluck('status')->all();
+            $groups = array_map(fn ($status) => $catalogGroups[$status] ?? 'other', $statuses);
+            $hasOpen = (bool) array_intersect($statuses, $openKeys);
+            // Active work takes priority; otherwise use the latest assignment's
+            // completion state before falling back to the team's duty status.
+            $key = in_array('on-scene', $groups, true) ? 'on-scene'
+                : (in_array('en-route', $groups, true) ? 'en-route'
+                    : ($hasOpen ? 'other'
+                        : (($groups[0] ?? null) === 'completed' ? 'completed'
+                            : ($team->duty_status === 'available' ? 'available' : 'other'))));
+            $counts[$key]++;
+        }
+        $labels = ['en-route' => 'En route', 'on-scene' => 'On scene', 'completed' => 'Completed', 'available' => 'Available', 'other' => 'Others / unavailable'];
+        return ['total_teams' => $teams->count(), 'team_counts' => collect($counts)->map(fn ($value, $key) => [
+            'label' => $labels[$key], 'class_name' => $key, 'value' => $value,
+        ])->values()->all()];
     }
 
 

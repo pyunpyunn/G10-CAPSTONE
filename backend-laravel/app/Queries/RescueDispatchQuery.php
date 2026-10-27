@@ -92,8 +92,8 @@ class RescueDispatchQuery
         if ($request->query('view') === 'management') $query->select([
             'ra.assignment_id','ra.assignment_code','ra.assigned_area','ra.priority_level','ra.status','ra.assigned_at','rt.team_name',
         ]);
-        if ($status === 'active') $query->whereIn('ra.status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning']);
-        elseif ($status === 'closed') $query->whereIn('ra.status', ['completed', 'cancelled']);
+        if ($status === 'active') $query->whereIn('ra.status', app(DispatchStatusQuery::class)->keys(true));
+        elseif ($status === 'closed') $query->whereIn('ra.status', app(DispatchStatusQuery::class)->keys(false));
         elseif ($status !== '' && $status !== 'all') $query->where('ra.status', $this->presenter->statusKey($status));
         if ($search !== '') $query->where(function ($q) use ($search): void { $q->where('ra.assignment_code', 'like', "%{$search}%")->orWhere('ra.assigned_area', 'like', "%{$search}%")->orWhere('rt.team_name', 'like', "%{$search}%")->orWhere('r.full_name', 'like', "%{$search}%"); });
         return $query->orderByRaw('CASE WHEN ra.status IN ("on_scene", "onscene", "dispatched", "en_route") THEN 0 ELSE 1 END')->orderByDesc('ra.assigned_at')->orderByDesc('ra.assignment_id')->paginate(\App\Http\Requests\ListRequest::clampPerPage($request->query('per_page')));
@@ -104,7 +104,7 @@ class RescueDispatchQuery
         if (!$eventId) return [];
         return ResponderAssignment::query()->from('responder_assignments as ra')
             ->leftJoin('rescue_teams as rt','rt.team_id','=','ra.team_id')->leftJoin('responders as r','r.responder_id','=','ra.responder_id')
-            ->where('ra.disaster_id',$eventId)->whereIn('ra.status',['dispatched','accepted','en_route','on_scene','onscene','returning'])
+            ->where('ra.disaster_id',$eventId)->whereIn('ra.status',app(DispatchStatusQuery::class)->keys(true))
             ->orderByDesc('ra.assigned_at')->orderByDesc('ra.assignment_id')
             ->get(['ra.*','rt.team_name','rt.team_code','rt.team_type','r.full_name as responder_name','r.contact_number as responder_contact'])
             ->map(fn ($assignment) => $this->presenter->dispatch($assignment))->all();
@@ -126,7 +126,7 @@ class RescueDispatchQuery
         $activeByResponder = $eventId && $responders->isNotEmpty()
             ? ResponderAssignment::query()->where('disaster_id', $eventId)
                 ->whereIn('responder_id', $responders->pluck('responder_id'))
-                ->whereIn('status', ['dispatched','accepted','en_route','on_scene','onscene','returning'])
+                ->whereIn('status', app(DispatchStatusQuery::class)->keys(true))
                 ->orderByDesc('assigned_at')->get(['assignment_id','assignment_code','assigned_area','responder_id','status','assigned_at'])
                 ->unique('responder_id')->keyBy('responder_id')
             : collect();
@@ -163,7 +163,7 @@ class RescueDispatchQuery
                 DB::raw('EXISTS (SELECT 1 FROM geotagged_locations gl WHERE gl.household_id=h.household_id AND gl.latitude IS NOT NULL AND gl.longitude IS NOT NULL) as has_geotag')])->get();
         $contacts = $this->contactChannels($rows->pluck('household_id')->unique()->all());
         $busy = collect();
-        foreach (ResponderAssignment::query()->where('disaster_id', $eventId)->whereIn('status', ['dispatched','accepted','en_route','on_scene','onscene','returning'])->get(['assignment_id','household_id','route_notes']) as $assignment) {
+        foreach (ResponderAssignment::query()->where('disaster_id', $eventId)->whereIn('status', app(DispatchStatusQuery::class)->keys(true))->get(['assignment_id','household_id','route_notes']) as $assignment) {
             $route = $this->presenter->decodeJson($assignment->route_notes);
             foreach (array_filter(array_merge([$assignment->household_id], $route['household_ids'] ?? [], array_merge([], ...array_values($route['responder_households'] ?? [])))) as $householdId) $busy[$householdId] = $assignment->assignment_id;
         }
@@ -192,7 +192,7 @@ class RescueDispatchQuery
         $realTeams = collect($teamCards)->filter(fn ($team) => ! empty($team['team_id']));
         $available = $realTeams->filter(fn ($team) => ($team['available_responder_count'] ?? 0) > 0)->count();
         $activeTeams = $eventId ? ResponderAssignment::query()->where('disaster_id', $eventId)
-            ->whereIn('status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'])
+            ->whereIn('status', app(DispatchStatusQuery::class)->keys(true))
             ->whereIn('team_id', $realTeams->pluck('team_id'))->distinct()->count('team_id') : 0;
         return ['total_teams' => $realTeams->count(), 'dispatched' => $dispatched, 'on_scene' => $onScene,
             'available_responders' => (int) $realTeams->sum('available_responder_count'),
@@ -247,7 +247,7 @@ class RescueDispatchQuery
         $activeAssignments = collect();
         if ($eventId && $teamIds !== []) {
             $ranked = ResponderAssignment::query()->where('disaster_id', $eventId)
-                ->whereIn('team_id', $teamIds)->whereNotIn('status', ['completed', 'cancelled'])
+                ->whereIn('team_id', $teamIds)->whereNotIn('status', app(DispatchStatusQuery::class)->keys(false))
                 ->select(['team_id', 'assignment_id', 'responder_id', 'assigned_area', 'assigned_at', 'status', 'route_notes', 'outcome_notes'])
                 ->selectRaw('ROW_NUMBER() OVER (PARTITION BY team_id ORDER BY assigned_at DESC, assignment_id DESC) as row_rank');
             $activeAssignments = DB::query()->fromSub($ranked, 'ranked_assignments')->where('row_rank', 1)->get()->keyBy('team_id');
@@ -280,7 +280,7 @@ class RescueDispatchQuery
         if (! $eventId) return $query->where('r.duty_status', 'available')->where('r.is_deployed', false);
         return $query->where('r.is_deployed', false)
             ->where('r.duty_status', 'available')
-            ->whereNotExists(function ($q) use ($eventId): void { $q->from('responder_assignments as active_ra')->whereColumn('active_ra.responder_id', 'r.responder_id')->where('active_ra.disaster_id', $eventId)->whereIn('active_ra.status', ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning']); });
+            ->whereNotExists(function ($q) use ($eventId): void { $q->from('responder_assignments as active_ra')->whereColumn('active_ra.responder_id', 'r.responder_id')->where('active_ra.disaster_id', $eventId)->whereIn('active_ra.status', app(DispatchStatusQuery::class)->keys(true)); });
     }
 }
 

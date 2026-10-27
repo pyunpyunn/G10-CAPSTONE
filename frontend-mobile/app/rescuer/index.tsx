@@ -1,4 +1,5 @@
 import { useMobileOverview } from '@/hooks/useMobileOverview';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import {
@@ -59,7 +60,7 @@ const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; 
 export default function RescuerHomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
-  const { overview, loading, refreshing, error: overviewError, loadOverview }
+  const { overview, loading, refreshing, error: overviewError, offline, lastSyncedAt, loadOverview }
     = useMobileOverview<RescuerOverview>('rescuer', getRescuerOverview);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -132,7 +133,6 @@ export default function RescuerHomeScreen() {
     return () => { void stopRescuerTracking(); };
   }, [trackingAssignmentId]);
   useEffect(() => {
-    if (!queueAssignmentId) return;
     return createAdaptivePoller(
       () => AppState.currentState === 'active' ? loadOverview(true, true) : null,
       { intervalMs: 30000, maxIntervalMs: 60000 },
@@ -282,7 +282,7 @@ export default function RescuerHomeScreen() {
     if (!overview) {
       return (
         <View style={styles.loadFailure}>
-          <EmptyState icon="cloud-offline-outline" title="OFFLINE MODE" />
+          <EmptyState icon="cloud-offline-outline" title="No saved page available" />
           <ActionButton label="Try again" icon="refresh-outline" onPress={() => { void loadOverview(); }} />
         </View>
       );
@@ -352,13 +352,14 @@ export default function RescuerHomeScreen() {
         onOpenRadio={() => setActiveTab('radio')}
       />
 
+      <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />
       <ScrollView
         removeClippedSubviews={false}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
-        {!!overviewError && overview ? (
+        {!!overviewError && !offline && overview ? (
           <View style={styles.refreshError}>
             <Text style={styles.refreshErrorText}>Could not refresh. Showing previously loaded data. {overviewError}</Text>
             <Pressable onPress={() => { void loadOverview(true); }} accessibilityRole="button">

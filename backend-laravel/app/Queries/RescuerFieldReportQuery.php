@@ -153,10 +153,7 @@ class RescuerFieldReportQuery
 
     public function assignmentStatusOptions(): array
     {
-        $presenter = app(\App\Presenters\RescueDispatchPresenter::class);
-        return array_merge(array_map(fn ($key) => $presenter->status($key), [
-            'dispatched', 'accepted', 'en_route', 'on_scene', 'returning', 'completed', 'cancelled',
-        ]), [['key' => 'unlinked', 'label' => 'No linked assignment']]);
+        return array_merge(app(DispatchStatusQuery::class)->options(), [['key' => 'unlinked', 'label' => 'No linked assignment']]);
     }
 
     private function reportTaskStatusExpression(): string

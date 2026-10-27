@@ -7,7 +7,9 @@ RUN npm run build
 
 FROM composer:2 AS composer-bin
 
-FROM php:8.3-fpm-bookworm
+FROM php:8.3.36-fpm-bookworm
+COPY deploy/php/security.ini /usr/local/etc/php/conf.d/zz-security.ini
+RUN php -r 'if (PHP_VERSION_ID < 80336 || ini_get("session.upload_progress.enabled")) { fwrite(STDERR, "Patched PHP and disabled session upload progress are required.\n"); exit(1); }'
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libfreetype6-dev \
         libicu-dev \

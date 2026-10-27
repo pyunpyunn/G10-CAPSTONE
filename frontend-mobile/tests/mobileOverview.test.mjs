@@ -7,7 +7,7 @@ import { copyWithStructuralSharing } from '@reduxjs/toolkit/query'
 import { createRefreshQueue } from '../utils/networkScheduling.js'
 
 // Exercise the hook's async state transitions without mounting native views.
-function fixture(read, snapshot = null) {
+function fixture(read, snapshot = null, persisted = null) {
   const slots = []
   let cursor = 0
   let saved
@@ -24,6 +24,11 @@ function fixture(read, snapshot = null) {
     '@reduxjs/toolkit/query': { copyWithStructuralSharing },
     '@/state/apiStore': { getViewState: () => snapshot, saveViewState: (key, value) => { saved = { key, value } } },
     '@/utils/networkScheduling': { createRefreshQueue },
+    '@/utils/mobileSnapshot': {
+      mobileSnapshotScope: async () => 'session',
+      readMobileSnapshot: () => persisted,
+      writeMobileSnapshot: (_scope, _key, value) => { persisted = value },
+    },
   }
   const output = {}
   const source = ts.transpileModule(fs.readFileSync(new URL('../hooks/useMobileOverview.ts', import.meta.url), 'utf8'),
@@ -40,6 +45,33 @@ function deferred() {
   const promise = new Promise(done => { resolve = done })
   return { promise, resolve }
 }
+
+test('a cold offline start restores the entire persisted overview without expiring it', async () => {
+  const value = { profile: { user: { name: 'Resident' } }, members: [{ id: 1 }], trusted: { households: [{ id: 2 }] } }
+  const app = fixture(async () => { throw new Error('server unavailable') }, null, { value, savedAt: 123 })
+  await app.render().loadOverview()
+  const view = app.render()
+  assert.equal(view.overview, value)
+  assert.equal(view.loading, false)
+  assert.equal(view.offline, true)
+  assert.equal(view.lastSyncedAt, 123)
+})
+
+test('server recovery replaces saved data and clears offline mode', async () => {
+  let online = false
+  const app = fixture(async () => {
+    if (!online) throw new Error('offline')
+    return { status: 'updated' }
+  }, null, { value: { status: 'old' }, savedAt: 123 })
+  await app.render().loadOverview()
+  online = true
+  await app.render().loadOverview(true)
+  const view = app.render()
+  assert.equal(view.overview.status, 'updated')
+  assert.equal(view.offline, false)
+  assert.equal(view.error, '')
+  assert.ok(view.lastSyncedAt > 123)
+})
 
 test('a warm screen shows its session snapshot immediately without a full loading screen', () => {
   const app = fixture(async () => ({}), { value: { status: 'safe' }, savedAt: 123 })

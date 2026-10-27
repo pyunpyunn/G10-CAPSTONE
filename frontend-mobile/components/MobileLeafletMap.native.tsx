@@ -82,13 +82,18 @@ export function MobileLeafletMap({
       <WebView
         ref={webView}
         originWhitelist={['*']}
+        onShouldStartLoadWithRequest={(request) => request.url === 'about:blank'}
+        setSupportMultipleWindows={false}
+        allowFileAccess={false}
+        mixedContentMode="never"
         source={source}
         onLoadEnd={() => { updateLayers(); updatePin(); updateGps(); }}
         onMessage={(event) => {
           try {
             const point = JSON.parse(event.nativeEvent.data);
             if (point.type === 'pinMoving') onPinMoving?.();
-            if (point.type === 'mapPress' && Number.isFinite(point.latitude) && Number.isFinite(point.longitude)) {
+            if (point.type === 'mapPress' && Number.isFinite(point.latitude) && Number.isFinite(point.longitude)
+              && Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180) {
               onMapPress?.({ latitude: point.latitude, longitude: point.longitude });
             }
           } catch {

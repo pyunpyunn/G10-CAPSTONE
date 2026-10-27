@@ -11,7 +11,6 @@ use Illuminate\Validation\ValidationException;
 class SelectDispatchResponders
 {
     public function __construct(private DispatchDestinationQuery $destinations) {}
-    private const ACTIVE = ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'];
 
     public function select(int $teamId, string $eventId, int $requested, ?string $householdId, ?object $destination = null, ?array $requestedIds = null): array
     {
@@ -23,7 +22,7 @@ class SelectDispatchResponders
                 ->from('responder_assignments as active_assignment')
                 ->whereColumn('active_assignment.responder_id', 'responders.responder_id')
                 ->where('active_assignment.disaster_id', $eventId)
-                ->whereIn('active_assignment.status', self::ACTIVE))
+                ->whereIn('active_assignment.status', app(\App\Queries\DispatchStatusQuery::class)->keys(true)))
             ->orderBy('responder_id')
             ->lockForUpdate()
             ->get(['responder_id', 'full_name', 'last_active_at']);
