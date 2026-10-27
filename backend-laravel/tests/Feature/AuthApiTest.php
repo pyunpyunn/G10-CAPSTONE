@@ -190,6 +190,34 @@ class AuthApiTest extends TestCase
             ]);
     }
 
+    public function test_login_returns_password_reset_guidance_for_an_unsupported_stored_hash(): void
+    {
+        DB::table('users')->where('user_id', 'USR-RESCUER-BDRRM-SAR-001')
+            ->update(['password' => str_repeat('x', 43)]);
+
+        $this->postJson('/api/v1/auth/login', [
+            'login' => 'BDRRM-SAR-001',
+            'password' => 'password',
+        ])->assertConflict()->assertJson([
+            'message' => 'This account password cannot be verified. Use Forgot password to reset it, or contact HQ/Admin.',
+        ]);
+    }
+
+    public function test_login_accepts_argon2id_hashes_alongside_bcrypt_hashes(): void
+    {
+        if (! defined('PASSWORD_ARGON2ID')) {
+            $this->markTestSkipped('Argon2id is not available in this PHP build.');
+        }
+
+        DB::table('users')->where('user_id', 'USR-RESCUER-BDRRM-SAR-001')
+            ->update(['password' => password_hash('password', PASSWORD_ARGON2ID)]);
+
+        $this->postJson('/api/v1/auth/login', [
+            'login' => 'BDRRM-SAR-001',
+            'password' => 'password',
+        ])->assertOk()->assertJsonPath('user.role.role_key', 'rescuer');
+    }
+
     public function test_rescuer_mobile_login_accepts_current_bdrm_account_credentials(): void
     {
         $response = $this->postJson('/api/v1/auth/login', [

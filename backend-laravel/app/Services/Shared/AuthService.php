@@ -56,7 +56,17 @@ class AuthService
             return response()->json(['message' => 'The database is not reachable right now. Make sure the shared MySQL laptop is online, or switch Laravel to a working local database.'], 503);
         }
 
-        if (! $user || ! $user->password || ! Hash::check($request->password, $user->password)) {
+        if (! $user || ! $user->password) {
+            throw ValidationException::withMessages(['login' => ['The login details are incorrect.']]);
+        }
+
+        $passwordMatches = $this->checkStoredPassword($request->password, $user->password);
+        if ($passwordMatches === null) {
+            return response()->json([
+                'message' => 'This account password cannot be verified. Use Forgot password to reset it, or contact HQ/Admin.',
+            ], 409);
+        }
+        if (! $passwordMatches) {
             throw ValidationException::withMessages(['login' => ['The login details are incorrect.']]);
         }
 
@@ -139,6 +149,19 @@ class AuthService
         }
 
         return response()->json($data);
+    }
+
+    private function checkStoredPassword(string $password, string $storedHash): ?bool
+    {
+        $algorithm = password_get_info($storedHash)['algoName'] ?? 'unknown';
+        $driver = match ($algorithm) {
+            'bcrypt' => 'bcrypt',
+            'argon2i' => 'argon',
+            'argon2id' => 'argon2id',
+            default => null,
+        };
+
+        return $driver === null ? null : Hash::driver($driver)->check($password, $storedHash);
     }
 
     public function me(Request $request): UserResource

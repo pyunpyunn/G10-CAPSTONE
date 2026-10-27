@@ -1,0 +1,249 @@
+usecase-beta
+direction LR
+accTitle: RESQPERATION entire system use case diagram
+accDescr: All human roles, external services, core workflows, and all 30 must-have requirements. GAP marks incomplete requirements rather than completed features.
+
+actor AccountHolder("Account holder")
+actor Resident("Household resident")
+actor Rescuer("Rescuer - shared field duties")
+actor TeamLeader("Rescue team leader")
+actor TeamMember("Rescue team member")
+actor Hq("HQ personnel - common permitted modules")
+actor Response("Response sub-committee / dispatcher")
+actor Chair("BDRRM committee chairperson")
+actor Admin("Operations / system administrator")
+actor Prevention("Mitigation and Prevention sub-committee")
+actor Preparedness("Preparedness sub-committee")
+actor Recovery("Recovery and Rehabilitation sub-committee")
+actor Verifier("Authorized evacuation verifier - duty, not separate account role")
+actor Visitor("Public inquiry sender")
+actor SafeTrack("SafeTrack")
+actor EvaTrack("EvaTrack")
+actor TrackingAid("TrackingAid")
+actor Push("Push notification provider")
+actor GeoWeather("Weather, hazard, map and routing providers")
+actor Sms("Configured SMS gateway")
+actor City("City disaster-response authority - manual report recipient")
+
+systemBoundary resqperation["RESQPERATION - web, mobile and partner exchange"]
+  %% Shared access and administration
+  signIn("Sign in, restore an authorized session and sign out - B2")
+  authorize("Validate account, role and applicable device binding - B2")
+  recoverAccount("Recover password and configure recovery information")
+  ownProfile("Maintain personal profile and password - B3")
+  personnel("Create, validate, activate or deactivate personnel accounts - B1")
+  officialId("GAP: capture and review official identification - B1"):::gap
+  teams("Manage rescue teams, leaders, members and assignments")
+  accessRules("Manage HQ accounts, roles, module access and approval rights")
+  configuration("Maintain barangay profile, disaster/status options and request types")
+  inquiry("Submit a public inquiry")
+  manageInquiries("Review inquiries, update status and inspect inquiry history")
+
+  %% Household mobile
+  householdProfile("Complete household setup; view members, address and geotag - A1")
+  deviceOwner("Select or reset the household member using the device")
+  householdAlerts("Receive alerts, instructions and broadcast history - A2")
+  householdStatus("Submit household/member safety status and review history - A3")
+  broadcastChoices("Use the applicable broadcast's configured status choices")
+  householdLocation("Capture permitted GPS location and update the geotag")
+  trustedConnections("Find, invite, accept, reject or remove trusted households")
+  trustedStatus("Report permitted trusted-household member statuses")
+  trustedPin("Verify trusted-household connection and PIN authorization")
+  evacuationRoute("Find available evacuation centers; view route, distance and ETA - A4")
+  residentQr("Display or save the resident household QR - A6")
+  evacuationVerify("Verify QR and record evacuation arrival - A6"):::partial
+  offlineView("View all saved mobile page data with Offline mode and last-sync time - A5")
+  offlineSubmit("GAP: durably queue household status reports while offline - A5"):::gap
+  replayStatuses("GAP: replay queued household reports safely after reconnection - A5"):::gap
+
+  %% Rescuer mobile and field operations
+  spatialMap("View geotagged households, evacuation sites and dispatch routes - B4")
+  assignments("View assigned incidents, households, members and route directions - C1")
+  assignmentProgress("Accept assignment; mark en route, arrived and completed")
+  gpsFollow("Follow GPS position and share assignment location")
+  offlineNavigation("Prepare navigation packs; record offline trips and sync saved events"):::partial
+  radio("Send and receive internet PTT voice clips and radio signals - C2")
+  rescueVerify("Check in at households and assess each member's outcome - C3")
+  fieldReport("Submit incident findings, injuries, deaths, damage and notes - C4")
+  operationLog("Record operational timestamps, status changes and history - C5")
+  logistics("Request personnel, equipment or supplies; track or cancel eligible requests - C6"):::partial
+
+  %% HQ monitoring, coordination and records
+  dashboard("Monitor operational dashboard, activity, impact and dispatch summaries")
+  search("Search permitted household, personnel and operational records")
+  notifications("Review, mark read or remove notifications and manage push subscription")
+  weather("Review forecasts, official advisories and event weather snapshots")
+  hazards("View hazard layers and annotate affected areas")
+  manageHazards("Add or remove authorized hazard layers")
+  disaster("Create, update and close disaster events - D1")
+  broadcast("Publish event-scoped alerts and reporting instructions - D1")
+  deliverAlerts("Deliver configured push notifications to subscribed users - A2 / D1")
+  dispatch("Prioritize households/areas, select responders and dispatch teams - D2")
+  priorityRules("Review and configure dispatch priority criteria")
+  incidentMonitor("Monitor incident findings, casualties and damage - D3")
+  householdMonitor("Review household/member reports, history and welfare-check queues - D4")
+  confirmStatus("Confirm household safety or evacuation status - D4")
+  severity("Classify event severity and affected-area priority - D5"):::partial
+  areaSeverity("GAP: assign exact Low / Medium / High / Critical severity per affected area - D5"):::gap
+  fieldMonitor("Monitor assignment progress, field GPS, reports and communications - D6")
+  situation("Prepare, synchronize, save and lock situation reports - D7")
+  exportReport("Export permitted report sections as PDF, CSV or Excel - D7")
+  escalate("Escalate an incident through a manually handed-off report - D8")
+  archive("Browse, filter, export and manage incident archives and saved groups - D9"):::partial
+
+  %% Resource coordination and external reports
+  externalIntake("Receive and record authenticated external resource requests - R1")
+  requestItems("Specify personnel, equipment, goods, quantities and urgency - R2")
+  requestReview("Review, validate, return, cancel or complete eligible requests - R3 / R4")
+  forwardRequest("Forward a validated request to TrackingAid - R3"):::partial
+  preventDuplicates("Validate request identity, permission and duplicate references - R4")
+  requestTracking("Track Pending, Validated/Approved, In Progress and Completed - R5")
+  externalReportRequest("Partner requests a RESQPERATION report and checks its release status")
+  releaseReport("Accept or reject report release; freeze accepted snapshot and issue download")
+  partnerReport("Request and review SafeTrack, EvaTrack or TrackingAid reports")
+  sharedHouseholds("Read linked shared household and member records")
+  smsStatus("Process supported inbound SMS safety reports")
+end
+
+%% Actor generalization: specialized actor inherits the parent's shared duties.
+Resident --|> AccountHolder
+Rescuer --|> AccountHolder
+Hq --|> AccountHolder
+TeamLeader --|> Rescuer
+TeamMember --|> Rescuer
+Response --|> Hq
+Chair --|> Response
+Admin --|> Chair
+Prevention --|> Hq
+Preparedness --|> Hq
+Recovery --|> Hq
+
+AccountHolder -- signIn
+AccountHolder -- recoverAccount
+AccountHolder -- ownProfile
+Admin -- personnel
+Admin -- officialId
+Admin -- teams
+Admin -- accessRules
+Admin -- configuration
+Admin -- manageInquiries
+Visitor -- inquiry
+
+Resident -- householdProfile
+Resident -- deviceOwner
+Resident -- householdAlerts
+Resident -- householdStatus
+Resident -- householdLocation
+Resident -- trustedConnections
+Resident -- trustedStatus
+Resident -- evacuationRoute
+Resident -- residentQr
+Resident -- offlineView
+Resident -- offlineSubmit
+Verifier -- evacuationVerify
+
+Rescuer -- spatialMap
+Rescuer -- assignments
+Rescuer -- assignmentProgress
+Rescuer -- gpsFollow
+Rescuer -- offlineNavigation
+Rescuer -- radio
+Rescuer -- rescueVerify
+Rescuer -- fieldReport
+Rescuer -- operationLog
+Rescuer -- offlineView
+TeamLeader -- logistics
+TeamLeader -- requestTracking
+
+Hq -- dashboard
+Hq -- search
+Hq -- notifications
+Hq -- weather
+Hq -- spatialMap
+Hq -- hazards
+Hq -- situation
+Hq -- exportReport
+Hq -- escalate
+Hq -- archive
+Hq -- partnerReport
+Hq -- releaseReport
+Prevention -- manageHazards
+Preparedness -- manageHazards
+Chair -- manageHazards
+
+Response -- dispatch
+Response -- priorityRules
+Response -- incidentMonitor
+Response -- householdMonitor
+Response -- confirmStatus
+Response -- severity
+Response -- areaSeverity
+Response -- fieldMonitor
+Response -- requestItems
+Response -- requestTracking
+Recovery -- requestItems
+Recovery -- requestTracking
+Chair -- disaster
+Chair -- broadcast
+Chair -- requestReview
+Chair -- forwardRequest
+
+SafeTrack -- sharedHouseholds
+SafeTrack -- partnerReport
+SafeTrack -- externalReportRequest
+EvaTrack -- externalIntake
+EvaTrack -- partnerReport
+EvaTrack -- externalReportRequest
+TrackingAid -- forwardRequest
+TrackingAid -- requestTracking
+TrackingAid -- partnerReport
+TrackingAid -- externalReportRequest
+Push -- deliverAlerts
+GeoWeather -- weather
+GeoWeather -- spatialMap
+GeoWeather -- hazards
+GeoWeather -- evacuationRoute
+GeoWeather -- assignments
+Sms -- smsStatus
+City -- escalate
+
+%% Required supporting behavior: include points to the included use case.
+signIn ..> : include authorize
+householdProfile ..> : include sharedHouseholds
+householdStatus ..> : include broadcastChoices
+householdStatus ..> : include operationLog
+trustedStatus ..> : include trustedPin
+trustedStatus ..> : include householdStatus
+evacuationVerify ..> : include operationLog
+offlineSubmit ..> : include replayStatuses
+assignmentProgress ..> : include operationLog
+rescueVerify ..> : include operationLog
+fieldReport ..> : include operationLog
+logistics ..> : include requestItems
+broadcast ..> : include deliverAlerts
+dispatch ..> : include operationLog
+confirmStatus ..> : include operationLog
+situation ..> : include operationLog
+escalate ..> : include exportReport
+externalIntake ..> : include preventDuplicates
+requestReview ..> : include preventDuplicates
+forwardRequest ..> : include preventDuplicates
+requestTracking ..> : include operationLog
+externalReportRequest ..> : include releaseReport
+
+%% Conditional behavior: extend points to the base use case.
+offlineView ..> : extend householdProfile
+offlineView ..> : extend assignments
+offlineNavigation ..> : extend assignments
+areaSeverity ..> : extend severity
+forwardRequest ..> : extend requestReview
+
+note for Hq "Role associations show the default permitted capabilities. Configured module access and backend authorization still apply."
+note for logistics "Submission is restricted to team leaders. Resource requests and live fulfillment need acceptance verification."
+note for offlineView "Viewing cached pages is implemented. This does not provide offline household submissions, downloadable map tiles or offline voice communication."
+note for evacuationVerify "Backend verification exists; the complete staff scan/entry interface remains a required gap."
+note for personnel "Registration is performed by authorized staff; public self-registration is not part of this system."
+note for escalate "Manual export and handoff; automatic city receipt or acknowledgment is not claimed."
+
+classDef gap fill:#fff1f2,color:#881337,stroke:#be123c,stroke-width:2px
+classDef partial fill:#fff7ed,color:#7c2d12,stroke:#c2410c,stroke-width:2px

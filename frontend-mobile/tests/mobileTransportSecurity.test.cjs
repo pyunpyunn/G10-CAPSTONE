@@ -37,11 +37,13 @@ function resolveCleartextSetting(environment) {
   }
 }
 
-function loadApiClient(savedServerUrl) {
+function loadApiClient(savedServerUrl, options = {}) {
   let requestInterceptor;
   let readyServerProbeCalled = false;
+  const probedUrls = [];
   const instance = {
     defaults: {},
+    getUri(config) { return `${config.baseURL}${config.url}`; },
     interceptors: {
       request: { use(callback) { requestInterceptor = callback; } },
       response: { use() {} },
@@ -49,10 +51,17 @@ function loadApiClient(savedServerUrl) {
   };
   const axios = {
     create: () => instance,
+    async get(url, config) {
+      readyServerProbeCalled = true;
+      probedUrls.push({ url, config });
+      if (options.probe) return options.probe(url, config);
+      throw new Error('Unexpected API probe.');
+    },
     CanceledError: class CanceledError extends Error {},
     isAxiosError: () => false,
     isCancel: () => false,
   };
+  axios.default = axios;
   const normalizeContext = { exports: {}, URL };
   const normalizeSource = fs.readFileSync(path.join(__dirname, '../utils/normalizeApiServerUrl.ts'), 'utf8');
   vm.runInNewContext(ts.transpileModule(normalizeSource, {
@@ -61,7 +70,6 @@ function loadApiClient(savedServerUrl) {
 
   const mocks = {
     axios,
-    '@/utils/networkScheduling': { firstSuccessful() { readyServerProbeCalled = true; throw Error('Unexpected API probe.'); } },
     'expo-constants': { default: {} },
     'react-native': { Platform: { OS: 'android' } },
     '@/utils/secureStorage': {
@@ -77,7 +85,10 @@ function loadApiClient(savedServerUrl) {
     exports: {},
     URL,
     __DEV__: false,
-    process: { env: { EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test/api/v1' } },
+    process: { env: {
+      EXPO_PUBLIC_API_BASE_URL: options.baseUrl || 'https://api.example.test/api/v1',
+      EXPO_PUBLIC_API_FALLBACK_URLS: options.fallbackUrls,
+    } },
     require(name) {
       if (!(name in mocks)) throw Error(`Unexpected import: ${name}`);
       return mocks[name];
@@ -89,6 +100,7 @@ function loadApiClient(savedServerUrl) {
 
   return {
     readyServerProbeCalled: () => readyServerProbeCalled,
+    probedUrls,
     request(config) { return requestInterceptor(config); },
   };
 }
@@ -159,4 +171,31 @@ test('a previously saved HTTP server URL is rejected before the app probes or se
   const client = loadApiClient('http://old-server.example.test/api/v1');
   await assert.rejects(client.request({ headers: {} }), /HTTPS/);
   assert.equal(client.readyServerProbeCalled(), false);
+});
+
+test('API routes are checked in order: ngrok first, then configured fallbacks', async () => {
+  const ngrok = 'https://sturdily-morse-sitter.ngrok-free.dev/api/v1';
+  const tailscale = 'https://resq.example.ts.net/api/v1';
+  const lan = 'https://resq-lan.example.test/api/v1';
+  const client = loadApiClient(null, {
+    baseUrl: ngrok,
+    fallbackUrls: `${tailscale},${lan}`,
+    probe: async (url) => {
+      if (url.startsWith(ngrok)) throw new Error('ngrok unavailable');
+      return { data: { status: 'ready' } };
+    },
+  });
+
+  let request;
+  try {
+    request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
+  } catch (error) {
+    assert.fail(`${error.message}; probes: ${JSON.stringify(client.probedUrls.map(({ url }) => url))}`);
+  }
+
+  assert.deepEqual(client.probedUrls.map(({ url }) => url), [
+    `${ngrok}/health/ready`,
+    `${tailscale}/health/ready`,
+  ]);
+  assert.equal(request.baseURL, tailscale);
 });
