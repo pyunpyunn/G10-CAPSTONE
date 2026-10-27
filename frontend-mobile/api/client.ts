@@ -171,6 +171,11 @@ api.interceptors.request.use(async (config) => {
   const failoverConfig = config as typeof config & FailoverRequestConfig;
   const serverUrl = failoverConfig._resqForcedServerUrl || await selectReadyServer();
   config.baseURL = serverUrl;
+  const trusted = new URL(normalizeApiServerUrl(serverUrl));
+  const destination = new URL(api.getUri(config));
+  if (destination.origin !== trusted.origin || destination.username || destination.password) {
+    throw new CanceledError('Blocked a request outside the selected API server.');
+  }
   api.defaults.baseURL = serverUrl;
   Object.assign(config.headers, ngrokHeaders(serverUrl));
   const [token, deviceUuid] = await Promise.all([getStoredItem(tokenKey), getStoredItem(rescuerDeviceUuidKey)]);
@@ -226,6 +231,8 @@ export async function saveToken(token: string) {
 
 export async function clearToken() {
   resetApiState();
+  const { clearMobileSnapshots } = await import('@/utils/mobileSnapshot');
+  await clearMobileSnapshots().catch(() => {});
   await deleteStoredItem(tokenKey);
 }
 

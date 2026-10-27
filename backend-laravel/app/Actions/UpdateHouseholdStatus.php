@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\DB;
 /** The shared current-status and dispatch transition for every reporting channel. */
 class UpdateHouseholdStatus
 {
-    private const ACTIVE_ASSIGNMENTS = ['dispatched', 'accepted', 'en_route', 'on_scene', 'onscene', 'returning'];
 
     public function apply(
         string $eventId,
@@ -81,7 +80,7 @@ class UpdateHouseholdStatus
     private function withdrawAssignments(string $eventId, string $householdId, $now): void
     {
         $assignments = ResponderAssignment::query()->where('disaster_id', $eventId)
-            ->where('household_id', $householdId)->whereIn('status', self::ACTIVE_ASSIGNMENTS)
+            ->where('household_id', $householdId)->whereIn('status', app(\App\Queries\DispatchStatusQuery::class)->keys(true))
             ->orderBy('assignment_id')->lockForUpdate()->get();
 
         foreach ($assignments as $assignment) {
@@ -97,7 +96,7 @@ class UpdateHouseholdStatus
             foreach ($ids as $id) {
                 if ($id <= 0) continue;
                 $busy = ResponderAssignment::query()->where('disaster_id', $eventId)
-                    ->whereIn('status', self::ACTIVE_ASSIGNMENTS)
+                    ->whereIn('status', app(\App\Queries\DispatchStatusQuery::class)->keys(true))
                     ->where(function ($query) use ($id): void {
                         $query->where('responder_id', $id)
                             ->orWhereJsonContains('route_notes->selected_responder_ids', $id);
@@ -110,7 +109,7 @@ class UpdateHouseholdStatus
             }
 
             if ($assignment->team_id && ! ResponderAssignment::query()->where('team_id', $assignment->team_id)
-                ->where('disaster_id', $eventId)->whereIn('status', self::ACTIVE_ASSIGNMENTS)->exists()) {
+                ->where('disaster_id', $eventId)->whereIn('status', app(\App\Queries\DispatchStatusQuery::class)->keys(true))->exists()) {
                 DB::table('rescue_teams')->where('team_id', $assignment->team_id)
                     ->update(['duty_status' => 'available', 'updated_at' => $now]);
             }

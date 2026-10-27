@@ -14,7 +14,7 @@ class RescueDispatchPresenter
     public function status(?string $value): array
     {
         $key = $this->statusKey($value ?: 'available');
-        return ['key' => $key, 'label' => match ($key) { 'accepted' => 'Accepted', 'returning' => 'Returning to base', 'on_scene' => 'On-scene', 'en_route' => 'En route', 'dispatched' => 'Dispatched', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'available' => 'Available', 'deployed' => 'Deployed', default => $this->label($key) }, 'tone' => \App\Support\StatusPalette::tone($key)];
+        return ['key' => $key, 'label' => app(\App\Queries\DispatchStatusQuery::class)->label($key) ?? $this->label($key), 'tone' => \App\Support\StatusPalette::tone($key)];
     }
 
     public function managementDispatch(object $row): array

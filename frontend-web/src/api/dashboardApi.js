@@ -5,6 +5,11 @@ export async function getDashboard() {
   return response.data.data
 }
 
+export async function getDashboardImpact(period) {
+  const response = await api.get('/dashboard/impact-history', { params: { period } })
+  return response.data.data
+}
+
 export async function closeActiveEvent() {
   const response = await api.post('/dashboard/active-event/close')
   return response.data.data

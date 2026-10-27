@@ -1,20 +1,16 @@
 import { X } from 'lucide-react'
 import { useState } from 'react'
-import RescueCriteriaChart from './RescueCriteriaChart'
+import OperationalViews from './OperationalViews'
+import DashboardImpactViews from './DashboardImpactViews'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import Badge from '../ui/Badge'
-import Panel from '../ui/Panel'
-import StatCard from '../ui/StatCard'
 import {
   eventTone,
-  makeAxis,
-  percent,
 } from '../../utils/dashboardHelpers'
 
 export default function DashboardMainContent({
   dashboard,
-  stats,
   hasActiveEvent,
   onOpenModule,
 }) {
@@ -44,32 +40,8 @@ export default function DashboardMainContent({
         </div>
       )}
 
-      <div className="stat-row">
-        {stats.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
-        ))}
-      </div>
-
-      <ReportingProgress households={dashboard.households} hasActiveEvent={hasActiveEvent} />
-
-      <Panel title="Operational charts">
-        <div className="dashboard-dispatch-graphs">
-          <ChartCard
-            title="Household status"
-            bars={dashboard.households.bars}
-            alwaysShowChart
-            onManage={() => onOpenModule('/households')}
-          />
-          <ChartCard
-            title="Dispatch status - team count"
-            bars={dashboard.dispatch.counts}
-            alwaysShowChart
-            onManage={() => onOpenModule('/dispatch')}
-          />
-        </div>
-      </Panel>
-
-      <RescueCriteriaChart eventId={dashboard.active_event?.event_id} />
+      <OperationalViews dashboard={dashboard} onOpenModule={onOpenModule} />
+      <DashboardImpactViews eventId={dashboard.active_event?.event_id} />
     </div>
   )
 }
@@ -141,60 +113,3 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
     </div>
   )
 }
-
-function ReportingProgress({ households, hasActiveEvent }) {
-  const safeOnlyPercent = percent(households.safe_only, households.total)
-  const evacuatedPercent = percent(households.evacuated, households.total)
-  const unsafePercent = percent(households.unsafe, households.total)
-
-  return (
-    <>
-      <div className="progress-label">
-        <span>{hasActiveEvent ? 'Reporting progress' : 'Reporting progress standby'}</span>
-        <span>
-          {hasActiveEvent
-            ? `${households.reporting_percent}% reported (${households.reported} / ${households.total})`
-            : 'No active reporting cycle'}
-        </span>
-      </div>
-      <div className="prog-track">
-        <div className="prog-seg green" style={{ width: `${safeOnlyPercent}%` }} />
-        <div className="prog-seg blue" style={{ width: `${evacuatedPercent}%` }} />
-        <div className="prog-seg red" style={{ width: `${unsafePercent}%` }} />
-      </div>
-    </>
-  )
-}
-
-function ChartCard({ title, bars = [], alwaysShowChart = false, onManage }) {
-  const hasValues = bars.some((bar) => Number(bar.value) > 0)
-  const axis = makeAxis(bars)
-
-  return (
-    <div className="dispatch-chart">
-      <div className="dispatch-chart-head">
-        <div className="dispatch-chart-title">{title}</div>
-        <button className="chart-manage-button" type="button" aria-label={`Open ${title}`} onClick={onManage}>
-          <FontAwesomeIcon icon={faArrowRight} />
-        </button>
-      </div>
-      {hasValues || alwaysShowChart ? (
-        <div className="team-count-chart" role="img" aria-label={title}>
-          <div className="chart-y-axis" aria-hidden="true">
-            {axis.map((item) => <span key={item}>{item}</span>)}
-          </div>
-          <div className="chart-plot" style={{ '--bar-count': bars.length }}>
-            {bars.map((bar) => (
-              <div className="dispatch-bar" style={{ '--bar-height': bar.height }} key={bar.label}>
-                <span className="dispatch-bar-value">{bar.value}</span>
-                <span className={`dispatch-bar-fill ${bar.class_name}`} />
-                <span className="dispatch-bar-label">{bar.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-

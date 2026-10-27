@@ -1,17 +1,14 @@
-import { useMemo } from 'react'
 import { Pencil, TriangleAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getDashboard } from '../api/dashboardApi'
 import DashboardMainContent from '../components/dashboard/DashboardMainContent'
 import DashboardOverview from '../components/dashboard/DashboardOverview'
 import LoadingState from '../components/ui/LoadingState'
-import { getStats } from '../utils/dashboardHelpers'
 import { useModuleData } from '../utils/useModuleData'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { data: dashboard, error, loading: isLoading } = useModuleData(getDashboard)
-  const stats = useMemo(() => getStats(dashboard), [dashboard])
   const hasActiveEvent = Boolean(dashboard?.active_event)
   function openModule(path) {
     navigate(path)
@@ -39,7 +36,6 @@ export default function DashboardPage() {
           <div className="dashboard-layout-mobile-actions">{disasterAction}</div>
           <DashboardMainContent
             dashboard={dashboard}
-            stats={stats}
             hasActiveEvent={hasActiveEvent}
             onOpenModule={openModule}
           />

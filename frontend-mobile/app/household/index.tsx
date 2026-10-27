@@ -1,4 +1,5 @@
 import { useMobileOverview } from '@/hooks/useMobileOverview';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -70,7 +71,7 @@ export default function HouseholdHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
-  const { overview, setOverview, loading, refreshing, error: overviewError, loadOverview: refreshOverview }
+  const { overview, setOverview, loading, refreshing, error: overviewError, offline, lastSyncedAt, loadOverview: refreshOverview }
     = useMobileOverview<HouseholdOverview>('household', getHouseholdOverview);
   const [deviceUuid, setDeviceUuid] = useState('');
   const [realBatteryLevel, setRealBatteryLevel] = useState<number | null>(null);
@@ -680,7 +681,7 @@ export default function HouseholdHomeScreen() {
   if (!loading && !overview && overviewError) {
     return <SafeAreaView style={styles.safe}>
       <View style={{ padding: spacing.lg, gap: spacing.md }}>
-        <HouseholdEmpty icon="cloud-offline-outline" title="OFFLINE MODE" />
+        <HouseholdEmpty icon="cloud-offline-outline" title="No saved page available" body="Connect to sync your household data on this device first." />
         <HouseholdButton label="Try again" icon="refresh-outline" onPress={() => { void loadOverview(); }} />
       </View>
     </SafeAreaView>;
@@ -705,6 +706,7 @@ export default function HouseholdHomeScreen() {
         }}
       />
 
+      <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />
       <ScrollView
         removeClippedSubviews={false}
         style={styles.scroll}
@@ -714,7 +716,7 @@ export default function HouseholdHomeScreen() {
         ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
-        {overviewError ? <View style={{ padding: spacing.sm, gap: spacing.xs }}>
+        {overviewError && !offline ? <View style={{ padding: spacing.sm, gap: spacing.xs }}>
           <Text accessibilityLiveRegion="polite" style={{ color: palette.textSoft }}>
             Could not refresh. Showing previously loaded data.
           </Text>
