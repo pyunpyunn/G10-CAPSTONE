@@ -1,12 +1,23 @@
 # Standalone Android APK
 
-## Latest local APK — version 2.0.0, build 48
+## Latest local APK — version 2.0.0, build 49
+
+Installable file: [`releases/RESQPERATION-build49.apk`](./releases/RESQPERATION-build49.apk).
+
+- 22,585,413 bytes; version code 49; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `5773780665BF52A1F5F58711CB73F47B6D88B831BCBD87FBC619DB4A1276AD93`.
+- Forgot-password sends its request immediately on tap, then disables resend and displays a five-minute countdown to reduce duplicate requests that could invalidate a code already in transit. The app cannot guarantee carrier/provider delivery time.
+- Mobile TypeScript check and recovery-screen lint passed; backend auth/OTP tests passed (29 tests, 184 assertions).
+- Android production build, APK identity and release-signature verification passed. Build 49 retains the existing signing identity so it updates earlier builds without uninstalling.
+- The backend must be deployed separately for OneSignal SMS-first delivery. OneSignal SMS configuration/eligibility and physical-device delivery remain to be verified.
+
+## Previous local APK — version 2.0.0, build 48
 
 Installable file: [`releases/RESQPERATION-build48.apk`](./releases/RESQPERATION-build48.apk).
 
 - 22,585,189 bytes; version code 48; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
 - SHA-256: `A122086CE09A0E7F8540151C9B923D1E3023844067B6065CC9256FD5C0625E7A`.
-- Password recovery now reports whether its code was sent by OneSignal push or SMS. Backend delivery targets active Android/iOS subscriptions registered to the account first, then falls back to the Android SMS Gateway and Semaphore. The Laravel backend change must be deployed and OneSignal configured for push recovery to work.
+- Password recovery reports whether the code was sent by OneSignal push or SMS. The later Build 49/backend change switches OTP delivery to OneSignal SMS first, retaining Android SMS Gateway and Semaphore as fallbacks.
 - Mobile TypeScript check, mobile recovery-screen lint, web recovery-screen lint, and backend auth tests (29 tests, 179 assertions) passed.
 - Android production build, APK identity and release-signature verification passed. Build 48 retains the existing signing identity so it updates earlier builds without uninstalling.
 - Physical-device push/SMS delivery and password recovery remain to be verified.

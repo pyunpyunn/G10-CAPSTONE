@@ -23,6 +23,8 @@ import {
 } from '@/api/auth';
 import { palette, spacing } from '@/constants/resqTheme';
 
+const RECOVERY_RESEND_COOLDOWN_SECONDS = 5 * 60;
+
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const scrollView = useRef<ScrollViewType>(null);
@@ -41,7 +43,6 @@ export default function ForgotPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [sendCooldownSeconds, setSendCooldownSeconds] = useState(0);
-  const sendAttempts = useRef(0);
   const sendInFlight = useRef(false);
 
   function scrollToFocusedInput(target: number) {
@@ -55,21 +56,13 @@ export default function ForgotPasswordScreen() {
   }, [initialLogin]);
 
   useEffect(() => {
-    if (sendCooldownSeconds <= 0) {
-      sendAttempts.current = 0;
-      return;
-    }
+    if (sendCooldownSeconds <= 0) return;
 
     const timer = setTimeout(() => {
       setSendCooldownSeconds((seconds) => Math.max(0, seconds - 1));
     }, 1000);
     return () => clearTimeout(timer);
   }, [sendCooldownSeconds]);
-
-  function resetSendCooldown() {
-    sendAttempts.current = 0;
-    setSendCooldownSeconds(0);
-  }
 
   async function lookupAccount(accountLogin: string) {
     setLoading(true);
@@ -89,7 +82,6 @@ export default function ForgotPasswordScreen() {
   }
 
   function handleLoginChange(value: string) {
-    resetSendCooldown();
     setLogin(value);
     setMaskedContact('');
     setValidatedNumber('');
@@ -99,12 +91,17 @@ export default function ForgotPasswordScreen() {
   }
 
   function handleContactChange(value: string) {
-    resetSendCooldown();
     setContactNumber(value);
     setValidatedNumber('');
     setCodeSent(false);
     setContactError('');
     setRequestError('');
+  }
+
+  function recoveryCooldownLabel() {
+    const minutes = Math.floor(sendCooldownSeconds / 60);
+    const seconds = String(sendCooldownSeconds % 60).padStart(2, '0');
+    return `${minutes}:${seconds}`;
   }
 
   async function validateContact() {
@@ -142,29 +139,31 @@ export default function ForgotPasswordScreen() {
       return;
     }
     sendInFlight.current = true;
-    const attempt = ++sendAttempts.current;
-    if (attempt >= 3) setSendCooldownSeconds(60);
+    setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS);
     setLoading(true);
     setRequestError('');
     try {
       const response = await sendHouseholdRecoveryCode(login.trim(), validatedNumber);
       if (response.cooldown) {
-        setSendCooldownSeconds(Math.max(1, Number(response.cooldown_seconds) || 60));
+        setSendCooldownSeconds(Math.max(
+          RECOVERY_RESEND_COOLDOWN_SECONDS,
+          Number(response.cooldown_seconds) || 0
+        ));
         setRequestError('Please wait before requesting another verification code.');
         return;
       }
       setCodeSent(true);
-      const deliveryMessage = response.delivery_channel === 'push'
-        ? 'A verification code was sent to your registered ResQperation app.'
-        : 'A verification code was sent by SMS.';
-      setRequestError(attempt >= 3
-        ? `${deliveryMessage} Please wait one minute before requesting another code.`
-        : deliveryMessage);
+      setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS);
+      const deliveryMessage = response.delivery_channel === 'onesignal_sms'
+        ? 'OneSignal accepted your SMS code request.'
+        : 'The SMS fallback provider accepted your code request.';
+      setRequestError(`${deliveryMessage} Delivery can take a few minutes. Check your SMS inbox and wait before requesting another code; a new request replaces this code.`);
     } catch (error: any) {
       if (error?.response?.status === 429) {
-        setSendCooldownSeconds(60);
-        setRequestError('Please wait one minute before requesting another verification code.');
+        setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS);
+        setRequestError('Please wait before requesting another verification code.');
       } else {
+        setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS);
         setRequestError(authErrorMessage(error, 'Unable to send the code. Please try again later.'));
       }
     } finally {
@@ -281,8 +280,8 @@ export default function ForgotPasswordScreen() {
                   <>
                     <Ionicons name="chatbubble-ellipses-outline" size={19} color="#fff" />
                     <Text style={styles.buttonText}>{sendCooldownSeconds > 0
-                      ? `Try again in ${sendCooldownSeconds}s`
-                      : 'Send recovery code'}</Text>
+                      ? `Wait ${recoveryCooldownLabel()}`
+                      : 'Get code via SMS'}</Text>
                   </>
                 )}
               </Pressable>
@@ -296,7 +295,7 @@ export default function ForgotPasswordScreen() {
                   disabled={loading || sendCooldownSeconds > 0}
                 >
                   <Text style={styles.resendText}>{sendCooldownSeconds > 0
-                    ? `Try again in ${sendCooldownSeconds}s`
+                    ? `Resend in ${recoveryCooldownLabel()}`
                     : 'Get code'}</Text>
                 </Pressable>
                 <View style={styles.fieldGroup}>
