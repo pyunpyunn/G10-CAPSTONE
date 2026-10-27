@@ -1,5 +1,6 @@
 import { AppState } from 'react-native';
 import * as Location from 'expo-location';
+import { rememberGps } from './savedGps';
 
 export type MapGpsPoint = { latitude: number; longitude: number; accuracy_m?: number | null };
 
@@ -29,17 +30,19 @@ export function watchForegroundMapGps(onPosition: (point: MapGpsPoint) => void, 
           if (disposed || current !== generation) return;
           const { latitude, longitude, accuracy } = fix.coords;
           if ((!Number.isFinite(fix.timestamp) || Date.now() - fix.timestamp < 15000) && Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180 && (accuracy == null || accuracy <= 75)) {
+            void rememberGps(fix).catch(() => {});
             onError(''); onPosition({ latitude, longitude, accuracy_m: accuracy });
           }
         }).catch(() => { if (!disposed && current === generation) onError('Waiting for a current GPS fix.'); });
       }
       const subscription = await Location.watchPositionAsync({
-        accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 5,
+        accuracy: Location.Accuracy.Balanced, timeInterval: 15000, distanceInterval: 15,
       }, (fix) => {
         const { latitude, longitude, accuracy } = fix.coords;
         if (disposed || current !== generation || (Number.isFinite(fix.timestamp) && Date.now() - fix.timestamp > 15000) || !Number.isFinite(latitude) || !Number.isFinite(longitude)
           || Math.abs(latitude) > 90 || Math.abs(longitude) > 180 || (accuracy != null && accuracy > 75)) return;
         onError('');
+        void rememberGps(fix).catch(() => {});
         onPosition({ latitude, longitude, accuracy_m: accuracy });
       }, () => { if (!disposed && current === generation) onError('GPS unavailable. The selected route remains visible.'); });
       if (disposed || current !== generation) subscription.remove();

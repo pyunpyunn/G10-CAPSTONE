@@ -26,15 +26,55 @@ class RescuerAssignmentQuery
         $history = $this->forResponder($responderId)->whereNotIn('ra.status', $activeStatuses)
             ->orderByDesc('ra.assigned_at')->limit($limit)->get();
 
-        return $active->concat($history)
+        $assignments = $active->concat($history)
             ->map(function (object $row) use ($responderId): object {
                 $row->status = \App\Support\RescuerHouseholdQueue::status($row, $responderId);
                 $row->dispatch_household_id = $row->household_id;
                 $row->household_id = \App\Support\RescuerHouseholdQueue::target($row, $responderId);
-                $row->mobile_route = $this->routeForAssignment((int) $row->assignment_id, $responderId);
-
                 return $row;
             });
+        $this->attachRoutes($assignments, $responderId);
+
+        return $assignments;
+    }
+
+    private function attachRoutes(Collection $assignments, int $responderId): void
+    {
+        $routes = collect();
+        if ($assignments->isNotEmpty() && Schema::hasTable('responder_routes')) {
+            $ranked = DB::table('responder_routes')
+                ->whereIn('assignment_id', $assignments->pluck('assignment_id')->unique())
+                ->when(Schema::hasColumn('responder_routes', 'responder_id'), fn ($query) => $query->where('responder_id', $responderId))
+                ->select('*')->selectRaw('ROW_NUMBER() OVER (PARTITION BY assignment_id ORDER BY created_at DESC, route_id DESC) AS mobile_rank');
+            $routes = DB::query()->fromSub($ranked, 'ranked_routes')->where('mobile_rank', 1)->get()->keyBy('assignment_id');
+        }
+        $hasHousehold = $routes->isNotEmpty() && Schema::hasColumn('responder_routes', 'household_id');
+        foreach ($assignments as $assignment) {
+            $route = $routes->get($assignment->assignment_id);
+            if ($route && $hasHousehold && (!$assignment->household_id
+                || ($route->household_id ?? null) !== $assignment->household_id || ($route->route_status ?? null) === 'completed')) {
+                $routes->forget($assignment->assignment_id);
+            }
+        }
+        $trails = collect();
+        if ($routes->isNotEmpty() && Schema::hasTable('route_coordinates')) {
+            $ranked = DB::table('route_coordinates')->whereIn('route_id', $routes->pluck('route_id'))
+                ->select(['route_id', 'latitude', 'longitude', 'sequence_order', 'recorded_at', 'accuracy_m'])
+                ->selectRaw('ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY sequence_order DESC) AS mobile_rank');
+            $trails = DB::query()->fromSub($ranked, 'ranked_points')
+                ->where('mobile_rank', '<=', self::MOBILE_TRAIL_POINT_LIMIT)->orderBy('sequence_order')->get()->groupBy('route_id');
+        }
+        foreach ($assignments as $assignment) {
+            $route = $routes->get($assignment->assignment_id);
+            if ($route) {
+                unset($route->mobile_rank);
+                $route->mobile_trail_coordinates = $trails->get($route->route_id, collect())->map(function ($point) {
+                    unset($point->mobile_rank, $point->route_id);
+                    return $point;
+                })->values();
+            }
+            $assignment->mobile_route = $route;
+        }
     }
 
     public function find(int $assignmentId, ?int $responderId): ?object

@@ -1,6 +1,27 @@
 # Standalone Android APK
 
-## Latest verified local APK — version 1.0.0, build 40
+## Latest local APK — version 2.0.0, build 44
+
+Installable file: [`releases/RESQPERATION-build44.apk`](./releases/RESQPERATION-build44.apk).
+
+- 22,577,265 bytes; version code 44; package `com.kathlnbarro.resqperationmobile`; existing release signature verified.
+- The rescuer and household offline fallback views display `OFFLINE MODE`.
+- TypeScript checks and all 124 mobile tests passed. Release APK identity, non-debuggable status, and signing certificate were verified.
+- SHA-256: `3349219A03E6B6D21F59A0D5A92DEDED3B337A0D1842E7C59D0E4F93A2AF2829`.
+
+## Build 42 notes — version 1.0.0
+
+Local file: [`releases/RESQPERATION-build42.apk`](./releases/RESQPERATION-build42.apk).
+
+- 22,574,181 bytes; version code 42; existing release signature verified.
+- Restored native map mounting across Android lifecycle changes; the embedded rescuer map uses a TextureView inside its scroll container.
+- Undownloaded map packs no longer replace the street-map style. A failed saved style falls back to the street map.
+- Preserved Expo's reflection-loaded `RNHeadlessAppLoader` in the release shrinker. Build 41 logged ClassNotFoundException for this removed class; build 42 retains it and the error was absent during the emulator check.
+- Dispatch actions reuse GPS saved within 30 seconds. New GPS acquisition has an eight-second timeout. Navigation overview/bootstrap requests run concurrently.
+- 122 mobile tests and TypeScript checks passed. Build 42 was installed in the Android emulator; navigation map rendering and background/resume were checked. Map-tab mounting and style fallback have component regression tests. Authenticated field operations, heat and performance on the user's physical phone remain unverified.
+- SHA-256: `E71B460732163D805ADD4E11E0F8E53C3150D1CD56C650DE2867FA2AD6F8BAAA`.
+
+## Previous local APK — version 1.0.0, build 40
 
 Local copy: [`releases/RESQPERATION-build40.apk`](./releases/RESQPERATION-build40.apk).
 

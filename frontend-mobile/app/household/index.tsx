@@ -680,7 +680,7 @@ export default function HouseholdHomeScreen() {
   if (!loading && !overview && overviewError) {
     return <SafeAreaView style={styles.safe}>
       <View style={{ padding: spacing.lg, gap: spacing.md }}>
-        <HouseholdEmpty icon="cloud-offline-outline" title="Unable to load household data" body={overviewError} />
+        <HouseholdEmpty icon="cloud-offline-outline" title="OFFLINE MODE" />
         <HouseholdButton label="Try again" icon="refresh-outline" onPress={() => { void loadOverview(); }} />
       </View>
     </SafeAreaView>;
@@ -706,6 +706,7 @@ export default function HouseholdHomeScreen() {
       />
 
       <ScrollView
+        removeClippedSubviews={false}
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,

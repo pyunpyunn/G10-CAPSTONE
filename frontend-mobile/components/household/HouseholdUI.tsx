@@ -17,6 +17,7 @@ export function HouseholdButton({ label, icon, tone = 'primary', disabled = fals
     <Pressable
       style={[styles.button, styles[tone], disabled && styles.disabled]}
       onPress={onPress}
+        android_ripple={{ color: '#236a7333' }}
       disabled={disabled}
     >
       {icon ? <Ionicons name={icon} size={17} color={tone === 'light' || tone === 'gray' ? palette.nav : '#fff'} /> : null}

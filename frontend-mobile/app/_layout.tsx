@@ -11,6 +11,7 @@ import { configureNotificationHandler } from '@/utils/pushNotifications';
 import { NotificationPermissionNotice } from '@/components/NotificationPermissionNotice';
 import { Provider } from 'react-redux';
 import { store } from '@/state/apiStore';
+export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
   initialRouteName: 'index',

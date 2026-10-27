@@ -1,4 +1,4 @@
-import * as SQLite from 'expo-sqlite';
+import * as SQLite from './navigationDatabase';
 import { Platform } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { getStoredItem, setStoredItem } from './secureStorage';

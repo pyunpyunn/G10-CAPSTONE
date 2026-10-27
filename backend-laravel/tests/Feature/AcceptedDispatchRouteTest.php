@@ -125,4 +125,39 @@ class AcceptedDispatchRouteTest extends TestCase
         app(RescuerRouteWriter::class)->refreshPlannedRoadRoute(12,['responder_id'=>5,'latitude'=>10.29,'longitude'=>123.88]);
         $this->assertDatabaseCount('responder_routes',0);
     }
+
+    public function test_assignment_list_batches_routes_and_preserves_the_latest_trail_per_rescuer(): void
+    {
+        for ($id = 20; $id < 28; $id++) {
+            DB::table('responder_assignments')->insert([
+                'assignment_id' => $id, 'responder_id' => 5, 'household_id' => 'HH-B', 'status' => 'accepted',
+            ]);
+            DB::table('responder_routes')->insert([
+                'route_id' => $id, 'assignment_id' => $id, 'responder_id' => 5,
+                'household_id' => 'HH-B', 'route_status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $points = [];
+            for ($sequence = 1; $sequence <= 305; $sequence++) {
+                $points[] = ['coordinate_id' => $id * 1000 + $sequence, 'route_id' => $id,
+                    'latitude' => 10.29, 'longitude' => 123.88, 'sequence_order' => $sequence];
+            }
+            DB::table('route_coordinates')->insert($points);
+        }
+        DB::table('responder_routes')->insert([
+            'route_id' => 99, 'assignment_id' => 20, 'responder_id' => 6,
+            'household_id' => 'HH-B', 'route_status' => 'active', 'created_at' => now()->addSecond(), 'updated_at' => now(),
+        ]);
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $assignments = app(RescuerAssignmentQuery::class)->list(5, 10);
+        $queries = collect(DB::getQueryLog())->pluck('query');
+        DB::disableQueryLog();
+        $this->assertCount(1, $queries->filter(fn ($query) => str_contains($query, 'ranked_routes')));
+        $this->assertCount(1, $queries->filter(fn ($query) => str_contains($query, 'ranked_points')));
+        foreach ($assignments->whereBetween('assignment_id', [20, 27]) as $assignment) {
+            $this->assertSame(5, (int) $assignment->mobile_route->responder_id);
+            $this->assertCount(300, $assignment->mobile_route->mobile_trail_coordinates);
+            $this->assertSame(6, (int) $assignment->mobile_route->mobile_trail_coordinates->first()->sequence_order);
+        }
+    }
 }

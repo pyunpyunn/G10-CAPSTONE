@@ -12,6 +12,15 @@ if (googleMapsAndroidApiKey) {
 module.exports = {
   ...base.expo,
   plugins: base.expo.plugins.map((plugin) => {
+    if (Array.isArray(plugin) && plugin[0] === 'expo-build-properties') {
+      return [plugin[0], {
+        ...plugin[1],
+        android: {
+          ...plugin[1].android,
+          extraProguardRules: `${plugin[1].android?.extraProguardRules || ''}\n-keep class expo.modules.adapters.react.apploader.RNHeadlessAppLoader { *; }`,
+        },
+      }];
+    }
     if (Array.isArray(plugin) && plugin[0] === 'onesignal-expo-plugin') {
       return [plugin[0], {
         ...plugin[1],
@@ -24,6 +33,12 @@ module.exports = {
     '@maplibre/maplibre-react-native',
     'expo-sqlite',
     'expo-task-manager',
+    ['expo-media-library', {
+      photosPermission: false,
+      savePhotosPermission: 'Allow RESQPERATION to save your household QR image to your photo gallery.',
+      granularPermissions: [],
+      isAccessMediaLocationEnabled: false,
+    }],
     ['expo-location', {
       locationWhenInUsePermission: 'Allow location access while following an active rescue dispatch.',
       locationAlwaysAndWhenInUsePermission: 'Allow location access while recording an active rescue dispatch.',

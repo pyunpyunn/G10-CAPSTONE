@@ -18,8 +18,8 @@ function load({ granted = true, pending = false, currentFix } = {}) {
     requestForegroundPermissionsAsync: async () => ({ status: granted ? 'granted' : 'denied' }),
     watchPositionAsync: async (options, listener) => {
       watches++; fixListener = listener;
-      assert.equal(options.timeInterval, 5000);
-      assert.equal(options.distanceInterval, 5);
+      assert.equal(options.timeInterval, 15000);
+      assert.equal(options.distanceInterval, 15);
       assert.equal(options.accuracy, 3);
       const subscription = { remove() { removed++; } };
       if (pending) return new Promise((resolve) => { completeWatch = () => resolve(subscription); });
@@ -29,7 +29,7 @@ function load({ granted = true, pending = false, currentFix } = {}) {
   const exports = {};
   const source = fs.readFileSync(path.join(__dirname, '../utils/foregroundMapGps.ts'), 'utf8');
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText,
-    { exports, Number, require: (name) => name === 'react-native' ? { AppState: appState } : location });
+    { exports, Number, require: (name) => name === 'react-native' ? { AppState: appState } : name === './savedGps' ? { rememberGps: async () => {} } : location });
   return { start: exports.watchForegroundMapGps, counts: () => ({ watches, removed }),
     state(value) { appState.currentState = value; stateListener?.(value); },
     fix(coords, timestamp) { fixListener({ coords, timestamp }); }, resolve: () => completeWatch() };

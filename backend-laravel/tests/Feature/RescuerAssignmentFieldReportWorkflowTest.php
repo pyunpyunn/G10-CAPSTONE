@@ -362,9 +362,14 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $enRoute = $change('en_route',5,['latitude'=>10.281,'longitude'=>123.871]);
         $this->assertSame('HH-4',$enRoute['route']->household_id);
         $this->assertNotEmpty(json_decode($enRoute['route']->route_polyline,true));
+        $routeCalls = count(\Illuminate\Support\Facades\Http::recorded());
         $fresh = $workflow->storeLocation($this->request(['latitude'=>10.282,'longitude'=>123.872,'refresh_route'=>true]),$id);
         $this->assertSame(200,$fresh->getStatusCode());
         $this->assertNotEmpty($fresh->getData(true)['data']['route']['coordinates']);
+        $this->assertCount($routeCalls, \Illuminate\Support\Facades\Http::recorded(), 'GPS saves must not wait for external routing.');
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\RefreshResponderRoadRoute::class);
+        $this->assertDatabaseHas('responder_routes',['assignment_id'=>$id,'responder_id'=>5,'start_latitude'=>10.281]);
+        (new \App\Jobs\RefreshResponderRoadRoute($id,['responder_id'=>5,'latitude'=>10.282,'longitude'=>123.872]))->handle($workflow);
         $this->assertDatabaseHas('responder_routes',['assignment_id'=>$id,'responder_id'=>5,'start_latitude'=>10.282,'start_longitude'=>123.872]);
         try {
             $workflow->storeLocation($this->request(['latitude'=>10.1,'longitude'=>123.1,'recorded_at'=>now()->subSeconds(5)->toIso8601String()]),$id);

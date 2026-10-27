@@ -15,7 +15,7 @@ function fixture() {
   async hasStartedLocationUpdatesAsync(){return background;},async stopLocationUpdatesAsync(){background=false;calls.push(['stop-background']);},async startLocationUpdatesAsync(name,options){background=true;calls.push(['background',options]);}};
  const app={currentState:'active',addEventListener(_,callback){appListener=callback;return {remove(){appListener=null;}};}};
  const exports={};
- const mocks={'expo-location':location,'expo-task-manager':{defineTask(name,callback){tasks[name]=callback;}},'react-native':{AppState:app,Platform:{OS:'android'}},
+ const mocks={'./savedGps':{rememberGps:async()=>{}},'expo-location':location,'expo-task-manager':{defineTask(name,callback){tasks[name]=callback;}},'react-native':{AppState:app,Platform:{OS:'android'}},
  '@/api/client':{api:{async post(url,payload,config){calls.push(['post',url,payload,config]);return {};}}},
  './secureStorage':{async getStoredItem(key){return storage.get(key)||null;},async setStoredItem(key,value){storage.set(key,value);},async deleteStoredItem(key){storage.delete(key);}}};
  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../utils/rescuerLiveLocation.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
@@ -67,10 +67,35 @@ test('GPS uploads are suppressed until movement and elapsed-time thresholds are 
  assert.equal(f.calls.filter(x=>x[0]==='post').at(-1)[2].refresh_route,false,'route recalculation is separately throttled');
  await f.runtime.stopRescuerTracking();
 });
+test('waiting and completed queues do not automatically request continuous GPS',()=>{
+ const f=fixture();
+ for(const status_key of ['dispatched','completed','cancelled']) assert.equal(f.runtime.trackingAssignmentFor({assignment_id:71,status_key}),null);
+ for(const status_key of ['accepted','en_route','on_scene']) assert.equal(f.runtime.trackingAssignmentFor({assignment_id:71,status_key}),71);
+ assert.equal(f.runtime.trackingAssignmentFor(null),null);
+});
+
 test('completion/logout stops tracking and prevents late background uploads',async()=>{
  const f=fixture();await f.runtime.configureRescuerTracking(71);await flush();await f.runtime.stopRescuerTracking();
  const count=f.calls.filter(x=>x[0]==='post').length;
  await f.sendBackground(f.fix(10.3));assert.equal(f.calls.filter(x=>x[0]==='post').length,count);assert.equal(f.background(),false);assert.equal(f.timers.size,0);
+});
+
+test('background service replaces the foreground watch and resuming does not create a second GPS watch',async()=>{
+ const f=fixture();await f.runtime.configureRescuerTracking(71);await flush();
+ assert.equal(f.removed(),1);
+ const watches=f.calls.filter(call=>call[0]==='watch').length;
+ f.state('background');f.state('active');await flush();
+ assert.equal(f.calls.filter(call=>call[0]==='watch').length,watches);
+ await f.runtime.stopRescuerTracking();
+});
+
+test('a failed screen subscriber and corrupt stored tracking state do not crash background tracking',async()=>{
+ const f=fixture();f.runtime.subscribeRescuerPosition(()=>{throw Error('Unmounted view');});
+ await f.runtime.configureRescuerTracking(71);await flush();
+ assert.equal(f.calls.filter(call=>call[0]==='post').length,1);
+ f.storage.set('resq_active_rescuer_location','broken JSON');
+ await f.sendBackground(f.fix());
+ await f.runtime.stopRescuerTracking();
 });
 test('a previous accounts background callback cannot post using a new session',async()=>{
  const f=fixture();await f.runtime.configureRescuerTracking(71);await flush();const count=f.calls.filter(x=>x[0]==='post').length;

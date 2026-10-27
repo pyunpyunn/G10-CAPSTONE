@@ -38,7 +38,7 @@ function storeFixture(t, { failInitialization = false } = {}) {
     'react-native': { Platform: { OS: 'android' } },
     './secureStorage': { async getStoredItem(key) { return stored.get(key) ?? null; }, async setStoredItem(key, value) { stored.set(key, value); } },
     'expo-crypto': { randomUUID: crypto.randomUUID },
-    'expo-sqlite': { async openDatabaseAsync(name) {
+    './navigationDatabase': { async openDatabaseAsync(name) {
       opens++;
       const db = connection(name);
       if (failInitialization && opens === 1) {

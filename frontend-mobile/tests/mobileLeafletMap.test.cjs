@@ -79,7 +79,7 @@ test('route refresh replaces layers without moving or reloading the map', () => 
   let cameraMoves=0,removed=0,lines=0;
   const map={setView(){cameraMoves++;return this;},on(){},removeLayer(){removed++;}};
   const bounds={isValid:()=>false,extend(){return this;}};
-  const window={};
+  const window={addEventListener() {}};
   vm.runInNewContext(script,{window,L:{map:()=>map,tileLayer:()=>({addTo(){}}),latLngBounds:()=>bounds,
     control:()=>({addTo(){this.onAdd();}}),DomUtil:{create:()=>({style:{},setAttribute(){}})},DomEvent:{disableClickPropagation(){},on(){}},
     polyline:()=>{lines++;return {addTo(){return this;},bindPopup(){return this;}};},
@@ -97,7 +97,7 @@ test('GPS zooms once, moves one marker, permits panning and recenters on demand'
   const map = { setView(point, level) { views.push({ point, level }); zoom = level; return this; },
     on: (name, fn) => { mapEvents[name] = fn; }, getZoom: () => zoom,
     removeLayer() { removed++; } };
-  const window = {};
+  const window = { addEventListener() {} };
   vm.runInNewContext(script, { window, L: {
     map: () => map, tileLayer: () => ({ addTo() {} }),
     latLngBounds: () => ({ isValid: () => false }),

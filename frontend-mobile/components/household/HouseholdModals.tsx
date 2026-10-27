@@ -1,7 +1,7 @@
 import { householdQrValue } from '@/utils/householdQr';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { saveQrImage } from '@/utils/saveQrImage';
 import type Svg from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import QRCode from 'react-native-qrcode-svg';
@@ -35,30 +35,14 @@ export function HouseholdQrModal({ visible, qr, householdId, onClose }: QrModalP
             clearTimeout(timeout);
             if (!data) reject(new Error('Unable to export the QR image.'));
             else resolve(data);
-          }, { width: 1024, height: 1024 });
+          }, { width: 512, height: 512 });
         } catch (error) {
           clearTimeout(timeout);
           reject(error);
         }
       });
 
-      if (Platform.OS === 'android') {
-        const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-        if (!permission.granted) return;
-        const uri = await FileSystem.StorageAccessFramework.createFileAsync(permission.directoryUri, filename, 'image/png');
-        try {
-          await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
-        } catch (error) {
-          await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-          throw error;
-        }
-        Alert.alert('QR downloaded', `${filename} was saved in your selected folder.`);
-      } else if (Platform.OS === 'ios' && FileSystem.documentDirectory) {
-        await FileSystem.writeAsStringAsync(`${FileSystem.documentDirectory}${filename}`, base64, { encoding: FileSystem.EncodingType.Base64 });
-        Alert.alert('QR downloaded', `${filename} was saved in Files > On My iPhone/iPad > RESQPERATION.`);
-      } else {
-        throw new Error('Download QR is available in the Android and iOS mobile app.');
-      }
+      Alert.alert('QR downloaded', await saveQrImage(base64, filename));
     } catch (error) {
       Alert.alert('Unable to download QR', error instanceof Error ? error.message : 'Could not save the PNG. Please try again.');
     } finally {
