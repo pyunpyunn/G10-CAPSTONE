@@ -23,20 +23,20 @@ return new class extends Migration {
             $table->timestamp('created_at');
             $table->unique(['subscription_id', 'notice_hash']);
         });
-        Schema::create('official_advisory_notifications', function (Blueprint $table) {
-            $table->id();
-            $table->string('source', 16);
-            $table->string('fingerprint', 64)->unique();
-            $table->string('title');
-            $table->text('body');
-            $table->text('source_url');
-            $table->timestamp('created_at')->index();
-        });
+        if (Schema::hasTable('notifications')) {
+            foreach (['advisory_source' => 'string', 'advisory_fingerprint' => 'string', 'advisory_title' => 'string', 'advisory_source_url' => 'text'] as $column => $type) {
+                if (! Schema::hasColumn('notifications', $column)) {
+                    Schema::table('notifications', function (Blueprint $table) use ($column, $type): void {
+                        $field = $table->$type($column)->nullable();
+                        if ($column === 'advisory_fingerprint') $field->unique();
+                    });
+                }
+            }
+        }
     }
     public function down(): void
     {
         Schema::dropIfExists('web_push_deliveries');
         Schema::dropIfExists('web_push_subscriptions');
-        Schema::dropIfExists('official_advisory_notifications');
     }
 };

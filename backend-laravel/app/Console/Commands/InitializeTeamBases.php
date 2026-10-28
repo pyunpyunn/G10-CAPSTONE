@@ -18,7 +18,7 @@ class InitializeTeamBases extends Command
         $missing = 0;
 
         foreach ($teamIds as $teamId) {
-            $existing = DB::table('team_bases')->where('team_id', $teamId)->exists();
+            $existing = DB::table('rescue_teams')->where('team_id', $teamId)->whereNotNull('base_latitude')->whereNotNull('base_longitude')->exists();
             if ($bases->ensureDefaultBase((int) $teamId)) {
                 $created += $existing ? 0 : 1;
             } else {

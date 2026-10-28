@@ -29,16 +29,14 @@ class HouseholdAccessService
         $input = $request->validate(['device_uuid' => ['required', 'string', 'max:150']]);
         return DB::transaction(function () use ($credential, $input): JsonResponse {
             $this->lockHousehold($credential->household_id);
-            DB::table('household_login_accounts')->insertOrIgnore([
-                'household_id' => $credential->household_id, 'user_id' => $credential->user_id, 'created_at' => now(), 'updated_at' => now(),
-            ]);
-            $binding = DB::table('household_device_owners')->where('household_id', $credential->household_id)->where('device_uuid', $input['device_uuid'])->first();
+            DB::table('households')->where('household_id', $credential->household_id)->whereNull('login_user_id')->update(['login_user_id' => $credential->user_id]);
+            $binding = DB::table('device_tokens')->where('household_id', $credential->household_id)->where('device_uuid', $input['device_uuid'])->whereNotNull('owner_selected_at')->first();
             $owner = $binding ? $this->memberUser($credential, $binding->member_id, false) : null;
             if ($owner) {
                 $this->revokeDeviceTokens($credential->household_id, $input['device_uuid']);
                 return $this->issue($owner, $input['device_uuid'], false);
             }
-            if ($binding) DB::table('household_device_owners')->where('id', $binding->id)->delete();
+            if ($binding) DB::table('device_tokens')->where('id', $binding->id)->update(['owner_selected_at' => null, 'selection_token_id' => null]);
             $this->revokeDeviceTokens($credential->household_id, $input['device_uuid']);
             return $this->issue($credential, $input['device_uuid'], true);
         }, 3);
@@ -60,19 +58,19 @@ class HouseholdAccessService
             $this->lockHousehold($user->household_id);
             $token = $user->currentAccessToken();
             abort_unless(DB::table('personal_access_tokens')->where('id', $token->id)->exists(), 401, 'Sign in again.');
-            $binding = DB::table('household_device_owners')->where('household_id', $user->household_id)->where('device_uuid', $uuid)->first();
+            $binding = DB::table('device_tokens')->where('household_id', $user->household_id)->where('device_uuid', $uuid)->whereNotNull('owner_selected_at')->first();
             if ($binding && ((int) $binding->selection_token_id !== (int) $token->id || $binding->member_id !== $input['member_id'])) {
                 abort(409, 'This phone already has an owner. Sign in again to use the saved owner, or reset it in Profile settings.');
             }
             $owner = $this->memberUser($this->credentialUser($user), $input['member_id'], true);
             abort_unless($owner, 422, 'Choose an active member of this household.');
-            DB::table('household_device_owners')->updateOrInsert(['household_id' => $user->household_id, 'device_uuid' => $uuid], [
-                'member_id' => $owner->member_id, 'selection_token_id' => $token->id, 'created_at' => $binding->created_at ?? now(), 'updated_at' => now(),
-            ]);
             $deviceRequest = Request::create('/api/v1/household/device-location', 'POST', ['device_uuid' => $uuid]);
             $deviceRequest->setUserResolver(fn () => $owner);
             $saved = app(HouseholdMobileSetupWorkflow::class)->updateDeviceLocation($deviceRequest);
             abort_if($saved->getStatusCode() >= 400, $saved->getStatusCode(), 'The device owner could not be saved.');
+            DB::table('device_tokens')->where('household_id', $user->household_id)->where('device_uuid', $uuid)->update([
+                'selection_token_id' => $token->id, 'owner_selected_at' => $binding->owner_selected_at ?? now(),
+            ]);
             // Keep the restricted selection token until the phone confirms its new session.
             // If a slow connection loses this response, the same selection can be retried.
             $this->revokeDeviceTokens($user->household_id, $uuid, false);
@@ -91,7 +89,7 @@ class HouseholdAccessService
         $uuid = $this->deviceUuid($request);
         return DB::transaction(function () use ($user, $uuid): JsonResponse {
             $this->lockHousehold($user->household_id);
-            DB::table('household_device_owners')->where('household_id', $user->household_id)->where('device_uuid', $uuid)->delete();
+            DB::table('device_tokens')->where('household_id', $user->household_id)->where('device_uuid', $uuid)->update(['owner_selected_at' => null, 'selection_token_id' => null]);
             $this->tokens($user->household_id)->where('name', 'household-pending:'.$uuid)->delete();
             return $this->issue($this->credentialUser($user), $uuid, true, $user->currentAccessToken()?->id);
         }, 3);
@@ -191,6 +189,6 @@ class HouseholdAccessService
 
     private function requireTables(): void
     {
-        abort_unless(Schema::hasTable('household_login_accounts') && Schema::hasTable('household_device_owners'), 503, 'The household login update must be installed first.');
+        abort_unless(Schema::hasColumn('households', 'login_user_id') && Schema::hasColumn('device_tokens', 'owner_selected_at') && Schema::hasColumn('device_tokens', 'selection_token_id'), 503, 'The household login update must be installed first.');
     }
 }

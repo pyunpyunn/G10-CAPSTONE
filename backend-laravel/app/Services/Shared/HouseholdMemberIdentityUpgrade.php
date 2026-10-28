@@ -55,7 +55,7 @@ class HouseholdMemberIdentityUpgrade
                 $temporary = [];
                 foreach ($mapping as $old => $new) {
                     $temporary[$old] = 'HM-MIGRATION-'.Str::uuid();
-                    DB::table('household_member_id_mappings')->insert(['old_member_id' => $old, 'member_id' => $new]);
+                    DB::table('household_members')->where('member_id', $old)->whereNull('legacy_member_id')->update(['legacy_member_id' => $old]);
                 }
                 $this->replaceIds($temporary, $references, $jsonColumns);
                 $this->replaceIds(array_combine(array_values($temporary), array_values($mapping)) ?: [], $references, $jsonColumns);

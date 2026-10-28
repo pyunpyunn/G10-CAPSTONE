@@ -24,45 +24,14 @@ class HouseholdMobileSetupWorkflow
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy_m' => ['nullable', 'numeric', 'min:0'],
             'address_label' => ['required', 'string', 'max:255'],
-            'sitio_id' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
-        $mambalingFocus = app(\App\Services\Shared\BarangayProfileService::class)->mambalingMapFocus();
-        if (! $mambalingFocus['boundary']) {
-            return response()->json(['message' => 'The Mambaling boundary is unavailable, so this location cannot be validated.'], 503);
+        try {
+            $classification = $this->validatePin((float) $validated['latitude'], (float) $validated['longitude']);
+        } catch (\Illuminate\Validation\ValidationException $error) {
+            return response()->json(['message' => $error->getMessage()], 422);
         }
-        $barangayId = (int) ($mambalingFocus['barangay_id'] ?? 0);
-        if (isset($validated['sitio_id']) && $barangayId < 1) {
-            return response()->json(['message' => 'The registered Mambaling barangay ID is unavailable.'], 503);
-        }
-        if (isset($validated['sitio_id'])) {
-            foreach (['sitios' => ['sitio_id', 'sitio_name', 'barangay_id'], 'addresses' => ['address_id', 'sitio_id', 'barangay_id'], 'households' => ['address_id']] as $table => $columns) {
-                if (! Schema::hasTable($table) || collect($columns)->contains(fn (string $column): bool => ! Schema::hasColumn($table, $column))) {
-                    return response()->json(['message' => 'The registered Mambaling sitio and household address schema is unavailable.'], 503);
-                }
-            }
-            $validated = array_merge($validated, $request->validate([
-                'sitio_id' => [Rule::exists('sitios', 'sitio_id')->where(fn ($query) => $query->where('barangay_id', $barangayId))],
-            ]));
-        }
-        $classifier = app(\App\Services\Shared\HouseholdGeographicClassifier::class);
-        $classification = $classifier->resolve((float) $validated['latitude'], (float) $validated['longitude'], $mambalingFocus);
-        if ($classification['status'] === 'barangay_boundary_missing') {
-            return response()->json(['message' => 'The Mambaling boundary is unavailable, so this location cannot be validated.'], 503);
-        }
-        if ($classification['status'] === 'outside_barangay') {
-            return response()->json(['message' => 'Choose a household location inside the Mambaling boundary.'], 422);
-        }
-        $confirmedSitio = isset($validated['sitio_id'])
-            ? DB::table('sitios')->where('sitio_id', (int) $validated['sitio_id'])->where('barangay_id', $barangayId)->first(['sitio_id', 'sitio_name'])
-            : null;
-        if (isset($validated['sitio_id']) && ! $confirmedSitio) {
-            return response()->json(['message' => 'Choose a sitio registered in Mambaling.'], 422);
-        }
-        if ($confirmedSitio && $classification['status'] === 'matched' && (int) $classification['sitio_id'] !== (int) $confirmedSitio->sitio_id) {
-            return response()->json(['message' => 'The selected sitio does not match the verified boundary at this pin.'], 422);
-        }
-        DB::transaction(function () use ($request, $householdId, $validated, $confirmedSitio, $barangayId, $mambalingFocus, &$classification): void {
-            $classification = $this->saveGeotag($householdId, $request->user()?->user_id, $validated, now(), $confirmedSitio, $barangayId, $mambalingFocus);
+        DB::transaction(function () use ($request, $householdId, $validated, &$classification): void {
+            $classification = $this->saveGeotag($householdId, $request->user()?->user_id, $validated, now());
             $this->support->writeAuditLog($request, 'mobile_household_geotag', 'households', $householdId, $validated);
         });
         $this->queueRouteRecompute($householdId);
@@ -83,7 +52,8 @@ class HouseholdMobileSetupWorkflow
         ]);
         return response()->json(['data' => [
             'reused_geotag' => false,
-            'address' => app(HouseholdSetupAddress::class)->resolve($householdId, (float) $coordinates['latitude'], (float) $coordinates['longitude']),
+            'geographic_classification' => $this->validatePin((float) $coordinates['latitude'], (float) $coordinates['longitude']),
+            'address' => app(HouseholdSetupAddress::class)->registered($householdId),
         ]]);
     }
 
@@ -123,8 +93,10 @@ class HouseholdMobileSetupWorkflow
                 'landmark' => ['nullable', 'string', 'max:255'],
             ], ['unit_number.required' => 'Enter your apartment unit number.']);
             $addresses = app(HouseholdSetupAddress::class);
-            $area = $addresses->resolve($householdId, (float) $validated['latitude'], (float) $validated['longitude']);
-            $validated['address_label'] = mb_substr($addresses->save($householdId, $area, $validated), 0, 255);
+            $classification = $this->validatePin((float) $validated['latitude'], (float) $validated['longitude']);
+            $area = $addresses->registered($householdId) ?? [];
+            $addresses->save($householdId, $area, $validated);
+            $validated['address_label'] = $validated['latitude'].', '.$validated['longitude'];
             $now = now();
             $locationData = $this->support->filterColumns('geotagged_locations', [
                 'household_id' => $householdId, 'latitude' => $validated['latitude'], 'longitude' => $validated['longitude'],
@@ -141,12 +113,8 @@ class HouseholdMobileSetupWorkflow
                 DB::table('geotagged_locations')->insert($this->support->withGeneratedKey('geotagged_locations', 'location_id', $locationData,
                     $this->support->nextId('geotagged_locations', 'location_id')));
             }
-            $classification = [
-                'status' => $area['source'] === 'boundary' ? 'matched' : 'registered_address',
-                'sitio_id' => $area['sitio_id'], 'purok_id' => $area['purok_id'],
-            ];
             if (Schema::hasTable('household_geographic_classifications')) {
-                DB::table('household_geographic_classifications')->updateOrInsert(['household_id' => $householdId], array_merge($classification, [
+                DB::table('household_geographic_classifications')->updateOrInsert(['household_id' => $householdId], array_merge($classification, ['sitio_id' => null, 'purok_id' => null,
                     'latitude' => $validated['latitude'], 'longitude' => $validated['longitude'], 'updated_at' => $now, 'created_at' => $now,
                 ]));
             }
@@ -199,16 +167,25 @@ class HouseholdMobileSetupWorkflow
         ]);
     }
 
-    private function saveGeotag(string $householdId, ?string $userId, array $validated, $now, ?object $confirmedSitio = null, ?int $barangayId = null, ?array $focus = null): array
+    private function validatePin(float $latitude, float $longitude): array
     {
-        $classification = app(\App\Services\Shared\HouseholdGeographicClassifier::class)->classify(
-            $householdId,
-            (float) $validated['latitude'],
-            (float) $validated['longitude'],
-            $confirmedSitio ? (int) $confirmedSitio->sitio_id : null,
-            $barangayId,
-            $focus
-        );
+        $focus = app(\App\Services\Shared\BarangayProfileService::class)->mambalingMapFocus();
+        abort_unless($focus['boundary'], 503, 'The Mambaling boundary is unavailable, so this location cannot be validated.');
+        if (! app(\App\Services\Shared\BarangayBoundaryService::class)->contains($focus['boundary'], $latitude, $longitude)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['latitude' => 'Choose a household location inside the Mambaling boundary.']);
+        }
+        return ['status' => 'pin_only'];
+    }
+
+    private function saveGeotag(string $householdId, ?string $userId, array $validated, $now): array
+    {
+        $classification = ['status' => 'pin_only'];
+        if (Schema::hasTable('household_geographic_classifications')) {
+            DB::table('household_geographic_classifications')->updateOrInsert(['household_id' => $householdId], [
+                'status' => 'pin_only', 'sitio_id' => null, 'purok_id' => null,
+                'latitude' => $validated['latitude'], 'longitude' => $validated['longitude'], 'created_at' => $now, 'updated_at' => $now,
+            ]);
+        }
         $data = $this->support->filterColumns('geotagged_locations', [
             'household_id' => $householdId,
             'latitude' => $validated['latitude'],

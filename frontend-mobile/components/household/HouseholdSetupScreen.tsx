@@ -38,7 +38,7 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
         <View style={styles.webMapFallback}>
           <Ionicons name="map-outline" size={30} color={palette.navActive} />
           <Text style={styles.fallbackText}>Use GPS here, or open the mobile app to choose the household location on the map.</Text>
-          <HouseholdBadge label={findingAddress ? 'Checking address...' : pin ? 'Location selected' : 'No location selected'} tone={pin ? 'info' : 'neutral'} />
+          <HouseholdBadge label={findingAddress ? 'Checking location...' : pin ? 'Location selected' : 'No location selected'} tone={pin ? 'info' : 'neutral'} />
         </View>
         <Text style={styles.helperText}>{geotagMessage}</Text>
       </View>

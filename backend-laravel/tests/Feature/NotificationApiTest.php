@@ -44,7 +44,7 @@ class NotificationApiTest extends TestCase
         $this->assertNotEmpty($second->json('data.preview'));
         $this->assertIsArray($cache->get($revision.':initial:notification-feed:v4'));
 
-        $this->postJson('/api/v1/notifications/mark-read', ['notification_ids' => ['advisory-1']])->assertOk();
+        $this->postJson('/api/v1/notifications/mark-read', ['notification_ids' => ['advisory-100']])->assertOk();
         $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.unread', 0);
     }
 
@@ -179,11 +179,11 @@ class NotificationApiTest extends TestCase
         }
         User::query()->where('user_id', 'USR-ADMIN-001')->update(['role_id' => $roleId]);
 
-        Schema::create('official_advisory_notifications', function (Blueprint $table) {
-            $table->id(); $table->string('source'); $table->string('fingerprint')->unique();
-            $table->string('title'); $table->text('body'); $table->text('source_url'); $table->timestamp('created_at');
+        Schema::table('notifications', function (Blueprint $table): void {
+            $table->string('advisory_source')->nullable(); $table->string('advisory_fingerprint')->nullable()->unique();
+            $table->string('advisory_title')->nullable(); $table->text('advisory_source_url')->nullable();
         });
-        \DB::table('official_advisory_notifications')->insert(['source'=>'PAGASA','fingerprint'=>'first','title'=>'Official sync','body'=>'Advisories synchronized','source_url'=>'https://publicalert.pagasa.dost.gov.ph/feeds/','created_at'=>now()]);
+        \DB::table('notifications')->insert(['notif_id'=>100,'advisory_source'=>'PAGASA','advisory_fingerprint'=>'first','advisory_title'=>'Official sync','message'=>'Advisories synchronized','advisory_source_url'=>'https://publicalert.pagasa.dost.gov.ph/feeds/','created_at'=>now()]);
         Notification::query()->updateOrCreate(
             ['notif_id' => 1],
             [
@@ -256,9 +256,9 @@ class NotificationApiTest extends TestCase
         $user = User::query()->where('user_id', 'USR-ADMIN-001')->firstOrFail();
         $this->actingAs($user, 'sanctum');
         $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.total', 1);
-        \DB::table('official_advisory_notifications')->insert(['source'=>'PHIVOLCS','fingerprint'=>'second','title'=>'Official quake sync','body'=>'Bulletins synchronized','source_url'=>'https://earthquake.phivolcs.dost.gov.ph/','created_at'=>now()]);
+        \DB::table('notifications')->insert(['advisory_source'=>'PHIVOLCS','advisory_fingerprint'=>'second','advisory_title'=>'Official quake sync','message'=>'Bulletins synchronized','advisory_source_url'=>'https://earthquake.phivolcs.dost.gov.ph/','created_at'=>now()]);
         $this->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('data.summary.total', 2)
             ->assertJsonFragment(['type'=>'PHIVOLCS advisory sync']);
-        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseCount('notifications', 3);
     }
 }

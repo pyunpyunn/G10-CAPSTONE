@@ -43,6 +43,20 @@ class MobileDeviceService
             ], 403);
         }
 
+        if (! Schema::hasColumn('device_tokens', 'household_id')
+            || ! Schema::hasColumn('device_tokens', 'user_id')
+            || ! Schema::hasColumn('device_tokens', 'device_uuid')) {
+            return response()->json([
+                'message' => 'The device_tokens identity fields are unavailable. Run the latest database migrations before registering mobile devices.',
+            ], 503);
+        }
+
+        if ($roleKey === 'household_resident' && ! $user->household_id) {
+            return response()->json([
+                'message' => 'This account is not linked to a household record.',
+            ], 403);
+        }
+
         $tokenColumn = $this->oneSignalTokenColumn();
 
         if (! $tokenColumn) {
@@ -258,7 +272,6 @@ class MobileDeviceService
         return $filtered;
     }
 }
-
 
 
 

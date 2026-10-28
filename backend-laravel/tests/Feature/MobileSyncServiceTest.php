@@ -24,7 +24,7 @@ class MobileSyncServiceTest extends TestCase
             $table->json('result_json')->nullable();
             $table->timestamp('received_at');
         });
-        Schema::create('devices', function (Blueprint $table): void {
+        Schema::create('device_tokens', function (Blueprint $table): void {
             $table->id();
             $table->string('user_id');
             $table->integer('team_id');
@@ -59,7 +59,7 @@ class MobileSyncServiceTest extends TestCase
             $table->dateTime('recorded_at', 6);
         });
 
-        DB::table('devices')->insert([
+        DB::table('device_tokens')->insert([
             'id' => 1, 'user_id' => 'USER-1', 'team_id' => 4, 'device_uuid' => 'device-4',
             'created_at' => now(), 'updated_at' => now(),
         ]);

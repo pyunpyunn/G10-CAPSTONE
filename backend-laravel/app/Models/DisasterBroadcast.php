@@ -27,6 +27,7 @@ class DisasterBroadcast extends Model
         'channel',
         'status',
         'notification_id',
+        'onesignal_id',
         'weather_log_id',
         'sent_at',
         'target_area_label',

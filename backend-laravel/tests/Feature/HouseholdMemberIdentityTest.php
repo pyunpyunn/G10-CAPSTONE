@@ -73,7 +73,7 @@ class HouseholdMemberIdentityTest extends TestCase
         $this->assertDatabaseHas('member_disaster_statuses', ['member_id' => 'HM-8560-2', 'reported_by_member_id' => 'HM-8560-1', 'notes' => '{"member_id":"HM-8560-2"}']);
         $this->upgrade();
         $this->assertDatabaseCount('users', 2);
-        $this->assertDatabaseCount('household_member_id_mappings', 2);
+        $this->assertSame(2, DB::table('household_members')->whereNotNull('legacy_member_id')->count());
     }
 
     public function test_sequence_is_per_household_and_supports_two_digit_increments(): void
@@ -88,7 +88,7 @@ class HouseholdMemberIdentityTest extends TestCase
 
     public function test_household_login_uses_shared_credentials_and_requires_a_device_owner(): void
     {
-        $this->upgrade();
+        $this->ownerAccess();
         $access = require database_path('migrations/2026_10_26_000003_create_household_login_and_device_owners.php');
         $access->up();
         $this->postJson('/api/v1/auth/login', ['login' => 'HH-2026-8560', 'password' => 'existing-password', 'device_uuid' => 'phone-1'])
@@ -150,11 +150,68 @@ class HouseholdMemberIdentityTest extends TestCase
     {
         $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
         $this->upgrade();
-        $migration = require database_path('migrations/2026_10_26_000003_create_household_login_and_device_owners.php');
-        $migration->up();
         Schema::create('device_tokens', function (Blueprint $t): void {
             $t->id(); $t->string('household_id'); $t->string('user_id'); $t->string('member_id'); $t->string('device_uuid'); $t->timestamps();
+            $t->string('player_id')->nullable();
         });
+        (require database_path('migrations/2026_10_26_000003_create_household_login_and_device_owners.php'))->up();
+    }
+
+    public function test_access_consolidation_preserves_existing_login_owners_and_push_tokens(): void
+    {
+        $this->ownerAccess();
+        Schema::create('household_login_accounts', function (Blueprint $t): void {
+            $t->string('household_id'); $t->string('user_id');
+        });
+        Schema::create('household_device_owners', function (Blueprint $t): void {
+            $t->id(); $t->string('household_id'); $t->string('device_uuid'); $t->string('member_id');
+            $t->unsignedBigInteger('selection_token_id')->nullable(); $t->timestamps();
+        });
+        DB::table('household_login_accounts')->insert(['household_id' => 'HH-2026-8560', 'user_id' => 'U1']);
+        $userId = DB::table('users')->where('member_id', 'HM-8560-2')->value('user_id');
+        DB::table('device_tokens')->insert(['id' => 1, 'household_id' => 'HH-2026-8560', 'device_uuid' => 'phone-a',
+            'user_id' => $userId, 'member_id' => 'HM-8560-2', 'player_id' => 'existing-subscription']);
+        foreach (['phone-a', 'phone-b'] as $uuid) {
+            DB::table('household_device_owners')->insert(['household_id' => 'HH-2026-8560', 'device_uuid' => $uuid,
+                'member_id' => 'HM-8560-2', 'selection_token_id' => 123, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $migration = require database_path('migrations/2026_10_28_000004_consolidate_household_access.php');
+        $migration->up();
+        $migration->up();
+        $this->assertTrue(Schema::hasTable('household_device_owners'));
+        $this->assertTrue(Schema::hasTable('household_login_accounts'));
+        $this->assertDatabaseHas('households', ['household_id' => 'HH-2026-8560', 'login_user_id' => 'U1']);
+        $this->assertDatabaseHas('device_tokens', ['device_uuid' => 'phone-a', 'player_id' => 'existing-subscription', 'selection_token_id' => 123]);
+        $this->assertDatabaseHas('device_tokens', ['device_uuid' => 'phone-b', 'member_id' => 'HM-8560-2', 'selection_token_id' => 123]);
+        $this->assertDatabaseCount('device_tokens', 2);
+        $this->assertSame(2, DB::table('device_tokens')->whereNotNull('owner_selected_at')->count());
+    }
+
+    public function test_existing_device_membership_does_not_skip_explicit_owner_selection(): void
+    {
+        $this->ownerAccess();
+        DB::table('device_tokens')->insert(['id' => 1, 'household_id' => 'HH-2026-8560', 'device_uuid' => 'phone-a',
+            'user_id' => 'U1', 'member_id' => 'HM-8560-1', 'player_id' => 'saved-subscription']);
+        $this->assertTrue($this->householdLogin('phone-a')['owner_selection_required']);
+        $this->assertDatabaseHas('device_tokens', ['id' => 1, 'player_id' => 'saved-subscription', 'owner_selected_at' => null]);
+    }
+
+    public function test_consolidation_retains_legacy_tables_when_a_login_link_conflicts(): void
+    {
+        $this->ownerAccess();
+        Schema::create('household_login_accounts', function (Blueprint $t): void {
+            $t->string('household_id'); $t->string('user_id');
+        });
+        $otherUser = DB::table('users')->where('member_id', 'HM-8560-2')->value('user_id');
+        DB::table('household_login_accounts')->insert(['household_id' => 'HH-2026-8560', 'user_id' => $otherUser]);
+        try {
+            (require database_path('migrations/2026_10_28_000004_consolidate_household_access.php'))->up();
+            $this->fail('Conflicting credential links must not be discarded.');
+        } catch (\RuntimeException $error) {
+            $this->assertStringContainsString('login conflict', $error->getMessage());
+        }
+        $this->assertDatabaseHas('household_login_accounts', ['household_id' => 'HH-2026-8560', 'user_id' => $otherUser]);
+        $this->assertDatabaseHas('households', ['household_id' => 'HH-2026-8560', 'login_user_id' => 'U1']);
     }
 
     private function ownerRequest(string $token, string $method, string $path, array $data = [])
@@ -176,7 +233,7 @@ class HouseholdMemberIdentityTest extends TestCase
         $this->ownerRequest($login['token'], 'GET', 'household/overview')->assertForbidden()->assertJsonPath('code', 'DEVICE_OWNER_REQUIRED');
         $this->ownerRequest($login['token'], 'PATCH', 'household/members/HM-8560-1', ['contact_number' => '09171234567'])->assertForbidden();
         $this->ownerRequest($login['token'], 'POST', 'household/device-owner/select', ['member_id' => 'HM-OTHER-1'])->assertUnprocessable();
-        $this->assertDatabaseCount('household_device_owners', 0);
+        $this->assertDatabaseCount('device_tokens', 0);
         $this->ownerRequest($login['token'], 'GET', 'household/device-owner/options')->assertOk()->assertJsonCount(2, 'data.members');
     }
 
@@ -187,13 +244,13 @@ class HouseholdMemberIdentityTest extends TestCase
             $login = $this->householdLogin($uuid);
             $selected = $this->ownerRequest($login['token'], 'POST', 'household/device-owner/select', ['member_id' => $memberId, 'device_uuid' => 'must-not-change-another-phone'])
                 ->assertOk()->assertJsonPath('user.member_id', $memberId)->assertJsonPath('owner_selection_required', false)->json();
-            $this->assertDatabaseHas('household_device_owners', ['device_uuid' => $uuid, 'member_id' => $memberId]);
+            $this->assertDatabaseHas('device_tokens', ['device_uuid' => $uuid, 'member_id' => $memberId]);
             $this->assertDatabaseHas('device_tokens', ['device_uuid' => $uuid, 'member_id' => $memberId]);
             $again = $this->householdLogin($uuid);
             $this->assertFalse($again['owner_selection_required']);
             $this->assertSame($memberId, $again['user']['member_id']);
         }
-        $this->assertDatabaseCount('household_device_owners', 2);
+        $this->assertDatabaseCount('device_tokens', 2);
         $this->assertTrue($this->householdLogin('new-phone')['owner_selection_required']);
     }
 
@@ -205,9 +262,10 @@ class HouseholdMemberIdentityTest extends TestCase
             $login = $this->householdLogin($uuid);
             $tokens[$uuid] = $this->ownerRequest($login['token'], 'POST', 'household/device-owner/select', ['member_id' => $memberId])->assertOk()->json('token');
         }
+        DB::table('device_tokens')->where('device_uuid', 'phone-a')->update(['player_id' => 'saved-subscription']);
         $reset = $this->ownerRequest($tokens['phone-a'], 'POST', 'household/device-owner/reset', ['device_uuid' => 'phone-b'])->assertOk()->assertJsonPath('owner_selection_required', true)->json();
-        $this->assertDatabaseMissing('household_device_owners', ['device_uuid' => 'phone-a']);
-        $this->assertDatabaseHas('household_device_owners', ['device_uuid' => 'phone-b', 'member_id' => 'HM-8560-2']);
+        $this->assertDatabaseHas('device_tokens', ['device_uuid' => 'phone-a', 'owner_selected_at' => null, 'player_id' => 'saved-subscription']);
+        $this->assertDatabaseHas('device_tokens', ['device_uuid' => 'phone-b', 'member_id' => 'HM-8560-2']);
         $this->ownerRequest($tokens['phone-b'], 'GET', 'auth/me')->assertOk();
         // Losing the reset response must not strand this phone with an invalid old session.
         $reset = $this->ownerRequest($tokens['phone-a'], 'POST', 'household/device-owner/reset')->assertOk()->json();
@@ -226,7 +284,7 @@ class HouseholdMemberIdentityTest extends TestCase
         $this->ownerRequest($first, 'GET', 'auth/me')->assertUnauthorized();
         $this->ownerRequest($second, 'GET', 'auth/me')->assertOk()->assertJsonPath('data.member_id', 'HM-8560-2');
         $this->ownerRequest($pending, 'GET', 'household/device-owner/options')->assertUnauthorized();
-        $this->assertDatabaseCount('household_device_owners', 1);
+        $this->assertSame(1, DB::table('device_tokens')->whereNotNull('owner_selected_at')->count());
     }
 
     public function test_owner_session_has_no_idle_expiration_and_contact_updates_are_member_scoped(): void

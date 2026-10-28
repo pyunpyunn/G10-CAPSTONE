@@ -39,8 +39,8 @@ class AuthAccountQuery
         $query = User::query()->where('household_id', $id)
             ->whereHas('role', fn ($q) => $q->where('role_key', 'household_resident'))
             ->when(Schema::hasColumn('users', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
-        if (Schema::hasTable('household_login_accounts')) {
-            $accountId = DB::table('household_login_accounts')->where('household_id', $id)->value('user_id');
+        if (Schema::hasColumn('households', 'login_user_id')) {
+            $accountId = DB::table('households')->where('household_id', $id)->value('login_user_id');
             if ($accountId) return $query->whereKey($accountId)->first();
         }
         if (Schema::hasTable('household_members') && Schema::hasColumn('users', 'member_id') && Schema::hasColumn('household_members', 'is_household_head')) {

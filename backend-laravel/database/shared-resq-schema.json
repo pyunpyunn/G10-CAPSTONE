@@ -1,0 +1,102 @@
+{
+  "columns": {
+    "addresses": {
+      "is_apartment": "tinyint(1) NULL",
+      "building_name": "varchar(120) NULL",
+      "floor_number": "varchar(30) NULL",
+      "unit_number": "varchar(80) NULL",
+      "room_number": "varchar(80) NULL",
+      "landmark": "varchar(255) NULL"
+    },
+    "device_tokens": {
+      "user_id": "varchar(255) NULL",
+      "team_id": "int NULL",
+      "last_sync_at": "timestamp NULL",
+      "selection_token_id": "bigint unsigned NULL",
+      "owner_selected_at": "timestamp NULL",
+      "push_token": "varchar(255) NULL",
+      "one_signal_user_id": "varchar(255) NULL",
+      "responder_id": "int NULL"
+    },
+    "disaster_broadcasts": {
+      "status_options_json": "text NULL",
+      "push_provider_ids_json": "json NULL",
+      "push_errors_json": "json NULL",
+      "push_accepted_count": "int unsigned NULL",
+      "onesignal_id": "varchar(36) NULL"
+    },
+    "household_statuses": {
+      "safety_basis": "varchar(6) NULL"
+    },
+    "member_statuses": {
+      "counts_as_death": "tinyint(1) NULL",
+      "counts_as_injury": "tinyint(1) NULL"
+    },
+    "notifications": {
+      "source_key": "varchar(120) NULL",
+      "onesignal_id": "varchar(36) NULL",
+      "onesignal_ids_json": "json NULL",
+      "feed_payload_json": "json NULL",
+      "advisory_source": "varchar(16) NULL",
+      "advisory_fingerprint": "varchar(64) NULL",
+      "advisory_title": "varchar(255) NULL",
+      "advisory_source_url": "text NULL"
+    },
+    "responder_field_reports": {
+      "assignment_id": "int unsigned NULL",
+      "submitted_by_user_id": "varchar(255) NULL",
+      "status_log_id": "int unsigned NULL",
+      "incident_type": "varchar(80) NULL",
+      "incident_type_other": "varchar(255) NULL",
+      "property_damage": "varchar(80) NULL",
+      "death_count": "int unsigned NULL DEFAULT '0'",
+      "injured_count": "int unsigned NULL DEFAULT '0'",
+      "idempotency_key": "varchar(100) NULL",
+      "payload_hash": "varchar(64) NULL",
+      "submitted_at": "timestamp NULL"
+    },
+    "responder_routes": {
+      "responder_id": "bigint unsigned NULL",
+      "household_id": "varchar(255) NULL",
+      "navigation_steps": "json NULL"
+    },
+    "households": {
+      "login_user_id": "varchar(255) NULL"
+    },
+    "household_members": {
+      "legacy_member_id": "varchar(255) NULL"
+    },
+    "rescue_teams": {
+      "base_name": "varchar(120) NULL",
+      "base_latitude": "decimal(10,7) NULL",
+      "base_longitude": "decimal(10,7) NULL"
+    },
+    "password_reset_requests": {
+      "otp_subject_key": "char(64) NULL",
+      "household_id": "varchar(255) NULL",
+      "code_hash": "varchar(255) NULL",
+      "sent_at": "timestamp NULL"
+    }
+  },
+  "create_tables": {
+    "cached_routes": "CREATE TABLE `cached_routes` (\n  `id` bigint unsigned NOT NULL AUTO_INCREMENT,\n  `team_id` int NOT NULL,\n  `household_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,\n  `evac_center_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,\n  `target_key` varchar(300) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `profile` enum('auto','pedestrian') COLLATE utf8mb4_unicode_ci NOT NULL,\n  `polyline6` longtext COLLATE utf8mb4_unicode_ci,\n  `steps` json DEFAULT NULL,\n  `distance_m` int unsigned DEFAULT NULL,\n  `duration_s` int unsigned DEFAULT NULL,\n  `status` enum('ready','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'failed',\n  `failure_reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `computed_at` timestamp NULL DEFAULT NULL,\n  `created_at` timestamp NULL DEFAULT NULL,\n  `updated_at` timestamp NULL DEFAULT NULL,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `cached_routes_team_target_profile_unique` (`team_id`,`target_key`,`profile`),\n  KEY `cached_routes_household_id_foreign` (`household_id`),\n  KEY `cached_routes_evac_center_id_foreign` (`evac_center_id`),\n  KEY `cached_routes_team_status_profile_index` (`team_id`,`status`,`profile`),\n  CONSTRAINT `cached_routes_evac_center_id_foreign` FOREIGN KEY (`evac_center_id`) REFERENCES `evacuation_centers` (`evacuation_center_id`) ON DELETE CASCADE,\n  CONSTRAINT `cached_routes_household_id_foreign` FOREIGN KEY (`household_id`) REFERENCES `households` (`household_id`) ON DELETE CASCADE,\n  CONSTRAINT `cached_routes_team_id_foreign` FOREIGN KEY (`team_id`) REFERENCES `rescue_teams` (`team_id`) ON DELETE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    "dispatch_trips": "CREATE TABLE `dispatch_trips` (\n  `id` bigint unsigned NOT NULL AUTO_INCREMENT,\n  `dispatch_id` int NOT NULL,\n  `team_id` int NOT NULL,\n  `device_id` bigint NOT NULL,\n  `profile` enum('auto','pedestrian') COLLATE utf8mb4_unicode_ci NOT NULL,\n  `started_at` datetime NOT NULL,\n  `ended_at` datetime DEFAULT NULL,\n  `distance_m` int unsigned DEFAULT NULL,\n  `planned_distance_m` int unsigned DEFAULT NULL,\n  `moving_s` int unsigned NOT NULL DEFAULT '0',\n  `stopped_s` int unsigned NOT NULL DEFAULT '0',\n  `avg_speed_ms` decimal(8,3) DEFAULT NULL,\n  `status` enum('recording','completed','abandoned') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'recording',\n  `created_at` timestamp NULL DEFAULT NULL,\n  `updated_at` timestamp NULL DEFAULT NULL,\n  PRIMARY KEY (`id`),\n  KEY `dispatch_trips_device_id_foreign` (`device_id`),\n  KEY `dispatch_trips_dispatch_started_index` (`dispatch_id`,`started_at`),\n  KEY `dispatch_trips_team_started_index` (`team_id`,`started_at`),\n  CONSTRAINT `dispatch_trips_device_id_foreign` FOREIGN KEY (`device_id`) REFERENCES `device_tokens` (`id`),\n  CONSTRAINT `dispatch_trips_dispatch_id_foreign` FOREIGN KEY (`dispatch_id`) REFERENCES `responder_assignments` (`assignment_id`),\n  CONSTRAINT `dispatch_trips_team_id_foreign` FOREIGN KEY (`team_id`) REFERENCES `rescue_teams` (`team_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    "trip_points": "CREATE TABLE `trip_points` (\n  `id` bigint unsigned NOT NULL AUTO_INCREMENT,\n  `trip_id` bigint unsigned NOT NULL,\n  `lat` decimal(10,7) NOT NULL,\n  `lng` decimal(10,7) NOT NULL,\n  `accuracy` decimal(8,2) DEFAULT NULL,\n  `speed` decimal(8,3) DEFAULT NULL,\n  `heading` decimal(6,2) DEFAULT NULL,\n  `recorded_at` datetime(6) NOT NULL,\n  PRIMARY KEY (`id`),\n  KEY `trip_points_trip_recorded_at_index` (`trip_id`,`recorded_at`),\n  CONSTRAINT `trip_points_trip_id_foreign` FOREIGN KEY (`trip_id`) REFERENCES `dispatch_trips` (`id`) ON DELETE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    "sync_events": "CREATE TABLE `sync_events` (\n  `id` bigint unsigned NOT NULL AUTO_INCREMENT,\n  `client_event_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `device_id` bigint NOT NULL,\n  `type` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `status` enum('received','processed','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'received',\n  `error_message` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `received_at` timestamp NOT NULL,\n  `result_json` json DEFAULT NULL,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `sync_events_client_event_id_unique` (`client_event_id`),\n  KEY `sync_events_device_received_at_index` (`device_id`,`received_at`),\n  CONSTRAINT `sync_events_device_id_foreign` FOREIGN KEY (`device_id`) REFERENCES `device_tokens` (`id`) ON DELETE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    "offline_packs": "CREATE TABLE `offline_packs` (\n  `version` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `bbox` json NOT NULL,\n  `style_url` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `size_bytes` bigint unsigned NOT NULL,\n  `checksum` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `is_active` tinyint(1) NOT NULL DEFAULT '0',\n  `created_at` timestamp NULL DEFAULT NULL,\n  `updated_at` timestamp NULL DEFAULT NULL,\n  `pack_format` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'mbtiles_zip',\n  PRIMARY KEY (`version`),\n  KEY `offline_packs_active_version_index` (`is_active`,`version`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    "mapping_hazard_layers": "CREATE TABLE `mapping_hazard_layers` (\n  `id` bigint unsigned NOT NULL AUTO_INCREMENT,\n  `barangay_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `source` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `source_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `assessed_at` date NOT NULL,\n  `geojson` json NOT NULL,\n  `created_at` timestamp NULL DEFAULT NULL,\n  `updated_at` timestamp NULL DEFAULT NULL,\n  PRIMARY KEY (`id`),\n  KEY `mapping_hazard_layers_barangay_id_index` (`barangay_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    "property_damage_levels": "CREATE TABLE `property_damage_levels` (\n  `damage_key` varchar(80) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `label` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `sort_order` int unsigned NOT NULL,\n  `is_active` tinyint(1) NOT NULL DEFAULT '1',\n  PRIMARY KEY (`damage_key`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    "responder_field_report_members": "CREATE TABLE `responder_field_report_members` (\n  `detail_id` bigint unsigned NOT NULL AUTO_INCREMENT,\n  `report_id` int NOT NULL,\n  `household_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `disaster_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `member_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `status_id` int unsigned DEFAULT NULL,\n  `status_key` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `assessed_at` timestamp NULL DEFAULT NULL,\n  `created_at` timestamp NULL DEFAULT NULL,\n  `updated_at` timestamp NULL DEFAULT NULL,\n  PRIMARY KEY (`detail_id`),\n  UNIQUE KEY `rf_report_member_unique` (`report_id`,`member_id`),\n  KEY `rf_member_event_household_idx` (`disaster_id`,`household_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    "web_push_subscriptions": "CREATE TABLE `web_push_subscriptions` (\n  `id` bigint unsigned NOT NULL AUTO_INCREMENT,\n  `user_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `token_id` bigint unsigned DEFAULT NULL,\n  `endpoint_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `subscription` text COLLATE utf8mb4_unicode_ci NOT NULL,\n  `expires_at` timestamp NULL DEFAULT NULL,\n  `created_at` timestamp NULL DEFAULT NULL,\n  `updated_at` timestamp NULL DEFAULT NULL,\n  `push_after` timestamp NULL DEFAULT NULL,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `web_push_subscriptions_endpoint_hash_unique` (`endpoint_hash`),\n  KEY `web_push_subscriptions_user_id_index` (`user_id`),\n  KEY `web_push_subscriptions_token_id_index` (`token_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    "web_push_deliveries": "CREATE TABLE `web_push_deliveries` (\n  `id` bigint unsigned NOT NULL AUTO_INCREMENT,\n  `subscription_id` bigint unsigned NOT NULL,\n  `notice_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `created_at` timestamp NOT NULL,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `web_push_deliveries_subscription_id_notice_hash_unique` (`subscription_id`,`notice_hash`),\n  KEY `web_push_deliveries_subscription_id_index` (`subscription_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+  },
+  "merged_tables": [
+    "devices",
+    "household_device_owners",
+    "household_login_accounts",
+    "household_member_id_mappings",
+    "household_password_recovery_otps",
+    "team_bases",
+    "official_advisory_notifications"
+  ]
+}

@@ -84,7 +84,7 @@ class HouseholdGeographicClassifierTest extends TestCase
         $this->assertDatabaseHas('addresses', ['address_id' => 1, 'purok_id' => null]);
         $this->assertDatabaseHas('addresses', ['address_id' => 2, 'purok_id' => 100]);
     }
-    public function test_pin_save_classifies_in_the_same_backend_transaction(): void
+    public function test_pin_save_preserves_registered_address_in_the_same_backend_transaction(): void
     {
         Schema::create('geotagged_locations', function (Blueprint $t): void {
             $t->integer('location_id')->primary(); $t->string('household_id');
@@ -97,8 +97,8 @@ class HouseholdGeographicClassifierTest extends TestCase
         ]);
         $request->setUserResolver(fn () => (object) ['household_id' => 'HH-1', 'user_id' => 'U-1']);
         $response = app(\App\Services\Mobile\HouseholdMobileSetupWorkflow::class)->updateGeotag($request);
-        $this->assertSame('matched', $response->getData(true)['data']['geographic_classification']['status']);
-        $this->assertDatabaseHas('addresses', ['address_id' => 1, 'sitio_id' => 10, 'purok_id' => 100]);
+        $this->assertSame('pin_only', $response->getData(true)['data']['geographic_classification']['status']);
+        $this->assertDatabaseHas('addresses', ['address_id' => 1, 'sitio_id' => null, 'purok_id' => null]);
         $this->assertDatabaseHas('geotagged_locations', ['household_id' => 'HH-1', 'latitude' => 2, 'longitude' => 3]);
     }
 

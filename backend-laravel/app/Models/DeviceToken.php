@@ -11,7 +11,7 @@ class DeviceToken extends Model
 
     public $incrementing = false;
 
-    protected $fillable = ['device_uuid', 'household_id', 'member_id', 'device_name', 'platform', 'app_role', 'push_provider', 'player_id', 'expo_push_token', 'battery_level', 'signal_strength', 'location_permission_status', 'notification_permission_status', 'last_latitude', 'last_longitude', 'last_location_label', 'last_location_accuracy_m', 'last_location_at', 'last_seen_at', 'is_active', 'logged_at'];
+    protected $fillable = ['device_uuid', 'household_id', 'user_id', 'member_id', 'device_name', 'platform', 'app_role', 'push_provider', 'player_id', 'expo_push_token', 'battery_level', 'signal_strength', 'location_permission_status', 'notification_permission_status', 'last_latitude', 'last_longitude', 'last_location_label', 'last_location_accuracy_m', 'last_location_at', 'last_seen_at', 'is_active', 'logged_at'];
 
     protected function casts(): array
     {
@@ -29,5 +29,4 @@ class DeviceToken extends Model
     }
 
 }
-
 

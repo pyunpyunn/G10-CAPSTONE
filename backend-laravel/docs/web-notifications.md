@@ -1,5 +1,41 @@
 # Web notifications
 
+## Strict notification archive
+
+The application mirrors supported web feed events into the shared `notifications`
+table only when every original field and the archive metadata have real values.
+This strict policy was explicitly requested: do not substitute dates, evacuation
+relationships, recurrence types, or provider IDs. Missing/inapplicable fields pause
+the archive record; its existing inbox entry and delivery behavior remain intact.
+One-time notices normally cannot satisfy this policy because no recurrence end or
+recurrence type exists. Web-only notices also have no OneSignal message ID.
+
+Migration `2026_10_28_000001_add_notification_archive_fields.php` adds a unique
+`source_key`, `onesignal_id`, `onesignal_ids_json` (all provider message IDs for a
+notice), and `feed_payload_json`. The columns remain nullable for compatibility
+with other applications sharing this table; the archive writer validates every
+field before inserting. Existing unrelated rows are not rewritten or deleted.
+It also adds the broadcast provider-ID/error/count columns already supported by
+the delivery workflow, so future push submissions retain their real provider IDs.
+Provider acceptance must not be interpreted as delivery to a phone.
+
+Run `php artisan notifications:archive --recover-onesignal --dry-run` to inspect
+history without database writes, then omit `--dry-run` to save recovered IDs and
+eligible notices. The command reads OneSignal message history using the configured
+backend credentials; it never sends/replays a notification. Explicit broadcast
+and disaster-event metadata must match. Operational log IDs are also recovered;
+automated-test entries and placeholder IDs are excluded. API failures are reported
+without printing credentials or response bodies. Recovery is repeatable.
+
+The report is `storage/app/private/notification-backfill-report.json`; it lists
+every paused source ID, validation failures, recovered message IDs, provenance,
+and API completeness. It is private and must not be served from public storage.
+Feed reads and browser-push worker reads run strict archiving; the scheduler also
+runs `notifications:archive` each minute. Existing historical push cutoffs and
+stable source IDs are retained. Complete unchanged notices produce no extra writes.
+This does not import all OneSignal messages indiscriminately: unrelated mobile
+messages, OTPs, and ambiguous matches do not become web notifications.
+
 The inbox, bell, and browser service worker accept only these six categories:
 
 - Disaster broadcast posts (`Broadcast`). Legacy outgoing SMS records are excluded.

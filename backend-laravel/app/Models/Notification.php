@@ -25,12 +25,18 @@ class Notification extends Model
         'channel',
         'status',
         'target_filter',
+        'source_key',
+        'onesignal_id',
+        'onesignal_ids_json',
+        'feed_payload_json',
     ];
 
     protected function casts(): array
     {
         return [
             'is_recurring' => 'boolean',
+            'onesignal_ids_json' => 'array',
+            'feed_payload_json' => 'array',
             'scheduled_at' => 'datetime',
             'recurrence_end_at' => 'datetime',
             'last_sent_at' => 'datetime',
