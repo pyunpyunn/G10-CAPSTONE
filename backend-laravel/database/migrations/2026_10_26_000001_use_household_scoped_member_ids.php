@@ -9,11 +9,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (! Schema::hasTable('household_member_id_mappings')) {
-            Schema::create('household_member_id_mappings', function (Blueprint $table): void {
-                $table->string('old_member_id')->primary();
-                $table->string('member_id')->unique();
-            });
+        if (! Schema::hasColumn('household_members', 'legacy_member_id')) {
+            Schema::table('household_members', fn (Blueprint $table) => $table->string('legacy_member_id')->nullable()->unique());
         }
         app(HouseholdMemberIdentityUpgrade::class)->run();
         $hasUniqueMember = collect(Schema::getIndexes('users'))->contains(
@@ -24,6 +21,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        throw new RuntimeException('Member identity upgrades require an explicit data restore using household_member_id_mappings to preserve member accounts and reports.');
+        throw new RuntimeException('Member identity upgrades require an explicit data restore using household_members.legacy_member_id to preserve member accounts and reports.');
     }
 };

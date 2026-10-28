@@ -18,8 +18,8 @@ export function HouseholdSetupAddressForm({ address, details, setDetails, disabl
     <HouseholdSection title="Household address" />
     <Text style={styles.label}>Registered address</Text>
     <Text style={styles.address}>{address
-      ? [address.street || address.street_address, address.purok_name, address.sitio_name, address.barangay_name, address.city_name, address.province_name].filter(Boolean).join(', ')
-      : 'Choose your location to load the registered sitio and purok.'}</Text>
+      ? [address.street || address.street_address, address.purok_sitio, address.purok_name, address.sitio_name, address.barangay_name, address.city_name, address.province_name].filter(Boolean).join(', ')
+      : 'No registered address available. Your map pin is saved separately.'}</Text>
     <Text style={styles.label}>Do you live in an apartment?</Text>
     <View style={styles.row}>
       <HouseholdButton label="Yes" tone={details.is_apartment === true ? 'primary' : 'light'} disabled={disabled}

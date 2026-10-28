@@ -27,6 +27,7 @@ class NavigationSchemaTest extends TestCase
             $table->string('evacuation_center_id')->primary();
         });
 
+        Schema::create('device_tokens', function (Blueprint $table): void { $table->bigInteger('id')->primary(); });
         $parentIndexes = require database_path('migrations/2026_10_18_000030_add_navigation_parent_indexes.php');
         $parentIndexes->up();
         $tables = require database_path('migrations/2026_10_18_000031_create_navigation_tables.php');
@@ -36,7 +37,7 @@ class NavigationSchemaTest extends TestCase
         $this->assertTrue(Schema::hasColumn('sync_events', 'result_json'));
         $this->assertTrue(Schema::hasColumn('offline_packs', 'pack_format'));
 
-        foreach (['team_bases', 'cached_routes', 'devices', 'dispatch_trips', 'trip_points', 'sync_events', 'offline_packs'] as $table) {
+        foreach (['rescue_teams', 'cached_routes', 'device_tokens', 'dispatch_trips', 'trip_points', 'sync_events', 'offline_packs'] as $table) {
             $this->assertTrue(Schema::hasTable($table), "Expected {$table} to be created.");
         }
 

@@ -2,36 +2,16 @@
 
 namespace App\Services\Mobile;
 
-use App\Services\Shared\BarangayProfileService;
-use App\Services\Shared\HouseholdGeographicClassifier;
 use App\Services\Shared\OperationalSequence;
 use App\Support\RequestSchema as Schema;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class HouseholdSetupAddress
 {
     public function registered(string $householdId): ?array
     {
         $address = $this->record($householdId);
-        $area = $address ? $this->area((int) ($address->purok_id ?? 0)) : null;
-        return $area ? array_merge((array) $address, $area, ['source' => 'registered_address']) : null;
-    }
-
-    public function resolve(string $householdId, float $latitude, float $longitude): array
-    {
-        $focus = app(BarangayProfileService::class)->mambalingMapFocus();
-        $classification = app(HouseholdGeographicClassifier::class)->resolve($latitude, $longitude, $focus);
-        if (in_array($classification['status'], ['outside_barangay', 'barangay_boundary_missing', 'ambiguous_boundary', 'no_boundary_match'], true)) {
-            throw ValidationException::withMessages(['latitude' => ['Choose a location clearly inside the verified Mambaling boundary.']]);
-        }
-        if ($classification['status'] === 'matched') {
-            $area = $this->area((int) $classification['purok_id']);
-            if ($area) return array_merge((array) ($this->record($householdId) ?? []), $area, ['source' => 'boundary']);
-        }
-        $registered = $this->registered($householdId);
-        if ($registered && (int) $registered['barangay_id'] === (int) ($focus['barangay_id'] ?? 0)) return $registered;
-        throw ValidationException::withMessages(['address' => ['The household needs a registered sitio and purok in the database. Contact HQ/Admin to correct its address before completing setup.']]);
+        return $address ? array_merge((array) $address, ['source' => 'registered_address']) : null;
     }
 
     public function save(string $householdId, array $area, array $details): string
@@ -41,8 +21,6 @@ class HouseholdSetupAddress
         }
         $apartment = (bool) $details['is_apartment'];
         $changes = [
-            'barangay_id' => $area['barangay_id'], 'sitio_id' => $area['sitio_id'], 'purok_id' => $area['purok_id'],
-            'barangay_name' => $area['barangay_name'], 'purok_sitio' => $area['purok_name'].', '.$area['sitio_name'],
             'house_number' => $details['house_number'] ?? null, 'is_apartment' => $apartment,
             'building_name' => $apartment ? ($details['building_name'] ?? null) : null,
             'floor_number' => $apartment ? ($details['floor_number'] ?? null) : null,
@@ -56,7 +34,7 @@ class HouseholdSetupAddress
             $changes['unit_number'] ? 'Unit '.$changes['unit_number'] : null,
             $changes['room_number'] ? 'Room '.$changes['room_number'] : null,
             $area['street'] ?? $area['street_address'] ?? null,
-            $area['purok_name'], $area['sitio_name'], $area['barangay_name'], $area['city_name'] ?? null, $area['province_name'] ?? null,
+            $area['purok_sitio'] ?? null, $area['barangay_name'] ?? null, $area['city_name'] ?? null, $area['province_name'] ?? null,
             $changes['landmark'] ? 'Near '.$changes['landmark'] : null,
         ]));
         $changes['full_address'] = mb_substr($fullAddress, 0, 500);
@@ -87,21 +65,4 @@ class HouseholdSetupAddress
             ->first('a.*');
     }
 
-    private function area(int $purokId): ?array
-    {
-        foreach (['puroks', 'sitios', 'barangays'] as $table) if (! Schema::hasTable($table)) return null;
-        $query = DB::table('puroks as p')->join('sitios as s', 's.sitio_id', '=', 'p.sitio_id')
-            ->join('barangays as b', 'b.barangay_id', '=', 's.barangay_id')->where('p.purok_id', $purokId);
-        $columns = ['p.purok_id', 'p.purok_name', 's.sitio_id', 's.sitio_name', 'b.barangay_id', 'b.barangay_name'];
-        if (Schema::hasTable('cities') && Schema::hasColumn('barangays', 'city_id')) {
-            $query->leftJoin('cities as c', 'c.city_id', '=', 'b.city_id');
-            $columns[] = 'c.city_name';
-            if (Schema::hasTable('provinces') && Schema::hasColumn('cities', 'province_id')) {
-                $query->leftJoin('provinces as province', 'province.province_id', '=', 'c.province_id');
-                $columns[] = 'province.province_name';
-            }
-        }
-        $area = $query->first($columns);
-        return $area ? (array) $area : null;
-    }
 }

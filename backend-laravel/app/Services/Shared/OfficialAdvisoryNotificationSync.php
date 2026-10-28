@@ -70,9 +70,9 @@ class OfficialAdvisoryNotificationSync
 
     private function save(string $source, array $signature, string $title, string $body, string $url): string
     {
-        $inserted = DB::table('official_advisory_notifications')->insertOrIgnore([
-            'source' => $source, 'fingerprint' => hash('sha256', $source.json_encode($signature)),
-            'title' => $title, 'body' => $body, 'source_url' => $url, 'created_at' => now(),
+        $inserted = DB::table('notifications')->insertOrIgnore([
+            'advisory_source' => $source, 'advisory_fingerprint' => hash('sha256', $source.json_encode($signature)),
+            'advisory_title' => $title, 'message' => $body, 'advisory_source_url' => $url, 'created_at' => now(),
         ]);
         return $inserted ? 'updated' : 'unchanged';
     }

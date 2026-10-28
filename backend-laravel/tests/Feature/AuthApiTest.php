@@ -54,11 +54,15 @@ class AuthApiTest extends TestCase
             });
         }
 
-        if (! Schema::hasTable('household_password_recovery_otps')) {
-            Schema::create('household_password_recovery_otps', function (Blueprint $table): void {
-                $table->string('user_id')->primary();
+        if (! Schema::hasTable('password_reset_requests')) {
+            Schema::create('password_reset_requests', function (Blueprint $table): void {
+                $table->uuid('request_id')->primary();
+                $table->string('otp_subject_key', 64)->nullable()->unique();
+                $table->string('verification_method');
+                $table->timestamp('consumed_at')->nullable();
+                $table->string('user_id');
                 $table->string('household_id');
-                $table->string('code_hash');
+                $table->string('code_hash')->nullable();
                 $table->unsignedTinyInteger('failed_attempts')->default(0);
                 $table->timestamp('expires_at');
                 $table->timestamp('sent_at');
@@ -96,9 +100,10 @@ class AuthApiTest extends TestCase
             });
         }
 
-        if (! Schema::hasTable('devices')) {
-            Schema::create('devices', function (Blueprint $table): void {
+        if (! Schema::hasTable('device_tokens')) {
+            Schema::create('device_tokens', function (Blueprint $table): void {
                 $table->id();
+                $table->string('app_role')->nullable();
                 $table->string('user_id');
                 $table->integer('team_id');
                 $table->string('device_uuid')->unique();
@@ -248,7 +253,7 @@ class AuthApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('device_uuid', 'device-rescuer-1')
             ->assertJsonPath('team_id', 1);
-        $this->assertDatabaseHas('devices', [
+        $this->assertDatabaseHas('device_tokens', [
             'device_uuid' => 'device-rescuer-1',
             'user_id' => 'USR-RESCUER-BDRRM-SAR-001',
             'team_id' => 1,
@@ -262,7 +267,7 @@ class AuthApiTest extends TestCase
 
     public function test_device_bound_mobile_login_rejects_device_uuid_owned_by_another_user(): void
     {
-        DB::table('devices')->insert([
+        DB::table('device_tokens')->insert([
             'user_id' => 'OTHER-USER',
             'team_id' => 1,
             'device_uuid' => 'shared-device',
@@ -461,7 +466,7 @@ class AuthApiTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonPath('errors.contact_number.0', 'This account exists, but no valid registered recovery phone number is on file. Contact an administrator to update it before requesting an OTP.');
 
-        $this->assertDatabaseMissing('household_password_recovery_otps', [
+        $this->assertDatabaseMissing('password_reset_requests', [
             'user_id' => 'USR-HOUSEHOLD-OTP-001',
         ]);
     }
@@ -502,7 +507,7 @@ class AuthApiTest extends TestCase
         $response->assertOk()->assertJsonPath('household_id', 'HH-OTP-001');
         $this->assertTrue(Hash::check('new-household-password', $user->fresh()->password));
         $this->assertSame(0, $user->tokens()->count());
-        $this->assertDatabaseMissing('household_password_recovery_otps', ['user_id' => $user->user_id]);
+        $this->assertDatabaseHas('password_reset_requests', ['user_id' => $user->user_id, 'code_hash' => null]);
     }
 
     public function test_sms_gateway_allows_three_sends_then_returns_a_friendly_cooldown(): void
@@ -561,7 +566,7 @@ class AuthApiTest extends TestCase
             ])->assertUnprocessable()->assertJsonValidationErrors('code');
         }
 
-        $this->assertDatabaseMissing('household_password_recovery_otps', ['user_id' => 'USR-HOUSEHOLD-OTP-001']);
+        $this->assertDatabaseHas('password_reset_requests', ['user_id' => 'USR-HOUSEHOLD-OTP-001', 'code_hash' => null]);
         $this->assertTrue(Hash::check('old-password', \App\Models\User::findOrFail('USR-HOUSEHOLD-OTP-001')->password));
     }
 
@@ -586,7 +591,7 @@ class AuthApiTest extends TestCase
         );
 
         Http::assertNothingSent();
-        $this->assertDatabaseMissing('household_password_recovery_otps', [
+        $this->assertDatabaseMissing('password_reset_requests', [
             'user_id' => 'USR-HOUSEHOLD-OTP-001',
         ]);
     }
@@ -599,7 +604,7 @@ class AuthApiTest extends TestCase
             'contact_number' => '09178889912',
         ])->assertUnprocessable()->assertJsonValidationErrors('contact_number');
         Http::assertNothingSent();
-        $this->assertDatabaseMissing('household_password_recovery_otps', [
+        $this->assertDatabaseMissing('password_reset_requests', [
             'user_id' => 'USR-HOUSEHOLD-OTP-001',
         ]);
     }
@@ -633,7 +638,7 @@ class AuthApiTest extends TestCase
                 && $sentCode !== null;
         });
         $this->assertStringNotContainsString($sentCode, $response->getContent());
-        $recovery = DB::table('household_password_recovery_otps')
+        $recovery = DB::table('password_reset_requests')
             ->where('user_id', 'USR-HOUSEHOLD-OTP-001')->first();
         $this->assertNotSame($sentCode, $recovery->code_hash);
         $this->assertTrue(Hash::check($sentCode, $recovery->code_hash));
@@ -651,7 +656,7 @@ class AuthApiTest extends TestCase
             'services.sms_gateway.password' => 'cloud-server-password',
             'services.sms_gateway.message_path' => '/messages',
         ]);
-        DB::table('household_password_recovery_otps')
+        DB::table('password_reset_requests')
             ->where('user_id', 'USR-HOUSEHOLD-OTP-001')
             ->delete();
         $sentCode = null;
@@ -674,7 +679,7 @@ class AuthApiTest extends TestCase
                 && $request['phoneNumbers'] === ['+639171234512'];
         });
         $this->assertNotNull($sentCode);
-        $recovery = DB::table('household_password_recovery_otps')
+        $recovery = DB::table('password_reset_requests')
             ->where('user_id', 'USR-HOUSEHOLD-OTP-001')
             ->first();
         $this->assertTrue(Hash::check($sentCode, $recovery->code_hash));
@@ -691,7 +696,7 @@ class AuthApiTest extends TestCase
             'services.onesignal.api_key' => 'test-api-key',
             'services.onesignal.base_url' => 'https://onesignal.test',
         ]);
-        DB::table('household_password_recovery_otps')
+        DB::table('password_reset_requests')
             ->where('user_id', 'USR-HOUSEHOLD-OTP-001')
             ->delete();
         Http::fake([
@@ -709,7 +714,7 @@ class AuthApiTest extends TestCase
 
         Http::assertSentCount(1);
         Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'onesignal.test'));
-        $this->assertDatabaseMissing('household_password_recovery_otps', [
+        $this->assertDatabaseMissing('password_reset_requests', [
             'user_id' => 'USR-HOUSEHOLD-OTP-001',
         ]);
     }
@@ -764,7 +769,7 @@ class AuthApiTest extends TestCase
             'services.onesignal.api_key' => 'test-api-key',
             'services.onesignal.base_url' => 'https://onesignal.test',
         ]);
-        DB::table('household_password_recovery_otps')
+        DB::table('password_reset_requests')
             ->where('user_id', 'USR-SYSTEM-ADMIN-001')
             ->delete();
         $sentCode = null;
@@ -788,7 +793,7 @@ class AuthApiTest extends TestCase
         Http::assertSentCount(1);
         Http::assertSent(fn ($request): bool => $request['phoneNumbers'] === ['+639178889912']);
         $this->assertNotNull($sentCode);
-        $this->assertDatabaseHas('household_password_recovery_otps', [
+        $this->assertDatabaseHas('password_reset_requests', [
             'user_id' => 'USR-SYSTEM-ADMIN-001',
             'household_id' => 'USR-SYSTEM-ADMIN-001',
         ]);

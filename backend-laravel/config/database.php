@@ -32,6 +32,19 @@ return [
 
     'connections' => [
 
+        // Explicit opt-in connection for additive shared-database upgrades.
+        'shared_resq' => [
+            'driver' => 'mysql',
+            'host' => env('SHARED_DB_HOST', '127.0.0.1'),
+            'port' => env('SHARED_DB_PORT', '3306'),
+            'database' => env('SHARED_DB_DATABASE'),
+            'username' => env('SHARED_DB_USERNAME'),
+            'password' => env('SHARED_DB_PASSWORD'),
+            'charset' => 'utf8mb4', 'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '', 'strict' => true, 'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? [\PDO::ATTR_TIMEOUT => 10] : [],
+        ],
+
         'resq_local' => [
             'driver' => env('RESQ_LOCAL_DB_CONNECTION', 'mysql'),
             'url' => env('RESQ_LOCAL_DB_URL'),

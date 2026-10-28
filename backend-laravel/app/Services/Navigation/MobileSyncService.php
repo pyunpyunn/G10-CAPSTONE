@@ -33,7 +33,7 @@ class MobileSyncService
             $acks[] = $this->processEvent($request, (int) $device->id, (int) $device->team_id, $event);
         }
 
-        DB::table('devices')->where('id', $device->id)->update(['last_sync_at' => now(), 'updated_at' => now()]);
+        DB::table('device_tokens')->where('id', $device->id)->update(['last_sync_at' => now(), 'updated_at' => now()]);
 
         return ['acks' => $acks, 'server_time' => now()->toISOString()];
     }

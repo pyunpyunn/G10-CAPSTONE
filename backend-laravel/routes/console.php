@@ -46,6 +46,7 @@ Artisan::command('advisories:sync', function (\App\Services\Shared\OfficialAdvis
 });
 Schedule::command('web-push:deliver')->everyTenSeconds()->withoutOverlapping();
 Schedule::command('advisories:sync')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('notifications:archive')->everyMinute()->withoutOverlapping();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

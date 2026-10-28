@@ -129,11 +129,10 @@ class RoutePrecomputeServiceTest extends TestCase
             $table->string('status')->default('active');
             $table->timestamp('deleted_at')->nullable();
         });
-        Schema::create('team_bases', function (Blueprint $table): void {
-            $table->integer('team_id')->primary();
-            $table->string('name');
-            $table->decimal('lat', 10, 7);
-            $table->decimal('lng', 10, 7);
+        Schema::table('rescue_teams', function (Blueprint $table): void {
+            $table->string('base_name')->nullable();
+            $table->decimal('base_latitude', 10, 7)->nullable();
+            $table->decimal('base_longitude', 10, 7)->nullable();
         });
         Schema::create('cached_routes', function (Blueprint $table): void {
             $table->id();

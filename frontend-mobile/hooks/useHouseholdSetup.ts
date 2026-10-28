@@ -38,7 +38,7 @@ export function useHouseholdSetup({ overview, deviceUuid, onComplete, photoUri =
     version.current++;
     setResolved(false);
     setFindingAddress(true);
-    setGeotagMessage('Release the pin to check the registered address.');
+    setGeotagMessage('Release the pin to validate the location.');
   }
 
   async function applyPinnedCoordinate(coordinate: NonNullable<typeof pin>) {
@@ -46,7 +46,7 @@ export function useHouseholdSetup({ overview, deviceUuid, onComplete, photoUri =
     setPin(coordinate);
     setResolved(false);
     setFindingAddress(true);
-    setGeotagMessage('Checking the household address in the database...');
+    setGeotagMessage('Checking the pin location...');
     try {
       const result = await previewHouseholdSetupLocation(coordinate.latitude, coordinate.longitude);
       if (current !== version.current) return;
@@ -57,9 +57,9 @@ export function useHouseholdSetup({ overview, deviceUuid, onComplete, photoUri =
       }
       setAddress(result.address);
       setResolved(true);
-      setGeotagMessage('Registered sitio and purok loaded. Complete the address details below.');
+      setGeotagMessage('Location confirmed. Complete the address details below.');
     } catch (error: any) {
-      if (current === version.current) setGeotagMessage(error?.response?.data?.message || 'Could not check the address. Choose the location again to retry.');
+      if (current === version.current) setGeotagMessage(error?.response?.data?.message || 'Could not validate the location. Choose the location again to retry.');
     } finally {
       if (current === version.current) setFindingAddress(false);
     }
@@ -84,7 +84,7 @@ export function useHouseholdSetup({ overview, deviceUuid, onComplete, photoUri =
 
   async function handleSave() {
     if (findingAddress || submitting.current) return;
-    if (!pin || !resolved || !address) return Alert.alert('Location required', 'Choose a location with a registered sitio and purok before continuing.');
+    if (!pin || !resolved) return Alert.alert('Location required', 'Choose a valid location inside Mambaling before continuing.');
     if (details.is_apartment === null) return Alert.alert('Address type', 'Select whether you live in an apartment.');
     if (details.is_apartment && !details.unit_number.trim()) return Alert.alert('Unit required', 'Enter your apartment unit number.');
     submitting.current = true;

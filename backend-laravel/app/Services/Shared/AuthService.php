@@ -95,7 +95,7 @@ class AuthService
             if (! in_array($user->roleKey(), ['rescuer', 'tl', 'tm'], true)) {
                 return response()->json(['message' => 'Device-bound navigation login is only available to rescuer accounts.'], 403);
             }
-            if (! Schema::hasTable('devices') || ! Schema::hasTable('responders')) {
+            if (! Schema::hasTable('device_tokens') || ! Schema::hasTable('responders')) {
                 return response()->json(['message' => 'Mobile device registration is not available in the current database.'], 503);
             }
 
@@ -105,7 +105,7 @@ class AuthService
                 return response()->json(['message' => 'This rescuer account is not assigned to a rescue team.'], 409);
             }
 
-            $existingDevice = DB::table('devices')->where('device_uuid', $deviceUuid)->first();
+            $existingDevice = DB::table('device_tokens')->where('device_uuid', $deviceUuid)->whereNotNull('team_id')->first();
             if ($existingDevice && (string) $existingDevice->user_id !== (string) $user->user_id) {
                 return response()->json(['message' => 'This device is already registered to another account.'], 409);
             }
@@ -118,16 +118,18 @@ class AuthService
                 DB::transaction(function () use ($user, $responder, $deviceUuid, $tokenName, &$token): void {
                     $user->tokens()->where('name', $tokenName)->delete();
                     $token = $user->createToken($tokenName, ['mobile:rescuer', 'team:'.(int) $responder->team_id])->plainTextToken;
-                    $device = DB::table('devices')->where('device_uuid', $deviceUuid)->first();
+                    $device = DB::table('device_tokens')->where('device_uuid', $deviceUuid)->whereNotNull('team_id')->first();
                     $deviceData = [
                         'user_id' => $user->user_id,
+                        'app_role' => 'rescuer',
                         'team_id' => $responder->team_id,
                         'updated_at' => now(),
                     ];
                     if ($device) {
-                        DB::table('devices')->where('id', $device->id)->update($deviceData);
+                        DB::table('device_tokens')->where('id', $device->id)->update($deviceData);
                     } else {
-                        DB::table('devices')->insert(array_merge($deviceData, [
+                        DB::table('device_tokens')->insert(array_merge($deviceData, [
+                            'id' => app(\App\Services\Shared\OperationalSequence::class)->nextNumericId('device_tokens', 'id'),
                             'device_uuid' => $deviceUuid,
                             'last_sync_at' => null,
                             'created_at' => now(),
@@ -351,7 +353,7 @@ class AuthService
                 'contact_number' => ['This number does not match a phone number registered to this account.'],
             ]);
         }
-        if (! Schema::hasTable('household_password_recovery_otps')) {
+        if (! Schema::hasColumn('password_reset_requests', 'otp_subject_key')) {
             return response()->json(['message' => 'Password recovery is not configured. Run the latest database migration.'], 503);
         }
 
@@ -362,12 +364,16 @@ class AuthService
             return response()->json(['message' => $smsResult['message']], 503);
         }
 
-        DB::table('household_password_recovery_otps')->updateOrInsert(
-            ['user_id' => $details['user']->user_id],
+        DB::table('password_reset_requests')->updateOrInsert(
+            ['otp_subject_key' => hash('sha256', (string) $details['user']->user_id)],
             [
+                'request_id' => (string) \Illuminate\Support\Str::uuid(),
+                'user_id' => $details['user']->user_id,
+                'verification_method' => 'sms_otp',
                 'household_id' => $details['household_id'],
                 'code_hash' => Hash::make($code),
                 'failed_attempts' => 0,
+                'consumed_at' => null,
                 'expires_at' => now()->addMinutes(10),
                 'sent_at' => now(),
                 'created_at' => now(),
@@ -406,7 +412,7 @@ class AuthService
                 'contact_number' => ['This number does not match a phone number registered to this account.'],
             ]);
         }
-        if (! Schema::hasTable('household_password_recovery_otps')) {
+        if (! Schema::hasColumn('password_reset_requests', 'otp_subject_key')) {
             return response()->json(['message' => 'Password recovery is not configured. Run the latest database migration.'], 503);
         }
         if ($details['user']->is_active !== null && ! $details['user']->is_active) {
@@ -414,24 +420,24 @@ class AuthService
         }
 
         $result = DB::transaction(function () use ($details, $values): array {
-            $table = DB::table('household_password_recovery_otps');
+            $table = DB::table('password_reset_requests')->where('otp_subject_key', hash('sha256', (string) $details['user']->user_id))->where('verification_method', 'sms_otp');
             $recovery = $table->where('user_id', $details['user']->user_id)->lockForUpdate()->first();
 
-            if (! $recovery) {
+            if (! $recovery || ! $recovery->code_hash || $recovery->consumed_at) {
                 return ['error' => 'Request a new verification code.'];
             }
             if ((string) $recovery->household_id !== $details['household_id']) {
-                $table->where('user_id', $details['user']->user_id)->delete();
+                $table->where('user_id', $details['user']->user_id)->update(['code_hash' => null, 'consumed_at' => now(), 'updated_at' => now()]);
                 return ['error' => 'Household details changed. Request a new verification code.'];
             }
             if (now()->gte(\Illuminate\Support\Carbon::parse($recovery->expires_at))) {
-                $table->where('user_id', $details['user']->user_id)->delete();
+                $table->where('user_id', $details['user']->user_id)->update(['code_hash' => null, 'consumed_at' => now(), 'updated_at' => now()]);
                 return ['error' => 'Your verification code has expired. Request a new code.'];
             }
             if (! Hash::check($values['code'], $recovery->code_hash)) {
                 $attempts = (int) $recovery->failed_attempts + 1;
                 if ($attempts >= 5) {
-                    $table->where('user_id', $details['user']->user_id)->delete();
+                    $table->where('user_id', $details['user']->user_id)->update(['code_hash' => null, 'consumed_at' => now(), 'updated_at' => now()]);
                     return ['error' => 'Too many incorrect codes. Request a new verification code.'];
                 }
                 $table->where('user_id', $details['user']->user_id)->update([
@@ -456,7 +462,7 @@ class AuthService
                 if ($details['user']->roleKey() === 'household_resident') app(\App\Services\Mobile\HouseholdAccessService::class)->revokeHouseholdSessions($details['user']->household_id);
                 else $details['user']->tokens()->delete();
             }
-            $table->where('user_id', $details['user']->user_id)->delete();
+            $table->where('user_id', $details['user']->user_id)->update(['code_hash' => null, 'consumed_at' => now(), 'updated_at' => now()]);
 
             return ['account_identifier' => $details['account_identifier']];
         });

@@ -23,13 +23,10 @@ class TeamBaseInitializationService
             return null;
         }
 
-        return TeamBase::query()->firstOrCreate(
-            ['team_id' => $teamId],
-            [
-                'name' => (string) ($office['name'] ?? 'Rescue office'),
-                'lat' => (float) $office['latitude'],
-                'lng' => (float) $office['longitude'],
-            ],
-        );
+        DB::table('rescue_teams')->where('team_id', $teamId)->whereNull('base_latitude')->whereNull('base_longitude')->update([
+            'base_name' => (string) ($office['name'] ?? 'Rescue office'),
+            'base_latitude' => (float) $office['latitude'], 'base_longitude' => (float) $office['longitude'],
+        ]);
+        return TeamBase::query()->find($teamId);
     }
 }

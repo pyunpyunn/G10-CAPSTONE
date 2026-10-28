@@ -336,13 +336,16 @@ class DisasterBroadcastWorkflow
         if (Schema::hasColumn('disaster_broadcasts', 'push_accepted_count')) {
             $updates['push_accepted_count'] = (int) ($pushResult['sent_count'] ?? 0);
         }
+        $broadcast = DisasterBroadcast::query()->where('broadcast_id', $broadcastId)->first();
+        $existingIds = $this->presenter->decodeJsonArray($broadcast?->push_provider_ids_json);
+        $providerIds = array_values(array_unique(array_filter([
+            ...$existingIds, $broadcast?->onesignal_id, ...($pushResult['provider_ids'] ?? []),
+        ], fn ($id) => is_string($id) && trim($id) !== '')));
+        if (Schema::hasColumn('disaster_broadcasts', 'onesignal_id')) {
+            $updates['onesignal_id'] = $providerIds[0] ?? null;
+        }
         if (Schema::hasColumn('disaster_broadcasts', 'push_provider_ids_json')) {
-            $existingIds = $this->presenter->decodeJsonArray(
-                DisasterBroadcast::query()->where('broadcast_id', $broadcastId)->value('push_provider_ids_json')
-            );
-            $updates['push_provider_ids_json'] = $this->jsonText(array_values(array_unique([
-                ...$existingIds, ...($pushResult['provider_ids'] ?? []),
-            ])));
+            $updates['push_provider_ids_json'] = $this->jsonText($providerIds);
         }
         if (Schema::hasColumn('disaster_broadcasts', 'push_errors_json')) {
             $errors = $pushResult['errors'] ?? [];
@@ -355,6 +358,41 @@ class DisasterBroadcastWorkflow
         DisasterBroadcast::query()
             ->where('broadcast_id', $broadcastId)
             ->update($this->query->filterColumns('disaster_broadcasts', $updates));
+        if ($providerIds !== [] && Schema::hasTable('notifications') && Schema::hasColumn('notifications', 'onesignal_id')) {
+            $linked = DB::table('notifications');
+            $notificationId = $broadcast?->notification_id;
+            $hasSource = Schema::hasColumn('notifications', 'source_key');
+            if (! $notificationId && $hasSource && $broadcast && filled($broadcast->message)) {
+                $sourceKey = 'broadcast-'.$broadcastId;
+                DB::table('notifications')->insertOrIgnore($this->query->filterColumns('notifications', [
+                    'source_key' => $sourceKey, 'message' => $broadcast->message,
+                    'sent_by' => $broadcast->sent_by_admin_id, 'created_at' => $broadcast->created_at ?? $broadcast->sent_at,
+                    'channel' => 'onesignal', 'status' => $pushResult['status'], 'target_filter' => $broadcast->scope_type,
+                    'onesignal_id' => $providerIds[0], 'onesignal_ids_json' => $this->jsonText($providerIds),
+                ]));
+                $notificationId = DB::table('notifications')->where('source_key', $sourceKey)->value('notif_id');
+                if ($notificationId && Schema::hasColumn('disaster_broadcasts', 'notification_id')) {
+                    DB::table('disaster_broadcasts')->where('broadcast_id', $broadcastId)->whereNull('notification_id')->update(['notification_id' => $notificationId]);
+                }
+            }
+
+            if ($notificationId || $hasSource) {
+                $linked->where(function ($query) use ($notificationId, $hasSource, $broadcastId): void {
+                    if ($notificationId) $query->where('notif_id', $notificationId);
+                    if ($hasSource) $query->orWhere('source_key', 'broadcast-'.$broadcastId);
+                });
+                foreach ($linked->get() as $notification) {
+                    $ids = array_values(array_unique([
+                        ...$this->presenter->decodeJsonArray($notification->onesignal_ids_json ?? null),
+                        ...array_filter([$notification->onesignal_id ?? null]), ...$providerIds,
+                    ]));
+                    $values = ['onesignal_id' => $ids[0]];
+                    if (Schema::hasColumn('notifications', 'onesignal_ids_json')) $values['onesignal_ids_json'] = $this->jsonText($ids);
+                    DB::table('notifications')->where('notif_id', $notification->notif_id)->update($values);
+                }
+            }
+        }
+
     }
 
     public function broadcastMetadata(array $validated): array

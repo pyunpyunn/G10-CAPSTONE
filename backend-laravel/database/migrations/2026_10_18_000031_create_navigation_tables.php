@@ -13,13 +13,11 @@ return new class extends Migration
         $householdCollation = collect(Schema::getColumns('households'))->firstWhere('name', 'household_id')['collation'] ?? null;
         $centerCollation = collect(Schema::getColumns('evacuation_centers'))->firstWhere('name', 'evacuation_center_id')['collation'] ?? null;
         $userCollation = collect(Schema::getColumns('users'))->firstWhere('name', 'user_id')['collation'] ?? null;
-        Schema::create('team_bases', function (Blueprint $table): void {
-            $table->integer('team_id')->primary();
-            $table->string('name', 120);
-            $table->decimal('lat', 10, 7);
-            $table->decimal('lng', 10, 7);
-            $table->foreign('team_id')->references('team_id')->on('rescue_teams')->cascadeOnDelete();
-        });
+        foreach (['base_name' => fn ($t) => $t->string('base_name', 120)->nullable(),
+            'base_latitude' => fn ($t) => $t->decimal('base_latitude', 10, 7)->nullable(),
+            'base_longitude' => fn ($t) => $t->decimal('base_longitude', 10, 7)->nullable()] as $column => $add) {
+            if (! Schema::hasColumn('rescue_teams', $column)) Schema::table('rescue_teams', $add);
+        }
 
         Schema::create('cached_routes', function (Blueprint $table) use ($householdCollation, $centerCollation): void {
             $table->bigIncrements('id');
@@ -43,23 +41,18 @@ return new class extends Migration
             $table->index(['team_id', 'status', 'profile'], 'cached_routes_team_status_profile_index');
         });
 
-        Schema::create('devices', function (Blueprint $table) use ($userCollation): void {
-            $table->bigIncrements('id');
-            $table->string('user_id', 255)->collation($userCollation);
-            $table->integer('team_id');
-            $table->string('device_uuid', 150)->unique();
-            $table->timestamp('last_sync_at')->nullable();
-            $table->timestamps();
-            $table->foreign('user_id')->references('user_id')->on('users');
-            $table->foreign('team_id')->references('team_id')->on('rescue_teams');
-            $table->index(['team_id', 'user_id'], 'devices_team_user_index');
-        });
+        foreach (['user_id' => fn ($t) => $t->string('user_id')->nullable(),
+            'team_id' => fn ($t) => $t->integer('team_id')->nullable(),
+            'device_uuid' => fn ($t) => $t->string('device_uuid', 150)->nullable()->index(),
+            'last_sync_at' => fn ($t) => $t->timestamp('last_sync_at')->nullable()] as $column => $add) {
+            if (! Schema::hasColumn('device_tokens', $column)) Schema::table('device_tokens', $add);
+        }
 
         Schema::create('dispatch_trips', function (Blueprint $table): void {
             $table->bigIncrements('id');
             $table->integer('dispatch_id');
             $table->integer('team_id');
-            $table->unsignedBigInteger('device_id');
+            $table->bigInteger('device_id');
             $table->enum('profile', ['auto', 'pedestrian']);
             $table->dateTime('started_at');
             $table->dateTime('ended_at')->nullable();
@@ -72,7 +65,7 @@ return new class extends Migration
             $table->timestamps();
             $table->foreign('dispatch_id')->references('assignment_id')->on('responder_assignments');
             $table->foreign('team_id')->references('team_id')->on('rescue_teams');
-            $table->foreign('device_id')->references('id')->on('devices');
+            $table->foreign('device_id')->references('id')->on('device_tokens');
             $table->index(['dispatch_id', 'started_at'], 'dispatch_trips_dispatch_started_index');
             $table->index(['team_id', 'started_at'], 'dispatch_trips_team_started_index');
         });
@@ -93,12 +86,12 @@ return new class extends Migration
         Schema::create('sync_events', function (Blueprint $table): void {
             $table->bigIncrements('id');
             $table->uuid('client_event_id')->unique();
-            $table->unsignedBigInteger('device_id');
+            $table->bigInteger('device_id');
             $table->string('type', 40);
             $table->enum('status', ['received', 'processed', 'failed'])->default('received');
             $table->string('error_message', 255)->nullable();
             $table->timestamp('received_at');
-            $table->foreign('device_id')->references('id')->on('devices')->cascadeOnDelete();
+            $table->foreign('device_id')->references('id')->on('device_tokens')->cascadeOnDelete();
             $table->index(['device_id', 'received_at'], 'sync_events_device_received_at_index');
         });
 
@@ -120,8 +113,6 @@ return new class extends Migration
         Schema::dropIfExists('sync_events');
         Schema::dropIfExists('trip_points');
         Schema::dropIfExists('dispatch_trips');
-        Schema::dropIfExists('devices');
         Schema::dropIfExists('cached_routes');
-        Schema::dropIfExists('team_bases');
     }
 };

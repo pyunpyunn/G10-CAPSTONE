@@ -28,7 +28,7 @@ class EnsureBoundMobileDevice
             return response()->json(['message' => 'The device identifier does not match this access token.'], 403);
         }
 
-        $device = DB::table('devices')->where('device_uuid', $deviceUuid)->first();
+        $device = DB::table('device_tokens')->where('device_uuid', $deviceUuid)->where('user_id', $user->user_id)->whereNotNull('team_id')->first();
         if (! $device || (string) $device->user_id !== (string) $user->user_id) {
             return response()->json(['message' => 'This mobile device is not registered to the authenticated account.'], 401);
         }

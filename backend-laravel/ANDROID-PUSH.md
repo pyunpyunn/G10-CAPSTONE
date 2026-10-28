@@ -12,12 +12,14 @@ OneSignal's delivery report is needed to confirm receipt.
 
 The local broadcast worker is started independently from the old operations
 backlog. Normal `composer dev` also consumes `broadcasts` before `operations`.
-The local Windows account now starts the dedicated broadcast worker automatically at sign-in through `RESQPERATIONBroadcastWorker`. The launcher checks for an existing broadcast worker to avoid duplicates. The startup command runs `start-broadcast-worker.ps1`, which consumes only the `broadcasts` queue.
+The local Windows account starts the worker through `RESQPERATIONBroadcastWorker`.
+The launcher checks for an existing worker to avoid duplicates.
+`start-broadcast-worker.ps1` consumes `broadcasts,operations,navigation`.
 
 For a dedicated worker on another machine:
 
 ```powershell
-php artisan queue:work operations_outbox --queue=broadcasts --sleep=1 --tries=3 --timeout=120
+php artisan queue:work operations_outbox --queue=broadcasts,operations,navigation --sleep=1 --tries=3 --timeout=120
 ```
 
 Read-only account readiness check:
@@ -31,11 +33,16 @@ belongs only in Laravel's environment. Firebase HTTP v1 service-account credenti
 must be configured in the OneSignal app's Android platform. The installed Android
 development/production APK registers its subscription on login; Expo Go cannot.
 
-Setup audit: the existing OneSignal API key authenticates, but Android Firebase
-credentials are empty and OneSignal reports zero messageable devices. Server
-delivery is wired; actual phone delivery remains blocked until Firebase credentials
-are supplied and a phone obtains its Android push subscription.
+**Readiness verified 2026-10-28:** `php artisan onesignal:status` authenticated
+successfully, reported Android FCM v1 configured, 19 provider-messageable
+devices, and 7 eligible locally registered Android subscriptions. These counts
+change as devices register, permission changes, or subscriptions expire. This
+check does not send a push and does not prove a specific phone received one.
+Confirm a test device using OneSignal delivery reports and the phone itself.
 
 Every newly saved broadcast uses `channel=onesignal`. Provider message IDs, errors, and accepted counts are stored on the broadcast and shown in its web history. Message IDs identify the corresponding request in OneSignal reports. An empty provider ID is never treated as a successful push.
 
-Latest audit: both the OneSignal account and Expo Android credentials lack an FCM v1 credential. No Firebase/gcloud login or service-account JSON was found locally. Actual delivery requires authenticating the Firebase integration or supplying an existing service-account file; the Expo build URL is an APK build, not a OneSignal account or Firebase credential.
+Keep the OneSignal App ID identical in backend `ONESIGNAL_APP_ID` and mobile
+`EXPO_PUBLIC_ONESIGNAL_APP_ID`. Keep the OneSignal REST API key and Firebase
+service-account JSON in their approved secure locations only. A successful
+server send is provider acceptance, not proof of OS display or user receipt.

@@ -75,7 +75,22 @@ class DisasterBroadcastPushTest extends TestCase
             $table->text('push_errors_json')->nullable();
             $table->timestamps();
         });
-        DB::table('disaster_broadcasts')->insert(['broadcast_id' => 42]);
+        Schema::table('disaster_broadcasts', fn (Blueprint $table) => $table->integer('notification_id')->nullable());
+        Schema::create('notifications', function (Blueprint $table): void {
+            $table->increments('notif_id');
+            $table->string('source_key')->nullable();
+            $table->text('onesignal_ids_json')->nullable();
+        });
+        DB::table('disaster_broadcasts')->insert(['broadcast_id' => 42, 'notification_id' => 1, 'push_provider_ids_json' => '["existing-provider"]']);
+        DB::table('notifications')->insert(['notif_id' => 1, 'source_key' => 'broadcast-42', 'onesignal_ids_json' => '["existing-provider"]']);
+        DB::table('notifications')->insert(['notif_id' => 2, 'source_key' => 'broadcast-99']);
+        $migration = require database_path('migrations/2026_10_28_000003_add_onesignal_message_ids.php');
+        $migration->up();
+        $migration->up();
+        $this->assertDatabaseHas('disaster_broadcasts', ['broadcast_id' => 42, 'onesignal_id' => 'existing-provider']);
+        $this->assertDatabaseHas('notifications', ['notif_id' => 1, 'onesignal_id' => 'existing-provider']);
+        DB::table('disaster_broadcasts')->where('broadcast_id', 42)->update(['onesignal_id' => null, 'push_provider_ids_json' => null]);
+        DB::table('notifications')->where('notif_id', 1)->update(['onesignal_id' => null, 'onesignal_ids_json' => null]);
         $workflow = app(\App\Services\Web\DisasterBroadcastWorkflow::class);
         $workflow->updateBroadcastPushStatus(42, [
             'status' => 'partial', 'recipient_count' => 2, 'sent_count' => 1,
@@ -91,8 +106,38 @@ class DisasterBroadcastPushTest extends TestCase
         ]);
         $this->assertDatabaseHas('disaster_broadcasts', [
             'broadcast_id' => 42, 'push_status' => 'onesignal_sent',
+            'onesignal_id' => 'provider-1',
             'push_provider_ids_json' => '["provider-1","provider-2"]', 'push_errors_json' => '[]',
         ]);
+            $this->assertDatabaseHas('notifications', ['notif_id' => 1, 'onesignal_id' => 'provider-1',
+            'onesignal_ids_json' => '["provider-1","provider-2"]']);
+        $this->assertDatabaseHas('notifications', ['notif_id' => 2, 'onesignal_id' => null]);
+        $workflow->updateBroadcastPushStatus(42, ['status' => 'failed', 'recipient_count' => 2, 'sent_count' => 0, 'provider_ids' => [], 'errors' => ['Unavailable']]);
+        $this->assertDatabaseHas('disaster_broadcasts', ['broadcast_id' => 42, 'onesignal_id' => 'provider-1']);
+    }
+
+    public function test_accepted_push_creates_one_linked_notification_with_the_actual_onesignal_id(): void
+    {
+        Schema::create('disaster_broadcasts', function (Blueprint $t): void {
+            $t->integer('broadcast_id')->primary(); $t->integer('notification_id')->nullable();
+            foreach (['message','sent_by_admin_id','scope_type','push_status','channel','onesignal_id'] as $c) $t->string($c)->nullable();
+            $t->text('push_provider_ids_json')->nullable(); $t->timestamps();
+        });
+        Schema::create('notifications', function (Blueprint $t): void {
+            $t->increments('notif_id'); $t->string('source_key')->nullable()->unique();
+            foreach (['message','sent_by','channel','status','target_filter','onesignal_id'] as $c) $t->string($c)->nullable();
+            $t->text('onesignal_ids_json')->nullable(); $t->timestamp('created_at')->nullable();
+        });
+        DB::table('disaster_broadcasts')->insert(['broadcast_id' => 55, 'message' => 'Evacuate now.',
+            'sent_by_admin_id' => 'U1', 'scope_type' => 'barangay_wide', 'created_at' => now()]);
+        $workflow = app(\App\Services\Web\DisasterBroadcastWorkflow::class);
+        $delivery = ['status' => 'sent', 'recipient_count' => 1, 'sent_count' => 1, 'provider_ids' => ['335fd3f1-b00e-427c-b72c-7c574cf8a4d5'], 'errors' => []];
+        $workflow->updateBroadcastPushStatus(55, $delivery);
+        $workflow->updateBroadcastPushStatus(55, $delivery);
+        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseHas('notifications', ['source_key' => 'broadcast-55', 'message' => 'Evacuate now.',
+            'onesignal_id' => $delivery['provider_ids'][0]]);
+        $this->assertDatabaseHas('disaster_broadcasts', ['broadcast_id' => 55, 'notification_id' => 1, 'onesignal_id' => $delivery['provider_ids'][0]]);
     }
 
     protected function setUp(): void
