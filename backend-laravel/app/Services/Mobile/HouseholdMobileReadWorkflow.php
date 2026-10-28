@@ -27,7 +27,7 @@ class HouseholdMobileReadWorkflow
 
         $household = $this->query->householdRecord($householdId);
         if (! $household) {
-            return response()->json(['message' => 'Household record was not found in the shared database.'], 404);
+            return response()->json(['message' => 'Household record was not found for this account in the configured database.'], 404);
         }
         $activeEvent = $this->query->activeEvent();
         $devices = $this->query->devices($householdId);
@@ -83,7 +83,6 @@ class HouseholdMobileReadWorkflow
         return response()->json(['data' => ['qr' => $this->presenter->qrPayload($household, $this->query->activeEvent())]]);
     }
 }
-
 
 
 

@@ -226,7 +226,7 @@ class RescuerFieldReportWorkflow
 
         if (Schema::hasTable('households') && ! DB::table('households')->where('household_id', $validated['household_id'])->exists()) {
             throw ValidationException::withMessages([
-                'household_id' => ['Household ID was not found in the shared database.'],
+                'household_id' => ['Household ID was not found in the configured database.'],
             ]);
         }
 
@@ -691,7 +691,6 @@ class RescuerFieldReportWorkflow
         return response()->json(['message' => 'The required '.$table.' table is not available in the current database.'], 503);
     }
 }
-
 
 
 

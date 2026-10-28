@@ -6,6 +6,7 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { deleteStoredItem, getStoredItem, setStoredItem } from '@/utils/secureStorage';
+import { setMobileSnapshotIdentity } from '@/utils/mobileSnapshot';
 import { selectNavigationAccount } from '@/utils/navigationStore';
 
 type Role = {
@@ -52,6 +53,13 @@ export async function restoreMobileSession(): Promise<string | null> {
       await setStoredItem(sessionRoleKey, role);
       const user = response.data?.data || response.data;
       await setStoredItem(ownerRequiredKey, user.owner_selection_required ? '1' : '0');
+      await setMobileSnapshotIdentity(
+        role,
+        String(user.user_id || ''),
+        user.household_id ? String(user.household_id) : undefined,
+        api.defaults.baseURL || '',
+        true,
+      );
       return role;
     }
     await clearToken();
@@ -120,6 +128,12 @@ export async function loginMobile(login: string, password: string) {
   }
   await saveToken(token);
   await setStoredItem(ownerRequiredKey, response.data.user.owner_selection_required ? '1' : '0');
+  await setMobileSnapshotIdentity(
+    response.data.user.role?.role_key || '',
+    String(response.data.user.user_id),
+    response.data.user.household_id ? String(response.data.user.household_id) : undefined,
+    api.defaults.baseURL || '',
+  );
   if (response.data.owner_options) saveViewState('mobile:household-owner', response.data.owner_options);
 
   return response.data.user;
@@ -129,6 +143,12 @@ async function acceptHouseholdSession(data: LoginResponse) {
   await saveToken(data.token);
   await setStoredItem(sessionRoleKey, 'household_resident');
   await setStoredItem(ownerRequiredKey, data.user.owner_selection_required ? '1' : '0');
+  await setMobileSnapshotIdentity(
+    data.user.role?.role_key || 'household_resident',
+    String(data.user.user_id),
+    data.user.household_id ? String(data.user.household_id) : undefined,
+    api.defaults.baseURL || '',
+  );
   if (data.owner_options) saveViewState('mobile:household-owner', data.owner_options);
   if (Platform.OS !== 'web') await selectNavigationAccount(String(data.user.user_id));
   return data.user;

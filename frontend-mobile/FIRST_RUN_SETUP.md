@@ -1,129 +1,77 @@
 # RESQPERATION APK: First-Run Server Setup
 
 Use the standalone APK for household and rescuer accounts. Expo Go, QR scanning,
-and Metro are not required. Build 6 needs a manually configured API address;
-automatic ngrok → Tailscale → LAN failover is included only in new APK builds.
+and Metro are not required.
 
-For build 6, follow the manual Tailscale or LAN steps below. For a new APK with
-automatic fallback, see [TAILSCALE_LAN.md](./TAILSCALE_LAN.md); ngrok must be
-running on the backend computer. `127.0.0.1` alone is reachable only from the
-server computer.
-There is no frontend command to run for the installed APK: open the app itself.
-`npm start` is for development and is not part of this installation flow.
+## 1. Start the server and database
 
-## 1. Start MySQL
+The backend computer must be awake, MySQL must be running, and Laravel must be
+able to connect to the selected database. Keep the existing
+`backend-laravel/.env`; do not overwrite it or recreate the database.
 
-Open **PowerShell as Administrator**:
-
-```powershell
-Start-Service MySQL95
-Get-Service MySQL95
-```
-
-The service should show `Running`. Keep the backend's existing `.env` file;
-do not overwrite it or recreate the database.
-
-## 2. Connect Tailscale
-
-On the server computer:
-
-```powershell
-tailscale up
-tailscale status
-tailscale ip -4
-```
-
-The computer's current Tailscale IPv4 address is `100.121.155.55`.
-
-On the phone:
-
-1. Install Tailscale.
-2. Sign in to the same authorized Tailscale network, or ask its administrator
-   to grant access to the server.
-3. Enable the Tailscale connection.
-
-The phone and computer can use different Wi-Fi or mobile networks. Tailscale
-access policies must allow the phone to reach the computer on TCP port 8000.
-
-## 3. Allow connections through Windows Firewall
-
-Run once in **Administrator PowerShell**:
-
-```powershell
-if (-not (Get-NetFirewallRule -DisplayName 'RESQPERATION API 8000' -ErrorAction SilentlyContinue)) {
-    New-NetFirewallRule `
-        -DisplayName 'RESQPERATION API 8000' `
-        -Direction Inbound `
-        -Action Allow `
-        -Protocol TCP `
-        -LocalPort 8000 `
-        -RemoteAddress LocalSubnet,100.64.0.0/10 `
-        -Profile Any
-}
-```
-
-This permits local-subnet and Tailscale IPv4 connections to the API port.
-
-## 4. Start Laravel — terminal 1
-
-Open a regular PowerShell terminal:
+The backend's `DB_CONNECTION` setting selects `resq_local` or `shared_resq`.
+For a database change, update that setting and its corresponding credentials
+in the backend `.env`, then run:
 
 ```powershell
 cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
-
-$env:APP_DEBUG = 'false'
-php artisan serve --host=0.0.0.0 --port=8000 --no-reload
+php artisan config:clear
+php artisan config:cache
+php artisan db:show
 ```
 
-Keep the terminal open. The `0.0.0.0` binding accepts connections through both
-the LAN and Tailscale interfaces. Do not enter `0.0.0.0` as the phone's server
-address.
+Verify the intended database is shown before restarting Laravel, queue
+workers, and the scheduler. Do not run migrations as part of switching
+connections. Database credentials belong only in the backend `.env`.
 
-If port 8000 is already running, do not start a duplicate server. Inspect it:
-
-```powershell
-Get-NetTCPConnection -LocalPort 8000 -State Listen |
-    Select-Object LocalAddress, OwningProcess
-```
-
-A listener on `0.0.0.0` accepts LAN/Tailscale connections. A listener only on
-`127.0.0.1` accepts connections from the computer itself; restart that Laravel
-instance using the command above.
-
-## 5. Start the notification worker — terminal 2
+The project manages Laravel API startup with the Windows
+`RESQPERATION Mobile Api` scheduled task. Ngrok is separate; install its
+per-user startup entry once from PowerShell under the Windows account that is
+signed in to ngrok:
 
 ```powershell
 cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
-
-php artisan queue:work operations_outbox --queue=operations,broadcasts --sleep=3 --tries=3 --timeout=120
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\install-ngrok-tunnel.ps1
 ```
 
-Keep this terminal open for queued dispatch notifications and broadcasts.
-Skip starting another copy if the same worker is already running.
+The server computer, Laravel API, database, and ngrok tunnel must all be
+running for the ngrok route to work.
 
-## 6. Start scheduled tasks — terminal 3
+## 2. Configure automatic API routes
 
-```powershell
-cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
+New builds can probe the primary URL and each comma-separated URL configured
+in `EXPO_PUBLIC_API_FALLBACK_URLS`. A saved **Server settings** URL is tried
+first; configured routes are still used as fallbacks. For release builds, all
+routes must use HTTPS and end in `/api/v1`.
 
-php artisan schedule:work
-```
-
-Keep this terminal open for scheduled reminders and other scheduled work.
-Use only one scheduler instance for this setup.
-
-## 7. Test the API
-
-On the computer:
-
-```powershell
-Invoke-RestMethod http://100.121.155.55:8000/api/v1/health/ready
-```
-
-With Tailscale connected on the phone, open this address in its browser:
+Set these build-time values before creating the APK:
 
 ```text
-http://100.121.155.55:8000/api/v1/health/ready
+EXPO_PUBLIC_API_BASE_URL=https://sturdily-morse-sitter.ngrok-free.dev/api/v1
+EXPO_PUBLIC_API_FALLBACK_URLS=https://<server-tailnet-fqdn>/api/v1,https://<lan-api-hostname>/api/v1
+```
+
+Only configure a fallback after it has a valid HTTPS certificate trusted by
+Android and its `/health/ready` endpoint returns `{"status":"ready"}` on the
+phones. Tailscale Serve is currently disabled by the tailnet administrator,
+so the existing Tailscale hostname is not a working fallback until that
+administrator enables and verifies it. A same-Wi-Fi route needs a stable
+hostname and trusted HTTPS reverse proxy; plain LAN HTTP is rejected by release
+APKs. See [TAILSCALE_LAN.md](./TAILSCALE_LAN.md) for route requirements and
+database selection details.
+
+Every configured API route must reach the same Laravel backend and database.
+The API URLs do not change databases, and MySQL must never be exposed through
+ngrok, Tailscale, or the LAN proxy. The current APK may contain only the routes
+that were configured when it was built; rebuild after changing build-time
+URLs.
+
+## 3. Verify from the phone
+
+For each configured HTTPS route, open this in the phone browser:
+
+```text
+https://<api-host>/api/v1/health/ready
 ```
 
 Expected response:
@@ -132,77 +80,29 @@ Expected response:
 {"status":"ready"}
 ```
 
-The phone browser check confirms the phone's network path; a successful check
-on the computer alone does not verify phone connectivity.
-
-## 8. Connect the installed APK
-
-1. Open RESQPERATION.
-2. On the sign-in screen, open **Server settings**.
-3. Enter the following API address:
-
-   ```text
-   http://100.121.155.55:8000/api/v1
-   ```
-
-4. Tap **Save server address**.
-5. Sign in with an existing household or rescuer account.
-6. Allow notifications when prompted.
-
-The saved address persists between launches. End active trips and sync saved
-events before changing servers. Changing the server signs out the old session.
-
-## Alternative: connect over the same Wi-Fi LAN
-
-Tailscale is not required when the phone and computer share a reachable local
-network. Keep Laravel running with `--host=0.0.0.0` and use this current LAN
-address in the APK's **Server settings**:
-
-```text
-http://10.90.159.87:8000/api/v1
-```
-
-Test it in the phone browser first:
-
-```text
-http://10.90.159.87:8000/api/v1/health/ready
-```
-
-After changing Wi-Fi networks, find the computer's current Wi-Fi IPv4 address:
-
-```powershell
-ipconfig
-```
-
-Replace `10.90.159.87` in the saved API URL with that address. Never use
-`localhost` or `127.0.0.1` on the phone: those point to the phone itself.
-Use plain LAN HTTP only on a trusted local network.
+This verifies the phone can reach that API route and that Laravel can reach its
+selected database. A health check does not verify login credentials or
+household/rescuer overview access. Open the APK and sign in to confirm those
+separately.
 
 ## OneSignal requirements
 
-- OneSignal is included and configured in the standalone APK.
-- The phone must allow notifications and have the required Google Play Services.
-- The phone and backend need internet access for push delivery, even if API
-  access uses the LAN.
-- Keep the notification worker and scheduler running for queued/scheduled work.
+- The phone must allow notifications and have the required Google Play
+  Services.
+- The phone and backend need internet access for push delivery, even when API
+  access uses a private network.
+- Keep the notification worker and scheduler running for queued and scheduled
+  work.
 - Validate notification delivery on a test phone before broad distribution.
 
 ## Troubleshooting
 
 | Problem | Check |
 | --- | --- |
-| Phone browser cannot open the health endpoint | Laravel is listening on `0.0.0.0`, the firewall rule is enabled, and the chosen IP is correct. |
-| Tailscale connection times out | Tailscale is connected on both devices and access policies permit TCP 8000. |
-| LAN connection times out | Both devices share the network; guest Wi-Fi or client isolation may block connections. |
-| Health endpoint reports a database error | MySQL95 is running and the existing Laravel database configuration is correct. |
-| Build 6 cannot connect | Save the Tailscale or LAN address in **Server settings**. |
-| Notifications do not arrive | Check Android permission, internet access, OneSignal/FCM configuration, worker and scheduler. |
-| API stops working when the computer sleeps | Keep the computer awake while it acts as the server. |
-| Starting Laravel says port 8000 is already in use | Check the existing listener in step 4. If it is already listening on `0.0.0.0`, use that server instead of launching another copy. |
-
-## Each time you use the system
-
-1. Keep the server computer awake and MySQL running.
-2. Start Laravel, the notification worker, and the scheduler if they are stopped.
-3. For Tailscale access, keep Tailscale connected on both devices.
-4. Open the installed APK and sign in. No Metro server or QR scan is needed.
+| No API route is reachable | Check each route's HTTPS certificate, phone connectivity, API process, and `/health/ready` response. |
+| Health endpoint reports a database error | Verify `DB_CONNECTION` and its host/database credentials in the backend `.env`; run `php artisan db:show`. |
+| Tailscale hostname does not work | The tailnet administrator must enable Tailscale Serve or provide another tested HTTPS endpoint. |
+| A local Wi-Fi route does not work | Use a stable LAN hostname with trusted HTTPS; release APKs do not allow plain HTTP. |
+| A saved server does not work | End and sync active trips first, save a working HTTPS URL under **Server settings**, then sign in again. |
+| Notifications do not arrive | Check Android permission, internet access, OneSignal/FCM configuration, worker, and scheduler. |
+| API stops working when the computer sleeps | Keep the backend computer awake while it acts as the server. |

@@ -7,19 +7,12 @@ use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
-    public function test_the_application_serves_the_frontend_or_reports_a_missing_build(): void
+    public function test_the_application_root_identifies_the_backend_api(): void
     {
-        $response = $this->get('/');
-
-        if (file_exists(public_path('frontend-web/index.html'))) {
-            $response->assertOk();
-
-            return;
-        }
-
-        $response->assertStatus(503)
-            ->assertSee('React web build not found.');
+        $this->getJson('/')
+            ->assertOk()
+            ->assertJsonPath('type', 'api')
+            ->assertJsonPath('status', 'ok');
     }
 }
-
 

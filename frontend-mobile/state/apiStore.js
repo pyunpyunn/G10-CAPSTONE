@@ -21,7 +21,7 @@ const cache = createSlice({
     wrote(state) { state.writes++ },
     savedView(state, { payload }) {
       while (Object.keys(state.views).length >= 30) delete state.views[Object.keys(state.views)[0]]
-      state.views[payload.key] = { value: payload.value, savedAt: Date.now() }
+      state.views[payload.key] = { value: payload.value, savedAt: payload.savedAt }
     },
     removedView(state, { payload }) {
       for (const key of Object.keys(state.views)) if (key.startsWith(payload)) delete state.views[key]
@@ -40,7 +40,8 @@ const cache = createSlice({
 export const store = configureStore({ reducer: { serverData: cache.reducer }, devTools: false })
 export const resetApiState = () => store.dispatch(cache.actions.reset())
 export const invalidateApiState = (paths) => store.dispatch(cache.actions.invalidate(paths))
-export const saveViewState = (key, value) => store.dispatch(cache.actions.savedView({ key, value }))
+export const saveViewState = (key, value, savedAt = Date.now()) => store.dispatch(cache.actions.savedView({ key, value, savedAt }))
+export const subscribeViewState = (listener) => store.subscribe(listener)
 export const getViewState = (key) => {
   const view = store.getState().serverData.views[key]
   return view && Date.now() - view.savedAt < 120000 ? view : null

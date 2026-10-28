@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Support\RequestSchema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -37,15 +38,50 @@ class RequestSchemaTest extends TestCase
         $this->app->instance('request', Request::create('/api/v1/test'));
 
         $queries = 0;
-        DB::listen(function () use (&$queries): void { $queries++; });
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
 
         $this->assertTrue(RequestSchema::hasTable('schema_cache_fixture'));
         $afterFirst = $queries;
         $this->assertTrue(RequestSchema::hasTable('schema_cache_fixture'));
         $this->assertSame($afterFirst, $queries);
+        $columns = RequestSchema::getColumnListing('schema_cache_fixture');
+        $afterColumnListing = $queries;
+        $this->assertSame($columns, RequestSchema::getColumnListing('schema_cache_fixture'));
+        $this->assertSame($afterColumnListing, $queries);
 
         $this->app->instance('request', Request::create('/api/v1/test-again'));
         $this->assertTrue(RequestSchema::hasTable('schema_cache_fixture'));
         $this->assertGreaterThan($afterFirst, $queries);
+    }
+
+    public function test_persistent_schema_cache_also_memoizes_lookups_within_a_request(): void
+    {
+        Schema::create('schema_persistent_request_fixture', fn (Blueprint $table) => $table->id());
+        $originalEnvironment = $this->app->environment();
+        $this->app->detectEnvironment(fn () => 'local');
+        config([
+            'app.schema_capability_cache_enabled' => true,
+            'app.schema_capability_cache_store' => 'array',
+            'app.schema_capability_cache_ttl' => 300,
+        ]);
+        Cache::store('array')->flush();
+        $this->app->instance('request', Request::create('/api/v1/test'));
+
+        try {
+            $queries = 0;
+            DB::listen(function () use (&$queries): void {
+                $queries++;
+            });
+
+            $this->assertTrue(RequestSchema::hasTable('schema_persistent_request_fixture'));
+            $afterFirst = $queries;
+            $this->assertTrue(RequestSchema::hasTable('schema_persistent_request_fixture'));
+            $this->assertSame($afterFirst, $queries);
+        } finally {
+            Cache::store('array')->flush();
+            $this->app->detectEnvironment(fn () => $originalEnvironment);
+        }
     }
 }

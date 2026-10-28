@@ -16,7 +16,7 @@ function fixture({ offline = false, slowLogout = false, conflict = false, restor
           calls.push(url);
           if (offline) throw new Error('network unavailable');
           if (restoreStatus === 401) throw { response: { status: 401 } };
-          return { data: { data: { role: { role_key: restoreRole }, owner_selection_required: ownerRequired } } };
+          return { data: { data: { user_id: 'restored-account', household_id: restoreRole === 'household_resident' ? 'HH-1' : undefined, role: { role_key: restoreRole }, owner_selection_required: ownerRequired } } };
         },
         async post(url, payload) {
         calls.push(url);
@@ -36,6 +36,7 @@ function fixture({ offline = false, slowLogout = false, conflict = false, restor
       async clearToken() { calls.push('clear-token'); storage.delete('resqperation_mobile_token'); }, async saveToken(token) { calls.push(['save-token', token]); storage.set('resqperation_mobile_token', token); },
     },
     '@/utils/pushNotifications': { async logoutPushIdentity() { calls.push('push-logout'); if (offline) throw new Error('offline'); } },
+    '@/utils/mobileSnapshot': { async setMobileSnapshotIdentity(...args) { calls.push(['set-snapshot-scope', ...args]); } },
     '@/utils/mobileDeviceRegistration': { async getMobileDeviceUuid() { return 'legacy-device'; } },
     '@/utils/secureStorage': {
       async getStoredItem(key) { return storage.get(key); },
@@ -90,6 +91,8 @@ test('rescuer login normalizes numeric account IDs and saves the device token', 
   assert.equal(payloads[0].payload.login, 'rescuer');
   assert.ok(calls.some((item) => Array.isArray(item) && item[0] === 'select-account' && item[1] === '123'));
   assert.ok(calls.some((item) => Array.isArray(item) && item[0] === 'save-token' && item[1] === 'device-token'));
+  assert.ok(calls.some((item) => Array.isArray(item) && item[0] === 'set-snapshot-scope' &&
+    item[1] === 'rescuer' && item[2] === '123' && item[4] === 'https://example.test/api/v1'));
 });
 test('another account can sign in on a shared phone using a separate device registration', async () => {
   const { auth, calls, storage } = fixture({ conflict: true });
@@ -103,8 +106,11 @@ test('startup restores an authenticated household session from its saved token',
   const { auth, calls, storage } = fixture();
   storage.set('resqperation_mobile_token', 'valid-token');
   assert.equal(await auth.restoreMobileSession(), 'household_resident');
-  assert.deepEqual(calls, ['/auth/me']);
+  assert.equal(calls[0], '/auth/me');
+  assert.equal(calls.length, 2);
   assert.equal(storage.get('resqperation_mobile_role'), 'household_resident');
+  assert.ok(calls.some((item) => Array.isArray(item) && item[0] === 'set-snapshot-scope' &&
+    item[1] === 'household_resident' && item[2] === 'restored-account' && item[3] === 'HH-1' && item[5] === true));
 });
 
 test('startup keeps the cached mobile session when the server is temporarily unreachable', async () => {
@@ -126,7 +132,7 @@ test('startup clears an expired server session instead of restoring it', async (
 
 
 test('household login sends the shared ID and stable phone ID, and caches the owner picker', async () => {
-  const { auth, storage, payloads, views } = fixture({ loginRole: 'household_resident', ownerRequired: true });
+  const { auth, storage, payloads, views, calls } = fixture({ loginRole: 'household_resident', ownerRequired: true });
   const user = await auth.loginMobile('HH-1', 'household-password');
   assert.equal(user.owner_selection_required, true);
   assert.equal(payloads[0].payload.login, 'HH-1');
@@ -134,6 +140,8 @@ test('household login sends the shared ID and stable phone ID, and caches the ow
   assert.equal(await auth.householdOwnerSelectionRequired(), true);
   assert.equal(storage.get('resqperation_mobile_token'), 'temporary');
   assert.equal(views.get('mobile:household-owner').household_id, 'HH-1');
+  assert.ok(calls.some((item) => Array.isArray(item) && item[0] === 'set-snapshot-scope' &&
+    item[1] === 'household_resident' && item[3] === 'HH-1'));
 });
 
 test('choosing an owner saves the selected session and stops requiring the picker', async () => {

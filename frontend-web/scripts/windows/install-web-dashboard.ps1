@@ -3,17 +3,18 @@ param(
     [switch]$TestRecovery
 )
 $ErrorActionPreference = 'Stop'
-$backendPath = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$webPath = Join-Path (Split-Path $backendPath -Parent) 'frontend-web'
+$webPath = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$backendPath = Join-Path (Split-Path $webPath -Parent) 'backend-laravel'
+$logPath = Join-Path $backendPath 'storage\logs\web-dashboard-install.log'
 $resultPath = Join-Path $backendPath 'storage\app\web-dashboard-install.json'
-Start-Transcript -Path (Join-Path $backendPath 'storage\logs\web-dashboard-install.log') -Append | Out-Null
+New-Item -ItemType Directory -Force (Split-Path $logPath -Parent), (Split-Path $resultPath -Parent) | Out-Null
+Start-Transcript -Path $logPath -Append | Out-Null
 try {
     $administrator = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     if (!$administrator) { throw 'Run this installer once from PowerShell as administrator.' }
     if (!(Test-Path -LiteralPath $NodePath) -or !(Test-Path -LiteralPath (Join-Path $webPath 'node_modules\vite\bin\vite.js'))) {
         throw 'Node.js and the installed frontend-web dependencies are required.'
     }
-    # Vite writes only its dependency/config caches during development serving.
     foreach ($relative in @('node_modules\.vite', 'node_modules\.vite-temp')) {
         $cachePath = [IO.Path]::GetFullPath((Join-Path $webPath $relative))
         if (!$cachePath.StartsWith($webPath + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Cache path is outside the frontend.' }
@@ -29,10 +30,20 @@ try {
     }
     $taskName = 'RESQPERATION Web Dashboard'
     $powershellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $runner = Join-Path $PSScriptRoot 'run-mobile-service.ps1'
+    $runner = Join-Path $PSScriptRoot 'run-web-dashboard.ps1'
+    $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    if ($existingTask -and $existingTask.State -eq 'Running') {
+        Stop-ScheduledTask -TaskName $taskName
+        $stopDeadline = (Get-Date).AddSeconds(15)
+        do {
+            Start-Sleep -Milliseconds 500
+            $existingTask = Get-ScheduledTask -TaskName $taskName
+        } while ($existingTask.State -eq 'Running' -and (Get-Date) -lt $stopDeadline)
+        if ($existingTask.State -eq 'Running') { throw 'The existing dashboard task did not stop for migration.' }
+    }
     $action = New-ScheduledTaskAction -Execute $powershellPath `
-        -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$runner`" -Role Web -NodePath `"$NodePath`"" `
-        -WorkingDirectory $backendPath
+        -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$runner`" -NodePath `"$NodePath`"" `
+        -WorkingDirectory $webPath
     $principal = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\LOCAL SERVICE' -LogonType ServiceAccount -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable `
         -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) `

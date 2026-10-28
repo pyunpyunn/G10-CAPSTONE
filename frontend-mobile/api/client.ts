@@ -9,7 +9,8 @@ const tokenKey = 'resqperation_mobile_token';
 const rescuerDeviceUuidKey = 'resq_rescuer_device_uuid';
 const serverUrlKey = 'resqperation_server_url';
 const serverHealthCacheMs = 60_000;
-const serverProbeTimeoutMs = 2_500;
+const serverProbeTimeoutMs = 4_000;
+const apiRequestTimeoutMs = 20_000;
 
 type FailoverRequestConfig = {
   _resqFailoverAttempted?: boolean;
@@ -89,8 +90,8 @@ async function getApiServerCandidates() {
   const uniqueConfigured = [...new Set(configured)];
   const savedUrl = (await getStoredItem(serverUrlKey))?.trim();
   const normalizedSavedUrl = savedUrl ? normalizeApiServerUrl(savedUrl) : null;
-  if (!normalizedSavedUrl || uniqueConfigured.includes(normalizedSavedUrl)) return uniqueConfigured;
-  return [...uniqueConfigured, normalizedSavedUrl];
+  if (!normalizedSavedUrl) return uniqueConfigured;
+  return [normalizedSavedUrl, ...uniqueConfigured.filter((url) => url !== normalizedSavedUrl)];
 }
 
 function ngrokHeaders(url: string) {
@@ -160,9 +161,18 @@ function getExpoHost() {
   return typeof hostUri === 'string' ? hostUri.split(':')[0] : '';
 }
 
+function canRetryOnAnotherServer(config: FailoverRequestConfig & { method?: string; url?: string }) {
+  const method = String(config.method || 'get').toLowerCase();
+  if (['get', 'head', 'options'].includes(method)) return true;
+  if (method !== 'post') return false;
+
+  const route = String(config.url || '').split('?')[0].replace(/^\/+|\/+$/g, '');
+  return ['auth/login', 'mobile/login'].includes(route);
+}
+
 export const api = create({
   baseURL: getApiBaseUrl(),
-  timeout: 12000,
+  timeout: apiRequestTimeoutMs,
   headers: {
     Accept: 'application/json',
   },
@@ -201,12 +211,11 @@ api.interceptors.response.use(
     if (isCancel(error)) return Promise.reject(error);
     if (error.response?.status === 401) resetApiState();
     const config = error.config as (typeof error.config & FailoverRequestConfig) | undefined;
-    const method = String(config?.method || 'get').toLowerCase();
     const currentUrl = config?.baseURL;
     if (!error.response && config && !config._resqFailoverAttempted) {
       activeServerUrl = null;
       activeServerCheckedAt = 0;
-      if (['get', 'head', 'options'].includes(method)) {
+      if (canRetryOnAnotherServer(config)) {
         return selectReadyServer(true, currentUrl ? [currentUrl] : [])
           .then((serverUrl) => {
             config._resqFailoverAttempted = true;
