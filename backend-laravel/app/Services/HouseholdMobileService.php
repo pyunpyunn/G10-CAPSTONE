@@ -3,12 +3,12 @@
 namespace App\Services;
 
 use App\Services\Shared\OneSignalNotificationService;
+use App\Support\RequestSchema as Schema;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -43,7 +43,7 @@ class HouseholdMobileService
 
         if (! $household) {
             return response()->json([
-                'message' => 'Household record was not found in the shared database.',
+                'message' => 'Household record was not found for this account in the configured database.',
             ], 404);
         }
 

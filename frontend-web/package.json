@@ -7,7 +7,6 @@
     "test:realtime": "node --test tests/realtime.test.js",
     "dev": "vite",
     "build": "vite build",
-    "build:laravel": "vite build --mode laravel",
     "lint": "eslint .",
     "preview": "vite preview"
   },

@@ -1,7 +1,6 @@
 param(
-    [Parameter(Mandatory = $true)][ValidateSet('Api', 'Queue', 'Web')][string]$Role,
-    [string]$PhpPath = 'C:\backend\php\php.exe',
-    [string]$NodePath = 'C:\Program Files\nodejs\node.exe'
+    [Parameter(Mandatory = $true)][ValidateSet('Api', 'Queue')][string]$Role,
+    [string]$PhpPath = 'C:\backend\php\php.exe'
 )
 $ErrorActionPreference = 'Stop'
 $backendPath = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -11,8 +10,7 @@ New-Item -ItemType Directory -Force $stateDirectory, $logDirectory | Out-Null
 $statePath = Join-Path $stateDirectory "$Role.json"
 $supervisorLog = Join-Path $logDirectory "$Role-supervisor.log"
 $env:APP_DEBUG = 'false'
-$executablePath = if ($Role -eq 'Web') { $NodePath } else { $PhpPath }
-$webPath = Join-Path (Split-Path $backendPath -Parent) 'frontend-web'
+$executablePath = $PhpPath
 
 function Write-ServiceLog([string]$Message) {
     Add-Content -LiteralPath $supervisorLog -Value ("{0} {1}" -f [DateTimeOffset]::Now.ToString('o'), $Message)
@@ -47,9 +45,7 @@ try {
         try {
             $previous = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
             $candidate = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$previous.child_pid)" -ErrorAction SilentlyContinue
-            $expected = if ($Role -eq 'Web') {
-                [regex]::Escape((Join-Path $webPath 'node_modules\vite\bin\vite.js'))
-            } elseif ($Role -eq 'Api') {
+            $expected = if ($Role -eq 'Api') {
                 [regex]::Escape((Join-Path $backendPath 'vendor\laravel\framework\src\Illuminate\Foundation\resources\server.php'))
             } else { [regex]::Escape((Join-Path $backendPath 'artisan')) + '"?\s+queue:work\s+operations_outbox\b' }
             if ($candidate -and $candidate.ExecutablePath -eq $executablePath -and $candidate.CommandLine -match $expected) {
@@ -66,11 +62,7 @@ try {
             $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
             $outputLog = Join-Path $logDirectory "$Role-$stamp.stdout.log"
             $errorLog = Join-Path $logDirectory "$Role-$stamp.stderr.log"
-            if ($Role -eq 'Web') {
-                $vite = Join-Path $webPath 'node_modules\vite\bin\vite.js'
-                $arguments = @(('"{0}"' -f $vite), '--host', '0.0.0.0', '--port', '5175', '--strictPort')
-                $workingDirectory = $webPath
-            } elseif ($Role -eq 'Api') {
+            if ($Role -eq 'Api') {
                 # Match artisan serve's public directory and Laravel router, but
                 # run PHP directly so there is only one server process to manage.
                 $publicPath = Join-Path $backendPath 'public'

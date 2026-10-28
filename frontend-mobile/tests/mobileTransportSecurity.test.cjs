@@ -39,20 +39,24 @@ function resolveCleartextSetting(environment) {
 
 function loadApiClient(savedServerUrl, options = {}) {
   let requestInterceptor;
-  let readyServerProbeCalled = false;
+  let responseErrorInterceptor;
+  let clientOptions;
   const probedUrls = [];
   const instance = {
     defaults: {},
     getUri(config) { return `${config.baseURL}${config.url}`; },
+    async request(config) {
+      await requestInterceptor(config);
+      return config;
+    },
     interceptors: {
       request: { use(callback) { requestInterceptor = callback; } },
-      response: { use() {} },
+      response: { use(_success, failure) { responseErrorInterceptor = failure; } },
     },
   };
   const axios = {
-    create: () => instance,
+    create(config) { clientOptions = config; return instance; },
     async get(url, config) {
-      readyServerProbeCalled = true;
       probedUrls.push({ url, config });
       if (options.probe) return options.probe(url, config);
       throw new Error('Unexpected API probe.');
@@ -99,9 +103,10 @@ function loadApiClient(savedServerUrl, options = {}) {
   }).outputText, context);
 
   return {
-    readyServerProbeCalled: () => readyServerProbeCalled,
+    clientOptions,
     probedUrls,
     request(config) { return requestInterceptor(config); },
+    failover(error) { return responseErrorInterceptor(error); },
   };
 }
 
@@ -170,7 +175,7 @@ test('secure release config rejects a missing or non-HTTPS production API endpoi
 test('a previously saved HTTP server URL is rejected before the app probes or sends authenticated requests', async () => {
   const client = loadApiClient('http://old-server.example.test/api/v1');
   await assert.rejects(client.request({ headers: {} }), /HTTPS/);
-  assert.equal(client.readyServerProbeCalled(), false);
+  assert.equal(client.probedUrls.length, 0);
 });
 
 test('API routes are checked in order: ngrok first, then configured fallbacks', async () => {
@@ -197,5 +202,56 @@ test('API routes are checked in order: ngrok first, then configured fallbacks', 
     `${ngrok}/health/ready`,
     `${tailscale}/health/ready`,
   ]);
+  assert.equal(client.probedUrls[0].config.timeout, 4000);
+  assert.equal(client.clientOptions.timeout, 20000);
   assert.equal(request.baseURL, tailscale);
+});
+
+test('a saved API route is preferred and configured routes remain available as fallbacks', async () => {
+  const saved = 'https://resq.example.ts.net/api/v1';
+  const configured = 'https://api.example.test/api/v1';
+  const client = loadApiClient(saved, {
+    baseUrl: configured,
+    probe: async (url) => {
+      if (url.startsWith(saved)) throw new Error('saved route unavailable');
+      return { data: { status: 'ready' } };
+    },
+  });
+
+  const request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
+
+  assert.deepEqual(client.probedUrls.map(({ url }) => url), [
+    `${saved}/health/ready`,
+    `${configured}/health/ready`,
+  ]);
+  assert.equal(request.baseURL, configured);
+});
+
+test('login POST requests fail over only after a connection loss, not an HTTP response', async () => {
+  const primary = 'https://api.example.test/api/v1';
+  const fallback = 'https://backup.example.test/api/v1';
+  const client = loadApiClient(null, {
+    baseUrl: primary,
+    fallbackUrls: fallback,
+    probe: async () => ({ data: { status: 'ready' } }),
+  });
+  const request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
+  const retried = await client.failover({ config: request });
+
+  assert.equal(retried.baseURL, fallback);
+  assert.equal(retried._resqFailoverAttempted, true);
+});
+
+test('non-login write requests are not replayed across API routes', async () => {
+  const primary = 'https://api.example.test/api/v1';
+  const client = loadApiClient(null, {
+    baseUrl: primary,
+    fallbackUrls: 'https://backup.example.test/api/v1',
+    probe: async () => ({ data: { status: 'ready' } }),
+  });
+  const request = await client.request({ headers: {}, method: 'post', url: '/household/status' });
+  const error = { config: request };
+
+  await assert.rejects(client.failover(error), (received) => received === error);
+  assert.deepEqual(client.probedUrls.map(({ url }) => url), [`${primary}/health/ready`]);
 });

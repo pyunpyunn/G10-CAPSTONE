@@ -19,8 +19,12 @@ prove that Google delivered a notification.
 ## Phone test
 
 1. Install the updated signed APK over the existing app, keeping its data.
-2. Connect Tailscale on the laptop and phone; start MySQL and Laravel.
-3. Confirm Server settings uses `http://100.121.155.55:8000/api/v1`.
+2. Start the backend, its selected database, and the ngrok tunnel.
+3. Confirm the phone can open
+   `https://sturdily-morse-sitter.ngrok-free.dev/api/v1/health/ready` and sees
+   `{"status":"ready"}`. Use
+   `https://sturdily-morse-sitter.ngrok-free.dev/api/v1` in **Server settings**.
+   The current APK does not have a working Tailscale or LAN HTTPS route.
 4. Log in with a household account and allow notifications.
 5. From HQ, broadcast a uniquely worded alert for that household's active event
    and area. Keep RESQPERATION open on the phone for this first test.

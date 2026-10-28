@@ -19,7 +19,7 @@ self.addEventListener('push', (event) => {
     if (await seen.match(receipt)) return
     const url = new URL(notice.url || 'notifications', self.registration.scope)
     if (url.origin !== self.location.origin) return
-    // Keep links inside this deployment, including Laravel's /frontend-web/ base.
+    // Keep notification links inside the standalone web deployment.
     const base = new URL(self.registration.scope).pathname
     const path = `${base}${url.pathname.replace(/^\//, '')}${url.search}`
     await self.registration.showNotification(notice.title || 'RESQPERATION', {

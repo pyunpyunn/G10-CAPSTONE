@@ -1,19 +1,29 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { copyWithStructuralSharing } from '@reduxjs/toolkit/query';
-import { getViewState, saveViewState } from '@/state/apiStore';
+import { getViewState, removeViewState, saveViewState, subscribeViewState } from '@/state/apiStore';
 import { createRefreshQueue } from '@/utils/networkScheduling';
 import { mobileSnapshotScope, readMobileSnapshot, writeMobileSnapshot } from '@/utils/mobileSnapshot';
 
 export function useMobileOverview<T>(key: string, read: (refresh?: boolean) => Promise<T>) {
-  const cached = useRef(getViewState(`mobile:${key}`));
-  const [overview, setOverview] = useState<T | null>(() => cached.current?.value || null);
-  const current = useRef(overview);
+  const viewKey = `mobile:${key}`;
+  const getViewSnapshot = useCallback(() => getViewState(viewKey), [viewKey]);
+  const cached = useSyncExternalStore(subscribeViewState, getViewSnapshot, getViewSnapshot);
+  const overview: T | null = cached?.value ?? null;
+  const current = useRef<T | null>(overview);
   current.current = overview;
+  const setOverview = useCallback((update: T | null | ((current: T | null) => T | null), savedAt = Date.now()) => {
+    const next = typeof update === 'function'
+      ? (update as (current: T | null) => T | null)(current.current)
+      : update;
+    current.current = next;
+    if (next === null) removeViewState(viewKey);
+    else saveViewState(viewKey, next, savedAt);
+  }, [viewKey]);
   const [loading, setLoading] = useState(!overview);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [offline, setOffline] = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(cached.current?.savedAt || null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(cached?.savedAt || null);
   const queue = useRef(createRefreshQueue());
   const readVersion = useRef(0);
 
@@ -26,7 +36,7 @@ export function useMobileOverview<T>(key: string, read: (refresh?: boolean) => P
         const saved = readMobileSnapshot<T>(scope, key);
         if (saved) {
           current.current = saved.value;
-          setOverview(saved.value);
+          setOverview(saved.value, saved.savedAt);
           setLastSyncedAt(saved.savedAt);
           setLoading(false);
         }
@@ -40,9 +50,8 @@ export function useMobileOverview<T>(key: string, read: (refresh?: boolean) => P
         if (version !== readVersion.current) return null;
         const data = copyWithStructuralSharing(current.current, response);
         current.current = data;
-        setOverview(data);
-        saveViewState(`mobile:${key}`, data);
         const savedAt = Date.now();
+        setOverview(data, savedAt);
         setLastSyncedAt(savedAt);
         setOffline(false);
         if (scope && scope === await mobileSnapshotScope().catch(() => null)) {

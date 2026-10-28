@@ -3,6 +3,28 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
+$resqLocalConnection = [
+    'driver' => env('RESQ_LOCAL_DB_CONNECTION', 'mysql'),
+    'url' => env('RESQ_LOCAL_DB_URL'),
+    'host' => env('RESQ_LOCAL_DB_HOST', '127.0.0.1'),
+    'port' => env('RESQ_LOCAL_DB_PORT', '3306'),
+    'database' => env('RESQ_LOCAL_DB_DATABASE', 'resq_local'),
+    'username' => env('RESQ_LOCAL_DB_USERNAME', 'root'),
+    'password' => env('RESQ_LOCAL_DB_PASSWORD', ''),
+    'unix_socket' => env('RESQ_LOCAL_DB_SOCKET', ''),
+    'charset' => env('RESQ_LOCAL_DB_CHARSET', 'utf8mb4'),
+    'collation' => env('RESQ_LOCAL_DB_COLLATION', 'utf8mb4_unicode_ci'),
+    'prefix' => '',
+    'prefix_indexes' => true,
+    'strict' => true,
+    'engine' => null,
+    'options' => extension_loaded('pdo_mysql') ? array_filter([
+        Mysql::ATTR_SSL_CA => env('RESQ_LOCAL_MYSQL_ATTR_SSL_CA'),
+        \PDO::ATTR_TIMEOUT => min(3, max(1, (int) env('RESQ_LOCAL_DB_TIMEOUT', 3))),
+        Mysql::ATTR_INIT_COMMAND => 'SET SESSION net_read_timeout = '.max(1, (int) env('RESQ_LOCAL_DB_READ_TIMEOUT', env('DB_READ_TIMEOUT', 30))),
+    ]) : [],
+];
+
 return [
 
     /*
@@ -17,7 +39,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'resq_local'),
+    'default' => env('DB_CONNECTION', 'ResQperation'),
 
     /*
     |--------------------------------------------------------------------------
@@ -32,6 +54,8 @@ return [
 
     'connections' => [
 
+        'ResQperation' => $resqLocalConnection,
+
         // Explicit opt-in connection for additive shared-database upgrades.
         'shared_resq' => [
             'driver' => 'mysql',
@@ -45,27 +69,7 @@ return [
             'options' => extension_loaded('pdo_mysql') ? [\PDO::ATTR_TIMEOUT => 10] : [],
         ],
 
-        'resq_local' => [
-            'driver' => env('RESQ_LOCAL_DB_CONNECTION', 'mysql'),
-            'url' => env('RESQ_LOCAL_DB_URL'),
-            'host' => env('RESQ_LOCAL_DB_HOST', '127.0.0.1'),
-            'port' => env('RESQ_LOCAL_DB_PORT', '3306'),
-            'database' => env('RESQ_LOCAL_DB_DATABASE', 'resq_local'),
-            'username' => env('RESQ_LOCAL_DB_USERNAME', 'root'),
-            'password' => env('RESQ_LOCAL_DB_PASSWORD', ''),
-            'unix_socket' => env('RESQ_LOCAL_DB_SOCKET', ''),
-            'charset' => env('RESQ_LOCAL_DB_CHARSET', 'utf8mb4'),
-            'collation' => env('RESQ_LOCAL_DB_COLLATION', 'utf8mb4_unicode_ci'),
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'strict' => true,
-            'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                Mysql::ATTR_SSL_CA => env('RESQ_LOCAL_MYSQL_ATTR_SSL_CA'),
-                \PDO::ATTR_TIMEOUT => min(3, max(1, (int) env('RESQ_LOCAL_DB_TIMEOUT', 3))),
-                Mysql::ATTR_INIT_COMMAND => 'SET SESSION net_read_timeout = '.max(1, (int) env('RESQ_LOCAL_DB_READ_TIMEOUT', env('DB_READ_TIMEOUT', 30))),
-            ]) : [],
-        ],
+        'resq_local' => $resqLocalConnection,
 
         'sqlite' => [
             'driver' => 'sqlite',

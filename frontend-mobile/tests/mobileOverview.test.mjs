@@ -11,6 +11,7 @@ function fixture(read, snapshot = null, persisted = null) {
   const slots = []
   let cursor = 0
   let saved
+  let reduxView = snapshot
   const mocks = {
     react: {
       useRef(value) { const i = cursor++; return slots[i] ||= { current: value } },
@@ -19,10 +20,22 @@ function fixture(read, snapshot = null, persisted = null) {
         if (!(i in slots)) slots[i] = typeof value === 'function' ? value() : value
         return [slots[i], next => { slots[i] = typeof next === 'function' ? next(slots[i]) : next }]
       },
-      useCallback(callback) { return callback },
+      useCallback(callback) {
+        const i = cursor++
+        return slots[i] ||= callback
+      },
+      useSyncExternalStore(_subscribe, getSnapshot) {
+        cursor++
+        return getSnapshot()
+      },
     },
     '@reduxjs/toolkit/query': { copyWithStructuralSharing },
-    '@/state/apiStore': { getViewState: () => snapshot, saveViewState: (key, value) => { saved = { key, value } } },
+    '@/state/apiStore': {
+      getViewState: () => reduxView,
+      saveViewState: (key, value, savedAt) => { reduxView = saved = { key, value, savedAt: savedAt ?? Date.now() } },
+      removeViewState() { reduxView = null },
+      subscribeViewState() { return () => {} },
+    },
     '@/utils/networkScheduling': { createRefreshQueue },
     '@/utils/mobileSnapshot': {
       mobileSnapshotScope: async () => 'session',
@@ -104,11 +117,12 @@ test('an old slow read cannot overwrite a confirmed write before its queued refr
   const first = view.loadOverview()
   await Promise.resolve()
   view.setOverview({ status: 'confirmed-saved' })
+  assert.equal(app.saved().value.status, 'confirmed-saved')
   const second = view.loadOverview(true, true, true)
   old.resolve({ status: 'obsolete' })
   await first
   assert.equal(app.render().overview.status, 'confirmed-saved')
-  assert.equal(app.saved(), undefined)
+  assert.equal(app.saved().value.status, 'confirmed-saved')
   fresh.resolve({ status: 'confirmed-saved' })
   await second
   assert.equal(app.render().overview.status, 'confirmed-saved')

@@ -1,6 +1,42 @@
 # Standalone Android APK
 
-## Latest local APK � version 2.0.0, build 50
+## Latest local APK — version 2.0.0, build 54
+
+Installable file: [`releases/RESQPERATION-build54.apk`](./releases/RESQPERATION-build54.apk).
+
+- 22,586,829 bytes; version code 54; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `5375198BE7D6A4B60DFB2529931783387AC938936011098665C2CD384FA53521`.
+- Household and rescuer overview data is stored in the existing Redux store; the last synced account snapshot remains in local SQLite for offline startup.
+- The backend migration `2026_10_29_000001_add_mobile_overview_indexes.php` adds idempotent indexes for household device recency and trusted-household feeds. Migration tests passed; the migration has **not** been run against the shared database.
+- API server health probes allow 4 seconds; API calls allow 20 seconds to accommodate cold household overview queries. A saved server is tried before configured routes. Login POSTs can fail over after a connection loss; other writes are not replayed.
+- Ngrok is the only configured API route in this APK. Tailscale Serve is disabled and no LAN HTTPS endpoint is configured, so neither is currently a working fallback.
+- Verification passed: TypeScript, 27 mobile overview/Redux/transport tests, five backend index/schema/household tests (25 assertions), PHP formatting, signed Android release compilation, package/version checks, and existing release certificate verification.
+- Physical-device login, offline startup, and route switching still require confirmation on the affected phones.
+
+## Latest local APK — version 2.0.0, build 53
+
+Installable file: [`releases/RESQPERATION-build53.apk`](./releases/RESQPERATION-build53.apk).
+
+- 22,586,549 bytes; version code 53; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `09FCE66E0FEF9582D14C6A8B51196002C1801DF01042BE14BF4E34BB162AA730`.
+- API server health probes allow 4 seconds; API calls allow 20 seconds to accommodate the household overview's cold schema cache. A manually saved server is tried before configured routes. Login POSTs can fail over after a connection loss; other writes are not replayed.
+- Ngrok is the only configured API route in this APK. Tailscale Serve is disabled and no LAN HTTPS endpoint is configured, so neither is currently a working fallback. Configure verified HTTPS URLs in the build environment and rebuild to activate them.
+- Verification passed: mobile TypeScript check, all 10 focused API transport tests, four backend schema/household route tests (20 assertions), PHP syntax/format checks, signed release compilation, package/version checks, and existing release certificate verification. The configured ngrok readiness endpoint returned `{"status":"ready"}`.
+- Local household overview service diagnostics returned HTTP 200 in about 15.5 seconds cold and 9 seconds warm. Physical-device login and route switching still require confirmation on the affected phones.
+
+## Latest local APK - version 2.0.0, build 52
+
+Installable file: [`releases/RESQPERATION-build52.apk`](./releases/RESQPERATION-build52.apk).
+
+- 22,586,561 bytes; version code 52; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `B4581792253EBE2FE48A024B142D0BB1C4F1BBED9A281CA522FA499609A5002E`.
+- Rescuer and household overview snapshots now use a server-and-account scope rather than the rotating access token, so verified sessions can reuse the last saved page after token rotation. A matching legacy token-scoped snapshot is migrated on successful session restoration; logout clears the active account's snapshots.
+- An offline page is available only after that account has successfully loaded its overview on the device at least once. If no snapshot exists, connect once to sync; snapshots are local to that device and are not copied from the server.
+- Build 52 currently has only the ngrok API route configured. Tailscale Serve is disabled by the tailnet administrator, and no LAN HTTPS endpoint is configured; these routes are not active fallbacks in this APK.
+- Verification passed: TypeScript, all 138 mobile regression tests, signed release build, package/version checks, and existing release certificate verification. Public API readiness returned HTTP 200. Lint reports one pre-existing hook-dependency warning in `OfflineNavigationScreen.tsx`.
+- Physical-device installation and offline/resume behavior still need confirmation on the affected phones.
+
+## Previous local APK - version 2.0.0, build 50
 
 Installable file: [`releases/RESQPERATION-build50.apk`](./releases/RESQPERATION-build50.apk).
 

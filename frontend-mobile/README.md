@@ -10,8 +10,10 @@ OneSignal configuration, device requirements, and measured build sizes.
 [**Download Android APK — 24.3 MB (version 1.0.0, build 6)**](https://github.com/pyunpyunn/G10-CAPSTONE/releases/download/v1.0.0-build6/RESQPERATION.apk)
 
 For 64-bit Android 7.0+. Follow [FIRST_RUN_SETUP.md](./FIRST_RUN_SETUP.md).
-Build 6 uses one manually saved API address; new builds support the automatic
-ngrok → Tailscale → LAN fallback described in [TAILSCALE_LAN.md](./TAILSCALE_LAN.md).
+Build 6 uses one manually saved API address. New builds can fail over among
+configured HTTPS API routes; only ngrok is configured currently. Tailscale/LAN
+routes need working HTTPS endpoints before they can be added. See
+[TAILSCALE_LAN.md](./TAILSCALE_LAN.md).
 
 ## Build the downloadable APK
 
@@ -27,11 +29,12 @@ an APK; `npm run build:android:store` builds an AAB for Google Play.
 
 ## Server connection
 
-New builds try the configured ngrok, Tailscale, and LAN routes automatically.
-The ngrok tunnel still must be started on the backend computer. All routes reach
-the same Laravel backend; Laravel's environment configuration determines the
-database. The mobile app never connects directly to the database. See
-[automatic fallback setup](./TAILSCALE_LAN.md).
+New builds automatically try each configured route. The current production
+configuration contains ngrok only; the Tailscale Serve route is not active and
+there is no LAN HTTPS endpoint yet. The ngrok tunnel still must be started on
+the backend computer. All routes must reach the same Laravel backend; Laravel's
+environment configuration determines the database. The mobile app never
+connects directly to the database. See [route setup](./TAILSCALE_LAN.md).
 
 ## Push notifications
 

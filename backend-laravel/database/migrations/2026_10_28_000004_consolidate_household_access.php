@@ -33,7 +33,9 @@ return new class extends Migration
                     if (! $household || ($household->login_user_id && $household->login_user_id !== $link->user_id)) {
                         throw new RuntimeException('Household login conflict; original tables were retained.');
                     }
-                    DB::table('households')->where('household_id', $link->household_id)->update(['login_user_id' => $link->user_id]);
+                    $values = ['login_user_id' => $link->user_id];
+                    if (property_exists($household, 'updated_at')) $values['updated_at'] = $household->updated_at;
+                    DB::table('households')->where('household_id', $link->household_id)->update($values);
                 }
             }
             if (Schema::hasTable('household_device_owners')) {
@@ -60,9 +62,13 @@ return new class extends Migration
                     }
                 }
             }
-            foreach (DB::table('households')->whereNull('login_user_id')->pluck('household_id') as $id) {
-                $user = app(\App\Queries\AuthAccountQuery::class)->householdAccount((string) $id);
-                if ($user) DB::table('households')->where('household_id', $id)->update(['login_user_id' => $user->user_id]);
+            foreach (DB::table('households')->whereNull('login_user_id')->get() as $household) {
+                $user = app(\App\Queries\AuthAccountQuery::class)->householdAccount((string) $household->household_id);
+                if ($user) {
+                    $values = ['login_user_id' => $user->user_id];
+                    if (property_exists($household, 'updated_at')) $values['updated_at'] = $household->updated_at;
+                    DB::table('households')->where('household_id', $household->household_id)->whereNull('login_user_id')->update($values);
+                }
             }
         });
         // Preserve legacy tables for other applications; ResQperation uses the consolidated fields.
