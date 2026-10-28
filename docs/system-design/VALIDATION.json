@@ -1,0 +1,245 @@
+{
+  "renderer": "Mermaid 11.12.0 in headless Chromium",
+  "parsed": 49,
+  "failed": 0,
+  "optional_native_skipped": 1,
+  "parse_results": [
+    {
+      "file": "architecture/00-entire-system.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "architecture/01-client-mobile-offline.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "architecture/02-backend-security-and-realtime.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "architecture/03-partner-integration.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "architecture/04-server-selection-and-deployment.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/00-entire-system-module-interaction.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/01-entire-system-table-relationships.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/02-identity.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/03-household.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/04-disaster.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/05-dispatch.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/06-field.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/07-navigation.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/08-resources.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/09-documentation.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/10-platform.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/11-storage-and-integration-boundaries.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/12-entire-source-and-storage-scope.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/00-entire-system.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/01-entire-system-all-columns.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/02-identity.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/03-household.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/04-disaster.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/05-dispatch.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/06-field.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/07-navigation.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/08-resources.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/09-documentation.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/10-platform.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/11-source-defined-deployment-gaps.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/12-entire-system-source-and-deployed-scope.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/13-mobile-navigation-local-storage.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/00-entire-system-narrative-map.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/00-entire-system.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/01-authentication-and-administration.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/02-household-safety-and-trust.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/03-dispatch-and-field-rescue.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/04-resource-request-handoff.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/05-situation-reports-archives-and-exchange.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/06-offline-page-and-navigation-behavior.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/07-evacuation-and-qr-verification.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/08-alert-weather-and-monitoring.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/09-public-inquiries.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "use-cases/00-entire-system-native.mmd",
+      "result": "not_parsed",
+      "reason": "Optional Mermaid 12+ native use-case source; compatible master is validated with Mermaid 11.12.0"
+    },
+    {
+      "file": "use-cases/00-entire-system.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "use-cases/01-accounts.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "use-cases/02-household.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "use-cases/03-rescue-field.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "use-cases/04-hq-coordination.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "use-cases/05-resources-reports-integration.mmd",
+      "result": "passed"
+    }
+  ],
+  "render_results": [
+    {
+      "file": "use-cases/00-entire-system.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/00-entire-system-narrative-map.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "narratives/00-entire-system.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "architecture/00-entire-system.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "erd/00-entire-system.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/00-entire-system-module-interaction.mmd",
+      "result": "passed"
+    },
+    {
+      "file": "data-model/01-entire-system-table-relationships.mmd",
+      "result": "passed"
+    }
+  ],
+  "viewer_checks": {
+    "initial_render": "passed",
+    "category_navigation": "passed",
+    "mermaid_source_download": "passed",
+    "mermaid_live_compression_roundtrip": "passed"
+  }
+}

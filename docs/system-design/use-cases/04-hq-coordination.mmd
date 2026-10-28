@@ -1,0 +1,67 @@
+flowchart LR
+    %% UML use-case approximation for broad Mermaid Live compatibility.
+    %% Plain lines are associations; labeled dotted arrows are UML relationships.
+    AccountHolder["Actor: Account holder"]:::actor
+    Rescuer["Actor: Rescuer - shared field duties"]:::actor
+    Hq["Actor: HQ personnel - common permitted modules"]:::actor
+    Response["Actor: Response sub-committee / dispatcher"]:::actor
+    Chair["Actor: BDRRM committee chairperson"]:::actor
+    Prevention["Actor: Mitigation and Prevention sub-committee"]:::actor
+    Preparedness["Actor: Preparedness sub-committee"]:::actor
+    Push["Actor: Push notification provider"]:::actor
+    GeoWeather["Actor: Weather, hazard, map and routing providers"]:::actor
+    subgraph resqperation["RESQPERATION"]
+        operationLog(["Record operational timestamps, status changes and history - C5"])
+        dashboard(["Monitor operational dashboard, activity, impact and dispatch summaries"])
+        search(["Search permitted household, personnel and operational records"])
+        notifications(["Review, mark read or remove notifications and manage push subscription"])
+        weather(["Review forecasts, official advisories and event weather snapshots"])
+        hazards(["View hazard layers and annotate affected areas"])
+        manageHazards(["Add or remove authorized hazard layers"])
+        disaster(["Create, update and close disaster events - D1"])
+        broadcast(["Publish event-scoped alerts and reporting instructions - D1"])
+        deliverAlerts(["Deliver configured push notifications to subscribed users - A2 / D1"])
+        dispatch(["Prioritize households/areas, select responders and dispatch teams - D2"])
+        priorityRules(["Review and configure dispatch priority criteria"])
+        incidentMonitor(["Monitor incident findings, casualties and damage - D3"])
+        householdMonitor(["Review household/member reports, history and welfare-check queues - D4"])
+        confirmStatus(["Confirm household safety or evacuation status - D4"])
+        severity(["Classify event severity and affected-area priority - D5"]):::partial
+        areaSeverity(["GAP: assign exact Low / Medium / High / Critical severity per affected area - D5"]):::gap
+        fieldMonitor(["Monitor assignment progress, field GPS, reports and communications - D6"])
+    end
+    Rescuer -. "specializes" .-> AccountHolder
+    Hq -. "specializes" .-> AccountHolder
+    Response -. "specializes" .-> Hq
+    Chair -. "specializes" .-> Response
+    Prevention -. "specializes" .-> Hq
+    Preparedness -. "specializes" .-> Hq
+    Rescuer --- operationLog
+    Hq --- dashboard
+    Hq --- search
+    Hq --- notifications
+    Hq --- weather
+    Hq --- hazards
+    Prevention --- manageHazards
+    Preparedness --- manageHazards
+    Chair --- manageHazards
+    Response --- dispatch
+    Response --- priorityRules
+    Response --- incidentMonitor
+    Response --- householdMonitor
+    Response --- confirmStatus
+    Response --- severity
+    Response --- areaSeverity
+    Response --- fieldMonitor
+    Chair --- disaster
+    Chair --- broadcast
+    Push --- deliverAlerts
+    GeoWeather --- weather
+    GeoWeather --- hazards
+    broadcast -. "include" .-> deliverAlerts
+    dispatch -. "include" .-> operationLog
+    confirmStatus -. "include" .-> operationLog
+    areaSeverity -. "extend" .-> severity
+    classDef actor fill:#e0f2fe,color:#0c4a6e,stroke:#0284c7
+    classDef gap fill:#fff1f2,color:#881337,stroke:#be123c,stroke-width:2px
+    classDef partial fill:#fff7ed,color:#7c2d12,stroke:#c2410c,stroke-width:2px

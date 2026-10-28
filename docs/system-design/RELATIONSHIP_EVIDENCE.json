@@ -1,0 +1,1774 @@
+[
+  {
+    "child": "addresses",
+    "column": "barangay_id",
+    "parent": "barangays",
+    "parent_column": "barangay_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Address.php",
+      "backend-laravel\\app\\Queries\\AreaCoverageQuery.php",
+      "backend-laravel\\app\\Services\\Shared\\BarangayProfileService.php"
+    ]
+  },
+  {
+    "child": "addresses",
+    "column": "purok_id",
+    "parent": "puroks",
+    "parent_column": "purok_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Address.php",
+      "backend-laravel\\app\\Queries\\HouseholdAddressQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdDirectoryQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdPurokQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Queries\\MappingQuery.php",
+      "backend-laravel\\app\\Queries\\RescueDispatchQuery.php",
+      "backend-laravel\\app\\Queries\\SitioDispatchCoverageQuery.php",
+      "backend-laravel\\app\\Queries\\SitioPriorityQuery.php",
+      "backend-laravel\\app\\Queries\\SituationReportQuery.php"
+    ]
+  },
+  {
+    "child": "addresses",
+    "column": "sitio_id",
+    "parent": "sitios",
+    "parent_column": "sitio_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Queries\\HouseholdAddressQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "affected_areas",
+    "column": "barangay_id",
+    "parent": "barangays",
+    "parent_column": "barangay_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\SituationReportQuery.php"
+    ]
+  },
+  {
+    "child": "affected_areas",
+    "column": "confirmed_by_admin_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\SituationReportQuery.php"
+    ]
+  },
+  {
+    "child": "affected_areas",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\AffectedArea.php"
+    ]
+  },
+  {
+    "child": "affected_areas",
+    "column": "purok_id",
+    "parent": "puroks",
+    "parent_column": "purok_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\SituationReportQuery.php"
+    ]
+  },
+  {
+    "child": "affected_areas",
+    "column": "severity_id",
+    "parent": "severity_levels",
+    "parent_column": "severity_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\AffectedArea.php"
+    ]
+  },
+  {
+    "child": "affected_areas",
+    "column": "sitio_id",
+    "parent": "sitios",
+    "parent_column": "sitio_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\SituationReportQuery.php"
+    ]
+  },
+  {
+    "child": "audit_logs",
+    "column": "user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\AuditLog.php"
+    ]
+  },
+  {
+    "child": "barangay_boundaries",
+    "column": "barangay_id",
+    "parent": "barangays",
+    "parent_column": "barangay_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Services\\Shared\\BarangayBoundaryService.php"
+    ]
+  },
+  {
+    "child": "barangays",
+    "column": "city_id",
+    "parent": "cities",
+    "parent_column": "city_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\City.php",
+      "backend-laravel\\app\\Services\\Mobile\\HouseholdSetupAddress.php",
+      "backend-laravel\\app\\Services\\Shared\\BarangayProfileService.php"
+    ]
+  },
+  {
+    "child": "cached_routes",
+    "column": "evac_center_id",
+    "parent": "evacuation_centers",
+    "parent_column": "evacuation_center_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: cached_routes_evac_center_id_foreign",
+      "backend-laravel\\app\\Models\\CachedRoute.php"
+    ]
+  },
+  {
+    "child": "cached_routes",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: cached_routes_household_id_foreign",
+      "backend-laravel\\app\\Models\\CachedRoute.php"
+    ]
+  },
+  {
+    "child": "cached_routes",
+    "column": "team_id",
+    "parent": "rescue_teams",
+    "parent_column": "team_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: cached_routes_team_id_foreign",
+      "backend-laravel\\app\\Models\\CachedRoute.php"
+    ]
+  },
+  {
+    "child": "cities",
+    "column": "province_id",
+    "parent": "provinces",
+    "parent_column": "province_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\City.php",
+      "backend-laravel\\app\\Models\\Province.php",
+      "backend-laravel\\app\\Services\\Mobile\\HouseholdSetupAddress.php",
+      "backend-laravel\\app\\Services\\Shared\\BarangayProfileService.php"
+    ]
+  },
+  {
+    "child": "device_tokens",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DeviceToken.php",
+      "backend-laravel\\app\\Models\\Household.php",
+      "backend-laravel\\app\\Services\\OneSignalNotificationService.php",
+      "backend-laravel\\app\\Services\\Shared\\OneSignalNotificationService.php"
+    ]
+  },
+  {
+    "child": "device_tokens",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DeviceToken.php"
+    ]
+  },
+  {
+    "child": "device_tracking_logs",
+    "column": "device_token_id",
+    "parent": "device_tokens",
+    "parent_column": "id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DeviceTrackingLog.php"
+    ]
+  },
+  {
+    "child": "device_tracking_logs",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DeviceTrackingLog.php"
+    ]
+  },
+  {
+    "child": "device_tracking_logs",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DeviceTrackingLog.php"
+    ]
+  },
+  {
+    "child": "devices",
+    "column": "team_id",
+    "parent": "rescue_teams",
+    "parent_column": "team_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: devices_team_id_foreign"
+    ]
+  },
+  {
+    "child": "devices",
+    "column": "user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: devices_user_id_foreign"
+    ]
+  },
+  {
+    "child": "disaster_broadcasts",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DisasterBroadcast.php",
+      "backend-laravel\\app\\Models\\DisasterEvent.php"
+    ]
+  },
+  {
+    "child": "disaster_broadcasts",
+    "column": "sent_by_admin_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DisasterBroadcast.php"
+    ]
+  },
+  {
+    "child": "disaster_broadcasts",
+    "column": "severity_id",
+    "parent": "severity_levels",
+    "parent_column": "severity_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DisasterBroadcast.php",
+      "backend-laravel\\app\\Queries\\DisasterBroadcastQuery.php"
+    ]
+  },
+  {
+    "child": "disaster_broadcasts",
+    "column": "weather_log_id",
+    "parent": "weather_logs",
+    "parent_column": "weather_log_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DisasterBroadcast.php"
+    ]
+  },
+  {
+    "child": "disaster_event_types",
+    "column": "event_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Services\\Web\\DisasterBroadcastService.php"
+    ]
+  },
+  {
+    "child": "disaster_event_types",
+    "column": "type_id",
+    "parent": "disaster_types",
+    "parent_column": "type_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Services\\Web\\DisasterBroadcastService.php"
+    ]
+  },
+  {
+    "child": "disaster_events",
+    "column": "severity_level_id",
+    "parent": "severity_levels",
+    "parent_column": "severity_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DisasterEvent.php",
+      "backend-laravel\\app\\Models\\SeverityLevel.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "backend-laravel\\app\\Queries\\DashboardQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Queries\\MappingQuery.php",
+      "backend-laravel\\app\\Queries\\ResourceRequestQuery.php",
+      "backend-laravel\\app\\Queries\\SituationReportQuery.php",
+      "backend-laravel\\app\\Services\\HouseholdMobileService.php",
+      "backend-laravel\\app\\Services\\Mobile\\RescuerMobileSupport.php"
+    ]
+  },
+  {
+    "child": "disaster_events",
+    "column": "type_id",
+    "parent": "disaster_types",
+    "parent_column": "type_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DisasterEvent.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "backend-laravel\\app\\Queries\\DashboardQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Queries\\MappingQuery.php",
+      "backend-laravel\\app\\Queries\\ResourceRequestQuery.php",
+      "backend-laravel\\app\\Queries\\SituationReportQuery.php",
+      "backend-laravel\\app\\Services\\Mobile\\RescuerMobileSupport.php"
+    ]
+  },
+  {
+    "child": "dispatch_trips",
+    "column": "device_id",
+    "parent": "devices",
+    "parent_column": "id",
+    "physical": true,
+    "evidence": [
+      "information_schema: dispatch_trips_device_id_foreign"
+    ]
+  },
+  {
+    "child": "dispatch_trips",
+    "column": "dispatch_id",
+    "parent": "responder_assignments",
+    "parent_column": "assignment_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: dispatch_trips_dispatch_id_foreign"
+    ]
+  },
+  {
+    "child": "dispatch_trips",
+    "column": "team_id",
+    "parent": "rescue_teams",
+    "parent_column": "team_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: dispatch_trips_team_id_foreign"
+    ]
+  },
+  {
+    "child": "evacuation_centers",
+    "column": "current_event_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Queries\\ResourceRequestQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Http\\Controllers\\Api\\MobileNavigationController.php"
+    ]
+  },
+  {
+    "child": "evacuation_records",
+    "column": "center_id",
+    "parent": "evacuation_centers",
+    "parent_column": "evacuation_center_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\EvacuationCenter.php",
+      "backend-laravel\\app\\Models\\EvacuationRecord.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\SituationEvacuationQuery.php"
+    ]
+  },
+  {
+    "child": "evacuation_records",
+    "column": "event_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\EvacuationRecord.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\SituationEvacuationQuery.php"
+    ]
+  },
+  {
+    "child": "evacuation_records",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\EvacuationRecord.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\SituationEvacuationQuery.php"
+    ]
+  },
+  {
+    "child": "evacuation_records",
+    "column": "household_status_id",
+    "parent": "household_statuses",
+    "parent_column": "status_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\SituationEvacuationQuery.php"
+    ]
+  },
+  {
+    "child": "geotagged_locations",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\GeotaggedLocation.php",
+      "backend-laravel\\app\\Models\\Household.php",
+      "backend-laravel\\app\\Queries\\MappingQuery.php"
+    ]
+  },
+  {
+    "child": "geotagged_locations",
+    "column": "verified_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\GeotaggedLocation.php"
+    ]
+  },
+  {
+    "child": "household_device_owners",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Services\\Mobile\\HouseholdAccessService.php"
+    ]
+  },
+  {
+    "child": "household_device_owners",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Services\\Mobile\\HouseholdAccessService.php"
+    ]
+  },
+  {
+    "child": "household_device_owners",
+    "column": "selection_token_id",
+    "parent": "personal_access_tokens",
+    "parent_column": "id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Services\\Mobile\\HouseholdAccessService.php"
+    ]
+  },
+  {
+    "child": "household_disasters",
+    "column": "current_status_id",
+    "parent": "household_statuses",
+    "parent_column": "status_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: fk_hd_status",
+      "backend-laravel\\app\\Models\\HouseholdDisaster.php",
+      "backend-laravel\\app\\Queries\\DashboardQuery.php",
+      "backend-laravel\\app\\Queries\\DispatchDestinationQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Queries\\RescueDispatchQuery.php",
+      "backend-laravel\\app\\Queries\\RescuePriorityQuery.php",
+      "backend-laravel\\app\\Queries\\SitioPriorityQuery.php"
+    ]
+  },
+  {
+    "child": "household_disasters",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: fk_hd_event",
+      "backend-laravel\\app\\Models\\DisasterEvent.php",
+      "backend-laravel\\app\\Models\\HouseholdDisaster.php"
+    ]
+  },
+  {
+    "child": "household_disasters",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: fk_hd_household",
+      "backend-laravel\\app\\Models\\Household.php",
+      "backend-laravel\\app\\Models\\HouseholdDisaster.php",
+      "backend-laravel\\app\\Queries\\ArchiveEventDetailQuery.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "backend-laravel\\app\\Queries\\DashboardQuery.php"
+    ]
+  },
+  {
+    "child": "household_disasters",
+    "column": "initial_status_id",
+    "parent": "household_statuses",
+    "parent_column": "status_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: fk_hd_initial_status"
+    ]
+  },
+  {
+    "child": "household_login_accounts",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\AuthAccountQuery.php"
+    ]
+  },
+  {
+    "child": "household_login_accounts",
+    "column": "user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\AuthAccountQuery.php"
+    ]
+  },
+  {
+    "child": "household_member_id_mappings",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Services\\Shared\\HouseholdMemberIdentityUpgrade.php"
+    ]
+  },
+  {
+    "child": "household_members",
+    "column": "gender_id",
+    "parent": "genders",
+    "parent_column": "gender_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\HouseholdMember.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Queries\\SituationEvacuationQuery.php",
+      "backend-laravel\\app\\Queries\\SituationHouseholdQuery.php"
+    ]
+  },
+  {
+    "child": "household_members",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Household.php",
+      "backend-laravel\\app\\Models\\HouseholdMember.php",
+      "backend-laravel\\app\\Queries\\RescuePriorityQuery.php",
+      "backend-laravel\\app\\Queries\\SitioPriorityQuery.php"
+    ]
+  },
+  {
+    "child": "household_members",
+    "column": "relationship_id",
+    "parent": "relationships",
+    "parent_column": "relationship_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\HouseholdMember.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Services\\HouseholdMobileService.php"
+    ]
+  },
+  {
+    "child": "household_password_recovery_otps",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Services\\Shared\\AuthService.php"
+    ]
+  },
+  {
+    "child": "household_status_logs",
+    "column": "device_token_id",
+    "parent": "device_tokens",
+    "parent_column": "id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\HouseholdStatusLog.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "household_status_logs",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DisasterEvent.php",
+      "backend-laravel\\app\\Models\\HouseholdStatusLog.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "household_status_logs",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Household.php",
+      "backend-laravel\\app\\Models\\HouseholdStatusLog.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "backend-laravel\\app\\Queries\\DashboardQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Queries\\RescuerFieldReportQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "household_status_logs",
+    "column": "responder_id",
+    "parent": "responders",
+    "parent_column": "responder_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "household_status_logs",
+    "column": "reviewed_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\HouseholdStatusLog.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "household_status_logs",
+    "column": "status_id",
+    "parent": "household_statuses",
+    "parent_column": "status_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: fk_hsl_status",
+      "backend-laravel\\app\\Models\\HouseholdStatus.php",
+      "backend-laravel\\app\\Models\\HouseholdStatusLog.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "backend-laravel\\app\\Queries\\DashboardQuery.php",
+      "backend-laravel\\app\\Queries\\DispatchDestinationQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdEventStatusQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Queries\\RescueDispatchQuery.php",
+      "backend-laravel\\app\\Queries\\RescuerFieldReportQuery.php",
+      "backend-laravel\\app\\Queries\\SitioPriorityQuery.php",
+      "backend-laravel\\app\\Services\\HouseholdMobileService.php"
+    ]
+  },
+  {
+    "child": "household_status_logs",
+    "column": "submitted_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\HouseholdStatusLog.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "household_trusted_pins",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\HouseholdTrustedPin.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "households",
+    "column": "address_id",
+    "parent": "addresses",
+    "parent_column": "address_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Address.php",
+      "backend-laravel\\app\\Models\\Household.php",
+      "backend-laravel\\app\\Queries\\ArchiveEventDetailQuery.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "backend-laravel\\app\\Queries\\AreaCoverageQuery.php",
+      "backend-laravel\\app\\Queries\\DisasterBroadcastQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdAddressQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdDirectoryQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdEligibilityQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdPurokQuery.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Queries\\MappingQuery.php",
+      "backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php",
+      "backend-laravel\\app\\Queries\\RescueDispatchQuery.php",
+      "backend-laravel\\app\\Queries\\RescuePriorityQuery.php",
+      "backend-laravel\\app\\Queries\\SitioDispatchCoverageQuery.php",
+      "backend-laravel\\app\\Queries\\SitioPriorityQuery.php",
+      "backend-laravel\\app\\Queries\\SituationReportQuery.php",
+      "backend-laravel\\app\\Services\\HouseholdMobileService.php",
+      "backend-laravel\\app\\Services\\OneSignalNotificationService.php",
+      "backend-laravel\\app\\Services\\Mobile\\HouseholdSetupAddress.php",
+      "backend-laravel\\app\\Services\\Mobile\\RescuerFieldReportWorkflow.php",
+      "backend-laravel\\app\\Services\\Navigation\\RoutePrecomputeService.php",
+      "backend-laravel\\app\\Services\\Shared\\BarangayProfileService.php",
+      "backend-laravel\\app\\Services\\Shared\\OneSignalNotificationService.php",
+      "backend-laravel\\app\\Services\\Shared\\SmsGatewayService.php",
+      "backend-laravel\\app\\Services\\Web\\DisasterBroadcastRequestValidator.php"
+    ]
+  },
+  {
+    "child": "incident_archives",
+    "column": "archived_by_admin_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveEventDetailQuery.php"
+    ]
+  },
+  {
+    "child": "incident_archives",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveEventDetailQuery.php"
+    ]
+  },
+  {
+    "child": "landing_inquiries",
+    "column": "handled_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\LandingInquiry.php"
+    ]
+  },
+  {
+    "child": "mapping_hazard_layers",
+    "column": "barangay_id",
+    "parent": "barangays",
+    "parent_column": "barangay_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Http\\Controllers\\Api\\HazardLayerController.php"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "device_token_id",
+    "parent": "device_tokens",
+    "parent_column": "id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Jobs\\SendStatusReminder.php"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: fk_mds_event",
+      "backend-laravel\\app\\Models\\MemberDisasterStatus.php"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "evacuation_center_id",
+    "parent": "evacuation_centers",
+    "parent_column": "evacuation_center_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Jobs\\SendStatusReminder.php"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: fk_mds_household"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: fk_mds_member",
+      "backend-laravel\\app\\Models\\HouseholdMember.php",
+      "backend-laravel\\app\\Models\\MemberDisasterStatus.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Queries\\MappingQuery.php",
+      "backend-laravel\\app\\Queries\\SituationEvacuationQuery.php",
+      "backend-laravel\\app\\Services\\HouseholdMobileService.php",
+      "backend-laravel\\app\\Services\\Mobile\\HouseholdMobileStatusWriter.php"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "previous_status_id",
+    "parent": "member_statuses",
+    "parent_column": "status_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: fk_mds_prev_status"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "reported_by_member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Jobs\\SendStatusReminder.php"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "reported_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Jobs\\SendStatusReminder.php"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "responder_id",
+    "parent": "responders",
+    "parent_column": "responder_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Jobs\\SendStatusReminder.php"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "status_id",
+    "parent": "member_statuses",
+    "parent_column": "status_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: fk_mds_status",
+      "backend-laravel\\app\\Models\\MemberDisasterStatus.php",
+      "backend-laravel\\app\\Models\\MemberStatus.php",
+      "backend-laravel\\app\\Queries\\HouseholdStatusQuery.php",
+      "backend-laravel\\app\\Queries\\MappingQuery.php",
+      "backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php",
+      "backend-laravel\\app\\Queries\\RescuePriorityQuery.php",
+      "backend-laravel\\app\\Queries\\SituationEvacuationQuery.php",
+      "backend-laravel\\app\\Queries\\SituationHouseholdQuery.php",
+      "backend-laravel\\app\\Services\\HouseholdMobileService.php",
+      "backend-laravel\\app\\Services\\Mobile\\HouseholdMobileStatusWriter.php",
+      "backend-laravel\\app\\Services\\Mobile\\RescuerFieldReportWorkflow.php"
+    ]
+  },
+  {
+    "child": "member_disaster_statuses",
+    "column": "verified_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Jobs\\SendStatusReminder.php"
+    ]
+  },
+  {
+    "child": "member_status_logs",
+    "column": "device_token_id",
+    "parent": "device_tokens",
+    "parent_column": "id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php"
+    ]
+  },
+  {
+    "child": "member_status_logs",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php"
+    ]
+  },
+  {
+    "child": "member_status_logs",
+    "column": "from_status_id",
+    "parent": "member_statuses",
+    "parent_column": "status_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php"
+    ]
+  },
+  {
+    "child": "member_status_logs",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php"
+    ]
+  },
+  {
+    "child": "member_status_logs",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php"
+    ]
+  },
+  {
+    "child": "member_status_logs",
+    "column": "reported_by_member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php"
+    ]
+  },
+  {
+    "child": "member_status_logs",
+    "column": "reported_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php"
+    ]
+  },
+  {
+    "child": "member_status_logs",
+    "column": "responder_id",
+    "parent": "responders",
+    "parent_column": "responder_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php"
+    ]
+  },
+  {
+    "child": "member_status_logs",
+    "column": "to_status_id",
+    "parent": "member_statuses",
+    "parent_column": "status_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescueCriteriaHistoryQuery.php"
+    ]
+  },
+  {
+    "child": "member_vulnerable_groups",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Queries\\RescuePriorityQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescuePriorityQuery.php"
+    ]
+  },
+  {
+    "child": "notifications",
+    "column": "sent_by",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Notification.php"
+    ]
+  },
+  {
+    "child": "personal_access_tokens",
+    "column": "tokenable_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ProfileQuery.php"
+    ]
+  },
+  {
+    "child": "puroks",
+    "column": "sitio_id",
+    "parent": "sitios",
+    "parent_column": "sitio_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Purok.php",
+      "backend-laravel\\app\\Models\\Sitio.php",
+      "backend-laravel\\app\\Queries\\HouseholdEligibilityQuery.php",
+      "backend-laravel\\app\\Queries\\MappingQuery.php",
+      "backend-laravel\\app\\Queries\\SitioPriorityQuery.php",
+      "backend-laravel\\app\\Queries\\SituationReportQuery.php",
+      "backend-laravel\\app\\Services\\Mobile\\HouseholdSetupAddress.php",
+      "backend-laravel\\app\\Services\\Shared\\HouseholdGeographicClassifier.php"
+    ]
+  },
+  {
+    "child": "request_validations",
+    "column": "duplicate_request_id",
+    "parent": "resource_requests",
+    "parent_column": "request_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ResourceRequestQuery.php"
+    ]
+  },
+  {
+    "child": "request_validations",
+    "column": "request_id",
+    "parent": "resource_requests",
+    "parent_column": "request_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\RequestValidation.php",
+      "backend-laravel\\app\\Models\\ResourceRequest.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ResourceRequestQuery.php"
+    ]
+  },
+  {
+    "child": "request_validations",
+    "column": "validator_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\RequestValidation.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ResourceRequestQuery.php"
+    ]
+  },
+  {
+    "child": "rescue_priority_settings",
+    "column": "updated_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Actions\\UpdateRescuePrioritySettings.php"
+    ]
+  },
+  {
+    "child": "rescue_teams",
+    "column": "assigned_purok_id",
+    "parent": "puroks",
+    "parent_column": "purok_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Actions\\NormalizeResponderCodes.php"
+    ]
+  },
+  {
+    "child": "rescue_teams",
+    "column": "leader_responder_id",
+    "parent": "responders",
+    "parent_column": "responder_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Actions\\NormalizeResponderCodes.php"
+    ]
+  },
+  {
+    "child": "resource_requests",
+    "column": "evacuation_center_id",
+    "parent": "evacuation_centers",
+    "parent_column": "evacuation_center_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\ResourceRequest.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "backend-laravel\\app\\Queries\\ResourceRequestQuery.php",
+      "backend-laravel\\app\\Http\\Controllers\\Api\\ResourceRequestController.php"
+    ]
+  },
+  {
+    "child": "resource_requests",
+    "column": "handled_by",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\ResourceRequest.php"
+    ]
+  },
+  {
+    "child": "resource_requests",
+    "column": "status_id",
+    "parent": "resource_request_status",
+    "parent_column": "status_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\ResourceRequest.php",
+      "backend-laravel\\app\\Models\\ResourceRequestStatus.php",
+      "backend-laravel\\app\\Queries\\ResourceRequestQuery.php"
+    ]
+  },
+  {
+    "child": "resource_requests",
+    "column": "validated_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\ResourceRequest.php",
+      "Reviewed application reference: backend-laravel\\app\\Console\\Commands\\VerifyExternalRequestIntegration.php"
+    ]
+  },
+  {
+    "child": "responder_assignments",
+    "column": "affected_area_id",
+    "parent": "affected_areas",
+    "parent_column": "affected_area_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\ResponderAssignment.php"
+    ]
+  },
+  {
+    "child": "responder_assignments",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\ResponderAssignment.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "backend-laravel\\app\\Queries\\RescuerAssignmentQuery.php"
+    ]
+  },
+  {
+    "child": "responder_assignments",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\ResponderAssignment.php",
+      "Reviewed application reference: backend-laravel\\app\\Actions\\SelectDispatchResponders.php"
+    ]
+  },
+  {
+    "child": "responder_assignments",
+    "column": "responder_id",
+    "parent": "responders",
+    "parent_column": "responder_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Responder.php",
+      "backend-laravel\\app\\Models\\ResponderAssignment.php"
+    ]
+  },
+  {
+    "child": "responder_assignments",
+    "column": "status_log_id",
+    "parent": "household_status_logs",
+    "parent_column": "status_log_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Actions\\SelectDispatchResponders.php"
+    ]
+  },
+  {
+    "child": "responder_assignments",
+    "column": "team_id",
+    "parent": "rescue_teams",
+    "parent_column": "team_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\RescueTeam.php",
+      "backend-laravel\\app\\Models\\ResponderAssignment.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "backend-laravel\\app\\Queries\\DashboardQuery.php",
+      "backend-laravel\\app\\Queries\\RescueDispatchQuery.php",
+      "backend-laravel\\app\\Queries\\RescuerAssignmentQuery.php",
+      "backend-laravel\\app\\Queries\\SituationReportQuery.php"
+    ]
+  },
+  {
+    "child": "responder_check_ins",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescuerMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "responder_check_ins",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescuerMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "responder_check_ins",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescuerMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "responder_check_ins",
+    "column": "responder_id",
+    "parent": "responders",
+    "parent_column": "responder_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescuerMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "responder_check_ins",
+    "column": "team_id",
+    "parent": "rescue_teams",
+    "parent_column": "team_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\RescuerMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "responder_communication_logs",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "responder_communication_logs",
+    "column": "responder_id",
+    "parent": "responders",
+    "parent_column": "responder_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "responder_communication_logs",
+    "column": "team_id",
+    "parent": "rescue_teams",
+    "parent_column": "team_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_report_members",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_report_members",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_report_members",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_report_members",
+    "column": "report_id",
+    "parent": "responder_field_reports",
+    "parent_column": "report_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_report_members",
+    "column": "status_id",
+    "parent": "member_statuses",
+    "parent_column": "status_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_reports",
+    "column": "assignment_id",
+    "parent": "responder_assignments",
+    "parent_column": "assignment_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Queries\\RescuerFieldReportQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_reports",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_reports",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_reports",
+    "column": "responder_id",
+    "parent": "responders",
+    "parent_column": "responder_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_reports",
+    "column": "status_log_id",
+    "parent": "household_status_logs",
+    "parent_column": "status_log_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Queries\\RescuerFieldReportQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_field_reports",
+    "column": "submitted_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\DashboardImpactQuery.php"
+    ]
+  },
+  {
+    "child": "responder_location_logs",
+    "column": "responder_id",
+    "parent": "responders",
+    "parent_column": "responder_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\ResponderLocationLog.php",
+      "Reviewed application reference: backend-laravel\\app\\Actions\\SelectDispatchResponders.php"
+    ]
+  },
+  {
+    "child": "responder_routes",
+    "column": "assignment_id",
+    "parent": "responder_assignments",
+    "parent_column": "assignment_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\ResponderRoute.php",
+      "backend-laravel\\app\\Queries\\MappingQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\MappingQuery.php"
+    ]
+  },
+  {
+    "child": "responder_routes",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\MappingQuery.php"
+    ]
+  },
+  {
+    "child": "responder_routes",
+    "column": "responder_id",
+    "parent": "responders",
+    "parent_column": "responder_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\MappingQuery.php"
+    ]
+  },
+  {
+    "child": "responders",
+    "column": "team_id",
+    "parent": "rescue_teams",
+    "parent_column": "team_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\RescueTeam.php",
+      "backend-laravel\\app\\Models\\Responder.php",
+      "backend-laravel\\app\\Actions\\NormalizeResponderCodes.php",
+      "backend-laravel\\app\\Queries\\MappingQuery.php",
+      "backend-laravel\\app\\Queries\\RescueDispatchQuery.php",
+      "backend-laravel\\app\\Queries\\RescuerAccountQuery.php",
+      "backend-laravel\\app\\Queries\\RescuerFieldReportQuery.php",
+      "backend-laravel\\app\\Queries\\RescuerRadioFeedQuery.php",
+      "backend-laravel\\app\\Services\\Mobile\\RescuerMobileSupport.php",
+      "backend-laravel\\app\\Services\\Web\\HeadquartersAccountWorkflow.php"
+    ]
+  },
+  {
+    "child": "responders",
+    "column": "user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Responder.php",
+      "backend-laravel\\app\\Actions\\NormalizeResponderCodes.php",
+      "backend-laravel\\app\\Queries\\RescuerAccountQuery.php",
+      "backend-laravel\\app\\Services\\Mobile\\RescuerTeamWorkflow.php"
+    ]
+  },
+  {
+    "child": "route_coordinates",
+    "column": "route_id",
+    "parent": "responder_routes",
+    "parent_column": "route_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\ResponderRoute.php",
+      "backend-laravel\\app\\Models\\RouteCoordinate.php"
+    ]
+  },
+  {
+    "child": "sitios",
+    "column": "barangay_id",
+    "parent": "barangays",
+    "parent_column": "barangay_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Sitio.php",
+      "backend-laravel\\app\\Services\\Mobile\\HouseholdSetupAddress.php"
+    ]
+  },
+  {
+    "child": "situation_reports",
+    "column": "created_by_admin_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "situation_reports",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\SituationReport.php",
+      "backend-laravel\\app\\Queries\\ArchiveQuery.php",
+      "backend-laravel\\app\\Queries\\SituationReportQuery.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "situation_reports",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\SituationReport.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "situation_reports",
+    "column": "reviewed_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\SituationReport.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\ArchiveQuery.php"
+    ]
+  },
+  {
+    "child": "status_reminders",
+    "column": "event_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Jobs\\SendStatusReminder.php"
+    ]
+  },
+  {
+    "child": "status_reminders",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\StatusReminder.php"
+    ]
+  },
+  {
+    "child": "status_reminders",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\StatusReminder.php"
+    ]
+  },
+  {
+    "child": "sync_events",
+    "column": "device_id",
+    "parent": "devices",
+    "parent_column": "id",
+    "physical": true,
+    "evidence": [
+      "information_schema: sync_events_device_id_foreign"
+    ]
+  },
+  {
+    "child": "team_bases",
+    "column": "team_id",
+    "parent": "rescue_teams",
+    "parent_column": "team_id",
+    "physical": true,
+    "evidence": [
+      "information_schema: team_bases_team_id_foreign",
+      "backend-laravel\\app\\Models\\TeamBase.php"
+    ]
+  },
+  {
+    "child": "trip_points",
+    "column": "trip_id",
+    "parent": "dispatch_trips",
+    "parent_column": "id",
+    "physical": true,
+    "evidence": [
+      "information_schema: trip_points_trip_id_foreign"
+    ]
+  },
+  {
+    "child": "trusted_households",
+    "column": "created_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Services\\HouseholdMobileService.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "trusted_households",
+    "column": "requesting_household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php",
+      "backend-laravel\\app\\Queries\\WelfareCheckQuery.php",
+      "backend-laravel\\app\\Services\\HouseholdMobileService.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "trusted_households",
+    "column": "trusted_household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php",
+      "backend-laravel\\app\\Queries\\WelfareCheckQuery.php",
+      "backend-laravel\\app\\Services\\HouseholdMobileService.php",
+      "Reviewed application reference: backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "trusted_households",
+    "column": "validated_by_user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Queries\\HouseholdMobileReadQuery.php"
+    ]
+  },
+  {
+    "child": "users",
+    "column": "household_id",
+    "parent": "households",
+    "parent_column": "household_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\User.php"
+    ]
+  },
+  {
+    "child": "users",
+    "column": "member_id",
+    "parent": "household_members",
+    "parent_column": "member_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\User.php"
+    ]
+  },
+  {
+    "child": "users",
+    "column": "role_id",
+    "parent": "roles",
+    "parent_column": "role_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\Role.php",
+      "backend-laravel\\app\\Models\\User.php",
+      "backend-laravel\\app\\Actions\\NormalizeResponderCodes.php",
+      "backend-laravel\\app\\Queries\\RescuerAccountQuery.php",
+      "backend-laravel\\app\\Services\\Mobile\\RescuerTeamWorkflow.php",
+      "backend-laravel\\app\\Services\\Web\\HeadquartersAccountWorkflow.php",
+      "backend-laravel\\app\\Services\\Web\\HeadquartersTeamSupport.php"
+    ]
+  },
+  {
+    "child": "weather_logs",
+    "column": "disaster_id",
+    "parent": "disaster_events",
+    "parent_column": "event_id",
+    "physical": false,
+    "evidence": [
+      "backend-laravel\\app\\Models\\DisasterEvent.php",
+      "backend-laravel\\app\\Models\\WeatherLog.php"
+    ]
+  },
+  {
+    "child": "web_push_deliveries",
+    "column": "subscription_id",
+    "parent": "web_push_subscriptions",
+    "parent_column": "id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Http\\Controllers\\Api\\BrowserPushController.php"
+    ]
+  },
+  {
+    "child": "web_push_subscriptions",
+    "column": "token_id",
+    "parent": "personal_access_tokens",
+    "parent_column": "id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Http\\Controllers\\Api\\BrowserPushController.php"
+    ]
+  },
+  {
+    "child": "web_push_subscriptions",
+    "column": "user_id",
+    "parent": "users",
+    "parent_column": "user_id",
+    "physical": false,
+    "evidence": [
+      "Reviewed application reference: backend-laravel\\app\\Http\\Controllers\\Api\\BrowserPushController.php"
+    ]
+  }
+]

@@ -1,0 +1,27 @@
+flowchart LR
+    subgraph resq["RESQPERATION boundary"]
+        intake["Authenticated external request intake"]
+        validate["HQ validation, duplicate checks and permission checks"]
+        ownrequests[("resource_requests and request_validations")]
+        forward["TrackingAid forwarding and fulfillment mirror"]
+        report["Controlled report request, decision, snapshot and export"]
+        sourceonly[("external_report_requests - source defined, absent locally")]
+        sitrep[("situation_reports and recorded summaries")]
+    end
+    subgraph partners["External system boundaries"]
+        safe["SafeTrack shared identity and reports"]
+        eva["EvaTrack requests and evacuation reports"]
+        track["TrackingAid inventory, handoff and fulfillment"]
+        remote[("Partner database: inventory and configured forwarding table")]
+    end
+    eva --> intake
+    intake --> ownrequests
+    ownrequests --> validate
+    validate --> forward
+    forward <--> track
+    forward -. "configured separate DB connection" .-> remote
+    report <--> safe & eva & track
+    report --> sourceonly
+    report --> sitrep
+    safe -. "linked shared census records" .-> sitrep
+    track --> remote

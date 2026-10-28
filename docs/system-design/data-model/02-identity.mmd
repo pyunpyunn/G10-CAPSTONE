@@ -1,0 +1,26 @@
+flowchart LR
+    %% Grouping is module relevance, not database/table ownership.
+    %% Arrows point from referenced identity to dependent records.
+    subgraph identity["Accounts and access"]
+        tusers["users"]
+        troles["roles"]
+        tpersonal_access_tokens["personal_access_tokens"]
+        thousehold_login_accounts["household_login_accounts"]
+        thousehold_device_owners["household_device_owners"]
+        thousehold_password_recovery_otps["household_password_recovery_otps"]
+    end
+    subgraph household["Shared household and geography foundation"]
+        thouseholds["households"]
+        thousehold_members["household_members"]
+    end
+    thouseholds -.->|"household_id"| thousehold_device_owners
+    thousehold_members -.->|"member_id"| thousehold_device_owners
+    tpersonal_access_tokens -.->|"selection_token_id"| thousehold_device_owners
+    thouseholds -.->|"household_id"| thousehold_login_accounts
+    tusers -.->|"user_id"| thousehold_login_accounts
+    thouseholds -.->|"household_id"| thousehold_members
+    thouseholds -.->|"household_id"| thousehold_password_recovery_otps
+    tusers -.->|"tokenable_id"| tpersonal_access_tokens
+    thouseholds -.->|"household_id"| tusers
+    thousehold_members -.->|"member_id"| tusers
+    troles -.->|"role_id"| tusers

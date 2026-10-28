@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    actor HQ as Authorized report operator
+    actor Partner as Partner report requester/provider
+    actor City as City authority
+    participant API as Reports API
+    participant DB as Operational data and report snapshots
+    HQ->>API: Select disaster event, geographic scope and report sections
+    API->>DB: Aggregate permitted recorded household/field/request evidence
+    opt External-source synchronization requested
+        API->>Partner: Request supported report data
+        Partner-->>API: Available authorized data or pending/error response
+    end
+    API->>DB: Save report and lock selected snapshot
+    API-->>HQ: Export PDF, CSV or Excel
+    opt Manual escalation
+        HQ->>City: Hand off exported situation report
+        Note over HQ,City: Automatic city receipt/acknowledgment is not implemented
+    end
+    opt Partner requests a RESQPERATION report
+        Partner->>API: Submit authenticated request and check status
+        API-->>HQ: Present pending release decision
+        HQ->>API: Accept or reject release
+        API->>DB: Save decision and accepted frozen summary
+        API-->>Partner: Authorized status and time-limited download when accepted
+        Note over API,DB: external_report_requests is source-defined but absent locally
+    end
+    HQ->>API: Browse/export authorized archives or manage saved groups
+    API->>DB: Retrieve scoped historical records

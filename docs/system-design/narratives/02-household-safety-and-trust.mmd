@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    actor HH as Household resident
+    actor Other as Trusted household resident
+    participant App as Household mobile
+    participant API as Household API
+    participant DB as Household, event and status records
+    HH->>App: Complete setup and confirm household/member identity
+    App->>API: Save permitted setup and geotag
+    API->>DB: Validate linked household and store allowed changes
+    HH->>App: Review alert and select configured report status
+    App->>API: Submit household/member status and available GPS
+    API->>DB: Validate event/status, persist current state and history
+    API-->>App: Confirm accepted report
+    opt Report for trusted household
+        HH->>API: Send connection invitation
+        Other->>API: Accept or reject request
+        HH->>App: Enter trusted PIN and select member
+        App->>API: Verify active connection and PIN before reporting
+        API->>DB: Save authorized member report and history
+    end
+    alt Submission rejected or network fails
+        API-->>App: Show failure, do not claim successful synchronization
+    else Accepted online
+        App->>App: Refresh and persist last successful overview
+    end

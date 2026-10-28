@@ -1,0 +1,21 @@
+flowchart LR
+    %% Grouping is module relevance, not database/table ownership.
+    %% Arrows point from referenced identity to dependent records.
+    subgraph identity["Accounts and access"]
+        tusers["users"]
+    end
+    subgraph resources["Request validation and fulfillment tracking"]
+        tresource_requests["resource_requests"]
+        tresource_request_status["resource_request_status"]
+        trequest_validations["request_validations"]
+    end
+    subgraph documentation["Evacuation evidence, reports and archives"]
+        tevacuation_centers["evacuation_centers"]
+    end
+    tresource_requests -.->|"duplicate_request_id"| trequest_validations
+    tresource_requests -.->|"request_id"| trequest_validations
+    tusers -.->|"validator_user_id"| trequest_validations
+    tevacuation_centers -.->|"evacuation_center_id"| tresource_requests
+    tusers -.->|"handled_by"| tresource_requests
+    tresource_request_status -.->|"status_id"| tresource_requests
+    tusers -.->|"validated_by_user_id"| tresource_requests

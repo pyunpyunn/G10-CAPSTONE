@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    actor U as Household resident or rescuer
+    participant App as Mobile app
+    participant Store as Account-scoped snapshots
+    participant Nav as Navigation SQLite and event outbox
+    participant API as Laravel API
+    U->>App: Open authenticated workspace
+    App->>Store: Read last successful overview for current account token
+    Store-->>App: Saved complete page data if present
+    App->>API: Attempt fresh overview read
+    alt Server reachable
+        API-->>App: Latest permitted overview
+        App->>Store: Replace snapshot and successful-sync timestamp
+    else Server unavailable
+        App->>App: Preserve complete saved page and show Offline mode
+        Note over U,Store: First use without a successful sync cannot display nonexistent data
+    end
+    opt Rescuer trip with compatible prepared offline assets
+        U->>App: Record trip/location events
+        App->>Nav: Persist supported navigation outbox events
+        App->>API: Replay supported events after reconnect
+        API-->>App: Idempotent acknowledgment or validation failure
+    end
+    Note over U,API: Household status-submission outbox remains a required gap
+    Note over U,API: Cached pages do not guarantee offline map tiles, routes or radio

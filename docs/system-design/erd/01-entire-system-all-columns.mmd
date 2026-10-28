@@ -1,0 +1,1139 @@
+erDiagram
+    direction LR
+    %% Solid relationships = inspected database foreign keys.
+    %% Dotted relationships = application/model references, not enforced foreign keys.
+    %% PK/UK markings come only from the inspected schema, not model assumptions.
+    addresses {
+        int address_id PK "application reference"
+        int street_address "nullable"
+        varchar street "nullable"
+        int barangay_id "nullable; application reference"
+        varchar barangay_name "nullable"
+        int sitio_id "nullable; application reference"
+        varchar purok_sitio "nullable"
+        varchar house_number "nullable"
+        int purok_id "nullable; application reference"
+        int zipcode_id "nullable"
+        varchar zip_code "nullable"
+        varchar full_address "nullable"
+        timestamp created_at
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+        tinyint is_apartment "nullable"
+        varchar building_name "nullable"
+        varchar floor_number "nullable"
+        varchar unit_number "nullable"
+        varchar room_number "nullable"
+        varchar landmark "nullable"
+    }
+    affected_areas {
+        int affected_area_id "application identity; not database PK; application reference"
+        varchar disaster_id "nullable; application reference"
+        varchar confirmed_by_admin_id "nullable; application reference"
+        int severity_id "nullable; application reference"
+        int purok_id "nullable; application reference"
+        int sitio_id "nullable; application reference"
+        int barangay_id "nullable; application reference"
+        tinyint confirmed_by_hq "nullable"
+        datetime confirmed_at "nullable"
+    }
+    audit_logs {
+        int audit_log_id PK
+        varchar user_id "nullable; application reference"
+        varchar role_key "nullable"
+        varchar module
+        varchar action
+        varchar reference_table "nullable"
+        varchar reference_id "nullable"
+        json old_values "nullable"
+        json new_values "nullable"
+        varchar ip_address "nullable"
+        varchar user_agent "nullable"
+        datetime created_at "nullable"
+    }
+    barangay_boundaries {
+        varchar psgc_code PK
+        bigint barangay_id "nullable; application reference"
+        varchar barangay_code "nullable"
+        varchar barangay_name
+        varchar city_name
+        longtext geometry_json
+        varchar source_url
+        varchar source_note
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    barangays {
+        int barangay_id PK "application reference"
+        varchar barangay_code "nullable"
+        varchar barangay_name "nullable"
+        int city_id "application reference"
+    }
+    cached_routes {
+        bigint id PK
+        int team_id FK
+        varchar household_id FK "nullable"
+        varchar evac_center_id FK "nullable"
+        varchar target_key
+        enum profile
+        longtext polyline6 "nullable"
+        json steps "nullable"
+        int distance_m "nullable"
+        int duration_s "nullable"
+        enum status
+        varchar failure_reason "nullable"
+        timestamp computed_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    cities {
+        int city_id PK "application reference"
+        varchar city_code "nullable"
+        varchar city_name "nullable"
+        int province_id "application reference"
+    }
+    device_tokens {
+        bigint id PK "application reference"
+        varchar device_uuid "nullable"
+        varchar household_id "nullable; application reference"
+        varchar member_id "nullable; application reference"
+        varchar device_name "nullable"
+        varchar platform "nullable"
+        varchar app_role "nullable"
+        varchar push_provider "nullable"
+        varchar player_id "nullable"
+        varchar expo_push_token "nullable"
+        int battery_level "nullable"
+        int signal_strength "nullable"
+        varchar location_permission_status
+        varchar notification_permission_status
+        decimal last_latitude "nullable"
+        decimal last_longitude "nullable"
+        varchar last_location_label "nullable"
+        decimal last_location_accuracy_m "nullable"
+        datetime last_location_at "nullable"
+        datetime last_seen_at "nullable"
+        tinyint is_active
+        datetime logged_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    device_tracking_logs {
+        int tracking_id "application identity; not database PK"
+        bigint device_token_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        varchar member_id "nullable; application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        varchar location_label "nullable"
+        decimal accuracy_m "nullable"
+        varchar location_source "nullable"
+        tinyint is_allowed_location
+        int battery_level "nullable"
+        int signal_strength "nullable"
+        datetime logged_at
+    }
+    devices {
+        bigint id PK "application reference"
+        varchar user_id FK
+        int team_id FK
+        varchar device_uuid UK
+        timestamp last_sync_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    disaster_broadcasts {
+        int broadcast_id "application identity; not database PK"
+        varchar broadcast_title "nullable"
+        varchar disaster_id "nullable; application reference"
+        varchar sent_by_admin_id "nullable; application reference"
+        int severity_id "nullable; application reference"
+        varchar scope_type "nullable"
+        int target_purok_id "nullable"
+        int target_area_id "nullable"
+        text message "nullable"
+        varchar allowed_statuses "nullable"
+        varchar channel "nullable"
+        varchar status
+        int notification_id "nullable"
+        int weather_log_id "nullable; application reference"
+        datetime sent_at
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+        varchar target_area_label "nullable"
+        json direct_impact_puroks_json "nullable"
+        json allowed_statuses_json "nullable"
+        int recipient_count "nullable"
+        varchar push_status "nullable"
+        varchar sms_status "nullable"
+        text status_options_json "nullable"
+    }
+    disaster_event_types {
+        int event_type_id PK
+        varchar event_id "nullable; application reference"
+        int type_id "application reference"
+    }
+    disaster_events {
+        varchar event_id PK "application reference"
+        varchar name "nullable"
+        int type_id "application reference"
+        int severity_level_id "nullable; application reference"
+        datetime started_at "nullable"
+        datetime ended_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+    }
+    disaster_types {
+        int type_id PK "application reference"
+        varchar type_code "nullable"
+        varchar type_name "nullable"
+        tinyint is_active "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+    }
+    dispatch_statuses {
+        varchar status_key PK
+        varchar label
+        tinyint is_open
+        tinyint allow_create
+        tinyint allow_mobile
+        varchar dashboard_group
+        tinyint is_alias
+        tinyint is_active
+        int sort_order
+        varchar status_code UK
+    }
+    dispatch_trips {
+        bigint id PK "application reference"
+        int dispatch_id FK
+        int team_id FK
+        bigint device_id FK
+        enum profile
+        datetime started_at
+        datetime ended_at "nullable"
+        int distance_m "nullable"
+        int planned_distance_m "nullable"
+        int moving_s
+        int stopped_s
+        decimal avg_speed_ms "nullable"
+        enum status
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    evacuation_centers {
+        varchar evacuation_center_id PK "application reference"
+        varchar current_event_id "nullable; application reference"
+        varchar name "nullable"
+        varchar center_type "nullable"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        int capacity "nullable"
+        varchar status
+        int current_occupancy "nullable"
+        varchar contact_person "nullable"
+        varchar contact_number "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar osm_address "nullable"
+        text notes "nullable"
+        datetime updated_at "nullable"
+    }
+    evacuation_records {
+        int evacuation_id PK
+        varchar event_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        varchar center_id "nullable; application reference"
+        int household_status_id "nullable; application reference"
+        int evacuated_count "nullable"
+        enum method "nullable"
+        varchar verified_by "nullable"
+        datetime verified_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    genders {
+        int gender_id PK "application reference"
+        varchar gender_key UK "nullable"
+        varchar gender_label "nullable"
+    }
+    geotagged_locations {
+        int location_id PK
+        varchar household_id "nullable; application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        varchar location_label "nullable"
+        decimal accuracy_m "nullable"
+        varchar geotag_source
+        tinyint is_verified
+        varchar verified_by_user_id "nullable; application reference"
+        datetime verified_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at
+    }
+    household_device_owners {
+        bigint id PK
+        varchar household_id "application reference"
+        varchar device_uuid
+        varchar member_id "application reference"
+        bigint selection_token_id "nullable; application reference"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    household_disasters {
+        int household_disaster_id PK
+        varchar household_id FK "nullable"
+        varchar disaster_id FK "nullable"
+        int initial_status_id FK "nullable"
+        int current_status_id FK "nullable"
+        varchar last_status_source "nullable"
+        text last_status_notes "nullable"
+        varchar last_reported_by_user_id "nullable"
+        int last_responder_id "nullable"
+        bigint last_device_token_id "nullable"
+        decimal last_latitude "nullable"
+        decimal last_longitude "nullable"
+        int last_battery_level "nullable"
+        datetime last_reported_at "nullable"
+        varchar priority_level "nullable"
+        tinyint needs_dispatch
+        datetime updated_at "nullable"
+        datetime created_at
+    }
+    household_login_accounts {
+        varchar household_id PK "application reference"
+        varchar user_id UK "application reference"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    household_member_id_mappings {
+        varchar old_member_id PK
+        varchar member_id UK "application reference"
+    }
+    household_members {
+        varchar member_id PK "application reference"
+        varchar household_id "nullable; application reference"
+        varchar first_name "nullable"
+        varchar middle_name "nullable"
+        varchar last_name "nullable"
+        date birth_date
+        int gender_id "nullable; application reference"
+        int relationship_id "nullable; application reference"
+        tinyint is_household_head
+        tinyint can_report_for_household
+        varchar contact_number "nullable"
+        int civil_status_id "nullable"
+        int occupation "nullable"
+        int education_level_id "nullable"
+        tinyint is_graduate "nullable"
+        timestamp deleted_at "nullable"
+        tinyint is_pwd
+        tinyint is_senior
+        tinyint is_pregnant
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        varchar name "nullable"
+        varchar sex "nullable"
+        varchar gender "nullable"
+        varchar relation "nullable"
+        varchar civil_status "nullable"
+        varchar religion "nullable"
+        varchar education_level "nullable"
+        varchar special_needs "nullable"
+    }
+    household_password_recovery_otps {
+        varchar user_id PK
+        varchar household_id "application reference"
+        varchar code_hash
+        tinyint failed_attempts
+        timestamp expires_at
+        timestamp sent_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    household_status_logs {
+        int status_log_id PK "application reference"
+        varchar disaster_id "nullable; application reference"
+        varchar household_id "application reference"
+        int status_id FK
+        varchar source
+        varchar submitted_by_user_id "nullable; application reference"
+        int responder_id "nullable; application reference"
+        bigint device_token_id "nullable; application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        varchar location_label "nullable"
+        decimal location_accuracy_m "nullable"
+        int battery_level "nullable"
+        int signal_strength "nullable"
+        text notes "nullable"
+        datetime submitted_at "nullable"
+        varchar reviewed_by_user_id "nullable; application reference"
+        datetime reviewed_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    household_statuses {
+        int status_id PK "application reference"
+        varchar status_key UK "nullable"
+        varchar status_label "nullable"
+        tinyint severity_rank
+        tinyint requires_rescue
+        varchar color_hex "nullable"
+        smallint sort_order
+        tinyint is_active
+        varchar safety_basis "nullable"
+    }
+    household_trusted_pins {
+        varchar household_id PK "application reference"
+        varchar pin_hash
+        varchar updated_by_user_id "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    households {
+        varchar household_id PK "application reference"
+        varchar household_code "nullable"
+        varchar household_number "nullable"
+        varchar household_name "nullable"
+        varchar email "nullable"
+        int member_count
+        varchar created_by "nullable"
+        int address_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar emergency_contact "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+    }
+    incident_archives {
+        int archive_id
+        varchar archive_type "nullable"
+        varchar disaster_id "nullable; application reference"
+        varchar reference_table "nullable"
+        varchar reference_id "nullable"
+        varchar archived_by_admin_id "nullable; application reference"
+        text archive_note "nullable"
+        datetime archived_at
+        datetime created_at "nullable"
+    }
+    landing_inquiries {
+        bigint inquiry_id PK
+        varchar name
+        varchar organization "nullable"
+        varchar email "nullable"
+        text message
+        varchar status
+        varchar source_page
+        varchar ip_address "nullable"
+        varchar user_agent "nullable"
+        timestamp responded_at "nullable"
+        varchar handled_by_user_id "nullable; application reference"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    mapping_hazard_layers {
+        bigint id PK
+        varchar barangay_id "application reference"
+        varchar name
+        varchar source
+        varchar source_url "nullable"
+        date assessed_at
+        json geojson
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    member_disaster_statuses {
+        bigint member_status_id PK
+        varchar disaster_id FK
+        varchar household_id FK
+        varchar member_id FK
+        int status_id FK
+        int previous_status_id FK "nullable"
+        enum report_source
+        varchar reported_by_user_id "nullable; application reference"
+        varchar reported_by_member_id "nullable; application reference"
+        int responder_id "nullable; application reference"
+        bigint device_token_id "nullable; application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        varchar location_label "nullable"
+        decimal location_accuracy_m "nullable"
+        int battery_level "nullable"
+        int signal_strength "nullable"
+        varchar evacuation_center_id "nullable; application reference"
+        tinyint needs_rescue
+        tinyint severity_rank
+        enum priority_level
+        text notes "nullable"
+        tinyint is_verified
+        varchar verified_by_user_id "nullable; application reference"
+        datetime verified_at "nullable"
+        datetime reported_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    member_status_logs {
+        bigint member_status_log_id PK
+        varchar disaster_id "application reference"
+        varchar household_id "application reference"
+        varchar member_id "application reference"
+        int from_status_id "nullable; application reference"
+        int to_status_id "application reference"
+        varchar report_source
+        varchar reported_by_user_id "nullable; application reference"
+        varchar reported_by_member_id "nullable; application reference"
+        int responder_id "nullable; application reference"
+        bigint device_token_id "nullable; application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        varchar location_label "nullable"
+        decimal location_accuracy_m "nullable"
+        int battery_level "nullable"
+        int signal_strength "nullable"
+        text notes "nullable"
+        datetime reported_at "nullable"
+        timestamp logged_at "nullable"
+    }
+    member_statuses {
+        int status_id PK "application reference"
+        varchar status_key UK
+        varchar status_label
+        varchar description "nullable"
+        tinyint severity_rank
+        tinyint requires_rescue
+        tinyint is_terminal
+        varchar color_hex "nullable"
+        smallint sort_order
+        tinyint is_active
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        tinyint counts_as_death
+        tinyint counts_as_injury
+    }
+    member_vulnerable_groups {
+        int id PK
+        varchar member_id "nullable; application reference"
+        int vulnerable_group_id
+    }
+    notifications {
+        int notif_id PK
+        text message "nullable"
+        varchar sent_by "nullable; application reference"
+        varchar evacuation_event_id "nullable"
+        varchar evacuation_center_id "nullable"
+        datetime scheduled_at "nullable"
+        tinyint is_recurring "nullable"
+        int recurrence_type_id "nullable"
+        datetime recurrence_end_at "nullable"
+        datetime last_sent_at "nullable"
+        datetime created_at "nullable"
+        varchar channel "nullable"
+        varchar status "nullable"
+        varchar target_filter "nullable"
+    }
+    official_advisory_notifications {
+        bigint id PK
+        varchar source
+        varchar fingerprint UK
+        varchar title
+        text body
+        text source_url
+        timestamp created_at
+    }
+    offline_packs {
+        varchar version PK
+        json bbox
+        varchar style_url
+        bigint size_bytes
+        char checksum
+        tinyint is_active
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        varchar pack_format
+    }
+    operational_sequences {
+        varchar sequence_key PK
+        bigint next_value
+        varchar sequence_prefix "nullable"
+    }
+    personal_access_tokens {
+        bigint id PK "application reference"
+        varchar tokenable_id "nullable; application reference"
+        varchar tokenable_type "nullable"
+        text name
+        varchar token "nullable"
+        text abilities "nullable"
+        timestamp last_used_at "nullable"
+        timestamp expires_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    property_damage_levels {
+        varchar damage_key PK
+        varchar label
+        int sort_order
+        tinyint is_active
+    }
+    provinces {
+        int province_id PK "application reference"
+        varchar province_code "nullable"
+        varchar province_name "nullable"
+        int region_id
+    }
+    puroks {
+        int purok_id PK "application reference"
+        varchar purok_name "nullable"
+        int sitio_id "application reference"
+    }
+    realtime_outbox {
+        bigint id PK
+        text topics
+        int available_at
+        char claim_token "nullable"
+        int claimed_until "nullable"
+        int attempts
+        timestamp created_at
+        timestamp delivered_at "nullable"
+    }
+    relationships {
+        int relationship_id PK "application reference"
+        varchar relationship_key UK "nullable"
+        varchar relationship_label "nullable"
+        tinyint is_head
+        tinyint is_immediate_family
+        tinyint can_report_for_household
+        smallint sort_order
+        tinyint is_active
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    report_idempotency {
+        char scope PK
+        char request_hash
+        smallint response_status "nullable"
+        longtext response_body "nullable"
+        varchar content_type "nullable"
+        timestamp created_at
+        timestamp expires_at
+    }
+    request_validations {
+        int validation_id PK
+        varchar request_id "application reference"
+        varchar validation_status
+        varchar validator_user_id "nullable; application reference"
+        text validation_notes "nullable"
+        text missing_information "nullable"
+        varchar duplicate_request_id "nullable; application reference"
+        datetime validated_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    rescue_priority_settings {
+        bigint version PK
+        tinyint impact_weight
+        tinyint vulnerability_weight
+        tinyint unreported_weight
+        tinyint no_contact_weight
+        varchar updated_by_user_id "nullable; application reference"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    rescue_teams {
+        int team_id PK "application reference"
+        varchar team_code "nullable"
+        varchar team_name "nullable"
+        varchar team_type "nullable"
+        int assigned_purok_id "nullable; application reference"
+        int leader_responder_id "nullable; application reference"
+        varchar duty_status
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    resource_request_status {
+        int status_id PK "application reference"
+        varchar status_key "nullable"
+        varchar status_label "nullable"
+    }
+    resource_requests {
+        varchar request_id PK "application reference"
+        varchar request_source "nullable"
+        varchar source_reference "nullable"
+        varchar request_category "nullable"
+        varchar evacuation_center_id "nullable; application reference"
+        varchar requested_by "nullable"
+        varchar handled_by "nullable; application reference"
+        varchar resource_type "nullable"
+        varchar item_name "nullable"
+        int quantity "nullable"
+        varchar unit "nullable"
+        text description "nullable"
+        int status_id "nullable; application reference"
+        varchar validation_status
+        text validation_notes "nullable"
+        varchar validated_by_user_id "nullable; application reference"
+        datetime validated_at "nullable"
+        datetime released_for_tracking_at "nullable"
+        varchar tracking_reference "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    responder_assignments {
+        int assignment_id PK "application reference"
+        varchar assignment_code "nullable"
+        int responder_id "application reference"
+        int team_id "nullable; application reference"
+        varchar disaster_id "nullable; application reference"
+        int affected_area_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        int status_log_id "nullable; application reference"
+        varchar assigned_area "nullable"
+        text route_notes "nullable"
+        varchar priority_level "nullable"
+        text dispatch_notes "nullable"
+        varchar created_by_admin_id "nullable"
+        varchar status "nullable"
+        datetime assigned_at
+        datetime accepted_at "nullable"
+        datetime en_route_at "nullable"
+        datetime arrived_at "nullable"
+        datetime completed_at "nullable"
+        text outcome_notes "nullable"
+        datetime updated_at "nullable"
+        smallint responder_count
+        varchar dispatch_type
+    }
+    responder_check_ins {
+        int check_in_id
+        int responder_id "application reference"
+        varchar disaster_id "nullable; application reference"
+        int team_id "nullable; application reference"
+        int affected_area_id "nullable"
+        varchar household_id "nullable; application reference"
+        varchar member_id "nullable; application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        varchar check_in_method "nullable"
+        int status_id "nullable"
+        text notes "nullable"
+        datetime checked_in_at
+        datetime checked_out_at "nullable"
+        varchar verified_by "nullable"
+    }
+    responder_communication_logs {
+        int communication_id
+        int responder_id "application reference"
+        int team_id "nullable; application reference"
+        varchar team_name "nullable"
+        varchar disaster_id "nullable; application reference"
+        text message "nullable"
+        datetime timestamp
+    }
+    responder_field_report_members {
+        bigint detail_id PK
+        int report_id "application reference"
+        varchar household_id "application reference"
+        varchar disaster_id "application reference"
+        varchar member_id "application reference"
+        int status_id "nullable; application reference"
+        varchar status_key
+        timestamp assessed_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    responder_field_reports {
+        int report_id "application reference"
+        int responder_id "application reference"
+        varchar disaster_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        text notes "nullable"
+        datetime created_at
+        int assignment_id "nullable; application reference"
+        varchar submitted_by_user_id "nullable; application reference"
+        int status_log_id "nullable; application reference"
+        varchar incident_type "nullable"
+        varchar incident_type_other "nullable"
+        varchar property_damage "nullable"
+        int death_count
+        int injured_count
+        varchar idempotency_key "nullable"
+        varchar payload_hash "nullable"
+        timestamp submitted_at "nullable"
+    }
+    responder_location_logs {
+        int log_id "application identity; not database PK"
+        int responder_id "application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        int battery_level "nullable"
+        int signal_strength "nullable"
+        datetime logged_at
+    }
+    responder_routes {
+        int route_id "application identity; not database PK; application reference"
+        int assignment_id "application reference"
+        varchar route_name "nullable"
+        varchar route_status
+        decimal start_latitude "nullable"
+        decimal start_longitude "nullable"
+        decimal end_latitude "nullable"
+        decimal end_longitude "nullable"
+        decimal estimated_distance_km "nullable"
+        int estimated_duration_min "nullable"
+        mediumtext route_polyline "nullable"
+        datetime created_at
+        datetime updated_at "nullable"
+        bigint responder_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        json navigation_steps "nullable"
+    }
+    responders {
+        int responder_id "application identity; not database PK; application reference"
+        varchar user_id "nullable; application reference"
+        varchar responder_code "nullable"
+        varchar created_by_admin_id "nullable"
+        int team_id "nullable; application reference"
+        varchar username "nullable"
+        varchar password_hash "nullable"
+        varchar full_name "nullable"
+        varchar title "nullable"
+        varchar contact_number "nullable"
+        varchar emergency_contact_name "nullable"
+        varchar emergency_contact_number "nullable"
+        date date_of_birth "nullable"
+        varchar gender "nullable"
+        varchar blood_type "nullable"
+        text address "nullable"
+        text skills "nullable"
+        text training_notes "nullable"
+        varchar certification_reference "nullable"
+        text equipment_notes "nullable"
+        tinyint is_validated "nullable"
+        tinyint is_deployed "nullable"
+        varchar duty_status
+        datetime last_active_at "nullable"
+        datetime created_at
+        datetime updated_at "nullable"
+        datetime deleted_at "nullable"
+    }
+    roles {
+        int role_id PK "application reference"
+        varchar role_key "nullable"
+        varchar role_name "nullable"
+        varchar name "nullable"
+        varchar base_role_key "nullable"
+        json web_modules "nullable"
+        tinyint can_manage_personnel "nullable"
+        tinyint can_approve_requests "nullable"
+    }
+    route_coordinates {
+        int coordinate_id "application identity; not database PK"
+        int route_id "application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        int sequence_order
+        datetime recorded_at "nullable"
+        decimal accuracy_m "nullable"
+    }
+    severity_levels {
+        int severity_id PK "application reference"
+        varchar severity_key "nullable"
+        varchar severity_label "nullable"
+    }
+    sitios {
+        int sitio_id PK "application reference"
+        varchar sitio_name "nullable"
+        int barangay_id "application reference"
+    }
+    situation_reports {
+        int sit_rep_id "application identity; not database PK"
+        varchar report_number "nullable"
+        varchar disaster_id "nullable; application reference"
+        varchar created_by_admin_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        text summary "nullable"
+        varchar report_status
+        varchar reviewed_by_user_id "nullable; application reference"
+        datetime reviewed_at "nullable"
+        varchar escalated_to "nullable"
+        tinyint is_archived "nullable"
+        datetime generated_at
+        datetime archived_at "nullable"
+        datetime updated_at "nullable"
+    }
+    status_reminders {
+        bigint reminder_id PK
+        varchar event_id "application reference"
+        varchar household_id "application reference"
+        varchar member_id "application reference"
+        tinyint attempt
+        varchar status
+        timestamp scheduled_at
+        timestamp sent_at "nullable"
+        timestamp stopped_at "nullable"
+        varchar member_delivery "nullable"
+        varchar household_delivery "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    sync_events {
+        bigint id PK
+        char client_event_id UK
+        bigint device_id FK
+        varchar type
+        enum status
+        varchar error_message "nullable"
+        timestamp received_at
+        json result_json "nullable"
+    }
+    team_bases {
+        int team_id PK, FK
+        varchar name
+        decimal lat
+        decimal lng
+    }
+    trip_points {
+        bigint id PK
+        bigint trip_id FK
+        decimal lat
+        decimal lng
+        decimal accuracy "nullable"
+        decimal speed "nullable"
+        decimal heading "nullable"
+        datetime recorded_at
+    }
+    trusted_households {
+        varchar connection_id PK
+        varchar requesting_household_id "application reference"
+        varchar trusted_household_id "application reference"
+        text reason
+        varchar validation_status
+        json member_relationships "nullable"
+        varchar created_by_user_id "nullable; application reference"
+        varchar validated_by_user_id "nullable; application reference"
+        datetime validated_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    users {
+        varchar user_id PK "application reference"
+        varchar first_name "nullable"
+        varchar last_name "nullable"
+        varchar name "nullable"
+        varchar username "nullable"
+        varchar email "nullable"
+        timestamp email_verified_at "nullable"
+        varchar password "nullable"
+        int role_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar assigned_center_id "nullable"
+        varchar household_id "nullable; application reference"
+        varchar member_id UK "nullable; application reference"
+        tinyint is_active "nullable"
+        tinyint must_change_password
+        varchar temp_password "nullable"
+        varchar remember_token "nullable"
+        timestamp updated_at "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar profile_photo "nullable"
+        varchar security_question_1 "nullable"
+        varchar security_answer_1 "nullable"
+        varchar security_question_2 "nullable"
+        varchar security_answer_2 "nullable"
+        timestamp password_changed_at "nullable"
+    }
+    weather_logs {
+        int weather_log_id PK "application reference"
+        varchar disaster_id "nullable; application reference"
+        varchar source_name
+        varchar source_url "nullable"
+        varchar condition_name "nullable"
+        decimal temperature "nullable"
+        decimal rainfall_mm "nullable"
+        decimal wind_speed "nullable"
+        varchar wind_direction "nullable"
+        int humidity "nullable"
+        varchar advisory_title "nullable"
+        text advisory_text "nullable"
+        json raw_payload "nullable"
+        datetime observed_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    web_push_deliveries {
+        bigint id PK
+        bigint subscription_id "application reference"
+        varchar notice_hash
+        timestamp created_at
+    }
+    web_push_subscriptions {
+        bigint id PK "application reference"
+        varchar user_id "application reference"
+        bigint token_id "nullable; application reference"
+        varchar endpoint_hash UK
+        text subscription
+        timestamp expires_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp push_after "nullable"
+    }
+    addresses o|..o{ households : "logical_address_id"
+    affected_areas o|..o{ responder_assignments : "logical_affected_area_id"
+    barangays o|..o{ addresses : "logical_barangay_id"
+    barangays o|..o{ affected_areas : "logical_barangay_id"
+    barangays o|..o{ barangay_boundaries : "logical_barangay_id"
+    barangays ||..o{ mapping_hazard_layers : "logical_barangay_id"
+    barangays ||..o{ sitios : "logical_barangay_id"
+    cities ||..o{ barangays : "logical_city_id"
+    device_tokens o|..o{ device_tracking_logs : "logical_device_token_id"
+    device_tokens o|..o{ household_status_logs : "logical_device_token_id"
+    device_tokens o|..o{ member_disaster_statuses : "logical_device_token_id"
+    device_tokens o|..o{ member_status_logs : "logical_device_token_id"
+    devices ||--o{ dispatch_trips : "FK_device_id"
+    devices ||--o{ sync_events : "FK_device_id"
+    disaster_events o|..o{ affected_areas : "logical_disaster_id"
+    disaster_events o|..o{ disaster_broadcasts : "logical_disaster_id"
+    disaster_events o|..o{ disaster_event_types : "logical_event_id"
+    disaster_events o|..o{ evacuation_centers : "logical_current_event_id"
+    disaster_events o|..o{ evacuation_records : "logical_event_id"
+    disaster_events o|--o{ household_disasters : "FK_disaster_id"
+    disaster_events o|..o{ household_status_logs : "logical_disaster_id"
+    disaster_events o|..o{ incident_archives : "logical_disaster_id"
+    disaster_events ||--o{ member_disaster_statuses : "FK_disaster_id"
+    disaster_events ||..o{ member_status_logs : "logical_disaster_id"
+    disaster_events o|..o{ responder_assignments : "logical_disaster_id"
+    disaster_events o|..o{ responder_check_ins : "logical_disaster_id"
+    disaster_events o|..o{ responder_communication_logs : "logical_disaster_id"
+    disaster_events ||..o{ responder_field_report_members : "logical_disaster_id"
+    disaster_events o|..o{ responder_field_reports : "logical_disaster_id"
+    disaster_events o|..o{ situation_reports : "logical_disaster_id"
+    disaster_events ||..o{ status_reminders : "logical_event_id"
+    disaster_events o|..o{ weather_logs : "logical_disaster_id"
+    disaster_types ||..o{ disaster_event_types : "logical_type_id"
+    disaster_types ||..o{ disaster_events : "logical_type_id"
+    dispatch_trips ||--o{ trip_points : "FK_trip_id"
+    evacuation_centers o|--o{ cached_routes : "FK_evac_center_id"
+    evacuation_centers o|..o{ evacuation_records : "logical_center_id"
+    evacuation_centers o|..o{ member_disaster_statuses : "logical_evacuation_center_id"
+    evacuation_centers o|..o{ resource_requests : "logical_evacuation_center_id"
+    genders o|..o{ household_members : "logical_gender_id"
+    household_members o|..o{ device_tokens : "logical_member_id"
+    household_members o|..o{ device_tracking_logs : "logical_member_id"
+    household_members ||..o{ household_device_owners : "logical_member_id"
+    household_members ||..o| household_member_id_mappings : "logical_member_id"
+    household_members ||--o{ member_disaster_statuses : "FK_member_id"
+    household_members o|..o{ member_disaster_statuses : "logical_reported_by_member_id"
+    household_members ||..o{ member_status_logs : "logical_member_id"
+    household_members o|..o{ member_status_logs : "logical_reported_by_member_id"
+    household_members o|..o{ member_vulnerable_groups : "logical_member_id"
+    household_members o|..o{ responder_check_ins : "logical_member_id"
+    household_members ||..o{ responder_field_report_members : "logical_member_id"
+    household_members ||..o{ status_reminders : "logical_member_id"
+    household_members o|..o| users : "logical_member_id"
+    household_status_logs o|..o{ responder_assignments : "logical_status_log_id"
+    household_status_logs o|..o{ responder_field_reports : "logical_status_log_id"
+    household_statuses o|..o{ evacuation_records : "logical_household_status_id"
+    household_statuses o|--o{ household_disasters : "FK_current_status_id"
+    household_statuses o|--o{ household_disasters : "FK_initial_status_id"
+    household_statuses ||--o{ household_status_logs : "FK_status_id"
+    households o|--o{ cached_routes : "FK_household_id"
+    households o|..o{ device_tokens : "logical_household_id"
+    households o|..o{ device_tracking_logs : "logical_household_id"
+    households o|..o{ evacuation_records : "logical_household_id"
+    households o|..o{ geotagged_locations : "logical_household_id"
+    households ||..o{ household_device_owners : "logical_household_id"
+    households o|--o{ household_disasters : "FK_household_id"
+    households ||..o| household_login_accounts : "logical_household_id"
+    households o|..o{ household_members : "logical_household_id"
+    households ||..o{ household_password_recovery_otps : "logical_household_id"
+    households ||..o{ household_status_logs : "logical_household_id"
+    households ||..o| household_trusted_pins : "logical_household_id"
+    households ||--o{ member_disaster_statuses : "FK_household_id"
+    households ||..o{ member_status_logs : "logical_household_id"
+    households o|..o{ responder_assignments : "logical_household_id"
+    households o|..o{ responder_check_ins : "logical_household_id"
+    households ||..o{ responder_field_report_members : "logical_household_id"
+    households o|..o{ responder_field_reports : "logical_household_id"
+    households o|..o{ responder_routes : "logical_household_id"
+    households o|..o{ situation_reports : "logical_household_id"
+    households ||..o{ status_reminders : "logical_household_id"
+    households ||..o{ trusted_households : "logical_requesting_household_id"
+    households ||..o{ trusted_households : "logical_trusted_household_id"
+    households o|..o{ users : "logical_household_id"
+    member_statuses o|--o{ member_disaster_statuses : "FK_previous_status_id"
+    member_statuses ||--o{ member_disaster_statuses : "FK_status_id"
+    member_statuses o|..o{ member_status_logs : "logical_from_status_id"
+    member_statuses ||..o{ member_status_logs : "logical_to_status_id"
+    member_statuses o|..o{ responder_field_report_members : "logical_status_id"
+    personal_access_tokens o|..o{ household_device_owners : "logical_selection_token_id"
+    personal_access_tokens o|..o{ web_push_subscriptions : "logical_token_id"
+    provinces ||..o{ cities : "logical_province_id"
+    puroks o|..o{ addresses : "logical_purok_id"
+    puroks o|..o{ affected_areas : "logical_purok_id"
+    puroks o|..o{ rescue_teams : "logical_assigned_purok_id"
+    relationships o|..o{ household_members : "logical_relationship_id"
+    rescue_teams ||--o{ cached_routes : "FK_team_id"
+    rescue_teams ||--o{ devices : "FK_team_id"
+    rescue_teams ||--o{ dispatch_trips : "FK_team_id"
+    rescue_teams o|..o{ responder_assignments : "logical_team_id"
+    rescue_teams o|..o{ responder_check_ins : "logical_team_id"
+    rescue_teams o|..o{ responder_communication_logs : "logical_team_id"
+    rescue_teams o|..o{ responders : "logical_team_id"
+    rescue_teams ||--o| team_bases : "FK_team_id"
+    resource_request_status o|..o{ resource_requests : "logical_status_id"
+    resource_requests o|..o{ request_validations : "logical_duplicate_request_id"
+    resource_requests ||..o{ request_validations : "logical_request_id"
+    responder_assignments ||--o{ dispatch_trips : "FK_dispatch_id"
+    responder_assignments o|..o{ responder_field_reports : "logical_assignment_id"
+    responder_assignments ||..o{ responder_routes : "logical_assignment_id"
+    responder_field_reports ||..o{ responder_field_report_members : "logical_report_id"
+    responder_routes ||..o{ route_coordinates : "logical_route_id"
+    responders o|..o{ household_status_logs : "logical_responder_id"
+    responders o|..o{ member_disaster_statuses : "logical_responder_id"
+    responders o|..o{ member_status_logs : "logical_responder_id"
+    responders o|..o{ rescue_teams : "logical_leader_responder_id"
+    responders ||..o{ responder_assignments : "logical_responder_id"
+    responders ||..o{ responder_check_ins : "logical_responder_id"
+    responders ||..o{ responder_communication_logs : "logical_responder_id"
+    responders ||..o{ responder_field_reports : "logical_responder_id"
+    responders ||..o{ responder_location_logs : "logical_responder_id"
+    responders o|..o{ responder_routes : "logical_responder_id"
+    roles o|..o{ users : "logical_role_id"
+    severity_levels o|..o{ affected_areas : "logical_severity_id"
+    severity_levels o|..o{ disaster_broadcasts : "logical_severity_id"
+    severity_levels o|..o{ disaster_events : "logical_severity_level_id"
+    sitios o|..o{ addresses : "logical_sitio_id"
+    sitios o|..o{ affected_areas : "logical_sitio_id"
+    sitios ||..o{ puroks : "logical_sitio_id"
+    users o|..o{ affected_areas : "logical_confirmed_by_admin_id"
+    users o|..o{ audit_logs : "logical_user_id"
+    users ||--o{ devices : "FK_user_id"
+    users o|..o{ disaster_broadcasts : "logical_sent_by_admin_id"
+    users o|..o{ geotagged_locations : "logical_verified_by_user_id"
+    users ||..o| household_login_accounts : "logical_user_id"
+    users o|..o{ household_status_logs : "logical_reviewed_by_user_id"
+    users o|..o{ household_status_logs : "logical_submitted_by_user_id"
+    users o|..o{ incident_archives : "logical_archived_by_admin_id"
+    users o|..o{ landing_inquiries : "logical_handled_by_user_id"
+    users o|..o{ member_disaster_statuses : "logical_reported_by_user_id"
+    users o|..o{ member_disaster_statuses : "logical_verified_by_user_id"
+    users o|..o{ member_status_logs : "logical_reported_by_user_id"
+    users o|..o{ notifications : "logical_sent_by"
+    users o|..o{ personal_access_tokens : "logical_tokenable_id"
+    users o|..o{ request_validations : "logical_validator_user_id"
+    users o|..o{ rescue_priority_settings : "logical_updated_by_user_id"
+    users o|..o{ resource_requests : "logical_handled_by"
+    users o|..o{ resource_requests : "logical_validated_by_user_id"
+    users o|..o{ responder_field_reports : "logical_submitted_by_user_id"
+    users o|..o{ responders : "logical_user_id"
+    users o|..o{ situation_reports : "logical_created_by_admin_id"
+    users o|..o{ situation_reports : "logical_reviewed_by_user_id"
+    users o|..o{ trusted_households : "logical_created_by_user_id"
+    users o|..o{ trusted_households : "logical_validated_by_user_id"
+    users ||..o{ web_push_subscriptions : "logical_user_id"
+    weather_logs o|..o{ disaster_broadcasts : "logical_weather_log_id"
+    web_push_subscriptions ||..o{ web_push_deliveries : "logical_subscription_id"

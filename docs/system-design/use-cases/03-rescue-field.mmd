@@ -1,0 +1,64 @@
+flowchart LR
+    %% UML use-case approximation for broad Mermaid Live compatibility.
+    %% Plain lines are associations; labeled dotted arrows are UML relationships.
+    AccountHolder["Actor: Account holder"]:::actor
+    Resident["Actor: Household resident"]:::actor
+    Rescuer["Actor: Rescuer - shared field duties"]:::actor
+    TeamLeader["Actor: Rescue team leader"]:::actor
+    Hq["Actor: HQ personnel - common permitted modules"]:::actor
+    Response["Actor: Response sub-committee / dispatcher"]:::actor
+    Recovery["Actor: Recovery and Rehabilitation sub-committee"]:::actor
+    TrackingAid["Actor: TrackingAid"]:::actor
+    GeoWeather["Actor: Weather, hazard, map and routing providers"]:::actor
+    subgraph resqperation["RESQPERATION"]
+        offlineView(["View all saved mobile page data with Offline mode and last-sync time - A5"])
+        spatialMap(["View geotagged households, evacuation sites and dispatch routes - B4"])
+        assignments(["View assigned incidents, households, members and route directions - C1"])
+        assignmentProgress(["Accept assignment; mark en route, arrived and completed"])
+        gpsFollow(["Follow GPS position and share assignment location"])
+        offlineNavigation(["Prepare navigation packs; record offline trips and sync saved events"]):::partial
+        radio(["Send and receive internet PTT voice clips and radio signals - C2"])
+        rescueVerify(["Check in at households and assess each member's outcome - C3"])
+        fieldReport(["Submit incident findings, injuries, deaths, damage and notes - C4"])
+        operationLog(["Record operational timestamps, status changes and history - C5"])
+        logistics(["Request personnel, equipment or supplies; track or cancel eligible requests - C6"]):::partial
+        requestItems(["Specify personnel, equipment, goods, quantities and urgency - R2"])
+        requestTracking(["Track Pending, Validated/Approved, In Progress and Completed - R5"])
+    end
+    Resident -. "specializes" .-> AccountHolder
+    Rescuer -. "specializes" .-> AccountHolder
+    Hq -. "specializes" .-> AccountHolder
+    TeamLeader -. "specializes" .-> Rescuer
+    Response -. "specializes" .-> Hq
+    Recovery -. "specializes" .-> Hq
+    Resident --- offlineView
+    Rescuer --- spatialMap
+    Rescuer --- assignments
+    Rescuer --- assignmentProgress
+    Rescuer --- gpsFollow
+    Rescuer --- offlineNavigation
+    Rescuer --- radio
+    Rescuer --- rescueVerify
+    Rescuer --- fieldReport
+    Rescuer --- operationLog
+    Rescuer --- offlineView
+    TeamLeader --- logistics
+    TeamLeader --- requestTracking
+    Hq --- spatialMap
+    Response --- requestItems
+    Response --- requestTracking
+    Recovery --- requestItems
+    Recovery --- requestTracking
+    TrackingAid --- requestTracking
+    GeoWeather --- spatialMap
+    GeoWeather --- assignments
+    assignmentProgress -. "include" .-> operationLog
+    rescueVerify -. "include" .-> operationLog
+    fieldReport -. "include" .-> operationLog
+    logistics -. "include" .-> requestItems
+    requestTracking -. "include" .-> operationLog
+    offlineView -. "extend" .-> assignments
+    offlineNavigation -. "extend" .-> assignments
+    classDef actor fill:#e0f2fe,color:#0c4a6e,stroke:#0284c7
+    classDef gap fill:#fff1f2,color:#881337,stroke:#be123c,stroke-width:2px
+    classDef partial fill:#fff7ed,color:#7c2d12,stroke:#c2410c,stroke-width:2px

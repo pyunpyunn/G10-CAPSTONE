@@ -1,0 +1,50 @@
+flowchart LR
+    %% Grouping is module relevance, not database/table ownership.
+    %% Arrows point from referenced identity to dependent records.
+    subgraph identity["Accounts and access"]
+        tusers["users"]
+    end
+    subgraph household["Shared household and geography foundation"]
+        thouseholds["households"]
+    end
+    subgraph dispatch["Teams, priority and dispatch"]
+        tresponders["responders"]
+        trescue_teams["rescue_teams"]
+        tresponder_assignments["responder_assignments"]
+    end
+    subgraph navigation["Routes, navigation and synchronization"]
+        tdevices["devices"]
+        tteam_bases["team_bases"]
+        toffline_packs["offline_packs"]
+        tcached_routes["cached_routes"]
+        tdispatch_trips["dispatch_trips"]
+        ttrip_points["trip_points"]
+        tsync_events["sync_events"]
+        tresponder_routes["responder_routes"]
+        troute_coordinates["route_coordinates"]
+    end
+    subgraph documentation["Evacuation evidence, reports and archives"]
+        tevacuation_centers["evacuation_centers"]
+    end
+    tevacuation_centers -->|"evac_center_id"| tcached_routes
+    thouseholds -->|"household_id"| tcached_routes
+    trescue_teams -->|"team_id"| tcached_routes
+    trescue_teams -->|"team_id"| tdevices
+    tusers -->|"user_id"| tdevices
+    tdevices -->|"device_id"| tdispatch_trips
+    tresponder_assignments -->|"dispatch_id"| tdispatch_trips
+    trescue_teams -->|"team_id"| tdispatch_trips
+    tresponders -.->|"leader_responder_id"| trescue_teams
+    thouseholds -.->|"household_id"| tresponder_assignments
+    tresponders -.->|"responder_id"| tresponder_assignments
+    trescue_teams -.->|"team_id"| tresponder_assignments
+    tresponder_assignments -.->|"assignment_id"| tresponder_routes
+    thouseholds -.->|"household_id"| tresponder_routes
+    tresponders -.->|"responder_id"| tresponder_routes
+    trescue_teams -.->|"team_id"| tresponders
+    tusers -.->|"user_id"| tresponders
+    tresponder_routes -.->|"route_id"| troute_coordinates
+    tdevices -->|"device_id"| tsync_events
+    trescue_teams -->|"team_id"| tteam_bases
+    tdispatch_trips -->|"trip_id"| ttrip_points
+    thouseholds -.->|"household_id"| tusers

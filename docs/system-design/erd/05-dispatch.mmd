@@ -1,0 +1,204 @@
+erDiagram
+    direction LR
+    %% Solid relationships = inspected database foreign keys.
+    %% Dotted relationships = application/model references, not enforced foreign keys.
+    %% PK/UK markings come only from the inspected schema, not model assumptions.
+    affected_areas {
+        int affected_area_id "application identity; not database PK; application reference"
+        varchar disaster_id "nullable; application reference"
+        varchar confirmed_by_admin_id "nullable; application reference"
+        int severity_id "nullable; application reference"
+        int purok_id "nullable; application reference"
+        int sitio_id "nullable; application reference"
+        int barangay_id "nullable; application reference"
+        tinyint confirmed_by_hq "nullable"
+        datetime confirmed_at "nullable"
+    }
+    disaster_events {
+        varchar event_id PK "application reference"
+        varchar name "nullable"
+        int type_id "application reference"
+        int severity_level_id "nullable; application reference"
+        datetime started_at "nullable"
+        datetime ended_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+    }
+    dispatch_statuses {
+        varchar status_key PK
+        varchar label
+        tinyint is_open
+        tinyint allow_create
+        tinyint allow_mobile
+        varchar dashboard_group
+        tinyint is_alias
+        tinyint is_active
+        int sort_order
+        varchar status_code UK
+    }
+    household_status_logs {
+        int status_log_id PK "application reference"
+        varchar disaster_id "nullable; application reference"
+        varchar household_id "application reference"
+        int status_id FK
+        varchar source
+        varchar submitted_by_user_id "nullable; application reference"
+        int responder_id "nullable; application reference"
+        bigint device_token_id "nullable; application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        varchar location_label "nullable"
+        decimal location_accuracy_m "nullable"
+        int battery_level "nullable"
+        int signal_strength "nullable"
+        text notes "nullable"
+        datetime submitted_at "nullable"
+        varchar reviewed_by_user_id "nullable; application reference"
+        datetime reviewed_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    households {
+        varchar household_id PK "application reference"
+        varchar household_code "nullable"
+        varchar household_number "nullable"
+        varchar household_name "nullable"
+        varchar email "nullable"
+        int member_count
+        varchar created_by "nullable"
+        int address_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar emergency_contact "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+    }
+    puroks {
+        int purok_id PK "application reference"
+        varchar purok_name "nullable"
+        int sitio_id "application reference"
+    }
+    rescue_priority_settings {
+        bigint version PK
+        tinyint impact_weight
+        tinyint vulnerability_weight
+        tinyint unreported_weight
+        tinyint no_contact_weight
+        varchar updated_by_user_id "nullable; application reference"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    rescue_teams {
+        int team_id PK "application reference"
+        varchar team_code "nullable"
+        varchar team_name "nullable"
+        varchar team_type "nullable"
+        int assigned_purok_id "nullable; application reference"
+        int leader_responder_id "nullable; application reference"
+        varchar duty_status
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    responder_assignments {
+        int assignment_id PK "application reference"
+        varchar assignment_code "nullable"
+        int responder_id "application reference"
+        int team_id "nullable; application reference"
+        varchar disaster_id "nullable; application reference"
+        int affected_area_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        int status_log_id "nullable; application reference"
+        varchar assigned_area "nullable"
+        text route_notes "nullable"
+        varchar priority_level "nullable"
+        text dispatch_notes "nullable"
+        varchar created_by_admin_id "nullable"
+        varchar status "nullable"
+        datetime assigned_at
+        datetime accepted_at "nullable"
+        datetime en_route_at "nullable"
+        datetime arrived_at "nullable"
+        datetime completed_at "nullable"
+        text outcome_notes "nullable"
+        datetime updated_at "nullable"
+        smallint responder_count
+        varchar dispatch_type
+    }
+    responders {
+        int responder_id "application identity; not database PK; application reference"
+        varchar user_id "nullable; application reference"
+        varchar responder_code "nullable"
+        varchar created_by_admin_id "nullable"
+        int team_id "nullable; application reference"
+        varchar username "nullable"
+        varchar password_hash "nullable"
+        varchar full_name "nullable"
+        varchar title "nullable"
+        varchar contact_number "nullable"
+        varchar emergency_contact_name "nullable"
+        varchar emergency_contact_number "nullable"
+        date date_of_birth "nullable"
+        varchar gender "nullable"
+        varchar blood_type "nullable"
+        text address "nullable"
+        text skills "nullable"
+        text training_notes "nullable"
+        varchar certification_reference "nullable"
+        text equipment_notes "nullable"
+        tinyint is_validated "nullable"
+        tinyint is_deployed "nullable"
+        varchar duty_status
+        datetime last_active_at "nullable"
+        datetime created_at
+        datetime updated_at "nullable"
+        datetime deleted_at "nullable"
+    }
+    users {
+        varchar user_id PK "application reference"
+        varchar first_name "nullable"
+        varchar last_name "nullable"
+        varchar name "nullable"
+        varchar username "nullable"
+        varchar email "nullable"
+        timestamp email_verified_at "nullable"
+        varchar password "nullable"
+        int role_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar assigned_center_id "nullable"
+        varchar household_id "nullable; application reference"
+        varchar member_id UK "nullable; application reference"
+        tinyint is_active "nullable"
+        tinyint must_change_password
+        varchar temp_password "nullable"
+        varchar remember_token "nullable"
+        timestamp updated_at "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar profile_photo "nullable"
+        varchar security_question_1 "nullable"
+        varchar security_answer_1 "nullable"
+        varchar security_question_2 "nullable"
+        varchar security_answer_2 "nullable"
+        timestamp password_changed_at "nullable"
+    }
+    affected_areas o|..o{ responder_assignments : "logical_affected_area_id"
+    disaster_events o|..o{ affected_areas : "logical_disaster_id"
+    disaster_events o|..o{ household_status_logs : "logical_disaster_id"
+    disaster_events o|..o{ responder_assignments : "logical_disaster_id"
+    household_status_logs o|..o{ responder_assignments : "logical_status_log_id"
+    households ||..o{ household_status_logs : "logical_household_id"
+    households o|..o{ responder_assignments : "logical_household_id"
+    households o|..o{ users : "logical_household_id"
+    puroks o|..o{ affected_areas : "logical_purok_id"
+    puroks o|..o{ rescue_teams : "logical_assigned_purok_id"
+    rescue_teams o|..o{ responder_assignments : "logical_team_id"
+    rescue_teams o|..o{ responders : "logical_team_id"
+    responders o|..o{ household_status_logs : "logical_responder_id"
+    responders o|..o{ rescue_teams : "logical_leader_responder_id"
+    responders ||..o{ responder_assignments : "logical_responder_id"
+    users o|..o{ affected_areas : "logical_confirmed_by_admin_id"
+    users o|..o{ household_status_logs : "logical_reviewed_by_user_id"
+    users o|..o{ household_status_logs : "logical_submitted_by_user_id"
+    users o|..o{ rescue_priority_settings : "logical_updated_by_user_id"
+    users o|..o{ responders : "logical_user_id"

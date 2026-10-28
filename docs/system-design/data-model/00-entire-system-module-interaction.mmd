@@ -1,0 +1,34 @@
+flowchart LR
+    identity["Accounts and access"]
+    foundation["Shared household, member and geographic foundation"]
+    events["Disaster events, alerts and safety state"]
+    dispatch["Rescue teams, priorities and assignments"]
+    field["Field assessments, reports and communication"]
+    navigation["Routes, device binding and navigation synchronization"]
+    resources["Resource requests and validation history"]
+    documentation["Evacuation evidence, SitRep and archives"]
+    platform["Notification delivery, audit and operational support"]
+    local["Separate on-device SQLite and overview snapshots"]
+    safe["External: SafeTrack shared identity and reports"]
+    eva["External: EvaTrack evacuation reports and request intake"]
+    tracking["External: TrackingAid inventory and fulfillment"]
+    gap["Source-only schema: 8 migration-defined tables missing locally"]
+    identity -->|"scopes access and account ownership"| foundation
+    identity -->|"personnel identities"| dispatch
+    foundation -->|"household/member and area references"| events
+    events -->|"affected areas, status and criteria"| dispatch
+    dispatch -->|"assignment and responder context"| field
+    field -->|"assessed outcomes and safety evidence"| events
+    dispatch -->|"assignment/team destinations"| navigation
+    foundation -->|"geotags and center context"| navigation
+    field -->|"logistical needs"| resources
+    foundation & events & dispatch & field & resources --> documentation
+    events & field & resources & documentation --> platform
+    navigation <--> local
+    events -. "cached overview reads" .-> local
+    safe -. "shared census and report exchange" .-> foundation
+    eva -. "evacuation reports" .-> documentation
+    eva -. "external requests" .-> resources
+    resources -. "validated handoff and mirrored status" .-> tracking
+    tracking -. "authorized report data" .-> documentation
+    gap -. "criteria, geography, mobile notices and report exchange" .-> events & documentation

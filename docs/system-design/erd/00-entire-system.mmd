@@ -1,0 +1,548 @@
+erDiagram
+    direction LR
+    %% Solid relationships = inspected database foreign keys.
+    %% Dotted relationships = application/model references, not enforced foreign keys.
+    %% PK/UK markings come only from the inspected schema, not model assumptions.
+    addresses {
+        int address_id PK "application reference"
+        int barangay_id "nullable; application reference"
+        int sitio_id "nullable; application reference"
+        int purok_id "nullable; application reference"
+    }
+    affected_areas {
+        int affected_area_id "application identity; not database PK; application reference"
+        varchar disaster_id "nullable; application reference"
+        varchar confirmed_by_admin_id "nullable; application reference"
+        int severity_id "nullable; application reference"
+        int purok_id "nullable; application reference"
+        int sitio_id "nullable; application reference"
+        int barangay_id "nullable; application reference"
+    }
+    audit_logs {
+        int audit_log_id PK
+        varchar user_id "nullable; application reference"
+    }
+    barangay_boundaries {
+        varchar psgc_code PK
+        bigint barangay_id "nullable; application reference"
+    }
+    barangays {
+        int barangay_id PK "application reference"
+        int city_id "application reference"
+    }
+    cached_routes {
+        bigint id PK
+        int team_id FK
+        varchar household_id FK "nullable"
+        varchar evac_center_id FK "nullable"
+    }
+    cities {
+        int city_id PK "application reference"
+        int province_id "application reference"
+    }
+    device_tokens {
+        bigint id PK "application reference"
+        varchar household_id "nullable; application reference"
+        varchar member_id "nullable; application reference"
+    }
+    device_tracking_logs {
+        int tracking_id "application identity; not database PK"
+        bigint device_token_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        varchar member_id "nullable; application reference"
+    }
+    devices {
+        bigint id PK "application reference"
+        varchar user_id FK
+        int team_id FK
+        varchar device_uuid UK
+    }
+    disaster_broadcasts {
+        int broadcast_id "application identity; not database PK"
+        varchar disaster_id "nullable; application reference"
+        varchar sent_by_admin_id "nullable; application reference"
+        int severity_id "nullable; application reference"
+        int weather_log_id "nullable; application reference"
+    }
+    disaster_event_types {
+        int event_type_id PK
+        varchar event_id "nullable; application reference"
+        int type_id "application reference"
+    }
+    disaster_events {
+        varchar event_id PK "application reference"
+        int type_id "application reference"
+        int severity_level_id "nullable; application reference"
+    }
+    disaster_types {
+        int type_id PK "application reference"
+    }
+    dispatch_statuses {
+        varchar status_key PK
+        varchar status_code UK
+    }
+    dispatch_trips {
+        bigint id PK "application reference"
+        int dispatch_id FK
+        int team_id FK
+        bigint device_id FK
+    }
+    evacuation_centers {
+        varchar evacuation_center_id PK "application reference"
+        varchar current_event_id "nullable; application reference"
+    }
+    evacuation_records {
+        int evacuation_id PK
+        varchar event_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        varchar center_id "nullable; application reference"
+        int household_status_id "nullable; application reference"
+    }
+    genders {
+        int gender_id PK "application reference"
+        varchar gender_key UK "nullable"
+    }
+    geotagged_locations {
+        int location_id PK
+        varchar household_id "nullable; application reference"
+        varchar verified_by_user_id "nullable; application reference"
+    }
+    household_device_owners {
+        bigint id PK
+        varchar household_id "application reference"
+        varchar member_id "application reference"
+        bigint selection_token_id "nullable; application reference"
+    }
+    household_disasters {
+        int household_disaster_id PK
+        varchar household_id FK "nullable"
+        varchar disaster_id FK "nullable"
+        int initial_status_id FK "nullable"
+        int current_status_id FK "nullable"
+    }
+    household_login_accounts {
+        varchar household_id PK "application reference"
+        varchar user_id UK "application reference"
+    }
+    household_member_id_mappings {
+        varchar old_member_id PK
+        varchar member_id UK "application reference"
+    }
+    household_members {
+        varchar member_id PK "application reference"
+        varchar household_id "nullable; application reference"
+        int gender_id "nullable; application reference"
+        int relationship_id "nullable; application reference"
+    }
+    household_password_recovery_otps {
+        varchar user_id PK
+        varchar household_id "application reference"
+    }
+    household_status_logs {
+        int status_log_id PK "application reference"
+        varchar disaster_id "nullable; application reference"
+        varchar household_id "application reference"
+        int status_id FK
+        varchar submitted_by_user_id "nullable; application reference"
+        int responder_id "nullable; application reference"
+        bigint device_token_id "nullable; application reference"
+        varchar reviewed_by_user_id "nullable; application reference"
+    }
+    household_statuses {
+        int status_id PK "application reference"
+        varchar status_key UK "nullable"
+    }
+    household_trusted_pins {
+        varchar household_id PK "application reference"
+    }
+    households {
+        varchar household_id PK "application reference"
+        int address_id "nullable; application reference"
+    }
+    incident_archives {
+        int archive_id
+        varchar disaster_id "nullable; application reference"
+        varchar archived_by_admin_id "nullable; application reference"
+    }
+    landing_inquiries {
+        bigint inquiry_id PK
+        varchar handled_by_user_id "nullable; application reference"
+    }
+    mapping_hazard_layers {
+        bigint id PK
+        varchar barangay_id "application reference"
+    }
+    member_disaster_statuses {
+        bigint member_status_id PK
+        varchar disaster_id FK
+        varchar household_id FK
+        varchar member_id FK
+        int status_id FK
+        int previous_status_id FK "nullable"
+        varchar reported_by_user_id "nullable; application reference"
+        varchar reported_by_member_id "nullable; application reference"
+        int responder_id "nullable; application reference"
+        bigint device_token_id "nullable; application reference"
+        varchar evacuation_center_id "nullable; application reference"
+        varchar verified_by_user_id "nullable; application reference"
+    }
+    member_status_logs {
+        bigint member_status_log_id PK
+        varchar disaster_id "application reference"
+        varchar household_id "application reference"
+        varchar member_id "application reference"
+        int from_status_id "nullable; application reference"
+        int to_status_id "application reference"
+        varchar reported_by_user_id "nullable; application reference"
+        varchar reported_by_member_id "nullable; application reference"
+        int responder_id "nullable; application reference"
+        bigint device_token_id "nullable; application reference"
+    }
+    member_statuses {
+        int status_id PK "application reference"
+        varchar status_key UK
+    }
+    member_vulnerable_groups {
+        int id PK
+        varchar member_id "nullable; application reference"
+    }
+    notifications {
+        int notif_id PK
+        varchar sent_by "nullable; application reference"
+    }
+    official_advisory_notifications {
+        bigint id PK
+        varchar fingerprint UK
+    }
+    offline_packs {
+        varchar version PK
+    }
+    operational_sequences {
+        varchar sequence_key PK
+    }
+    personal_access_tokens {
+        bigint id PK "application reference"
+        varchar tokenable_id "nullable; application reference"
+    }
+    property_damage_levels {
+        varchar damage_key PK
+    }
+    provinces {
+        int province_id PK "application reference"
+    }
+    puroks {
+        int purok_id PK "application reference"
+        int sitio_id "application reference"
+    }
+    realtime_outbox {
+        bigint id PK
+    }
+    relationships {
+        int relationship_id PK "application reference"
+        varchar relationship_key UK "nullable"
+    }
+    report_idempotency {
+        char scope PK
+    }
+    request_validations {
+        int validation_id PK
+        varchar request_id "application reference"
+        varchar validator_user_id "nullable; application reference"
+        varchar duplicate_request_id "nullable; application reference"
+    }
+    rescue_priority_settings {
+        bigint version PK
+        varchar updated_by_user_id "nullable; application reference"
+    }
+    rescue_teams {
+        int team_id PK "application reference"
+        int assigned_purok_id "nullable; application reference"
+        int leader_responder_id "nullable; application reference"
+    }
+    resource_request_status {
+        int status_id PK "application reference"
+    }
+    resource_requests {
+        varchar request_id PK "application reference"
+        varchar evacuation_center_id "nullable; application reference"
+        varchar handled_by "nullable; application reference"
+        int status_id "nullable; application reference"
+        varchar validated_by_user_id "nullable; application reference"
+    }
+    responder_assignments {
+        int assignment_id PK "application reference"
+        int responder_id "application reference"
+        int team_id "nullable; application reference"
+        varchar disaster_id "nullable; application reference"
+        int affected_area_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        int status_log_id "nullable; application reference"
+    }
+    responder_check_ins {
+        int check_in_id
+        int responder_id "application reference"
+        varchar disaster_id "nullable; application reference"
+        int team_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        varchar member_id "nullable; application reference"
+    }
+    responder_communication_logs {
+        int communication_id
+        int responder_id "application reference"
+        int team_id "nullable; application reference"
+        varchar disaster_id "nullable; application reference"
+    }
+    responder_field_report_members {
+        bigint detail_id PK
+        int report_id "application reference"
+        varchar household_id "application reference"
+        varchar disaster_id "application reference"
+        varchar member_id "application reference"
+        int status_id "nullable; application reference"
+    }
+    responder_field_reports {
+        int report_id "application reference"
+        int responder_id "application reference"
+        varchar disaster_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        int assignment_id "nullable; application reference"
+        varchar submitted_by_user_id "nullable; application reference"
+        int status_log_id "nullable; application reference"
+    }
+    responder_location_logs {
+        int log_id "application identity; not database PK"
+        int responder_id "application reference"
+    }
+    responder_routes {
+        int route_id "application identity; not database PK; application reference"
+        int assignment_id "application reference"
+        bigint responder_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+    }
+    responders {
+        int responder_id "application identity; not database PK; application reference"
+        varchar user_id "nullable; application reference"
+        int team_id "nullable; application reference"
+    }
+    roles {
+        int role_id PK "application reference"
+    }
+    route_coordinates {
+        int coordinate_id "application identity; not database PK"
+        int route_id "application reference"
+    }
+    severity_levels {
+        int severity_id PK "application reference"
+    }
+    sitios {
+        int sitio_id PK "application reference"
+        int barangay_id "application reference"
+    }
+    situation_reports {
+        int sit_rep_id "application identity; not database PK"
+        varchar disaster_id "nullable; application reference"
+        varchar created_by_admin_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        varchar reviewed_by_user_id "nullable; application reference"
+    }
+    status_reminders {
+        bigint reminder_id PK
+        varchar event_id "application reference"
+        varchar household_id "application reference"
+        varchar member_id "application reference"
+    }
+    sync_events {
+        bigint id PK
+        char client_event_id UK
+        bigint device_id FK
+    }
+    team_bases {
+        int team_id PK, FK
+    }
+    trip_points {
+        bigint id PK
+        bigint trip_id FK
+    }
+    trusted_households {
+        varchar connection_id PK
+        varchar requesting_household_id "application reference"
+        varchar trusted_household_id "application reference"
+        varchar created_by_user_id "nullable; application reference"
+        varchar validated_by_user_id "nullable; application reference"
+    }
+    users {
+        varchar user_id PK "application reference"
+        int role_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        varchar member_id UK "nullable; application reference"
+    }
+    weather_logs {
+        int weather_log_id PK "application reference"
+        varchar disaster_id "nullable; application reference"
+    }
+    web_push_deliveries {
+        bigint id PK
+        bigint subscription_id "application reference"
+    }
+    web_push_subscriptions {
+        bigint id PK "application reference"
+        varchar user_id "application reference"
+        bigint token_id "nullable; application reference"
+        varchar endpoint_hash UK
+    }
+    addresses o|..o{ households : "logical_address_id"
+    affected_areas o|..o{ responder_assignments : "logical_affected_area_id"
+    barangays o|..o{ addresses : "logical_barangay_id"
+    barangays o|..o{ affected_areas : "logical_barangay_id"
+    barangays o|..o{ barangay_boundaries : "logical_barangay_id"
+    barangays ||..o{ mapping_hazard_layers : "logical_barangay_id"
+    barangays ||..o{ sitios : "logical_barangay_id"
+    cities ||..o{ barangays : "logical_city_id"
+    device_tokens o|..o{ device_tracking_logs : "logical_device_token_id"
+    device_tokens o|..o{ household_status_logs : "logical_device_token_id"
+    device_tokens o|..o{ member_disaster_statuses : "logical_device_token_id"
+    device_tokens o|..o{ member_status_logs : "logical_device_token_id"
+    devices ||--o{ dispatch_trips : "FK_device_id"
+    devices ||--o{ sync_events : "FK_device_id"
+    disaster_events o|..o{ affected_areas : "logical_disaster_id"
+    disaster_events o|..o{ disaster_broadcasts : "logical_disaster_id"
+    disaster_events o|..o{ disaster_event_types : "logical_event_id"
+    disaster_events o|..o{ evacuation_centers : "logical_current_event_id"
+    disaster_events o|..o{ evacuation_records : "logical_event_id"
+    disaster_events o|--o{ household_disasters : "FK_disaster_id"
+    disaster_events o|..o{ household_status_logs : "logical_disaster_id"
+    disaster_events o|..o{ incident_archives : "logical_disaster_id"
+    disaster_events ||--o{ member_disaster_statuses : "FK_disaster_id"
+    disaster_events ||..o{ member_status_logs : "logical_disaster_id"
+    disaster_events o|..o{ responder_assignments : "logical_disaster_id"
+    disaster_events o|..o{ responder_check_ins : "logical_disaster_id"
+    disaster_events o|..o{ responder_communication_logs : "logical_disaster_id"
+    disaster_events ||..o{ responder_field_report_members : "logical_disaster_id"
+    disaster_events o|..o{ responder_field_reports : "logical_disaster_id"
+    disaster_events o|..o{ situation_reports : "logical_disaster_id"
+    disaster_events ||..o{ status_reminders : "logical_event_id"
+    disaster_events o|..o{ weather_logs : "logical_disaster_id"
+    disaster_types ||..o{ disaster_event_types : "logical_type_id"
+    disaster_types ||..o{ disaster_events : "logical_type_id"
+    dispatch_trips ||--o{ trip_points : "FK_trip_id"
+    evacuation_centers o|--o{ cached_routes : "FK_evac_center_id"
+    evacuation_centers o|..o{ evacuation_records : "logical_center_id"
+    evacuation_centers o|..o{ member_disaster_statuses : "logical_evacuation_center_id"
+    evacuation_centers o|..o{ resource_requests : "logical_evacuation_center_id"
+    genders o|..o{ household_members : "logical_gender_id"
+    household_members o|..o{ device_tokens : "logical_member_id"
+    household_members o|..o{ device_tracking_logs : "logical_member_id"
+    household_members ||..o{ household_device_owners : "logical_member_id"
+    household_members ||..o| household_member_id_mappings : "logical_member_id"
+    household_members ||--o{ member_disaster_statuses : "FK_member_id"
+    household_members o|..o{ member_disaster_statuses : "logical_reported_by_member_id"
+    household_members ||..o{ member_status_logs : "logical_member_id"
+    household_members o|..o{ member_status_logs : "logical_reported_by_member_id"
+    household_members o|..o{ member_vulnerable_groups : "logical_member_id"
+    household_members o|..o{ responder_check_ins : "logical_member_id"
+    household_members ||..o{ responder_field_report_members : "logical_member_id"
+    household_members ||..o{ status_reminders : "logical_member_id"
+    household_members o|..o| users : "logical_member_id"
+    household_status_logs o|..o{ responder_assignments : "logical_status_log_id"
+    household_status_logs o|..o{ responder_field_reports : "logical_status_log_id"
+    household_statuses o|..o{ evacuation_records : "logical_household_status_id"
+    household_statuses o|--o{ household_disasters : "FK_current_status_id"
+    household_statuses o|--o{ household_disasters : "FK_initial_status_id"
+    household_statuses ||--o{ household_status_logs : "FK_status_id"
+    households o|--o{ cached_routes : "FK_household_id"
+    households o|..o{ device_tokens : "logical_household_id"
+    households o|..o{ device_tracking_logs : "logical_household_id"
+    households o|..o{ evacuation_records : "logical_household_id"
+    households o|..o{ geotagged_locations : "logical_household_id"
+    households ||..o{ household_device_owners : "logical_household_id"
+    households o|--o{ household_disasters : "FK_household_id"
+    households ||..o| household_login_accounts : "logical_household_id"
+    households o|..o{ household_members : "logical_household_id"
+    households ||..o{ household_password_recovery_otps : "logical_household_id"
+    households ||..o{ household_status_logs : "logical_household_id"
+    households ||..o| household_trusted_pins : "logical_household_id"
+    households ||--o{ member_disaster_statuses : "FK_household_id"
+    households ||..o{ member_status_logs : "logical_household_id"
+    households o|..o{ responder_assignments : "logical_household_id"
+    households o|..o{ responder_check_ins : "logical_household_id"
+    households ||..o{ responder_field_report_members : "logical_household_id"
+    households o|..o{ responder_field_reports : "logical_household_id"
+    households o|..o{ responder_routes : "logical_household_id"
+    households o|..o{ situation_reports : "logical_household_id"
+    households ||..o{ status_reminders : "logical_household_id"
+    households ||..o{ trusted_households : "logical_requesting_household_id"
+    households ||..o{ trusted_households : "logical_trusted_household_id"
+    households o|..o{ users : "logical_household_id"
+    member_statuses o|--o{ member_disaster_statuses : "FK_previous_status_id"
+    member_statuses ||--o{ member_disaster_statuses : "FK_status_id"
+    member_statuses o|..o{ member_status_logs : "logical_from_status_id"
+    member_statuses ||..o{ member_status_logs : "logical_to_status_id"
+    member_statuses o|..o{ responder_field_report_members : "logical_status_id"
+    personal_access_tokens o|..o{ household_device_owners : "logical_selection_token_id"
+    personal_access_tokens o|..o{ web_push_subscriptions : "logical_token_id"
+    provinces ||..o{ cities : "logical_province_id"
+    puroks o|..o{ addresses : "logical_purok_id"
+    puroks o|..o{ affected_areas : "logical_purok_id"
+    puroks o|..o{ rescue_teams : "logical_assigned_purok_id"
+    relationships o|..o{ household_members : "logical_relationship_id"
+    rescue_teams ||--o{ cached_routes : "FK_team_id"
+    rescue_teams ||--o{ devices : "FK_team_id"
+    rescue_teams ||--o{ dispatch_trips : "FK_team_id"
+    rescue_teams o|..o{ responder_assignments : "logical_team_id"
+    rescue_teams o|..o{ responder_check_ins : "logical_team_id"
+    rescue_teams o|..o{ responder_communication_logs : "logical_team_id"
+    rescue_teams o|..o{ responders : "logical_team_id"
+    rescue_teams ||--o| team_bases : "FK_team_id"
+    resource_request_status o|..o{ resource_requests : "logical_status_id"
+    resource_requests o|..o{ request_validations : "logical_duplicate_request_id"
+    resource_requests ||..o{ request_validations : "logical_request_id"
+    responder_assignments ||--o{ dispatch_trips : "FK_dispatch_id"
+    responder_assignments o|..o{ responder_field_reports : "logical_assignment_id"
+    responder_assignments ||..o{ responder_routes : "logical_assignment_id"
+    responder_field_reports ||..o{ responder_field_report_members : "logical_report_id"
+    responder_routes ||..o{ route_coordinates : "logical_route_id"
+    responders o|..o{ household_status_logs : "logical_responder_id"
+    responders o|..o{ member_disaster_statuses : "logical_responder_id"
+    responders o|..o{ member_status_logs : "logical_responder_id"
+    responders o|..o{ rescue_teams : "logical_leader_responder_id"
+    responders ||..o{ responder_assignments : "logical_responder_id"
+    responders ||..o{ responder_check_ins : "logical_responder_id"
+    responders ||..o{ responder_communication_logs : "logical_responder_id"
+    responders ||..o{ responder_field_reports : "logical_responder_id"
+    responders ||..o{ responder_location_logs : "logical_responder_id"
+    responders o|..o{ responder_routes : "logical_responder_id"
+    roles o|..o{ users : "logical_role_id"
+    severity_levels o|..o{ affected_areas : "logical_severity_id"
+    severity_levels o|..o{ disaster_broadcasts : "logical_severity_id"
+    severity_levels o|..o{ disaster_events : "logical_severity_level_id"
+    sitios o|..o{ addresses : "logical_sitio_id"
+    sitios o|..o{ affected_areas : "logical_sitio_id"
+    sitios ||..o{ puroks : "logical_sitio_id"
+    users o|..o{ affected_areas : "logical_confirmed_by_admin_id"
+    users o|..o{ audit_logs : "logical_user_id"
+    users ||--o{ devices : "FK_user_id"
+    users o|..o{ disaster_broadcasts : "logical_sent_by_admin_id"
+    users o|..o{ geotagged_locations : "logical_verified_by_user_id"
+    users ||..o| household_login_accounts : "logical_user_id"
+    users o|..o{ household_status_logs : "logical_reviewed_by_user_id"
+    users o|..o{ household_status_logs : "logical_submitted_by_user_id"
+    users o|..o{ incident_archives : "logical_archived_by_admin_id"
+    users o|..o{ landing_inquiries : "logical_handled_by_user_id"
+    users o|..o{ member_disaster_statuses : "logical_reported_by_user_id"
+    users o|..o{ member_disaster_statuses : "logical_verified_by_user_id"
+    users o|..o{ member_status_logs : "logical_reported_by_user_id"
+    users o|..o{ notifications : "logical_sent_by"
+    users o|..o{ personal_access_tokens : "logical_tokenable_id"
+    users o|..o{ request_validations : "logical_validator_user_id"
+    users o|..o{ rescue_priority_settings : "logical_updated_by_user_id"
+    users o|..o{ resource_requests : "logical_handled_by"
+    users o|..o{ resource_requests : "logical_validated_by_user_id"
+    users o|..o{ responder_field_reports : "logical_submitted_by_user_id"
+    users o|..o{ responders : "logical_user_id"
+    users o|..o{ situation_reports : "logical_created_by_admin_id"
+    users o|..o{ situation_reports : "logical_reviewed_by_user_id"
+    users o|..o{ trusted_households : "logical_created_by_user_id"
+    users o|..o{ trusted_households : "logical_validated_by_user_id"
+    users ||..o{ web_push_subscriptions : "logical_user_id"
+    weather_logs o|..o{ disaster_broadcasts : "logical_weather_log_id"
+    web_push_subscriptions ||..o{ web_push_deliveries : "logical_subscription_id"

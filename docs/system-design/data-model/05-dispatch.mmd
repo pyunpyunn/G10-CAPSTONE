@@ -1,0 +1,42 @@
+flowchart LR
+    %% Grouping is module relevance, not database/table ownership.
+    %% Arrows point from referenced identity to dependent records.
+    subgraph identity["Accounts and access"]
+        tusers["users"]
+    end
+    subgraph household["Shared household and geography foundation"]
+        thouseholds["households"]
+        tpuroks["puroks"]
+    end
+    subgraph disaster["Events, alerts and safety state"]
+        tdisaster_events["disaster_events"]
+        taffected_areas["affected_areas"]
+        thousehold_status_logs["household_status_logs"]
+    end
+    subgraph dispatch["Teams, priority and dispatch"]
+        tresponders["responders"]
+        trescue_teams["rescue_teams"]
+        trescue_priority_settings["rescue_priority_settings"]
+        tresponder_assignments["responder_assignments"]
+        tdispatch_statuses["dispatch_statuses"]
+    end
+    tusers -.->|"confirmed_by_admin_id"| taffected_areas
+    tdisaster_events -.->|"disaster_id"| taffected_areas
+    tpuroks -.->|"purok_id"| taffected_areas
+    tdisaster_events -.->|"disaster_id"| thousehold_status_logs
+    thouseholds -.->|"household_id"| thousehold_status_logs
+    tresponders -.->|"responder_id"| thousehold_status_logs
+    tusers -.->|"reviewed_by_user_id"| thousehold_status_logs
+    tusers -.->|"submitted_by_user_id"| thousehold_status_logs
+    tusers -.->|"updated_by_user_id"| trescue_priority_settings
+    tpuroks -.->|"assigned_purok_id"| trescue_teams
+    tresponders -.->|"leader_responder_id"| trescue_teams
+    taffected_areas -.->|"affected_area_id"| tresponder_assignments
+    tdisaster_events -.->|"disaster_id"| tresponder_assignments
+    thouseholds -.->|"household_id"| tresponder_assignments
+    tresponders -.->|"responder_id"| tresponder_assignments
+    thousehold_status_logs -.->|"status_log_id"| tresponder_assignments
+    trescue_teams -.->|"team_id"| tresponder_assignments
+    trescue_teams -.->|"team_id"| tresponders
+    tusers -.->|"user_id"| tresponders
+    thouseholds -.->|"household_id"| tusers

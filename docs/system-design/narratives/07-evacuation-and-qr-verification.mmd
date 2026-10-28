@@ -1,0 +1,16 @@
+sequenceDiagram
+    autonumber
+    actor HH as Household resident
+    actor Staff as Authorized HQ/rescuer evacuation verifier
+    participant App as Resident app
+    participant UI as Staff scanner/entry interface - required gap
+    participant API as Existing verification/check-in API
+    participant DB as Household, evacuation and member status records
+    HH->>App: Display or save household QR
+    App-->>HH: Generated household identification payload
+    Staff->>UI: Scan or enter payload at evacuation arrival
+    Note over Staff,UI: Complete dedicated staff interface was not established by audit
+    UI->>API: Submit verification with authorized account and center
+    API->>DB: Validate household/center and record accepted arrival
+    API-->>UI: Confirmation or validation failure
+    Note over API,DB: Diagram shows required end-to-end scope, not completed staff UI

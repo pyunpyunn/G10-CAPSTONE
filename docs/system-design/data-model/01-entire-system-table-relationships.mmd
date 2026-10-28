@@ -1,0 +1,252 @@
+flowchart LR
+    %% Grouping is module relevance, not database/table ownership.
+    %% Arrows point from referenced identity to dependent records.
+    subgraph identity["Accounts and access"]
+        tusers["users"]
+        troles["roles"]
+        tpersonal_access_tokens["personal_access_tokens"]
+        thousehold_login_accounts["household_login_accounts"]
+        thousehold_device_owners["household_device_owners"]
+        thousehold_password_recovery_otps["household_password_recovery_otps"]
+    end
+    subgraph household["Shared household and geography foundation"]
+        thouseholds["households"]
+        thousehold_members["household_members"]
+        thousehold_member_id_mappings["household_member_id_mappings"]
+        taddresses["addresses"]
+        tbarangays["barangays"]
+        tcities["cities"]
+        tprovinces["provinces"]
+        tsitios["sitios"]
+        tpuroks["puroks"]
+        tgenders["genders"]
+        trelationships["relationships"]
+        tmember_vulnerable_groups["member_vulnerable_groups"]
+        tgeotagged_locations["geotagged_locations"]
+        ttrusted_households["trusted_households"]
+        thousehold_trusted_pins["household_trusted_pins"]
+        tbarangay_boundaries["barangay_boundaries"]
+        tmapping_hazard_layers["mapping_hazard_layers"]
+    end
+    subgraph disaster["Events, alerts and safety state"]
+        tdisaster_types["disaster_types"]
+        tdisaster_events["disaster_events"]
+        tdisaster_event_types["disaster_event_types"]
+        tseverity_levels["severity_levels"]
+        taffected_areas["affected_areas"]
+        tdisaster_broadcasts["disaster_broadcasts"]
+        tweather_logs["weather_logs"]
+        thousehold_disasters["household_disasters"]
+        thousehold_statuses["household_statuses"]
+        thousehold_status_logs["household_status_logs"]
+        tmember_statuses["member_statuses"]
+        tmember_disaster_statuses["member_disaster_statuses"]
+        tmember_status_logs["member_status_logs"]
+        tstatus_reminders["status_reminders"]
+    end
+    subgraph dispatch["Teams, priority and dispatch"]
+        tresponders["responders"]
+        trescue_teams["rescue_teams"]
+        trescue_priority_settings["rescue_priority_settings"]
+        tresponder_assignments["responder_assignments"]
+        tdispatch_statuses["dispatch_statuses"]
+    end
+    subgraph field["Field outcomes and communication"]
+        tresponder_check_ins["responder_check_ins"]
+        tresponder_field_reports["responder_field_reports"]
+        tresponder_field_report_members["responder_field_report_members"]
+        tresponder_communication_logs["responder_communication_logs"]
+        tresponder_location_logs["responder_location_logs"]
+        tproperty_damage_levels["property_damage_levels"]
+    end
+    subgraph navigation["Routes, navigation and synchronization"]
+        tdevices["devices"]
+        tteam_bases["team_bases"]
+        toffline_packs["offline_packs"]
+        tcached_routes["cached_routes"]
+        tdispatch_trips["dispatch_trips"]
+        ttrip_points["trip_points"]
+        tsync_events["sync_events"]
+        tresponder_routes["responder_routes"]
+        troute_coordinates["route_coordinates"]
+    end
+    subgraph resources["Request validation and fulfillment tracking"]
+        tresource_requests["resource_requests"]
+        tresource_request_status["resource_request_status"]
+        trequest_validations["request_validations"]
+    end
+    subgraph documentation["Evacuation evidence, reports and archives"]
+        tevacuation_centers["evacuation_centers"]
+        tevacuation_records["evacuation_records"]
+        tsituation_reports["situation_reports"]
+        tincident_archives["incident_archives"]
+    end
+    subgraph platform["Notification, audit and delivery support"]
+        tdevice_tokens["device_tokens"]
+        tdevice_tracking_logs["device_tracking_logs"]
+        tnotifications["notifications"]
+        tweb_push_subscriptions["web_push_subscriptions"]
+        tweb_push_deliveries["web_push_deliveries"]
+        tofficial_advisory_notifications["official_advisory_notifications"]
+        taudit_logs["audit_logs"]
+        trealtime_outbox["realtime_outbox"]
+        treport_idempotency["report_idempotency"]
+        toperational_sequences["operational_sequences"]
+        tlanding_inquiries["landing_inquiries"]
+    end
+    tbarangays -.->|"barangay_id"| taddresses
+    tpuroks -.->|"purok_id"| taddresses
+    tsitios -.->|"sitio_id"| taddresses
+    tbarangays -.->|"barangay_id"| taffected_areas
+    tusers -.->|"confirmed_by_admin_id"| taffected_areas
+    tdisaster_events -.->|"disaster_id"| taffected_areas
+    tpuroks -.->|"purok_id"| taffected_areas
+    tseverity_levels -.->|"severity_id"| taffected_areas
+    tsitios -.->|"sitio_id"| taffected_areas
+    tusers -.->|"user_id"| taudit_logs
+    tbarangays -.->|"barangay_id"| tbarangay_boundaries
+    tcities -.->|"city_id"| tbarangays
+    tevacuation_centers -->|"evac_center_id"| tcached_routes
+    thouseholds -->|"household_id"| tcached_routes
+    trescue_teams -->|"team_id"| tcached_routes
+    tprovinces -.->|"province_id"| tcities
+    thouseholds -.->|"household_id"| tdevice_tokens
+    thousehold_members -.->|"member_id"| tdevice_tokens
+    tdevice_tokens -.->|"device_token_id"| tdevice_tracking_logs
+    thouseholds -.->|"household_id"| tdevice_tracking_logs
+    thousehold_members -.->|"member_id"| tdevice_tracking_logs
+    trescue_teams -->|"team_id"| tdevices
+    tusers -->|"user_id"| tdevices
+    tdisaster_events -.->|"disaster_id"| tdisaster_broadcasts
+    tusers -.->|"sent_by_admin_id"| tdisaster_broadcasts
+    tseverity_levels -.->|"severity_id"| tdisaster_broadcasts
+    tweather_logs -.->|"weather_log_id"| tdisaster_broadcasts
+    tdisaster_events -.->|"event_id"| tdisaster_event_types
+    tdisaster_types -.->|"type_id"| tdisaster_event_types
+    tseverity_levels -.->|"severity_level_id"| tdisaster_events
+    tdisaster_types -.->|"type_id"| tdisaster_events
+    tdevices -->|"device_id"| tdispatch_trips
+    tresponder_assignments -->|"dispatch_id"| tdispatch_trips
+    trescue_teams -->|"team_id"| tdispatch_trips
+    tdisaster_events -.->|"current_event_id"| tevacuation_centers
+    tevacuation_centers -.->|"center_id"| tevacuation_records
+    tdisaster_events -.->|"event_id"| tevacuation_records
+    thouseholds -.->|"household_id"| tevacuation_records
+    thousehold_statuses -.->|"household_status_id"| tevacuation_records
+    thouseholds -.->|"household_id"| tgeotagged_locations
+    tusers -.->|"verified_by_user_id"| tgeotagged_locations
+    thouseholds -.->|"household_id"| thousehold_device_owners
+    thousehold_members -.->|"member_id"| thousehold_device_owners
+    tpersonal_access_tokens -.->|"selection_token_id"| thousehold_device_owners
+    thousehold_statuses -->|"current_status_id"| thousehold_disasters
+    tdisaster_events -->|"disaster_id"| thousehold_disasters
+    thouseholds -->|"household_id"| thousehold_disasters
+    thousehold_statuses -->|"initial_status_id"| thousehold_disasters
+    thouseholds -.->|"household_id"| thousehold_login_accounts
+    tusers -.->|"user_id"| thousehold_login_accounts
+    thousehold_members -.->|"member_id"| thousehold_member_id_mappings
+    tgenders -.->|"gender_id"| thousehold_members
+    thouseholds -.->|"household_id"| thousehold_members
+    trelationships -.->|"relationship_id"| thousehold_members
+    thouseholds -.->|"household_id"| thousehold_password_recovery_otps
+    tdevice_tokens -.->|"device_token_id"| thousehold_status_logs
+    tdisaster_events -.->|"disaster_id"| thousehold_status_logs
+    thouseholds -.->|"household_id"| thousehold_status_logs
+    tresponders -.->|"responder_id"| thousehold_status_logs
+    tusers -.->|"reviewed_by_user_id"| thousehold_status_logs
+    thousehold_statuses -->|"status_id"| thousehold_status_logs
+    tusers -.->|"submitted_by_user_id"| thousehold_status_logs
+    thouseholds -.->|"household_id"| thousehold_trusted_pins
+    taddresses -.->|"address_id"| thouseholds
+    tusers -.->|"archived_by_admin_id"| tincident_archives
+    tdisaster_events -.->|"disaster_id"| tincident_archives
+    tusers -.->|"handled_by_user_id"| tlanding_inquiries
+    tbarangays -.->|"barangay_id"| tmapping_hazard_layers
+    tdevice_tokens -.->|"device_token_id"| tmember_disaster_statuses
+    tdisaster_events -->|"disaster_id"| tmember_disaster_statuses
+    tevacuation_centers -.->|"evacuation_center_id"| tmember_disaster_statuses
+    thouseholds -->|"household_id"| tmember_disaster_statuses
+    thousehold_members -->|"member_id"| tmember_disaster_statuses
+    tmember_statuses -->|"previous_status_id"| tmember_disaster_statuses
+    thousehold_members -.->|"reported_by_member_id"| tmember_disaster_statuses
+    tusers -.->|"reported_by_user_id"| tmember_disaster_statuses
+    tresponders -.->|"responder_id"| tmember_disaster_statuses
+    tmember_statuses -->|"status_id"| tmember_disaster_statuses
+    tusers -.->|"verified_by_user_id"| tmember_disaster_statuses
+    tdevice_tokens -.->|"device_token_id"| tmember_status_logs
+    tdisaster_events -.->|"disaster_id"| tmember_status_logs
+    tmember_statuses -.->|"from_status_id"| tmember_status_logs
+    thouseholds -.->|"household_id"| tmember_status_logs
+    thousehold_members -.->|"member_id"| tmember_status_logs
+    thousehold_members -.->|"reported_by_member_id"| tmember_status_logs
+    tusers -.->|"reported_by_user_id"| tmember_status_logs
+    tresponders -.->|"responder_id"| tmember_status_logs
+    tmember_statuses -.->|"to_status_id"| tmember_status_logs
+    thousehold_members -.->|"member_id"| tmember_vulnerable_groups
+    tusers -.->|"sent_by"| tnotifications
+    tusers -.->|"tokenable_id"| tpersonal_access_tokens
+    tsitios -.->|"sitio_id"| tpuroks
+    tresource_requests -.->|"duplicate_request_id"| trequest_validations
+    tresource_requests -.->|"request_id"| trequest_validations
+    tusers -.->|"validator_user_id"| trequest_validations
+    tusers -.->|"updated_by_user_id"| trescue_priority_settings
+    tpuroks -.->|"assigned_purok_id"| trescue_teams
+    tresponders -.->|"leader_responder_id"| trescue_teams
+    tevacuation_centers -.->|"evacuation_center_id"| tresource_requests
+    tusers -.->|"handled_by"| tresource_requests
+    tresource_request_status -.->|"status_id"| tresource_requests
+    tusers -.->|"validated_by_user_id"| tresource_requests
+    taffected_areas -.->|"affected_area_id"| tresponder_assignments
+    tdisaster_events -.->|"disaster_id"| tresponder_assignments
+    thouseholds -.->|"household_id"| tresponder_assignments
+    tresponders -.->|"responder_id"| tresponder_assignments
+    thousehold_status_logs -.->|"status_log_id"| tresponder_assignments
+    trescue_teams -.->|"team_id"| tresponder_assignments
+    tdisaster_events -.->|"disaster_id"| tresponder_check_ins
+    thouseholds -.->|"household_id"| tresponder_check_ins
+    thousehold_members -.->|"member_id"| tresponder_check_ins
+    tresponders -.->|"responder_id"| tresponder_check_ins
+    trescue_teams -.->|"team_id"| tresponder_check_ins
+    tdisaster_events -.->|"disaster_id"| tresponder_communication_logs
+    tresponders -.->|"responder_id"| tresponder_communication_logs
+    trescue_teams -.->|"team_id"| tresponder_communication_logs
+    tdisaster_events -.->|"disaster_id"| tresponder_field_report_members
+    thouseholds -.->|"household_id"| tresponder_field_report_members
+    thousehold_members -.->|"member_id"| tresponder_field_report_members
+    tresponder_field_reports -.->|"report_id"| tresponder_field_report_members
+    tmember_statuses -.->|"status_id"| tresponder_field_report_members
+    tresponder_assignments -.->|"assignment_id"| tresponder_field_reports
+    tdisaster_events -.->|"disaster_id"| tresponder_field_reports
+    thouseholds -.->|"household_id"| tresponder_field_reports
+    tresponders -.->|"responder_id"| tresponder_field_reports
+    thousehold_status_logs -.->|"status_log_id"| tresponder_field_reports
+    tusers -.->|"submitted_by_user_id"| tresponder_field_reports
+    tresponders -.->|"responder_id"| tresponder_location_logs
+    tresponder_assignments -.->|"assignment_id"| tresponder_routes
+    thouseholds -.->|"household_id"| tresponder_routes
+    tresponders -.->|"responder_id"| tresponder_routes
+    trescue_teams -.->|"team_id"| tresponders
+    tusers -.->|"user_id"| tresponders
+    tresponder_routes -.->|"route_id"| troute_coordinates
+    tbarangays -.->|"barangay_id"| tsitios
+    tusers -.->|"created_by_admin_id"| tsituation_reports
+    tdisaster_events -.->|"disaster_id"| tsituation_reports
+    thouseholds -.->|"household_id"| tsituation_reports
+    tusers -.->|"reviewed_by_user_id"| tsituation_reports
+    tdisaster_events -.->|"event_id"| tstatus_reminders
+    thouseholds -.->|"household_id"| tstatus_reminders
+    thousehold_members -.->|"member_id"| tstatus_reminders
+    tdevices -->|"device_id"| tsync_events
+    trescue_teams -->|"team_id"| tteam_bases
+    tdispatch_trips -->|"trip_id"| ttrip_points
+    tusers -.->|"created_by_user_id"| ttrusted_households
+    thouseholds -.->|"requesting_household_id"| ttrusted_households
+    thouseholds -.->|"trusted_household_id"| ttrusted_households
+    tusers -.->|"validated_by_user_id"| ttrusted_households
+    thouseholds -.->|"household_id"| tusers
+    thousehold_members -.->|"member_id"| tusers
+    troles -.->|"role_id"| tusers
+    tdisaster_events -.->|"disaster_id"| tweather_logs
+    tweb_push_subscriptions -.->|"subscription_id"| tweb_push_deliveries
+    tpersonal_access_tokens -.->|"token_id"| tweb_push_subscriptions
+    tusers -.->|"user_id"| tweb_push_subscriptions

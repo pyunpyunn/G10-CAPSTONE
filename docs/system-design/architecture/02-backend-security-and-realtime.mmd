@@ -1,0 +1,16 @@
+flowchart LR
+    clients["Authorized web/mobile requests"] --> routes["Laravel routes, throttling and validation"]
+    routes --> auth["Sanctum session/token and active account"]
+    auth --> access["Role/module policy; household owner and device scope"]
+    access --> modules["Controllers, queries, services and transactional workflows"]
+    modules --> db[("Scoped operational and shared master tables")]
+    modules --> audit[("audit_logs and business history")]
+    modules --> outbox[("realtime_outbox")]
+    outbox --> relay["Configured relay to Reverb"]
+    relay --> echo["HQ Echo subscribers"]
+    echo --> reread["Refresh only affected authorized data"]
+    reread --> routes
+    fallback["Visibility-aware polling if realtime is unavailable"] --> routes
+    scheduler["Scheduler: alerts, weather, reminders and rescue criteria"] --> modules
+    modules --> execution["Jobs: synchronous locally; worker required for asynchronous drivers"]
+    execution --> push["OneSignal and browser push delivery"]

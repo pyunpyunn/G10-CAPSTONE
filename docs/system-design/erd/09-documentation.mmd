@@ -1,0 +1,140 @@
+erDiagram
+    direction LR
+    %% Solid relationships = inspected database foreign keys.
+    %% Dotted relationships = application/model references, not enforced foreign keys.
+    %% PK/UK markings come only from the inspected schema, not model assumptions.
+    disaster_events {
+        varchar event_id PK "application reference"
+        varchar name "nullable"
+        int type_id "application reference"
+        int severity_level_id "nullable; application reference"
+        datetime started_at "nullable"
+        datetime ended_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+    }
+    evacuation_centers {
+        varchar evacuation_center_id PK "application reference"
+        varchar current_event_id "nullable; application reference"
+        varchar name "nullable"
+        varchar center_type "nullable"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        int capacity "nullable"
+        varchar status
+        int current_occupancy "nullable"
+        varchar contact_person "nullable"
+        varchar contact_number "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar osm_address "nullable"
+        text notes "nullable"
+        datetime updated_at "nullable"
+    }
+    evacuation_records {
+        int evacuation_id PK
+        varchar event_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        varchar center_id "nullable; application reference"
+        int household_status_id "nullable; application reference"
+        int evacuated_count "nullable"
+        enum method "nullable"
+        varchar verified_by "nullable"
+        datetime verified_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    household_statuses {
+        int status_id PK "application reference"
+        varchar status_key UK "nullable"
+        varchar status_label "nullable"
+        tinyint severity_rank
+        tinyint requires_rescue
+        varchar color_hex "nullable"
+        smallint sort_order
+        tinyint is_active
+        varchar safety_basis "nullable"
+    }
+    households {
+        varchar household_id PK "application reference"
+        varchar household_code "nullable"
+        varchar household_number "nullable"
+        varchar household_name "nullable"
+        varchar email "nullable"
+        int member_count
+        varchar created_by "nullable"
+        int address_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar emergency_contact "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+    }
+    incident_archives {
+        int archive_id
+        varchar archive_type "nullable"
+        varchar disaster_id "nullable; application reference"
+        varchar reference_table "nullable"
+        varchar reference_id "nullable"
+        varchar archived_by_admin_id "nullable; application reference"
+        text archive_note "nullable"
+        datetime archived_at
+        datetime created_at "nullable"
+    }
+    situation_reports {
+        int sit_rep_id "application identity; not database PK"
+        varchar report_number "nullable"
+        varchar disaster_id "nullable; application reference"
+        varchar created_by_admin_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        text summary "nullable"
+        varchar report_status
+        varchar reviewed_by_user_id "nullable; application reference"
+        datetime reviewed_at "nullable"
+        varchar escalated_to "nullable"
+        tinyint is_archived "nullable"
+        datetime generated_at
+        datetime archived_at "nullable"
+        datetime updated_at "nullable"
+    }
+    users {
+        varchar user_id PK "application reference"
+        varchar first_name "nullable"
+        varchar last_name "nullable"
+        varchar name "nullable"
+        varchar username "nullable"
+        varchar email "nullable"
+        timestamp email_verified_at "nullable"
+        varchar password "nullable"
+        int role_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar assigned_center_id "nullable"
+        varchar household_id "nullable; application reference"
+        varchar member_id UK "nullable; application reference"
+        tinyint is_active "nullable"
+        tinyint must_change_password
+        varchar temp_password "nullable"
+        varchar remember_token "nullable"
+        timestamp updated_at "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar profile_photo "nullable"
+        varchar security_question_1 "nullable"
+        varchar security_answer_1 "nullable"
+        varchar security_question_2 "nullable"
+        varchar security_answer_2 "nullable"
+        timestamp password_changed_at "nullable"
+    }
+    disaster_events o|..o{ evacuation_centers : "logical_current_event_id"
+    disaster_events o|..o{ evacuation_records : "logical_event_id"
+    disaster_events o|..o{ incident_archives : "logical_disaster_id"
+    disaster_events o|..o{ situation_reports : "logical_disaster_id"
+    evacuation_centers o|..o{ evacuation_records : "logical_center_id"
+    household_statuses o|..o{ evacuation_records : "logical_household_status_id"
+    households o|..o{ evacuation_records : "logical_household_id"
+    households o|..o{ situation_reports : "logical_household_id"
+    households o|..o{ users : "logical_household_id"
+    users o|..o{ incident_archives : "logical_archived_by_admin_id"
+    users o|..o{ situation_reports : "logical_created_by_admin_id"
+    users o|..o{ situation_reports : "logical_reviewed_by_user_id"

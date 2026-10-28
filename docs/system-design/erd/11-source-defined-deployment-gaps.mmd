@@ -1,0 +1,92 @@
+erDiagram
+    direction LR
+    %% SOURCE-DEFINED ONLY: these tables are absent from the inspected default connection.
+    external_report_requests["external_report_requests - source only"] {
+        uuid id PK
+        string source_system
+        string reference
+        string event_id
+        json sections
+        string format
+        text purpose
+        string status
+        text decision_note
+        string decided_by
+        timestamp decided_at
+        json approved_summary
+        json file
+        timestamp created_at
+        timestamp updated_at
+    }
+    household_geographic_classifications["household_geographic_classifications - source only"] {
+        string household_id PK
+        string status
+        decimal latitude
+        decimal longitude
+        unsignedBigInteger sitio_id
+        unsignedBigInteger purok_id
+        timestamp created_at
+        timestamp updated_at
+    }
+    household_mobile_notifications["household_mobile_notifications - source only"] {
+        bigIncrements notification_id
+        string household_id
+        string type
+        string title
+        text message
+        string connection_id
+        timestamp read_at
+        timestamp created_at
+        timestamp updated_at
+    }
+    purok_boundaries["purok_boundaries - source only"] {
+        unsignedBigInteger purok_id PK
+        longText geometry_json
+        text source
+        timestamp created_at
+        timestamp updated_at
+    }
+    rescue_criteria_contact_baselines["rescue_criteria_contact_baselines - source only"] {
+        string event_id
+        string household_id
+        boolean no_contact
+        timestamp captured_at
+    }
+    rescue_criteria_line_snapshots["rescue_criteria_line_snapshots - source only"] {
+        id id PK
+        string event_id
+        unsignedInteger bucket_hour
+        timestamp observed_at
+        timestamp created_at
+        timestamp updated_at
+    }
+    rescue_criteria_snapshots["rescue_criteria_snapshots - source only"] {
+        id id PK
+        string event_id
+        timestamp observed_at
+        decimal impact
+        decimal special_needs
+        decimal unreported
+        decimal no_contact
+        unsignedInteger purok_count
+    }
+    situation_report_submissions["situation_report_submissions - source only"] {
+        id id PK
+        unsignedBigInteger sit_rep_id
+        timestamp submitted_at
+        string delivered_by
+        string received_by
+        string recorded_by
+        timestamp created_at
+        timestamp updated_at
+    }
+    disaster_events o|..o{ external_report_requests : "source_reference_event_id"
+    households o|..o{ household_mobile_notifications : "source_reference_household_id"
+    puroks o|..o{ purok_boundaries : "source_reference_purok_id"
+    households o|..o{ household_geographic_classifications : "source_reference_household_id"
+    sitios o|..o{ household_geographic_classifications : "source_reference_sitio_id"
+    puroks o|..o{ household_geographic_classifications : "source_reference_purok_id"
+    disaster_events o|..o{ rescue_criteria_snapshots : "source_reference_event_id"
+    disaster_events o|..o{ rescue_criteria_line_snapshots : "source_reference_event_id"
+    disaster_events o|..o{ rescue_criteria_contact_baselines : "source_reference_event_id"
+    situation_reports o|..o{ situation_report_submissions : "source_reference_sit_rep_id"

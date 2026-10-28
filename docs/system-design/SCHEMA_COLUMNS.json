@@ -1,0 +1,5948 @@
+{
+  "addresses": [
+    {
+      "table_name": "addresses",
+      "name": "address_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "addresses",
+      "name": "street_address",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "street",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "barangay_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "barangay_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "sitio_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "addresses",
+      "name": "purok_sitio",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "house_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "purok_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "addresses",
+      "name": "zipcode_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "zip_code",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "full_address",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "deleted_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "is_apartment",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "building_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "floor_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "unit_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "room_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "addresses",
+      "name": "landmark",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "affected_areas": [
+    {
+      "table_name": "affected_areas",
+      "name": "affected_area_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "affected_areas",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "affected_areas",
+      "name": "confirmed_by_admin_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "affected_areas",
+      "name": "severity_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "affected_areas",
+      "name": "purok_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "affected_areas",
+      "name": "sitio_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "affected_areas",
+      "name": "barangay_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "affected_areas",
+      "name": "confirmed_by_hq",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "affected_areas",
+      "name": "confirmed_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "audit_logs": [
+    {
+      "table_name": "audit_logs",
+      "name": "audit_log_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "role_key",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "module",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "action",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "reference_table",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "reference_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "old_values",
+      "type": "json",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "new_values",
+      "type": "json",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "ip_address",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "user_agent",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "audit_logs",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "barangay_boundaries": [
+    {
+      "table_name": "barangay_boundaries",
+      "name": "psgc_code",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "barangay_boundaries",
+      "name": "barangay_id",
+      "type": "bigint",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "barangay_boundaries",
+      "name": "barangay_code",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "barangay_boundaries",
+      "name": "barangay_name",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "barangay_boundaries",
+      "name": "city_name",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "barangay_boundaries",
+      "name": "geometry_json",
+      "type": "longtext",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "barangay_boundaries",
+      "name": "source_url",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "barangay_boundaries",
+      "name": "source_note",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "barangay_boundaries",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "barangay_boundaries",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "barangays": [
+    {
+      "table_name": "barangays",
+      "name": "barangay_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "barangays",
+      "name": "barangay_code",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "barangays",
+      "name": "barangay_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "barangays",
+      "name": "city_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "cached_routes": [
+    {
+      "table_name": "cached_routes",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "team_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "evac_center_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "target_key",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "profile",
+      "type": "enum",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "polyline6",
+      "type": "longtext",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "steps",
+      "type": "json",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "distance_m",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "duration_s",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "status",
+      "type": "enum",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "failure_reason",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "computed_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "cached_routes",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "cities": [
+    {
+      "table_name": "cities",
+      "name": "city_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "cities",
+      "name": "city_code",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "cities",
+      "name": "city_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "cities",
+      "name": "province_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "device_tokens": [
+    {
+      "table_name": "device_tokens",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "device_uuid",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "device_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "platform",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "app_role",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "push_provider",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "player_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "expo_push_token",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "battery_level",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "signal_strength",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "location_permission_status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "notification_permission_status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "last_latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "last_longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "last_location_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "last_location_accuracy_m",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "last_location_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "last_seen_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "is_active",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "logged_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tokens",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "device_tracking_logs": [
+    {
+      "table_name": "device_tracking_logs",
+      "name": "tracking_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "device_token_id",
+      "type": "bigint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "location_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "accuracy_m",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "location_source",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "is_allowed_location",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "battery_level",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "signal_strength",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "device_tracking_logs",
+      "name": "logged_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "devices": [
+    {
+      "table_name": "devices",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "devices",
+      "name": "user_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "devices",
+      "name": "team_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "devices",
+      "name": "device_uuid",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "UNI"
+    },
+    {
+      "table_name": "devices",
+      "name": "last_sync_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "devices",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "devices",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "disaster_broadcasts": [
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "broadcast_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "broadcast_title",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "sent_by_admin_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "severity_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "scope_type",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "target_purok_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "target_area_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "message",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "allowed_statuses",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "channel",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "notification_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "weather_log_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "sent_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "target_area_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "direct_impact_puroks_json",
+      "type": "json",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "allowed_statuses_json",
+      "type": "json",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "recipient_count",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "push_status",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "sms_status",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_broadcasts",
+      "name": "status_options_json",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "disaster_event_types": [
+    {
+      "table_name": "disaster_event_types",
+      "name": "event_type_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "disaster_event_types",
+      "name": "event_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_event_types",
+      "name": "type_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "disaster_events": [
+    {
+      "table_name": "disaster_events",
+      "name": "event_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "disaster_events",
+      "name": "name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_events",
+      "name": "type_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_events",
+      "name": "severity_level_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_events",
+      "name": "started_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_events",
+      "name": "ended_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_events",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_events",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_events",
+      "name": "deleted_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": "MUL"
+    }
+  ],
+  "disaster_types": [
+    {
+      "table_name": "disaster_types",
+      "name": "type_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "disaster_types",
+      "name": "type_code",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_types",
+      "name": "type_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_types",
+      "name": "is_active",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_types",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_types",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "disaster_types",
+      "name": "deleted_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "dispatch_statuses": [
+    {
+      "table_name": "dispatch_statuses",
+      "name": "status_key",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "dispatch_statuses",
+      "name": "label",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_statuses",
+      "name": "is_open",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_statuses",
+      "name": "allow_create",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_statuses",
+      "name": "allow_mobile",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_statuses",
+      "name": "dashboard_group",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_statuses",
+      "name": "is_alias",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_statuses",
+      "name": "is_active",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_statuses",
+      "name": "sort_order",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_statuses",
+      "name": "status_code",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "UNI"
+    }
+  ],
+  "dispatch_trips": [
+    {
+      "table_name": "dispatch_trips",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "dispatch_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "team_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "device_id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "profile",
+      "type": "enum",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "started_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "ended_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "distance_m",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "planned_distance_m",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "moving_s",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "stopped_s",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "avg_speed_ms",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "status",
+      "type": "enum",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "dispatch_trips",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "evacuation_centers": [
+    {
+      "table_name": "evacuation_centers",
+      "name": "evacuation_center_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "current_event_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "center_type",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "capacity",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "current_occupancy",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "contact_person",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "contact_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "deleted_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "osm_address",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_centers",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "evacuation_records": [
+    {
+      "table_name": "evacuation_records",
+      "name": "evacuation_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "evacuation_records",
+      "name": "event_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_records",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_records",
+      "name": "center_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "evacuation_records",
+      "name": "household_status_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_records",
+      "name": "evacuated_count",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_records",
+      "name": "method",
+      "type": "enum",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_records",
+      "name": "verified_by",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_records",
+      "name": "verified_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_records",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "evacuation_records",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "genders": [
+    {
+      "table_name": "genders",
+      "name": "gender_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "genders",
+      "name": "gender_key",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "UNI"
+    },
+    {
+      "table_name": "genders",
+      "name": "gender_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "geotagged_locations": [
+    {
+      "table_name": "geotagged_locations",
+      "name": "location_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "location_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "accuracy_m",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "geotag_source",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "is_verified",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "verified_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "verified_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "geotagged_locations",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "household_device_owners": [
+    {
+      "table_name": "household_device_owners",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "household_device_owners",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_device_owners",
+      "name": "device_uuid",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_device_owners",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_device_owners",
+      "name": "selection_token_id",
+      "type": "bigint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_device_owners",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_device_owners",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "household_disasters": [
+    {
+      "table_name": "household_disasters",
+      "name": "household_disaster_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "initial_status_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "current_status_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "last_status_source",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "last_status_notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "last_reported_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "last_responder_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "last_device_token_id",
+      "type": "bigint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "last_latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "last_longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "last_battery_level",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "last_reported_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "priority_level",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "needs_dispatch",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_disasters",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "household_login_accounts": [
+    {
+      "table_name": "household_login_accounts",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "household_login_accounts",
+      "name": "user_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "UNI"
+    },
+    {
+      "table_name": "household_login_accounts",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_login_accounts",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "household_member_id_mappings": [
+    {
+      "table_name": "household_member_id_mappings",
+      "name": "old_member_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "household_member_id_mappings",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "UNI"
+    }
+  ],
+  "household_members": [
+    {
+      "table_name": "household_members",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "household_members",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_members",
+      "name": "first_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "middle_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "last_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "birth_date",
+      "type": "date",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "gender_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "relationship_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_members",
+      "name": "is_household_head",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "can_report_for_household",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "contact_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "civil_status_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "occupation",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "education_level_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "is_graduate",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "deleted_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "is_pwd",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "is_senior",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "is_pregnant",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "sex",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "gender",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "relation",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "civil_status",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "religion",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "education_level",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_members",
+      "name": "special_needs",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "household_password_recovery_otps": [
+    {
+      "table_name": "household_password_recovery_otps",
+      "name": "user_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "household_password_recovery_otps",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_password_recovery_otps",
+      "name": "code_hash",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_password_recovery_otps",
+      "name": "failed_attempts",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_password_recovery_otps",
+      "name": "expires_at",
+      "type": "timestamp",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_password_recovery_otps",
+      "name": "sent_at",
+      "type": "timestamp",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_password_recovery_otps",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_password_recovery_otps",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "household_status_logs": [
+    {
+      "table_name": "household_status_logs",
+      "name": "status_log_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "status_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "source",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "submitted_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "responder_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "device_token_id",
+      "type": "bigint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "location_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "location_accuracy_m",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "battery_level",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "signal_strength",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "submitted_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "reviewed_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "reviewed_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_status_logs",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "household_statuses": [
+    {
+      "table_name": "household_statuses",
+      "name": "status_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "household_statuses",
+      "name": "status_key",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "UNI"
+    },
+    {
+      "table_name": "household_statuses",
+      "name": "status_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_statuses",
+      "name": "severity_rank",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_statuses",
+      "name": "requires_rescue",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_statuses",
+      "name": "color_hex",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_statuses",
+      "name": "sort_order",
+      "type": "smallint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_statuses",
+      "name": "is_active",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_statuses",
+      "name": "safety_basis",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "household_trusted_pins": [
+    {
+      "table_name": "household_trusted_pins",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "household_trusted_pins",
+      "name": "pin_hash",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_trusted_pins",
+      "name": "updated_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_trusted_pins",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "household_trusted_pins",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "households": [
+    {
+      "table_name": "households",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "households",
+      "name": "household_code",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "households",
+      "name": "household_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "households",
+      "name": "household_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "households",
+      "name": "email",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "households",
+      "name": "member_count",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "households",
+      "name": "created_by",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "households",
+      "name": "address_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "households",
+      "name": "contact_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "households",
+      "name": "emergency_contact",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "households",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "households",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "households",
+      "name": "deleted_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "incident_archives": [
+    {
+      "table_name": "incident_archives",
+      "name": "archive_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "incident_archives",
+      "name": "archive_type",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "incident_archives",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "incident_archives",
+      "name": "reference_table",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "incident_archives",
+      "name": "reference_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "incident_archives",
+      "name": "archived_by_admin_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "incident_archives",
+      "name": "archive_note",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "incident_archives",
+      "name": "archived_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "incident_archives",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "landing_inquiries": [
+    {
+      "table_name": "landing_inquiries",
+      "name": "inquiry_id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "name",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "organization",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "email",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "message",
+      "type": "text",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "source_page",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "ip_address",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "user_agent",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "responded_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "handled_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "landing_inquiries",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "mapping_hazard_layers": [
+    {
+      "table_name": "mapping_hazard_layers",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "mapping_hazard_layers",
+      "name": "barangay_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "mapping_hazard_layers",
+      "name": "name",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "mapping_hazard_layers",
+      "name": "source",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "mapping_hazard_layers",
+      "name": "source_url",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "mapping_hazard_layers",
+      "name": "assessed_at",
+      "type": "date",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "mapping_hazard_layers",
+      "name": "geojson",
+      "type": "json",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "mapping_hazard_layers",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "mapping_hazard_layers",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "member_disaster_statuses": [
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "member_status_id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "status_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "previous_status_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "report_source",
+      "type": "enum",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "reported_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "reported_by_member_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "responder_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "device_token_id",
+      "type": "bigint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "location_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "location_accuracy_m",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "battery_level",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "signal_strength",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "evacuation_center_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "needs_rescue",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "severity_rank",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "priority_level",
+      "type": "enum",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "is_verified",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "verified_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "verified_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "reported_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_disaster_statuses",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "member_status_logs": [
+    {
+      "table_name": "member_status_logs",
+      "name": "member_status_log_id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "from_status_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "to_status_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "report_source",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "reported_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "reported_by_member_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "responder_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "device_token_id",
+      "type": "bigint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "location_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "location_accuracy_m",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "battery_level",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "signal_strength",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "reported_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_status_logs",
+      "name": "logged_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "member_statuses": [
+    {
+      "table_name": "member_statuses",
+      "name": "status_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "status_key",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "UNI"
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "status_label",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "description",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "severity_rank",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "requires_rescue",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "is_terminal",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "color_hex",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "sort_order",
+      "type": "smallint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "is_active",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "counts_as_death",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "member_statuses",
+      "name": "counts_as_injury",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "member_vulnerable_groups": [
+    {
+      "table_name": "member_vulnerable_groups",
+      "name": "id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "member_vulnerable_groups",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "member_vulnerable_groups",
+      "name": "vulnerable_group_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "notifications": [
+    {
+      "table_name": "notifications",
+      "name": "notif_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "notifications",
+      "name": "message",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "sent_by",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "evacuation_event_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "evacuation_center_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "scheduled_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "is_recurring",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "recurrence_type_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "recurrence_end_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "last_sent_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "notifications",
+      "name": "channel",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "status",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "notifications",
+      "name": "target_filter",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "official_advisory_notifications": [
+    {
+      "table_name": "official_advisory_notifications",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "official_advisory_notifications",
+      "name": "source",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "official_advisory_notifications",
+      "name": "fingerprint",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "UNI"
+    },
+    {
+      "table_name": "official_advisory_notifications",
+      "name": "title",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "official_advisory_notifications",
+      "name": "body",
+      "type": "text",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "official_advisory_notifications",
+      "name": "source_url",
+      "type": "text",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "official_advisory_notifications",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "NO",
+      "column_key": "MUL"
+    }
+  ],
+  "offline_packs": [
+    {
+      "table_name": "offline_packs",
+      "name": "version",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "offline_packs",
+      "name": "bbox",
+      "type": "json",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "offline_packs",
+      "name": "style_url",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "offline_packs",
+      "name": "size_bytes",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "offline_packs",
+      "name": "checksum",
+      "type": "char",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "offline_packs",
+      "name": "is_active",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "offline_packs",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "offline_packs",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "offline_packs",
+      "name": "pack_format",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "operational_sequences": [
+    {
+      "table_name": "operational_sequences",
+      "name": "sequence_key",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "operational_sequences",
+      "name": "next_value",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "operational_sequences",
+      "name": "sequence_prefix",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "personal_access_tokens": [
+    {
+      "table_name": "personal_access_tokens",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "personal_access_tokens",
+      "name": "tokenable_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "personal_access_tokens",
+      "name": "tokenable_type",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "personal_access_tokens",
+      "name": "name",
+      "type": "text",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "personal_access_tokens",
+      "name": "token",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "personal_access_tokens",
+      "name": "abilities",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "personal_access_tokens",
+      "name": "last_used_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "personal_access_tokens",
+      "name": "expires_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "personal_access_tokens",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "personal_access_tokens",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "property_damage_levels": [
+    {
+      "table_name": "property_damage_levels",
+      "name": "damage_key",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "property_damage_levels",
+      "name": "label",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "property_damage_levels",
+      "name": "sort_order",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "property_damage_levels",
+      "name": "is_active",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "provinces": [
+    {
+      "table_name": "provinces",
+      "name": "province_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "provinces",
+      "name": "province_code",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "provinces",
+      "name": "province_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "provinces",
+      "name": "region_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "puroks": [
+    {
+      "table_name": "puroks",
+      "name": "purok_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "puroks",
+      "name": "purok_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "puroks",
+      "name": "sitio_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    }
+  ],
+  "realtime_outbox": [
+    {
+      "table_name": "realtime_outbox",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "realtime_outbox",
+      "name": "topics",
+      "type": "text",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "realtime_outbox",
+      "name": "available_at",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "realtime_outbox",
+      "name": "claim_token",
+      "type": "char",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "realtime_outbox",
+      "name": "claimed_until",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "realtime_outbox",
+      "name": "attempts",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "realtime_outbox",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "realtime_outbox",
+      "name": "delivered_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": "MUL"
+    }
+  ],
+  "relationships": [
+    {
+      "table_name": "relationships",
+      "name": "relationship_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "relationships",
+      "name": "relationship_key",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "UNI"
+    },
+    {
+      "table_name": "relationships",
+      "name": "relationship_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "relationships",
+      "name": "is_head",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "relationships",
+      "name": "is_immediate_family",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "relationships",
+      "name": "can_report_for_household",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "relationships",
+      "name": "sort_order",
+      "type": "smallint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "relationships",
+      "name": "is_active",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "relationships",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "relationships",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "report_idempotency": [
+    {
+      "table_name": "report_idempotency",
+      "name": "scope",
+      "type": "char",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "report_idempotency",
+      "name": "request_hash",
+      "type": "char",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "report_idempotency",
+      "name": "response_status",
+      "type": "smallint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "report_idempotency",
+      "name": "response_body",
+      "type": "longtext",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "report_idempotency",
+      "name": "content_type",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "report_idempotency",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "report_idempotency",
+      "name": "expires_at",
+      "type": "timestamp",
+      "nullable": "NO",
+      "column_key": "MUL"
+    }
+  ],
+  "request_validations": [
+    {
+      "table_name": "request_validations",
+      "name": "validation_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "request_validations",
+      "name": "request_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "request_validations",
+      "name": "validation_status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "request_validations",
+      "name": "validator_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "request_validations",
+      "name": "validation_notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "request_validations",
+      "name": "missing_information",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "request_validations",
+      "name": "duplicate_request_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "request_validations",
+      "name": "validated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "request_validations",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "request_validations",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "rescue_priority_settings": [
+    {
+      "table_name": "rescue_priority_settings",
+      "name": "version",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "rescue_priority_settings",
+      "name": "impact_weight",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_priority_settings",
+      "name": "vulnerability_weight",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_priority_settings",
+      "name": "unreported_weight",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_priority_settings",
+      "name": "no_contact_weight",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_priority_settings",
+      "name": "updated_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_priority_settings",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_priority_settings",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "rescue_teams": [
+    {
+      "table_name": "rescue_teams",
+      "name": "team_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "rescue_teams",
+      "name": "team_code",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_teams",
+      "name": "team_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_teams",
+      "name": "team_type",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_teams",
+      "name": "assigned_purok_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_teams",
+      "name": "leader_responder_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_teams",
+      "name": "duty_status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_teams",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "rescue_teams",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "resource_request_status": [
+    {
+      "table_name": "resource_request_status",
+      "name": "status_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "resource_request_status",
+      "name": "status_key",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_request_status",
+      "name": "status_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "resource_requests": [
+    {
+      "table_name": "resource_requests",
+      "name": "request_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "request_source",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "source_reference",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "request_category",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "evacuation_center_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "requested_by",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "handled_by",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "resource_type",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "item_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "quantity",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "unit",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "description",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "status_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "validation_status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "validation_notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "validated_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "validated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "released_for_tracking_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "tracking_reference",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "resource_requests",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "responder_assignments": [
+    {
+      "table_name": "responder_assignments",
+      "name": "assignment_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "assignment_code",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "responder_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "team_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "affected_area_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "status_log_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "assigned_area",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "route_notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "priority_level",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "dispatch_notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "created_by_admin_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "status",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "assigned_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "accepted_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "en_route_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "arrived_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "completed_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "outcome_notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "responder_count",
+      "type": "smallint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_assignments",
+      "name": "dispatch_type",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    }
+  ],
+  "responder_check_ins": [
+    {
+      "table_name": "responder_check_ins",
+      "name": "check_in_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "responder_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "team_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "affected_area_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "check_in_method",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "status_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "checked_in_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "checked_out_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_check_ins",
+      "name": "verified_by",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "responder_communication_logs": [
+    {
+      "table_name": "responder_communication_logs",
+      "name": "communication_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_communication_logs",
+      "name": "responder_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_communication_logs",
+      "name": "team_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_communication_logs",
+      "name": "team_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_communication_logs",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_communication_logs",
+      "name": "message",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_communication_logs",
+      "name": "timestamp",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "responder_field_report_members": [
+    {
+      "table_name": "responder_field_report_members",
+      "name": "detail_id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "responder_field_report_members",
+      "name": "report_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_field_report_members",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_report_members",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_field_report_members",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_report_members",
+      "name": "status_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_report_members",
+      "name": "status_key",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_report_members",
+      "name": "assessed_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_report_members",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_report_members",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "responder_field_reports": [
+    {
+      "table_name": "responder_field_reports",
+      "name": "report_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "responder_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "assignment_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "submitted_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "status_log_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "incident_type",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "incident_type_other",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "property_damage",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "death_count",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "injured_count",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "idempotency_key",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "payload_hash",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_field_reports",
+      "name": "submitted_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "responder_location_logs": [
+    {
+      "table_name": "responder_location_logs",
+      "name": "log_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_location_logs",
+      "name": "responder_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_location_logs",
+      "name": "latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_location_logs",
+      "name": "longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_location_logs",
+      "name": "battery_level",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_location_logs",
+      "name": "signal_strength",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_location_logs",
+      "name": "logged_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "responder_routes": [
+    {
+      "table_name": "responder_routes",
+      "name": "route_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "assignment_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "route_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "route_status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "start_latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "start_longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "end_latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "end_longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "estimated_distance_km",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "estimated_duration_min",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "route_polyline",
+      "type": "mediumtext",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "responder_id",
+      "type": "bigint",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responder_routes",
+      "name": "navigation_steps",
+      "type": "json",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "responders": [
+    {
+      "table_name": "responders",
+      "name": "responder_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responders",
+      "name": "user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responders",
+      "name": "responder_code",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "created_by_admin_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "team_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "responders",
+      "name": "username",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "password_hash",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "full_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "title",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "contact_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "emergency_contact_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "emergency_contact_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "date_of_birth",
+      "type": "date",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "gender",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "blood_type",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "address",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "skills",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "training_notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "certification_reference",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "equipment_notes",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "is_validated",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "is_deployed",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "duty_status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "last_active_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "responders",
+      "name": "deleted_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "roles": [
+    {
+      "table_name": "roles",
+      "name": "role_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "roles",
+      "name": "role_key",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "roles",
+      "name": "role_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "roles",
+      "name": "name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "roles",
+      "name": "base_role_key",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "roles",
+      "name": "web_modules",
+      "type": "json",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "roles",
+      "name": "can_manage_personnel",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "roles",
+      "name": "can_approve_requests",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "route_coordinates": [
+    {
+      "table_name": "route_coordinates",
+      "name": "coordinate_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "route_coordinates",
+      "name": "route_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "route_coordinates",
+      "name": "latitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "route_coordinates",
+      "name": "longitude",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "route_coordinates",
+      "name": "sequence_order",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "route_coordinates",
+      "name": "recorded_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "route_coordinates",
+      "name": "accuracy_m",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "severity_levels": [
+    {
+      "table_name": "severity_levels",
+      "name": "severity_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "severity_levels",
+      "name": "severity_key",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "severity_levels",
+      "name": "severity_label",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "sitios": [
+    {
+      "table_name": "sitios",
+      "name": "sitio_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "sitios",
+      "name": "sitio_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "sitios",
+      "name": "barangay_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "MUL"
+    }
+  ],
+  "situation_reports": [
+    {
+      "table_name": "situation_reports",
+      "name": "sit_rep_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "report_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "created_by_admin_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "summary",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "report_status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "reviewed_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "reviewed_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "escalated_to",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "is_archived",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "generated_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "archived_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "situation_reports",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "status_reminders": [
+    {
+      "table_name": "status_reminders",
+      "name": "reminder_id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "event_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "attempt",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "scheduled_at",
+      "type": "timestamp",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "sent_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "stopped_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "member_delivery",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "household_delivery",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "status_reminders",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "sync_events": [
+    {
+      "table_name": "sync_events",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "sync_events",
+      "name": "client_event_id",
+      "type": "char",
+      "nullable": "NO",
+      "column_key": "UNI"
+    },
+    {
+      "table_name": "sync_events",
+      "name": "device_id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "sync_events",
+      "name": "type",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "sync_events",
+      "name": "status",
+      "type": "enum",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "sync_events",
+      "name": "error_message",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "sync_events",
+      "name": "received_at",
+      "type": "timestamp",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "sync_events",
+      "name": "result_json",
+      "type": "json",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "team_bases": [
+    {
+      "table_name": "team_bases",
+      "name": "team_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "team_bases",
+      "name": "name",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "team_bases",
+      "name": "lat",
+      "type": "decimal",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "team_bases",
+      "name": "lng",
+      "type": "decimal",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "trip_points": [
+    {
+      "table_name": "trip_points",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "trip_points",
+      "name": "trip_id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "trip_points",
+      "name": "lat",
+      "type": "decimal",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "trip_points",
+      "name": "lng",
+      "type": "decimal",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "trip_points",
+      "name": "accuracy",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "trip_points",
+      "name": "speed",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "trip_points",
+      "name": "heading",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "trip_points",
+      "name": "recorded_at",
+      "type": "datetime",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "trusted_households": [
+    {
+      "table_name": "trusted_households",
+      "name": "connection_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "trusted_households",
+      "name": "requesting_household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "trusted_households",
+      "name": "trusted_household_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "trusted_households",
+      "name": "reason",
+      "type": "text",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "trusted_households",
+      "name": "validation_status",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "trusted_households",
+      "name": "member_relationships",
+      "type": "json",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "trusted_households",
+      "name": "created_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "trusted_households",
+      "name": "validated_by_user_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "trusted_households",
+      "name": "validated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "trusted_households",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "trusted_households",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "users": [
+    {
+      "table_name": "users",
+      "name": "user_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "users",
+      "name": "first_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "last_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "username",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "email",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "email_verified_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "password",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "role_id",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "contact_number",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "assigned_center_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "household_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "users",
+      "name": "member_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "UNI"
+    },
+    {
+      "table_name": "users",
+      "name": "is_active",
+      "type": "tinyint",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "must_change_password",
+      "type": "tinyint",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "temp_password",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "remember_token",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "deleted_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "profile_photo",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "security_question_1",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "security_answer_1",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "security_question_2",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "security_answer_2",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "users",
+      "name": "password_changed_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "weather_logs": [
+    {
+      "table_name": "weather_logs",
+      "name": "weather_log_id",
+      "type": "int",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "disaster_id",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "source_name",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "source_url",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "condition_name",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "temperature",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "rainfall_mm",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "wind_speed",
+      "type": "decimal",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "wind_direction",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "humidity",
+      "type": "int",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "advisory_title",
+      "type": "varchar",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "advisory_text",
+      "type": "text",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "raw_payload",
+      "type": "json",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "observed_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "created_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "weather_logs",
+      "name": "updated_at",
+      "type": "datetime",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ],
+  "web_push_deliveries": [
+    {
+      "table_name": "web_push_deliveries",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "web_push_deliveries",
+      "name": "subscription_id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "web_push_deliveries",
+      "name": "notice_hash",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "web_push_deliveries",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "NO",
+      "column_key": ""
+    }
+  ],
+  "web_push_subscriptions": [
+    {
+      "table_name": "web_push_subscriptions",
+      "name": "id",
+      "type": "bigint",
+      "nullable": "NO",
+      "column_key": "PRI"
+    },
+    {
+      "table_name": "web_push_subscriptions",
+      "name": "user_id",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "web_push_subscriptions",
+      "name": "token_id",
+      "type": "bigint",
+      "nullable": "YES",
+      "column_key": "MUL"
+    },
+    {
+      "table_name": "web_push_subscriptions",
+      "name": "endpoint_hash",
+      "type": "varchar",
+      "nullable": "NO",
+      "column_key": "UNI"
+    },
+    {
+      "table_name": "web_push_subscriptions",
+      "name": "subscription",
+      "type": "text",
+      "nullable": "NO",
+      "column_key": ""
+    },
+    {
+      "table_name": "web_push_subscriptions",
+      "name": "expires_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "web_push_subscriptions",
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "web_push_subscriptions",
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    },
+    {
+      "table_name": "web_push_subscriptions",
+      "name": "push_after",
+      "type": "timestamp",
+      "nullable": "YES",
+      "column_key": ""
+    }
+  ]
+}

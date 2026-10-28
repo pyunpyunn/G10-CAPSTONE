@@ -1,0 +1,242 @@
+erDiagram
+    direction LR
+    %% Solid relationships = inspected database foreign keys.
+    %% Dotted relationships = application/model references, not enforced foreign keys.
+    %% PK/UK markings come only from the inspected schema, not model assumptions.
+    audit_logs {
+        int audit_log_id PK
+        varchar user_id "nullable; application reference"
+        varchar role_key "nullable"
+        varchar module
+        varchar action
+        varchar reference_table "nullable"
+        varchar reference_id "nullable"
+        json old_values "nullable"
+        json new_values "nullable"
+        varchar ip_address "nullable"
+        varchar user_agent "nullable"
+        datetime created_at "nullable"
+    }
+    device_tokens {
+        bigint id PK "application reference"
+        varchar device_uuid "nullable"
+        varchar household_id "nullable; application reference"
+        varchar member_id "nullable; application reference"
+        varchar device_name "nullable"
+        varchar platform "nullable"
+        varchar app_role "nullable"
+        varchar push_provider "nullable"
+        varchar player_id "nullable"
+        varchar expo_push_token "nullable"
+        int battery_level "nullable"
+        int signal_strength "nullable"
+        varchar location_permission_status
+        varchar notification_permission_status
+        decimal last_latitude "nullable"
+        decimal last_longitude "nullable"
+        varchar last_location_label "nullable"
+        decimal last_location_accuracy_m "nullable"
+        datetime last_location_at "nullable"
+        datetime last_seen_at "nullable"
+        tinyint is_active
+        datetime logged_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    device_tracking_logs {
+        int tracking_id "application identity; not database PK"
+        bigint device_token_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        varchar member_id "nullable; application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        varchar location_label "nullable"
+        decimal accuracy_m "nullable"
+        varchar location_source "nullable"
+        tinyint is_allowed_location
+        int battery_level "nullable"
+        int signal_strength "nullable"
+        datetime logged_at
+    }
+    household_members {
+        varchar member_id PK "application reference"
+        varchar household_id "nullable; application reference"
+        varchar first_name "nullable"
+        varchar middle_name "nullable"
+        varchar last_name "nullable"
+        date birth_date
+        int gender_id "nullable; application reference"
+        int relationship_id "nullable; application reference"
+        tinyint is_household_head
+        tinyint can_report_for_household
+        varchar contact_number "nullable"
+        int civil_status_id "nullable"
+        int occupation "nullable"
+        int education_level_id "nullable"
+        tinyint is_graduate "nullable"
+        timestamp deleted_at "nullable"
+        tinyint is_pwd
+        tinyint is_senior
+        tinyint is_pregnant
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        varchar name "nullable"
+        varchar sex "nullable"
+        varchar gender "nullable"
+        varchar relation "nullable"
+        varchar civil_status "nullable"
+        varchar religion "nullable"
+        varchar education_level "nullable"
+        varchar special_needs "nullable"
+    }
+    households {
+        varchar household_id PK "application reference"
+        varchar household_code "nullable"
+        varchar household_number "nullable"
+        varchar household_name "nullable"
+        varchar email "nullable"
+        int member_count
+        varchar created_by "nullable"
+        int address_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar emergency_contact "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+    }
+    landing_inquiries {
+        bigint inquiry_id PK
+        varchar name
+        varchar organization "nullable"
+        varchar email "nullable"
+        text message
+        varchar status
+        varchar source_page
+        varchar ip_address "nullable"
+        varchar user_agent "nullable"
+        timestamp responded_at "nullable"
+        varchar handled_by_user_id "nullable; application reference"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    notifications {
+        int notif_id PK
+        text message "nullable"
+        varchar sent_by "nullable; application reference"
+        varchar evacuation_event_id "nullable"
+        varchar evacuation_center_id "nullable"
+        datetime scheduled_at "nullable"
+        tinyint is_recurring "nullable"
+        int recurrence_type_id "nullable"
+        datetime recurrence_end_at "nullable"
+        datetime last_sent_at "nullable"
+        datetime created_at "nullable"
+        varchar channel "nullable"
+        varchar status "nullable"
+        varchar target_filter "nullable"
+    }
+    official_advisory_notifications {
+        bigint id PK
+        varchar source
+        varchar fingerprint UK
+        varchar title
+        text body
+        text source_url
+        timestamp created_at
+    }
+    operational_sequences {
+        varchar sequence_key PK
+        bigint next_value
+        varchar sequence_prefix "nullable"
+    }
+    personal_access_tokens {
+        bigint id PK "application reference"
+        varchar tokenable_id "nullable; application reference"
+        varchar tokenable_type "nullable"
+        text name
+        varchar token "nullable"
+        text abilities "nullable"
+        timestamp last_used_at "nullable"
+        timestamp expires_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    realtime_outbox {
+        bigint id PK
+        text topics
+        int available_at
+        char claim_token "nullable"
+        int claimed_until "nullable"
+        int attempts
+        timestamp created_at
+        timestamp delivered_at "nullable"
+    }
+    report_idempotency {
+        char scope PK
+        char request_hash
+        smallint response_status "nullable"
+        longtext response_body "nullable"
+        varchar content_type "nullable"
+        timestamp created_at
+        timestamp expires_at
+    }
+    users {
+        varchar user_id PK "application reference"
+        varchar first_name "nullable"
+        varchar last_name "nullable"
+        varchar name "nullable"
+        varchar username "nullable"
+        varchar email "nullable"
+        timestamp email_verified_at "nullable"
+        varchar password "nullable"
+        int role_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar assigned_center_id "nullable"
+        varchar household_id "nullable; application reference"
+        varchar member_id UK "nullable; application reference"
+        tinyint is_active "nullable"
+        tinyint must_change_password
+        varchar temp_password "nullable"
+        varchar remember_token "nullable"
+        timestamp updated_at "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar profile_photo "nullable"
+        varchar security_question_1 "nullable"
+        varchar security_answer_1 "nullable"
+        varchar security_question_2 "nullable"
+        varchar security_answer_2 "nullable"
+        timestamp password_changed_at "nullable"
+    }
+    web_push_deliveries {
+        bigint id PK
+        bigint subscription_id "application reference"
+        varchar notice_hash
+        timestamp created_at
+    }
+    web_push_subscriptions {
+        bigint id PK "application reference"
+        varchar user_id "application reference"
+        bigint token_id "nullable; application reference"
+        varchar endpoint_hash UK
+        text subscription
+        timestamp expires_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp push_after "nullable"
+    }
+    device_tokens o|..o{ device_tracking_logs : "logical_device_token_id"
+    household_members o|..o{ device_tokens : "logical_member_id"
+    household_members o|..o{ device_tracking_logs : "logical_member_id"
+    household_members o|..o| users : "logical_member_id"
+    households o|..o{ device_tokens : "logical_household_id"
+    households o|..o{ device_tracking_logs : "logical_household_id"
+    households o|..o{ household_members : "logical_household_id"
+    households o|..o{ users : "logical_household_id"
+    personal_access_tokens o|..o{ web_push_subscriptions : "logical_token_id"
+    users o|..o{ audit_logs : "logical_user_id"
+    users o|..o{ landing_inquiries : "logical_handled_by_user_id"
+    users o|..o{ notifications : "logical_sent_by"
+    users o|..o{ personal_access_tokens : "logical_tokenable_id"
+    users ||..o{ web_push_subscriptions : "logical_user_id"
+    web_push_subscriptions ||..o{ web_push_deliveries : "logical_subscription_id"

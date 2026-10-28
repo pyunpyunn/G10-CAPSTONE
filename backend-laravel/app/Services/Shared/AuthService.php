@@ -25,8 +25,6 @@ class AuthService
     public function __construct(
         private AuthAccountQuery $accounts,
         private SmsGatewayService $smsGateway,
-        private SemaphoreSmsService $semaphore,
-        private OneSignalNotificationService $oneSignal,
     ) {}
     private const RECOVERY_QUESTIONS = [
         'first_pet' => "What was your first pet's name?",
@@ -359,31 +357,9 @@ class AuthService
 
         $code = (string) random_int(100000, 999999);
         $deliveryMessage = "Your ResQperation password reset code is {$code}. It expires in 10 minutes.";
-        $deliveryChannel = null;
-        $lastFailure = null;
-        $smsProviders = [
-            'onesignal_sms' => fn (): array => $this->oneSignal->sendSmsToPhoneNumber($details['contact_number'], $deliveryMessage),
-            'sms_gateway' => fn (): array => $this->smsGateway->sendDirectSms($details['contact_number'], $deliveryMessage),
-        ];
-        if ($this->semaphore->isConfigured()) {
-            $smsProviders['semaphore'] = fn (): array => $this->semaphore->sendDirectSms($details['contact_number'], $deliveryMessage);
-        }
-
-        foreach ($smsProviders as $channel => $sendSms) {
-            $smsResult = $sendSms();
-            if ($smsResult['status'] === 'accepted') {
-                $deliveryChannel = $channel;
-                break;
-            }
-            if ($smsResult['status'] !== 'not_configured') {
-                $lastFailure = $smsResult;
-            }
-        }
-        if ($deliveryChannel === null) {
-            $message = $lastFailure['message']
-                ?? 'OneSignal SMS, Android SMS Gateway, and Semaphore are not configured. Configure at least one SMS provider.';
-
-            return response()->json(['message' => $message], 503);
+        $smsResult = $this->smsGateway->sendDirectSms($details['contact_number'], $deliveryMessage);
+        if ($smsResult['status'] !== 'accepted') {
+            return response()->json(['message' => $smsResult['message']], 503);
         }
 
         DB::table('household_password_recovery_otps')->updateOrInsert(
@@ -400,12 +376,8 @@ class AuthService
         );
 
         return response()->json([
-            'message' => match ($deliveryChannel) {
-                'onesignal_sms' => 'OneSignal accepted the password reset code for SMS delivery.',
-                'sms_gateway' => 'Android SMS Gateway accepted the password reset code for delivery.',
-                'semaphore' => 'Semaphore accepted the password reset code for delivery.',
-            },
-            'delivery_channel' => $deliveryChannel,
+            'message' => 'Android SMS Gateway accepted the password reset code for delivery.',
+            'delivery_channel' => 'sms_gateway',
         ]);
     }
 

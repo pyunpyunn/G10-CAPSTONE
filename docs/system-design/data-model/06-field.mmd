@@ -1,0 +1,64 @@
+flowchart LR
+    %% Grouping is module relevance, not database/table ownership.
+    %% Arrows point from referenced identity to dependent records.
+    subgraph identity["Accounts and access"]
+        tusers["users"]
+    end
+    subgraph household["Shared household and geography foundation"]
+        thouseholds["households"]
+        thousehold_members["household_members"]
+    end
+    subgraph disaster["Events, alerts and safety state"]
+        tdisaster_events["disaster_events"]
+        thousehold_status_logs["household_status_logs"]
+        tmember_statuses["member_statuses"]
+    end
+    subgraph dispatch["Teams, priority and dispatch"]
+        tresponders["responders"]
+        trescue_teams["rescue_teams"]
+        tresponder_assignments["responder_assignments"]
+    end
+    subgraph field["Field outcomes and communication"]
+        tresponder_check_ins["responder_check_ins"]
+        tresponder_field_reports["responder_field_reports"]
+        tresponder_field_report_members["responder_field_report_members"]
+        tresponder_communication_logs["responder_communication_logs"]
+        tresponder_location_logs["responder_location_logs"]
+        tproperty_damage_levels["property_damage_levels"]
+    end
+    thouseholds -.->|"household_id"| thousehold_members
+    tdisaster_events -.->|"disaster_id"| thousehold_status_logs
+    thouseholds -.->|"household_id"| thousehold_status_logs
+    tresponders -.->|"responder_id"| thousehold_status_logs
+    tusers -.->|"reviewed_by_user_id"| thousehold_status_logs
+    tusers -.->|"submitted_by_user_id"| thousehold_status_logs
+    tresponders -.->|"leader_responder_id"| trescue_teams
+    tdisaster_events -.->|"disaster_id"| tresponder_assignments
+    thouseholds -.->|"household_id"| tresponder_assignments
+    tresponders -.->|"responder_id"| tresponder_assignments
+    thousehold_status_logs -.->|"status_log_id"| tresponder_assignments
+    trescue_teams -.->|"team_id"| tresponder_assignments
+    tdisaster_events -.->|"disaster_id"| tresponder_check_ins
+    thouseholds -.->|"household_id"| tresponder_check_ins
+    thousehold_members -.->|"member_id"| tresponder_check_ins
+    tresponders -.->|"responder_id"| tresponder_check_ins
+    trescue_teams -.->|"team_id"| tresponder_check_ins
+    tdisaster_events -.->|"disaster_id"| tresponder_communication_logs
+    tresponders -.->|"responder_id"| tresponder_communication_logs
+    trescue_teams -.->|"team_id"| tresponder_communication_logs
+    tdisaster_events -.->|"disaster_id"| tresponder_field_report_members
+    thouseholds -.->|"household_id"| tresponder_field_report_members
+    thousehold_members -.->|"member_id"| tresponder_field_report_members
+    tresponder_field_reports -.->|"report_id"| tresponder_field_report_members
+    tmember_statuses -.->|"status_id"| tresponder_field_report_members
+    tresponder_assignments -.->|"assignment_id"| tresponder_field_reports
+    tdisaster_events -.->|"disaster_id"| tresponder_field_reports
+    thouseholds -.->|"household_id"| tresponder_field_reports
+    tresponders -.->|"responder_id"| tresponder_field_reports
+    thousehold_status_logs -.->|"status_log_id"| tresponder_field_reports
+    tusers -.->|"submitted_by_user_id"| tresponder_field_reports
+    tresponders -.->|"responder_id"| tresponder_location_logs
+    trescue_teams -.->|"team_id"| tresponders
+    tusers -.->|"user_id"| tresponders
+    thouseholds -.->|"household_id"| tusers
+    thousehold_members -.->|"member_id"| tusers

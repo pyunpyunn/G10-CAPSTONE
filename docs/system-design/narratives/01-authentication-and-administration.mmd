@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    actor U as Account holder
+    actor A as Operations/Admin
+    participant Client as Web or mobile app
+    participant API as API and access policy
+    participant DB as Users, roles and device/session records
+    U->>Client: Enter assigned login and password
+    Client->>API: Submit login
+    API->>DB: Verify account, credentials and role
+    alt Eligible account
+        API-->>Client: Authorized token and workspace
+        opt Household device has no selected member
+            U->>Client: Select household device owner
+            Client->>API: Validate selection and bind permitted session
+        end
+        opt Authorized personnel maintenance
+            A->>API: Create/update personnel, team or access settings
+            API->>DB: Enforce management rights and save changes
+        end
+    else Invalid, inactive or unauthorized account
+        API-->>Client: Reject without granting access
+    end
+    opt Password recovery
+        U->>API: Follow configured recovery verification
+        API->>DB: Verify recovery information and update password
+        Note over U,DB: Recovery differs by account type, verify current implementation
+    end
+    U->>Client: Sign out
+    Client->>API: Best-effort token revocation
+    Client->>Client: Clear local token and cached account snapshots
