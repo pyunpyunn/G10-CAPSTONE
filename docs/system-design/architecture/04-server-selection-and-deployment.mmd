@@ -1,0 +1,11 @@
+flowchart LR
+    apk["Production APK"] --> config["Embedded release URLs plus saved server setting"]
+    config --> validation["Release URLs must satisfy HTTPS validation"]
+    validation --> readiness["Probe configured API health/ready"]
+    readiness --> selected["Choose a reachable ready Laravel server"]
+    selected --> scope["Check request origin before attaching credentials"]
+    scope --> backend["Laravel host and database"]
+    readiness -. "all candidates fail" .-> offline["Restore saved pages and show Offline mode"]
+    current["Build 21 configuration: ngrok only; no Tailscale/LAN fallbacks"] --> config
+    blocked["Old saved HTTP Tailscale/LAN addresses are rejected by current release policy"] -.-> validation
+    candidate["Tailscale/LAN are possible deployment routes only when configured and permitted"] -.-> config

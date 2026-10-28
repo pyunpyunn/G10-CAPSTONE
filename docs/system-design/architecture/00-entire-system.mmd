@@ -1,0 +1,71 @@
+flowchart LR
+    subgraph users["Users"]
+        resident["Household residents"]
+        rescuer["Team leaders and team members"]
+        headquarters["Authorized HQ, chair and Operations/Admin"]
+        public["Public inquiry senders"]
+    end
+    subgraph clients["Client applications"]
+        mobile["Expo React Native Android APK"]
+        web["React and Vite HQ web application"]
+        local["On-device SQLite navigation, outbox and page snapshots"]
+        credentials["SecureStore tokens; browser storage in web builds"]
+    end
+    subgraph transport["Backend reachability and transport"]
+        connection["Configured server URL and readiness probing"]
+        entry["Laravel JSON API and Sanctum authentication"]
+        realtime["Reverb and Echo WebSocket channels when configured"]
+    end
+    subgraph backend["Laravel monolith - logical modules, not microservices"]
+        policy["Role, module, device and household-owner authorization"]
+        household["Household profiles, safety reports and trusted connections"]
+        disaster["Disaster broadcasts, weather and hazard context"]
+        operations["Priorities, dispatch, rescue assessments and PTT clips"]
+        requests["Resource validation and TrackingAid handoff"]
+        reports["Situation reports, archives and controlled report exchange"]
+        admin["Personnel, teams, configuration and public inquiries"]
+        events["Audit, durable realtime outbox and scheduled work"]
+    end
+    subgraph persistence["Persistence boundaries"]
+        database[("Configured RESQPERATION database connection - scoped shared tables")]
+        files[("Report exports, voice clips and map-pack files")]
+        localdrivers[("Current local runtime: synchronous jobs; file cache and sessions")]
+    end
+    subgraph external["External integrations - configuration dependent"]
+        shared["SafeTrack linked household data and report exchange"]
+        eva["EvaTrack reports and request intake"]
+        tracking["TrackingAid API/report client and configured partner DB handoff"]
+        push["OneSignal and browser Web Push"]
+        weather["Open-Meteo; PAGASA and PHIVOLCS advisories"]
+        maps["Map tiles, hazard sources and routing services"]
+        sms["Optional SMS gateway"]
+        city["City authority - manual exported report handoff"]
+    end
+    resident --> mobile
+    rescuer --> mobile
+    headquarters --> web
+    public --> web
+    mobile <--> local
+    mobile --> credentials
+    mobile --> connection
+    web --> connection
+    connection --> entry
+    web <--> realtime
+    entry --> policy
+    policy --> household & disaster & operations & requests & reports & admin
+    household & disaster & operations & requests & reports & admin --> database
+    operations & reports --> files
+    disaster & operations & requests & reports --> events
+    events --> database
+    events --> localdrivers
+    events -. "configured relay" .-> realtime
+    events -. "notification delivery" .-> push
+    disaster -. "forecast and advisory reads" .-> weather
+    mobile & web -. "map assets and supported online routing" .-> maps
+    operations -. "assigned route calculation" .-> maps
+    household -. "shared records through configured database" .-> shared
+    reports -. "request and review reports" .-> shared & eva & tracking
+    requests -. "forwarding and fulfillment mirror" .-> tracking
+    eva -. "authenticated request intake" .-> entry
+    sms -. "authenticated inbound processing" .-> entry
+    reports -. "export and human handoff" .-> city

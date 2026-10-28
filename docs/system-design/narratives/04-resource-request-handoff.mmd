@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    actor Sender as Team leader or authorized external partner
+    actor HQ as Authorized HQ approver
+    participant API as Resource-request workflow
+    participant DB as Requests and validation history
+    participant TA as Configured TrackingAid connection
+    Sender->>API: Submit personnel/equipment/supply request
+    API->>API: Authenticate, validate scope and detect duplicate references
+    API->>DB: Record Pending request and supplied items
+    HQ->>API: Review identity, details, urgency and justification
+    alt Incomplete, duplicate or rejected request
+        HQ->>API: Return or cancel within allowed workflow
+        API->>DB: Record decision and history
+    else Valid request
+        HQ->>API: Validate/approve and forward
+        API->>DB: Save validation and handoff reference
+        API->>TA: Deliver configured forwarding payload
+        alt Partner available
+            TA-->>API: Acknowledgment and later fulfillment state
+            API-->>HQ: In Progress / Completed when confirmed
+        else Partner unavailable
+            API-->>HQ: Pending/retry state, do not imply completed fulfillment
+        end
+    end
+    Note over API,TA: Live partner round trip remains an acceptance dependency

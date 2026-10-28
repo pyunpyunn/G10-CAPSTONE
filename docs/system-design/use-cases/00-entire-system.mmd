@@ -1,0 +1,216 @@
+flowchart LR
+    %% UML use-case approximation for broad Mermaid Live compatibility.
+    %% Plain lines are associations; labeled dotted arrows are UML relationships.
+    AccountHolder["Actor: Account holder"]:::actor
+    Resident["Actor: Household resident"]:::actor
+    Rescuer["Actor: Rescuer - shared field duties"]:::actor
+    TeamLeader["Actor: Rescue team leader"]:::actor
+    Hq["Actor: HQ personnel - common permitted modules"]:::actor
+    Response["Actor: Response sub-committee / dispatcher"]:::actor
+    Chair["Actor: BDRRM committee chairperson"]:::actor
+    Admin["Actor: Operations / system administrator"]:::actor
+    Prevention["Actor: Mitigation and Prevention sub-committee"]:::actor
+    Preparedness["Actor: Preparedness sub-committee"]:::actor
+    Recovery["Actor: Recovery and Rehabilitation sub-committee"]:::actor
+    Verifier["Actor: Authorized evacuation verifier - duty, not separate account role"]:::actor
+    Visitor["Actor: Public inquiry sender"]:::actor
+    SafeTrack["Actor: SafeTrack"]:::actor
+    EvaTrack["Actor: EvaTrack"]:::actor
+    TrackingAid["Actor: TrackingAid"]:::actor
+    Push["Actor: Push notification provider"]:::actor
+    GeoWeather["Actor: Weather, hazard, map and routing providers"]:::actor
+    Sms["Actor: Configured SMS gateway"]:::actor
+    City["Actor: City disaster-response authority - manual report recipient"]:::actor
+    subgraph resqperation["RESQPERATION"]
+        signIn(["Sign in, restore an authorized session and sign out - B2"])
+        authorize(["Validate account, role and applicable device binding - B2"])
+        recoverAccount(["Recover password and configure recovery information"])
+        ownProfile(["Maintain personal profile and password - B3"])
+        personnel(["Create, validate, activate or deactivate personnel accounts - B1"])
+        officialId(["GAP: capture and review official identification - B1"]):::gap
+        teams(["Manage rescue teams, leaders, members and assignments"])
+        accessRules(["Manage HQ accounts, roles, module access and approval rights"])
+        configuration(["Maintain barangay profile, disaster/status options and request types"])
+        inquiry(["Submit a public inquiry"])
+        manageInquiries(["Review inquiries, update status and inspect inquiry history"])
+        householdProfile(["Complete household setup; view members, address and geotag - A1"])
+        deviceOwner(["Select or reset the household member using the device"])
+        householdAlerts(["Receive alerts, instructions and broadcast history - A2"])
+        householdStatus(["Submit household/member safety status and review history - A3"])
+        broadcastChoices(["Use the applicable broadcast's configured status choices"])
+        householdLocation(["Capture permitted GPS location and update the geotag"])
+        trustedConnections(["Find, invite, accept, reject or remove trusted households"])
+        trustedStatus(["Report permitted trusted-household member statuses"])
+        trustedPin(["Verify trusted-household connection and PIN authorization"])
+        evacuationRoute(["Find available evacuation centers; view route, distance and ETA - A4"])
+        residentQr(["Display or save the resident household QR - A6"])
+        evacuationVerify(["Verify QR and record evacuation arrival - A6"]):::partial
+        offlineView(["View all saved mobile page data with Offline mode and last-sync time - A5"])
+        offlineSubmit(["GAP: durably queue household status reports while offline - A5"]):::gap
+        replayStatuses(["GAP: replay queued household reports safely after reconnection - A5"]):::gap
+        spatialMap(["View geotagged households, evacuation sites and dispatch routes - B4"])
+        assignments(["View assigned incidents, households, members and route directions - C1"])
+        assignmentProgress(["Accept assignment; mark en route, arrived and completed"])
+        gpsFollow(["Follow GPS position and share assignment location"])
+        offlineNavigation(["Prepare navigation packs; record offline trips and sync saved events"]):::partial
+        radio(["Send and receive internet PTT voice clips and radio signals - C2"])
+        rescueVerify(["Check in at households and assess each member's outcome - C3"])
+        fieldReport(["Submit incident findings, injuries, deaths, damage and notes - C4"])
+        operationLog(["Record operational timestamps, status changes and history - C5"])
+        logistics(["Request personnel, equipment or supplies; track or cancel eligible requests - C6"]):::partial
+        dashboard(["Monitor operational dashboard, activity, impact and dispatch summaries"])
+        search(["Search permitted household, personnel and operational records"])
+        notifications(["Review, mark read or remove notifications and manage push subscription"])
+        weather(["Review forecasts, official advisories and event weather snapshots"])
+        hazards(["View hazard layers and annotate affected areas"])
+        manageHazards(["Add or remove authorized hazard layers"])
+        disaster(["Create, update and close disaster events - D1"])
+        broadcast(["Publish event-scoped alerts and reporting instructions - D1"])
+        deliverAlerts(["Deliver configured push notifications to subscribed users - A2 / D1"])
+        dispatch(["Prioritize households/areas, select responders and dispatch teams - D2"])
+        priorityRules(["Review and configure dispatch priority criteria"])
+        incidentMonitor(["Monitor incident findings, casualties and damage - D3"])
+        householdMonitor(["Review household/member reports, history and welfare-check queues - D4"])
+        confirmStatus(["Confirm household safety or evacuation status - D4"])
+        severity(["Classify event severity and affected-area priority - D5"]):::partial
+        areaSeverity(["GAP: assign exact Low / Medium / High / Critical severity per affected area - D5"]):::gap
+        fieldMonitor(["Monitor assignment progress, field GPS, reports and communications - D6"])
+        situation(["Prepare, synchronize, save and lock situation reports - D7"])
+        exportReport(["Export permitted report sections as PDF, CSV or Excel - D7"])
+        escalate(["Escalate an incident through a manually handed-off report - D8"])
+        archive(["Browse, filter, export and manage incident archives and saved groups - D9"]):::partial
+        externalIntake(["Receive and record authenticated external resource requests - R1"])
+        requestItems(["Specify personnel, equipment, goods, quantities and urgency - R2"])
+        requestReview(["Review, validate, return, cancel or complete eligible requests - R3 / R4"])
+        forwardRequest(["Forward a validated request to TrackingAid - R3"]):::partial
+        preventDuplicates(["Validate request identity, permission and duplicate references - R4"])
+        requestTracking(["Track Pending, Validated/Approved, In Progress and Completed - R5"])
+        externalReportRequest(["Partner requests a RESQPERATION report and checks its release status"])
+        releaseReport(["Accept or reject report release; freeze accepted snapshot and issue download"])
+        partnerReport(["Request and review SafeTrack, EvaTrack or TrackingAid reports"])
+        sharedHouseholds(["Read linked shared household and member records"])
+        smsStatus(["Process supported inbound SMS safety reports"])
+    end
+    Resident -. "specializes" .-> AccountHolder
+    Rescuer -. "specializes" .-> AccountHolder
+    Hq -. "specializes" .-> AccountHolder
+    TeamLeader -. "specializes" .-> Rescuer
+    Response -. "specializes" .-> Hq
+    Chair -. "specializes" .-> Response
+    Admin -. "specializes" .-> Chair
+    Prevention -. "specializes" .-> Hq
+    Preparedness -. "specializes" .-> Hq
+    Recovery -. "specializes" .-> Hq
+    AccountHolder --- signIn
+    AccountHolder --- recoverAccount
+    AccountHolder --- ownProfile
+    Admin --- personnel
+    Admin --- officialId
+    Admin --- teams
+    Admin --- accessRules
+    Admin --- configuration
+    Admin --- manageInquiries
+    Visitor --- inquiry
+    Resident --- householdProfile
+    Resident --- deviceOwner
+    Resident --- householdAlerts
+    Resident --- householdStatus
+    Resident --- householdLocation
+    Resident --- trustedConnections
+    Resident --- trustedStatus
+    Resident --- evacuationRoute
+    Resident --- residentQr
+    Resident --- offlineView
+    Resident --- offlineSubmit
+    Verifier --- evacuationVerify
+    Rescuer --- spatialMap
+    Rescuer --- assignments
+    Rescuer --- assignmentProgress
+    Rescuer --- gpsFollow
+    Rescuer --- offlineNavigation
+    Rescuer --- radio
+    Rescuer --- rescueVerify
+    Rescuer --- fieldReport
+    Rescuer --- operationLog
+    Rescuer --- offlineView
+    TeamLeader --- logistics
+    TeamLeader --- requestTracking
+    Hq --- dashboard
+    Hq --- search
+    Hq --- notifications
+    Hq --- weather
+    Hq --- spatialMap
+    Hq --- hazards
+    Hq --- situation
+    Hq --- exportReport
+    Hq --- escalate
+    Hq --- archive
+    Hq --- partnerReport
+    Hq --- releaseReport
+    Prevention --- manageHazards
+    Preparedness --- manageHazards
+    Chair --- manageHazards
+    Response --- dispatch
+    Response --- priorityRules
+    Response --- incidentMonitor
+    Response --- householdMonitor
+    Response --- confirmStatus
+    Response --- severity
+    Response --- areaSeverity
+    Response --- fieldMonitor
+    Response --- requestItems
+    Response --- requestTracking
+    Recovery --- requestItems
+    Recovery --- requestTracking
+    Chair --- disaster
+    Chair --- broadcast
+    Chair --- requestReview
+    Chair --- forwardRequest
+    SafeTrack --- sharedHouseholds
+    SafeTrack --- partnerReport
+    SafeTrack --- externalReportRequest
+    EvaTrack --- externalIntake
+    EvaTrack --- partnerReport
+    EvaTrack --- externalReportRequest
+    TrackingAid --- forwardRequest
+    TrackingAid --- requestTracking
+    TrackingAid --- partnerReport
+    TrackingAid --- externalReportRequest
+    Push --- deliverAlerts
+    GeoWeather --- weather
+    GeoWeather --- spatialMap
+    GeoWeather --- hazards
+    GeoWeather --- evacuationRoute
+    GeoWeather --- assignments
+    Sms --- smsStatus
+    City --- escalate
+    signIn -. "include" .-> authorize
+    householdProfile -. "include" .-> sharedHouseholds
+    householdStatus -. "include" .-> broadcastChoices
+    householdStatus -. "include" .-> operationLog
+    trustedStatus -. "include" .-> trustedPin
+    trustedStatus -. "include" .-> householdStatus
+    evacuationVerify -. "include" .-> operationLog
+    offlineSubmit -. "include" .-> replayStatuses
+    assignmentProgress -. "include" .-> operationLog
+    rescueVerify -. "include" .-> operationLog
+    fieldReport -. "include" .-> operationLog
+    logistics -. "include" .-> requestItems
+    broadcast -. "include" .-> deliverAlerts
+    dispatch -. "include" .-> operationLog
+    confirmStatus -. "include" .-> operationLog
+    situation -. "include" .-> operationLog
+    escalate -. "include" .-> exportReport
+    externalIntake -. "include" .-> preventDuplicates
+    requestReview -. "include" .-> preventDuplicates
+    forwardRequest -. "include" .-> preventDuplicates
+    requestTracking -. "include" .-> operationLog
+    externalReportRequest -. "include" .-> releaseReport
+    offlineView -. "extend" .-> householdProfile
+    offlineView -. "extend" .-> assignments
+    offlineNavigation -. "extend" .-> assignments
+    areaSeverity -. "extend" .-> severity
+    forwardRequest -. "extend" .-> requestReview
+    classDef actor fill:#e0f2fe,color:#0c4a6e,stroke:#0284c7
+    classDef gap fill:#fff1f2,color:#881337,stroke:#be123c,stroke-width:2px
+    classDef partial fill:#fff7ed,color:#7c2d12,stroke:#c2410c,stroke-width:2px

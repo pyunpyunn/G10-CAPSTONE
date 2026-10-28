@@ -19,11 +19,10 @@ import {
   lookupHouseholdRecoveryContact,
   resetHouseholdPassword,
   sendHouseholdRecoveryCode,
-  validateHouseholdRecoveryContact,
 } from '@/api/auth';
 import { palette, spacing } from '@/constants/resqTheme';
 
-const RECOVERY_RESEND_COOLDOWN_SECONDS = 5 * 60;
+const RECOVERY_RESEND_COOLDOWN_SECONDS = 60;
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -104,46 +103,27 @@ export default function ForgotPasswordScreen() {
     return `${minutes}:${seconds}`;
   }
 
-  async function validateContact() {
+  async function requestCode() {
+    if (sendInFlight.current || loading || sendCooldownSeconds > 0) return;
     const accountLogin = login.trim();
-    const digits = contactNumber.replace(/\D/g, '');
+    const number = contactNumber.trim();
+    const digits = number.replace(/\D/g, '');
     if (!accountLogin) {
-      setContactError('Enter your user ID first.');
+      setAccountError('Enter your user ID first.');
       return;
     }
     if (!(digits.length === 11 && digits.startsWith('09'))
       && !(digits.length === 10 && digits.startsWith('9'))
-      && !(digits.length === 12 && digits.startsWith('63'))) {
+      && !(digits.length === 12 && digits.startsWith('639'))) {
       setContactError('Enter a valid Philippine mobile number.');
       return;
     }
-
-    setLoading(true);
-    setContactError('');
-    setValidatedNumber('');
-    setCodeSent(false);
-    try {
-      await validateHouseholdRecoveryContact(accountLogin, contactNumber);
-      setValidatedNumber(contactNumber.trim());
-    } catch (error: any) {
-      setContactError(authErrorMessage(error, 'This number does not match a phone number registered to this account.'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function requestCode() {
-    if (sendInFlight.current || sendCooldownSeconds > 0) return;
-    if (!validatedNumber || validatedNumber !== contactNumber.trim()) {
-      setContactError('Verify your registered phone number before requesting a code.');
-      return;
-    }
     sendInFlight.current = true;
-    setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS);
+    setContactError('');
     setLoading(true);
     setRequestError('');
     try {
-      const response = await sendHouseholdRecoveryCode(login.trim(), validatedNumber);
+      const response = await sendHouseholdRecoveryCode(accountLogin, number);
       if (response.cooldown) {
         setSendCooldownSeconds(Math.max(
           RECOVERY_RESEND_COOLDOWN_SECONDS,
@@ -152,18 +132,17 @@ export default function ForgotPasswordScreen() {
         setRequestError('Please wait before requesting another verification code.');
         return;
       }
+      setValidatedNumber(number);
       setCodeSent(true);
       setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS);
-      const deliveryMessage = response.delivery_channel === 'onesignal_sms'
-        ? 'OneSignal accepted your SMS code request.'
-        : 'The SMS fallback provider accepted your code request.';
-      setRequestError(`${deliveryMessage} Delivery can take a few minutes. Check your SMS inbox and wait before requesting another code; a new request replaces this code.`);
+      const deliveryMessage = 'The SMS gateway accepted your code request.';
+      setRequestError(`${deliveryMessage} Check your SMS inbox. Arrival time depends on the gateway and mobile network. A new request replaces this code.`);
     } catch (error: any) {
       if (error?.response?.status === 429) {
-        setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS);
+        setSendCooldownSeconds(Math.max(1, Number(error?.response?.headers?.['retry-after']) || RECOVERY_RESEND_COOLDOWN_SECONDS));
         setRequestError('Please wait before requesting another verification code.');
       } else {
-        setSendCooldownSeconds(RECOVERY_RESEND_COOLDOWN_SECONDS);
+        setSendCooldownSeconds(error?.response ? 0 : RECOVERY_RESEND_COOLDOWN_SECONDS);
         setRequestError(authErrorMessage(error, 'Unable to send the code. Please try again later.'));
       }
     } finally {
@@ -175,7 +154,7 @@ export default function ForgotPasswordScreen() {
   async function handleResetPassword() {
     setRequestError('');
     if (!/^\d{6}$/.test(code)) {
-      setRequestError('Enter the 6-digit code from your notification or SMS.');
+      setRequestError('Enter the 6-digit code from your SMS.');
       return;
     }
     if (password.length < 8 || password.length > 128) {
@@ -259,7 +238,6 @@ export default function ForgotPasswordScreen() {
                   value={contactNumber}
                   onFocus={(event) => scrollToFocusedInput(event.nativeEvent.target)}
                   onChangeText={handleContactChange}
-                  onBlur={() => { if (maskedContact) void validateContact(); }}
                   placeholder="09XX XXX XXXX"
                   placeholderTextColor={palette.navMuted}
                   keyboardType="phone-pad"
@@ -270,9 +248,11 @@ export default function ForgotPasswordScreen() {
               {!!contactError && <Text accessibilityLiveRegion="polite" style={styles.error}>{contactError}</Text>}
             </View>
 
-            {validatedNumber && !codeSent ? (
+            {maskedContact && contactNumber.trim() && !codeSent ? (
               <Pressable
                 style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, (loading || sendCooldownSeconds > 0) && styles.buttonDisabled]}
+                accessibilityRole="button"
+                accessibilityLabel="Get verification code by SMS"
                 onPress={() => { void requestCode(); }}
                 disabled={loading || sendCooldownSeconds > 0}
               >

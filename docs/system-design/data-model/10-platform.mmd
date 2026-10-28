@@ -1,0 +1,39 @@
+flowchart LR
+    %% Grouping is module relevance, not database/table ownership.
+    %% Arrows point from referenced identity to dependent records.
+    subgraph identity["Accounts and access"]
+        tusers["users"]
+        tpersonal_access_tokens["personal_access_tokens"]
+    end
+    subgraph household["Shared household and geography foundation"]
+        thouseholds["households"]
+        thousehold_members["household_members"]
+    end
+    subgraph platform["Notification, audit and delivery support"]
+        tdevice_tokens["device_tokens"]
+        tdevice_tracking_logs["device_tracking_logs"]
+        tnotifications["notifications"]
+        tweb_push_subscriptions["web_push_subscriptions"]
+        tweb_push_deliveries["web_push_deliveries"]
+        tofficial_advisory_notifications["official_advisory_notifications"]
+        taudit_logs["audit_logs"]
+        trealtime_outbox["realtime_outbox"]
+        treport_idempotency["report_idempotency"]
+        toperational_sequences["operational_sequences"]
+        tlanding_inquiries["landing_inquiries"]
+    end
+    tusers -.->|"user_id"| taudit_logs
+    thouseholds -.->|"household_id"| tdevice_tokens
+    thousehold_members -.->|"member_id"| tdevice_tokens
+    tdevice_tokens -.->|"device_token_id"| tdevice_tracking_logs
+    thouseholds -.->|"household_id"| tdevice_tracking_logs
+    thousehold_members -.->|"member_id"| tdevice_tracking_logs
+    thouseholds -.->|"household_id"| thousehold_members
+    tusers -.->|"handled_by_user_id"| tlanding_inquiries
+    tusers -.->|"sent_by"| tnotifications
+    tusers -.->|"tokenable_id"| tpersonal_access_tokens
+    thouseholds -.->|"household_id"| tusers
+    thousehold_members -.->|"member_id"| tusers
+    tweb_push_subscriptions -.->|"subscription_id"| tweb_push_deliveries
+    tpersonal_access_tokens -.->|"token_id"| tweb_push_subscriptions
+    tusers -.->|"user_id"| tweb_push_subscriptions

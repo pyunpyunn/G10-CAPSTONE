@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    actor HQ as Permitted HQ operator / alert publisher
+    actor HH as Resident
+    participant API as Events, weather and alerts
+    participant Weather as Forecast and official-advisory providers
+    participant DB as Event, advisory, broadcast and status tables
+    participant Push as Push delivery provider
+    API->>Weather: Refresh configured forecast/advisory sources
+    Weather-->>API: Attributed weather/advisory context
+    API->>DB: Store weather snapshots and advisory notices
+    HQ->>API: Review source context and select local event severity
+    HQ->>API: Authorized publication of instructions and status choices
+    API->>DB: Save scoped broadcast and delivery state
+    API->>Push: Submit notifications
+    Push-->>HH: Deliver when connectivity and permissions allow
+    HH->>API: View latest alert and broadcast history
+    API->>DB: Read applicable event-scoped broadcast
+    Note over HQ,DB: Exact four-level affected-area severity is a separate required gap

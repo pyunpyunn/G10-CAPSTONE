@@ -1,0 +1,31 @@
+flowchart LR
+    %% Grouping is module relevance, not database/table ownership.
+    %% Arrows point from referenced identity to dependent records.
+    subgraph identity["Accounts and access"]
+        tusers["users"]
+    end
+    subgraph household["Shared household and geography foundation"]
+        thouseholds["households"]
+    end
+    subgraph disaster["Events, alerts and safety state"]
+        tdisaster_events["disaster_events"]
+        thousehold_statuses["household_statuses"]
+    end
+    subgraph documentation["Evacuation evidence, reports and archives"]
+        tevacuation_centers["evacuation_centers"]
+        tevacuation_records["evacuation_records"]
+        tsituation_reports["situation_reports"]
+        tincident_archives["incident_archives"]
+    end
+    tdisaster_events -.->|"current_event_id"| tevacuation_centers
+    tevacuation_centers -.->|"center_id"| tevacuation_records
+    tdisaster_events -.->|"event_id"| tevacuation_records
+    thouseholds -.->|"household_id"| tevacuation_records
+    thousehold_statuses -.->|"household_status_id"| tevacuation_records
+    tusers -.->|"archived_by_admin_id"| tincident_archives
+    tdisaster_events -.->|"disaster_id"| tincident_archives
+    tusers -.->|"created_by_admin_id"| tsituation_reports
+    tdisaster_events -.->|"disaster_id"| tsituation_reports
+    thouseholds -.->|"household_id"| tsituation_reports
+    tusers -.->|"reviewed_by_user_id"| tsituation_reports
+    thouseholds -.->|"household_id"| tusers

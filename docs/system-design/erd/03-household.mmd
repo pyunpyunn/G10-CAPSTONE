@@ -1,0 +1,237 @@
+erDiagram
+    direction LR
+    %% Solid relationships = inspected database foreign keys.
+    %% Dotted relationships = application/model references, not enforced foreign keys.
+    %% PK/UK markings come only from the inspected schema, not model assumptions.
+    addresses {
+        int address_id PK "application reference"
+        int street_address "nullable"
+        varchar street "nullable"
+        int barangay_id "nullable; application reference"
+        varchar barangay_name "nullable"
+        int sitio_id "nullable; application reference"
+        varchar purok_sitio "nullable"
+        varchar house_number "nullable"
+        int purok_id "nullable; application reference"
+        int zipcode_id "nullable"
+        varchar zip_code "nullable"
+        varchar full_address "nullable"
+        timestamp created_at
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+        tinyint is_apartment "nullable"
+        varchar building_name "nullable"
+        varchar floor_number "nullable"
+        varchar unit_number "nullable"
+        varchar room_number "nullable"
+        varchar landmark "nullable"
+    }
+    barangay_boundaries {
+        varchar psgc_code PK
+        bigint barangay_id "nullable; application reference"
+        varchar barangay_code "nullable"
+        varchar barangay_name
+        varchar city_name
+        longtext geometry_json
+        varchar source_url
+        varchar source_note
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    barangays {
+        int barangay_id PK "application reference"
+        varchar barangay_code "nullable"
+        varchar barangay_name "nullable"
+        int city_id "application reference"
+    }
+    cities {
+        int city_id PK "application reference"
+        varchar city_code "nullable"
+        varchar city_name "nullable"
+        int province_id "application reference"
+    }
+    genders {
+        int gender_id PK "application reference"
+        varchar gender_key UK "nullable"
+        varchar gender_label "nullable"
+    }
+    geotagged_locations {
+        int location_id PK
+        varchar household_id "nullable; application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        varchar location_label "nullable"
+        decimal accuracy_m "nullable"
+        varchar geotag_source
+        tinyint is_verified
+        varchar verified_by_user_id "nullable; application reference"
+        datetime verified_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at
+    }
+    household_member_id_mappings {
+        varchar old_member_id PK
+        varchar member_id UK "application reference"
+    }
+    household_members {
+        varchar member_id PK "application reference"
+        varchar household_id "nullable; application reference"
+        varchar first_name "nullable"
+        varchar middle_name "nullable"
+        varchar last_name "nullable"
+        date birth_date
+        int gender_id "nullable; application reference"
+        int relationship_id "nullable; application reference"
+        tinyint is_household_head
+        tinyint can_report_for_household
+        varchar contact_number "nullable"
+        int civil_status_id "nullable"
+        int occupation "nullable"
+        int education_level_id "nullable"
+        tinyint is_graduate "nullable"
+        timestamp deleted_at "nullable"
+        tinyint is_pwd
+        tinyint is_senior
+        tinyint is_pregnant
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        varchar name "nullable"
+        varchar sex "nullable"
+        varchar gender "nullable"
+        varchar relation "nullable"
+        varchar civil_status "nullable"
+        varchar religion "nullable"
+        varchar education_level "nullable"
+        varchar special_needs "nullable"
+    }
+    household_trusted_pins {
+        varchar household_id PK "application reference"
+        varchar pin_hash
+        varchar updated_by_user_id "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    households {
+        varchar household_id PK "application reference"
+        varchar household_code "nullable"
+        varchar household_number "nullable"
+        varchar household_name "nullable"
+        varchar email "nullable"
+        int member_count
+        varchar created_by "nullable"
+        int address_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar emergency_contact "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+    }
+    mapping_hazard_layers {
+        bigint id PK
+        varchar barangay_id "application reference"
+        varchar name
+        varchar source
+        varchar source_url "nullable"
+        date assessed_at
+        json geojson
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    member_vulnerable_groups {
+        int id PK
+        varchar member_id "nullable; application reference"
+        int vulnerable_group_id
+    }
+    provinces {
+        int province_id PK "application reference"
+        varchar province_code "nullable"
+        varchar province_name "nullable"
+        int region_id
+    }
+    puroks {
+        int purok_id PK "application reference"
+        varchar purok_name "nullable"
+        int sitio_id "application reference"
+    }
+    relationships {
+        int relationship_id PK "application reference"
+        varchar relationship_key UK "nullable"
+        varchar relationship_label "nullable"
+        tinyint is_head
+        tinyint is_immediate_family
+        tinyint can_report_for_household
+        smallint sort_order
+        tinyint is_active
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    sitios {
+        int sitio_id PK "application reference"
+        varchar sitio_name "nullable"
+        int barangay_id "application reference"
+    }
+    trusted_households {
+        varchar connection_id PK
+        varchar requesting_household_id "application reference"
+        varchar trusted_household_id "application reference"
+        text reason
+        varchar validation_status
+        json member_relationships "nullable"
+        varchar created_by_user_id "nullable; application reference"
+        varchar validated_by_user_id "nullable; application reference"
+        datetime validated_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    users {
+        varchar user_id PK "application reference"
+        varchar first_name "nullable"
+        varchar last_name "nullable"
+        varchar name "nullable"
+        varchar username "nullable"
+        varchar email "nullable"
+        timestamp email_verified_at "nullable"
+        varchar password "nullable"
+        int role_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar assigned_center_id "nullable"
+        varchar household_id "nullable; application reference"
+        varchar member_id UK "nullable; application reference"
+        tinyint is_active "nullable"
+        tinyint must_change_password
+        varchar temp_password "nullable"
+        varchar remember_token "nullable"
+        timestamp updated_at "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar profile_photo "nullable"
+        varchar security_question_1 "nullable"
+        varchar security_answer_1 "nullable"
+        varchar security_question_2 "nullable"
+        varchar security_answer_2 "nullable"
+        timestamp password_changed_at "nullable"
+    }
+    addresses o|..o{ households : "logical_address_id"
+    barangays o|..o{ addresses : "logical_barangay_id"
+    barangays o|..o{ barangay_boundaries : "logical_barangay_id"
+    barangays ||..o{ mapping_hazard_layers : "logical_barangay_id"
+    barangays ||..o{ sitios : "logical_barangay_id"
+    cities ||..o{ barangays : "logical_city_id"
+    genders o|..o{ household_members : "logical_gender_id"
+    household_members ||..o| household_member_id_mappings : "logical_member_id"
+    household_members o|..o{ member_vulnerable_groups : "logical_member_id"
+    household_members o|..o| users : "logical_member_id"
+    households o|..o{ geotagged_locations : "logical_household_id"
+    households o|..o{ household_members : "logical_household_id"
+    households ||..o| household_trusted_pins : "logical_household_id"
+    households ||..o{ trusted_households : "logical_requesting_household_id"
+    households ||..o{ trusted_households : "logical_trusted_household_id"
+    households o|..o{ users : "logical_household_id"
+    provinces ||..o{ cities : "logical_province_id"
+    puroks o|..o{ addresses : "logical_purok_id"
+    relationships o|..o{ household_members : "logical_relationship_id"
+    sitios o|..o{ addresses : "logical_sitio_id"
+    sitios ||..o{ puroks : "logical_sitio_id"
+    users o|..o{ geotagged_locations : "logical_verified_by_user_id"
+    users o|..o{ trusted_households : "logical_created_by_user_id"
+    users o|..o{ trusted_households : "logical_validated_by_user_id"

@@ -1,0 +1,260 @@
+erDiagram
+    direction LR
+    %% Solid relationships = inspected database foreign keys.
+    %% Dotted relationships = application/model references, not enforced foreign keys.
+    %% PK/UK markings come only from the inspected schema, not model assumptions.
+    cached_routes {
+        bigint id PK
+        int team_id FK
+        varchar household_id FK "nullable"
+        varchar evac_center_id FK "nullable"
+        varchar target_key
+        enum profile
+        longtext polyline6 "nullable"
+        json steps "nullable"
+        int distance_m "nullable"
+        int duration_s "nullable"
+        enum status
+        varchar failure_reason "nullable"
+        timestamp computed_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    devices {
+        bigint id PK "application reference"
+        varchar user_id FK
+        int team_id FK
+        varchar device_uuid UK
+        timestamp last_sync_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    dispatch_trips {
+        bigint id PK "application reference"
+        int dispatch_id FK
+        int team_id FK
+        bigint device_id FK
+        enum profile
+        datetime started_at
+        datetime ended_at "nullable"
+        int distance_m "nullable"
+        int planned_distance_m "nullable"
+        int moving_s
+        int stopped_s
+        decimal avg_speed_ms "nullable"
+        enum status
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    evacuation_centers {
+        varchar evacuation_center_id PK "application reference"
+        varchar current_event_id "nullable; application reference"
+        varchar name "nullable"
+        varchar center_type "nullable"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        int capacity "nullable"
+        varchar status
+        int current_occupancy "nullable"
+        varchar contact_person "nullable"
+        varchar contact_number "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar osm_address "nullable"
+        text notes "nullable"
+        datetime updated_at "nullable"
+    }
+    households {
+        varchar household_id PK "application reference"
+        varchar household_code "nullable"
+        varchar household_number "nullable"
+        varchar household_name "nullable"
+        varchar email "nullable"
+        int member_count
+        varchar created_by "nullable"
+        int address_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar emergency_contact "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
+    }
+    offline_packs {
+        varchar version PK
+        json bbox
+        varchar style_url
+        bigint size_bytes
+        char checksum
+        tinyint is_active
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        varchar pack_format
+    }
+    rescue_teams {
+        int team_id PK "application reference"
+        varchar team_code "nullable"
+        varchar team_name "nullable"
+        varchar team_type "nullable"
+        int assigned_purok_id "nullable; application reference"
+        int leader_responder_id "nullable; application reference"
+        varchar duty_status
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    responder_assignments {
+        int assignment_id PK "application reference"
+        varchar assignment_code "nullable"
+        int responder_id "application reference"
+        int team_id "nullable; application reference"
+        varchar disaster_id "nullable; application reference"
+        int affected_area_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        int status_log_id "nullable; application reference"
+        varchar assigned_area "nullable"
+        text route_notes "nullable"
+        varchar priority_level "nullable"
+        text dispatch_notes "nullable"
+        varchar created_by_admin_id "nullable"
+        varchar status "nullable"
+        datetime assigned_at
+        datetime accepted_at "nullable"
+        datetime en_route_at "nullable"
+        datetime arrived_at "nullable"
+        datetime completed_at "nullable"
+        text outcome_notes "nullable"
+        datetime updated_at "nullable"
+        smallint responder_count
+        varchar dispatch_type
+    }
+    responder_routes {
+        int route_id "application identity; not database PK; application reference"
+        int assignment_id "application reference"
+        varchar route_name "nullable"
+        varchar route_status
+        decimal start_latitude "nullable"
+        decimal start_longitude "nullable"
+        decimal end_latitude "nullable"
+        decimal end_longitude "nullable"
+        decimal estimated_distance_km "nullable"
+        int estimated_duration_min "nullable"
+        mediumtext route_polyline "nullable"
+        datetime created_at
+        datetime updated_at "nullable"
+        bigint responder_id "nullable; application reference"
+        varchar household_id "nullable; application reference"
+        json navigation_steps "nullable"
+    }
+    responders {
+        int responder_id "application identity; not database PK; application reference"
+        varchar user_id "nullable; application reference"
+        varchar responder_code "nullable"
+        varchar created_by_admin_id "nullable"
+        int team_id "nullable; application reference"
+        varchar username "nullable"
+        varchar password_hash "nullable"
+        varchar full_name "nullable"
+        varchar title "nullable"
+        varchar contact_number "nullable"
+        varchar emergency_contact_name "nullable"
+        varchar emergency_contact_number "nullable"
+        date date_of_birth "nullable"
+        varchar gender "nullable"
+        varchar blood_type "nullable"
+        text address "nullable"
+        text skills "nullable"
+        text training_notes "nullable"
+        varchar certification_reference "nullable"
+        text equipment_notes "nullable"
+        tinyint is_validated "nullable"
+        tinyint is_deployed "nullable"
+        varchar duty_status
+        datetime last_active_at "nullable"
+        datetime created_at
+        datetime updated_at "nullable"
+        datetime deleted_at "nullable"
+    }
+    route_coordinates {
+        int coordinate_id "application identity; not database PK"
+        int route_id "application reference"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        int sequence_order
+        datetime recorded_at "nullable"
+        decimal accuracy_m "nullable"
+    }
+    sync_events {
+        bigint id PK
+        char client_event_id UK
+        bigint device_id FK
+        varchar type
+        enum status
+        varchar error_message "nullable"
+        timestamp received_at
+        json result_json "nullable"
+    }
+    team_bases {
+        int team_id PK, FK
+        varchar name
+        decimal lat
+        decimal lng
+    }
+    trip_points {
+        bigint id PK
+        bigint trip_id FK
+        decimal lat
+        decimal lng
+        decimal accuracy "nullable"
+        decimal speed "nullable"
+        decimal heading "nullable"
+        datetime recorded_at
+    }
+    users {
+        varchar user_id PK "application reference"
+        varchar first_name "nullable"
+        varchar last_name "nullable"
+        varchar name "nullable"
+        varchar username "nullable"
+        varchar email "nullable"
+        timestamp email_verified_at "nullable"
+        varchar password "nullable"
+        int role_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar assigned_center_id "nullable"
+        varchar household_id "nullable; application reference"
+        varchar member_id UK "nullable; application reference"
+        tinyint is_active "nullable"
+        tinyint must_change_password
+        varchar temp_password "nullable"
+        varchar remember_token "nullable"
+        timestamp updated_at "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar profile_photo "nullable"
+        varchar security_question_1 "nullable"
+        varchar security_answer_1 "nullable"
+        varchar security_question_2 "nullable"
+        varchar security_answer_2 "nullable"
+        timestamp password_changed_at "nullable"
+    }
+    devices ||--o{ dispatch_trips : "FK_device_id"
+    devices ||--o{ sync_events : "FK_device_id"
+    dispatch_trips ||--o{ trip_points : "FK_trip_id"
+    evacuation_centers o|--o{ cached_routes : "FK_evac_center_id"
+    households o|--o{ cached_routes : "FK_household_id"
+    households o|..o{ responder_assignments : "logical_household_id"
+    households o|..o{ responder_routes : "logical_household_id"
+    households o|..o{ users : "logical_household_id"
+    rescue_teams ||--o{ cached_routes : "FK_team_id"
+    rescue_teams ||--o{ devices : "FK_team_id"
+    rescue_teams ||--o{ dispatch_trips : "FK_team_id"
+    rescue_teams o|..o{ responder_assignments : "logical_team_id"
+    rescue_teams o|..o{ responders : "logical_team_id"
+    rescue_teams ||--o| team_bases : "FK_team_id"
+    responder_assignments ||--o{ dispatch_trips : "FK_dispatch_id"
+    responder_assignments ||..o{ responder_routes : "logical_assignment_id"
+    responder_routes ||..o{ route_coordinates : "logical_route_id"
+    responders o|..o{ rescue_teams : "logical_leader_responder_id"
+    responders ||..o{ responder_assignments : "logical_responder_id"
+    responders o|..o{ responder_routes : "logical_responder_id"
+    users ||--o{ devices : "FK_user_id"
+    users o|..o{ responders : "logical_user_id"

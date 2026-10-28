@@ -205,7 +205,7 @@ export async function sendHouseholdRecoveryCode(login: string, contact_number: s
   return (await api.post('/auth/password-recovery/household/send-code', {
     login: login.trim(),
     contact_number: contact_number.trim(),
-  })).data;
+  }, { timeout: 30000 })).data;
 }
 
 export async function resetHouseholdPassword(payload: {

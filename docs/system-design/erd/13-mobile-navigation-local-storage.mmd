@@ -1,0 +1,67 @@
+erDiagram
+    direction LR
+    %% Independent mobile navigation SQLite database, not shared MySQL.
+    metadata {
+        text key PK
+        text value
+    }
+    households {
+        text household_id PK
+        text payload_json
+    }
+    dispatches {
+        integer dispatch_id PK
+        text payload_json
+    }
+    routes {
+        integer team_id PK
+        text target_key PK
+        text profile PK
+        text status
+        text payload_json
+    }
+    evacuation_centers {
+        text center_id PK
+        text payload_json
+    }
+    center_route_cache {
+        text center_id PK
+        text profile PK
+        real origin_latitude
+        real origin_longitude
+        real destination_latitude
+        real destination_longitude
+        text route_json
+        text updated_at
+    }
+    outbox {
+        text client_event_id PK
+        text type
+        text payload_json
+        text occurred_at
+        text created_at
+        text status
+        text error_message
+    }
+    local_trips {
+        text local_trip_id PK
+        integer server_trip_id
+        integer dispatch_id
+        text profile
+        text started_at
+        text ended_at
+        real distance_m
+        text status
+    }
+    local_trip_points {
+        integer id PK
+        text local_trip_id
+        real latitude
+        real longitude
+        real accuracy
+        real speed
+        real heading
+        text recorded_at
+    }
+    local_trips ||--o{ local_trip_points : "FK_local_trip_id"
+    dispatches ||..o{ local_trips : "logical_dispatch_id"

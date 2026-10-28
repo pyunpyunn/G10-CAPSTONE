@@ -1,0 +1,34 @@
+{
+  "live_tables_inspected": 118,
+  "included_business_tables": 75,
+  "excluded_live_tables": 43,
+  "source_only_tables": 8,
+  "relationships": 156,
+  "database_foreign_keys": 21,
+  "use_cases": 68,
+  "actors": 21,
+  "schema_date": "2026-10-28",
+  "rejected_unverified_relationships": [
+    [
+      "household_member_id_mappings",
+      "household_id",
+      "households",
+      "household_id",
+      "Reviewed application reference: backend-laravel\\app\\Services\\Shared\\HouseholdMemberIdentityUpgrade.php"
+    ],
+    [
+      "responder_assignments",
+      "affected_area_id",
+      "affected_areas",
+      "area_id",
+      "Reviewed application reference: backend-laravel\\app\\Actions\\SelectDispatchResponders.php"
+    ],
+    [
+      "responder_location_logs",
+      "assignment_id",
+      "responder_assignments",
+      "assignment_id",
+      "Reviewed application reference: backend-laravel\\app\\Actions\\SelectDispatchResponders.php"
+    ]
+  ]
+}

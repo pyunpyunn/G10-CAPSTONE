@@ -10,76 +10,6 @@ use App\Support\RequestSchema as Schema;
 
 class OneSignalNotificationService
 {
-    public function sendSmsToPhoneNumber(string $phoneNumber, string $message): array
-    {
-        if (! $this->isConfigured()) {
-            return $this->result('not_configured', 0, 'OneSignal credentials are not configured.');
-        }
-
-        $number = $this->normalizePhoneNumber($phoneNumber);
-        if (! $number) {
-            return $this->result('invalid_number', 0, 'The phone number is not a valid Philippine mobile number.');
-        }
-
-        try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Key '.$this->apiKey(),
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ])
-                ->timeout(15)
-                ->connectTimeout(5)
-                ->post(rtrim($this->baseUrl(), '/').'/notifications?c=sms', [
-                    'app_id' => $this->appId(),
-                    'target_channel' => 'sms',
-                    'include_phone_numbers' => [$number],
-                    'contents' => ['en' => $message],
-                ]);
-
-            $providerErrors = $response->json('errors', []);
-            $providerErrors = is_array($providerErrors)
-                ? collect($providerErrors)->flatten()->filter(fn ($error): bool => is_string($error) && trim($error) !== '')->values()->all()
-                : [];
-
-            if (! $response->successful() || ! $response->json('id') || $providerErrors !== []) {
-                Log::warning('OneSignal SMS request was not accepted', [
-                    'status' => $response->status(),
-                    'errors' => $providerErrors,
-                ]);
-
-                $isNotSubscribed = collect($providerErrors)
-                    ->contains(fn (string $error): bool => str_contains(strtolower($error), 'all included players are not subscribed'));
-                if ($isNotSubscribed) {
-                    return [
-                        ...$this->result(
-                            'not_subscribed',
-                            1,
-                            'OneSignal has no active SMS subscription for this number. Enable SMS with an approved Philippine sender and ensure the number can receive ResQperation security-code messages, or configure an SMS gateway.'
-                        ),
-                        'errors' => $providerErrors,
-                    ];
-                }
-
-                return [
-                    ...$this->result('failed', 1, 'OneSignal did not accept the SMS request.'),
-                    'errors' => $providerErrors,
-                ];
-            }
-
-            return [
-                'status' => 'accepted',
-                'recipient_count' => 1,
-                'accepted_count' => 1,
-                'provider_ids' => [(string) $response->json('id')],
-                'message' => 'OneSignal accepted the SMS request.',
-                'errors' => [],
-            ];
-        } catch (\Throwable $error) {
-            Log::warning('OneSignal SMS request failed', ['message' => $error->getMessage()]);
-            return $this->result('failed', 1, 'OneSignal could not send the SMS.');
-        }
-    }
-
     public function prepareDelivery(array $options): array
     {
         $ids = $this->mobilePlayerIds($options);
@@ -411,16 +341,6 @@ class OneSignalNotificationService
     private function isConfigured(): bool
     {
         return $this->appId() !== '' && $this->apiKey() !== '';
-    }
-
-    private function normalizePhoneNumber(string $number): ?string
-    {
-        $digits = preg_replace('/\D+/', '', $number);
-        if (! $digits) return null;
-        if (str_starts_with($digits, '0') && strlen($digits) === 11) return '+63'.substr($digits, 1);
-        if (str_starts_with($digits, '9') && strlen($digits) === 10) return '+63'.$digits;
-        if (str_starts_with($digits, '63') && strlen($digits) === 12) return '+'.$digits;
-        return null;
     }
 
     private function appId(): string

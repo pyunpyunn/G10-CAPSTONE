@@ -1,0 +1,26 @@
+flowchart LR
+    subgraph mobile["Installed mobile APK"]
+        roles["Household or rescuer workspace"]
+        hook["useMobileOverview"]
+        banner["Offline mode banner and last successful sync"]
+        snapshots[("Persistent account-token-scoped overview snapshots")]
+        secure[("SecureStore authentication token")]
+        navigation["Navigation runtime and GPS tracking"]
+        navdb[("Separate SQLite navigation database and event outbox")]
+        reconnect["Refresh, reconnect and navigation event sync"]
+    end
+    api["Laravel API"]
+    route["Routing and map-pack services"]
+    gap["Required gap: durable household status submission outbox"]
+    roles --> hook
+    secure --> hook
+    hook --> snapshots
+    snapshots --> roles
+    hook --> api
+    hook -. "read failure or no connectivity" .-> banner
+    navigation --> navdb
+    navigation --> route
+    reconnect --> api
+    navdb --> reconnect
+    roles --> navigation
+    roles -. "not implemented by page caching" .-> gap

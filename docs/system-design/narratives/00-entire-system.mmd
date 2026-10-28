@@ -1,0 +1,39 @@
+sequenceDiagram
+    autonumber
+    actor HQ as Authorized HQ operator
+    actor HH as Household resident
+    actor R as Rescuer / team leader
+    participant API as RESQPERATION API
+    participant DB as Scoped operational and shared tables
+    participant Notify as Push provider
+    participant Partner as Partner systems
+    HQ->>API: Authenticate and access permitted modules
+    API->>DB: Verify account, role and access scope
+    HQ->>API: Declare event and publish alert with report-status choices
+    API->>DB: Store event and broadcast
+    API->>Notify: Submit configured notification delivery
+    Notify-->>HH: Alert when device delivery succeeds
+    HH->>API: Submit own or authorized trusted-member safety status
+    API->>DB: Validate event, member and status, save history
+    HQ->>API: Review affected households and dispatch available team
+    API->>DB: Save assignment and operational history
+    R->>API: Load own assignment, route and household details
+    R->>API: Update progress, record location and submit member assessments
+    API->>DB: Persist field findings and current safety state
+    opt Team leader requests logistics
+        R->>API: Submit personnel, equipment or supply request
+        API->>DB: Record pending request
+        HQ->>API: Authorized validation and forwarding decision
+        API->>Partner: Forward to configured TrackingAid connection
+        Partner-->>API: Handoff or fulfillment status when available
+    end
+    opt Generate situation report
+        HQ->>API: Select event, scope and report sections
+        API->>DB: Read recorded operational evidence
+        API->>Partner: Request configured external report data
+        API-->>HQ: Saved report and export for manual escalation
+    end
+    opt API or network unavailable
+        Note over HH,R: Mobile restores last-synced pages and shows Offline mode
+        Note over HH,R: Page caching does not queue household status submissions
+    end

@@ -1,0 +1,30 @@
+flowchart LR
+    subgraph localDb["Inspected default database connection: resq_local"]
+        business["75 verified RESQPERATION-used business/support tables"]
+        excluded["43 existing tables excluded from the business ERD"]
+        missing["8 application/migration-defined tables absent here"]
+    end
+    subgraph mobile["Independent mobile storage"]
+        meta["SQLite metadata, households, dispatches, routes and centers"]
+        localtrip["local_trips and local_trip_points"]
+        outbox["outbox navigation events"]
+        snapshots["expo-sqlite key/value overview snapshots"]
+        token["SecureStore token; no token value in schema diagrams"]
+    end
+    api["Laravel API, access policy and synchronization"]
+    subgraph partners["External boundaries - not local ERD entities"]
+        safe["SafeTrack"]
+        eva["EvaTrack"]
+        track["TrackingAid"]
+        remote[("Partner inventory / configured forwarding table")]
+    end
+    api --> business
+    api -. "may require schema deployment" .-> missing
+    api <--> safe & eva & track
+    track --> remote
+    api -. "configured forwarding connection" .-> remote
+    api <--> meta
+    outbox --> api
+    localtrip --> outbox
+    api --> snapshots
+    token -. "authenticated request scope" .-> api

@@ -1,0 +1,40 @@
+flowchart LR
+    %% UML use-case approximation for broad Mermaid Live compatibility.
+    %% Plain lines are associations; labeled dotted arrows are UML relationships.
+    AccountHolder["Actor: Account holder"]:::actor
+    Hq["Actor: HQ personnel - common permitted modules"]:::actor
+    Response["Actor: Response sub-committee / dispatcher"]:::actor
+    Chair["Actor: BDRRM committee chairperson"]:::actor
+    Admin["Actor: Operations / system administrator"]:::actor
+    Visitor["Actor: Public inquiry sender"]:::actor
+    subgraph resqperation["RESQPERATION"]
+        signIn(["Sign in, restore an authorized session and sign out - B2"])
+        authorize(["Validate account, role and applicable device binding - B2"])
+        recoverAccount(["Recover password and configure recovery information"])
+        ownProfile(["Maintain personal profile and password - B3"])
+        personnel(["Create, validate, activate or deactivate personnel accounts - B1"])
+        officialId(["GAP: capture and review official identification - B1"]):::gap
+        teams(["Manage rescue teams, leaders, members and assignments"])
+        accessRules(["Manage HQ accounts, roles, module access and approval rights"])
+        configuration(["Maintain barangay profile, disaster/status options and request types"])
+        inquiry(["Submit a public inquiry"])
+        manageInquiries(["Review inquiries, update status and inspect inquiry history"])
+    end
+    Hq -. "specializes" .-> AccountHolder
+    Response -. "specializes" .-> Hq
+    Chair -. "specializes" .-> Response
+    Admin -. "specializes" .-> Chair
+    AccountHolder --- signIn
+    AccountHolder --- recoverAccount
+    AccountHolder --- ownProfile
+    Admin --- personnel
+    Admin --- officialId
+    Admin --- teams
+    Admin --- accessRules
+    Admin --- configuration
+    Admin --- manageInquiries
+    Visitor --- inquiry
+    signIn -. "include" .-> authorize
+    classDef actor fill:#e0f2fe,color:#0c4a6e,stroke:#0284c7
+    classDef gap fill:#fff1f2,color:#881337,stroke:#be123c,stroke-width:2px
+    classDef partial fill:#fff7ed,color:#7c2d12,stroke:#c2410c,stroke-width:2px

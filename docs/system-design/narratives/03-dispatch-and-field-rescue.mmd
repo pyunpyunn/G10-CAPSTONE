@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    actor HQ as Authorized dispatcher
+    actor R as Assigned rescuer
+    participant API as Dispatch and field APIs
+    participant DB as Assignment, household and report records
+    participant Router as Routing service
+    HQ->>API: Review area priorities and available teams
+    API->>DB: Read affected households, criteria and responder availability
+    HQ->>API: Confirm assignment and selected responders
+    API->>DB: Save scoped assignment and history
+    R->>API: Load own assignment and destination
+    API->>Router: Calculate permitted road route
+    Router-->>R: Route geometry and directions through app
+    R->>API: Accept, mark en route, then mark arrived
+    API->>DB: Save progression, location and timestamps
+    R->>API: Check in and submit each household member assessment
+    API->>DB: Save member outcomes and field report
+    opt Communication required and internet available
+        R->>API: Start PTT session, upload voice clip/signals
+        API->>DB: Record communication metadata
+        API-->>HQ: Authorized communication feed
+    end
+    R->>API: Submit eligible final household/assignment outcome
+    API->>DB: Validate transition and persist result
+    API-->>HQ: Updated operational picture

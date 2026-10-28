@@ -1,0 +1,57 @@
+flowchart LR
+    %% UML use-case approximation for broad Mermaid Live compatibility.
+    %% Plain lines are associations; labeled dotted arrows are UML relationships.
+    AccountHolder["Actor: Account holder"]:::actor
+    Resident["Actor: Household resident"]:::actor
+    Rescuer["Actor: Rescuer - shared field duties"]:::actor
+    Verifier["Actor: Authorized evacuation verifier - duty, not separate account role"]:::actor
+    SafeTrack["Actor: SafeTrack"]:::actor
+    GeoWeather["Actor: Weather, hazard, map and routing providers"]:::actor
+    subgraph resqperation["RESQPERATION"]
+        householdProfile(["Complete household setup; view members, address and geotag - A1"])
+        deviceOwner(["Select or reset the household member using the device"])
+        householdAlerts(["Receive alerts, instructions and broadcast history - A2"])
+        householdStatus(["Submit household/member safety status and review history - A3"])
+        broadcastChoices(["Use the applicable broadcast's configured status choices"])
+        householdLocation(["Capture permitted GPS location and update the geotag"])
+        trustedConnections(["Find, invite, accept, reject or remove trusted households"])
+        trustedStatus(["Report permitted trusted-household member statuses"])
+        trustedPin(["Verify trusted-household connection and PIN authorization"])
+        evacuationRoute(["Find available evacuation centers; view route, distance and ETA - A4"])
+        residentQr(["Display or save the resident household QR - A6"])
+        evacuationVerify(["Verify QR and record evacuation arrival - A6"]):::partial
+        offlineView(["View all saved mobile page data with Offline mode and last-sync time - A5"])
+        offlineSubmit(["GAP: durably queue household status reports while offline - A5"]):::gap
+        replayStatuses(["GAP: replay queued household reports safely after reconnection - A5"]):::gap
+        operationLog(["Record operational timestamps, status changes and history - C5"])
+        sharedHouseholds(["Read linked shared household and member records"])
+    end
+    Resident -. "specializes" .-> AccountHolder
+    Rescuer -. "specializes" .-> AccountHolder
+    Resident --- householdProfile
+    Resident --- deviceOwner
+    Resident --- householdAlerts
+    Resident --- householdStatus
+    Resident --- householdLocation
+    Resident --- trustedConnections
+    Resident --- trustedStatus
+    Resident --- evacuationRoute
+    Resident --- residentQr
+    Resident --- offlineView
+    Resident --- offlineSubmit
+    Verifier --- evacuationVerify
+    Rescuer --- operationLog
+    Rescuer --- offlineView
+    SafeTrack --- sharedHouseholds
+    GeoWeather --- evacuationRoute
+    householdProfile -. "include" .-> sharedHouseholds
+    householdStatus -. "include" .-> broadcastChoices
+    householdStatus -. "include" .-> operationLog
+    trustedStatus -. "include" .-> trustedPin
+    trustedStatus -. "include" .-> householdStatus
+    evacuationVerify -. "include" .-> operationLog
+    offlineSubmit -. "include" .-> replayStatuses
+    offlineView -. "extend" .-> householdProfile
+    classDef actor fill:#e0f2fe,color:#0c4a6e,stroke:#0284c7
+    classDef gap fill:#fff1f2,color:#881337,stroke:#be123c,stroke-width:2px
+    classDef partial fill:#fff7ed,color:#7c2d12,stroke:#c2410c,stroke-width:2px

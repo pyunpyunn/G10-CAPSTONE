@@ -1,0 +1,76 @@
+flowchart LR
+    %% UML use-case approximation for broad Mermaid Live compatibility.
+    %% Plain lines are associations; labeled dotted arrows are UML relationships.
+    AccountHolder["Actor: Account holder"]:::actor
+    Rescuer["Actor: Rescuer - shared field duties"]:::actor
+    TeamLeader["Actor: Rescue team leader"]:::actor
+    Hq["Actor: HQ personnel - common permitted modules"]:::actor
+    Response["Actor: Response sub-committee / dispatcher"]:::actor
+    Chair["Actor: BDRRM committee chairperson"]:::actor
+    Recovery["Actor: Recovery and Rehabilitation sub-committee"]:::actor
+    SafeTrack["Actor: SafeTrack"]:::actor
+    EvaTrack["Actor: EvaTrack"]:::actor
+    TrackingAid["Actor: TrackingAid"]:::actor
+    Sms["Actor: Configured SMS gateway"]:::actor
+    City["Actor: City disaster-response authority - manual report recipient"]:::actor
+    subgraph resqperation["RESQPERATION"]
+        operationLog(["Record operational timestamps, status changes and history - C5"])
+        situation(["Prepare, synchronize, save and lock situation reports - D7"])
+        exportReport(["Export permitted report sections as PDF, CSV or Excel - D7"])
+        escalate(["Escalate an incident through a manually handed-off report - D8"])
+        archive(["Browse, filter, export and manage incident archives and saved groups - D9"]):::partial
+        externalIntake(["Receive and record authenticated external resource requests - R1"])
+        requestItems(["Specify personnel, equipment, goods, quantities and urgency - R2"])
+        requestReview(["Review, validate, return, cancel or complete eligible requests - R3 / R4"])
+        forwardRequest(["Forward a validated request to TrackingAid - R3"]):::partial
+        preventDuplicates(["Validate request identity, permission and duplicate references - R4"])
+        requestTracking(["Track Pending, Validated/Approved, In Progress and Completed - R5"])
+        externalReportRequest(["Partner requests a RESQPERATION report and checks its release status"])
+        releaseReport(["Accept or reject report release; freeze accepted snapshot and issue download"])
+        partnerReport(["Request and review SafeTrack, EvaTrack or TrackingAid reports"])
+        sharedHouseholds(["Read linked shared household and member records"])
+        smsStatus(["Process supported inbound SMS safety reports"])
+    end
+    Rescuer -. "specializes" .-> AccountHolder
+    Hq -. "specializes" .-> AccountHolder
+    TeamLeader -. "specializes" .-> Rescuer
+    Response -. "specializes" .-> Hq
+    Chair -. "specializes" .-> Response
+    Recovery -. "specializes" .-> Hq
+    Rescuer --- operationLog
+    TeamLeader --- requestTracking
+    Hq --- situation
+    Hq --- exportReport
+    Hq --- escalate
+    Hq --- archive
+    Hq --- partnerReport
+    Hq --- releaseReport
+    Response --- requestItems
+    Response --- requestTracking
+    Recovery --- requestItems
+    Recovery --- requestTracking
+    Chair --- requestReview
+    Chair --- forwardRequest
+    SafeTrack --- sharedHouseholds
+    SafeTrack --- partnerReport
+    SafeTrack --- externalReportRequest
+    EvaTrack --- externalIntake
+    EvaTrack --- partnerReport
+    EvaTrack --- externalReportRequest
+    TrackingAid --- forwardRequest
+    TrackingAid --- requestTracking
+    TrackingAid --- partnerReport
+    TrackingAid --- externalReportRequest
+    Sms --- smsStatus
+    City --- escalate
+    situation -. "include" .-> operationLog
+    escalate -. "include" .-> exportReport
+    externalIntake -. "include" .-> preventDuplicates
+    requestReview -. "include" .-> preventDuplicates
+    forwardRequest -. "include" .-> preventDuplicates
+    requestTracking -. "include" .-> operationLog
+    externalReportRequest -. "include" .-> releaseReport
+    forwardRequest -. "extend" .-> requestReview
+    classDef actor fill:#e0f2fe,color:#0c4a6e,stroke:#0284c7
+    classDef gap fill:#fff1f2,color:#881337,stroke:#be123c,stroke-width:2px
+    classDef partial fill:#fff7ed,color:#7c2d12,stroke:#c2410c,stroke-width:2px

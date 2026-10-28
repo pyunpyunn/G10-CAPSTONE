@@ -1,0 +1,16 @@
+sequenceDiagram
+    autonumber
+    actor Visitor as Public sender
+    actor Admin as Operations/Admin
+    participant Web as Public web page
+    participant API as Inquiry API
+    participant DB as landing_inquiries and audit records
+    Visitor->>Web: Enter inquiry details
+    Web->>API: Submit inquiry
+    API->>API: Validate and throttle intake
+    API->>DB: Store accepted inquiry
+    API-->>Visitor: Acknowledge saved inquiry
+    Admin->>API: Open inquiry management
+    API->>API: Enforce administrative access
+    Admin->>API: Review and update inquiry status
+    API->>DB: Store authorized status/history

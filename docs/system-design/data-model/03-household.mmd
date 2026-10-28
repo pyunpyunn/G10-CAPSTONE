@@ -1,0 +1,49 @@
+flowchart LR
+    %% Grouping is module relevance, not database/table ownership.
+    %% Arrows point from referenced identity to dependent records.
+    subgraph identity["Accounts and access"]
+        tusers["users"]
+    end
+    subgraph household["Shared household and geography foundation"]
+        thouseholds["households"]
+        thousehold_members["household_members"]
+        thousehold_member_id_mappings["household_member_id_mappings"]
+        taddresses["addresses"]
+        tbarangays["barangays"]
+        tcities["cities"]
+        tprovinces["provinces"]
+        tsitios["sitios"]
+        tpuroks["puroks"]
+        tgenders["genders"]
+        trelationships["relationships"]
+        tmember_vulnerable_groups["member_vulnerable_groups"]
+        tgeotagged_locations["geotagged_locations"]
+        ttrusted_households["trusted_households"]
+        thousehold_trusted_pins["household_trusted_pins"]
+        tbarangay_boundaries["barangay_boundaries"]
+        tmapping_hazard_layers["mapping_hazard_layers"]
+    end
+    tbarangays -.->|"barangay_id"| taddresses
+    tpuroks -.->|"purok_id"| taddresses
+    tsitios -.->|"sitio_id"| taddresses
+    tbarangays -.->|"barangay_id"| tbarangay_boundaries
+    tcities -.->|"city_id"| tbarangays
+    tprovinces -.->|"province_id"| tcities
+    thouseholds -.->|"household_id"| tgeotagged_locations
+    tusers -.->|"verified_by_user_id"| tgeotagged_locations
+    thousehold_members -.->|"member_id"| thousehold_member_id_mappings
+    tgenders -.->|"gender_id"| thousehold_members
+    thouseholds -.->|"household_id"| thousehold_members
+    trelationships -.->|"relationship_id"| thousehold_members
+    thouseholds -.->|"household_id"| thousehold_trusted_pins
+    taddresses -.->|"address_id"| thouseholds
+    tbarangays -.->|"barangay_id"| tmapping_hazard_layers
+    thousehold_members -.->|"member_id"| tmember_vulnerable_groups
+    tsitios -.->|"sitio_id"| tpuroks
+    tbarangays -.->|"barangay_id"| tsitios
+    tusers -.->|"created_by_user_id"| ttrusted_households
+    thouseholds -.->|"requesting_household_id"| ttrusted_households
+    thouseholds -.->|"trusted_household_id"| ttrusted_households
+    tusers -.->|"validated_by_user_id"| ttrusted_households
+    thouseholds -.->|"household_id"| tusers
+    thousehold_members -.->|"member_id"| tusers

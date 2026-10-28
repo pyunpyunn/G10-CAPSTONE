@@ -1,0 +1,98 @@
+erDiagram
+    direction LR
+    %% Solid relationships = inspected database foreign keys.
+    %% Dotted relationships = application/model references, not enforced foreign keys.
+    %% PK/UK markings come only from the inspected schema, not model assumptions.
+    evacuation_centers {
+        varchar evacuation_center_id PK "application reference"
+        varchar current_event_id "nullable; application reference"
+        varchar name "nullable"
+        varchar center_type "nullable"
+        decimal latitude "nullable"
+        decimal longitude "nullable"
+        int capacity "nullable"
+        varchar status
+        int current_occupancy "nullable"
+        varchar contact_person "nullable"
+        varchar contact_number "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar osm_address "nullable"
+        text notes "nullable"
+        datetime updated_at "nullable"
+    }
+    request_validations {
+        int validation_id PK
+        varchar request_id "application reference"
+        varchar validation_status
+        varchar validator_user_id "nullable; application reference"
+        text validation_notes "nullable"
+        text missing_information "nullable"
+        varchar duplicate_request_id "nullable; application reference"
+        datetime validated_at "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    resource_request_status {
+        int status_id PK "application reference"
+        varchar status_key "nullable"
+        varchar status_label "nullable"
+    }
+    resource_requests {
+        varchar request_id PK "application reference"
+        varchar request_source "nullable"
+        varchar source_reference "nullable"
+        varchar request_category "nullable"
+        varchar evacuation_center_id "nullable; application reference"
+        varchar requested_by "nullable"
+        varchar handled_by "nullable; application reference"
+        varchar resource_type "nullable"
+        varchar item_name "nullable"
+        int quantity "nullable"
+        varchar unit "nullable"
+        text description "nullable"
+        int status_id "nullable; application reference"
+        varchar validation_status
+        text validation_notes "nullable"
+        varchar validated_by_user_id "nullable; application reference"
+        datetime validated_at "nullable"
+        datetime released_for_tracking_at "nullable"
+        varchar tracking_reference "nullable"
+        datetime created_at "nullable"
+        datetime updated_at "nullable"
+    }
+    users {
+        varchar user_id PK "application reference"
+        varchar first_name "nullable"
+        varchar last_name "nullable"
+        varchar name "nullable"
+        varchar username "nullable"
+        varchar email "nullable"
+        timestamp email_verified_at "nullable"
+        varchar password "nullable"
+        int role_id "nullable; application reference"
+        varchar contact_number "nullable"
+        varchar assigned_center_id "nullable"
+        varchar household_id "nullable; application reference"
+        varchar member_id UK "nullable; application reference"
+        tinyint is_active "nullable"
+        tinyint must_change_password
+        varchar temp_password "nullable"
+        varchar remember_token "nullable"
+        timestamp updated_at "nullable"
+        datetime created_at "nullable"
+        datetime deleted_at "nullable"
+        varchar profile_photo "nullable"
+        varchar security_question_1 "nullable"
+        varchar security_answer_1 "nullable"
+        varchar security_question_2 "nullable"
+        varchar security_answer_2 "nullable"
+        timestamp password_changed_at "nullable"
+    }
+    evacuation_centers o|..o{ resource_requests : "logical_evacuation_center_id"
+    resource_request_status o|..o{ resource_requests : "logical_status_id"
+    resource_requests o|..o{ request_validations : "logical_duplicate_request_id"
+    resource_requests ||..o{ request_validations : "logical_request_id"
+    users o|..o{ request_validations : "logical_validator_user_id"
+    users o|..o{ resource_requests : "logical_handled_by"
+    users o|..o{ resource_requests : "logical_validated_by_user_id"
