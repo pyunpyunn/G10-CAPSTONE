@@ -1,5 +1,18 @@
 # Standalone Android APK
 
+## Latest local APK — version 2.0.0, build 50
+
+Installable file: [`releases/RESQPERATION-build50.apk`](./releases/RESQPERATION-build50.apk).
+
+- 22,584,969 bytes; version code 50; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `E78C3E7213DBFD5688F4D044D4024C53015CDF72D404D1E27CE23DE7AB1E8BA2`.
+- Get code submits directly without requiring phone-field blur or a separate validation request. The backend verifies the registered number before sending.
+- Resend wait is 60 seconds; confirmed gateway errors allow immediate retry. Duplicate taps cannot send concurrent requests. The OTP request timeout now exceeds the gateway timeout.
+- OTP uses only SMS Gateway, never OneSignal or Semaphore. Operational push alerts remain enabled. Carrier arrival time cannot be guaranteed.
+- Backend configuration cache was cleared on the running workspace server; public HTTPS readiness passed. Gateway configuration is present.
+- Verification passed: 42 backend auth/alert tests (216 assertions), two recovery-screen interaction tests, TypeScript, signed release compilation, package/version checks, and non-debuggable/HTTPS manifest checks.
+- Physical-device installation and live SMS testing were skipped at the user's request.
+
 ## Latest local APK â€” version 2.0.0, build 49
 
 Installable file: [`releases/RESQPERATION-build49.apk`](./releases/RESQPERATION-build49.apk).
