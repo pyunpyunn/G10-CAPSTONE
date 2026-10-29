@@ -88,7 +88,7 @@ class OperationalSequence
         }
 
         $row = DB::table('operational_sequences')->where('sequence_key', $key)->lockForUpdate()->first();
-        $id = (int) $row->next_value;
+        $id = max((int) $row->next_value, ((int) DB::table($table)->max($column)) + 1);
         DB::table('operational_sequences')->where('sequence_key', $key)->update(['next_value' => $id + 1]);
 
         return $id;

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ResponderAssignment extends Model
 {
@@ -18,6 +19,8 @@ class ResponderAssignment extends Model
     public function disaster(): BelongsTo { return $this->belongsTo(DisasterEvent::class, 'disaster_id', 'event_id'); }
     public function household(): BelongsTo { return $this->belongsTo(Household::class, 'household_id', 'household_id'); }
     public function affectedArea(): BelongsTo { return $this->belongsTo(AffectedArea::class, 'affected_area_id', 'affected_area_id'); }
+    public function fieldReports(): HasMany { return $this->hasMany(ResponderFieldReport::class, 'assignment_id', 'assignment_id'); }
+    public function trips(): HasMany { return $this->hasMany(DispatchTrip::class, 'dispatch_id', 'assignment_id'); }
 }
 
 

@@ -1,0 +1,12 @@
+{
+    "sql": [
+        "ALTER TABLE `responders` ADD CONSTRAINT `resq_ac9f025ccc12d022_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT ON UPDATE RESTRICT",
+        "ALTER TABLE `responders` ADD CONSTRAINT `resq_f84c0a52eebdaba4_fk` FOREIGN KEY (`team_id`) REFERENCES `rescue_teams` (`team_id`) ON DELETE RESTRICT ON UPDATE RESTRICT",
+        "ALTER TABLE `responder_assignments` ADD CONSTRAINT `resq_3428d072259e0d09_fk` FOREIGN KEY (`disaster_id`) REFERENCES `disaster_events` (`event_id`) ON DELETE RESTRICT ON UPDATE RESTRICT",
+        "ALTER TABLE `responder_assignments` ADD CONSTRAINT `resq_fcdd6dad91e8b153_fk` FOREIGN KEY (`household_id`) REFERENCES `households` (`household_id`) ON DELETE RESTRICT ON UPDATE RESTRICT",
+        "ALTER TABLE `responder_routes` MODIFY `responder_id` int NULL DEFAULT NULL",
+        "ALTER TABLE `responder_routes` ADD CONSTRAINT `resq_801e43211609687c_fk` FOREIGN KEY (`responder_id`) REFERENCES `responders` (`responder_id`) ON DELETE RESTRICT ON UPDATE RESTRICT",
+        "ALTER TABLE `request_validations` ADD CONSTRAINT `resq_fc738be83da633c4_fk` FOREIGN KEY (`request_id`) REFERENCES `resource_requests` (`request_id`) ON DELETE RESTRICT ON UPDATE RESTRICT"
+    ],
+    "blocked": []
+}

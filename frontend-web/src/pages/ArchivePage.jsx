@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useArchiveRecordsQuery } from '../state/operationsApi'
 import { useOutletContext } from 'react-router-dom'
 import {
   exportArchive,
@@ -6,7 +7,6 @@ import {
   deleteArchiveRecords,
   deleteSavedArchiveGroup,
   deleteSavedArchiveGroupRecord,
-  getArchiveRecords,
   getSavedArchiveGroups,
 } from '../api/archiveApi'
 import InquiryLogsView from './InquiryLogsView'
@@ -25,6 +25,7 @@ import {
   ARCHIVE_TABS,
   archiveErrorMessage,
   archiveParams,
+  archiveRecordTitle,
 } from '../utils/archiveHelpers'
 
 
@@ -33,9 +34,6 @@ export default function ArchivePage() {
   const isSuperAdmin = user?.role?.role_key === 'operations_admin'
   const [isExporting, setIsExporting] = useState(false)
   const [activeCategory, setActiveCategory] = useState('disaster-events')
-  const [payload, setPayload] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [page, setPage] = useState(1)
   const [selectedRecord, setSelectedRecord] = useState(null)
@@ -45,46 +43,17 @@ export default function ArchivePage() {
   const [savedGroups, setSavedGroups] = useState([])
   const [openGroupId, setOpenGroupId] = useState('')
   const [isSavedGroupsOpen, setIsSavedGroupsOpen] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [search, setSearch] = useState('')
   const [purok, setPurok] = useState('all')
   const [eventId, setEventId] = useState('all')
   const [status, setStatus] = useState('all')
 
-  useEffect(() => {
-    let ignore = false
-
-    async function loadRecords() {
-      if (['inquiry-logs', 'evatrack-reports'].includes(activeCategory)) return
-      setIsLoading(true)
-      setError('')
-
-      try {
-        const params = archiveParams({ search, purok, eventId, status, page })
-        const data = await getArchiveRecords(activeCategory, params)
-
-        if (!ignore) {
-          setPayload(data)
-        }
-      } catch (loadError) {
-        if (!ignore) {
-          setError(archiveErrorMessage(loadError))
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadRecords()
-
-    return () => {
-      ignore = true
-    }
-  }, [activeCategory, eventId, page, purok, refreshKey, search, status])
-
+  const { currentData: payload, isFetching: isLoading, error: queryError, refetch } = useArchiveRecordsQuery(
+    { category: activeCategory, ...archiveParams({ search, purok, eventId, status, page }) },
+    { skip: ['inquiry-logs', 'evatrack-reports'].includes(activeCategory), pollingInterval: 30000, skipPollingIfUnfocused: true },
+  )
+  const error = queryError?.message || ''
   useEffect(() => {
     let ignore = false
 
@@ -248,7 +217,7 @@ export default function ArchivePage() {
       setIsSavedGroupsOpen(true)
       setMessage('')
       clearSelected()
-      setRefreshKey((value) => value + 1)
+      refetch()
     } catch (saveError) {
       setMessage(archiveErrorMessage(saveError, 'Selected logs cannot be saved as a database group right now.'))
     }
@@ -265,7 +234,7 @@ export default function ArchivePage() {
       await deleteSavedArchiveGroup(groupId)
       setSavedGroups((current) => current.filter((group) => group.id !== groupId))
       setOpenGroupId('')
-      setRefreshKey((value) => value + 1)
+      refetch()
     } catch (deleteError) {
       setMessage(archiveErrorMessage(deleteError, 'Saved archive group cannot be deleted right now.'))
     }
@@ -301,7 +270,7 @@ export default function ArchivePage() {
 
         return nextGroups
       })
-      setRefreshKey((value) => value + 1)
+      refetch()
     } catch (deleteError) {
       setMessage(archiveErrorMessage(deleteError, 'Saved archive log cannot be deleted right now.'))
     }
@@ -328,7 +297,9 @@ export default function ArchivePage() {
       return
     }
 
-    const confirmedText = window.prompt(`Type DELETE to permanently delete ${ids.length} selected archive log(s).`)
+    const recordsById = new Map(selectedRecords().map(record => [String(record.id), record]))
+    const selection = ids.slice(0, 10).map(id => `${id}: ${archiveRecordTitle(recordsById.get(String(id)) || { id })}`).join('\n')
+    const confirmedText = window.prompt(`Type DELETE to permanently delete ${ids.length} selected archive log(s).\n\n${selection}${ids.length > 10 ? '\n…more selected records' : ''}`)
 
     if (confirmedText !== 'DELETE') {
       setMessage('Delete cancelled. Type DELETE exactly to confirm permanent deletion.')
@@ -339,7 +310,7 @@ export default function ArchivePage() {
       const result = await deleteArchiveRecords(activeCategory, ids)
       setMessage(`${result.deleted_count || ids.length} selected log(s) deleted forever.`)
       clearSelected()
-      setRefreshKey((value) => value + 1)
+      refetch()
     } catch (deleteError) {
       setMessage(archiveErrorMessage(deleteError, 'Selected logs cannot be deleted right now.'))
     }

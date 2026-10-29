@@ -3,7 +3,11 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
+<<<<<<< HEAD
 $resqLocalConnection = [
+=======
+$localConnection = [
+>>>>>>> sub-main
     'driver' => env('RESQ_LOCAL_DB_CONNECTION', 'mysql'),
     'url' => env('RESQ_LOCAL_DB_URL'),
     'host' => env('RESQ_LOCAL_DB_HOST', '127.0.0.1'),
@@ -54,6 +58,7 @@ return [
 
     'connections' => [
 
+<<<<<<< HEAD
         'ResQperation' => $resqLocalConnection,
 
         // Explicit opt-in connection for additive shared-database upgrades.
@@ -68,6 +73,12 @@ return [
             'prefix' => '', 'strict' => true, 'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? [\PDO::ATTR_TIMEOUT => 10] : [],
         ],
+=======
+        'resq_local' => $localConnection,
+
+        // Preserve the deployed connection name without depending on cached config.
+        'ResQperation' => $localConnection,
+>>>>>>> sub-main
 
         'resq_local' => $resqLocalConnection,
 

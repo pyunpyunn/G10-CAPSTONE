@@ -180,6 +180,6 @@ function requestActions(request, onView, onEdit) {
   return actions
 }
 
-function statusTone(status, validationStatus) {
-  return unifiedStatusTone(['verified','forwarded'].includes(validationStatus) ? validationStatus : status)
+function statusTone(status) {
+  return unifiedStatusTone(status)
 }
