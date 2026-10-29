@@ -69,6 +69,11 @@ class DisasterBroadcast extends Model
     {
         return $this->belongsTo(WeatherLog::class, 'weather_log_id', 'weather_log_id');
     }
+
+    public function notification(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Notification::class, 'notification_id', 'notif_id');
+    }
 }
 
 

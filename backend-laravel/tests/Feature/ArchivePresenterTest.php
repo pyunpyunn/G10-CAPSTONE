@@ -7,6 +7,30 @@ use Tests\TestCase;
 
 class ArchivePresenterTest extends TestCase
 {
+    public function test_radio_archive_includes_playable_recording_only_when_the_file_exists(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $path = 'radio/test-recording.webm';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($path, 'test-audio-file');
+        $row = (object) [
+            'communication_id' => 17, 'disaster_id' => null,
+            'message' => json_encode(['type' => 'ptt_audio', 'audio_path' => $path, 'duration_seconds' => 3.5]),
+            'responder_name' => 'Responder', 'responder_code' => 'R17', 'team_name' => 'Team',
+            'event_name' => null, 'team_code' => 'T1', 'timestamp' => '2026-10-29 09:00:00',
+        ];
+        $presenter = app(ArchivePresenter::class);
+        $record = $presenter->formatRadioCommunication($row);
+        $this->assertTrue($record['recording']['available']);
+        $this->assertSame('/storage/'.$path, $record['recording']['url']);
+        $this->assertSame(3.5, $record['recording']['duration_seconds']);
+
+        \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
+        $record = $presenter->formatRadioCommunication($row);
+        $this->assertFalse($record['recording']['available']);
+        $this->assertNull($record['recording']['url']);
+        $this->assertStringContainsString('unavailable', $record['recording']['status']);
+    }
+
     public function test_saved_group_payload_is_presented_with_a_safe_category_and_valid_records(): void
     {
         $presenter = app(ArchivePresenter::class);

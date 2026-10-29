@@ -3,6 +3,8 @@
 namespace App\Services\Mobile;
 
 use App\Actions\UpdateHouseholdStatus;
+use App\Models\ResponderFieldReport;
+use App\Models\ResponderFieldReportMember;
 use App\Queries\RescuerAssignmentQuery;
 use App\Queries\RescuerFieldReportQuery;
 use Illuminate\Http\JsonResponse;
@@ -455,7 +457,7 @@ class RescuerFieldReportWorkflow
                 'updated_at' => $now,
             ]));
 
-            DB::table('responder_field_reports')->insert($this->support->filterColumns('responder_field_reports', [
+            ResponderFieldReport::query()->insert($this->support->filterColumns('responder_field_reports', [
                 'report_id' => $reportId,
                 'responder_id' => $responder->responder_id,
                 'disaster_id' => $activeEvent->event_id,
@@ -479,7 +481,7 @@ class RescuerFieldReportWorkflow
 
             foreach ($members as $member) {
                 $memberStatusId = $memberStatuses[$member['status_key']]->status_id;
-                DB::table('responder_field_report_members')->insert([
+                ResponderFieldReportMember::query()->insert([
                     'report_id' => $reportId,
                     'household_id' => $assignment->household_id,
                     'disaster_id' => $activeEvent->event_id,
@@ -661,7 +663,7 @@ class RescuerFieldReportWorkflow
             return;
         }
 
-        DB::table('responder_field_reports')->insert($this->support->filterColumns('responder_field_reports', [
+        ResponderFieldReport::query()->insert($this->support->filterColumns('responder_field_reports', [
             'report_id' => (string) $this->support->nextId('responder_field_reports', 'report_id'),
             'responder_id' => $responderId,
             'disaster_id' => $eventId,

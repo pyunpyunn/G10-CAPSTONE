@@ -58,7 +58,7 @@ window.addEventListener('focus', () => invalidateTransportCache())
 window.addEventListener('personnel-access:changed', () => invalidateApiState(['/auth/', '/profile', '/rescuers']))
 
 api.interceptors.request.use((config) => {
-  assertApiDestination(api.getUri(config), api.defaults.baseURL, window.location.href, import.meta.env.PROD)
+  assertApiDestination(api.getUri(config), api.defaults.baseURL, window.location.href, import.meta.env?.PROD)
   const token = getToken()
 
   if (token) {

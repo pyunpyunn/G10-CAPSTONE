@@ -2344,11 +2344,7 @@ class HouseholdMobileService
 
     private function nextId(string $table, string $column): int
     {
-        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $column)) {
-            return 1;
-        }
-
-        return ((int) DB::table($table)->max($column)) + 1;
+        return app(\App\Services\Shared\OperationalSequence::class)->nextNumericId($table, $column);
     }
 
     private function filterColumns(string $table, array $data): array

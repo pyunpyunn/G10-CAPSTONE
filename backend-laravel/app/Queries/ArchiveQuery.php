@@ -90,7 +90,7 @@ class ArchiveQuery
             'resource-requests' => [
                 'rr.request_id', 'rr.source_reference', 'rr.validation_status', 'rr.quantity', 'rr.unit',
                 'rr.item_name', 'rr.resource_type', 'rr.evacuation_center_id', 'rr.description', 'rr.created_at',
-                'rr.tracking_reference', 'rr.released_for_tracking_at', 'rr.validation_notes', 'rr.requested_by',
+                'rr.tracking_reference', 'rr.released_for_tracking_at', 'rr.validation_notes', 'rr.requested_by', 'rrs.status_key as request_status_key', 'rrs.status_label as request_status_label',
                 'rr.request_source', 'de.name as event_name', 'de.ended_at as event_ended_at',
                 'ec.name as evacuation_center_name', 'ec.osm_address as evacuation_center_address',
             ],
@@ -135,7 +135,7 @@ class ArchiveQuery
 
     private function resourceRequestRows(Request $request, int $perPage, bool $asQuery = false): mixed
     {
-        $query = ResourceRequest::query()->from('resource_requests as rr')->leftJoin('disaster_events as de', 'de.event_id', '=', 'rr.source_reference')->leftJoin('evacuation_centers as ec', 'ec.evacuation_center_id', '=', 'rr.evacuation_center_id')->select(['rr.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'ec.name as evacuation_center_name', 'ec.osm_address as evacuation_center_address', 'ec.current_event_id as evacuation_event_id']);
+        $query = ResourceRequest::query()->from('resource_requests as rr')->leftJoin('resource_request_status as rrs', 'rrs.status_id', '=', 'rr.status_id')->leftJoin('disaster_events as de', 'de.event_id', '=', 'rr.source_reference')->leftJoin('evacuation_centers as ec', 'ec.evacuation_center_id', '=', 'rr.evacuation_center_id')->select(['rr.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'ec.name as evacuation_center_name', 'ec.osm_address as evacuation_center_address', 'ec.current_event_id as evacuation_event_id', 'rrs.status_key as request_status_key', 'rrs.status_label as request_status_label']);
         $this->applySearch($query, $request, ['rr.request_id', 'rr.request_source', 'rr.source_reference', 'rr.requested_by', 'rr.resource_type', 'rr.item_name', 'rr.description', 'rr.validation_status', 'rr.tracking_reference', 'ec.name', 'ec.osm_address']); $this->applyEventFilter($query, $request, 'rr.source_reference'); $this->applyResourcePurokFilter($query, $request); $this->applyResourceStatusFilter($query, $request); if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'resource-requests', 'rr.request_id');
         if ($asQuery) return $query;
         $paginator = $query->orderByDesc('rr.created_at')->paginate($this->perPage($request, $perPage));
