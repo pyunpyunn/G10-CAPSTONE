@@ -21,7 +21,16 @@ class RescuerFieldReportQuery
     public function paginateAdmin(array $filters, int $perPage): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
         abort_unless(Schema::hasTable('household_status_logs'), 503, 'Field report records are currently unavailable.');
-        return $this->reportQuery(null, null, array_merge($filters, ['assignment_status_filter' => true]))->paginate($perPage);
+        $assignmentFilter = true;
+        $status = strtolower(trim((string) ($filters['status'] ?? 'all')));
+        if (! empty($filters['status_id'])) {
+            $assignmentFilter = false;
+        } elseif ($status !== 'all' && Schema::hasTable('household_statuses')
+            && ! in_array($status, app(DispatchStatusQuery::class)->keys(), true)
+            && DB::table('household_statuses')->where('status_key', $status)->exists()) {
+            $assignmentFilter = false;
+        }
+        return $this->reportQuery(null, null, array_merge($filters, ['assignment_status_filter' => $assignmentFilter]))->paginate($perPage);
     }
 
     private function reportQuery(?int $responderId, ?string $userId, array $filters): \Illuminate\Database\Query\Builder

@@ -16,6 +16,7 @@ class OperationalSequenceTest extends TestCase
     {
         parent::setUp();
         DB::table('operational_sequences')->insert(['sequence_key' => 'incident_archives', 'next_value' => 8]);
+        Schema::create('incident_archives', fn (Blueprint $table) => $table->integer('archive_id')->primary());
         Schema::create('resource_requests', function (Blueprint $table): void {
             $table->string('request_id')->primary();
             $table->timestamp('released_for_tracking_at')->nullable();
@@ -52,6 +53,12 @@ class OperationalSequenceTest extends TestCase
     {
         $this->expectException(LogicException::class);
         app(OperationalSequence::class)->nextIncidentArchiveId();
+    }
+
+    public function test_archive_sequence_recovers_after_an_external_insert(): void
+    {
+        DB::table('incident_archives')->insert(['archive_id' => 100]);
+        $this->assertSame(101, DB::transaction(fn () => app(OperationalSequence::class)->nextIncidentArchiveId()));
     }
 
     public function test_tracking_references_advance_on_a_locked_daily_row(): void

@@ -4,9 +4,41 @@ namespace App\Services\Shared;
 
 use PDO;
 
-/** Additive repairs only; shared master records and historical evidence are never rewritten. */
+/** Additive schema repairs and journaled reference repairs; shared master records are preserved. */
 class ResqDatabaseIntegrity
 {
+    public const SHARED_REFERENCES = [
+        ['users', 'role_id', 'roles', 'role_id'],
+        ['users', 'household_id', 'households', 'household_id'],
+        ['users', 'member_id', 'household_members', 'member_id'],
+        ['household_members', 'household_id', 'households', 'household_id'],
+        ['households', 'address_id', 'addresses', 'address_id'],
+        ['device_tokens', 'household_id', 'households', 'household_id'],
+        ['geotagged_locations', 'household_id', 'households', 'household_id'],
+        ['resource_requests', 'status_id', 'resource_request_status', 'status_id'],
+        ['resource_requests', 'evacuation_center_id', 'evacuation_centers', 'evacuation_center_id'],
+    ];
+
+    /** Read-only findings: shared parent records must be reconciled by their authoritative owners. */
+    public function sharedReferenceWarnings(PDO $pdo): array
+    {
+        $columns = [];
+        foreach ($pdo->query('SELECT TABLE_NAME,COLUMN_NAME,COLLATION_NAME,CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE()')->fetchAll(PDO::FETCH_ASSOC) as $column) {
+            $columns[$column['TABLE_NAME']][$column['COLUMN_NAME']] = $column;
+        }
+        $warnings = [];
+        foreach (self::SHARED_REFERENCES as [$table, $key, $parent, $parentKey]) {
+            if (! isset($columns[$table][$key], $columns[$parent][$parentKey])) continue;
+            $comparison = "c.`$key`";
+            if ($columns[$table][$key]['CHARACTER_SET_NAME'] && $columns[$parent][$parentKey]['COLLATION_NAME']) {
+                $comparison .= ' COLLATE '.$columns[$parent][$parentKey]['COLLATION_NAME'];
+            }
+            $count = (int) $pdo->query("SELECT COUNT(*) FROM `$table` c LEFT JOIN `$parent` p ON $comparison=p.`$parentKey` WHERE c.`$key` IS NOT NULL AND p.`$parentKey` IS NULL")->fetchColumn();
+            if ($count) $warnings[] = ['relationship' => "$table.$key -> $parent.$parentKey", 'orphans' => $count, 'action' => 'Shared records preserved; authoritative reconciliation required.'];
+        }
+        return $warnings;
+    }
+
     public const PRIMARY_KEYS = [
         'affected_areas' => 'affected_area_id', 'device_tracking_logs' => 'tracking_id',
         'disaster_broadcasts' => 'broadcast_id', 'field_report_categories' => 'category_id',
@@ -105,6 +137,11 @@ class ResqDatabaseIntegrity
         ['purok_boundaries', 'purok_id', 'puroks', 'purok_id'],
         ['external_report_requests', 'event_id', 'disaster_events', 'event_id'],
         ['situation_report_submissions', 'sit_rep_id', 'situation_reports', 'sit_rep_id'],
+        ['hq_field_reports', 'linked_report_id', 'responder_field_reports', 'report_id'],
+        ['status_reminders', 'event_id', 'disaster_events', 'event_id'],
+        ['status_reminders', 'household_id', 'households', 'household_id'],
+        ['status_reminders', 'member_id', 'household_members', 'member_id'],
+        ['user_notifications', 'user_id', 'users', 'user_id'],
     ];
 
     public function plan(PDO $pdo): array
@@ -199,7 +236,10 @@ class ResqDatabaseIntegrity
                 $safeRouteId = $table === 'responder_routes' && $key === 'responder_id'
                     && $target['COLUMN_TYPE'] === 'int'
                     && ! $pdo->query('SELECT COUNT(*) FROM responder_routes WHERE responder_id < -2147483648 OR responder_id > 2147483647')->fetchColumn();
-                $safeAsciiKey = $child['COLUMN_TYPE'] === $target['COLUMN_TYPE']
+                $safeWidening = preg_match('/^varchar\((\d+)\)$/i', $child['COLUMN_TYPE'], $childLength)
+                    && preg_match('/^varchar\((\d+)\)$/i', $target['COLUMN_TYPE'], $targetLength)
+                    && (int) $targetLength[1] >= (int) $childLength[1];
+                $safeAsciiKey = ($child['COLUMN_TYPE'] === $target['COLUMN_TYPE'] || $safeWidening)
                     && $child['CHARACTER_SET_NAME'] === 'utf8mb4'
                     && $target['CHARACTER_SET_NAME'] === 'utf8mb4'
                     && ! $pdo->query("SELECT COUNT(*) FROM `$table` WHERE `$key` REGEXP '[^ -~]'")->fetchColumn();

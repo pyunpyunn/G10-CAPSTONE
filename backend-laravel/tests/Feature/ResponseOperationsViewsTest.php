@@ -82,6 +82,7 @@ class ResponseOperationsViewsTest extends TestCase
             ['requesting_household_id'=>'HH-4','trusted_household_id'=>'HH-5','validation_status'=>'pending'],
         ]);
         $dispatch = (object) ['household_id'=>null,'disaster_id'=>'EV-1','route_notes'=>json_encode(['household_ids'=>['HH-1','HH-2','HH-3','HH-4','HH-5']])];
+        \Tests\Support\BarangayScopeFixture::seed();
         $rows = collect(app(RescueDispatchQuery::class)->coverageHouseholds($dispatch))->keyBy('household_id');
         foreach (['HH-1','HH-2','HH-3','HH-5'] as $id) $this->assertTrue($rows[$id]['has_contact_channel']);
         $this->assertFalse($rows['HH-4']['has_contact_channel']);
@@ -276,7 +277,7 @@ class ResponseOperationsViewsTest extends TestCase
 
     public function test_response_read_endpoints_reject_resident_and_rescuer_roles(): void
     {
-        Schema::create('users', function (Blueprint $table) { $table->string('user_id')->primary(); $table->string('role'); $table->timestamps(); });
+        Schema::create('users', function (Blueprint $table) { $table->string('user_id')->primary(); $table->string('role'); $table->boolean('is_active')->default(true); $table->timestamps(); });
         foreach (['household_resident', 'rescuer'] as $role) {
             Sanctum::actingAs(User::query()->create(['user_id' => $role, 'role' => $role]));
             $this->getJson('/api/v1/dispatches/communications')->assertForbidden();
@@ -286,7 +287,7 @@ class ResponseOperationsViewsTest extends TestCase
 
     public function test_admin_field_reports_endpoint_exposes_real_pagination_metadata(): void
     {
-        Schema::create('users', function (Blueprint $table) { $table->string('user_id')->primary(); $table->string('role'); $table->timestamps(); });
+        Schema::create('users', function (Blueprint $table) { $table->string('user_id')->primary(); $table->string('role'); $table->boolean('is_active')->default(true); $table->timestamps(); });
         Schema::create('disaster_events', function (Blueprint $table) {
             $table->string('event_id')->primary(); $table->string('name'); $table->timestamp('started_at'); $table->timestamp('ended_at')->nullable();
         });
@@ -297,7 +298,8 @@ class ResponseOperationsViewsTest extends TestCase
         DB::table('disaster_events')->insert(['event_id' => 'EV-1', 'name' => 'Flood response', 'started_at' => now()]);
         foreach (range(1, 25) as $id) DB::table('household_status_logs')->insert(['status_log_id' => $id,
             'household_id' => 'HH-'.$id, 'disaster_id' => 'EV-1', 'source' => 'responder_field_report', 'notes' => 'Field update', 'submitted_at' => now()]);
-        Sanctum::actingAs(User::query()->create(['user_id' => 'ADMIN', 'role' => 'admin']));
+        Sanctum::actingAs(User::query()->create(['user_id' => 'ADMIN', 'role' => 'admin', 'is_active' => true]));
+        \Tests\Support\BarangayScopeFixture::seed(DB::table('household_status_logs')->pluck('household_id')->all());
         $this->getJson('/api/v1/field-reports?page=2&per_page=20')->assertOk()
             ->assertJsonPath('data.active_event.event_id', 'EV-1')
             ->assertJsonPath('data.reports_meta.total', 25)->assertJsonPath('data.reports_meta.current_page', 2)

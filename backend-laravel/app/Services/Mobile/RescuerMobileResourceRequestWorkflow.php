@@ -4,21 +4,25 @@ namespace App\Services\Mobile;
 
 use App\Models\ResourceRequest;
 use App\Models\ResourceRequestStatus;
+use App\Support\RequestSchema as Schema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Support\RequestSchema as Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class RescuerMobileResourceRequestWorkflow
 {
-    public function __construct(private \App\Services\Mobile\RescuerMobileSupport $support) {}
+    public function __construct(private RescuerMobileSupport $support) {}
 
     public function store(Request $request): JsonResponse
     {
         if (! Schema::hasTable('resource_requests')) {
             return $this->missingTableResponse('resource_requests');
+        }
+
+        if ($request->filled('urgency_key') && (! Schema::hasTable('urgency_levels') || ! Schema::hasColumn('resource_requests', 'urgency_id'))) {
+            return response()->json(['message' => 'Request priority cannot be saved until the database schema is updated.'], 503);
         }
 
         $validated = $request->validate([
@@ -30,6 +34,7 @@ class RescuerMobileResourceRequestWorkflow
             'quantity' => ['required', 'integer', 'min:1', 'max:100000'],
             'unit' => ['required', 'string', 'min:2', 'max:50'],
             'description' => ['required', 'string', 'min:5', 'max:1000'],
+            'urgency_key' => ['nullable', 'string', 'max:50', Rule::exists('urgency_levels', 'urgency_key')],
         ], [
             'location.required' => 'Location is required.',
             'cluster.required' => 'Purok or cluster is required for personnel and vehicle requests.',
@@ -59,6 +64,9 @@ class RescuerMobileResourceRequestWorkflow
             'quantity' => $validated['quantity'],
             'unit' => $validated['unit'] ?? null,
             'description' => $this->description($validated),
+            'urgency_id' => ! empty($validated['urgency_key'])
+                ? DB::table('urgency_levels')->where('urgency_key', $validated['urgency_key'])->value('urgency_id')
+                : null,
             'status_id' => $this->statusId('needs_validation'),
             'validation_status' => 'needs_validation',
             'created_at' => $now,
@@ -155,10 +163,3 @@ class RescuerMobileResourceRequestWorkflow
         ], 503);
     }
 }
-
-
-
-
-
-
-

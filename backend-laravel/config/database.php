@@ -3,11 +3,7 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
-<<<<<<< HEAD
-$resqLocalConnection = [
-=======
 $localConnection = [
->>>>>>> sub-main
     'driver' => env('RESQ_LOCAL_DB_CONNECTION', 'mysql'),
     'url' => env('RESQ_LOCAL_DB_URL'),
     'host' => env('RESQ_LOCAL_DB_HOST', '127.0.0.1'),
@@ -24,7 +20,7 @@ $localConnection = [
     'engine' => null,
     'options' => extension_loaded('pdo_mysql') ? array_filter([
         Mysql::ATTR_SSL_CA => env('RESQ_LOCAL_MYSQL_ATTR_SSL_CA'),
-        \PDO::ATTR_TIMEOUT => min(3, max(1, (int) env('RESQ_LOCAL_DB_TIMEOUT', 3))),
+        PDO::ATTR_TIMEOUT => min(3, max(1, (int) env('RESQ_LOCAL_DB_TIMEOUT', 3))),
         Mysql::ATTR_INIT_COMMAND => 'SET SESSION net_read_timeout = '.max(1, (int) env('RESQ_LOCAL_DB_READ_TIMEOUT', env('DB_READ_TIMEOUT', 30))),
     ]) : [],
 ];
@@ -58,8 +54,7 @@ return [
 
     'connections' => [
 
-<<<<<<< HEAD
-        'ResQperation' => $resqLocalConnection,
+        'ResQperation' => $localConnection,
 
         // Explicit opt-in connection for additive shared-database upgrades.
         'shared_resq' => [
@@ -71,16 +66,10 @@ return [
             'password' => env('SHARED_DB_PASSWORD'),
             'charset' => 'utf8mb4', 'collation' => 'utf8mb4_unicode_ci',
             'prefix' => '', 'strict' => true, 'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? [\PDO::ATTR_TIMEOUT => 10] : [],
+            'options' => extension_loaded('pdo_mysql') ? [PDO::ATTR_TIMEOUT => 10] : [],
         ],
-=======
+
         'resq_local' => $localConnection,
-
-        // Preserve the deployed connection name without depending on cached config.
-        'ResQperation' => $localConnection,
->>>>>>> sub-main
-
-        'resq_local' => $resqLocalConnection,
 
         'sqlite' => [
             'driver' => 'sqlite',
@@ -111,7 +100,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                \PDO::ATTR_TIMEOUT => min(3, max(1, (int) env('DB_CONNECTION_TIMEOUT', 3))),
+                PDO::ATTR_TIMEOUT => min(3, max(1, (int) env('DB_CONNECTION_TIMEOUT', 3))),
                 Mysql::ATTR_INIT_COMMAND => 'SET SESSION net_read_timeout = '.max(1, (int) env('DB_READ_TIMEOUT', 30)),
             ]) : [],
         ],
@@ -133,7 +122,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('TRACKINGAID_MYSQL_ATTR_SSL_CA'),
-                \PDO::ATTR_TIMEOUT => (int) env('TRACKINGAID_DB_TIMEOUT', 1),
+                PDO::ATTR_TIMEOUT => (int) env('TRACKINGAID_DB_TIMEOUT', 1),
                 Mysql::ATTR_INIT_COMMAND => 'SET SESSION net_read_timeout = '.max(1, (int) env('TRACKINGAID_DB_READ_TIMEOUT', env('DB_READ_TIMEOUT', 30))),
             ]) : [],
         ],
@@ -155,7 +144,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                \PDO::ATTR_TIMEOUT => min(3, max(1, (int) env('DB_CONNECTION_TIMEOUT', 3))),
+                PDO::ATTR_TIMEOUT => min(3, max(1, (int) env('DB_CONNECTION_TIMEOUT', 3))),
                 Mysql::ATTR_INIT_COMMAND => 'SET SESSION net_read_timeout = '.max(1, (int) env('DB_READ_TIMEOUT', 30)),
             ]) : [],
         ],

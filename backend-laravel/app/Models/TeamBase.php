@@ -26,6 +26,11 @@ class TeamBase extends Model
 
     protected $fillable = ['team_id', 'name', 'lat', 'lng'];
 
+    public function schemaColumnAliases(): array
+    {
+        return ['name' => 'base_name', 'lat' => 'base_latitude', 'lng' => 'base_longitude'];
+    }
+
     protected function casts(): array
     {
         return ['lat' => 'decimal:7', 'lng' => 'decimal:7'];

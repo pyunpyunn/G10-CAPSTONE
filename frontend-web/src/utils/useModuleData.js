@@ -22,7 +22,7 @@ export function useModuleData(loader, topics = [], { keepPreviousData = false } 
       } catch (failure) {
         if (!cancelled) setResult((previous) => ({ loader, version,
           data: previous?.loader === loader ? previous.data : null,
-          error: failure.response?.data?.message || 'Records could not be loaded. Please try again.' }))
+          error: failure.response?.data?.message || failure.friendlyMessage || 'Records could not be loaded. Please try again.' }))
       } finally {
         running = false
         if (!cancelled && pending) scheduler.request()

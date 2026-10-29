@@ -133,7 +133,7 @@ class OperationalSequence
             throw new LogicException('The incident archive sequence is not initialized. Run migrations.');
         }
 
-        $id = (int) $row->next_value;
+        $id = max((int) $row->next_value, ((int) DB::table('incident_archives')->max('archive_id')) + 1);
         DB::table('operational_sequences')
             ->where('sequence_key', 'incident_archives')
             ->update(['next_value' => $id + 1]);
