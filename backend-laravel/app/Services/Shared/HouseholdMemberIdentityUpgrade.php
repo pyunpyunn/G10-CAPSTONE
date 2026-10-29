@@ -114,7 +114,7 @@ class HouseholdMemberIdentityUpgrade
                     'name' => trim(($member->first_name ?? '').' '.($member->middle_name ?? '').' '.($member->last_name ?? '')),
                     'contact_number' => $member->contact_number ?? null,
                     // Retain the existing household-issued password process; never reset existing hashes.
-                    'password' => $source->password, 'temp_password' => $source->temp_password ?? null,
+                    'password' => $source->password, 'temp_password' => null,
                     'must_change_password' => $source->must_change_password ?? true,
                     'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
                 ];

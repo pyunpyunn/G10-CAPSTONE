@@ -1,4 +1,6 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useState } from 'react'
+import { useResourceRequestsQuery } from '../state/operationsApi'
+import { statusTone } from '../utils/statusPalette'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import {
   Box,
@@ -12,7 +14,6 @@ import {
   User,
 } from 'lucide-react'
 import {
-  getResourceRequests,
   validateResourceRequest,
   forwardResourceRequest,
 } from '../api/resourceRequestApi'
@@ -20,7 +21,7 @@ import {
   buildValidationPayload,
   buildForwardPayload,
 } from '../utils/resourceRequestHelpers'
-import { useModuleData } from '../utils/useModuleData'
+
 import PageHeader from '../components/ui/PageHeader'
 import DataFilterBar from '../components/ui/DataFilterBar'
 import PaginationBar from '../components/ui/PaginationBar'
@@ -132,20 +133,14 @@ export default function RequestWorkflowPage() {
     setInspectingRequest(row)
   }
 
-  const loader = useCallback(
-    () =>
-      getResourceRequests({
-        page,
-        per_page: 20,
-        search,
-        status,
-        source: source === 'all' ? undefined : source,
-        workflow: external ? 'approval' : 'monitoring',
-      }),
-    [page, search, status, source, external],
-  )
-
-  const { data, error, loading, refresh } = useModuleData(loader)
+  const { data, error: queryError, isFetching: loading, refetch: refresh } = useResourceRequestsQuery({
+    page, per_page: 20, search, urgency,
+    status: status.startsWith('resource:') ? 'all' : status,
+    status_id: status.startsWith('resource:') ? status.slice('resource:'.length) : undefined,
+    source: source === 'all' ? undefined : source,
+    workflow: external ? 'approval' : 'monitoring',
+  }, { pollingInterval: 30000, skipPollingIfUnfocused: true })
+  const error = queryError?.message || ''
   // Navigate to editor/viewer
   const open = (row, mode) =>
     navigate(`/resources-requests/${row.request_id}/${mode}`, {
@@ -221,12 +216,7 @@ export default function RequestWorkflowPage() {
   const rawRequests = data?.requests?.data
   const totalCount = data?.requests?.total ?? rawRequests?.length ?? 0
 
-  // Client-side urgency filtering
-  const filteredRequests = useMemo(() => {
-    const requests = rawRequests || []
-    if (urgency === 'all') return requests
-    return requests.filter((r) => r.urgency?.key === urgency)
-  }, [rawRequests, urgency])
+  const filteredRequests = rawRequests || []
 
   const hasActiveFilters = search || source !== 'all' || status !== 'all' || urgency !== 'all'
 
@@ -258,10 +248,7 @@ export default function RequestWorkflowPage() {
       onChange: (value) => { setUrgency(value); setPage(1) },
       options: [
         { value: 'all', label: 'All priorities' },
-        { value: 'critical', label: 'Critical' },
-        { value: 'high', label: 'High' },
-        { value: 'medium', label: 'Medium' },
-        { value: 'low', label: 'Low' },
+        ...(data?.options?.urgencies || []).map(item => ({ value: item.key, label: item.label })),
       ],
     },
     ...(!external ? [{
@@ -270,10 +257,8 @@ export default function RequestWorkflowPage() {
       value: status,
       onChange: (value) => { setStatus(value); setPage(1) },
       options: [
-        { value: 'all', label: 'All approved' },
-        { value: 'verified', label: 'Validated / Staged' },
-        { value: 'forwarded', label: 'In Transit' },
-        { value: 'fulfilled', label: 'Completed' },
+        { value: 'all', label: 'All resource statuses' },
+        ...(data?.options?.resource_statuses || []).map(item => ({ value: `resource:${item.status_id}`, label: item.label })),
       ],
     }] : []),
   ]
@@ -370,9 +355,9 @@ export default function RequestWorkflowPage() {
           <div className="n">{external ? 'awaiting verification' : 'ready for allocation'}</div>
         </div>
         <div className="rr-stat">
-          <div className="k">{external ? 'Approved Today' : 'In Transit'}</div>
+          <div className="k">{external ? 'Validated Requests' : 'Forwarded Today'}</div>
           <div className="v">{Number(external ? summary.verified ?? 0 : summary.forwarded_today ?? 0).toLocaleString()}</div>
-          <div className="n">{external ? 'validated by command' : 'active dispatch tracking'}</div>
+          <div className="n">{external ? 'validated by command' : 'handoffs recorded today'}</div>
         </div>
         <div className="rr-stat">
           <div className="k">{external ? 'Forwarded to Depot' : 'Completed Requests'}</div>
@@ -380,15 +365,15 @@ export default function RequestWorkflowPage() {
             {Number(
               external
                 ? summary.forwarded_today ?? 0
-                : summary.fulfilled ?? summary.delivered ?? 0
+                : summary.delivered ?? summary.fulfilled ?? 0
             ).toLocaleString()}
           </div>
           <div className="n">{external ? 'warehouse handoffs' : 'delivered to centers'}</div>
         </div>
         <div className="rr-stat">
           <div className="k">{external ? 'Total Inbound' : 'Total Monitored'}</div>
-          <div className="v">{Number(summary.total_requests ?? totalCount).toLocaleString()}</div>
-          <div className="n">{external ? 'all logged intake requests' : 'active relief stream'}</div>
+          <div className="v">{Number(external ? summary.total_requests ?? totalCount : totalCount).toLocaleString()}</div>
+          <div className="n">{external ? 'all logged intake requests' : 'matching current filters'}</div>
         </div>
       </div>
 
@@ -546,8 +531,8 @@ export default function RequestWorkflowPage() {
 
                       {/* Status */}
                       <td>
-                        <Badge tone={row.validation?.tone || 'amber'}>
-                          {row.validation?.label || row.status?.label || 'Pending'}
+                        <Badge tone={external ? row.validation?.tone || 'gray' : statusTone(row.status?.key)}>
+                          {external ? row.validation?.label || 'Validation unavailable' : row.status?.label || 'Status unavailable'}
                         </Badge>
                       </td>
 

@@ -73,6 +73,7 @@ export const ARCHIVE_COLUMNS = {
     { key: 'event', label: 'Event' },
     { key: 'request', label: 'Request' },
     { key: 'purok_site', label: 'Purok / site' },
+    { key: 'status', label: 'Resource status' },
     { key: 'validation', label: 'Validation' },
     { key: 'handoff', label: 'Release / handoff' },
   ],

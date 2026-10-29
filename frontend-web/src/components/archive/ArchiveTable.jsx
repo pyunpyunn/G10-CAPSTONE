@@ -3,6 +3,7 @@ import { Fragment } from 'react'
 import { ARCHIVE_COLUMNS, ARCHIVE_TABLE_COPY, archiveDateLabel } from '../../utils/archiveHelpers'
 import Badge from '../ui/Badge'
 import PaginationBar from '../ui/PaginationBar'
+import ArchiveRecording from './ArchiveRecording'
 
 export default function ArchiveTable({
   category,
@@ -92,7 +93,10 @@ export default function ArchiveTable({
                         />
                       </td>
                       {columns.map((column) => (
-                        <td key={column.key}>{renderCell(record[column.key], column.key, category)}</td>
+                        <td key={column.key}>
+                          {renderCell(record[column.key], column.key, category)}
+                          {column.key === 'transmission' && <ArchiveRecording recording={record.recording} recordId={record.id} />}
+                        </td>
                       ))}
                       <td>
                         <button className="btn btn-secondary btn-sm archive-view-button" type="button" onClick={() => onView(record)}>

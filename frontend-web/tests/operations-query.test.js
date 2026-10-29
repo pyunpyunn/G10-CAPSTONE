@@ -9,6 +9,29 @@ const { default: api } = await import('../src/api/client.js')
 const wait = () => new Promise(resolve => setTimeout(resolve, 15))
 test.afterEach(() => resetApiState())
 
+test('resource writes invalidate subscribed request and archive queries', async () => {
+  const calls = new Map()
+  api.defaults.adapter = async config => {
+    calls.set(config.url, (calls.get(config.url) || 0) + 1)
+    return { config, status: 200, headers: {}, data: { data: { requests: [], records: [] } } }
+  }
+  const requests = store.dispatch(operationsApi.endpoints.resourceRequests.initiate({ page: 1 }))
+  const archive = store.dispatch(operationsApi.endpoints.archiveRecords.initiate({ category: 'resource-requests', page: 1 }))
+  await Promise.all([requests.unwrap(), archive.unwrap()])
+  invalidateApiState(['/resource-requests'])
+  await wait(); await wait()
+  assert.equal(calls.get('/resource-requests'), 2)
+  assert.equal(calls.get('/archive/resource-requests'), 2)
+  requests.unsubscribe(); archive.unsubscribe()
+})
+
+test('an invalid API envelope is reported instead of appearing as an empty database', async () => {
+  api.defaults.adapter = async config => ({ config, status: 200, headers: {}, data: '<html>not API data</html>' })
+  const request = store.dispatch(operationsApi.endpoints.resourceRequests.initiate({ page: 1 }))
+  await assert.rejects(request.unwrap(), error => error.status === 'INVALID_RESPONSE')
+  request.unsubscribe()
+})
+
 test('RTK subscriptions share one request and return visits immediately reuse cached operations data', async () => {
   let calls = 0
   api.defaults.adapter = async config => {

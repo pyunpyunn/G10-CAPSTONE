@@ -95,7 +95,7 @@ export default function ResourceRequestDetailDrawer({
                   <span className="rr-card-label">Resource Status</span>
                   <div className="rr-card-val">
                     <Badge tone={statusTone(request.status?.key, request.validation?.key)}>
-                      {request.status?.label || 'Pending'}
+                      {request.status?.label || 'Status unavailable'}
                     </Badge>
                   </div>
                 </div>
@@ -103,7 +103,7 @@ export default function ResourceRequestDetailDrawer({
                   <span className="rr-card-label">Handoff Status</span>
                   <div className="rr-card-val">
                     <Badge tone={request.handoff?.tone || 'gray'}>
-                      {request.handoff?.label || 'Ready'}
+                      {request.handoff?.label || 'Handoff unavailable'}
                     </Badge>
                   </div>
                 </div>
@@ -503,8 +503,7 @@ function getHandoffStep(request) {
   return 1
 }
 
-function statusTone(status, validationStatus) {
-  if (['verified', 'forwarded'].includes(validationStatus)) return 'blue'
+function statusTone(status) {
   return {
     pending: 'amber',
     acknowledged: 'blue',

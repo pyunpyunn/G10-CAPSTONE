@@ -47,6 +47,11 @@ class ResponderRoute extends Model
     {
         return $this->hasMany(RouteCoordinate::class, 'route_id', 'route_id');
     }
+
+    public function responder(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Responder::class, 'responder_id', 'responder_id');
+    }
 }
 
 
