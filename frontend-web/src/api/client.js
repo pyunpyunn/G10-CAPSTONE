@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { getToken } from './token.js'
 import { assertApiDestination } from './requestSecurity.js'
+import { assertJsonApiResponse } from './responseContract.js'
 import { installReduxTransport, invalidateApiState, invalidateTransportCache, resetApiState } from '../state/apiStore.js'
 
 function getApiBaseUrl() {
@@ -70,6 +71,12 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => {
+    try {
+      assertJsonApiResponse(response)
+    } catch (error) {
+      invalidateTransportCache([String(response.config?.url || '')])
+      throw error
+    }
     const method = String(response.config?.method || 'get').toLowerCase()
     const path = response.config?.url || ''
     if (['post', 'patch', 'put', 'delete'].includes(method)

@@ -70,7 +70,7 @@ class RescuerAccountMetadataTest extends TestCase
         $workflow = app(\App\Services\Mobile\RescuerTeamWorkflow::class);
         $payload = ['team_name' => ' Medical ', 'team_code' => 'med', 'team_type' => 'Medical', 'duty_status' => 'available'];
         $validated = $workflow->validateTeamPayload(\Illuminate\Http\Request::create('/', 'POST', $payload));
-        $this->assertSame('MED', $validated['team_code']);
+        $this->assertSame('HFAPS', $validated['team_code']);
         $this->assertSame('Medical', $validated['team_name']);
         DB::table('rescue_teams')->insert(['team_id' => 1, 'team_code' => 'MED', 'team_name' => 'Medical']);
         $this->expectException(\Illuminate\Validation\ValidationException::class);

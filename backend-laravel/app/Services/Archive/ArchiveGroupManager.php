@@ -32,6 +32,31 @@ class ArchiveGroupManager
         $unavailableMessage = $this->storageMessage();
         if ($unavailableMessage !== '') return response()->json(['success' => false, 'message' => $unavailableMessage, 'data' => ['groups' => []]], 503);
         $groups = DB::table('incident_archives')->where('archive_type', 'saved_log_group')->orderByDesc('archived_at')->orderByDesc('archive_id')->limit(50)->get()->map(fn (object $row): array => $this->presenter->savedGroup($row, self::CATEGORIES))->values()->all();
+        $ids = collect($groups)->where('category', 'radio-communication-logs')->flatMap(fn ($group) => array_column($group['records'], 'id'))->map(fn ($id) => (string) $id)->unique()->all();
+        $messages = [];
+        if ($ids && Schema::hasTable('responder_communication_logs')) {
+            foreach (array_chunk($ids, 500) as $chunk) {
+                foreach (DB::table('responder_communication_logs')->whereIn('communication_id', $chunk)->pluck('message', 'communication_id') as $id => $message) $messages[(string) $id] = $message;
+            }
+        }
+        foreach ($groups as &$group) {
+            if ($group['category'] !== 'radio-communication-logs') continue;
+            foreach ($group['records'] as &$record) {
+                if (isset($messages[(string) $record['id']])) {
+                    $record['recording'] = $this->presenter->recording($messages[(string) $record['id']]);
+                } elseif (is_string($record['recording']['url'] ?? null) && str_starts_with($record['recording']['url'], '/storage/')) {
+                    $record['recording'] = $this->presenter->recording(json_encode([
+                        'type' => 'ptt_audio', 'audio_path' => substr($record['recording']['url'], strlen('/storage/')),
+                        'duration_seconds' => $record['recording']['duration_seconds'] ?? null,
+                    ]));
+                } else {
+                    $record['recording'] = ($record['status_key'] ?? null) === 'ptt_audio'
+                        ? ['url' => null, 'available' => false, 'status' => 'The original recording entry is unavailable.'] : null;
+                }
+            }
+            unset($record);
+        }
+        unset($group);
         return response()->json(['success' => true, 'message' => 'Saved archive groups loaded.', 'data' => ['groups' => $groups]]);
     }
 
@@ -44,6 +69,11 @@ class ArchiveGroupManager
         $groupId = 'AG-'.$now->format('Ymd-His').'-'.strtoupper(substr(md5((string) microtime(true)), 0, 6));
         $records = collect($validated['records'])->map(fn (mixed $record): array => is_array($record) ? $record : [])->filter(fn (array $record): bool => trim((string) ($record['id'] ?? '')) !== '')->values()->all();
         if (empty($records)) return response()->json(['success' => false, 'message' => 'Select at least one valid archive record before saving a group.'], 422);
+        $ids = collect($records)->pluck('id')->map(fn ($id) => (string) $id)->unique()->sort()->values()->all();
+        [, $source] = app(\App\Queries\ArchiveQuery::class)->exportRows($validated['category'], Request::create('/', 'GET', ['ids' => $ids]));
+        $records = $source->values()->all();
+        $found = collect($records)->pluck('id')->map(fn ($id) => (string) $id)->unique()->sort()->values()->all();
+        if ($found !== $ids) return response()->json(['success' => false, 'message' => 'Some selected records are no longer available. Refresh the archive before saving.'], 422);
         $archiveNote = $this->payload->encode($validated['category'], $records);
         $group = DB::transaction(function () use ($request, $validated, $groupId, $archiveNote, $now): array {
             $archiveId = $this->sequence->nextIncidentArchiveId();

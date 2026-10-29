@@ -29,6 +29,7 @@ class AuditResqDatabase extends Command
         }
         try {
             $plan = $integrity->plan($db->getPdo());
+            $sharedWarnings = $integrity->sharedReferenceWarnings($db->getPdo());
             $schema = $db->getSchemaBuilder();
             $missing = [];
             $warnings = [];
@@ -48,7 +49,9 @@ class AuditResqDatabase extends Command
                         continue;
                     }
                     $columns = $schema->getColumnListing($table);
-                    foreach (array_diff($model->getFillable(), $columns) as $column) {
+                    $aliases = method_exists($model, 'schemaColumnAliases') ? $model->schemaColumnAliases() : [];
+                    $writeColumns = array_map(fn ($column) => $aliases[$column] ?? $column, $model->getFillable());
+                    foreach (array_diff($writeColumns, $columns) as $column) {
                         $warnings[] = "$class: $table.$column is absent; do not write it without a schema check";
                     }
                     if (! in_array($model->getKeyName(), $columns, true)) {
@@ -64,13 +67,24 @@ class AuditResqDatabase extends Command
                     $mapped[$module][$table] = $class;
                 }
             }
+            foreach (config('resq_database.query_builder_tables', []) as $table => $keys) {
+                if (! $schema->hasTable($table)) {
+                    $missing[] = "Query builder: $table is missing";
+                    continue;
+                }
+                foreach (array_diff($keys, $schema->getColumnListing($table)) as $key) {
+                    $missing[] = "$table.$key: composite key column is missing";
+                }
+            }
             $this->line(json_encode([
                 'connection' => $name, 'database' => $db->getDatabaseName(),
                 'mapped' => $mapped, 'missing' => $missing, 'warnings' => $warnings,
+                'query_builder_tables' => config('resq_database.query_builder_tables'),
+                'shared_reference_warnings' => $sharedWarnings,
                 'pending_schema_statements' => count($plan['sql']), 'blocked' => $plan['blocked'],
             ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
 
-            return $missing || $plan['sql'] || $plan['blocked'] || $warnings ? self::FAILURE : self::SUCCESS;
+            return $missing || $plan['sql'] || $plan['blocked'] || $warnings || $sharedWarnings ? self::FAILURE : self::SUCCESS;
         } catch (\Throwable $error) {
             if ($error instanceof \Error) {
                 $this->error('Audit implementation error: '.$error->getMessage());

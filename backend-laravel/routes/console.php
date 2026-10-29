@@ -46,6 +46,8 @@ Artisan::command('advisories:sync', function (\App\Services\Shared\OfficialAdvis
 });
 Schedule::command('web-push:deliver')->everyTenSeconds()->withoutOverlapping();
 Schedule::command('advisories:sync')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('realtime:status --prune --retention-days='.config('realtime.retention_days'))
+    ->daily()->withoutOverlapping();
 Schedule::command('notifications:archive')->everyMinute()->withoutOverlapping();
 
 Artisan::command('inspire', function () {

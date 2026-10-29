@@ -181,7 +181,7 @@ class User extends Authenticatable
 
     public function isHqccLeader(): bool
     {
-        if ($this->is_active === false || ($this->attributes['deleted_at'] ?? null)
+        if (! $this->exists || $this->is_active === false || ($this->attributes['deleted_at'] ?? null)
             || ! Schema::hasTable('responders') || ! Schema::hasTable('rescue_teams')) {
             return false;
         }

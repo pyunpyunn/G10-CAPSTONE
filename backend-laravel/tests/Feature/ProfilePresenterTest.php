@@ -12,7 +12,7 @@ class ProfilePresenterTest extends TestCase
     {
         $user = new User([
             'username' => 'personnel.one', 'user_id' => 'USR-1', 'first_name' => 'Personnel',
-            'last_name' => 'One', 'name' => 'Personnel One', 'is_active' => true, 'role' => 'hq_personnel',
+            'last_name' => 'One', 'name' => 'Personnel One', 'is_active' => true, 'role' => 'response',
         ]);
         $presenter = app(ProfilePresenter::class);
         $this->assertSame('personnel.one', $presenter->identity($user)['account_id']);

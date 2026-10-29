@@ -205,17 +205,10 @@ class ArchivePresenter
         $responderName = $row->responder_name ?: ($message['responder_name'] ?? 'Responder');
         $eventName = $row->event_name ?: ($message['event_name'] ?? 'No active event');
         $teamName = $row->team_name ?: ($message['team_name'] ?? 'Assigned team');
-        $path = is_string($message['audio_path'] ?? null) ? $message['audio_path'] : null;
-        $audioAvailable = $path && ! str_contains($path, '..') && Storage::disk('public')->exists($path);
 
         return [
             'id' => $row->communication_id,
-            'recording' => $type === 'ptt_audio' ? [
-                'url' => $audioAvailable ? '/storage/'.ltrim($path, '/') : null,
-                'available' => (bool) $audioAvailable,
-                'status' => $audioAvailable ? 'Recording available' : ($path ? 'Recording file is unavailable on this server' : 'No recording file was saved'),
-                'duration_seconds' => isset($message['duration_seconds']) ? (float) $message['duration_seconds'] : null,
-            ] : null,
+            'recording' => $this->recording($row->message),
             'event_id' => $row->disaster_id,
             'event_name' => $eventName,
             'status_key' => $type,
@@ -263,6 +256,20 @@ class ArchivePresenter
                 'transmission' => $this->radioDisplayMessage($type, $message, $responderName),
                 'status' => $typeLabel,
             ],
+        ];
+    }
+
+    public function recording(?string $rawMessage): ?array
+    {
+        $message = $this->decodeJson($rawMessage);
+        if (($message['type'] ?? null) !== 'ptt_audio') return null;
+        $path = is_string($message['audio_path'] ?? null) ? $message['audio_path'] : null;
+        $available = $path && ! str_contains($path, '..') && Storage::disk('public')->exists($path);
+        return [
+            'url' => $available ? '/storage/'.ltrim($path, '/') : null,
+            'available' => (bool) $available,
+            'status' => $available ? 'Recording available' : ($path ? 'Recording file is unavailable on this server' : 'No recording file was saved'),
+            'duration_seconds' => isset($message['duration_seconds']) ? (float) $message['duration_seconds'] : null,
         ];
     }
 

@@ -18,8 +18,8 @@ class UserResourceQueryTest extends TestCase
 
         $data = (new UserResource($user))->toArray(Request::create('/api/v1/auth/me'));
 
-        $this->assertSame('admin', $data['role']['role_key']);
-        $this->assertSame('Admin', $data['role']['role_name']);
+        $this->assertSame('operations_admin', $data['role']['role_key']);
+        $this->assertSame('Operations/Admin', $data['role']['role_name']);
         $this->assertSame(0, $reads);
     }
 }

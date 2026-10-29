@@ -37,8 +37,8 @@ export const operationsApi = createApi({
       }
       return { data: response.data.data }
     } catch (failure) {
-      return { error: { status: failure.response?.status || 'NETWORK_ERROR',
-        message: failure.response?.data?.message || 'Records could not be loaded. Please try again.' } }
+      return { error: { status: failure.code === 'INVALID_API_RESPONSE' ? 'INVALID_RESPONSE' : failure.response?.status || 'NETWORK_ERROR',
+        message: failure.response?.data?.message || failure.friendlyMessage || 'Records could not be loaded. Please try again.' } }
     }
   },
   endpoints: builder => ({

@@ -85,6 +85,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
 
     public function test_dashboard_summary_keeps_authenticated_json_shape(): void
     {
+        \Tests\Support\BarangayScopeFixture::seed();
         $this->getJson('/api/v1/dashboard/summary')
             ->assertOk()
             ->assertJsonPath('data.active_event.event_id', 'EV-1')
@@ -94,6 +95,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
 
     public function test_dashboard_full_workspace_keeps_authenticated_json_shape(): void
     {
+        \Tests\Support\BarangayScopeFixture::seed();
         $this->getJson('/api/v1/dashboard')
             ->assertOk()
             ->assertJsonPath('data.active_event.event_id', 'EV-1')
@@ -137,7 +139,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
 
         $this->getJson('/api/v1/profile')
             ->assertOk()
-            ->assertJsonPath('data.user.user_id', 'ADMIN-TEST')
+            ->assertJsonPath('data.user.user_id', 'HQ-PERSONNEL-TEST')
             ->assertJsonStructure(['data' => ['user', 'summary', 'identity', 'permissions',
                 'activity', 'barangay_profile']]);
     }
@@ -171,7 +173,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
         $this->patchJson('/api/v1/profile', ['first_name' => 'Changed', 'last_name' => 'Name'])
             ->assertStatus(500);
 
-        $this->assertNull(DB::table('users')->where('user_id', 'ADMIN-TEST')->value('first_name'));
+        $this->assertNull(DB::table('users')->where('user_id', 'HQ-PERSONNEL-TEST')->value('first_name'));
         $this->assertSame(0, DB::table('audit_logs')->count());
     }
 
@@ -199,6 +201,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
         DB::table('households')->insert(['household_id' => 'HH-2', 'address_id' => 2]);
         DB::table('households')->insert(['household_id' => 'HH-DELETED', 'address_id' => 2, 'deleted_at' => now()]);
 
+        \Tests\Support\BarangayScopeFixture::seed();
         $this->assertSame(['Address Label', 'Catalog Two'], app(HouseholdPurokQuery::class)->names());
         $this->assertSame(['Address Label', 'Catalog Two'], app(MappingQuery::class)->getPuroks());
     }
@@ -297,6 +300,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
 
     public function test_broadcast_save_attempts_push_immediately_and_queues_delivery_fallback(): void
     {
+        \Tests\Support\BarangayScopeFixture::seed();
         Queue::fake();
         config(['services.onesignal.app_id' => 'test-app', 'services.onesignal.api_key' => 'test-key']);
         Schema::create('device_tokens', function (Blueprint $table): void {
@@ -465,6 +469,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
 
     public function test_dashboard_clears_ended_event_references_without_loading_event_ids(): void
     {
+        \Tests\Support\BarangayScopeFixture::seed();
         Schema::create('evacuation_centers', function (Blueprint $table): void {
             $table->integer('evacuation_center_id')->primary();
             $table->string('current_event_id')->nullable();
@@ -568,6 +573,7 @@ class AuthenticatedWorkspaceContractTest extends TestCase
             ['member_id' => 2, 'household_id' => 'HH-2', 'disaster_id' => 'EV-1', 'status_id' => 2],
         ]);
 
+        \Tests\Support\BarangayScopeFixture::seed();
         $fallbackReads = 0;
         DB::listen(function ($query) use (&$fallbackReads): void {
             if (str_contains(strtolower($query->sql), 'from "member_disaster_statuses"')) $fallbackReads++;

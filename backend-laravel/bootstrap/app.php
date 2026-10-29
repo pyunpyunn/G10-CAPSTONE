@@ -74,6 +74,20 @@ return Application::configure(basePath: dirname(__DIR__))
             ]);
 
             if (! $connectionFailure) {
+                if (in_array($sqlState, ['42S02', '42S22'], true) || in_array($nativeErrorCode, ['1146', '1054'], true)) {
+                    return response()->json([
+                        'message' => 'The database structure needs an update before these records can be loaded. Please contact the administrator.',
+                        'code' => 'database_schema_mismatch',
+                        'request_id' => $requestId,
+                    ], 503)->header('X-Request-ID', $requestId);
+                }
+                if (in_array($nativeErrorCode, ['1062', '1451', '1452'], true)) {
+                    return response()->json([
+                        'message' => 'This change conflicts with existing or related records. Refresh the data and try again.',
+                        'code' => 'database_integrity_conflict',
+                        'request_id' => $requestId,
+                    ], 409)->header('X-Request-ID', $requestId);
+                }
                 return response()->json([
                     'message' => 'The request could not be completed.',
                     'request_id' => $requestId,

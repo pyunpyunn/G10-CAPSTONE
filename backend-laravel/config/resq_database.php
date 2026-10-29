@@ -7,10 +7,13 @@ return [
         'dispatch' => ['RescueTeam', 'Responder', 'ResponderAssignment', 'DispatchStatus', 'DispatchTrip', 'TripPoint', 'RescuePrioritySetting', 'RescueCriteriaSnapshot', 'RescueCriteriaLineSnapshot'],
         'field_reports' => ['ResponderFieldReport', 'ResponderFieldReportMember', 'ResponderFieldReportDetail', 'FieldReportCategory', 'PropertyDamageLevel', 'ResponderCheckIn', 'HqFieldReport'],
         'navigation' => ['ResponderRoute', 'RouteCoordinate', 'ResponderLocationLog', 'CachedRoute', 'BarangayBoundary', 'MappingHazardLayer', 'MapTileMetadata', 'OfflinePack', 'TeamBase', 'NavigationDevice'],
-        'household_safety' => ['MemberDisasterStatus', 'MemberStatus', 'MemberStatusLog', 'HouseholdDisaster', 'HouseholdStatusLog', 'StatusReminder', 'TrustedHousehold', 'HouseholdTrustedPin', 'HouseholdGeographicClassification', 'PurokBoundary', 'HouseholdMobileNotification'],
+        'household_safety' => ['AffectedArea', 'MemberDisasterStatus', 'MemberStatus', 'MemberStatusLog', 'HouseholdDisaster', 'HouseholdStatusLog', 'StatusReminder', 'TrustedHousehold', 'HouseholdTrustedPin', 'HouseholdGeographicClassification', 'PurokBoundary', 'HouseholdMobileNotification'],
         'communications' => ['ResponderCommunicationLog', 'DisasterBroadcast', 'WeatherLog', 'UserNotification', 'WebPushSubscription', 'WebPushDelivery', 'OfficialAdvisoryNotification'],
         'reports_and_requests' => ['SituationReport', 'SituationReportSubmission', 'IncidentArchive', 'RequestValidation', 'ExternalReportRequest', 'UrgencyLevel'],
         'authentication' => ['PasswordResetRequest', 'RememberedDevice', 'HouseholdLoginAccount', 'HouseholdDeviceOwner', 'HouseholdPasswordRecoveryOtp'],
         'infrastructure' => ['DeviceTrackingLog', 'RealtimeOutbox', 'SyncEvent', 'ReportIdempotency', 'OperationalCounter', 'ResqOrphanReference'],
+        'public_inquiries' => ['LandingInquiry'],
     ],
+    // Eloquent has no native composite primary-key support; writes explicitly scope both columns.
+    'query_builder_tables' => ['rescue_criteria_contact_baselines' => ['event_id', 'household_id']],
 ];

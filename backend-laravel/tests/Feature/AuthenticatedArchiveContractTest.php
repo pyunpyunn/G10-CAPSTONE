@@ -16,6 +16,7 @@ class AuthenticatedArchiveContractTest extends TestCase
         Schema::create('users', function (Blueprint $table): void {
             $table->string('user_id')->primary();
             $table->string('role')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
         Schema::create('incident_archives', function (Blueprint $table): void {
@@ -36,7 +37,7 @@ class AuthenticatedArchiveContractTest extends TestCase
             'archived_at' => '2026-01-01 12:00:00',
         ]);
 
-        Sanctum::actingAs(User::query()->create(['user_id' => 'ADMIN-TEST', 'role' => 'admin']));
+        Sanctum::actingAs(User::query()->create(['user_id' => 'ADMIN-TEST', 'role' => 'admin', 'is_active' => true]));
 
         $this->getJson('/api/v1/archive/saved-groups')
             ->assertOk()

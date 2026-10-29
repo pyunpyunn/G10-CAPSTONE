@@ -13,6 +13,15 @@ use Tests\TestCase;
 
 class ResqEloquentMappingTest extends TestCase
 {
+    public function test_team_base_aliases_match_the_rescue_team_columns(): void
+    {
+        $base = new \App\Models\TeamBase(['team_id' => 1, 'name' => 'Registered base', 'lat' => 10.29, 'lng' => 123.87]);
+        $this->assertSame('rescue_teams', $base->getTable());
+        $this->assertSame('Registered base', $base->getAttributes()['base_name']);
+        $this->assertSame(10.29, $base->getAttributes()['base_latitude']);
+        $this->assertSame(['name' => 'base_name', 'lat' => 'base_latitude', 'lng' => 'base_longitude'], $base->schemaColumnAliases());
+    }
+
     public function test_field_report_eager_loading_and_updates_use_legacy_keys_without_missing_timestamps(): void
     {
         Schema::create('responder_field_reports', function (Blueprint $table): void {
