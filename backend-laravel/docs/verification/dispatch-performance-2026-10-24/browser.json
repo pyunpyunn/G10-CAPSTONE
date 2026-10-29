@@ -1,1 +1,0 @@
-{"cold_page_ms":1191,"return_visit_ms":83,"return_visit_api_requests":[],"all_api_requests":["/api/v1/auth/me","/api/v1/dispatches?view=overview","/api/v1/dispatches/communications?page=1&per_page=20&search=&channel=all&recordings_only=1","/api/v1/notifications?status=all&page=1","/api/v1/dispatches?view=management&status=active&page=1&per_page=20"],"page_errors":[]}
