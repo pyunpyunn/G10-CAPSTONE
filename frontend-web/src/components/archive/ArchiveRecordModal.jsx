@@ -1,5 +1,6 @@
 import { CheckCircle2, Download, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import ArchiveRecording from './ArchiveRecording'
 
 export default function ArchiveRecordModal({ record, categoryLabel, onClose, onDownload }) {
   if (!record) {
@@ -27,6 +28,8 @@ export default function ArchiveRecordModal({ record, categoryLabel, onClose, onD
         </div>
 
         <div className="archive-view-body">
+          <p>Record ID: {record.id}</p>
+          <ArchiveRecording key={record.id} recording={record.recording} recordId={record.id} />
           <div className="archive-detail-grid">
             {(record.details || []).map((item) => (
               <div className="archive-detail-item" key={item.label}>
@@ -59,7 +62,8 @@ export default function ArchiveRecordModal({ record, categoryLabel, onClose, onD
 }
 
 function recordTitle(record) {
-  return record?.event?.title
+  return record?.transmission?.title
+    || record?.event?.title
     || record?.household?.title
     || record?.team_route?.title
     || record?.transmission?.title

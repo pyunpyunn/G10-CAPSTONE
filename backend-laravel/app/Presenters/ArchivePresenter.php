@@ -4,6 +4,7 @@ namespace App\Presenters;
 
 use App\Support\ArchiveGroupPayload;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class ArchivePresenter
 {
@@ -99,7 +100,7 @@ class ArchivePresenter
             ],
             'purok' => $purok,
             'status' => [
-                'label' => $this->label($status),
+                'label' => app(\App\Queries\DispatchStatusQuery::class)->label($status) ?? $this->label($status),
                 'tone' => $this->statusTone($status),
             ],
             'outcome' => [
@@ -160,6 +161,11 @@ class ArchivePresenter
                 'label' => $this->label($validation),
                 'tone' => $this->statusTone($validation),
             ],
+            'status' => [
+                'key' => $row->request_status_key ?? 'unknown',
+                'label' => $row->request_status_label ?? 'Status unavailable',
+                'tone' => $this->statusTone($row->request_status_key ?? 'unknown'),
+            ],
             'handoff' => [
                 'title' => $row->tracking_reference ?: ($validation === 'verified' ? 'Ready for TrackingAid' : 'Not forwarded'),
                 'meta' => $row->released_for_tracking_at ? $this->formatDateTime($row->released_for_tracking_at) : ($row->validation_notes ?: 'Validation record only'),
@@ -172,6 +178,7 @@ class ArchivePresenter
             'Request' => $requestTitle.' - '.$requestMeta,
             'Purok / site' => $record['purok_site']['title'].' - '.$record['purok_site']['meta'],
             'Validation' => $record['validation']['label'],
+            'Resource status' => $record['status']['label'],
             'Release / handoff' => $record['handoff']['title'].' - '.$record['handoff']['meta'],
             'Requested by' => $row->requested_by ?: 'Not recorded',
             'Source' => $this->label($row->request_source ?: 'shared_db'),
@@ -182,7 +189,7 @@ class ArchivePresenter
             'reference' => $requestTitle,
             'request' => $requestMeta,
             'purok_site' => $record['purok_site']['title'],
-            'status' => $record['validation']['label'],
+            'status' => $record['status']['label'],
             'handoff' => $record['handoff']['title'],
         ];
 
@@ -198,9 +205,17 @@ class ArchivePresenter
         $responderName = $row->responder_name ?: ($message['responder_name'] ?? 'Responder');
         $eventName = $row->event_name ?: ($message['event_name'] ?? 'No active event');
         $teamName = $row->team_name ?: ($message['team_name'] ?? 'Assigned team');
+        $path = is_string($message['audio_path'] ?? null) ? $message['audio_path'] : null;
+        $audioAvailable = $path && ! str_contains($path, '..') && Storage::disk('public')->exists($path);
 
         return [
             'id' => $row->communication_id,
+            'recording' => $type === 'ptt_audio' ? [
+                'url' => $audioAvailable ? '/storage/'.ltrim($path, '/') : null,
+                'available' => (bool) $audioAvailable,
+                'status' => $audioAvailable ? 'Recording available' : ($path ? 'Recording file is unavailable on this server' : 'No recording file was saved'),
+                'duration_seconds' => isset($message['duration_seconds']) ? (float) $message['duration_seconds'] : null,
+            ] : null,
             'event_id' => $row->disaster_id,
             'event_name' => $eventName,
             'status_key' => $type,

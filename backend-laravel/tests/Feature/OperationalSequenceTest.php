@@ -105,4 +105,13 @@ class OperationalSequenceTest extends TestCase
         $this->assertSame('EV-10', DB::transaction(fn (): string => $sequence->nextEvacuationId()));
         $this->assertSame('EV-11', DB::transaction(fn (): string => $sequence->nextEvacuationId()));
     }
+
+    public function test_numeric_sequence_recovers_when_another_database_client_inserts_a_higher_id(): void
+    {
+        Schema::create('device_tokens', fn (Blueprint $table) => $table->unsignedBigInteger('id')->primary());
+        $sequence = app(OperationalSequence::class);
+        $this->assertSame(1, $sequence->nextNumericId('device_tokens', 'id'));
+        DB::table('device_tokens')->insert(['id' => 100]);
+        $this->assertSame(101, $sequence->nextNumericId('device_tokens', 'id'));
+    }
 }

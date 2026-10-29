@@ -39,7 +39,6 @@ class User extends Authenticatable
         'member_id',
         'is_active',
         'must_change_password',
-        'temp_password',
         'profile_photo',
         'security_question_1',
         'security_answer_1',

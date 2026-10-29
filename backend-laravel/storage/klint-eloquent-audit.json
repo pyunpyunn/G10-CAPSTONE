@@ -1,0 +1,87 @@
+{
+ "connection": "audit_klint",
+ "database": "klint",
+ "mapped": {
+ "dispatch": {
+ "rescue_teams": "RescueTeam",
+ "responders": "Responder",
+ "responder_assignments": "ResponderAssignment",
+ "dispatch_statuses": "DispatchStatus",
+ "dispatch_trips": "DispatchTrip",
+ "trip_points": "TripPoint",
+ "rescue_priority_settings": "RescuePrioritySetting",
+ "rescue_criteria_snapshots": "RescueCriteriaSnapshot",
+ "rescue_criteria_line_snapshots": "RescueCriteriaLineSnapshot"
+ },
+ "field_reports": {
+ "responder_field_reports": "ResponderFieldReport",
+ "responder_field_report_members": "ResponderFieldReportMember",
+ "responder_field_report_details": "ResponderFieldReportDetail",
+ "field_report_categories": "FieldReportCategory",
+ "property_damage_levels": "PropertyDamageLevel",
+ "responder_check_ins": "ResponderCheckIn",
+ "hq_field_reports": "HqFieldReport"
+ },
+ "navigation": {
+ "responder_routes": "ResponderRoute",
+ "route_coordinates": "RouteCoordinate",
+ "responder_location_logs": "ResponderLocationLog",
+ "cached_routes": "CachedRoute",
+ "barangay_boundaries": "BarangayBoundary",
+ "mapping_hazard_layers": "MappingHazardLayer",
+ "map_tile_metadata": "MapTileMetadata",
+ "offline_packs": "OfflinePack",
+ "team_bases": "TeamBase",
+ "devices": "NavigationDevice"
+ },
+ "household_safety": {
+ "member_disaster_statuses": "MemberDisasterStatus",
+ "member_statuses": "MemberStatus",
+ "member_status_logs": "MemberStatusLog",
+ "household_disasters": "HouseholdDisaster",
+ "household_status_logs": "HouseholdStatusLog",
+ "status_reminders": "StatusReminder",
+ "trusted_households": "TrustedHousehold",
+ "household_trusted_pins": "HouseholdTrustedPin",
+ "household_geographic_classifications": "HouseholdGeographicClassification",
+ "purok_boundaries": "PurokBoundary",
+ "household_mobile_notifications": "HouseholdMobileNotification"
+ },
+ "communications": {
+ "responder_communication_logs": "ResponderCommunicationLog",
+ "disaster_broadcasts": "DisasterBroadcast",
+ "weather_logs": "WeatherLog",
+ "user_notifications": "UserNotification",
+ "web_push_subscriptions": "WebPushSubscription",
+ "web_push_deliveries": "WebPushDelivery",
+ "official_advisory_notifications": "OfficialAdvisoryNotification"
+ },
+ "reports_and_requests": {
+ "situation_reports": "SituationReport",
+ "situation_report_submissions": "SituationReportSubmission",
+ "incident_archives": "IncidentArchive",
+ "request_validations": "RequestValidation",
+ "external_report_requests": "ExternalReportRequest",
+ "urgency_levels": "UrgencyLevel"
+ },
+ "authentication": {
+ "password_reset_requests": "PasswordResetRequest",
+ "remembered_devices": "RememberedDevice",
+ "household_login_accounts": "HouseholdLoginAccount",
+ "household_device_owners": "HouseholdDeviceOwner",
+ "household_password_recovery_otps": "HouseholdPasswordRecoveryOtp"
+ },
+ "infrastructure": {
+ "device_tracking_logs": "DeviceTrackingLog",
+ "realtime_outbox": "RealtimeOutbox",
+ "sync_events": "SyncEvent",
+ "report_idempotency": "ReportIdempotency",
+ "operational_sequences": "OperationalCounter",
+ "resq_orphan_references": "ResqOrphanReference"
+ }
+ },
+ "missing": [],
+ "warnings": [],
+ "pending_schema_statements": 0,
+ "blocked": []
+}

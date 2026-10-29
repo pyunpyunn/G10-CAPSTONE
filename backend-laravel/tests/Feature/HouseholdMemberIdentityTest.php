@@ -56,6 +56,36 @@ class HouseholdMemberIdentityTest extends TestCase
         $migration->up();
     }
 
+    public function test_upgrade_does_not_copy_plaintext_temporary_passwords(): void
+    {
+        DB::table('users')->where('user_id', 'U1')->update(['temp_password' => 'legacy-temporary-password']);
+        $passwordHash = DB::table('users')->where('user_id', 'U1')->value('password');
+
+        $this->upgrade();
+
+        $created = DB::table('users')->where('user_id', '!=', 'U1')->first();
+        $this->assertNotNull($created);
+        $this->assertNull($created->temp_password);
+        $this->assertSame($passwordHash, $created->password);
+        $this->assertTrue(Hash::check('existing-password', $created->password));
+    }
+
+    public function test_plaintext_cleanup_preserves_hashes_and_leaves_partner_roles_and_invalid_hashes_for_review(): void
+    {
+        DB::table('roles')->insert(['role_id' => 99, 'role_key' => 'partner_role', 'role_name' => 'Partner']);
+        $hash = DB::table('users')->where('user_id', 'U1')->value('password');
+        DB::table('users')->where('user_id', 'U1')->update(['temp_password' => 'legacy']);
+        DB::table('users')->insert([
+            ['user_id' => 'partner', 'role_id' => 99, 'password' => $hash, 'temp_password' => 'partner-legacy'],
+            ['user_id' => 'invalid', 'role_id' => 6, 'password' => 'not-a-hash', 'temp_password' => 'preserve-for-review'],
+        ]);
+        $result = app(\App\Services\Shared\LegacyResidentCredentialCleanup::class)->run(DB::connection());
+        $this->assertSame(['cleared' => 1, 'unresolved' => 1], $result);
+        $this->assertDatabaseHas('users', ['user_id' => 'U1', 'password' => $hash, 'temp_password' => null]);
+        $this->assertDatabaseHas('users', ['user_id' => 'partner', 'temp_password' => 'partner-legacy']);
+        $this->assertDatabaseHas('users', ['user_id' => 'invalid', 'temp_password' => 'preserve-for-review']);
+    }
+
     public function test_upgrade_preserves_household_passwords_and_updates_relational_and_json_references(): void
     {
         Schema::create('member_disaster_statuses', function (Blueprint $t): void {

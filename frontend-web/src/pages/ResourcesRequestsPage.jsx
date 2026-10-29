@@ -1,9 +1,9 @@
 import { PackageCheck } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useResourceRequestsQuery } from '../state/operationsApi'
 import { useNavigate } from 'react-router-dom'
 import {
   forwardResourceRequest,
-  getResourceRequests,
   returnResourceRequest,
   validateResourceRequest,
 } from '../api/resourceRequestApi'
@@ -25,9 +25,7 @@ import {
 
 export default function ResourcesRequestsPage() {
   const navigate = useNavigate()
-  const [payload, setPayload] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [actionError, setError] = useState('')
   const [message, setMessage] = useState('')
   const [queuePage, setQueuePage] = useState(1)
   const [summaryPeriod, setSummaryPeriod] = useState('week')
@@ -37,50 +35,17 @@ export default function ResourcesRequestsPage() {
   const [inspectingRequest, setInspectingRequest] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
-  useEffect(() => {
-    let ignore = false
-
-    async function loadInitialRequests() {
-      setIsLoading(true)
-      setError('')
-
-      try {
-        const data = await getResourceRequests(filterParams('', 'all', 'all', queuePage, summaryPeriod))
-
-        if (!ignore) {
-          setPayload(data)
-        }
-      } catch (loadError) {
-        if (!ignore) {
-          setError(
-            resourceRequestErrorMessage(
-              loadError,
-              'Resource requests could not be loaded. Please sign in again or check the Laravel API.'
-            )
-          )
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadInitialRequests()
-
-    return () => {
-      ignore = true
-    }
-  }, [queuePage, summaryPeriod])
-
+  const { data: payload, isFetching: isLoading, error: queryError, refetch } = useResourceRequestsQuery(
+    filterParams('', 'all', 'all', queuePage, summaryPeriod),
+    { pollingInterval: 30000, skipPollingIfUnfocused: true },
+  )
+  const error = actionError || queryError?.message || ''
   async function loadRequests(showMessage = '') {
-    setIsLoading(true)
     setError('')
     setMessage('')
 
     try {
-      const data = await getResourceRequests(filterParams('', 'all', 'all', queuePage, summaryPeriod))
-      setPayload(data)
+      await refetch().unwrap()
 
       if (showMessage) {
         setMessage(showMessage)
@@ -92,8 +57,6 @@ export default function ResourcesRequestsPage() {
           'Resource requests could not be loaded. Please sign in again or check the Laravel API.'
         )
       )
-    } finally {
-      setIsLoading(false)
     }
   }
 

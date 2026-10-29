@@ -32,6 +32,16 @@ class ResourceRequestPresenterTest extends TestCase
         $this->assertSame(['urgency_id' => 3, 'key' => 'high', 'label' => 'High'], $request['urgency']);
         $this->assertSame('active', $request['area']['event']['status']);
         $this->assertSame('Not forwarded', $request['handoff']['label']);
+
+        $row->validation_status = 'verified';
+        $row->request_status_key = 'approved';
+        $row->request_status_label = 'Approved by resource office';
+        $request = $presenter->format($row);
+        $this->assertSame(['key' => 'approved', 'label' => 'Approved by resource office'], $request['status']);
+
+        $request = $presenter->format($row, handoffStatuses: ['RR-1' => ['status' => 'acknowledged', 'tracking_reference' => 'TR-1']]);
+        $this->assertSame('Approved by resource office', $request['status']['label']);
+        $this->assertSame('Acknowledged', $request['handoff']['label']);
     }
 }
 
