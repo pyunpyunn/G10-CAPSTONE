@@ -79,11 +79,18 @@ class BrowserPushDeliveryTest extends TestCase
 
     public function test_expired_provider_subscription_is_retired(): void
     {
-        $this->push->subscribe($this->user, $this->subscription(), 1);
+        // Exercise the real parent/child deletion order, rather than an unconstrained fixture.
+        Schema::table('web_push_deliveries', function (Blueprint $table): void {
+            $table->foreign('subscription_id')->references('id')->on('web_push_subscriptions')->restrictOnDelete();
+        });
         $this->sources['advisories']->push($this->notice(1));
+        $this->push->subscribe($this->user, $this->subscription(), 1);
+        $this->assertDatabaseCount('web_push_deliveries', 1);
+        $this->sources['advisories']->push($this->notice(2));
         $this->transport->shouldReceive('sendOneNotification')->once()->andReturn(new MessageSentReport(new Request('POST', $this->subscription()['endpoint']), new Response(410), false));
         $this->assertSame(0, $this->push->deliver());
         $this->assertDatabaseCount('web_push_subscriptions', 0);
+        $this->assertDatabaseCount('web_push_deliveries', 0);
     }
 
     public function test_push_endpoints_require_login_and_reject_untrusted_targets(): void

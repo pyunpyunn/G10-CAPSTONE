@@ -28,6 +28,16 @@ class RescueCriteriaLineSnapshot extends Model
         'rescue_priority_version',
     ];
 
+    public function disaster()
+    {
+        return $this->belongsTo(DisasterEvent::class, 'event_id', 'event_id');
+    }
+
+    public function prioritySetting()
+    {
+        return $this->belongsTo(RescuePrioritySetting::class, 'rescue_priority_version', 'version');
+    }
+
     protected function casts(): array
     {
         return [

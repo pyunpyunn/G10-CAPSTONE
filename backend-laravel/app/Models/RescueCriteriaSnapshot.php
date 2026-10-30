@@ -16,6 +16,7 @@ class RescueCriteriaSnapshot extends Model
         'id',
         'event_id',
         'observed_at',
+        'definition_version',
         'impact',
         'special_needs',
         'unreported',
@@ -28,6 +29,17 @@ class RescueCriteriaSnapshot extends Model
     {
         return [
             'observed_at' => 'datetime',
+            'definition_version' => 'integer',
         ];
+    }
+
+    public function disaster()
+    {
+        return $this->belongsTo(DisasterEvent::class, 'event_id', 'event_id');
+    }
+
+    public function prioritySetting()
+    {
+        return $this->belongsTo(RescuePrioritySetting::class, 'rescue_priority_version', 'version');
     }
 }

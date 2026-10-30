@@ -28,7 +28,15 @@ The seven scoped migrations are `2026_10_29_000001` through `000006`, plus `2026
 - Klint: zero missing mapped columns/tables, zero pending repair statements, zero blocked owned relationships. Shared-data warnings below intentionally keep the comprehensive audit nonzero.
 - Nineteen authenticated module read endpoints returned HTTP 200, including dashboard, household directory/status, dispatch, teams, field reports, mapping, requests, weather, notifications, situation reports and all six archive categories.
 - Web: 41 tests passed; production build passed. Mobile TypeScript checking passed.
-- Latest full backend suite: 517 tests, 503 passed, 11 assertion failures and three errors. Outstanding tests concern sparse geography fixtures and role/team/status contract expectations. They have not been hidden or relaxed to obtain a green result. Targeted database error, mapping, archive, request and sequence checks passed.
+- Latest full backend suite: 519 tests passed with 4,585 assertions. Geography/identity fixtures were corrected, and household-status filtering and unsaved-user role checks were fixed. Archive tests verify persisted source validation, legacy recording metadata, retained files after source deletion, and missing-source rejection.
+
+## Follow-up relationship audit
+
+The [table-by-table relationship audit](RESQPERATION_TABLE_RELATIONSHIP_AUDIT.md) reviews all 63 mapped tables and identifies remaining physical relationship gaps. The earlier zero-pending-plan result covers only relationships declared in that plan, not every possible entity reference. History tables require individual lifecycle review; they are not automatically exempt from foreign keys. The saved criteria-snapshot schema also lacks a column required by current chart queries. Klint was offline during this follow-up, so these additional findings remain unverified against current live data and unapplied. The ERD is not finalized.
+
+Prepared follow-up repairs add an idempotent criteria-definition migration, criteria Eloquent parent mappings, transactional child-first push cleanup, and read-only checks for 38 additional relationships. Focused testing passed 34 tests plus the relationship-review regression. A cached-config test-isolation incident temporarily created one local fixture table; its exact test-only contents were verified and reverted. The base test class now refuses persistent databases before fixtures execute. See the relationship audit for details; the prepared migration has not been run against either local or Klint databases.
+
+Latest follow-up full backend suite: **521 tests passed, 4,600 assertions**, using SQLite in memory and a process-only 512 MB PHP limit after the default 128 MB limit exhausted memory. The final relationship-review adjustment also passed its focused regression. PHP syntax and git diff whitespace checks passed. Existing enforced references are now checked for orphan rows as well as the additional undeclared relationships.
 
 ## Explicitly retained limitations
 

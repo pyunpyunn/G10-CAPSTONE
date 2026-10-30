@@ -79,8 +79,10 @@ class BrowserPushService
                         continue;
                     }
                     if ($report->isSubscriptionExpired()) {
-                        DB::table('web_push_subscriptions')->where('id', $device->id)->delete();
-                        DB::table('web_push_deliveries')->where('subscription_id', $device->id)->delete();
+                        DB::transaction(function () use ($device) {
+                            DB::table('web_push_deliveries')->where('subscription_id', $device->id)->delete();
+                            DB::table('web_push_subscriptions')->where('id', $device->id)->delete();
+                        });
                         break;
                     }
                     if ($report->isSuccess()) {
