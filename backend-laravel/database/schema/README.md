@@ -70,4 +70,4 @@ Verified against the shared Klint schema. This export contains schema metadata o
 | `web_push_deliveries` | WebPushDelivery | `id` | 0 |
 | `web_push_subscriptions` | WebPushSubscription | `id` | 0 |
 
-History, outbox and archive tables intentionally retain historical identities; do not infer missing foreign keys from names or add cascades that erase history. See `../../DATABASE_REMEDIATION_REPORT.md` for scope, verification and unresolved shared data.
+History and archive references require individual lifecycle review; history retention alone does not justify missing foreign keys. Independent outbox/cache tables and polymorphic recovery references may legitimately have no ordinary parent. See the [table-by-table relationship audit](../../RESQPERATION_TABLE_RELATIONSHIP_AUDIT.md) for remaining gaps and the [remediation report](../../DATABASE_REMEDIATION_REPORT.md) for verification and preserved shared data. This snapshot is not a certification that every required relationship has been enforced.

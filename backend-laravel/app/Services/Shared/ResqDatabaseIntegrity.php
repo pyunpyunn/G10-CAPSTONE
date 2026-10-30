@@ -7,6 +7,44 @@ use PDO;
 /** Additive schema repairs and journaled reference repairs; shared master records are preserved. */
 class ResqDatabaseIntegrity
 {
+    /** Surface references outside the automatic repair plan without choosing destructive lifecycle policies. */
+    public function relationshipReview(PDO $pdo, array $relationships): array
+    {
+        $columns = [];
+        foreach ($pdo->query('SELECT TABLE_NAME,COLUMN_NAME,COLUMN_TYPE,COLLATION_NAME,CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE()')->fetchAll(PDO::FETCH_ASSOC) as $column) {
+            $columns[$column['TABLE_NAME']][$column['COLUMN_NAME']] = $column;
+        }
+        $foreign = [];
+        foreach ($pdo->query('SELECT TABLE_NAME,COLUMN_NAME,REFERENCED_TABLE_NAME,REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL')->fetchAll(PDO::FETCH_ASSOC) as $key) {
+            $foreign[$key['TABLE_NAME'].'.'.$key['COLUMN_NAME']] = [$key['REFERENCED_TABLE_NAME'], $key['REFERENCED_COLUMN_NAME']];
+        }
+        $findings = [];
+        foreach ($relationships as [$table, $key, $parent, $pk]) {
+            $relationship = "$table.$key -> $parent.$pk";
+            $enforced = ($foreign["$table.$key"] ?? null) === [$parent, $pk];
+            if (! isset($columns[$table][$key], $columns[$parent][$pk])) {
+                $findings[] = ['relationship' => $relationship, 'issue' => 'missing_table_or_column'];
+                continue;
+            }
+            $child = $columns[$table][$key];
+            $target = $columns[$parent][$pk];
+            $comparison = "c.`$key`";
+            if ($child['CHARACTER_SET_NAME'] && $child['CHARACTER_SET_NAME'] === $target['CHARACTER_SET_NAME'] && $target['COLLATION_NAME']) {
+                $comparison .= ' COLLATE '.$target['COLLATION_NAME'];
+            }
+            $count = $pdo->query("SELECT COUNT(*) FROM `$table` c LEFT JOIN `$parent` p ON $comparison=p.`$pk` WHERE c.`$key` IS NOT NULL AND p.`$pk` IS NULL")->fetchColumn();
+            if ($enforced && ! $count) continue;
+            $findings[] = [
+                'relationship' => $relationship,
+                'issue' => $enforced ? 'orphaned_reference' : (isset($foreign["$table.$key"]) ? 'unexpected_foreign_key_parent' : 'missing_foreign_key'),
+                'orphans' => (int) $count,
+                'child_type' => $child['COLUMN_TYPE'], 'parent_type' => $target['COLUMN_TYPE'],
+                'action' => 'Review live data, nullability and parent deletion workflow before applying a scoped constraint.',
+            ];
+        }
+        return $findings;
+    }
+
     public const SHARED_REFERENCES = [
         ['users', 'role_id', 'roles', 'role_id'],
         ['users', 'household_id', 'households', 'household_id'],

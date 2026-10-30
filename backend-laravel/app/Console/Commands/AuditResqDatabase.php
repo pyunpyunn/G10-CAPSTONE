@@ -30,6 +30,12 @@ class AuditResqDatabase extends Command
         try {
             $plan = $integrity->plan($db->getPdo());
             $sharedWarnings = $integrity->sharedReferenceWarnings($db->getPdo());
+            $relationships = array_values(array_unique(array_merge(
+                ResqDatabaseIntegrity::RELATIONSHIPS,
+                ResqDatabaseIntegrity::SHARED_REFERENCES,
+                config('resq_database.relationship_review', []),
+            ), SORT_REGULAR));
+            $relationshipReview = $integrity->relationshipReview($db->getPdo(), $relationships);
             $schema = $db->getSchemaBuilder();
             $missing = [];
             $warnings = [];
@@ -81,10 +87,11 @@ class AuditResqDatabase extends Command
                 'mapped' => $mapped, 'missing' => $missing, 'warnings' => $warnings,
                 'query_builder_tables' => config('resq_database.query_builder_tables'),
                 'shared_reference_warnings' => $sharedWarnings,
+                'relationship_review' => $relationshipReview,
                 'pending_schema_statements' => count($plan['sql']), 'blocked' => $plan['blocked'],
             ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
 
-            return $missing || $plan['sql'] || $plan['blocked'] || $warnings || $sharedWarnings ? self::FAILURE : self::SUCCESS;
+            return $missing || $plan['sql'] || $plan['blocked'] || $warnings || $sharedWarnings || $relationshipReview ? self::FAILURE : self::SUCCESS;
         } catch (\Throwable $error) {
             if ($error instanceof \Error) {
                 $this->error('Audit implementation error: '.$error->getMessage());
