@@ -3,6 +3,7 @@
 namespace App\Services\Shared;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -192,10 +193,6 @@ class OneSignalNotificationService
         }
 
         $this->applyRoleFilter($query, $options['roles'] ?? []);
-        if (! empty($options['platforms'])) {
-            if (! Schema::hasColumn('device_tokens', 'platform')) return [];
-            $query->whereIn('dt.platform', $options['platforms']);
-        }
         $this->applyUserFilter($query, $options['user_ids'] ?? []);
         $this->applyResponderFilter($query, $options['responder_ids'] ?? []);
 
@@ -215,6 +212,16 @@ class OneSignalNotificationService
         if (! $this->applyPurokFilter($query, $options['household_puroks'] ?? [])) {
             return [];
         }
+        if (! empty($options['platforms'])) {
+            if (! Schema::hasColumn('device_tokens', 'platform')) return [];
+            $legacyIds = $this->verifiedLegacySubscriptions($query, $options['platforms']);
+            $query->where(function ($platforms) use ($options, $legacyIds): void {
+                $platforms->whereIn('dt.platform', $options['platforms']);
+                if ($legacyIds) {
+                    $platforms->orWhere(fn ($legacy) => $legacy->where('dt.platform', 'mobile')->whereIn('dt.player_id', $legacyIds));
+                }
+            });
+        }
 
         return $query
             ->distinct()
@@ -224,6 +231,36 @@ class OneSignalNotificationService
             ->unique()
             ->values()
             ->all();
+    }
+
+    /** Old household setup wrote "mobile" over a native platform. Verify ownership/type with the provider; never guess it. */
+    private function verifiedLegacySubscriptions($query, array $platforms): array
+    {
+        if (! $this->isConfigured() || ! Schema::hasColumn('device_tokens', 'user_id')) return [];
+        $devices = (clone $query)->where('dt.platform', 'mobile')->whereNotNull('dt.user_id')
+            ->limit($this->recipientLimit() + 1)->get(['dt.user_id', 'dt.player_id'])->groupBy('user_id');
+        $verified = [];
+        foreach ($devices as $userId => $registrations) {
+            $ids = $registrations->pluck('player_id')->filter(fn ($id) => Str::isUuid((string) $id))->unique()->sort()->values()->all();
+            if (! $ids) continue;
+            $cacheKey = 'onesignal:legacy-platform:'.hash('sha256', json_encode([$this->appId(), (string) $userId, $ids, $platforms]));
+            $verified = [...$verified, ...Cache::store(app()->environment('testing') ? 'array' : 'file')->remember($cacheKey, 300, function () use ($userId, $ids, $platforms): array {
+                try {
+                    $response = Http::withHeaders(['Authorization' => 'Key '.$this->apiKey()])->connectTimeout(3)->timeout(5)
+                        ->get(rtrim($this->baseUrl(), '/').'/apps/'.$this->appId().'/users/by/external_id/'.rawurlencode((string) $userId));
+                    if (! $response->successful() || (string) $response->json('identity.external_id', '') !== (string) $userId) return [];
+                    return collect($response->json('subscriptions', []))->filter(function ($subscription) use ($ids, $platforms): bool {
+                        $platform = match ($subscription['type'] ?? '') { 'AndroidPush' => 'android', 'iOSPush' => 'ios', default => null };
+                        return in_array($subscription['id'] ?? null, $ids, true) && in_array($platform, $platforms, true)
+                            && ($subscription['enabled'] ?? false) && (int) ($subscription['notification_types'] ?? 0) > 0;
+                    })->pluck('id')->values()->all();
+                } catch (\Throwable) {
+                    Log::notice('Legacy OneSignal subscription platform could not be verified.');
+                    return [];
+                }
+            })];
+        }
+        return array_values(array_unique($verified));
     }
 
     private function recipientLimit(): int

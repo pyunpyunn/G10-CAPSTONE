@@ -39,7 +39,7 @@ class DisasterBroadcastWorkflow
                 'event_id' => $eventId,
                 'name' => $validated['name'],
                 'type_id' => $validated['type_id'],
-                'severity_level_id' => $validated['severity_level_id'],
+                'severity_level_id' => $validated['severity_level_id'] ?? null,
                 'started_at' => $validated['started_at'] ?? $now,
                 'ended_at' => null,
                 'created_at' => $now,
@@ -121,7 +121,7 @@ class DisasterBroadcastWorkflow
             ], 409);
         }
 
-        $validated = $this->validator->validateBroadcast($request);
+        $validated = $this->validator->validateBroadcast($request, (int) $event->type_id);
         $metadata = $this->broadcastMetadata($validated);
 
         $broadcastId = DB::transaction(function () use ($request, $validated, &$metadata, $event): int {
@@ -306,11 +306,21 @@ class DisasterBroadcastWorkflow
         $sent = array_sum(array_column($results, 'sent_count'));
         $errors = array_merge(...array_column($results, 'errors'));
         $unsuccessful = array_filter($results, fn ($result) => ! in_array($result['status'], ['sent', 'no_recipients'], true));
+        if ($sent === 0 && $unsuccessful === []) {
+            $errors = array_values(array_unique(array_column($results, 'message')));
+        }
+        $status = $sent > 0
+            ? ($unsuccessful ? 'partial' : 'sent')
+            : ($unsuccessful ? $unsuccessful[array_key_first($unsuccessful)]['status'] : 'no_recipients');
+
         return [
-            'status' => $sent > 0 ? ($unsuccessful ? 'partial' : 'sent') : ($unsuccessful ? $unsuccessful[array_key_first($unsuccessful)]['status'] : 'no_recipients'),
+            'status' => $status,
             'recipient_count' => array_sum(array_column($results, 'recipient_count')),
             'sent_count' => $sent, 'provider_ids' => array_merge(...array_column($results, 'provider_ids')),
-            'errors' => $errors, 'message' => 'Household and rescuer broadcast delivery submitted.',
+            'errors' => $errors,
+            'message' => $status === 'no_recipients'
+                ? 'No eligible OneSignal mobile subscriptions are registered for household or rescuer accounts.'
+                : 'Household and rescuer broadcast delivery submitted.',
         ];
     }
 
@@ -358,37 +368,54 @@ class DisasterBroadcastWorkflow
         DisasterBroadcast::query()
             ->where('broadcast_id', $broadcastId)
             ->update($this->query->filterColumns('disaster_broadcasts', $updates));
-        if ($providerIds !== [] && Schema::hasTable('notifications') && Schema::hasColumn('notifications', 'onesignal_id')) {
-            $linked = DB::table('notifications');
-            $notificationId = $broadcast?->notification_id;
+        if (Schema::hasTable('notifications') && Schema::hasColumn('notifications', 'notif_id')) {
             $hasSource = Schema::hasColumn('notifications', 'source_key');
-            if (! $notificationId && $hasSource && $broadcast && filled($broadcast->message)) {
-                $sourceKey = 'broadcast-'.$broadcastId;
-                DB::table('notifications')->insertOrIgnore($this->query->filterColumns('notifications', [
-                    'source_key' => $sourceKey, 'message' => $broadcast->message,
-                    'sent_by' => $broadcast->sent_by_admin_id, 'created_at' => $broadcast->created_at ?? $broadcast->sent_at,
-                    'channel' => 'onesignal', 'status' => $pushResult['status'], 'target_filter' => $broadcast->scope_type,
-                    'onesignal_id' => $providerIds[0], 'onesignal_ids_json' => $this->jsonText($providerIds),
-                ]));
-                $notificationId = DB::table('notifications')->where('source_key', $sourceKey)->value('notif_id');
-                if ($notificationId && Schema::hasColumn('disaster_broadcasts', 'notification_id')) {
-                    DB::table('disaster_broadcasts')->where('broadcast_id', $broadcastId)->whereNull('notification_id')->update(['notification_id' => $notificationId]);
-                }
+            $sourceKey = 'broadcast-'.$broadcastId;
+            $notificationId = $broadcast?->notification_id;
+            $notificationValues = $this->query->filterColumns('notifications', [
+                'source_key' => $sourceKey,
+                'message' => $broadcast?->message,
+                'sent_by' => $broadcast?->sent_by_admin_id,
+                'created_at' => $broadcast?->created_at ?? $broadcast?->sent_at ?? now(),
+                'channel' => 'onesignal',
+                'status' => $pushResult['status'],
+                'target_filter' => $broadcast?->scope_type,
+                'onesignal_id' => $providerIds[0] ?? null,
+                'onesignal_ids_json' => $this->jsonText($providerIds),
+            ]);
+
+            if ($hasSource) {
+                DB::table('notifications')->insertOrIgnore($notificationValues);
+                $notificationId = DB::table('notifications')
+                    ->where('source_key', $sourceKey)
+                    ->value('notif_id') ?? $notificationId;
+            } elseif ($notificationId) {
+                DB::table('notifications')->where('notif_id', $notificationId)->update($notificationValues);
+            } elseif ($broadcast) {
+                $notificationId = DB::table('notifications')->insertGetId($notificationValues, 'notif_id');
             }
 
-            if ($notificationId || $hasSource) {
-                $linked->where(function ($query) use ($notificationId, $hasSource, $broadcastId): void {
-                    if ($notificationId) $query->where('notif_id', $notificationId);
-                    if ($hasSource) $query->orWhere('source_key', 'broadcast-'.$broadcastId);
-                });
-                foreach ($linked->get() as $notification) {
+            if ($notificationId && Schema::hasColumn('disaster_broadcasts', 'notification_id')) {
+                DB::table('disaster_broadcasts')
+                    ->where('broadcast_id', $broadcastId)
+                    ->whereNull('notification_id')
+                    ->update(['notification_id' => $notificationId]);
+            }
+
+            if ($notificationId) {
+                $notification = DB::table('notifications')->where('notif_id', $notificationId)->first();
+                if ($notification) {
                     $ids = array_values(array_unique([
                         ...$this->presenter->decodeJsonArray($notification->onesignal_ids_json ?? null),
-                        ...array_filter([$notification->onesignal_id ?? null]), ...$providerIds,
+                        ...array_filter([$notification->onesignal_id ?? null]),
+                        ...$providerIds,
                     ]));
-                    $values = ['onesignal_id' => $ids[0]];
-                    if (Schema::hasColumn('notifications', 'onesignal_ids_json')) $values['onesignal_ids_json'] = $this->jsonText($ids);
-                    DB::table('notifications')->where('notif_id', $notification->notif_id)->update($values);
+                    $updates = $this->query->filterColumns('notifications', [
+                        'status' => $pushResult['status'],
+                        'onesignal_id' => $ids[0] ?? null,
+                        'onesignal_ids_json' => $this->jsonText($ids),
+                    ]);
+                    DB::table('notifications')->where('notif_id', $notificationId)->update($updates);
                 }
             }
         }
@@ -461,8 +488,6 @@ class DisasterBroadcastWorkflow
         DB::table('disaster_event_types')->insert(['event_type_id' => $eventTypeId, 'event_id' => $eventId, 'type_id' => $typeId]);
     }
 }
-
-
 
 
 

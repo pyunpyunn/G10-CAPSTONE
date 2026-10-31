@@ -33,7 +33,7 @@ class SituationReportPresenter
             'event' => [
                 'event_id' => $event->event_id, 'name' => $event->name,
                 'type' => $event->type_name ?? 'Disaster event', 'severity' => $event->severity_label ?? 'Unspecified',
-                'severity_key' => $event->severity_key ?? 'medium', 'declared_at' => $this->formatDateTime($event->started_at),
+                'severity_key' => $event->severity_key, 'declared_at' => $this->formatDateTime($event->started_at),
                 'declared_time' => $this->formatTime($event->started_at),
                 'finished_at' => $event->ended_at ? $this->formatDateTime($event->ended_at) : 'Ongoing',
                 'status' => $event->ended_at ? 'Closed' : 'Active',
@@ -188,5 +188,4 @@ class SituationReportPresenter
     private function formatDate(?string $value): ?string { return $value ? Carbon::parse($value)->format('M Y') : null; }
     private function formatTime(?string $value): ?string { return $value ? Carbon::parse($value)->format('g:i A') : null; }
 }
-
 

@@ -11,7 +11,7 @@ return [
         'communications' => ['ResponderCommunicationLog', 'DisasterBroadcast', 'WeatherLog', 'UserNotification', 'WebPushSubscription', 'WebPushDelivery'],
         'reports_and_requests' => ['SituationReport', 'SituationReportSubmission', 'IncidentArchive', 'RequestValidation', 'ExternalReportRequest', 'UrgencyLevel'],
         'authentication' => ['PasswordResetRequest', 'RememberedDevice'],
-        'infrastructure' => ['DeviceTrackingLog', 'RealtimeOutbox', 'SyncEvent', 'ReportIdempotency', 'OperationalCounter', 'ResqOrphanReference'],
+        'infrastructure' => ['DeviceTrackingLog', 'RealtimeOutbox', 'SyncEvent', 'ReportIdempotency', 'OperationalCounter', 'ResqOrphanReference', 'AuditLog'],
         'public_inquiries' => ['LandingInquiry'],
     ],
     // Eloquent has no native composite primary-key support; writes explicitly scope both columns.
@@ -25,6 +25,8 @@ return [
     // Additional reviewed references used by the read-only audit and guarded repair plan.
     // Repairs reject orphans and incompatible populated keys; they never guess parent identities.
     'relationship_review' => [
+        ['responder_field_reports', 'property_damage', 'property_damage_levels', 'damage_key'],
+        ['audit_logs', 'user_id', 'users', 'user_id'],
         ['households', 'login_user_id', 'users', 'user_id'],
         ['device_tokens', 'selection_token_id', 'personal_access_tokens', 'id'],
         ['password_reset_requests', 'household_id', 'households', 'household_id'],

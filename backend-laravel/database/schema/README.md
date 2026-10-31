@@ -7,6 +7,7 @@ NavigationDevice maps device_tokens; TeamBase maps rescue_teams using base-field
 | Table | Models | Primary key | Outgoing FK column mappings |
 |---|---|---|---:|
 | `affected_areas` | AffectedArea | `affected_area_id` | 5 |
+| `audit_logs` | AuditLog | `audit_log_id` | 1 |
 | `barangay_boundaries` | BarangayBoundary | `psgc_code` | 1 |
 | `cached_routes` | CachedRoute | `id` | 3 |
 | `device_tokens` | NavigationDevice | `id` | 6 |
@@ -48,7 +49,7 @@ NavigationDevice maps device_tokens; TeamBase maps rescue_teams using base-field
 | `responder_communication_logs` | ResponderCommunicationLog | `communication_id` | 3 |
 | `responder_field_report_details` | ResponderFieldReportDetail | `detail_id` | 2 |
 | `responder_field_report_members` | ResponderFieldReportMember | `detail_id` | 5 |
-| `responder_field_reports` | ResponderFieldReport | `report_id` | 5 |
+| `responder_field_reports` | ResponderFieldReport | `report_id` | 6 |
 | `responder_location_logs` | ResponderLocationLog | `log_id` | 1 |
 | `responder_routes` | ResponderRoute | `route_id` | 3 |
 | `responders` | Responder | `responder_id` | 2 |

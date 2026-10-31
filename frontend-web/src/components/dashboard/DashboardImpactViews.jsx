@@ -23,16 +23,17 @@ export default function DashboardImpactViews({ eventId }) {
   </div>
 }
 
-function HistoricalImpact() {
+export function HistoricalImpact() {
   const [period, setPeriod] = useState('monthly')
   const [selected, setSelected] = useState(() => new Set(metrics.map((metric) => metric.key)))
   const loader = useCallback(() => getDashboardImpact(period), [period])
   const { data, loading, error, refresh } = useModuleData(loader, ['disasters', 'households', 'dispatch'])
   const rows = data?.periods || []
+  const totals = data?.totals || {}
   const active = metrics.filter((metric) => selected.has(metric.key))
   const options = {
     responsive: true, maintainAspectRatio: false,
-    scales: { y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Recorded count' } } },
+    scales: { y: { beginAtZero: true, suggestedMax: 5, ticks: { precision: 0 }, title: { display: true, text: 'Recorded count' } } },
     plugins: { legend: { display: false }, tooltip: { callbacks: {
       label: (context) => {
         const metric = active[context.datasetIndex]
@@ -48,21 +49,21 @@ function HistoricalImpact() {
   }>
     {loading && <p role="status">Loading recorded impact…</p>}
     {error && <div role="alert">{error} <button type="button" onClick={refresh}>Retry</button></div>}
-    {!loading && !error && data && <>
+    <>
       <div className="dashboard-impact-legend" role="group" aria-label="Select impact metrics">
         {metrics.map((metric) => <button type="button" key={metric.key} aria-pressed={selected.has(metric.key)}
           className={selected.has(metric.key) ? '' : 'is-hidden'}
-          title={`${metric.label}: ${Number(data.totals[metric.key] || 0).toLocaleString()} total`}
+          title={data ? `${metric.label}: ${Number(totals[metric.key] || 0).toLocaleString()} total` : metric.label}
           onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(metric.key)) next.delete(metric.key); else next.add(metric.key); return next })}>
           <i aria-hidden="true" style={{ backgroundColor: metric.color }} />{metric.label}
         </button>)}
       </div>
-      {rows.length === 0 ? <p>No completed disaster events recorded.</p> : active.length === 0 ? <p>Select a metric to display its history.</p> : <>
-        <div className="dashboard-history-chart"><Line options={options} aria-label="Recorded impact of past Mambaling disaster events" data={{ labels: rows.map((row) => row.label), datasets: active.map((metric) => ({ label: metric.label, data: rows.map((row) => row[metric.key]), backgroundColor: metric.color, borderColor: metric.color, borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.25 })) }} /></div>
-      </>}
+      <div className="dashboard-history-chart"><Line options={options} aria-label="Recorded impact of past Mambaling disaster events" data={{ labels: rows.map((row) => row.label), datasets: active.map((metric) => ({ label: metric.label, data: rows.map((row) => row[metric.key]), backgroundColor: metric.color, borderColor: metric.color, borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.25 })) }} /></div>
+      {!loading && !error && rows.length === 0 && <p role="status">No completed disaster events recorded.</p>}
+      {active.length === 0 && <p>Select a metric to display its history.</p>}
       {rows.length > 0 && <details className="dashboard-impact-details"><summary>Recorded totals by {period === 'weekly' ? 'week' : period === 'monthly' ? 'month' : 'year'}</summary>
         <div className="dashboard-impact-table"><table><caption>Recorded totals by {period === 'weekly' ? 'week' : period === 'monthly' ? 'month' : 'year'}</caption><thead><tr><th scope="col">Period</th><th scope="col">Events</th>{metrics.map((metric) => <th scope="col" key={metric.key}>{metric.label}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.key}><th scope="row">{row.label}</th><td>{row.event_count}</td>{metrics.map((metric) => <td key={metric.key} title={`${data.totals[metric.key] ? (row[metric.key] / data.totals[metric.key] * 100).toFixed(1) : '0.0'}% of displayed ${metric.label.toLowerCase()} total`}>{row[metric.key]}</td>)}</tr>)}</tbody><tfoot><tr><th scope="row">Total</th><td>{data.event_count}</td>{metrics.map((metric) => <td key={metric.key}>{data.totals[metric.key]}</td>)}</tr></tfoot></table></div>
       </details>}
-    </>}
+    </>
   </Panel>
 }

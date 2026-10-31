@@ -238,7 +238,8 @@ class HouseholdMobileSetupWorkflow
             'user_id' => $userId,
             'device_uuid' => $deviceUuid,
             'device_name' => $validated['device_name'] ?? 'Household mobile',
-            'platform' => $validated['platform'] ?? 'mobile',
+            'platform' => in_array($validated['platform'] ?? null, ['android', 'ios'], true)
+                ? $validated['platform'] : ($existing?->platform ?: ($validated['platform'] ?? 'mobile')),
             'app_role' => 'household',
             'push_provider' => 'onesignal',
             'location_permission_status' => $validated['location_permission_status'] ?? 'granted',

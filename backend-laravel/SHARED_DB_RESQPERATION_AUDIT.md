@@ -11,23 +11,24 @@ The initial shared schema was stronger than the obsolete local-table mapping in 
 | Check | Before | After |
 |---|---:|---:|
 | Entire shared database: base tables | 111 | 121 |
-| Entire shared database: FK column mappings | 160 | 198 |
-| Entire shared database: index column mappings | 457 | 512 |
+| Entire shared database: FK column mappings | 160 | 200 |
+| Entire shared database: index column mappings | 457 | 513 |
 | Missing current mapped tables / composite query table | 10 | 0 |
 | Missing mapped writable columns | 8 | 0 |
 | Missing / wrong reviewed FK relationships | 35 findings including missing tables | 0 |
 | Pending guarded repair statements | — | 0 |
 | Blocked repairs / shared orphan warnings | — | 0 |
 
-These totals describe schema objects, not business records or distinct multi-column indexes. The schema export covers **59 canonical mapped tables**, including consolidated shared dependencies. Every one of the original 160 FK column mappings retains its original name, target and deletion/update rules. No original table or column was removed. All original index requirements remain covered. MySQL replaced the redundant single-column `responder_check_ins.fk_rci_responder` index with the new covering `(responder_id, checked_in_at)` index; this is a stronger lookup path, not a lost responder index.
+These totals describe schema objects, not business records or distinct multi-column indexes. The schema export covers **60 canonical mapped tables**, including consolidated shared dependencies and the audit-log mapping added during the isolated-object follow-up. Every one of the original 160 FK column mappings retains its original name, target and deletion/update rules. No original table or column was removed. All original index requirements remain covered. MySQL replaced the redundant single-column `responder_check_ins.fk_rci_responder` index with the new covering `(responder_id, checked_in_at)` index; this is a stronger lookup path, not a lost responder index.
 
 ## Applied changes
 
-Only these three scoped migrations were executed against `shared_resq` targeting `shared_db`:
+Only these four scoped migrations were executed against `shared_resq` targeting `shared_db`:
 
 - `2026_10_31_000001_finalize_resq_shared_modules.php`
 - `2026_10_31_000002_reconcile_resq_owned_lookup_catalogs.php`
 - `2026_10_31_000003_enforce_consolidated_resq_references.php`
+- `2026_10_31_000004_link_resq_damage_and_audit_actors.php` — follow-up on the 21 apparently disconnected objects; see the [object-by-object audit](ISOLATED_DATABASE_OBJECT_AUDIT.md).
 
 They created the following missing Resqperation module tables:
 

@@ -16,24 +16,32 @@ class DisasterBroadcastRequestValidator
 
     public function validateEvent(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:20'],
             'type_id' => ['required', 'integer', 'exists:disaster_types,type_id'],
-            'severity_level_id' => ['required', 'integer', 'exists:severity_levels,severity_id'],
+            'severity_level_id' => ['nullable', 'integer', 'exists:severity_levels,severity_id'],
             'started_at' => ['nullable', 'date'],
         ]);
+
+        $this->validateSeverityForType($validated['type_id'], $validated['severity_level_id'] ?? null, 'severity_level_id');
+
+        return $validated;
     }
 
     public function validateEventUpdate(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:20'],
             'type_id' => ['required', 'integer', 'exists:disaster_types,type_id'],
-            'severity_level_id' => ['required', 'integer', 'exists:severity_levels,severity_id'],
+            'severity_level_id' => ['nullable', 'integer', 'exists:severity_levels,severity_id'],
         ]);
+
+        $this->validateSeverityForType($validated['type_id'], $validated['severity_level_id'] ?? null, 'severity_level_id');
+
+        return $validated;
     }
 
-    public function validateBroadcast(Request $request): array
+    public function validateBroadcast(Request $request, ?int $typeId = null): array
     {
         $validated = $request->validate([
             'broadcast_title' => ['required', 'string', 'max:50'],
@@ -49,6 +57,10 @@ class DisasterBroadcastRequestValidator
             'direct_puroks.*.name' => ['required_with:direct_puroks', 'string', 'max:80'],
             'direct_puroks.*.priority' => ['nullable', 'string', Rule::in(['critical', 'high', 'watch', 'monitor'])],
         ]);
+
+        if ($typeId !== null) {
+            $this->validateSeverityForType($typeId, $validated['severity_id'] ?? null, 'severity_id');
+        }
 
         $statusKeys = array_values($validated['allowed_statuses']);
 
@@ -107,8 +119,25 @@ class DisasterBroadcastRequestValidator
 
         return $validated;
     }
-}
 
+    private function validateSeverityForType(int $typeId, mixed $severityId, string $field): void
+    {
+        if ($severityId === null || ! Schema::hasTable('disaster_type_severity_levels')) {
+            return;
+        }
+
+        $belongsToType = DB::table('disaster_type_severity_levels')
+            ->where('type_id', $typeId)
+            ->where('severity_id', $severityId)
+            ->exists();
+
+        if (! $belongsToType) {
+            throw ValidationException::withMessages([
+                $field => ['Select a severity level associated with the selected disaster type.'],
+            ]);
+        }
+    }
+}
 
 
 

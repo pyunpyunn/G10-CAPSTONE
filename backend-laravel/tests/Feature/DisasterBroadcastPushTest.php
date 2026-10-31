@@ -140,6 +140,70 @@ class DisasterBroadcastPushTest extends TestCase
         $this->assertDatabaseHas('disaster_broadcasts', ['broadcast_id' => 55, 'notification_id' => 1, 'onesignal_id' => $delivery['provider_ids'][0]]);
     }
 
+    public function test_no_recipient_broadcast_still_gets_an_internal_notification_id_without_faking_provider_id(): void
+    {
+        Schema::create('disaster_broadcasts', function (Blueprint $table): void {
+            $table->integer('broadcast_id')->primary();
+            $table->integer('notification_id')->nullable();
+            $table->string('message')->nullable();
+            $table->string('sent_by_admin_id')->nullable();
+            $table->string('scope_type')->nullable();
+            $table->string('push_status')->nullable();
+            $table->string('channel')->nullable();
+            $table->string('onesignal_id')->nullable();
+            $table->text('push_provider_ids_json')->nullable();
+            $table->text('push_errors_json')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('notifications', function (Blueprint $table): void {
+            $table->increments('notif_id');
+            $table->string('source_key')->nullable()->unique();
+            $table->text('message')->nullable();
+            $table->string('sent_by')->nullable();
+            $table->string('channel')->nullable();
+            $table->string('status')->nullable();
+            $table->string('target_filter')->nullable();
+            $table->string('onesignal_id')->nullable();
+            $table->text('onesignal_ids_json')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
+        DB::table('disaster_broadcasts')->insert([
+            'broadcast_id' => 56,
+            'message' => 'No devices should receive this test.',
+            'sent_by_admin_id' => 'U1',
+            'scope_type' => 'barangay_wide',
+            'created_at' => now(),
+        ]);
+        DB::table('device_tokens')->delete();
+        Http::fake();
+
+        $workflow = app(\App\Services\Web\DisasterBroadcastWorkflow::class);
+        $delivery = $workflow->sendBroadcastPush(56, [
+            'broadcast_title' => 'Test broadcast',
+            'message' => 'No devices should receive this test.',
+            'scope_type' => 'barangay_wide',
+            'allowed_statuses' => ['safe', 'unsafe'],
+        ], ['puroks' => []], (object) ['event_id' => 'EVT-TEST']);
+        $workflow->updateBroadcastPushStatus(56, $delivery);
+        $workflow->updateBroadcastPushStatus(56, $delivery);
+
+        Http::assertNothingSent();
+        $this->assertSame('no_recipients', $delivery['status']);
+        $this->assertStringContainsString('No eligible OneSignal mobile subscriptions', $delivery['message']);
+        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseHas('notifications', [
+            'notif_id' => 1,
+            'source_key' => 'broadcast-56',
+            'status' => 'no_recipients',
+            'onesignal_id' => null,
+        ]);
+        $this->assertDatabaseHas('disaster_broadcasts', [
+            'broadcast_id' => 56,
+            'notification_id' => 1,
+            'onesignal_id' => null,
+        ]);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

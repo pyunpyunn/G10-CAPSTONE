@@ -95,7 +95,11 @@ class NotificationPresenter
     private function broadcast($row): array
     {
         $severity = $row->severity?->severity_key;
-        $priority = in_array($severity, ['high','critical','severe'], true) ? 'Critical' : 'High';
+        $priority = $severity !== null && (in_array($severity, ['high','critical','severe'], true)
+            || str_ends_with((string) $severity, '_high')
+            || str_ends_with((string) $severity, '_critical'))
+            ? 'Critical'
+            : ($severity === null ? 'Normal' : 'High');
         return $this->notice('broadcast-'.$row->broadcast_id, 'Broadcast', $priority, $row->broadcast_title ?: 'Disaster broadcast saved',
             ($row->message ?: 'Broadcast message saved.').' Scope: '.$this->label($row->scope_type ?: 'barangay'), $row->sent_at, false, 'dashboard');
     }
@@ -154,5 +158,3 @@ class NotificationPresenter
     private function dateLabel(Carbon $date): string { return $date->isToday() ? 'Today' : ($date->isYesterday() ? 'Yesterday' : $date->format('M d, Y')); }
     private function label(?string $value): string { return ucwords(str_replace(['_','-'],' ',$value ?? 'Unknown')); }
 }
-
-

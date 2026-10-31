@@ -98,7 +98,7 @@ class HouseholdStatusPresenter
             'name' => $event->name,
             'type' => $event->type_name ?? 'Disaster event',
             'severity' => $event->severity_label ?? 'Unspecified',
-            'severity_key' => $event->severity_key ?? 'medium',
+            'severity_key' => $event->severity_key,
             'started_at' => $this->formatDateTime($event->started_at),
             'started_time' => $this->formatTime($event->started_at),
         ];
@@ -334,5 +334,4 @@ class HouseholdStatusPresenter
         ];
     }
 }
-
 

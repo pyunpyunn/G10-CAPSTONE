@@ -16,6 +16,9 @@ const groups = {
 const tonesByStatus = Object.fromEntries(Object.entries(groups).flatMap(([tone, keys]) => keys.map(key => [key, tone])))
 export function statusTone(status) {
   const key = normalizeStatus(status)
+  if (/_critical$|_high$/.test(key)) return 'red'
+  if (/_medium$/.test(key)) return 'amber'
+  if (/_low$/.test(key)) return 'green'
   return Object.hasOwn(toneColors, key) ? key : tonesByStatus[key] || 'gray'
 }
 export function statusColor(status) {

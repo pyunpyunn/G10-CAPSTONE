@@ -67,6 +67,27 @@ class SituationManualHandoffTest extends TestCase
         $this->assertSame('2',$query->nextReportNumber('EV2'));
     }
 
+    public function test_global_unique_report_numbers_do_not_restart_for_a_different_event(): void
+    {
+        Schema::table('situation_reports', fn ($table) => $table->unique('report_number'));
+        $query = app(SituationReportQuery::class);
+        $this->assertSame('2', $query->nextReportNumber('EV2'));
+        DB::table('situation_reports')->insert(['sit_rep_id' => 2, 'disaster_id' => 'EV2', 'report_number' => '2', 'summary' => '{}']);
+        $this->assertSame('3', $query->nextReportNumber('EV3'));
+        DB::table('situation_reports')->insert(['sit_rep_id' => 3, 'disaster_id' => 'EV-IMPORTED', 'report_number' => '500', 'summary' => '{}']);
+        $this->assertSame('501', $query->nextReportNumber('EV2'));
+    }
+
+    public function test_event_unique_numbers_recover_after_an_external_insert(): void
+    {
+        Schema::table('situation_reports', fn ($table) => $table->unique(['disaster_id', 'report_number']));
+        $query = app(SituationReportQuery::class);
+        $this->assertSame('1', $query->nextReportNumber('EV2'));
+        DB::table('situation_reports')->insert(['sit_rep_id' => 2, 'disaster_id' => 'EV2', 'report_number' => '40', 'summary' => '{}']);
+        $this->assertSame('41', $query->nextReportNumber('EV2'));
+        $this->assertSame('2', $query->nextReportNumber('EV1'));
+    }
+
     public function test_print_layout_has_manual_receipt_confidential_annexes_and_supersession(): void
     {
         $html=view('reports.situation',['summary'=>[

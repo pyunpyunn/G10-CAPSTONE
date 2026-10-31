@@ -38,10 +38,9 @@ class ResourceRequestPresenter
     }
     public function handoff(object $row, ?array $handoffStatuses = null):array{$tracking=$handoffStatuses!==null?($handoffStatuses[$row->request_id]??null):(DB::transactionLevel()>0?null:$this->trackingAid->requestHandoffStatus($row->request_id,$row->tracking_reference));$trackingStatus=$tracking['status']??null;if(in_array($trackingStatus,['acknowledged','received','received_by_trackingaid','approved'],true)&&$tracking)return['label'=>'Acknowledged','tone'=>'green','tracking_reference'=>$tracking['tracking_reference'],'meta'=>($tracking['updated_at']??null)?'acknowledged '.$this->time($tracking['updated_at']):null];$status=$this->statusKey($row->validation_status??'needs_validation');if(in_array($status,['verified','forwarded'],true)||$row->tracking_reference)return['label'=>'Ready','tone'=>'green','tracking_reference'=>null,'meta'=>'ready for TrackingAid'];return['label'=>'Not forwarded','tone'=>'gray','tracking_reference'=>null,'meta'=>null];}
     public function evacuationEventStatus(?string $id,?string $ended,?string $deleted):string{return !$id?'none':($ended||$deleted?'closed':'active');}
-    public function activeEvent(?object $event):?array{return !$event?null:['event_id'=>$event->event_id,'name'=>$event->name,'type'=>$event->type_name??'Disaster event','severity'=>$event->severity_label??'Unspecified','severity_key'=>$event->severity_key??'medium','started_at'=>$this->dateTime($event->started_at)];}
+    public function activeEvent(?object $event):?array{return !$event?null:['event_id'=>$event->event_id,'name'=>$event->name,'type'=>$event->type_name??'Disaster event','severity'=>$event->severity_label??'Unspecified','severity_key'=>$event->severity_key,'started_at'=>$this->dateTime($event->started_at)];}
     public function dateTime(?string $value):?string{return$value?Carbon::parse($value)->format('M d, Y g:i A'):null;}
     public function time(?string $value):?string{return$value?Carbon::parse($value)->format('g:i A'):null;}
     private function label(?string $value):string{return ucwords(str_replace(['_','-'],' ',$value??'Unknown'));}
 }
-
 

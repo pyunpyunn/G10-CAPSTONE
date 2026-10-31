@@ -19,14 +19,14 @@ export function RefreshButton({ onClick, loading }) {
 export function EventBadge({ event, loading }) {
   return <span className={`ev ${!event ? 'off' : ''}`}><i />{loading ? 'Loading event…' : event?.name || event?.event_name || 'Standby'}</span>
 }
-export function HouseholdChart({ rows, mode, setMode, selected, onSelect }) {
+export function HouseholdChart({ rows, mode, setMode, selected, onSelect, emptyMessage = 'No sitio data available for this event.' }) {
   const [isolate, setIsolate] = useState(null)
   const [tooltip, setTooltip] = useState(null)
   const statusMode = mode === 'status'
   const keys = statusMode ? statuses : factors
   return <div className="cd">
     <div className="ch"><div className="sg2">{['status', 'prio'].map((key, i) => <button type="button" key={key} className={mode === key ? 'on' : ''} aria-pressed={mode === key} onClick={() => { setMode(key); setIsolate(null) }}>{i ? 'Priority' : 'Status'}</button>)}</div><span className="sp" /><div className="lgd">{keys.map((item, i) => <button type="button" key={item.key} className={isolate !== null && isolate !== i ? 'off' : ''} aria-pressed={isolate === i} onClick={() => setIsolate(isolate === i ? null : i)}><i style={{ background: item.color }} />{item.label}</button>)}</div></div>
-    {!rows.length ? <div className="sby">No sitio data available for this event.</div> : <div className="cht"><div className="yax">{[100, 75, 50, 25, 0].map(tick => <span key={tick}>{tick}%</span>)}</div><div className="plot"><div className="pin" style={{ minWidth: `${Math.max(1, rows.length) * 78}px` }}><div className="area">{[0, 25, 50, 75, 100].map(tick => <div key={tick} className="gl" style={{ bottom: `${tick}%` }} />)}<div className={`cols ${selected !== null ? 'sel' : ''}`}>
+    <div className={`cht${rows.length ? '' : ' is-empty'}`} role="group" aria-label="Household sitio chart"><div className="yax">{[100, 75, 50, 25, 0].map(tick => <span key={tick}>{tick}%</span>)}</div><div className="plot"><div className="pin" style={{ minWidth: `${Math.max(1, rows.length) * 78}px` }}><div className="area">{[0, 25, 50, 75, 100].map(tick => <div key={tick} className="gl" style={{ bottom: `${tick}%` }} />)}{!rows.length && <div className="chart-empty-message" role="status">{emptyMessage}</div>}<div className={`cols ${selected !== null ? 'sel' : ''}`}>
       {rows.map(row => {
         const values = keys.map(item => Number((statusMode ? row.status_counts : row.contributions)?.[item.key] || 0))
         const total = Number(row.households || 0)
@@ -37,8 +37,8 @@ export function HouseholdChart({ rows, mode, setMode, selected, onSelect }) {
         }
         return <button type="button" key={row.sitio_id} className={row.sitio_id === selected ? 'on' : ''} aria-label={tooltip} onPointerMove={showTip} onPointerLeave={() => setTooltip(null)} onFocus={showTip} onBlur={() => setTooltip(null)} onClick={() => { setTooltip(null); onSelect(row) }}><div className="bar" style={{ height: `${statusMode ? total ? 100 : 0 : row.priority_score}%` }}>{values.map((value, i) => <i key={keys[i].key} style={{ flex: `${value} 1 0`, background: keys[i].color, opacity: isolate === null || isolate === i ? 1 : .18 }} />)}</div></button>
       })}
-    </div></div><div className="xls">{rows.map(row => <span key={row.sitio_id}>{row.sitio}</span>)}</div></div></div></div>}
-    {tooltip && <div className="chart-tooltip" role="tooltip" style={{ left: tooltip.left, top: tooltip.top }}><div className="h"><span>{tooltip.row.sitio}</span>{!statusMode && <span>{Math.round(tooltip.row.priority_score)}%</span>}</div>{keys.map((item, i) => <div key={item.key}><span>{item.label}</span><b>{statusMode ? `${tooltip.values[i]} · ${tooltip.row.households ? Math.round(tooltip.values[i] / tooltip.row.households * 100) : 0}%` : `${tooltip.values[i].toFixed(1)} pts`}</b></div>)}</div>}
+    </div></div><div className="xls">{rows.map(row => <span key={row.sitio_id}>{row.sitio}</span>)}</div></div></div></div>
+    {rows.length > 0 && tooltip && <div className="chart-tooltip" role="tooltip" style={{ left: tooltip.left, top: tooltip.top }}><div className="h"><span>{tooltip.row.sitio}</span>{!statusMode && <span>{Math.round(tooltip.row.priority_score)}%</span>}</div>{keys.map((item, i) => <div key={item.key}><span>{item.label}</span><b>{statusMode ? `${tooltip.values[i]} · ${tooltip.row.households ? Math.round(tooltip.values[i] / tooltip.row.households * 100) : 0}%` : `${tooltip.values[i].toFixed(1)} pts`}</b></div>)}</div>}
   </div>
 }
 export function SitioDialog({ row, onClose }) {

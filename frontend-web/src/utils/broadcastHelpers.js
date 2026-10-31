@@ -11,12 +11,11 @@ export function defaultForm(workspace = {}) {
   const date = now.toISOString().slice(0, 10)
   const time = now.toTimeString().slice(0, 5)
   const disasterTypes = workspace.disaster_types || []
-  const severityLevels = workspace.severity_levels || []
 
   return {
     event_name: '',
     type_id: disasterTypes[0]?.type_id || '',
-    severity_id: preferredSeverityId(severityLevels),
+    severity_id: '',
     started_date: date,
     started_time: time,
     estimated_duration: '12 hours',
@@ -39,11 +38,11 @@ export function labelFromValue(options, value) {
 }
 
 export function eventTone(severityKey) {
-  if (['critical', 'high'].includes(severityKey)) {
+  if (['critical', 'high'].includes(severityKey) || /_(high|critical)$/.test(severityKey || '')) {
     return 'red'
   }
 
-  if (severityKey === 'medium' || severityKey === 'watch') {
+  if (severityKey === 'medium' || severityKey === 'watch' || /_medium$/.test(severityKey || '')) {
     return 'amber'
   }
 
@@ -75,10 +74,4 @@ export function apiErrorMessage(error, fallback) {
   }
 
   return data?.message || fallback
-}
-
-function preferredSeverityId(severityLevels) {
-  return severityLevels.find((severity) => severity.severity_key === 'high')?.severity_id
-    || severityLevels[0]?.severity_id
-    || ''
 }

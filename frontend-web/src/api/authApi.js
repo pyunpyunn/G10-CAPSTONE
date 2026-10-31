@@ -68,10 +68,11 @@ export async function resetHouseholdPassword(payload) {
 }
 
 // Errors stay in a separate popup; textContent keeps server messages as plain text.
-export function showAuthError(message) {
+export function showAuthError(message, titleText = 'Unable to continue') {
   const existing = document.getElementById('auth-error-popup')
   if (existing) {
     existing.querySelector('.auth-error-message').textContent = message
+    existing.querySelector('#auth-error-title').textContent = titleText
     return
   }
 
@@ -90,7 +91,7 @@ export function showAuthError(message) {
 
   const title = document.createElement('h2')
   title.id = 'auth-error-title'
-  title.textContent = 'Unable to continue'
+  title.textContent = titleText
 
   const detail = document.createElement('p')
   detail.id = 'auth-error-message'

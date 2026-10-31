@@ -13,11 +13,10 @@ class RescuerMobileEventResource extends JsonResource
             'event_id' => $this->event_id,
             'name' => $this->name,
             'type' => $this->type_name ?? 'Disaster event',
-            'severity' => $this->severity_label ?? 'Monitoring',
-            'severity_key' => $this->severity_key ?? 'medium',
+            'severity' => $this->severity_label ?? 'Unspecified',
+            'severity_key' => $this->severity_key,
             'started_at' => $this->started_at,
         ];
     }
 }
-
 

@@ -1,5 +1,5 @@
 {
-    "verified_at": "2026-10-31T13:15:20+08:00",
+    "verified_at": "2026-10-31T13:37:40+08:00",
     "database": "shared_db",
     "scope": "Current Resqperation mappings, including consolidated shared dependencies. Shared parent ownership is unchanged.",
     "tables": {
@@ -201,6 +201,208 @@
                     "REFERENCED_COLUMN_NAME": "sitio_id",
                     "DELETE_RULE": "SET NULL",
                     "UPDATE_RULE": "CASCADE"
+                }
+            ]
+        },
+        "audit_logs": {
+            "models": [
+                "AuditLog"
+            ],
+            "modules": [
+                "infrastructure"
+            ],
+            "columns": [
+                {
+                    "COLUMN_NAME": "audit_log_id",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "NO",
+                    "COLUMN_KEY": "PRI",
+                    "EXTRA": "auto_increment",
+                    "COLLATION_NAME": null,
+                    "CHARACTER_SET_NAME": null,
+                    "ORDINAL_POSITION": 1,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "user_id",
+                    "COLUMN_TYPE": "varchar(255)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "EXTRA": "",
+                    "COLLATION_NAME": "utf8mb4_0900_ai_ci",
+                    "CHARACTER_SET_NAME": "utf8mb4",
+                    "ORDINAL_POSITION": 2,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "role_key",
+                    "COLUMN_TYPE": "varchar(50)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "EXTRA": "",
+                    "COLLATION_NAME": "utf8mb4_0900_ai_ci",
+                    "CHARACTER_SET_NAME": "utf8mb4",
+                    "ORDINAL_POSITION": 3,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "module",
+                    "COLUMN_TYPE": "varchar(80)",
+                    "IS_NULLABLE": "NO",
+                    "COLUMN_KEY": "MUL",
+                    "EXTRA": "",
+                    "COLLATION_NAME": "utf8mb4_0900_ai_ci",
+                    "CHARACTER_SET_NAME": "utf8mb4",
+                    "ORDINAL_POSITION": 4,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "action",
+                    "COLUMN_TYPE": "varchar(80)",
+                    "IS_NULLABLE": "NO",
+                    "COLUMN_KEY": "",
+                    "EXTRA": "",
+                    "COLLATION_NAME": "utf8mb4_0900_ai_ci",
+                    "CHARACTER_SET_NAME": "utf8mb4",
+                    "ORDINAL_POSITION": 5,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "reference_table",
+                    "COLUMN_TYPE": "varchar(80)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "EXTRA": "",
+                    "COLLATION_NAME": "utf8mb4_0900_ai_ci",
+                    "CHARACTER_SET_NAME": "utf8mb4",
+                    "ORDINAL_POSITION": 6,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "reference_id",
+                    "COLUMN_TYPE": "varchar(255)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "EXTRA": "",
+                    "COLLATION_NAME": "utf8mb4_0900_ai_ci",
+                    "CHARACTER_SET_NAME": "utf8mb4",
+                    "ORDINAL_POSITION": 7,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "old_values",
+                    "COLUMN_TYPE": "json",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "EXTRA": "",
+                    "COLLATION_NAME": null,
+                    "CHARACTER_SET_NAME": null,
+                    "ORDINAL_POSITION": 8,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "new_values",
+                    "COLUMN_TYPE": "json",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "EXTRA": "",
+                    "COLLATION_NAME": null,
+                    "CHARACTER_SET_NAME": null,
+                    "ORDINAL_POSITION": 9,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "ip_address",
+                    "COLUMN_TYPE": "varchar(45)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "EXTRA": "",
+                    "COLLATION_NAME": "utf8mb4_0900_ai_ci",
+                    "CHARACTER_SET_NAME": "utf8mb4",
+                    "ORDINAL_POSITION": 10,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "user_agent",
+                    "COLUMN_TYPE": "varchar(255)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "EXTRA": "",
+                    "COLLATION_NAME": "utf8mb4_0900_ai_ci",
+                    "CHARACTER_SET_NAME": "utf8mb4",
+                    "ORDINAL_POSITION": 11,
+                    "COLUMN_DEFAULT": null
+                },
+                {
+                    "COLUMN_NAME": "created_at",
+                    "COLUMN_TYPE": "datetime",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "EXTRA": "",
+                    "COLLATION_NAME": null,
+                    "CHARACTER_SET_NAME": null,
+                    "ORDINAL_POSITION": 12,
+                    "COLUMN_DEFAULT": null
+                }
+            ],
+            "indexes": [
+                {
+                    "INDEX_NAME": "idx_audit_logs_created",
+                    "NON_UNIQUE": 1,
+                    "COLUMN_NAME": "created_at",
+                    "SEQ_IN_INDEX": 1
+                },
+                {
+                    "INDEX_NAME": "idx_audit_logs_module_action",
+                    "NON_UNIQUE": 1,
+                    "COLUMN_NAME": "module",
+                    "SEQ_IN_INDEX": 1
+                },
+                {
+                    "INDEX_NAME": "idx_audit_logs_module_action",
+                    "NON_UNIQUE": 1,
+                    "COLUMN_NAME": "action",
+                    "SEQ_IN_INDEX": 2
+                },
+                {
+                    "INDEX_NAME": "idx_audit_logs_reference",
+                    "NON_UNIQUE": 1,
+                    "COLUMN_NAME": "reference_table",
+                    "SEQ_IN_INDEX": 1
+                },
+                {
+                    "INDEX_NAME": "idx_audit_logs_reference",
+                    "NON_UNIQUE": 1,
+                    "COLUMN_NAME": "reference_id",
+                    "SEQ_IN_INDEX": 2
+                },
+                {
+                    "INDEX_NAME": "idx_audit_logs_user_created",
+                    "NON_UNIQUE": 1,
+                    "COLUMN_NAME": "user_id",
+                    "SEQ_IN_INDEX": 1
+                },
+                {
+                    "INDEX_NAME": "idx_audit_logs_user_created",
+                    "NON_UNIQUE": 1,
+                    "COLUMN_NAME": "created_at",
+                    "SEQ_IN_INDEX": 2
+                },
+                {
+                    "INDEX_NAME": "PRIMARY",
+                    "NON_UNIQUE": 0,
+                    "COLUMN_NAME": "audit_log_id",
+                    "SEQ_IN_INDEX": 1
+                }
+            ],
+            "foreign_keys": [
+                {
+                    "COLUMN_NAME": "user_id",
+                    "CONSTRAINT_NAME": "resq_7e9e267e7c9af499_fk",
+                    "REFERENCED_TABLE_NAME": "users",
+                    "REFERENCED_COLUMN_NAME": "user_id",
+                    "DELETE_RULE": "RESTRICT",
+                    "UPDATE_RULE": "RESTRICT"
                 }
             ]
         },
@@ -8415,7 +8617,7 @@
                     "COLUMN_NAME": "property_damage",
                     "COLUMN_TYPE": "varchar(80)",
                     "IS_NULLABLE": "YES",
-                    "COLUMN_KEY": "",
+                    "COLUMN_KEY": "MUL",
                     "EXTRA": "",
                     "COLLATION_NAME": "utf8mb4_0900_ai_ci",
                     "CHARACTER_SET_NAME": "utf8mb4",
@@ -8522,6 +8724,12 @@
                     "SEQ_IN_INDEX": 1
                 },
                 {
+                    "INDEX_NAME": "resq_5bd01543efdb9459_fk",
+                    "NON_UNIQUE": 1,
+                    "COLUMN_NAME": "property_damage",
+                    "SEQ_IN_INDEX": 1
+                },
+                {
                     "INDEX_NAME": "resq_6beb664e75439fd1_fk",
                     "NON_UNIQUE": 1,
                     "COLUMN_NAME": "status_log_id",
@@ -8566,6 +8774,14 @@
                     "REFERENCED_COLUMN_NAME": "responder_id",
                     "DELETE_RULE": "RESTRICT",
                     "UPDATE_RULE": "CASCADE"
+                },
+                {
+                    "COLUMN_NAME": "property_damage",
+                    "CONSTRAINT_NAME": "resq_5bd01543efdb9459_fk",
+                    "REFERENCED_TABLE_NAME": "property_damage_levels",
+                    "REFERENCED_COLUMN_NAME": "damage_key",
+                    "DELETE_RULE": "RESTRICT",
+                    "UPDATE_RULE": "RESTRICT"
                 },
                 {
                     "COLUMN_NAME": "status_log_id",

@@ -30,6 +30,14 @@ class InquiryListQueryTest extends TestCase
             $table->string('handled_by_user_id')->nullable();
             $table->timestamps();
         });
+        Schema::create('inquiries', function (Blueprint $table): void {
+            $table->id();
+            $table->string('full_name', 150);
+            $table->string('organization', 150);
+            $table->string('email', 255);
+            $table->string('message', 100);
+            $table->timestamp('created_at')->nullable();
+        });
 
         \DB::table('landing_inquiries')->insert([
             [
@@ -95,6 +103,54 @@ class InquiryListQueryTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('message', 'Inquiry sent.')
             ->assertJsonPath('data.inquiry.name', 'Requester');
+
+        $this->assertDatabaseHas('inquiries', [
+            'full_name' => 'Requester',
+            'organization' => '',
+            'email' => '',
+            'message' => 'Please help us.',
+        ]);
+    }
+
+    public function test_account_rows_support_users_table_without_login_id_column(): void
+    {
+        Schema::create('roles', function (Blueprint $table): void {
+            $table->integer('role_id')->primary();
+            $table->string('role_key');
+            $table->string('role_name');
+            $table->string('base_role_key')->nullable();
+            $table->json('web_modules')->nullable();
+        });
+        Schema::create('users', function (Blueprint $table): void {
+            $table->string('user_id')->primary();
+            $table->string('username');
+            $table->string('name')->nullable();
+            $table->string('email')->nullable();
+            $table->integer('role_id')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+            $table->softDeletes();
+        });
+        \DB::table('roles')->insert([
+            'role_id' => 1,
+            'role_key' => 'operations_admin',
+            'role_name' => 'Operations/Admin',
+        ]);
+        \DB::table('users')->insert([
+            'user_id' => 'USR-ADMIN',
+            'username' => 'OPS-0001',
+            'name' => 'Admin User',
+            'role_id' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $accounts = app(\App\Queries\InquiryListQuery::class)->accountRows();
+
+        $this->assertCount(1, $accounts);
+        $this->assertSame('OPS-0001', $accounts->first()->username);
+        $this->assertSame('operations_admin', $accounts->first()->role->role_key);
     }
 
     public function test_admin_status_update_keeps_inquiry_response_shape(): void
@@ -112,6 +168,3 @@ class InquiryListQueryTest extends TestCase
             ->assertJsonPath('data.inquiry.status', 'responded');
     }
 }
-
-
-

@@ -124,18 +124,20 @@ class OperationalSequence
             throw new LogicException('Archive IDs must be allocated inside a transaction.');
         }
 
+        $key = 'incident_archives';
+        DB::table('operational_sequences')->insertOrIgnore([
+            'sequence_key' => $key,
+            'next_value' => ((int) DB::table('incident_archives')->max('archive_id')) + 1,
+        ]);
+
         $row = DB::table('operational_sequences')
-            ->where('sequence_key', 'incident_archives')
+            ->where('sequence_key', $key)
             ->lockForUpdate()
             ->first();
 
-        if ($row === null) {
-            throw new LogicException('The incident archive sequence is not initialized. Run migrations.');
-        }
-
         $id = max((int) $row->next_value, ((int) DB::table('incident_archives')->max('archive_id')) + 1);
         DB::table('operational_sequences')
-            ->where('sequence_key', 'incident_archives')
+            ->where('sequence_key', $key)
             ->update(['next_value' => $id + 1]);
 
         return $id;

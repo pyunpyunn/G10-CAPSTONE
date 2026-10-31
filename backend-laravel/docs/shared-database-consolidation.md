@@ -34,6 +34,7 @@ For the schema state audited October 31, run only the current scoped migrations 
 php artisan migrate --database=shared_resq --path=database/migrations/2026_10_31_000001_finalize_resq_shared_modules.php --force
 php artisan migrate --database=shared_resq --path=database/migrations/2026_10_31_000002_reconcile_resq_owned_lookup_catalogs.php --force
 php artisan migrate --database=shared_resq --path=database/migrations/2026_10_31_000003_enforce_consolidated_resq_references.php --force
+php artisan migrate --database=shared_resq --path=database/migrations/2026_10_31_000004_link_resq_damage_and_audit_actors.php --force
 ```
 
 Do not run the entire backlog of old migrations on the shared database: the historical member-ID upgrade changes identifiers used by other systems. No account restoration or local-data import was executed as part of this schema upgrade. Their separately reviewed behavior is described below for historical context.

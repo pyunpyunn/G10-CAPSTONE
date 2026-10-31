@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { submitLandingInquiry } from '../../api/inquiryApi'
+import { showAuthError } from '../../api/authApi'
 import ResQperationLogo from '../layout/ResQperationLogo'
 
 const featureCards = [
@@ -292,13 +293,30 @@ function VisualPanelsSection() {
 function ContactSection() {
   const [status, setStatus] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [messageLength, setMessageLength] = useState(0)
 
   async function submitInquiry(event) {
     event.preventDefault()
     setStatus('')
-    setIsSending(true)
 
-    const data = new FormData(event.currentTarget)
+    const form = event.currentTarget
+    const invalidField = [...form.elements].find(field => !field.checkValidity())
+    if (invalidField) {
+      const message = invalidField.name === 'name'
+        ? 'Enter your name before sending an inquiry.'
+        : invalidField.name === 'message'
+          ? invalidField.validity.tooShort
+            ? 'Your message must be at least 20 characters.'
+            : 'Enter a message before sending an inquiry.'
+          : invalidField.name === 'email'
+            ? 'Enter a valid email address.'
+            : invalidField.validationMessage
+      showAuthError(message, 'Check your inquiry')
+      return
+    }
+
+    setIsSending(true)
+    const data = new FormData(form)
     const payload = {
       name: data.get('name') || '',
       organization: data.get('organization') || '',
@@ -308,11 +326,15 @@ function ContactSection() {
 
     try {
       await submitLandingInquiry(payload)
-      event.currentTarget.reset()
+      form.reset()
+      setMessageLength(0)
       setStatus('Inquiry sent. The Super Admin can review it in the Inquiries page.')
     } catch (error) {
-      const message = error?.response?.data?.message || 'Inquiry cannot be saved right now. Please try again later.'
-      setStatus(message)
+      const response = error?.response?.data
+      const message = Object.values(response?.errors || {}).flat()[0]
+        || response?.message
+        || 'Inquiry cannot be saved right now. Please try again later.'
+      showAuthError(message, 'Inquiry could not be sent')
     } finally {
       setIsSending(false)
     }
@@ -344,16 +366,16 @@ function ContactSection() {
             </div>
           </div>
 
-          <form className="soft-card contact-form" onSubmit={submitInquiry}>
+          <form className="soft-card contact-form" onSubmit={submitInquiry} noValidate>
               <div className="form-row">
                  <input type="text" name="name" placeholder="Name" aria-label="Name" required />
-                 <input type="text"name="organization" placeholder="Organization" aria-label="Organization" required />
+                 <input type="text" name="organization" placeholder="Organization" aria-label="Organization" />
           </div>
 
-                <input type="email" name="email" placeholder="Email" aria-label="Email" required title="Please enter a valid email address." />
+                <input type="email" name="email" placeholder="Email" aria-label="Email" title="Please enter a valid email address." />
                 <textarea name="message" placeholder="Message" aria-label="Message" minLength={20} maxLength={100} required title="Message must be between 20 and 100 characters."
-                    onChange={(e) => {  e.target.nextElementSibling.textContent = `${e.target.value.length} / 100`; }} />
-                <small className="message-counter">0 / 100 characters</small>
+                    onChange={(e) => setMessageLength(e.target.value.length)} />
+                <small className="message-counter">{messageLength} / 100 characters</small>
 
                   {status && <div className="landing-form-note">{status}</div>}
                   <button className="primary-button" type="submit" disabled={isSending} >
