@@ -244,13 +244,30 @@ class DisasterBroadcastQuery
             $query->where('is_active', 1);
         }
 
-        return $query->orderBy('type_name')
-            ->get(['type_id', 'type_code', 'type_name'])
-            ->map(fn (object $type): array => [
+        $types = $query->orderBy('type_name')
+            ->get(['type_id', 'type_code', 'type_name']);
+        $severityIdsByType = [];
+
+        $hasSeverityRelation = Schema::hasTable('disaster_type_severity_levels');
+        if ($hasSeverityRelation) {
+            $severityIdsByType = DB::table('disaster_type_severity_levels')
+                ->get(['type_id', 'severity_id'])
+                ->groupBy('type_id')
+                ->map(fn ($rows) => $rows->pluck('severity_id')->map(fn ($id) => (int) $id)->values()->all())
+                ->all();
+        }
+
+        return $types->map(function (object $type) use ($hasSeverityRelation, $severityIdsByType): array {
+            $result = [
                 'type_id' => $type->type_id,
                 'type_code' => $type->type_code,
                 'type_name' => $type->type_name,
-            ])
+            ];
+            if ($hasSeverityRelation) {
+                $result['severity_ids'] = $severityIdsByType[$type->type_id] ?? [];
+            }
+            return $result;
+        })
             ->values()
             ->all();
     }
@@ -260,6 +277,7 @@ class DisasterBroadcastQuery
         $query = SeverityLevel::query();
 
         return $query->orderByRaw("CASE severity_key WHEN 'low' THEN 0 WHEN 'medium' THEN 1 WHEN 'high' THEN 2 WHEN 'critical' THEN 3 ELSE 4 END")
+            ->orderBy('severity_id')
             ->get(['severity_id', 'severity_key', 'severity_label'])
             ->map(fn (object $severity): array => [
                 'severity_id' => $severity->severity_id,
@@ -402,5 +420,3 @@ class DisasterBroadcastQuery
         );
     }
 }
-
-

@@ -137,7 +137,7 @@ class WeatherSnapshotPresenter
             'event_id' => $event->event_id,
             'name' => $event->name,
             'type_name' => $event->type_name ?? 'Disaster event',
-            'severity_key' => $event->severity_key ?? 'medium',
+            'severity_key' => $event->severity_key,
             'severity_label' => $event->severity_label ?? 'Unspecified',
             'started_at' => $this->formatDateTime($event->started_at),
             'started_time' => $this->formatTime($event->started_at),
@@ -223,4 +223,3 @@ class WeatherSnapshotPresenter
         return $value ? Carbon::parse($value)->format('g:i A') : null;
     }
 }
-

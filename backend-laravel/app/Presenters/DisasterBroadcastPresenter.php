@@ -50,7 +50,7 @@ class DisasterBroadcastPresenter
             'type_code' => $event->type_code,
             'type_name' => $event->type_name ?? 'Disaster event',
             'severity_level_id' => $event->severity_level_id,
-            'severity_key' => $event->severity_key ?? 'medium',
+            'severity_key' => $event->severity_key,
             'severity_label' => $event->severity_label ?? 'Unspecified',
             'started_at' => $this->formatDateTime($event->started_at),
             'started_time' => $this->formatTime($event->started_at),
@@ -97,8 +97,8 @@ class DisasterBroadcastPresenter
             'disaster_id' => $broadcast->disaster_id,
             'sent_by_admin_id' => $broadcast->sent_by_admin_id,
             'severity_id' => $broadcast->severity_id,
-            'severity_key' => $broadcast->severity_key ?? 'medium',
-            'severity_label' => $broadcast->severity_label ?? 'Medium',
+            'severity_key' => $broadcast->severity_key,
+            'severity_label' => $broadcast->severity_label ?? 'Unspecified',
             'scope_type' => $broadcast->scope_type,
             'scope_label' => $this->scopeLabel($broadcast->scope_type),
             'target_area' => $broadcast->target_area_label ?? $metadata['area'] ?? $this->scopeLabel($broadcast->scope_type),
@@ -182,5 +182,4 @@ class DisasterBroadcastPresenter
         return Carbon::parse($value)->format('h:i A');
     }
 }
-
 

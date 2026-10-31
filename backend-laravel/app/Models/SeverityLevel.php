@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SeverityLevel extends Model
@@ -17,6 +18,17 @@ class SeverityLevel extends Model
     {
         return $this->hasMany(DisasterEvent::class, 'severity_level_id', 'severity_id');
     }
-}
 
+    public function disasterTypes(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            DisasterType::class,
+            'disaster_type_severity_levels',
+            'severity_id',
+            'type_id',
+            'severity_id',
+            'type_id',
+        );
+    }
+}
 

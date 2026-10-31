@@ -13,6 +13,16 @@ use Tests\TestCase;
 
 class HouseholdMobileSetupWorkflowTest extends TestCase
 {
+    public function test_location_heartbeat_preserves_the_registered_android_push_platform(): void
+    {
+        DB::table('device_tokens')->insert(['id' => 10, 'household_id' => 'HH-1', 'device_uuid' => 'android-phone', 'platform' => 'android', 'created_at' => now(), 'updated_at' => now()]);
+        $response = app(HouseholdMobileSetupWorkflow::class)->updateDeviceLocation($this->householdRequest('/api/v1/household/device-location', 'POST', [
+            'device_uuid' => 'android-phone', 'latitude' => 10.287, 'longitude' => 123.88,
+        ]));
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertDatabaseHas('device_tokens', ['device_uuid' => 'android-phone', 'platform' => 'android']);
+    }
+
     public function test_pin_autosave_updates_only_the_authenticated_household_geotag(): void
     {
         DB::table('geotagged_locations')->insert([

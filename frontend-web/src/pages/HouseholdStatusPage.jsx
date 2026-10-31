@@ -12,7 +12,10 @@ export default function HouseholdStatusPage() {
   const [mode, setMode] = useState('status')
   const [selected, setSelected] = useState(null)
   const loader = useCallback(async () => {
-    const [rows, workspace] = await Promise.all([getSitioPriorities(), getDispatchDashboard({ per_page: 1 })])
+    const [rows, workspace] = await Promise.all([
+      getSitioPriorities(),
+      getDispatchDashboard({ per_page: 1 }),
+    ])
     return { rows, event: workspace.active_event, sitioCoverage: workspace.sitio_coverage || [] }
   }, [])
   const { data, error, loading } = useModuleData(loader, ['households', 'disasters'])
@@ -29,18 +32,20 @@ export default function HouseholdStatusPage() {
   return <section className="hh-prototype" aria-label="Household status">
     <div className="hd"><span className="ttl">Household status</span><span className="sp" /><Link className="bt" to="/households/_data-directory">Household data directory</Link></div>
     {error && <div className="emp" role="alert">{error}</div>}
-    {loading ? <div className="cd sby" role="status">Loading household status…</div> : data && !data.event ? <div className="cd sby"><div>Standby<small>Household reporting starts after HQ/Admin broadcasts an active event.</small></div></div> : data && <div className="ovg">
-      <HouseholdChart rows={rows} mode={mode} setMode={setMode} selected={selected} onSelect={select} />
+    {loading && <div className="cd sby" role="status">Loading household status…</div>}
+    <div className="ovg" aria-busy={loading}>
+      {!loading && !error && !data?.event && <div className="cd sby household-standby"><div>Standby<small>Household status and household directory remain available without an active event.</small></div></div>}
+      <HouseholdChart rows={rows} mode={mode} setMode={setMode} selected={selected} onSelect={select} emptyMessage={loading ? 'Loading sitio data…' : error ? 'Sitio data could not be loaded.' : 'No sitio data available yet.'} />
       <div className="cd"><div className="ch">Ranking</div><div className="cb">
-        {!rows.length && <div className="emp">No sitio ranking available</div>}
+        {!rows.length && <div className="emp">{loading ? 'Loading sitio ranking…' : error ? 'Sitio ranking unavailable' : data?.event ? 'No sitio ranking available' : 'No household status data available yet'}</div>}
         {rankingGroups.filter(group => group.rows.length).map(group => <section className="sitio-priority-list" key={group.title} aria-label={group.title}>
           <h3>{group.title}<span>{group.rows.length}</span></h3>
           {group.rows.map(row => <div key={row.sitio_id} className={`rk ${row.sitio_id === selected ? 'on' : ''}`}>
             <button type="button" className="rh" onClick={() => select(row)} aria-label={`View ${row.sitio} households`}><span className="rn">{row.rank}</span><b>{row.sitio}</b><span className="sc"><i style={{ width: `${row.priority_score}%`, background: bandColor(row.band) }} /></span><em>{Math.round(row.priority_score)}%</em>{!assignedSitios.has(String(row.sitio_id)) && <span className="pl" style={{ '--c': bandColor(row.band) }}>{row.band?.label || 'Low'}</span>}</button>
-            <div className="rx"><div><div className="mts"><span>Households <b>{row.households}</b></span><span>Unsafe <b>{row.impacted_households}</b></span><span>Special needs <b>{row.special_needs_members}</b></span><span>Unchecked members <b>{row.unchecked_members}</b></span><span>No mobile / geotag <b>{row.no_contact_households}</b></span>{canOpenWebPage(user, '/rescue-management/new') && data.event && row.households > 0 && <Link className="bt p sm sitio-dispatch" to={`/rescue-management/new?sitio_id=${row.sitio_id}`} aria-label={`Dispatch to ${row.sitio}`}>Dispatch →</Link>}</div></div></div>
+            <div className="rx"><div><div className="mts"><span>Households <b>{row.households}</b></span><span>Unsafe <b>{row.impacted_households}</b></span><span>Special needs <b>{row.special_needs_members}</b></span><span>Unchecked members <b>{row.unchecked_members}</b></span><span>No mobile / geotag <b>{row.no_contact_households}</b></span>{canOpenWebPage(user, '/rescue-management/new') && data?.event && row.households > 0 && <Link className="bt p sm sitio-dispatch" to={`/rescue-management/new?sitio_id=${row.sitio_id}`} aria-label={`Dispatch to ${row.sitio}`}>Dispatch →</Link>}</div></div></div>
           </div>)}
         </section>)}
       </div></div>
-    </div>}
+    </div>
   </section>
 }

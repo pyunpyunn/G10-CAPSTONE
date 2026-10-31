@@ -101,7 +101,7 @@ export default function BroadcastPage() {
 
       nextForm.type_id = active.type_id || nextForm.type_id
 
-      nextForm.severity_id = active.severity_level_id || nextForm.severity_id
+      nextForm.severity_id = active.severity_level_id || ''
 
       nextForm.event_name = active.name
 
@@ -326,8 +326,11 @@ export default function BroadcastPage() {
 
 
   function updateForm(field, value) {
-
-    setForm((current) => ({ ...current, [field]: value }))
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === 'type_id' ? { severity_id: '' } : {}),
+    }))
 
     if (field === 'scope_type' && value === 'barangay_wide') {
 
@@ -423,9 +426,8 @@ export default function BroadcastPage() {
 
 
 
-    if (!form.type_id || !form.severity_id) {
-
-      setFormError('Choose a disaster type and severity.')
+    if (!form.type_id) {
+      setFormError('Choose a disaster type.')
 
       return
 
@@ -473,7 +475,7 @@ export default function BroadcastPage() {
 
           type_id: form.type_id,
 
-          severity_level_id: form.severity_id,
+          severity_level_id: form.severity_id || null,
 
         })
 
@@ -487,7 +489,7 @@ export default function BroadcastPage() {
 
           type_id: form.type_id,
 
-          severity_level_id: form.severity_id,
+          severity_level_id: form.severity_id || null,
 
         })
 
@@ -505,7 +507,7 @@ export default function BroadcastPage() {
 
         message: form.message,
 
-        severity_id: form.severity_id,
+        severity_id: form.severity_id || null,
 
         scope_type: form.scope_type,
 
@@ -522,11 +524,12 @@ export default function BroadcastPage() {
 
 
       setWorkspace(broadcastResult)
-
       initForm(broadcastResult)
-
       const pushDelivery = broadcastResult.push_delivery || {}
-      setFormError(`Broadcast posted. Mobile push ${pushDelivery.status || 'submitted'}: ${Number(pushDelivery.sent_count || 0)} of ${Number(pushDelivery.recipient_count || 0)} devices accepted.`)
+      const pushSummary = pushDelivery.status === 'no_recipients'
+        ? `Mobile push not delivered: ${pushDelivery.message || 'No eligible registered devices.'}`
+        : `Mobile push ${pushDelivery.status || 'submitted'}: ${Number(pushDelivery.sent_count || 0)} of ${Number(pushDelivery.recipient_count || 0)} devices accepted.`
+      setFormError(`Broadcast posted. ${pushSummary}`)
 
       setView('live')
 
@@ -1115,7 +1118,7 @@ function BroadcastLiveView({ activeEvent, latestBroadcast, broadcasts, clock, on
 
                 <td>{item.target_area || item.scope_label || 'Barangay-wide'}</td>
 
-                <td>{Number(item.recipient_count || 0).toLocaleString()} <small>OneSignal: {pushDeliveryLabel(item.push_status)}</small>{(item.provider_ids || []).map((id) => <small key={id}>Message ID: {id}</small>)}{(item.push_errors || []).map((error, index) => <small key={index}>{error}</small>)}</td>
+                <td>{Number(item.recipient_count || 0).toLocaleString()} <small>OneSignal: {pushDeliveryLabel(item.push_status)}</small>{(item.push_errors || []).map((error, index) => <small key={index}>{error}</small>)}</td>
 
               </tr>
 
@@ -1196,4 +1199,3 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString()
 
 }
-

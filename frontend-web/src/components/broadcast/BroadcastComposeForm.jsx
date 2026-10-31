@@ -1,4 +1,5 @@
 import { Plus, Send, Trash2 } from 'lucide-react'
+import { eventTone } from '../../utils/broadcastHelpers'
 
 export default function BroadcastComposeForm({
   activeEvent,
@@ -26,6 +27,11 @@ export default function BroadcastComposeForm({
   const durationMatch = String(form.estimated_duration || '').match(/^(\d+)\s*(hours?|days?)$/i)
   const durationValue = durationMatch?.[1] || '12'
   const durationUnit = durationMatch?.[2]?.toLowerCase().startsWith('day') ? 'Days' : 'Hours'
+  const selectedType = disasterTypes.find((item) => String(item.type_id) === String(form.type_id))
+  const typeSeverityIds = selectedType?.severity_ids
+  const availableSeverityLevels = Array.isArray(typeSeverityIds)
+    ? severityLevels.filter((item) => typeSeverityIds.includes(Number(item.severity_id)))
+    : severityLevels
   const severity = severityLevels.find((item) => String(item.severity_id) === String(form.severity_id))
 
   return (
@@ -46,9 +52,10 @@ export default function BroadcastComposeForm({
           <Field label="Disaster name" counter={`${form.event_name.length}/20`} limitReached={form.event_name.length >= 20}>
             <input value={form.event_name} maxLength={20} onChange={(event) => onChange('event_name', event.target.value)} required />
           </Field>
-          <Field label="Severity">
-            <select value={form.severity_id} onChange={(event) => onChange('severity_id', event.target.value)} required>
-              {severityLevels.map((item) => <option value={item.severity_id} key={item.severity_id}>{item.severity_label}</option>)}
+          <Field label="Severity (optional)">
+            <select value={form.severity_id} onChange={(event) => onChange('severity_id', event.target.value)}>
+              <option value="">No severity selected</option>
+              {availableSeverityLevels.map((item) => <option value={item.severity_id} key={item.severity_id}>{item.severity_label}</option>)}
             </select>
           </Field>
           <Field label="Est. duration">
@@ -177,5 +184,5 @@ function targetHouseholds(scope, directPuroks, puroks, householdCount) {
 }
 
 function severityColor(key) {
-  return ({ low: '#16a34a', medium: '#d97706', moderate: '#d97706', high: '#ea580c', critical: '#dc2626' })[key] || '#d97706'
+  return ({ green: '#16a34a', amber: '#d97706', red: '#dc2626' })[eventTone(key)] || '#d97706'
 }

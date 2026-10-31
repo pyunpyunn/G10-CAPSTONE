@@ -172,15 +172,19 @@ class SituationReportQuery
     {
         if ($eventId === null) throw new \InvalidArgumentException('An event is required for SitRep numbering.');
         return DB::transaction(function () use ($eventId) {
-            $key = 'sitrep-series:'.hash('sha256', $eventId);
-            $existing=SituationReport::query()->where('disaster_id',$eventId)->pluck('report_number');
-            $seed=max($existing->count(), (int) $existing->filter(fn ($v) => ctype_digit((string) $v))->map(fn ($v) => (int) $v)->max())+1;
+            $global = collect(DB::connection()->getSchemaBuilder()->getIndexes('situation_reports'))
+                ->contains(fn ($index) => $index['unique'] && $index['columns'] === ['report_number']);
+            $key = 'sitrep-series:'.($global ? 'global' : hash('sha256', $eventId));
             DB::table('operational_sequences')->insertOrIgnore([
                 'sequence_key'=>$key,
-                'next_value'=>$seed,
+                'next_value'=>1,
             ]);
             $sequence=DB::table('operational_sequences')->where('sequence_key',$key)->lockForUpdate()->first();
-            $number=(int) $sequence->next_value;
+            $scope = SituationReport::query()->when(! $global, fn ($query) => $query->where('disaster_id', $eventId));
+            $existing = (clone $scope)->pluck('report_number');
+            $seed = max($existing->count(), (int) $existing->filter(fn ($v) => ctype_digit((string) $v))->map(fn ($v) => (int) $v)->max()) + 1;
+            $number = max((int) $sequence->next_value, $seed);
+            while ((clone $scope)->where('report_number', (string) $number)->exists()) $number++;
             DB::table('operational_sequences')->where('sequence_key',$key)->update(['next_value'=>$number+1]);
             return (string) $number;
         }, 3);

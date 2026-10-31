@@ -22,10 +22,12 @@ class InquiryListQuery
     public function accountRows(): Collection
     {
         if (! Schema::hasTable('users')) return collect();
-        return User::query()->select([
+        $columns = array_values(array_filter([
             'user_id', 'username', 'login_id', 'name', 'email', 'role_id',
             'is_active', 'created_at', 'updated_at',
-        ])->with('role')
+        ], fn (string $column): bool => Schema::hasColumn('users', $column)));
+
+        return User::query()->select($columns)->with('role')
             ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->orderByDesc('created_at')->limit(12)->get();
     }
@@ -67,5 +69,4 @@ class InquiryListQuery
             });
     }
 }
-
 

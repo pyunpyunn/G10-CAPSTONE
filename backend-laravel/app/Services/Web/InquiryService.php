@@ -8,6 +8,7 @@ use App\Models\LandingInquiry;
 use App\Queries\InquiryListQuery;
 use Illuminate\Http\Request;
 use App\Support\RequestSchema as Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class InquiryService
@@ -46,28 +47,42 @@ class InquiryService
             'updated_at' => $now,
         ]);
 
-        $inquiry = LandingInquiry::query()->create($insert);
+        return DB::transaction(function () use ($request, $validated, $insert, $now): LandingInquiry {
+            $inquiry = LandingInquiry::query()->create($insert);
 
-        $this->recordAuditLog([
-            'user_id' => null,
-            'role_key' => 'anonymous',
-            'module' => 'inquiry',
-            'action' => 'created',
-            'reference_table' => 'landing_inquiries',
-            'reference_id' => $inquiry->inquiry_id,
-            'old_values' => null,
-            'new_values' => [
-                'status' => 'new',
-                'name' => $inquiry->name,
-                'organization' => $inquiry->organization,
-                'email' => $inquiry->email,
-            ],
-            'ip_address' => $request->ip(),
-            'user_agent' => substr((string) $request->userAgent(), 0, 255),
-            'created_at' => $now,
-        ]);
+            if (Schema::hasTable('inquiries')) {
+                $legacyInsert = [
+                    'full_name' => $inquiry->name,
+                    'organization' => $inquiry->organization ?? '',
+                    'email' => $inquiry->email ?? '',
+                    'message' => $inquiry->message,
+                    'created_at' => $now,
+                ];
+                $legacyInsert = array_intersect_key($legacyInsert, array_flip(Schema::getColumnListing('inquiries')));
+                DB::table('inquiries')->insert($legacyInsert);
+            }
 
-        return $inquiry;
+            $this->recordAuditLog([
+                'user_id' => null,
+                'role_key' => 'anonymous',
+                'module' => 'inquiry',
+                'action' => 'created',
+                'reference_table' => 'landing_inquiries',
+                'reference_id' => $inquiry->inquiry_id,
+                'old_values' => null,
+                'new_values' => [
+                    'status' => 'new',
+                    'name' => $inquiry->name,
+                    'organization' => $inquiry->organization,
+                    'email' => $inquiry->email,
+                ],
+                'ip_address' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 255),
+                'created_at' => $now,
+            ]);
+
+            return $inquiry;
+        });
     }
 
     public function index(Request $request): InquiryListResult
@@ -171,8 +186,6 @@ class InquiryService
         return $text === '' ? null : $text;
     }
 }
-
-
 
 
 

@@ -418,3 +418,13 @@ platform policy can affect display even after OneSignal accepts a send.
   content to a production audience while testing.
 - Rotate any credential that is accidentally exposed and update the backend
   secret store.
+
+## October 31: household platform overwrite repair
+
+The reported no-recipient broadcasts were in the selected resq_local database, not shared_db. Provider read-only checks accepted the API credentials, found matching backend/mobile App IDs, and confirmed Android FCM v1 configuration. The local registration was an enabled Android subscription with matching external account ownership, but household setup/location writes had replaced its android platform with the generic mobile fallback. The broadcast's Android filter therefore excluded it.
+
+Household setup/location now preserves a known Android/iOS platform. For existing mobile-labelled rows, recipient selection verifies the exact subscription, external account, native platform and enabled notification state using the configured OneSignal app before including it. Other role, scope, permission and active-state filters still apply. The verification is cached briefly; it does not rewrite database registrations or target unrelated provider subscribers.
+
+The repaired read-only readiness command found one locally registered eligible Android subscription. The provider reported 27 messageable subscriptions across its app, but that does not make all 27 authorized Resqperation database recipients. Shared_db had no registered devices during this check. No database connection, credentials or business rows were changed, and old disaster alerts were not resent.
+
+Focused registration/setup/broadcast tests passed: 37 tests, 133 assertions. These checks verify eligibility and mocked provider-ID persistence; a new actual broadcast is still required to establish real message acceptance/device display. A saved broadcast that was never accepted by OneSignal cannot truthfully receive a fabricated onesignal_id. Consult OneSignal's [message API response rules](https://documentation.onesignal.com/reference/create-message) for provider message IDs and delivery outcomes.

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class DisasterType extends Model
 {
@@ -22,6 +23,17 @@ class DisasterType extends Model
             'deleted_at' => 'datetime',
         ];
     }
-}
 
+    public function severityLevels(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            SeverityLevel::class,
+            'disaster_type_severity_levels',
+            'type_id',
+            'severity_id',
+            'type_id',
+            'severity_id',
+        );
+    }
+}
 

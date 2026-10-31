@@ -39,11 +39,11 @@ export function percent(value, total) {
 export { statusTone } from './statusPalette'
 
 export function eventTone(severityKey) {
-  if (['critical', 'high'].includes(severityKey)) {
+  if (['critical', 'high'].includes(severityKey) || /_(high|critical)$/.test(severityKey || '')) {
     return 'red'
   }
 
-  if (severityKey === 'medium') {
+  if (severityKey === 'medium' || /_medium$/.test(severityKey || '')) {
     return 'amber'
   }
 

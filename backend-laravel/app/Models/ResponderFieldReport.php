@@ -80,4 +80,9 @@ class ResponderFieldReport extends Model
     {
         return $this->hasMany(ResponderFieldReportDetail::class, 'report_id', 'report_id');
     }
+
+    public function damageLevel(): BelongsTo
+    {
+        return $this->belongsTo(PropertyDamageLevel::class, 'property_damage', 'damage_key');
+    }
 }

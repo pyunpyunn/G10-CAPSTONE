@@ -61,6 +61,17 @@ class OperationalSequenceTest extends TestCase
         $this->assertSame(101, DB::transaction(fn () => app(OperationalSequence::class)->nextIncidentArchiveId()));
     }
 
+    public function test_archive_sequence_initializes_when_its_sequence_row_is_missing(): void
+    {
+        DB::table('operational_sequences')->where('sequence_key', 'incident_archives')->delete();
+        DB::table('incident_archives')->insert(['archive_id' => 12]);
+
+        $this->assertSame(13, DB::transaction(fn () => app(OperationalSequence::class)->nextIncidentArchiveId()));
+        $this->assertSame(14, (int) DB::table('operational_sequences')
+            ->where('sequence_key', 'incident_archives')
+            ->value('next_value'));
+    }
+
     public function test_tracking_references_advance_on_a_locked_daily_row(): void
     {
         $sequence = app(OperationalSequence::class);

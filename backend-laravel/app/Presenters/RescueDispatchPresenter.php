@@ -27,7 +27,7 @@ class RescueDispatchPresenter
 
     public function activeEvent(object $event): array
     {
-        return ['event_id' => $event->event_id, 'name' => $event->name, 'type' => $event->type_name ?? $event->type?->type_name ?? 'Disaster event', 'severity' => $event->severity_label ?? $event->severity?->severity_label ?? 'Unspecified', 'severity_key' => $event->severity_key ?? $event->severity?->severity_key ?? 'medium', 'started_at' => $this->dateTime($event->started_at), 'started_time' => $this->time($event->started_at)];
+        return ['event_id' => $event->event_id, 'name' => $event->name, 'type' => $event->type_name ?? $event->type?->type_name ?? 'Disaster event', 'severity' => $event->severity_label ?? $event->severity?->severity_label ?? 'Unspecified', 'severity_key' => $event->severity_key ?? $event->severity?->severity_key, 'started_at' => $this->dateTime($event->started_at), 'started_time' => $this->time($event->started_at)];
     }
 
     public function dateTime(?string $dateTime): ?string { return $dateTime ? Carbon::parse($dateTime)->format('M d, Y h:i A') : null; }
@@ -62,5 +62,4 @@ class RescueDispatchPresenter
         return ['household_id' => $item->household_id, 'household_code' => $item->household_code, 'household_name' => $item->household_name ?: $item->household_code ?: $item->household_id, 'member_count' => (int) ($item->member_count ?? 0), 'address' => $item->geotag_label ?: ($item->full_address ?: trim(($item->house_number ? $item->house_number.' ' : '').($item->area_name ?: ''))), 'status_key' => $statusKey, 'status_label' => $item->status_label ?: 'Unchecked', 'reported_unsafe_count' => in_array($statusKey, ['not_evacuated', 'displaced', 'unsafe', 'needs_help', 'need_help', 'needs_assistance', 'missing', 'injured'], true) ? 1 : 0, 'priority_level' => $item->priority_level ?: 'watch', 'needs_dispatch' => (bool) $item->needs_dispatch, 'has_geotag' => (bool) $item->has_geotag, 'last_battery_level' => $item->last_battery_level, 'last_reported_at' => $this->dateTime($item->last_reported_at), 'active_assignment_id' => $busyAssignmentId ? (int) $busyAssignmentId : null, 'is_available_for_dispatch' => ! $busyAssignmentId];
     }
 }
-
 

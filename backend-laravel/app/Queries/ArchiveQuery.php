@@ -181,7 +181,7 @@ class ArchiveQuery
     private function applyDisasterStatusFilter(object $query, Request $request): void
     {
         $s = $this->presenter->statusKey((string) $request->query('status', 'all')); if ($s === 'all') return;
-        if ($s === 'active') $query->whereNull('de.ended_at'); elseif ($s === 'closed') $query->whereNotNull('de.ended_at'); elseif ($s === 'critical') $query->where(function ($q): void { $q->whereIn('sl.severity_key', ['high', 'critical', 'severe'])->orWhere('sl.severity_label', 'like', '%High%')->orWhere('sl.severity_label', 'like', '%Critical%'); });
+        if ($s === 'active') $query->whereNull('de.ended_at'); elseif ($s === 'closed') $query->whereNotNull('de.ended_at'); elseif ($s === 'critical') $query->where(function ($q): void { $q->whereIn('sl.severity_key', ['high', 'critical', 'severe'])->orWhereRaw("substr(sl.severity_key, -5) = '_high'")->orWhereRaw("substr(sl.severity_key, -9) = '_critical'")->orWhere('sl.severity_label', 'like', '%High%')->orWhere('sl.severity_label', 'like', '%Critical%'); });
     }
     private function applyHouseholdStatusFilter(object $query, Request $request): void
     {
@@ -217,5 +217,4 @@ class ArchiveQuery
         return app(\App\Services\Archive\ArchiveGroupManager::class)->savedRecordIds($category);
     }
 }
-
 
