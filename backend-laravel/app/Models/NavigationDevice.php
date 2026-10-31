@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class NavigationDevice extends Model
 {
-    protected $table = 'devices';
+    protected $table = 'device_tokens';
+
+    public $incrementing = false;
 
     protected $primaryKey = 'id';
 

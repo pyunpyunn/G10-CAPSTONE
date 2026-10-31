@@ -1,6 +1,8 @@
 # Shared database consolidation
 
-The shared database is named `klint`. Existing table names, primary IDs, credentials, and business records remain authoritative. The upgrade only adds columns, indexes, enum options, and new tables. It does not drop or rename tables, delete records, reset passwords, or renumber shared members.
+**Current target, October 31, 2026:** `shared_db`. See the [current Resqperation audit](../SHARED_DB_RESQPERATION_AUDIT.md) for applied scoped migrations, preservation tests and data-readiness limits. The Klint application/import results below are historical. The current developer-local connection remains unchanged; do not interpret historical deployment statements below as its current configuration. Do not rerun an old import or the full migration backlog against the new target.
+
+The current shared database is named `shared_db`. Existing table names, primary IDs, credentials, and business records remain authoritative. The upgrade adds compatible columns, indexes, constraints, catalogs and missing tables. It does not drop or rename tables, delete records, reset passwords, or renumber shared members. Type alignment is guarded by existing data and parent-key compatibility checks.
 
 | Local-only table | Shared implementation |
 | --- | --- |
@@ -26,17 +28,15 @@ The shared database is named `klint`. Existing table names, primary IDs, credent
 
 Configure `SHARED_DB_HOST`, `SHARED_DB_PORT`, `SHARED_DB_DATABASE`, `SHARED_DB_USERNAME`, and `SHARED_DB_PASSWORD` securely on the machine running the upgrade. No credentials are committed. Keep a private database backup and rehearse against an isolated copy first.
 
-Run only the compatibility migration on the shared database:
+For the schema state audited October 31, run only the current scoped migrations on the explicitly configured shared connection:
 
 ```powershell
-php artisan migrate --database=shared_resq --path=database/migrations/2026_10_28_000005_align_shared_resq_schema.php --force
-php artisan migrate --database=shared_resq --path=database/migrations/2026_10_28_000004_consolidate_household_access.php --force
-php artisan migrate --database=shared_resq --path=database/migrations/2026_10_28_000006_restore_responder_user_accounts.php --force
-php artisan resq:merge-local-data --source=resq_local --target=shared_resq
-php artisan resq:merge-local-data --source=resq_local --target=shared_resq --apply --expect-database=klint
+php artisan migrate --database=shared_resq --path=database/migrations/2026_10_31_000001_finalize_resq_shared_modules.php --force
+php artisan migrate --database=shared_resq --path=database/migrations/2026_10_31_000002_reconcile_resq_owned_lookup_catalogs.php --force
+php artisan migrate --database=shared_resq --path=database/migrations/2026_10_31_000003_enforce_consolidated_resq_references.php --force
 ```
 
-Do not run the entire backlog of old migrations on the shared database: the historical member-ID upgrade changes identifiers used by other systems. The compatibility migration is independent of that backlog and checks parent-key duplicates before making schema changes.
+Do not run the entire backlog of old migrations on the shared database: the historical member-ID upgrade changes identifiers used by other systems. No account restoration or local-data import was executed as part of this schema upgrade. Their separately reviewed behavior is described below for historical context.
 
 The household-access migration only fills an empty `households.login_user_id`
 when a matching account exists; it retains the legacy source tables and the

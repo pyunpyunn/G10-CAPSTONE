@@ -1,5 +1,7 @@
 # Resqperation table and relationship audit
 
+**Superseded for the current target:** the [October 31 shared_db audit](SHARED_DB_RESQPERATION_AUDIT.md) and refreshed schema export document the applied repairs and current consolidated mappings. The following Klint/offline review is retained as historical evidence.
+
 Review date: October 30, 2026. Evidence: saved Klint schema captured at `2026-10-30T05:21:56+08:00`, Eloquent manifest, and inspected application queries/workflows. This is not a fresh live-schema certification: the new connection attempt failed, Tailscale reports 100.73.14.100 offline, and TCP 3306 is unreachable. The .env is unchanged. A test-isolation incident and restoration of the local schema are documented below.
 
 ## Finding and scope

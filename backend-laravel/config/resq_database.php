@@ -1,24 +1,33 @@
 <?php
 
-// Resqperation-owned operational tables verified against Klint and the API workflows.
-// Shared master tables are intentionally not owned by this manifest.
+// Current operational mappings, including consolidated dependencies in shared_db.
+// Referencing a shared master table does not transfer its ownership.
 return [
     'modules' => [
         'dispatch' => ['RescueTeam', 'Responder', 'ResponderAssignment', 'DispatchStatus', 'DispatchTrip', 'TripPoint', 'RescuePrioritySetting', 'RescueCriteriaSnapshot', 'RescueCriteriaLineSnapshot'],
         'field_reports' => ['ResponderFieldReport', 'ResponderFieldReportMember', 'ResponderFieldReportDetail', 'FieldReportCategory', 'PropertyDamageLevel', 'ResponderCheckIn', 'HqFieldReport'],
         'navigation' => ['ResponderRoute', 'RouteCoordinate', 'ResponderLocationLog', 'CachedRoute', 'BarangayBoundary', 'MappingHazardLayer', 'MapTileMetadata', 'OfflinePack', 'TeamBase', 'NavigationDevice'],
         'household_safety' => ['AffectedArea', 'MemberDisasterStatus', 'MemberStatus', 'MemberStatusLog', 'HouseholdDisaster', 'HouseholdStatusLog', 'StatusReminder', 'TrustedHousehold', 'HouseholdTrustedPin', 'HouseholdGeographicClassification', 'PurokBoundary', 'HouseholdMobileNotification'],
-        'communications' => ['ResponderCommunicationLog', 'DisasterBroadcast', 'WeatherLog', 'UserNotification', 'WebPushSubscription', 'WebPushDelivery', 'OfficialAdvisoryNotification'],
+        'communications' => ['ResponderCommunicationLog', 'DisasterBroadcast', 'WeatherLog', 'UserNotification', 'WebPushSubscription', 'WebPushDelivery'],
         'reports_and_requests' => ['SituationReport', 'SituationReportSubmission', 'IncidentArchive', 'RequestValidation', 'ExternalReportRequest', 'UrgencyLevel'],
-        'authentication' => ['PasswordResetRequest', 'RememberedDevice', 'HouseholdLoginAccount', 'HouseholdDeviceOwner', 'HouseholdPasswordRecoveryOtp'],
+        'authentication' => ['PasswordResetRequest', 'RememberedDevice'],
         'infrastructure' => ['DeviceTrackingLog', 'RealtimeOutbox', 'SyncEvent', 'ReportIdempotency', 'OperationalCounter', 'ResqOrphanReference'],
         'public_inquiries' => ['LandingInquiry'],
     ],
     // Eloquent has no native composite primary-key support; writes explicitly scope both columns.
     'query_builder_tables' => ['rescue_criteria_contact_baselines' => ['event_id', 'household_id']],
-    // Verified business references still requiring live data and deletion-policy review.
-    // Read-only audit inputs: these are not automatically added by repair migrations.
+    'required_columns' => [
+        'households' => ['login_user_id'],
+        'device_tokens' => ['user_id', 'team_id', 'last_sync_at', 'selection_token_id', 'owner_selected_at'],
+        'password_reset_requests' => ['otp_subject_key', 'household_id', 'code_hash', 'sent_at'],
+        'notifications' => ['advisory_source', 'advisory_fingerprint', 'advisory_title', 'advisory_source_url'],
+    ],
+    // Additional reviewed references used by the read-only audit and guarded repair plan.
+    // Repairs reject orphans and incompatible populated keys; they never guess parent identities.
     'relationship_review' => [
+        ['households', 'login_user_id', 'users', 'user_id'],
+        ['device_tokens', 'selection_token_id', 'personal_access_tokens', 'id'],
+        ['password_reset_requests', 'household_id', 'households', 'household_id'],
         ['barangay_boundaries', 'barangay_id', 'barangays', 'barangay_id'],
         ['mapping_hazard_layers', 'barangay_id', 'barangays', 'barangay_id'],
         ['landing_inquiries', 'handled_by_user_id', 'users', 'user_id'],
