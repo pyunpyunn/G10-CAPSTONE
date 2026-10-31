@@ -36,7 +36,10 @@ class AuditResqDatabase extends Command
                 config('resq_database.relationship_review', []),
             ), SORT_REGULAR));
             $relationshipReview = $integrity->relationshipReview($db->getPdo(), $relationships);
-            $schema = $db->getSchemaBuilder();
+            $tableColumns = [];
+            foreach ($db->select('SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE()') as $column) {
+                $tableColumns[$column->TABLE_NAME][] = $column->COLUMN_NAME;
+            }
             $missing = [];
             $warnings = [];
             $mapped = [];
@@ -49,12 +52,12 @@ class AuditResqDatabase extends Command
                     }
                     $model = new ('App\\Models\\'.$class);
                     $table = $model->getTable();
-                    if (! $schema->hasTable($table)) {
+                    if (! isset($tableColumns[$table])) {
                         $missing[] = "$module: $table";
 
                         continue;
                     }
-                    $columns = $schema->getColumnListing($table);
+                    $columns = $tableColumns[$table];
                     $aliases = method_exists($model, 'schemaColumnAliases') ? $model->schemaColumnAliases() : [];
                     $writeColumns = array_map(fn ($column) => $aliases[$column] ?? $column, $model->getFillable());
                     foreach (array_diff($writeColumns, $columns) as $column) {
@@ -74,12 +77,17 @@ class AuditResqDatabase extends Command
                 }
             }
             foreach (config('resq_database.query_builder_tables', []) as $table => $keys) {
-                if (! $schema->hasTable($table)) {
+                if (! isset($tableColumns[$table])) {
                     $missing[] = "Query builder: $table is missing";
                     continue;
                 }
-                foreach (array_diff($keys, $schema->getColumnListing($table)) as $key) {
+                foreach (array_diff($keys, $tableColumns[$table]) as $key) {
                     $missing[] = "$table.$key: composite key column is missing";
+                }
+            }
+            foreach (config('resq_database.required_columns', []) as $table => $required) {
+                foreach (array_diff($required, $tableColumns[$table] ?? []) as $column) {
+                    $missing[] = "Consolidated mapping: $table.$column is missing";
                 }
             }
             $this->line(json_encode([

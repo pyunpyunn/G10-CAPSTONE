@@ -156,18 +156,11 @@ class ResqDatabaseIntegrity
         ['password_reset_requests', 'user_id', 'users', 'user_id'],
         ['remembered_devices', 'user_id', 'users', 'user_id'],
         ['request_validations', 'request_id', 'resource_requests', 'request_id'],
-        ['devices', 'user_id', 'users', 'user_id'],
-        ['devices', 'team_id', 'rescue_teams', 'team_id'],
-        ['team_bases', 'team_id', 'rescue_teams', 'team_id'],
-        ['dispatch_trips', 'device_id', 'devices', 'id'],
-        ['sync_events', 'device_id', 'devices', 'id'],
+        ['device_tokens', 'user_id', 'users', 'user_id'],
+        ['device_tokens', 'team_id', 'rescue_teams', 'team_id'],
+        ['dispatch_trips', 'device_id', 'device_tokens', 'id'],
+        ['sync_events', 'device_id', 'device_tokens', 'id'],
         ['trip_points', 'trip_id', 'dispatch_trips', 'id'],
-        ['household_login_accounts', 'household_id', 'households', 'household_id'],
-        ['household_login_accounts', 'user_id', 'users', 'user_id'],
-        ['household_device_owners', 'household_id', 'households', 'household_id'],
-        ['household_device_owners', 'member_id', 'household_members', 'member_id'],
-        ['household_password_recovery_otps', 'user_id', 'users', 'user_id'],
-        ['household_password_recovery_otps', 'household_id', 'households', 'household_id'],
         ['household_mobile_notifications', 'household_id', 'households', 'household_id'],
         ['household_geographic_classifications', 'household_id', 'households', 'household_id'],
         ['household_geographic_classifications', 'purok_id', 'puroks', 'purok_id'],
@@ -243,7 +236,8 @@ class ResqDatabaseIntegrity
                 }
             }
         }
-        foreach (self::RELATIONSHIPS as [$table, $key, $parent, $pk]) {
+        $relationships = array_values(array_unique(array_merge(self::RELATIONSHIPS, config('resq_database.relationship_review', [])), SORT_REGULAR));
+        foreach ($relationships as [$table, $key, $parent, $pk]) {
             if (isset($foreign[$table.'.'.$key])) {
                 if ($foreign[$table.'.'.$key] !== [$parent, $pk]) {
                     $blocked[] = "$table.$key: foreign key points to an unexpected parent";
@@ -274,6 +268,9 @@ class ResqDatabaseIntegrity
                 $safeRouteId = $table === 'responder_routes' && $key === 'responder_id'
                     && $target['COLUMN_TYPE'] === 'int'
                     && ! $pdo->query('SELECT COUNT(*) FROM responder_routes WHERE responder_id < -2147483648 OR responder_id > 2147483647')->fetchColumn();
+                $safeHazardId = $table === 'mapping_hazard_layers' && $key === 'barangay_id'
+                    && str_starts_with($child['COLUMN_TYPE'], 'varchar(') && $target['COLUMN_TYPE'] === 'int'
+                    && ! $pdo->query("SELECT COUNT(*) FROM mapping_hazard_layers WHERE barangay_id IS NOT NULL AND (barangay_id NOT REGEXP '^(0|[1-9][0-9]{0,9})$' OR CAST(barangay_id AS UNSIGNED)>2147483647 OR BINARY CAST(CAST(barangay_id AS UNSIGNED) AS CHAR)<>BINARY barangay_id)")->fetchColumn();
                 $safeWidening = preg_match('/^varchar\((\d+)\)$/i', $child['COLUMN_TYPE'], $childLength)
                     && preg_match('/^varchar\((\d+)\)$/i', $target['COLUMN_TYPE'], $targetLength)
                     && (int) $targetLength[1] >= (int) $childLength[1];
@@ -281,7 +278,7 @@ class ResqDatabaseIntegrity
                     && $child['CHARACTER_SET_NAME'] === 'utf8mb4'
                     && $target['CHARACTER_SET_NAME'] === 'utf8mb4'
                     && ! $pdo->query("SELECT COUNT(*) FROM `$table` WHERE `$key` REGEXP '[^ -~]'")->fetchColumn();
-                if ($rows !== 0 && ! $safeRouteId && ! $safeAsciiKey) {
+                if ($rows !== 0 && ! $safeRouteId && ! $safeAsciiKey && ! $safeHazardId) {
                     $blocked[] = "$table.$key: incompatible type/collation on populated table";
 
                     continue;
@@ -294,7 +291,11 @@ class ResqDatabaseIntegrity
                 $sql[] = "ALTER TABLE `$table` MODIFY `$key` $definition";
             }
             $name = 'resq_'.substr(hash('sha256', $table.'.'.$key), 0, 16).'_fk';
-            $sql[] = "ALTER TABLE `$table` ADD CONSTRAINT `$name` FOREIGN KEY (`$key`) REFERENCES `$parent` (`$pk`) ON DELETE RESTRICT ON UPDATE RESTRICT";
+            // Revoking a login must remain possible without deleting the browser's subscription.
+            $revocableToken = ($table === 'web_push_subscriptions' && $key === 'token_id')
+                || ($table === 'device_tokens' && $key === 'selection_token_id');
+            $deleteRule = $revocableToken && $child['IS_NULLABLE'] === 'YES' ? 'SET NULL' : 'RESTRICT';
+            $sql[] = "ALTER TABLE `$table` ADD CONSTRAINT `$name` FOREIGN KEY (`$key`) REFERENCES `$parent` (`$pk`) ON DELETE $deleteRule ON UPDATE RESTRICT";
         }
 
         return ['sql' => $sql, 'blocked' => $blocked];

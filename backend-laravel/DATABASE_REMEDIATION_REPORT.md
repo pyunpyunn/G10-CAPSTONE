@@ -1,5 +1,7 @@
 # Resqperation database remediation
 
+**Current target:** see the [October 31 shared_db audit](SHARED_DB_RESQPERATION_AUDIT.md). Its live verification supersedes the historical Klint/offline results below for the new database.
+
 Verified October 30, 2026 against Klint through a separate runtime connection. The backend `.env`, its selected local database, and local database records were not changed by the shared-database remediation. The user explicitly requested that local schema gaps and ambiguous shared records be left unchanged.
 
 ## Applied to Klint
