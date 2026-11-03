@@ -14,6 +14,8 @@ import {
   TextInput,
   View,
   useWindowDimensions,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { type Href, useRouter } from 'expo-router';
@@ -22,7 +24,7 @@ import { clearToken, getApiServerUrl, setApiServerUrl } from '@/api/client';
 import { getRememberedCredentials, saveRememberedCredentials, getStoredItem } from '@/utils/secureStorage';
 import { navigationMetadata } from '@/utils/navigationStore';
 import { householdOwnerSelectionRequired, loginMobile, restoreMobileSession } from '@/api/auth';
-import { palette, spacing } from '@/constants/resqTheme';
+import { palette, radius, spacing } from '@/constants/resqTheme';
 import { askStandardMobilePermissions } from '@/utils/mobilePermissions';
 import ResQperationLogo from '@/components/ResQperationLogo';
 
@@ -80,9 +82,24 @@ export default function MobileLoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(Platform.OS !== 'web');
+  const [sessionRole, setSessionRole] = useState('');
+  const skeletonOpacity = useRef(new Animated.Value(0.45)).current;
+
+  useEffect(() => {
+    if (!checkingSession) return;
+    const animation = Animated.loop(Animated.sequence([
+      Animated.timing(skeletonOpacity, { toValue: 0.9, duration: 700, useNativeDriver: true }),
+      Animated.timing(skeletonOpacity, { toValue: 0.45, duration: 700, useNativeDriver: true }),
+    ]));
+    animation.start();
+    return () => animation.stop();
+  }, [checkingSession, skeletonOpacity]);
 
   useEffect(() => {
     let active = true;
+    void getStoredItem('resqperation_mobile_role')
+      .then((role) => { if (active) setSessionRole(role || ''); })
+      .catch((error) => console.warn('Cached role could not be loaded for the startup skeleton.', error));
     async function restoreSession() {
       try {
         const role = await restoreMobileSession();
@@ -144,12 +161,7 @@ export default function MobileLoginScreen() {
   }
 
   if (checkingSession) {
-    return (
-      <SafeAreaView style={styles.sessionChecking}>
-        <ActivityIndicator size="large" color={palette.navText} />
-        <Text style={styles.sessionCheckingText}>Restoring your session...</Text>
-      </SafeAreaView>
-    );
+    return <SessionHomeSkeleton role={sessionRole} opacity={skeletonOpacity} />;
   }
 
   return (
@@ -273,6 +285,60 @@ export default function MobileLoginScreen() {
   );
 }
 
+function SessionHomeSkeleton({ role, opacity }: { role: string; opacity: Animated.Value }) {
+  const household = role === 'household_resident';
+  return (
+    <SafeAreaView style={styles.skeletonSafe} edges={['top']}>
+      <View style={styles.skeletonHeader}>
+        <ResQperationLogo width={190} height={42} />
+        <SkeletonBlock opacity={opacity} style={styles.skeletonHeaderAction} />
+      </View>
+      <ScrollView contentContainerStyle={styles.skeletonContent}>
+        {household ? (
+          <>
+            <View style={styles.skeletonBroadcastCard}>
+              <SkeletonBlock opacity={opacity} style={styles.skeletonBroadcastHeading} />
+              <SkeletonBlock opacity={opacity} style={styles.skeletonLineLong} />
+              <SkeletonBlock opacity={opacity} style={styles.skeletonLineMedium} />
+              <SkeletonBlock opacity={opacity} style={styles.skeletonLineShort} />
+            </View>
+            <View style={styles.skeletonStats}>
+              {[0, 1, 2].map((item) => <SkeletonBlock key={item} opacity={opacity} style={styles.skeletonStat} />)}
+            </View>
+            <SkeletonBlock opacity={opacity} style={styles.skeletonHouseholdCard} />
+            <SkeletonBlock opacity={opacity} style={styles.skeletonListCard} />
+          </>
+        ) : (
+          <>
+            <View style={styles.skeletonIdentityCard}>
+              <View style={styles.skeletonIdentityText}>
+                <SkeletonBlock opacity={opacity} style={styles.skeletonLineLong} />
+                <SkeletonBlock opacity={opacity} style={styles.skeletonLineMedium} />
+              </View>
+              <SkeletonBlock opacity={opacity} style={styles.skeletonStatus} />
+              <SkeletonBlock opacity={opacity} style={styles.skeletonLineLong} />
+            </View>
+            <View style={styles.skeletonStats}>
+              {[0, 1, 2].map((item) => <SkeletonBlock key={item} opacity={opacity} style={styles.skeletonStat} />)}
+            </View>
+            <SkeletonBlock opacity={opacity} style={styles.skeletonHouseholdCard} />
+            <SkeletonBlock opacity={opacity} style={styles.skeletonListCard} />
+          </>
+        )}
+      </ScrollView>
+      <View style={styles.skeletonTabBar}>
+        {Array.from({ length: household ? 5 : 4 }, (_, item) => (
+          <SkeletonBlock key={item} opacity={opacity} style={styles.skeletonTab} />
+        ))}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function SkeletonBlock({ opacity, style }: { opacity: Animated.Value; style: StyleProp<ViewStyle> }) {
+  return <Animated.View style={[styles.skeletonBlock, style, { opacity }]} />;
+}
+
 function authErrorMessage(error: any, fallback: string) {
   if (error?.response?.status === 429) {
     return 'Unable to log in right now. Please wait a moment and try again.';
@@ -283,18 +349,28 @@ function authErrorMessage(error: any, fallback: string) {
 }
 
 const styles = StyleSheet.create({
-  sessionChecking: {
+  skeletonSafe: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-    backgroundColor: palette.nav,
+    backgroundColor: palette.page,
   },
-  sessionCheckingText: {
-    color: palette.navMuted,
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  skeletonHeader: { minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, backgroundColor: palette.nav },
+  skeletonHeaderAction: { width: 42, height: 34, borderRadius: radius.pill, backgroundColor: palette.navActive },
+  skeletonContent: { flexGrow: 1, gap: spacing.md, padding: spacing.md, paddingBottom: 112 },
+  skeletonBlock: { backgroundColor: palette.border, borderRadius: radius.md },
+  skeletonBroadcastCard: { gap: spacing.md, overflow: 'hidden', borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, backgroundColor: palette.card },
+  skeletonBroadcastHeading: { height: 42, margin: -spacing.md, marginBottom: 0, borderRadius: 0, backgroundColor: palette.nav },
+  skeletonLineLong: { width: '88%', height: 16 },
+  skeletonLineMedium: { width: '62%', height: 14 },
+  skeletonLineShort: { width: '38%', height: 12 },
+  skeletonStats: { flexDirection: 'row', gap: spacing.sm },
+  skeletonStat: { flex: 1, height: 92, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.card },
+  skeletonIdentityCard: { minHeight: 126, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, backgroundColor: palette.card },
+  skeletonIdentityText: { flex: 1, gap: spacing.sm },
+  skeletonStatus: { width: 78, height: 32, borderRadius: radius.pill },
+  skeletonHouseholdCard: { height: 190, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.card },
+  skeletonListCard: { height: 170, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.card },
+  skeletonTabBar: { position: 'absolute', right: spacing.md, bottom: spacing.md, left: spacing.md, minHeight: 70, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, paddingHorizontal: spacing.sm, backgroundColor: palette.nav },
+  skeletonTab: { width: 34, height: 34, borderRadius: radius.md, backgroundColor: palette.navActive },
   rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 2 },
   help: { color: palette.navMuted, fontSize: 13, lineHeight: 20 },
   safe: {

@@ -70,7 +70,7 @@ class MobileDeviceService
         $canLinkResponder = Schema::hasColumn('device_tokens', 'responder_id');
         $canLinkMember = Schema::hasColumn('device_tokens', 'member_id');
         $householdId = $roleKey === 'household_resident' ? $user->household_id : null;
-        $appRole = $roleKey === 'household_resident' ? 'household' : $roleKey;
+        $appRole = $roleKey === 'household_resident' ? 'household_mobile' : 'rescuer_mobile';
         $savedPlayerId = $this->oneSignalPlayerIdForStorage($validated);
 
         if ($roleKey === 'rescuer' && ! $canLinkUser && ! $canLinkResponder && ! $canLinkMember) {
@@ -110,7 +110,7 @@ class MobileDeviceService
             'updated_at' => $now,
         ];
 
-        if ($appRole === 'household' && $canLinkMember) {
+        if ($appRole === 'household_mobile' && $canLinkMember) {
             $data['member_id'] = app(HouseholdMobileSupport::class)->authenticatedMemberId($user);
         }
 
@@ -272,7 +272,6 @@ class MobileDeviceService
         return $filtered;
     }
 }
-
 
 
 

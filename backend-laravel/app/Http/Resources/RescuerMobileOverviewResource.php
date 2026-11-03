@@ -23,6 +23,7 @@ class RescuerMobileOverviewResource extends JsonResource
             'active_event' => $overview['active_event']
                 ? (new RescuerMobileEventResource($overview['active_event']))->resolve($request)
                 : null,
+            'recent_alerts' => $overview['recent_alerts'],
             'summary' => $overview['summary'],
             'assignments' => RescuerMobileAssignmentResource::collection($overview['assignments']),
             'field_reports' => RescuerMobileFieldReportResource::collection($overview['field_reports']),
@@ -34,5 +35,4 @@ class RescuerMobileOverviewResource extends JsonResource
         ];
     }
 }
-
 

@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
 import { getRescuerDispatchHistory } from '@/api/rescuer';
+import { DisasterBroadcastBanner } from '@/components/household/DisasterBroadcastBanner';
 import { ActionButton, EmptyState, SectionHeader, StatTile, StatusBadge } from './RescuerUI';
 
 type Props = { overview: any; pendingAssignmentId?: number | null; onOpenMap: (assignment?: any) => void; onOpenReport: (assignment?: any) => void; onStatusChange: (id: number, status: string) => void };
@@ -37,7 +38,7 @@ export function RescuerDashboardScreen({ overview, pendingAssignmentId, onOpenMa
   const updating = pendingAssignmentId != null && Number(pendingAssignmentId) === Number(current?.assignment_id);
   return <View style={styles.stack}>
     <View style={styles.identity}><View style={styles.flex}><Text style={styles.name}>{responder.full_name || overview?.profile?.user?.full_name || 'Rescuer'}</Text><Text style={styles.meta}>{responder.team_name || 'No team'}</Text></View><StatusBadge label={responder.duty_status || 'Standby'} tone={responder.duty_status} /></View>
-    {overview?.active_event && <Text style={styles.event}>{overview.active_event.name}</Text>}
+    {overview?.active_event && <DisasterBroadcastBanner event={overview.active_event} broadcast={overview.recent_alerts?.[0]} />}
     <View style={styles.stats}><StatTile label="Assigned" value={summary.total_assignments || 0} /><StatTile label="Active" value={summary.active_assignments || 0} /><StatTile label="Done" value={summary.completed_assignments || 0} tone="completed" /></View>
     {current ? <View style={styles.card}>
       <SectionHeader title="Current assignment" action={<StatusBadge label={current.status_label} tone={current.status_key} />} />
@@ -71,7 +72,7 @@ function TaskAction({ label, icon, primary, disabled, onPress }: { label: string
   return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} android_ripple={{ color: '#236a7333' }} onPress={onPress} style={[styles.task, primary && styles.primary, disabled && { opacity: 0.5 }]}><Ionicons name={icon} size={20} color={primary ? '#fff' : palette.navActive} /><Text style={[styles.taskText, primary && styles.white]} numberOfLines={2}>{label}</Text></Pressable>;
 }
 const styles = StyleSheet.create({
-  stack: { gap: spacing.md }, identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, flex: { flex: 1, minWidth: 0 }, name: { color: palette.text, fontSize: 20, fontWeight: '700' }, meta: { color: palette.textSoft, fontSize: 12, lineHeight: 18 }, event: { color: palette.text, fontSize: 14, fontWeight: '600' },
+  stack: { gap: spacing.md }, identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, flex: { flex: 1, minWidth: 0 }, name: { color: palette.text, fontSize: 20, fontWeight: '700' }, meta: { color: palette.textSoft, fontSize: 12, lineHeight: 18 },
   stats: { flexDirection: 'row', gap: spacing.sm }, card: { backgroundColor: palette.card, borderColor: palette.border, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm }, household: { color: palette.text, fontSize: 19, fontWeight: '700' }, info: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }, data: { color: palette.text, fontWeight: '600' },
   actions: { flexDirection: 'row', gap: 8 }, task: { flex: 1, minWidth: 0, minHeight: 64, padding: 6, justifyContent: 'center', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: palette.border, borderRadius: radius.md }, taskText: { fontSize: 12, fontWeight: '600', color: palette.text, textAlign: 'center' }, primary: { backgroundColor: palette.navActive, borderColor: palette.navActive }, white: { color: '#fff' },
   queueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 10, borderBottomWidth: 1, borderColor: palette.border }, queueName: { color: palette.text, fontSize: 14, fontWeight: '600' }, iconButton: { padding: 10, minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }, overlay: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: '#0008' }, history: { backgroundColor: palette.card, borderRadius: radius.lg, padding: spacing.md, height: '80%' }, error: { color: palette.unsafe },

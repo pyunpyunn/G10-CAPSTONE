@@ -7,6 +7,7 @@ export type RescuerOverview = {
     responder: any;
   };
   active_event: any;
+  recent_alerts: any[];
   summary: {
     total_assignments: number;
     active_assignments: number;
