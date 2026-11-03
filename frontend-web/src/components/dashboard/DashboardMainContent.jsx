@@ -4,7 +4,6 @@ import OperationalViews from './OperationalViews'
 import DashboardImpactViews from './DashboardImpactViews'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
-import Badge from '../ui/Badge'
 import {
   eventTone,
 } from '../../utils/dashboardHelpers'
@@ -105,7 +104,7 @@ function ActiveEventBanner({ activeEvent, onOpenBroadcast }) {
           <div className="meta-group">
             <span className="meta-label">Severity</span>
             <div className="meta-value">
-              <Badge tone={tone}>{activeEvent.severity}</Badge>
+              <span className="severity-meta-value">{activeEvent.severity}</span>
             </div>
           </div>
         </div>
