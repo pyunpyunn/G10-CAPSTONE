@@ -280,8 +280,8 @@ class OneSignalNotificationService
 
         $normalized = collect($roles)
             ->flatMap(fn (string $role): array => match ($role) {
-                'household', 'household_resident' => ['household', 'household_resident'],
-                'rescuer' => ['rescuer'],
+                'household', 'household_resident', 'household_mobile' => ['household_mobile', 'household', 'household_resident'],
+                'rescuer', 'rescuer_mobile' => ['rescuer_mobile', 'rescuer'],
                 default => [$role],
             })
             ->unique()
@@ -407,7 +407,6 @@ class OneSignalNotificationService
         ];
     }
 }
-
 
 
 

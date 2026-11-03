@@ -63,9 +63,11 @@ export async function getPushRegistration(_deviceUuid?: string): Promise<PushReg
     const identity = await api.get('/auth/me');
     const user = identity.data.user ?? identity.data.data;
     if (!user?.user_id) return emptyOneSignalRegistration('error');
+    const appRole = appRoleForUser(user);
+    if (!appRole) return emptyOneSignalRegistration('error');
     if (_deviceUuid) pushSyncContext = { deviceUuid: _deviceUuid, userId: String(user.user_id) };
     await initializeOneSignal();
-    return getOneSignalRegistration(oneSignalAppId, String(user.user_id));
+    return getOneSignalRegistration(oneSignalAppId, String(user.user_id), appRole);
   } catch {
     return emptyOneSignalRegistration('error');
   }
@@ -109,7 +111,8 @@ async function initializeOneSignal() {
 
 async function getOneSignalRegistration(
   appId: string,
-  externalUserId?: string
+  externalUserId: string,
+  appRole: 'rescuer_mobile' | 'household_mobile',
 ): Promise<PushRegistration> {
   try {
     const { OneSignal } = await import('react-native-onesignal');
@@ -119,12 +122,8 @@ async function getOneSignalRegistration(
       oneSignalReady = true;
     }
 
-    if (externalUserId) {
-      OneSignal.login(externalUserId);
-      OneSignal.User.addTags({
-        app_role: 'mobile',
-      });
-    }
+    OneSignal.login(externalUserId);
+    OneSignal.User.addTags({ app_role: appRole });
 
     const hasPermission = await OneSignal.Notifications.getPermissionAsync();
     let accepted = hasPermission;
@@ -186,6 +185,13 @@ async function getOneSignalRegistration(
   }
 }
 
+function appRoleForUser(user: any): 'rescuer_mobile' | 'household_mobile' | null {
+  const role = user?.role?.base_role_key || user?.role?.role_key || user?.role_key;
+  if (role === 'rescuer') return 'rescuer_mobile';
+  if (role === 'household_resident') return 'household_mobile';
+  return null;
+}
+
 // A subscription can arrive after login, rotate, or change when Firebase is configured.
 // Keep the database current without displaying another permission prompt.
 async function syncCurrentSubscription() {
@@ -196,8 +202,10 @@ async function syncCurrentSubscription() {
     const { OneSignal } = await import('react-native-onesignal');
     const identity = await api.get('/auth/me');
     const user = identity.data.user ?? identity.data.data;
+    const appRole = appRoleForUser(user);
     if (pushSyncContext !== context || String(user?.user_id) !== context.userId ||
-        await OneSignal.User.getExternalId() !== context.userId) return;
+        !appRole || await OneSignal.User.getExternalId() !== context.userId) return;
+    OneSignal.User.addTags({ app_role: appRole });
     const playerId = await OneSignal.User.pushSubscription.getIdAsync();
     const token = await OneSignal.User.pushSubscription.getTokenAsync();
     const permission = await OneSignal.Notifications.getPermissionAsync();
@@ -205,7 +213,7 @@ async function syncCurrentSubscription() {
     if (pushSyncContext !== context) return;
     await savePushRegistration({
       device_uuid: context.deviceUuid,
-      device_name: user.role_key === 'rescuer' ? 'Rescuer mobile' : 'Household mobile',
+      device_name: appRole === 'rescuer_mobile' ? 'Rescuer mobile' : 'Household mobile',
       platform: Platform.OS === 'ios' ? 'ios' : 'android',
       player_id: playerId,
       push_token: token,

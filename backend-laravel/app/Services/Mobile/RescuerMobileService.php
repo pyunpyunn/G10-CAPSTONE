@@ -74,6 +74,7 @@ class RescuerMobileService
                 'responder' => $responder,
             ],
             'active_event' => $activeEvent,
+            'recent_alerts' => app(\App\Queries\HouseholdMobileReadQuery::class)->recentAlerts($activeEvent?->event_id),
             'summary' => $this->assignmentPresenter->summary($assignments),
             'assignments' => $assignments,
             'field_reports' => $this->fieldReportWorkflow->fieldReports($request)['reports'],
@@ -252,7 +253,6 @@ class RescuerMobileService
     }
 
 }
-
 
 
 

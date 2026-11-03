@@ -53,9 +53,8 @@ class MobileDeviceRegistrationTest extends TestCase
         });
 
         DB::table('roles')->insert([
-            'role_id' => 6,
-            'role_key' => 'household_resident',
-            'role_name' => 'Household resident',
+            ['role_id' => 5, 'role_key' => 'rescuer', 'role_name' => 'Rescuer'],
+            ['role_id' => 6, 'role_key' => 'household_resident', 'role_name' => 'Household resident'],
         ]);
         DB::table('users')->insert([
             'user_id' => 'household-user-1',
@@ -86,12 +85,14 @@ class MobileDeviceRegistrationTest extends TestCase
             'household_id' => 'HH-100',
             'user_id' => 'household-user-1',
             'player_id' => 'subscription-1',
+            'app_role' => 'household_mobile',
         ]);
         $this->assertDatabaseHas('device_tokens', [
             'device_uuid' => 'phone-2',
             'household_id' => 'HH-100',
             'user_id' => 'household-user-1',
             'player_id' => 'subscription-2',
+            'app_role' => 'household_mobile',
         ]);
 
         $this->postJson('/api/v1/mobile/device-token', $this->registration('phone-1', 'subscription-1-rotated'))
@@ -103,6 +104,28 @@ class MobileDeviceRegistrationTest extends TestCase
             'household_id' => 'HH-100',
             'user_id' => 'household-user-1',
             'player_id' => 'subscription-1-rotated',
+        ]);
+    }
+
+    public function test_rescuer_device_registration_uses_the_rescuer_mobile_app_role(): void
+    {
+        DB::table('users')->insert([
+            'user_id' => 'rescuer-user-1',
+            'role_id' => 5,
+            'household_id' => null,
+            'member_id' => null,
+        ]);
+        Sanctum::actingAs(User::findOrFail('rescuer-user-1'));
+
+        $this->postJson('/api/v1/mobile/device-token', $this->registration('rescuer-phone-1', 'rescuer-subscription-1'))
+            ->assertOk()
+            ->assertJsonPath('data.push_token_saved', true);
+
+        $this->assertDatabaseHas('device_tokens', [
+            'device_uuid' => 'rescuer-phone-1',
+            'user_id' => 'rescuer-user-1',
+            'player_id' => 'rescuer-subscription-1',
+            'app_role' => 'rescuer_mobile',
         ]);
     }
 

@@ -139,6 +139,7 @@ class RescuerMobileResourcesTest extends TestCase
         $overview = [
             'profile' => ['user' => null, 'responder' => null],
             'active_event' => null,
+            'recent_alerts' => [],
             'summary' => ['total_assignments' => 0, 'active_assignments' => 0, 'completed_assignments' => 0, 'urgent_assignments' => 0],
             'assignments' => [],
             'field_reports' => [],
@@ -438,5 +439,4 @@ class RescuerMobileResourcesTest extends TestCase
         ]], $response->getData(true));
     }
 }
-
 

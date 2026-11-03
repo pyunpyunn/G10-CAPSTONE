@@ -30,9 +30,9 @@ class OneSignalLegacyPlatformTest extends TestCase
         Http::fake(['*/users/by/external_id/*' => Http::response(['identity' => ['external_id' => $owner], 'subscriptions' => [['id' => self::SUBSCRIPTION, 'type' => $type, 'enabled' => $enabled, 'notification_types' => $enabled ? 1 : 0]]])]);
     }
 
-    private function audience(): array
+    private function audience(string $role = 'household'): array
     {
-        return app(OneSignalNotificationService::class)->prepareDelivery(['platforms' => ['android'], 'roles' => ['household']])['recipient_ids'];
+        return app(OneSignalNotificationService::class)->prepareDelivery(['platforms' => ['android'], 'roles' => [$role]])['recipient_ids'];
     }
 
     public function test_provider_verified_android_registration_is_eligible_without_changing_the_database(): void
@@ -43,6 +43,24 @@ class OneSignalLegacyPlatformTest extends TestCase
         $this->assertDatabaseHas('device_tokens', ['platform' => 'mobile', 'player_id' => self::SUBSCRIPTION]);
         Http::assertSentCount(1);
         Http::assertSent(fn ($request) => $request->method() === 'GET');
+    }
+
+    public function test_household_mobile_role_is_eligible_for_household_broadcasts(): void
+    {
+        DB::table('device_tokens')->update(['platform' => 'android', 'app_role' => 'household_mobile']);
+        Http::fake();
+
+        $this->assertSame([self::SUBSCRIPTION], $this->audience());
+        Http::assertNothingSent();
+    }
+
+    public function test_rescuer_mobile_role_is_eligible_for_rescuer_broadcasts(): void
+    {
+        DB::table('device_tokens')->update(['platform' => 'android', 'app_role' => 'rescuer_mobile']);
+        Http::fake();
+
+        $this->assertSame([self::SUBSCRIPTION], $this->audience('rescuer'));
+        Http::assertNothingSent();
     }
 
     public function test_ios_subscription_is_not_treated_as_android(): void
