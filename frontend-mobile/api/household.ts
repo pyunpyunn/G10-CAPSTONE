@@ -33,7 +33,7 @@ export type HouseholdOverview = {
 };
 
 export async function getHouseholdOverview(refresh = false) {
-  const config = { timeout: 12000, cache: !refresh };
+  const config = { timeout: 30000, cache: !refresh };
   const response = await api.get<{ data: HouseholdOverview }>('/household/overview', config);
   return response.data.data;
 }

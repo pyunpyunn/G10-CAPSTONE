@@ -257,9 +257,9 @@ class RescuerAccountMetadataTest extends TestCase
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertSame('SRR-1006', $choices['options'][0]['account_id']);
-        $this->assertSame('HFAPS-3000', $choices['options'][1]['account_id']);
-        $this->assertSame('SRR-1006', $choices['default']);
+        $this->assertSame('BDRRM-SRR-1006', $choices['options'][0]['account_id']);
+        $this->assertSame('BDRRM-HFAPS-3000', $choices['options'][1]['account_id']);
+        $this->assertSame('BDRRM-SRR-1006', $choices['default']);
         $this->assertSame(3, $queryCount, 'Account ID choices should query users, responder usernames, and responder codes once each.');
     }
 }

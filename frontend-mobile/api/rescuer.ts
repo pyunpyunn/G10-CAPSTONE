@@ -22,7 +22,7 @@ export type RescuerOverview = {
 };
 
 export async function getRescuerOverview(refresh = false) {
-  const config = { timeout: 12000, cache: !refresh };
+  const config = { timeout: 30000, cache: !refresh };
   const response = await api.get<{ data: RescuerOverview }>('/rescuer/overview', config);
   return response.data.data;
 }

@@ -24,10 +24,12 @@ Verify the intended database is shown before restarting Laravel, queue
 workers, and the scheduler. Do not run migrations as part of switching
 connections. Database credentials belong only in the backend `.env`.
 
-The project manages Laravel API startup with the Windows
-`RESQPERATION Mobile Api` scheduled task. Ngrok is separate; install its
-per-user startup entry once from PowerShell under the Windows account that is
-signed in to ngrok:
+The Windows `RESQPERATION Mobile Api` and `RESQPERATION Mobile Queue` tasks
+start the backend automatically. The `RESQPERATION Ngrok Tunnel` task starts
+and supervises Ngrok when the configured Windows account signs in. It uses
+that account's existing Ngrok configuration; no terminal needs to stay open.
+Keep the laptop awake, online, and signed in to Windows (locking the screen is
+fine). The one-time Ngrok task setup is:
 
 ```powershell
 cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
@@ -37,41 +39,33 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\instal
 The server computer, Laravel API, database, and ngrok tunnel must all be
 running for the ngrok route to work.
 
-## 2. Configure automatic API routes
+This laptop already has the Ngrok task installed. Re-run the setup command only
+if the task is missing or the Ngrok account/domain changes.
 
-New builds can probe the primary URL and each comma-separated URL configured
-in `EXPO_PUBLIC_API_FALLBACK_URLS`. A saved **Server settings** URL is tried
-first; configured routes are still used as fallbacks. For release builds, all
-routes must use HTTPS and end in `/api/v1`.
+## 2. API route in the current APK
 
-Set these build-time values before creating the APK:
+Build 61 uses only the Ngrok HTTPS API route below. It does not need the phone
+to be on the laptop's Wi-Fi or Tailscale, and it ignores saved server
+addresses. Android resolves the Ngrok address over HTTPS DNS inside the app
+when the phone's normal DNS cannot resolve it; there is no need to change
+Private DNS:
 
 ```text
 EXPO_PUBLIC_API_BASE_URL=https://sturdily-morse-sitter.ngrok-free.dev/api/v1
-EXPO_PUBLIC_API_FALLBACK_URLS=https://<server-tailnet-fqdn>/api/v1,https://<lan-api-hostname>/api/v1
+EXPO_PUBLIC_API_FALLBACK_URLS=
 ```
 
-Only configure a fallback after it has a valid HTTPS certificate trusted by
-Android and its `/health/ready` endpoint returns `{"status":"ready"}` on the
-phones. Tailscale Serve is currently disabled by the tailnet administrator,
-so the existing Tailscale hostname is not a working fallback until that
-administrator enables and verifies it. A same-Wi-Fi route needs a stable
-hostname and trusted HTTPS reverse proxy; plain LAN HTTP is rejected by release
-APKs. See [TAILSCALE_LAN.md](./TAILSCALE_LAN.md) for route requirements and
-database selection details.
-
-Every configured API route must reach the same Laravel backend and database.
-The API URLs do not change databases, and MySQL must never be exposed through
-ngrok, Tailscale, or the LAN proxy. The current APK may contain only the routes
-that were configured when it was built; rebuild after changing build-time
-URLs.
+If the Ngrok domain changes, update the build configuration and create/install
+a new APK. All API traffic goes through Laravel on the laptop; MySQL itself
+must never be exposed through Ngrok, Tailscale, or the LAN.
 
 ## 3. Verify from the phone
 
-For each configured HTTPS route, open this in the phone browser:
+Open this exact URL in the phone browser using mobile data or another internet
+connection:
 
 ```text
-https://<api-host>/api/v1/health/ready
+https://sturdily-morse-sitter.ngrok-free.dev/api/v1/health/ready
 ```
 
 Expected response:
@@ -99,7 +93,8 @@ separately.
 
 | Problem | Check |
 | --- | --- |
-| No API route is reachable | Check each route's HTTPS certificate, phone connectivity, API process, and `/health/ready` response. |
+| The phone browser cannot find the Ngrok hostname | Browser DNS is controlled by the phone's network; the app's HTTPS DNS fallback does not change browser behavior. Install build 61 or newer to use the fallback inside RESQPERATION. |
+| The APK still cannot reach the API | Confirm build 61 or newer is installed, then retry after closing/reopening it. Make sure the laptop is awake, online, and signed in to Windows. The health check proves API reachability, not the account password. |
 | Health endpoint reports a database error | Verify `DB_CONNECTION` and its host/database credentials in the backend `.env`; run `php artisan db:show`. |
 | Tailscale hostname does not work | The tailnet administrator must enable Tailscale Serve or provide another tested HTTPS endpoint. |
 | A local Wi-Fi route does not work | Use a stable LAN hostname with trusted HTTPS; release APKs do not allow plain HTTP. |

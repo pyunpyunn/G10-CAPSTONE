@@ -22,7 +22,7 @@ class NormalizeResponderCodesTest extends TestCase
         DB::table('rescue_teams')->insert([['team_id'=>1,'team_code'=>'DANA'],['team_id'=>2,'team_code'=>'HQCC']]);
         foreach ([1,2,3] as $id) {
             $login=$id===3?'2026035500':'member'.$id;
-            $code=$id===3?'2026035500':'BDRRM-DANA-00'.$id;
+            $code=$id===3?'2026035500':'BDRRM-DANA-000'.$id;
             DB::table('users')->insert(['user_id'=>'U'.$id,'username'=>$login,'login_id'=>$login,'password'=>'original-hash','role_id'=>$id===3?2:1]);
             DB::table('responders')->insert(['responder_id'=>$id,'user_id'=>'U'.$id,'username'=>$code,'responder_code'=>$code,'full_name'=>'Member '.$id,'team_id'=>$id===3?2:1]);
         }
@@ -31,13 +31,13 @@ class NormalizeResponderCodesTest extends TestCase
     public function test_dry_run_and_apply_are_collision_safe_and_keep_logins_passwords_and_admin_id(): void
     {
         // A reserved login must not be allocated to another account.
-        DB::table('users')->insert(['user_id'=>'OTHER','username'=>'RDANA-9000','login_id'=>'RDANA-9000','password'=>'other-hash','role_id'=>1]);
+        DB::table('users')->insert(['user_id'=>'OTHER','username'=>'BDRRM-RDANA-9000','login_id'=>'BDRRM-RDANA-9000','password'=>'other-hash','role_id'=>1]);
         $action=app(NormalizeResponderCodes::class);
         $plan=$action->run();
-        $this->assertSame(['RDANA-9001','RDANA-9002'],array_column($plan,'new_code'));
-        $this->assertDatabaseHas('responders',['responder_id'=>1,'responder_code'=>'BDRRM-DANA-001']);
+        $this->assertSame(['BDRRM-RDANA-9001','BDRRM-RDANA-9002'],array_column($plan,'new_code'));
+        $this->assertDatabaseHas('responders',['responder_id'=>1,'responder_code'=>'BDRRM-DANA-0001']);
         $this->assertSame($plan,$action->run(true));
-        $this->assertDatabaseHas('responders',['responder_id'=>1,'responder_code'=>'RDANA-9001','username'=>'BDRRM-DANA-001','user_id'=>'U1']);
+        $this->assertDatabaseHas('responders',['responder_id'=>1,'responder_code'=>'BDRRM-RDANA-9001','username'=>'BDRRM-DANA-0001','user_id'=>'U1']);
         $this->assertDatabaseHas('users',['user_id'=>'U1','username'=>'member1','login_id'=>'member1','password'=>'original-hash']);
         $this->assertDatabaseHas('responders',['responder_id'=>3,'responder_code'=>'2026035500']);
         $this->assertSame([],$action->run(true));
@@ -45,18 +45,18 @@ class NormalizeResponderCodesTest extends TestCase
 
     public function test_an_old_open_edit_form_cannot_restore_the_legacy_code(): void
     {
-        $request=Request::create('/','PATCH',['account_id'=>'BDRRM-DANA-001','responder_code'=>'BDRRM-DANA-001',
+        $request=Request::create('/','PATCH',['account_id'=>'BDRRM-DANA-0001','responder_code'=>'BDRRM-DANA-0001',
             'first_name'=>'Member','last_name'=>'One','contact_number'=>'09123456789','title'=>'Team Member','duty_status'=>'available']);
         $payload=app(RescuerAccountPayloadValidator::class)->validate($request,true,(object)[
-            'role_key'=>'tm','username'=>'BDRRM-DANA-001','responder_code'=>'RDANA-9000']);
-        $this->assertSame('RDANA-9000',$payload['account_id']);
-        $this->assertSame('RDANA-9000',$payload['responder_code']);
+            'role_key'=>'tm','username'=>'BDRRM-DANA-0001','responder_code'=>'BDRRM-RDANA-9000']);
+        $this->assertSame('BDRRM-RDANA-9000',$payload['account_id']);
+        $this->assertSame('BDRRM-RDANA-9000',$payload['responder_code']);
     }
 
     public function test_legacy_user_tables_without_a_login_id_column_are_supported(): void
     {
         Schema::table('users',fn($table)=>$table->dropColumn('login_id'));
         $changes=app(NormalizeResponderCodes::class)->run();
-        $this->assertSame('RDANA-9000',$changes[0]['new_code']);
+        $this->assertSame('BDRRM-RDANA-9000',$changes[0]['new_code']);
     }
 }

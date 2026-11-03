@@ -24,10 +24,24 @@ try {
     if (!$production.RESQ_ANDROID_RELEASE -or !$production.EXPO_PUBLIC_API_BASE_URL) {
         throw 'Release configuration must enable secure Android release settings and provide an HTTPS API URL.'
     }
+    $allowPrivateReleaseCleartext = $false
     foreach ($apiUrl in $apiUrls) {
         $parsedApiUrl = $null
-        if (![Uri]::TryCreate($apiUrl.Trim(), [UriKind]::Absolute, [ref]$parsedApiUrl) -or $parsedApiUrl.Scheme -ne 'https' -or !$parsedApiUrl.AbsolutePath.TrimEnd('/').EndsWith('/api/v1')) {
-            throw "Release API URLs must use HTTPS and end with /api/v1: $apiUrl"
+        if (![Uri]::TryCreate($apiUrl.Trim(), [UriKind]::Absolute, [ref]$parsedApiUrl)) {
+            throw "Release API URL is invalid: $apiUrl"
+        }
+        $octets = $parsedApiUrl.Host.Split('.') | ForEach-Object { $value = 0; if (![int]::TryParse($_, [ref]$value)) { -1 } else { $value } }
+        $privateIpv4 = $octets.Count -eq 4 -and $octets -notcontains -1 -and $octets[0] -ge 0 -and $octets[0] -le 255 `
+            -and $octets[1] -ge 0 -and $octets[1] -le 255 -and $octets[2] -ge 0 -and $octets[2] -le 255 -and $octets[3] -ge 0 -and $octets[3] -le 255 `
+            -and ($octets[0] -eq 10 -or ($octets[0] -eq 192 -and $octets[1] -eq 168) `
+                -or ($octets[0] -eq 172 -and $octets[1] -ge 16 -and $octets[1] -le 31) `
+                -or ($octets[0] -eq 100 -and $octets[1] -ge 64 -and $octets[1] -le 127))
+        if ($parsedApiUrl.Scheme -eq 'http' -and $privateIpv4) {
+            $allowPrivateReleaseCleartext = $true
+        }
+        if ((($parsedApiUrl.Scheme -ne 'https') -and !(($parsedApiUrl.Scheme -eq 'http') -and $privateIpv4)) `
+            -or !$parsedApiUrl.AbsolutePath.TrimEnd('/').EndsWith('/api/v1')) {
+            throw "Release API URLs must use HTTPS or a private IPv4 HTTP address and end with /api/v1: $apiUrl"
         }
     }
     $production.PSObject.Properties | ForEach-Object { [Environment]::SetEnvironmentVariable($_.Name, $_.Value, 'Process') }
@@ -81,7 +95,10 @@ android {
     if ($metadata -match '^application-debuggable') { throw 'APK is debuggable.' }
     $manifest = & "$AndroidSdk\build-tools\36.0.0\aapt.exe" dump xmltree $output AndroidManifest.xml
     if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect the APK manifest.' }
-    if ($manifest -match 'android:usesCleartextTraffic.*\(type 0x12\)0xffffffff') { throw 'Release APK allows cleartext network traffic.' }
+    $manifestAllowsCleartext = [bool]($manifest -match 'android:usesCleartextTraffic.*\(type 0x12\)0xffffffff')
+    if ($manifestAllowsCleartext -ne $allowPrivateReleaseCleartext) {
+        throw 'Release APK cleartext policy does not match the configured private HTTP routes.'
+    }
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
     try {
         $digest = [BitConverter]::ToString($sha256.ComputeHash([System.IO.File]::ReadAllBytes($output))).Replace('-', '')

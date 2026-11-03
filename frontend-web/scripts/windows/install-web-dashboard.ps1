@@ -22,11 +22,28 @@ try {
         & icacls.exe $cachePath /grant '*S-1-5-19:(OI)(CI)M' /T /Q
         if ($LASTEXITCODE -ne 0) { throw 'Could not grant Vite cache access.' }
     }
-    $ruleName = 'RESQPERATION-Web-Dashboard-Tailscale'
-    if (!(Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue)) {
-        New-NetFirewallRule -Name $ruleName -DisplayName 'RESQPERATION web dashboard via Tailscale' `
+    $tailscaleRuleName = 'RESQPERATION-Web-Dashboard-Tailscale'
+    $tailscaleRule = Get-NetFirewallRule -Name $tailscaleRuleName -ErrorAction SilentlyContinue
+    if (!$tailscaleRule) {
+        New-NetFirewallRule -Name $tailscaleRuleName -DisplayName 'RESQPERATION web dashboard via Tailscale' `
             -Direction Inbound -Action Allow -Enabled True -Profile Any -Protocol TCP -LocalPort 5175 `
             -RemoteAddress '100.64.0.0/10' -Program $NodePath | Out-Null
+    } else {
+        Set-NetFirewallRule -Name $tailscaleRuleName -Enabled True -Profile Any -Action Allow
+        Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $tailscaleRule |
+            Set-NetFirewallAddressFilter -RemoteAddress '100.64.0.0/10'
+    }
+
+    $lanRuleName = 'RESQPERATION-Web-Dashboard-LAN'
+    $lanRule = Get-NetFirewallRule -Name $lanRuleName -ErrorAction SilentlyContinue
+    if (!$lanRule) {
+        New-NetFirewallRule -Name $lanRuleName -DisplayName 'RESQPERATION web dashboard on private LAN' `
+            -Direction Inbound -Action Allow -Enabled True -Profile Private -Protocol TCP -LocalPort 5175 `
+            -RemoteAddress LocalSubnet -Program $NodePath | Out-Null
+    } else {
+        Set-NetFirewallRule -Name $lanRuleName -Enabled True -Profile Private -Action Allow
+        Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $lanRule |
+            Set-NetFirewallAddressFilter -RemoteAddress LocalSubnet
     }
     $taskName = 'RESQPERATION Web Dashboard'
     $powershellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -84,6 +101,7 @@ try {
     $proxy = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:5175/api/v1/health/ready' -TimeoutSec 15
     if ($proxy.StatusCode -ne 200) { throw 'The dashboard cannot reach the Laravel API proxy.' }
     [ordered]@{ installed = $true; web_ready = $true; api_proxy_ready = $true; recovery_tested = $recoveryChecked
+        lan_access = 'Private Windows network profile only'; tailscale_access = '100.64.0.0/10'
         child_pid = $state.child_pid; account = 'NT AUTHORITY\LOCAL SERVICE'; completed_at = [DateTimeOffset]::Now.ToString('o') } |
         ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding UTF8
     Get-Content -LiteralPath $resultPath

@@ -94,11 +94,11 @@ class HeadquartersAccountWorkflowTest extends TestCase
             'contact_number' => '09171111111',
             'password' => 'temporary-password',
             'role_id' => 1,
-        ])->assertCreated()->assertJsonPath('data.account.account_id', 'OPS-0001');
+        ])->assertCreated()->assertJsonPath('data.account.account_id', 'BDRRM-HQCC-11000');
 
         $this->assertSame('operations_admin', DB::table('users as u')->join('roles as r', 'r.role_id', '=', 'u.role_id')
-            ->where('u.username', 'OPS-0001')->value('r.role_key'));
-        $this->assertSame(1, DB::table('responders')->where('username', 'OPS-0001')->count());
+            ->where('u.username', 'BDRRM-HQCC-11000')->value('r.role_key'));
+        $this->assertSame(1, DB::table('responders')->where('username', 'BDRRM-HQCC-11000')->count());
         $this->assertSame(1, DB::table('rescue_teams')->where('team_code', 'HQCC')->count());
     }
 }

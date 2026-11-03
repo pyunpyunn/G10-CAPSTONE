@@ -10,7 +10,7 @@ class RescuerAccountPayloadValidator
     public function validate(Request $request, bool $isUpdate = false, ?object $existing = null): array
     {
         if ($isUpdate && str_starts_with((string)($existing->username ?? ''), 'BDRRM-')
-            && preg_match('/^[A-Z0-9]{2,8}-[0-9]{4,}$/i', (string)($existing->responder_code ?? ''))) {
+            && preg_match('/^BDRRM-[A-Z0-9]{2,8}-[0-9]{3,}$/i', (string)($existing->responder_code ?? ''))) {
             foreach (['account_id','responder_code'] as $field) {
                 if ($request->input($field) === $existing->username) $request->merge([$field=>$existing->responder_code]);
             }
@@ -20,8 +20,8 @@ class RescuerAccountPayloadValidator
         }
 
         $messages = [
-            'account_id.regex' => 'Field account ID must use the team acronym and a team sequence, for example SRR-1000.',
-            'responder_code.regex' => 'Responder code must use the team acronym and a team sequence, for example SRR-1000.',
+            'account_id.regex' => 'Field account ID must use the BDRRM prefix, team code, and team sequence, for example BDRRM-SRR-1000.',
+            'responder_code.regex' => 'Responder code must use the BDRRM prefix, team code, and team sequence, for example BDRRM-SRR-1000.',
             'first_name.required' => 'First name is required.',
             'last_name.required' => 'Last name is required.',
             'team_name.required' => 'Team is required before creating a rescuer account.',
@@ -36,6 +36,13 @@ class RescuerAccountPayloadValidator
         $numericAdminId = $isUpdate && in_array(strtolower((string) ($existing->role_key ?? '')),
             ['operations_admin', 'super_admin', 'superadmin', 'admin'], true);
         $rules = $this->rules($isUpdate, $numericAdminId);
+        if ($isUpdate && str_starts_with(strtoupper((string) ($existing->username ?? '')), 'BDRRM-')) {
+            foreach (['account_id', 'responder_code'] as $field) {
+                if ($request->input($field) === $existing->username) {
+                    $rules[$field] = ['nullable', 'string', 'max:80'];
+                }
+            }
+        }
         if ($isUpdate && in_array(strtolower((string)($existing->role_key ?? '')),
             ['operations_admin','super_admin','superadmin','admin','chair','response','mitigation_prevention','preparedness','recovery_rehabilitation'],true)) {
             // Headquarters identities may predate the field-team format. Only
@@ -54,8 +61,8 @@ class RescuerAccountPayloadValidator
     public function rules(bool $isUpdate = false, bool $numericAdminId = false): array
     {
         $identifier = $isUpdate && $numericAdminId
-            ? 'regex:/^(?:[A-Z0-9]{2,8}-[0-9]{4,}|[0-9]{10})$/i'
-            : 'regex:/^[A-Z0-9]{2,8}-[0-9]{4,}$/i';
+            ? 'regex:/^(?:BDRRM-[A-Z0-9]{2,8}-[0-9]{4,}|[0-9]{10})$/i'
+            : 'regex:/^BDRRM-[A-Z0-9]{2,8}-[0-9]{4,}$/i';
         return [
             'account_id' => ['nullable', 'string', 'max:30', $identifier],
             'responder_code' => ['nullable', 'string', 'max:80', $identifier],

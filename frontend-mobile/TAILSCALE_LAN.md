@@ -1,71 +1,70 @@
 # API routes and database switching
 
-Release APKs require HTTPS for every API route. The current production route is:
+## Web dashboard access
 
-1. Ngrok: `https://sturdily-morse-sitter.ngrok-free.dev/api/v1`
+The Windows setup runs the Laravel API and web dashboard automatically. The web
+dashboard uses port `5175` and can be opened from the server PC, the same
+private LAN, or Tailscale after its Windows startup installer is repaired:
 
-The app checks the primary URL, then each comma-separated URL in
-`EXPO_PUBLIC_API_FALLBACK_URLS`. A URL saved under **Server settings** is tried
-first; the configured routes remain available as fallbacks. Read-only requests
-can switch to another ready route after a connection loss. All routes must
-reach the same Laravel backend and database, or users could see different data
-after failover.
-Login requests may retry only after a connection failure without an HTTP
-response. Other writes are never automatically replayed.
+- This PC: `http://localhost:5175`
+- Same private LAN: `http://<server-lan-ip>:5175`
+- Tailscale: `http://<server-tailscale-ip>:5175`
 
-To add the other routes for a release build, set the build environment variable
-`EXPO_PUBLIC_API_FALLBACK_URLS` to a comma-separated list such as:
+The web server proxies API requests through Laravel on the same PC. Its
+firewall rules allow Tailscale addresses and, separately, the local subnet only
+when the Windows network profile is Private. This is HTTP, so use it only on a
+trusted private LAN or Tailscale network; browser push notifications require a
+secure origin.
 
-```text
-https://<server-tailnet-fqdn>/api/v1,https://<lan-api-hostname>/api/v1
-```
+## Mobile API route
 
-Only add endpoints after testing that each returns
-`{"status":"ready"}` from `/health/ready` on the phones. The readiness check
-also verifies that the API server can access its selected database.
+The current standalone APK (build 61) uses only this public HTTPS API:
 
-- **Tailscale:** use an HTTPS endpoint provided by Tailscale Serve or an HTTPS
-  reverse proxy with a phone-trusted certificate. Tailscale Serve is currently
-  disabled by this tailnet's administrator, so the existing Tailscale hostname
-  is not a working fallback until the administrator enables it and the endpoint
-  passes the readiness check.
-- **Same Wi-Fi/LAN:** use a stable hostname and HTTPS reverse proxy with a
-  certificate trusted by Android. A changing private IP and plain HTTP are not
-  suitable release routes. Do not weaken the APK's cleartext-traffic policy.
-- **Ngrok:** keep the existing HTTPS tunnel running on the backend computer.
+`https://sturdily-morse-sitter.ngrok-free.dev/api/v1`
 
-For every added hostname, add its hostname (not the full URL) to
-`API_ALLOWED_HOSTS` in the backend `.env`, then refresh Laravel's cached
-configuration and restart the API service. If a LAN route uses an IP address,
-allow that exact reserved IP. Do not use wildcard host entries.
+Phones can use it over mobile data or other internet access; they do not need
+to join the laptop's Wi-Fi or Tailscale network. Android in the app uses
+Cloudflare or Google DNS over HTTPS to resolve this host if the phone's normal
+DNS returns no result; it keeps HTTPS hostname certificate validation. This
+does not change DNS behavior in browsers. The APK ignores saved **Server
+settings** addresses and does not have LAN or Tailscale fallbacks configured. Open
+`https://sturdily-morse-sitter.ngrok-free.dev/api/v1/health/ready` in the
+phone's browser; `{"status":"ready"}` confirms that the public route can reach
+Laravel and its selected database.
 
-Current endpoint discovery found `https://mc15a.tail1e9a11.ts.net/api/v1` as
-the machine's possible Tailscale URL, but there is no Serve configuration and
-its HTTPS health check is refused. The current Wi-Fi IP is `10.159.187.107`,
-but Laravel listens only on `127.0.0.1:8000` and there is no local HTTPS
-listener. Neither address is a working release fallback today.
-
-Do not expose MySQL or any database port through ngrok, Tailscale Serve, or the
-LAN reverse proxy. Only publish the Laravel API.
+Ngrok forwards only to Laravel on `127.0.0.1:8000`; it does not publish the
+web dashboard or MySQL. Do not expose or forward the MySQL port.
 
 The Laravel API is already managed by the Windows `RESQPERATION Mobile Api`
-scheduled task. The ngrok tunnel is a separate process and must run on the
-backend computer too. Install its per-user startup entry once from PowerShell
-as the Windows account that has signed in to ngrok:
+scheduled task. The web dashboard has a separate Windows task. Install or
+repair it once from an elevated PowerShell:
+
+```powershell
+& 'C:\backend\G10CAPSTONE\resqperation-system\frontend-web\scripts\windows\install-web-dashboard.ps1'
+```
+
+This registers the dashboard for Windows boot and user logon, starts it, and
+allows port `5175` from Tailscale or the private LAN. Keep the Windows LAN
+network profile set to **Private**. To install or repair the mobile API and
+queue startup tasks, use `backend-laravel\scripts\windows\install-mobile-backend.ps1`
+from elevated PowerShell.
+
+Ngrok runs under the Windows account configured for Ngrok. Its scheduled task
+starts and supervises the tunnel at sign-in, even on battery. Install or repair
+that task once under the same Windows account:
 
 ```powershell
 cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\install-ngrok-tunnel.ps1
 ```
 
-This starts ngrok immediately, restarts it if it exits, and starts it again
-when that Windows account signs in. The backend computer must be powered on,
-connected to the internet, and signed in to Windows; the startup entry uses that
-account's existing ngrok configuration. The Laravel API and its database must
-also be running. The ngrok address is the project's configured domain; it works
-only while the tunnel is running and the account allows it. It is not a substitute for an
-organization-controlled production API domain. Never put secrets in public
-Expo build variables.
+The task uses that account's existing Ngrok configuration. The computer must
+be awake, connected to the internet, and signed in to Windows; the Laravel API
+and database must also be running. After the task is installed, no terminal
+needs to stay open. The Ngrok address is the project's configured domain; it
+works only while the tunnel is running and the account allows it. It is not a
+substitute for an organization-controlled production API domain. Never put
+secrets in public Expo build variables.
 
 ## Select or switch the backend database
 
@@ -95,19 +94,12 @@ then return ready. Do not run migrations or data-merges as part of a connection
 switch unless separately planned and backed up. Every API route configured in
 the APK must point to a server using this same selected database.
 
-The backend computer, database, and API must remain running. The current API
-service binds to loopback for the ngrok tunnel. Start Laravel with:
-
-```powershell
-cd C:\backend\G10CAPSTONE\resqperation-system\backend-laravel
-$env:APP_DEBUG = 'false'
-php artisan serve --host=127.0.0.1 --port=8000 --no-reload
-```
-
-Changing a manually saved server address requires ending/syncing pending trips
-first and signing in again. To check an HTTPS route from a phone, append
-`/health/ready` to its base address. It should show `{"status":"ready"}`. The
-workspace cannot verify a phone's network path or certificate trust.
+The backend computer, database, and API must remain running. Windows
+`RESQPERATION Mobile Api` and `RESQPERATION Mobile Queue` tasks manage the API
+and worker; Ngrok is managed by `RESQPERATION Ngrok Tunnel`. To check an HTTPS
+route from a phone, append `/health/ready` to its base address. It should show
+`{"status":"ready"}`. The workspace cannot verify a phone's network path or
+certificate trust.
 
 OneSignal remains configured and independent of the API transport. The phone
 and backend need internet access for push delivery.

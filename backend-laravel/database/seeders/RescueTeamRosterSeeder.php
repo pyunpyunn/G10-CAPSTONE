@@ -242,7 +242,7 @@ class RescueTeamRosterSeeder extends Seeder
     {
         [$firstName, $middleInitial, $lastName, $gender, $bloodType, $mobile, $iceName, $iceMobile] = $person;
 
-        $accountId = $teamCode.'-'.str_pad((string) ($this->teamIdBase($teamCode) + $sequence - 1), 4, '0', STR_PAD_LEFT);
+        $accountId = 'BDRRM-'.$teamCode.'-'.str_pad((string) ($this->teamIdBase($teamCode) + $sequence - 1), 4, '0', STR_PAD_LEFT);
         $fullName = trim($firstName.' '.$middleInitial.' '.$lastName);
 
         $existing = DB::table('responders')
@@ -350,6 +350,7 @@ class RescueTeamRosterSeeder extends Seeder
                 'CLT' => 8000,
                 'RDANA' => 9000,
                 'PDANA' => 10000,
+                'CWT' => 11000,
                 default => 11000,
         };
     }
