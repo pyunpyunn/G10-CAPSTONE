@@ -115,7 +115,7 @@ class RescuerProfileWorkflow
 
     private function ensureUniqueMobileUsername(string $username, string $currentUserId): void
     {
-        if (preg_match('/^BDRRM-[A-Z0-9]{2,8}-[0-9]{3}$/i', $username) === 1) {
+        if (preg_match('/^BDRRM-[A-Z0-9]{2,8}-[0-9]{4,}$/i', $username) === 1) {
             throw ValidationException::withMessages([
                 'username' => ['Use a personal username, not the BDRRM account ID.'],
             ]);
@@ -160,7 +160,6 @@ class RescuerProfileWorkflow
         return $middle === '' ? '' : substr($middle, 0, 1).'.';
     }
 }
-
 
 
 

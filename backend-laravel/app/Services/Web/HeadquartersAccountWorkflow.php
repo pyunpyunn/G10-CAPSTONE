@@ -13,14 +13,6 @@ use Illuminate\Validation\ValidationException;
 class HeadquartersAccountWorkflow
 {
     private const WEB_ROLE_KEYS = ['chair', 'operations_admin', 'mitigation_prevention', 'preparedness', 'response', 'recovery_rehabilitation'];
-    private const ACCOUNT_PREFIXES = [
-        'chair' => 'CHAIR',
-        'operations_admin' => 'OPS',
-        'mitigation_prevention' => 'MITPREV',
-        'preparedness' => 'PREP',
-        'response' => 'RESP',
-        'recovery_rehabilitation' => 'RECOVERY',
-    ];
 
     public function __construct(private RescuerAccountSupport $support) {}
 
@@ -38,8 +30,8 @@ class HeadquartersAccountWorkflow
 
         return response()->json(['data' => [
             'accounts' => $accounts->map(fn (object $account): array => $this->present($account))->values()->all(),
-            'next_account_id' => $this->nextAccountId('operations_admin'),
-            'next_account_ids' => collect(self::WEB_ROLE_KEYS)->mapWithKeys(fn (string $key): array => [$key => $this->nextAccountId($key)])->all(),
+            'next_account_id' => $this->nextAccountId(),
+            'next_account_ids' => collect(self::WEB_ROLE_KEYS)->mapWithKeys(fn (string $key): array => [$key => $this->nextAccountId()])->all(),
         ]]);
     }
 
@@ -67,7 +59,7 @@ class HeadquartersAccountWorkflow
         }
 
         $account = DB::transaction(function () use ($validated, $role): array {
-            $accountId = $this->nextAccountId(strtolower($role->role_key), true);
+            $accountId = $this->nextAccountId();
             $userId = 'USR-'.$accountId;
 
             if (empty($validated['password'])) {
@@ -139,22 +131,9 @@ class HeadquartersAccountWorkflow
         ], 201);
     }
 
-    private function nextAccountId(string $roleKey, bool $lock = false): string
+    private function nextAccountId(): string
     {
-        $prefix = (self::ACCOUNT_PREFIXES[$roleKey] ?? strtoupper($roleKey)).'-';
-        $query = DB::table('users')->where('username', 'like', $prefix.'%');
-        if ($lock) $query->lockForUpdate();
-        $next = 1;
-        foreach ($query->pluck('username') as $username) {
-            if (preg_match('/^'.preg_quote($prefix, '/').'(\d{4,})$/i', (string) $username, $matches)) {
-                $next = max($next, (int) $matches[1] + 1);
-            }
-        }
-        if ($next > 9999) {
-            throw ValidationException::withMessages(['role_id' => ['No account identifiers remain for this role.']]);
-        }
-
-        return $prefix.sprintf('%04d', $next);
+        return $this->support->nextAccountId('HQCC');
     }
 
     private function present(object $account): array

@@ -32,11 +32,21 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Could not grant runtime access: $target" }
     }
 
-    $ruleName = 'RESQPERATION-Mobile-API-Tailscale'
-    if (!(Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue)) {
-        New-NetFirewallRule -Name $ruleName -DisplayName 'RESQPERATION mobile API via Tailscale' `
-            -Direction Inbound -Action Allow -Enabled True -Profile Any -Protocol TCP -LocalPort 8000 `
-            -RemoteAddress '100.64.0.0/10' -Program $PhpPath | Out-Null
+    foreach ($rule in @(
+        @{ Name = 'RESQPERATION-Mobile-API-Tailscale'; Display = 'RESQPERATION mobile API via Tailscale'; Remote = '100.64.0.0/10' },
+        @{ Name = 'RESQPERATION-Mobile-API-LAN'; Display = 'RESQPERATION mobile API via local network'; Remote = 'LocalSubnet' }
+    )) {
+        $firewallRule = Get-NetFirewallRule -Name $rule.Name -ErrorAction SilentlyContinue
+        if (!$firewallRule) {
+            $firewallRule = New-NetFirewallRule -Name $rule.Name -DisplayName $rule.Display `
+                -Direction Inbound -Action Allow -Enabled True -Profile Any -Protocol TCP -LocalPort 8000 `
+                -RemoteAddress $rule.Remote -Program $PhpPath
+        } else {
+            Set-NetFirewallRule -Name $rule.Name -DisplayName $rule.Display -Direction Inbound `
+                -Action Allow -Enabled True -Profile Any -Program $PhpPath | Out-Null
+            $firewallRule | Set-NetFirewallPortFilter -Protocol TCP -LocalPort 8000
+            $firewallRule | Set-NetFirewallAddressFilter -RemoteAddress $rule.Remote
+        }
     }
 
     Push-Location $backendPath
@@ -62,6 +72,41 @@ try {
     $interactiveUserSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
     foreach ($role in @('Api', 'Queue')) {
         $name = "RESQPERATION Mobile $role"
+        $existingTask = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+        if ($existingTask -and $existingTask.State -eq 'Running') {
+            Stop-ScheduledTask -TaskName $name
+        }
+        $roleState = Join-Path $backendPath "storage\app\mobile-backend\$role.json"
+        if (Test-Path -LiteralPath $roleState) {
+            try {
+                $previousPid = [int](Get-Content -LiteralPath $roleState -Raw | ConvertFrom-Json).child_pid
+                $previousProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $previousPid" -ErrorAction SilentlyContinue
+                $expectedProcess = if ($role -eq 'Api') {
+                    [regex]::Escape((Join-Path $backendPath 'vendor\laravel\framework\src\Illuminate\Foundation\resources\server.php'))
+                } else {
+                    [regex]::Escape((Join-Path $backendPath 'artisan')) + '"?\s+queue:work\s+operations_outbox\b'
+                }
+                if ($previousProcess -and $previousProcess.ExecutablePath -eq $PhpPath -and $previousProcess.CommandLine -match $expectedProcess) {
+                    Stop-Process -Id $previousPid -Force
+                }
+            } catch {
+                throw "Could not safely stop the existing $role child before applying the updated startup configuration: $($_.Exception.Message)"
+            }
+        }
+        for ($attempt = 0; $attempt -lt 20; $attempt++) {
+            if ($existingTask) { $existingTask = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue }
+            $remainingChild = if (Test-Path -LiteralPath $roleState) {
+                try {
+                    $remainingChildPid = [int](Get-Content -LiteralPath $roleState -Raw | ConvertFrom-Json).child_pid
+                    if ($remainingChildPid) { Get-Process -Id $remainingChildPid -ErrorAction SilentlyContinue }
+                } catch { $null }
+            }
+            if ((!$existingTask -or $existingTask.State -ne 'Running') -and !$remainingChild) { break }
+            Start-Sleep -Seconds 1
+        }
+        if ($existingTask -and $existingTask.State -eq 'Running') {
+            throw "Could not stop the existing $role task to apply the updated API listener configuration."
+        }
         $action = New-ScheduledTaskAction -Execute $powershellPath `
             -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$runner`" -Role $role -PhpPath `"$PhpPath`"" `
             -WorkingDirectory $backendPath

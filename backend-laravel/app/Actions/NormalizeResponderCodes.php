@@ -34,8 +34,8 @@ class NormalizeResponderCodes
                     continue;
                 }
                 $sequence = $this->support->accountSequence($next[$team],$team);
-                do { $code = $team.'-'.str_pad((string)$sequence++,4,'0',STR_PAD_LEFT); } while(isset($reserved[$code]));
-                $next[$team] = $team.'-'.str_pad((string)$sequence,4,'0',STR_PAD_LEFT);
+                do { $code = 'BDRRM-'.$team.'-'.str_pad((string)$sequence++,4,'0',STR_PAD_LEFT); } while(isset($reserved[$code]));
+                $next[$team] = 'BDRRM-'.$team.'-'.str_pad((string)$sequence,4,'0',STR_PAD_LEFT);
                 $reserved[$code] = true; $seen[$code] = true;
                 $change = ['responder_id'=>$row->responder_id,'name'=>$row->full_name,'team'=>$team,
                     'old_code'=>$old,'new_code'=>$code,'login'=>$row->login,'legacy_login'=>$row->username];

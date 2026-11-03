@@ -1,5 +1,55 @@
 # Standalone Android APK
 
+## Latest local APK — version 2.0.0, build 61
+
+Installable file: [`releases/RESQPERATION-build61.apk`](./releases/RESQPERATION-build61.apk).
+
+- Android app networking falls back to Cloudflare DNS-over-HTTPS, then Google DNS-over-HTTPS, when normal DNS cannot resolve an Ngrok host. API traffic still uses the original Ngrok HTTPS hostname and validates its certificate; phone DNS settings are not changed.
+- The `RESQPERATION Ngrok Tunnel` Windows scheduled task starts and supervises Ngrok at sign-in, including on battery. No terminal needs to remain open; the laptop must be awake, online, and signed in to the configured Windows account.
+- Verification: native Android release build, existing release signing certificate, TypeScript, mobile transport tests, and plugin checks passed. The laptop API and public Ngrok endpoint were reachable. A physical phone login was not available to verify.
+
+## Previous local APK — version 2.0.0, build 60
+
+Installable file: [`releases/RESQPERATION-build60.apk`](./releases/RESQPERATION-build60.apk).
+
+- Android release uses only the configured Ngrok HTTPS route; saved server settings and Tailscale/LAN routes are ignored. If unreachable, the screen shows the route hostname and network error.
+- The `RESQPERATION Ngrok Tunnel` Windows scheduled task starts and supervises Ngrok at sign-in, including on battery. No terminal needs to remain open; the laptop must be awake, online, and signed in to the configured Windows account.
+- Verification on the backend computer: Laravel readiness returned HTTP 200 through the public Ngrok URL. The public mobile login endpoint returned its expected HTTP 422 for a deliberately invalid diagnostic login. No Android device was attached for a physical login test.
+
+## Latest local APK — version 2.0.0, build 57
+
+Installable file: [`releases/RESQPERATION-build57.apk`](./releases/RESQPERATION-build57.apk).
+
+- 22,587,429 bytes; version code 57; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `C87022F8B842A18679A6AAE506AAB90A243C72557D0CF9F8CD9AAB05885FD8EE`.
+- Android now selects a ready HTTPS route conditionally: configured LAN HTTPS first, Tailscale HTTPS second, then Ngrok. Saved server addresses are fallback routes only.
+- The Tailscale HTTPS URL is configured, but Tailscale Serve is still disabled by tailnet policy. Once an administrator enables Serve, run `tailscale serve --bg 8000`; the app can then use it without another APK build.
+- No trusted LAN HTTPS endpoint exists yet, so phones on the same Wi-Fi use Ngrok until one is configured. The APK does not permit plain HTTP.
+- Verification passed: TypeScript, all 144 mobile regression tests, implementation lint, production HTTPS route validation, signed Android release build, package/version checks, and existing release certificate verification. Public Ngrok readiness returned HTTP 200.
+- A connected Android device was not available for a physical install/test.
+
+## Latest local APK — version 2.0.0, build 56
+
+Installable file: [`releases/RESQPERATION-build56.apk`](./releases/RESQPERATION-build56.apk).
+
+- 22,587,173 bytes; version code 56; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `20FCBF77F8DE01A4F1B3EF4328924CC0214935B40B9B9806A2476DBC0388A266`.
+- Android release builds now try configured HTTPS API routes (Ngrok first) before a saved **Server settings** address. A stale saved HTTP LAN address is ignored, so it cannot block Ngrok.
+- Household and rescuer overview requests allow 30 seconds for cold-start sync over Ngrok.
+- Verification passed: TypeScript, all 143 mobile regression tests, changed implementation lint, signed Android release build, package/version checks, and existing release certificate verification. Public Ngrok readiness returned HTTP 200.
+- A connected Android device was not available for a physical install/test. The phone still needs internet, and the laptop, Laravel API, and Ngrok tunnel must be running; offline data is available only after the account has synced on that device.
+
+## Latest local APK — version 2.0.0, build 55
+
+Installable file: [`releases/RESQPERATION-build55.apk`](./releases/RESQPERATION-build55.apk).
+
+- 22,587,149 bytes; version code 55; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `2356F983D335629D71E8DFB9898CD0B33FD107664578AD9E127C76CB11FC2B5C`.
+- Household and rescuer overview requests now allow 30 seconds so cold-start data loads can complete over Ngrok instead of timing out at 12 seconds.
+- The household initial-sync screen shows the API failure and clarifies that mobile internet works outside LAN/Tailscale when the laptop, Laravel API, and Ngrok tunnel are running.
+- Verification passed: TypeScript, all 142 mobile tests, changed-file lint, signed Android release build, package/version checks, and existing release certificate verification. Public Ngrok readiness returned HTTP 200.
+- A device still needs internet access to sync fresh data. Offline data is available only after that account has synced successfully on the device.
+
 ## Latest local APK — version 2.0.0, build 54
 
 Installable file: [`releases/RESQPERATION-build54.apk`](./releases/RESQPERATION-build54.apk).

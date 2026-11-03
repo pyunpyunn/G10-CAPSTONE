@@ -681,7 +681,11 @@ export default function HouseholdHomeScreen() {
   if (!loading && !overview && overviewError) {
     return <SafeAreaView style={styles.safe}>
       <View style={{ padding: spacing.lg, gap: spacing.md }}>
-        <HouseholdEmpty icon="cloud-offline-outline" title="No saved page available" body="Connect to sync your household data on this device first." />
+        <HouseholdEmpty
+          icon="cloud-offline-outline"
+          title="Unable to sync household data"
+          body={overviewError || 'Connect to the internet and try again. When you are away from the local network, your laptop, Laravel API, and Ngrok tunnel must be running.'}
+        />
         <HouseholdButton label="Try again" icon="refresh-outline" onPress={() => { void loadOverview(); }} />
       </View>
     </SafeAreaView>;

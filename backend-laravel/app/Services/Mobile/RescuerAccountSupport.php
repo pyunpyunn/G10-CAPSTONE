@@ -14,6 +14,7 @@ class RescuerAccountSupport
         'SRR' => 1000, 'ECM' => 2000, 'HFAPS' => 3000, 'BHERT' => 3500,
         'SST' => 4000, 'FMT' => 5000, 'RDT' => 6000, 'TRT' => 7000,
         'CLT' => 8000, 'RDANA' => 9000, 'PDANA' => 10000,
+        'CWT' => 11000, 'HQCC' => 11000,
     ];
     public function validatePayload(Request $request, bool $isUpdate = false, ?object $existing = null): array
     {
@@ -218,7 +219,10 @@ class RescuerAccountSupport
         $accountIdsForCodes = fn (string $column) => static function ($query) use ($teamCodes, $column): void {
             foreach ($teamCodes as $index => $teamCode) {
                 $method = $index === 0 ? 'where' : 'orWhere';
-                $query->{$method}($column, 'like', $teamCode.'-%');
+                $query->{$method}(function ($teamQuery) use ($column, $teamCode): void {
+                    $teamQuery->where($column, 'like', $teamCode.'-%')
+                        ->orWhere($column, 'like', 'BDRRM-'.$teamCode.'-%');
+                });
             }
         };
         $accountIds = DB::table('users')
@@ -229,7 +233,8 @@ class RescuerAccountSupport
         $sequences = array_fill_keys($teamCodes, 0);
 
         foreach ($accountIds as $accountId) {
-            $teamCode = $this->normalizeTeamCode(explode('-', (string) $accountId, 2)[0]);
+            $parts = explode('-', strtoupper((string) $accountId));
+            $teamCode = $this->normalizeTeamCode($parts[0] === 'BDRRM' ? ($parts[1] ?? '') : ($parts[0] ?? ''));
             if (array_key_exists($teamCode, $sequences)) {
                 $sequences[$teamCode] = max(
                     $sequences[$teamCode],
@@ -240,7 +245,7 @@ class RescuerAccountSupport
 
         foreach ($sequences as $teamCode => $sequence) {
             $base = self::TEAM_ID_BASES[$teamCode] ?? 11000;
-            $sequences[$teamCode] = $teamCode.'-'.str_pad(
+            $sequences[$teamCode] = 'BDRRM-'.$teamCode.'-'.str_pad(
                 (string) (max($sequence, $base - 1) + 1),
                 4,
                 '0',
@@ -253,7 +258,7 @@ class RescuerAccountSupport
 
     public function accountSequence(?string $accountId, string $teamCode): int
     {
-        if (! $accountId || ! preg_match('/^'.preg_quote($teamCode, '/').'-([0-9]{4,})$/i', $accountId, $matches)) {
+        if (! $accountId || ! preg_match('/^(?:BDRRM-)?'.preg_quote($teamCode, '/').'-([0-9]{4,})$/i', $accountId, $matches)) {
             return 0;
         }
 
@@ -263,7 +268,7 @@ class RescuerAccountSupport
     public function accountIdMatchesTeam(string $accountId, string $teamCode): bool
     {
         $base = self::TEAM_ID_BASES[$teamCode] ?? 11000;
-        return preg_match('/^'.preg_quote($teamCode, '/').'-([0-9]{4,})$/i', $accountId, $matches) === 1
+        return preg_match('/^BDRRM-'.preg_quote($teamCode, '/').'-([0-9]{4,})$/i', $accountId, $matches) === 1
             && (int) $matches[1] >= $base;
     }
 

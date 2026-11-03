@@ -174,6 +174,36 @@ npm run start:go
 
 For mobile devices, configure `EXPO_PUBLIC_API_BASE_URL` with a backend address reachable from the device. OneSignal and some native map functionality require an Expo development or production build; Expo Go is for ordinary UI testing.
 
+## Automatic Windows startup and network access
+
+The Windows installers configure the Laravel API/queue and web dashboard to
+start at boot and user logon. Run these once from **PowerShell as
+Administrator** on the server PC:
+
+```powershell
+& 'C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\scripts\windows\install-mobile-backend.ps1'
+& 'C:\backend\G10CAPSTONE\resqperation-system\frontend-web\scripts\windows\install-web-dashboard.ps1'
+```
+
+Install the mobile APK's Ngrok API tunnel separately under the Windows account
+that is signed in to Ngrok:
+
+```powershell
+& 'C:\backend\G10CAPSTONE\resqperation-system\backend-laravel\scripts\windows\install-ngrok-tunnel.ps1'
+```
+
+Ngrok publishes the Laravel API only, for the mobile APK. The web dashboard is
+available at `http://localhost:5175`, `http://<server-lan-ip>:5175` on the same
+private LAN, and `http://<server-tailscale-ip>:5175` over Tailscale. LAN
+firewall access is limited to the local subnet when Windows identifies that
+network as **Private**. The computer must remain powered on and awake; Ngrok
+starts when its configured Windows user signs in.
+
+The installed Android release currently uses the HTTPS Ngrok API route.
+Tailscale and LAN API routes require trusted HTTPS endpoints before they can be
+added to a release APK; do not weaken its HTTPS policy. See
+[mobile API route setup](frontend-mobile/TAILSCALE_LAN.md).
+
 ## Revision History
 
 | Version | Date | Description | Author(s) |

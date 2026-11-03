@@ -22,9 +22,10 @@ prove that Google delivered a notification.
 2. Start the backend, its selected database, and the ngrok tunnel.
 3. Confirm the phone can open
    `https://sturdily-morse-sitter.ngrok-free.dev/api/v1/health/ready` and sees
-   `{"status":"ready"}`. Use
-   `https://sturdily-morse-sitter.ngrok-free.dev/api/v1` in **Server settings**.
-   The current APK does not have a working Tailscale or LAN HTTPS route.
+   `{"status":"ready"}`. The app selects Ngrok automatically when no configured
+   private route is ready. Tailscale requires Serve enabled by the tailnet
+   administrator; local Wi-Fi uses Ngrok until a trusted LAN HTTPS endpoint is
+   configured.
 4. Log in with a household account and allow notifications.
 5. From HQ, broadcast a uniquely worded alert for that household's active event
    and area. Keep RESQPERATION open on the phone for this first test.

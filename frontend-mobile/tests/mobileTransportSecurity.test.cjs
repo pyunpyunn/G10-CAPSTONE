@@ -62,7 +62,7 @@ function loadApiClient(savedServerUrl, options = {}) {
       throw new Error('Unexpected API probe.');
     },
     CanceledError: class CanceledError extends Error {},
-    isAxiosError: () => false,
+    isAxiosError: (error) => Boolean(error?.isAxiosError),
     isCancel: () => false,
   };
   axios.default = axios;
@@ -114,7 +114,10 @@ test('release API URLs require HTTPS and normalize the API path', () => {
   const normalize = loadUrlNormalizer();
   assert.equal(normalize(' https://api.example.test/ ', true), 'https://api.example.test/api/v1');
   assert.equal(normalize('https://api.example.test/custom/api/v1/', true), 'https://api.example.test/custom/api/v1');
+  assert.equal(normalize('http://10.13.93.87:8000/api/v1', true, true), 'http://10.13.93.87:8000/api/v1');
+  assert.equal(normalize('http://100.121.155.55:8000/api/v1', true, true), 'http://100.121.155.55:8000/api/v1');
   assert.throws(() => normalize('http://api.example.test/api/v1', true), /HTTPS/);
+  assert.throws(() => normalize('http://8.8.8.8/api/v1', true, true), /private IPv4 HTTP/);
 });
 
 test('HTTP API URLs are accepted only in development; unsafe URL parts stay rejected', () => {
@@ -141,6 +144,16 @@ test('Android cleartext traffic is disabled in production, EAS, and release prof
     NODE_ENV: 'development', EAS_BUILD: undefined, RESQ_ANDROID_RELEASE: '1',
     EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test/api/v1',
   }), false);
+  assert.equal(resolveCleartextSetting({
+    NODE_ENV: 'production', EAS_BUILD: undefined, RESQ_ANDROID_RELEASE: '1',
+    EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test/api/v1',
+    EXPO_PUBLIC_API_FALLBACK_URLS: 'http://10.13.93.87:8000/api/v1,http://100.121.155.55:8000/api/v1',
+  }), true);
+  assert.throws(() => resolveCleartextSetting({
+    NODE_ENV: 'production', EAS_BUILD: undefined, RESQ_ANDROID_RELEASE: '1',
+    EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test/api/v1',
+    EXPO_PUBLIC_API_FALLBACK_URLS: 'http://8.8.8.8/api/v1',
+  }), /private IPv4 HTTP/);
 });
 
 test('Android cleartext traffic is opt-in to a local development build', () => {
@@ -172,59 +185,116 @@ test('secure release config rejects a missing or non-HTTPS production API endpoi
   }), false);
 });
 
-test('a previously saved HTTP server URL is rejected before the app probes or sends authenticated requests', async () => {
-  const client = loadApiClient('http://old-server.example.test/api/v1');
-  await assert.rejects(client.request({ headers: {} }), /HTTPS/);
-  assert.equal(client.probedUrls.length, 0);
+test('a previously saved HTTP server URL is ignored in favor of configured HTTPS routes', async () => {
+  const configured = 'https://api.example.test/api/v1';
+  const client = loadApiClient('http://old-server.example.test/api/v1', {
+    baseUrl: configured,
+    probe: async () => ({ data: { status: 'ready' } }),
+  });
+
+  const request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
+
+  assert.deepEqual(client.probedUrls.map(({ url }) => url), [`${configured}/health/ready`]);
+  assert.equal(request.baseURL, configured);
 });
 
-test('API routes are checked in order: ngrok first, then configured fallbacks', async () => {
+test('Android release routes prefer Ngrok over Tailscale and other HTTPS routes', async () => {
   const ngrok = 'https://sturdily-morse-sitter.ngrok-free.dev/api/v1';
   const tailscale = 'https://resq.example.ts.net/api/v1';
-  const lan = 'https://resq-lan.example.test/api/v1';
+  const lan = 'https://resq-lan.local/api/v1';
+  const client = loadApiClient(null, {
+    baseUrl: ngrok,
+    fallbackUrls: `${tailscale},${lan}`,
+    probe: async () => ({ data: { status: 'ready' } }),
+  });
+
+  const request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
+
+  assert.deepEqual(client.probedUrls.map(({ url }) => url), [
+    `${ngrok}/health/ready`,
+  ]);
+  assert.equal(client.probedUrls[0].config.timeout, 4000);
+  assert.equal(client.clientOptions.timeout, 20000);
+  assert.equal(request.baseURL, ngrok);
+});
+
+test('Android release routes prefer Ngrok, then local subnet and Tailscale IP', async () => {
+  const ngrok = 'https://sturdily-morse-sitter.ngrok-free.dev/api/v1';
+  const tailscale = 'http://100.121.155.55:8000/api/v1';
+  const lan = 'http://10.13.93.87:8000/api/v1';
   const client = loadApiClient(null, {
     baseUrl: ngrok,
     fallbackUrls: `${tailscale},${lan}`,
     probe: async (url) => {
-      if (url.startsWith(ngrok)) throw new Error('ngrok unavailable');
-      return { data: { status: 'ready' } };
-    },
-  });
-
-  let request;
-  try {
-    request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
-  } catch (error) {
-    assert.fail(`${error.message}; probes: ${JSON.stringify(client.probedUrls.map(({ url }) => url))}`);
-  }
-
-  assert.deepEqual(client.probedUrls.map(({ url }) => url), [
-    `${ngrok}/health/ready`,
-    `${tailscale}/health/ready`,
-  ]);
-  assert.equal(client.probedUrls[0].config.timeout, 4000);
-  assert.equal(client.clientOptions.timeout, 20000);
-  assert.equal(request.baseURL, tailscale);
-});
-
-test('a saved API route is preferred and configured routes remain available as fallbacks', async () => {
-  const saved = 'https://resq.example.ts.net/api/v1';
-  const configured = 'https://api.example.test/api/v1';
-  const client = loadApiClient(saved, {
-    baseUrl: configured,
-    probe: async (url) => {
-      if (url.startsWith(saved)) throw new Error('saved route unavailable');
-      return { data: { status: 'ready' } };
+      if (url.startsWith(tailscale)) return { data: { status: 'ready' } };
+      throw new Error('Route unavailable');
     },
   });
 
   const request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
 
   assert.deepEqual(client.probedUrls.map(({ url }) => url), [
-    `${saved}/health/ready`,
+    `${ngrok}/health/ready`,
+    `${lan}/health/ready`,
+    `${tailscale}/health/ready`,
+  ]);
+  assert.equal(request.baseURL, tailscale);
+});
+
+test('unavailable Ngrok falls back to LAN and then Tailscale', async () => {
+  const ngrok = 'https://sturdily-morse-sitter.ngrok-free.dev/api/v1';
+  const tailscale = 'http://100.121.155.55:8000/api/v1';
+  const lan = 'http://10.13.93.87:8000/api/v1';
+  const client = loadApiClient(null, {
+    baseUrl: ngrok,
+    fallbackUrls: `${lan},${tailscale}`,
+    probe: async (url) => {
+      if (url.startsWith(ngrok) || url.startsWith(lan)) throw new Error('Route unavailable');
+      if (url.startsWith(tailscale)) return { data: { status: 'ready' } };
+      throw new Error('Unexpected route');
+    },
+  });
+
+  const request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
+
+  assert.deepEqual(client.probedUrls.map(({ url }) => url), [
+    `${ngrok}/health/ready`,
+    `${lan}/health/ready`,
+    `${tailscale}/health/ready`,
+  ]);
+  assert.equal(request.baseURL, tailscale);
+});
+
+test('configured Ngrok route is preferred over a saved API route in Android releases', async () => {
+  const saved = 'https://resq.example.ts.net/api/v1';
+  const configured = 'https://api.example.test/api/v1';
+  const client = loadApiClient(saved, {
+    baseUrl: configured,
+    probe: async () => ({ data: { status: 'ready' } }),
+  });
+
+  const request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
+
+  assert.deepEqual(client.probedUrls.map(({ url }) => url), [
     `${configured}/health/ready`,
   ]);
   assert.equal(request.baseURL, configured);
+});
+
+test('Android releases do not use saved server settings instead of the configured Ngrok route', async () => {
+  const saved = 'https://resq.example.ts.net/api/v1';
+  const configured = 'https://api.example.test/api/v1';
+  const client = loadApiClient(saved, {
+    baseUrl: configured,
+    probe: async () => { throw Object.assign(new Error('Network Error'), { isAxiosError: true, code: 'ERR_NETWORK' }); },
+  });
+
+  await assert.rejects(client.request({ headers: {}, method: 'post', url: '/auth/login' }), (error) => {
+    assert.match(error.userMessage, /api\.example\.test: ERR_NETWORK/);
+    assert.doesNotMatch(error.userMessage, /resq\.example\.ts\.net/);
+    return true;
+  });
+  assert.deepEqual(client.probedUrls.map(({ url }) => url), [`${configured}/health/ready`]);
 });
 
 test('login POST requests fail over only after a connection loss, not an HTTP response', async () => {
