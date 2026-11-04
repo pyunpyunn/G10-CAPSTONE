@@ -126,6 +126,15 @@ export async function sendRadioSignal(payload: any) {
   return response.data.data;
 }
 
+export async function getRescuerRequestLocations(): Promise<{ locations?: any[]; barangay?: string }> {
+  try {
+    const response = await api.get('/rescuer/request-locations');
+    return response.data?.data ?? response.data ?? { locations: [], barangay: 'the barangay' };
+  } catch {
+    return { locations: [], barangay: 'the barangay' };
+  }
+}
+
 export async function getRescuerDispatchHistory(page = 1): Promise<any> {
   return (await api.get('/rescuer/assignments/history', { params: { page } })).data.data;
 }

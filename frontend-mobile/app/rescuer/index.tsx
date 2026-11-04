@@ -332,6 +332,7 @@ export default function RescuerHomeScreen() {
       return (
         <ResourceRequestScreen
           requests={overview.resource_requests || []}
+          assignments={assignments}
           categoryOptions={overview.category_options || []}
           onSubmitRequest={handleSubmitResourceRequest}
           onCancelRequest={handleCancelResourceRequest}
