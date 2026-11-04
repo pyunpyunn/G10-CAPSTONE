@@ -112,11 +112,7 @@
     },
     "extra": {
       "router": {},
-      "oneSignalAppId": "bc6266ac-90a4-4bfe-b4d5-59c57939e7a5",
-      "eas": {
-        "projectId": "46103553-dfad-4364-a44d-7de048079f00"
-      }
-    },
-    "owner": "kathlnbarro"
+      "oneSignalAppId": "bc6266ac-90a4-4bfe-b4d5-59c57939e7a5"
+    }
   }
 }

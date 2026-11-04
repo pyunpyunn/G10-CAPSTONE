@@ -88,6 +88,10 @@ module.exports = {
   },
   extra: {
     ...base.expo.extra,
+    eas: {
+      ...base.expo.extra?.eas,
+      projectId: 'b0963010-4483-43c7-a1ea-05327e43ea3b',
+    },
     oneSignalAppId: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID || base.expo.extra.oneSignalAppId,
     googleMapsAndroidApiKeyConfigured: Boolean(googleMapsAndroidApiKey),
   },
