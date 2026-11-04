@@ -13,19 +13,21 @@ class GuardApiHeaders
     public function handle(Request $request, Closure $next): Response
     {
         // Runs before operational DB access. File/Redis cache, never the SQL DB.
-        $limiter = new RateLimiter(Cache::store(config('api_security.rate_limit_store', 'file')));
-        $key = 'api-edge:'.hash('sha256', (string) $request->ip());
-        $limit = config('api_security.requests_per_minute', 6000);
-        // A clock change or stale cache must not turn a one-minute limit into
-        // a prolonged outage for every client behind the same API proxy.
-        if ($limiter->availableIn($key) > 60) {
-            $limiter->clear($key);
+        if (! $request->is('api/v1/external/reports/*', 'api/v1/external/report-requests', 'api/v1/external/report-requests/*', 'api/v1/reports/*', 'api/v1/households/directory', 'api/v1/households/directory/*')) {
+            $limiter = new RateLimiter(Cache::store(config('api_security.rate_limit_store', 'file')));
+            $key = 'api-edge:'.hash('sha256', (string) $request->ip());
+            $limit = config('api_security.requests_per_minute', 6000);
+            // A clock change or stale cache must not turn a one-minute limit into
+            // a prolonged outage for every client behind the same API proxy.
+            if ($limiter->availableIn($key) > 60) {
+                $limiter->clear($key);
+            }
+            if ($limiter->tooManyAttempts($key, $limit)) {
+                return response()->json(['message' => 'Too many API requests. Try again shortly.'], 429)
+                    ->header('Retry-After', $limiter->availableIn($key));
+            }
+            $limiter->hit($key, 60);
         }
-        if ($limiter->tooManyAttempts($key, $limit)) {
-            return response()->json(['message' => 'Too many API requests. Try again shortly.'], 429)
-                ->header('Retry-After', $limiter->availableIn($key));
-        }
-        $limiter->hit($key, 60);
 
         if (! in_array(strtolower($request->getHost()), config('api_security.allowed_hosts', []), true)) {
             return response()->json(['message' => 'This API host is not allowed.'], 403);
