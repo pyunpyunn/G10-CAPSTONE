@@ -75,6 +75,12 @@ class SafeTrackReportClient
         return ['households'=>$this->allPages('households',[]),'members'=>$this->allPages('members',[])];
     }
 
+    public function households(): array
+    {
+        if (! $this->configuration()['configured']) throw new \RuntimeException('SafeTrack is not configured.');
+        return $this->allPages('households', []);
+    }
+
     private function reportRows(array $payload): array
     {
         $type = $payload['report_type'];

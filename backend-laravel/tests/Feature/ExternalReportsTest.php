@@ -8,6 +8,23 @@ use Tests\TestCase;
 
 class ExternalReportsTest extends TestCase
 {
+    public function test_reports_and_household_directory_have_no_attempt_limit(): void
+    {
+        config(['reports.external_api_key' => 'test-secret', 'api_security.requests_per_minute' => 1]);
+        foreach (app('router')->getRoutes() as $route) {
+            if (preg_match('#^api/v1/(external/reports/|external/report-requests|reports/|households/directory)#', $route->uri())) {
+                foreach (app('router')->gatherRouteMiddleware($route) as $middleware) {
+                    $this->assertStringNotContainsString('ThrottleRequests', $middleware, $route->uri());
+                }
+            }
+        }
+        for ($attempt = 0; $attempt < 35; $attempt++) {
+            $this->withHeader('X-API-KEY', 'test-secret')
+                ->postJson('/api/v1/external/reports/handshake')->assertOk()->assertJsonPath('authenticated', true);
+        }
+        $this->withHeader('X-API-KEY', 'wrong')->postJson('/api/v1/external/reports/handshake')->assertUnauthorized();
+    }
+
     public function test_external_generation_requires_configured_api_key_and_valid_payload(): void
     {
         config(['reports.external_api_key' => 'test-secret']);
