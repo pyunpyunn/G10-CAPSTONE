@@ -1,5 +1,5 @@
 import { statusColor as unifiedStatusColor } from '@/constants/statusPalette';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ReactNode } from 'react';
 import { palette, radius, spacing } from '@/constants/resqTheme';
@@ -86,6 +86,78 @@ export function EmptyState({ icon, title, body }: { icon: keyof typeof Ionicons.
       <Ionicons name={icon} size={28} color={palette.navMuted} />
       <Text style={styles.emptyTitle}>{title}</Text>
       {body ? <Text style={styles.emptyBody}>{body}</Text> : null}
+    </View>
+  );
+}
+
+export function RescuerSelect({
+  title,
+  placeholder,
+  options,
+  value,
+  onChange,
+  accessibilityLabel,
+}: {
+  title: string;
+  placeholder: string;
+  options: Array<{ key: string; label: string }>;
+  value: string;
+  onChange: (value: string) => void;
+  accessibilityLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.key === value)?.label || placeholder;
+
+  return (
+    <View style={styles.selectField}>
+      <Text style={styles.selectLabel}>{title}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel || `${title}: ${selected}`}
+        style={styles.select}
+        onPress={() => setOpen(true)}
+      >
+        <Text style={styles.selectValue} numberOfLines={2}>{selected}</Text>
+        <Ionicons name="chevron-down" size={18} color={palette.textSoft} />
+      </Pressable>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <View style={styles.selectOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Close list" onPress={() => setOpen(false)} />
+          <View style={styles.selectDialog} accessibilityViewIsModal>
+            <View style={styles.selectHeader}>
+              <Text style={styles.selectTitle}>{title}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close list"
+                onPress={() => setOpen(false)}
+                style={styles.selectClose}
+              >
+                <Ionicons name="close" size={22} color={palette.text} />
+              </Pressable>
+            </View>
+
+            <FlatList
+              data={options}
+              keyExtractor={(option) => option.key}
+              renderItem={({ item }) => (
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: value === item.key }}
+                  style={styles.selectOption}
+                  onPress={() => {
+                    onChange(item.key);
+                    setOpen(false);
+                  }}
+                >
+                  <Text style={styles.selectOptionText}>{item.label}</Text>
+                  {value === item.key ? <Ionicons name="checkmark" size={20} color={palette.navActive} /> : null}
+                </Pressable>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -211,5 +283,75 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',
+  },
+  selectField: {
+    gap: 6,
+  },
+  selectLabel: {
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  select: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: '#fff',
+  },
+  selectValue: {
+    flex: 1,
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  selectOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    backgroundColor: '#0008',
+  },
+  selectDialog: {
+    backgroundColor: palette.card,
+    borderRadius: radius.lg,
+    maxHeight: '75%',
+    overflow: 'hidden',
+  },
+  selectHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderColor: palette.border,
+    paddingLeft: spacing.md,
+  },
+  selectTitle: {
+    flex: 1,
+    color: palette.text,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  selectClose: {
+    padding: 14,
+  },
+  selectOption: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  selectOptionText: {
+    flex: 1,
+    color: palette.text,
+    fontSize: 14,
   },
 });

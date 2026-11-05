@@ -1,11 +1,13 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getHouseholdDirectory } from '../api/householdApi'
+import api from '../api/client'
 import { HouseholdPagination, RefreshButton } from '../components/households/HouseholdPrototype'
 import { useModuleData } from '../utils/useModuleData'
 
 const perPage = 25
 const geographicLabels = {
+  source_record: 'SafeTrack census',
   assigned: 'Assigned',
   missing_address: 'Address missing',
   unassigned_sitio: 'Sitio not assigned',
@@ -145,21 +147,46 @@ function HouseholdRecord({ item }) {
 
 export default function HouseholdDataDirectoryPage() {
   const [page, setPage] = useState(1)
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const [syncNotice, setSyncNotice] = useState('')
   const loader = useCallback(() => getHouseholdDirectory({
     page,
     per_page: perPage,
-    ...(search ? { search } : {}),
-  }), [page, search])
+  }), [page])
   const { data, error, loading, refresh } = useModuleData(loader, ['households', 'accounts'])
   const households = data?.households
   const summary = data?.summary
 
-  function submitSearch(event) {
-    event.preventDefault()
-    setPage(1)
-    setSearch(searchInput.trim())
+  useEffect(() => {
+    let cancelled = false
+    let checking = false
+    async function checkUpdates() {
+      if (checking || document.hidden) return
+      checking = true
+      try {
+        const { data: response } = await api.get('/households/directory/updates', { timeout: 90000 })
+        const changes = response.data
+        if (!cancelled && (changes.new_households || changes.updated_households || changes.removed_households)) {
+          setSyncNotice(`SafeTrack updates available: ${changes.new_households} new, ${changes.updated_households} updated, ${changes.removed_households} removed households. Click Sync from SafeTrack to apply.`)
+        }
+      } catch {
+        if (!cancelled) setSyncNotice('Unable to check SafeTrack for updates. Previously synced records remain available.')
+      } finally { checking = false }
+    }
+    const timer = window.setInterval(checkUpdates, 60000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [])
+
+  async function syncHouseholds() {
+    setSyncing(true)
+    try {
+      const { data: response } = await api.post('/households/directory/sync', {}, { timeout: 90000 })
+      setSyncNotice(`Synced ${response.data.total} households from SafeTrack. ${response.data.new_households} new households.`)
+      setPage(1)
+      refresh()
+    } catch (failure) {
+      setSyncNotice(failure.response?.data?.message || 'SafeTrack sync failed. Please try again.')
+    } finally { setSyncing(false) }
   }
 
   return <section className="hh-prototype" aria-label="Household data directory">
@@ -167,13 +194,10 @@ export default function HouseholdDataDirectoryPage() {
       <Link className="bk" to="/households" title="Back to household status" aria-label="Back to household status">‹</Link>
       <b className="ttl">Household data directory</b>
       <span className="sp" />
-      <form className="household-directory-search" onSubmit={submitSearch}>
-        <input aria-label="Search households" value={searchInput} onChange={event => setSearchInput(event.target.value)} placeholder="Search household, address, or area" />
-        <button className="bt" type="submit">Search</button>
-      </form>
+      <button className="bt" type="button" onClick={syncHouseholds} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync from SafeTrack'}</button>
       <RefreshButton onClick={refresh} loading={loading} />
     </div>
-    <p className="household-directory-note">Read-only view of active household records. Missing geographic or account links are shown as recorded; this directory does not infer or change them.</p>
+    {syncNotice && <p role="status">{syncNotice}</p>}
     {summary && <div className="household-directory-summary-grid">
       <SummaryCard label="Active households" value={summary.active_households} />
       <SummaryCard label="Active member records" value={summary.active_members} />
@@ -185,10 +209,21 @@ export default function HouseholdDataDirectoryPage() {
     {error && <div className="emp" role="alert">{error}</div>}
     <div className="cd" style={{ flex: 1 }}>
       <div className="tw">
-        {loading && !households ? <div className="emp" role="status">Loading household records…</div> : !households?.data?.length ? <div className="emp">No household records found</div> : <table>
+        <table aria-busy={loading}>
           <thead><tr><th>Household</th><th>Sitio / purok</th><th>Address</th><th>Members</th><th>Accounts</th></tr></thead>
-          <tbody>{households.data.map(item => <HouseholdRecord key={item.household.household_id} item={item} />)}</tbody>
-        </table>}
+          <tbody>
+            {loading && !households
+              ? Array.from({ length: 5 }, (_, rowIndex) => <tr key={`skeleton-${rowIndex}`}>
+                {Array.from({ length: 5 }, (_, columnIndex) => <td key={columnIndex}>
+                  <span className="household-directory-skeleton" aria-hidden="true" />
+                  {rowIndex === 0 && columnIndex === 0 && <span className="household-directory-sr-only">Loading household records…</span>}
+                </td>)}
+              </tr>)
+              : households?.data?.length
+                ? households.data.map(item => <HouseholdRecord key={item.household.household_id} item={item} />)
+                : <tr><td className="household-directory-empty" colSpan={5}>{error ? 'Household records could not be loaded.' : 'There are no household records at the moment.'}</td></tr>}
+          </tbody>
+        </table>
       </div>
       <HouseholdPagination meta={households?.meta} loading={loading} onPageChange={setPage} />
     </div>
