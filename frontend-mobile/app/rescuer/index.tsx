@@ -102,7 +102,7 @@ export default function RescuerHomeScreen() {
         await savePushRegistration({
           device_uuid: savedDeviceUuid,
           device_name: 'Rescuer mobile',
-          platform: Platform.OS as 'android' | 'ios',
+          platform: Platform.OS === 'ios' ? 'ios' : 'android',
           player_id: registration.playerId,
           push_token: registration.pushToken,
           push_provider: registration.pushProvider,
