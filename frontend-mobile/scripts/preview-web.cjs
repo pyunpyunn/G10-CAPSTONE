@@ -2,6 +2,8 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '../dist');
+const port = Number(process.env.PORT || 8099);
+const host = process.env.HOST || '0.0.0.0';
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
   '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.ttf': 'font/ttf' };
 http.createServer((request, response) => {
@@ -21,4 +23,4 @@ http.createServer((request, response) => {
     'Cache-Control': /(?:index\.html|sw\.js|webmanifest)$/.test(file) ? 'no-cache' : 'public, max-age=3600',
     'X-Content-Type-Options': 'nosniff' });
   if (request.method === 'HEAD') response.end(); else fs.createReadStream(file).pipe(response);
-}).listen(8099, '127.0.0.1', () => console.log('PWA preview: http://127.0.0.1:8099'));
+}).listen(port, host, () => console.log(`PWA preview running at http://localhost:${port} (and http://127.0.0.1:${port})`));

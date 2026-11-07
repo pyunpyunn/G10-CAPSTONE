@@ -49,7 +49,24 @@ Keep the backend queues/scheduler running for queued pushes and reminders.
 screens, but native OneSignal and MapLibre features require the installed native
 application. These development tools are not required by release APK users.
 
+## Web Browser Access (Desktop, Tablet, Laptop)
+
+The mobile application is accessible on the web as a responsive single-page Progressive Web App (PWA) sharing the same Laravel backend API and user accounts.
+
+```powershell
+# Development server (Expo Web)
+npm run web
+
+# Production PWA build and preview
+npm run export:web
+npm run preview:web
+```
+
+The web version runs locally at `http://127.0.0.1:8099` (or port `8081` in dev mode). On desktop and tablet screens, the interface is centered with responsive container boundaries and desktop-optimized controls. See [WEB_RELEASE.md](./WEB_RELEASE.md) for web hosting and deployment instructions.
+
 ## Reference screens
 
 - [Household reference](./ResQperation-Household-Mobile-Reference.md)
 - [Rescuer reference](./ResQperation-Rescuer-Mobile-Reference.md)
+- [Web release reference](./WEB_RELEASE.md)
+

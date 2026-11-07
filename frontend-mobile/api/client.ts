@@ -23,7 +23,16 @@ let activeServerUrl: string | null = null;
 let activeServerCheckedAt = 0;
 
 export async function getApiServerUrl() {
-  return (await getStoredItem(serverUrlKey)) || getApiBaseUrl();
+  const stored = await getStoredItem(serverUrlKey);
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+      if (stored && !stored.includes('127.0.0.1') && !stored.includes('localhost')) {
+        await deleteStoredItem(serverUrlKey);
+        return getApiBaseUrl();
+      }
+    }
+  }
+  return stored || getApiBaseUrl();
 }
 
 export async function setApiServerUrl(value: string) {
@@ -49,22 +58,24 @@ export async function setApiServerUrl(value: string) {
 }
 
 function normalizeApiServerUrl(value: string) {
-  return normalizeServerUrl(value, !__DEV__, Platform.OS === 'android' && !__DEV__);
+  const isLocal = isLocalhostUrl(value) || (Platform.OS === 'web' && typeof window !== 'undefined' && ['127.0.0.1', 'localhost'].includes(window.location.hostname));
+  return normalizeServerUrl(value, isLocal ? false : !__DEV__, Platform.OS === 'android' && !__DEV__);
 }
 
 function getApiBaseUrl() {
   const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 
-  if (Platform.OS === 'web' && configuredUrl && isLocalhostUrl(configuredUrl)) {
-    return configuredUrl;
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+      if (configuredUrl && isLocalhostUrl(configuredUrl)) return configuredUrl;
+      return 'http://127.0.0.1:8000/api/v1';
+    }
+    return configuredUrl || `${window.location.origin}/api/v1`;
   }
 
-  if (configuredUrl && !isLocalhostUrl(configuredUrl)) {
+  if (configuredUrl) {
     return configuredUrl;
   }
-
-  if (!__DEV__ && Platform.OS !== 'web') return '';
-  if (Platform.OS === 'web' && typeof window !== 'undefined') return `${window.location.origin}/api/v1`;
 
   const expoHost = getExpoHost();
 
@@ -72,7 +83,7 @@ function getApiBaseUrl() {
     return `http://${expoHost}:8000/api/v1`;
   }
 
-  return configuredUrl || 'http://127.0.0.1:8000/api/v1';
+  return 'http://127.0.0.1:8000/api/v1';
 }
 
 async function getApiServerCandidates() {
@@ -91,7 +102,15 @@ async function getApiServerCandidates() {
   const orderedConfigured = Platform.OS === 'android' && !__DEV__
     ? [...uniqueConfigured].sort((left, right) => routePriority(left) - routePriority(right))
     : uniqueConfigured;
-  const savedUrl = (await getStoredItem(serverUrlKey))?.trim();
+  let savedUrl = (await getStoredItem(serverUrlKey))?.trim();
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+      if (savedUrl && !savedUrl.includes('127.0.0.1') && !savedUrl.includes('localhost')) {
+        await deleteStoredItem(serverUrlKey);
+        savedUrl = undefined;
+      }
+    }
+  }
   let normalizedSavedUrl: string | null = null;
   if (savedUrl) {
     try {
