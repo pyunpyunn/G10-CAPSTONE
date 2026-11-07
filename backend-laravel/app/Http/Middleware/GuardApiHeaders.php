@@ -35,11 +35,15 @@ class GuardApiHeaders
         $origin = $request->header('Origin');
         $referer = $request->header('Referer');
         if ($origin !== null) {
-            if (! in_array($this->origin($origin, true), config('api_security.allowed_origins', []), true)) {
+            $parsedOrigin = $this->origin($origin, true);
+            $isLocalDev = config('app.env') === 'local' && ($parsedOrigin && preg_match('#^https?://(localhost|127\.0\.0\.1)(:\d+)?$#', $parsedOrigin));
+            if (! $isLocalDev && ! in_array($parsedOrigin, config('api_security.allowed_origins', []), true)) {
                 return response()->json(['message' => 'This browser origin is not allowed.'], 403);
             }
         } elseif ($referer !== null) {
-            if (! in_array($this->origin($referer), config('api_security.allowed_origins', []), true)) {
+            $parsedReferer = $this->origin($referer);
+            $isLocalDev = config('app.env') === 'local' && ($parsedReferer && preg_match('#^https?://(localhost|127\.0\.0\.1)(:\d+)?$#', $parsedReferer));
+            if (! $isLocalDev && ! in_array($parsedReferer, config('api_security.allowed_origins', []), true)) {
                 return response()->json(['message' => 'This browser origin is not allowed.'], 403);
             }
         } elseif ($request->header('Sec-Fetch-Site') === 'cross-site') {

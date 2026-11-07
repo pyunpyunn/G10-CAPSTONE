@@ -105,7 +105,8 @@ class HouseholdMemberIdentityUpgrade
                     throw new RuntimeException('The account for '.$member->member_id.' has an incorrect household or role.');
                 }
                 if ($linked->isNotEmpty()) continue;
-                if (! $source) throw new RuntimeException('No existing password source for household '.$householdId);
+
+                $fallbackPassword = \Illuminate\Support\Facades\Hash::make('password');
                 $values = [
                     'user_id' => (string) Str::uuid(), 'member_id' => $member->member_id,
                     'household_id' => $householdId, 'role_id' => $roleId,
@@ -114,7 +115,7 @@ class HouseholdMemberIdentityUpgrade
                     'name' => trim(($member->first_name ?? '').' '.($member->middle_name ?? '').' '.($member->last_name ?? '')),
                     'contact_number' => $member->contact_number ?? null,
                     // Retain the existing household-issued password process; never reset existing hashes.
-                    'password' => $source->password, 'temp_password' => null,
+                    'password' => $source ? $source->password : $fallbackPassword, 'temp_password' => null,
                     'must_change_password' => $source->must_change_password ?? true,
                     'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
                 ];

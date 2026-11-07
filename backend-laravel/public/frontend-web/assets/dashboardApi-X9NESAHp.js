@@ -1,0 +1,1 @@
+import{t as e}from"./client-C5ftPHUH.js";async function t(){return(await e.get(`/dashboard`)).data.data}async function n(t){return(await e.get(`/dashboard/impact-history`,{params:{period:t}})).data.data}async function r(){return(await e.post(`/dashboard/active-event/close`)).data.data}export{t as n,n as r,r as t};

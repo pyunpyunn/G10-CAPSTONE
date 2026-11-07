@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
@@ -37,7 +38,7 @@ import { RescueMapScreen } from '@/components/rescuer/RescueMapScreen';
 import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScreen';
 import { MobileLogoutOverlay } from '@/components/MobileLogoutOverlay';
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
-import { ActionButton, EmptyState, LoadingState } from '@/components/rescuer/RescuerUI';
+import { ActionButton, EmptyState, LoadingState, StatusBadge } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
@@ -45,6 +46,8 @@ import { configureRescuerTracking, stopRescuerTracking, trackingAssignmentFor } 
 import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
 import { createAdaptivePoller } from '@/utils/networkScheduling';
 import { rescueActionGps } from '@/utils/rescueActionGps';
+import { useWebViewMode } from '@/utils/viewMode';
+import { WebAppShell } from '@/components/WebAppShell';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 const deviceUuidKey = 'resq_rescuer_device_uuid';
@@ -59,6 +62,7 @@ const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; 
 
 export default function RescuerHomeScreen() {
   const router = useRouter();
+  const { isDesktopSite: isDesktop, isWideDesktop } = useWebViewMode();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
   const { overview, loading, refreshing, error: overviewError, offline, lastSyncedAt, loadOverview }
     = useMobileOverview<RescuerOverview>('rescuer', getRescuerOverview);
@@ -347,6 +351,139 @@ export default function RescuerHomeScreen() {
     return <ResponderProfileScreen profile={overview.profile} onSaveProfile={handleUpdateProfile} onLogout={handleLogout} />;
   }
 
+  const responder: any = overview?.profile?.responder || {};
+  const responderName = responder.full_name || overview?.profile?.user?.full_name || 'Field Rescuer';
+  const responderTeam = responder.team_name || 'Responder Unit';
+  const summary: any = overview?.summary || {};
+
+  const rescuerPageTitles: Record<TabKey, string> = {
+    dashboard: 'Dispatch Dashboard',
+    map: 'Mapping',
+    report: 'Field Reports',
+    resource: 'Request Monitoring',
+    radio: 'Field Communication',
+    profile: 'Profile',
+  };
+
+  if (isDesktop) {
+    return (
+      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
+        <WebAppShell
+          activeKey={activeTab}
+          pageTitle={rescuerPageTitles[activeTab] || 'Dashboard'}
+          dashboardItem={{
+            key: 'dashboard',
+            title: 'Dashboard',
+            icon: 'grid-outline',
+            keywords: 'home overview assignments queue dispatch',
+          }}
+          groups={[
+            {
+              title: 'Geospatial & Analytics',
+              items: [
+                {
+                  key: 'map',
+                  title: 'Mapping',
+                  icon: 'map-outline',
+                  keywords: 'rescue map route evacuation centers',
+                },
+              ],
+            },
+            {
+              title: 'Response Operations',
+              items: [
+                {
+                  key: 'report',
+                  title: 'Field Reports',
+                  icon: 'document-text-outline',
+                  keywords: 'submit field report status',
+                },
+                {
+                  key: 'radio',
+                  title: 'Field Communication',
+                  icon: 'radio-outline',
+                  keywords: 'radio call communication',
+                },
+              ],
+            },
+            {
+              title: 'Resources & Requests',
+              items: [
+                {
+                  key: 'resource',
+                  title: 'Request Monitoring',
+                  icon: 'cube-outline',
+                  keywords: 'resources supplies requests',
+                },
+              ],
+            },
+            {
+              title: 'Personnel Access Control',
+              items: [
+                {
+                  key: 'profile',
+                  title: 'Profile',
+                  icon: 'person-outline',
+                  keywords: 'account responder profile settings',
+                },
+              ],
+            },
+          ]}
+          userName={responderName}
+          userRole={responderTeam}
+          onOpenProfile={() => setActiveTab('profile')}
+          onSelectKey={(key) => setActiveTab(key as TabKey)}
+          onLogout={() => void handleLogout()}
+          refreshing={refreshing}
+          onRefresh={() => void loadOverview(true)}
+          banner={<OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />}
+          rightRail={
+            isWideDesktop && overview ? (
+              <>
+                <View style={styles.desktopSummaryCard}>
+                  <Text style={styles.desktopSummaryTitle}>Dispatch Summary</Text>
+                  <View style={styles.desktopSummaryRow}>
+                    <Text style={styles.desktopSummaryLabel}>Duty Status</Text>
+                    <StatusBadge label={responder.duty_status || 'Standby'} tone={responder.duty_status} />
+                  </View>
+                  <View style={styles.desktopSummaryRow}>
+                    <Text style={styles.desktopSummaryLabel}>Total Assigned</Text>
+                    <Text style={styles.desktopSummaryValue}>{summary.total_assignments || 0}</Text>
+                  </View>
+                  <View style={styles.desktopSummaryRow}>
+                    <Text style={styles.desktopSummaryLabel}>Active Missions</Text>
+                    <Text style={styles.desktopSummaryValue}>{summary.active_assignments || 0}</Text>
+                  </View>
+                  <View style={styles.desktopSummaryRow}>
+                    <Text style={styles.desktopSummaryLabel}>Completed</Text>
+                    <Text style={styles.desktopSummaryValue}>{summary.completed_assignments || 0}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.desktopSummaryCard}>
+                  <Text style={styles.desktopSummaryTitle}>Quick Actions</Text>
+                  <ActionButton label="Open Rescue Map" icon="map-outline" onPress={() => openMap()} />
+                  <ActionButton label="New Field Report" icon="document-text-outline" onPress={() => openReport()} />
+                </View>
+              </>
+            ) : undefined
+          }
+        >
+          {!!overviewError && !offline && overview ? (
+            <View style={styles.refreshError}>
+              <Text style={styles.refreshErrorText}>Could not refresh. Showing previously loaded data. {overviewError}</Text>
+              <Pressable onPress={() => { void loadOverview(true); }} accessibilityRole="button">
+                <Text style={styles.refreshErrorAction}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {renderContent()}
+        </WebAppShell>
+        <MobileLogoutOverlay visible={loggingOut} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
       <RescuerHeader
@@ -354,6 +491,7 @@ export default function RescuerHomeScreen() {
       />
 
       <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />
+
       <ScrollView
         removeClippedSubviews={false}
         style={styles.scroll}
@@ -435,6 +573,141 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     paddingBottom: 100,
+  },
+  desktopBody: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: palette.page,
+  },
+  desktopSidebar: {
+    width: 260,
+    backgroundColor: palette.card,
+    borderRightWidth: 1,
+    borderColor: palette.border,
+    padding: spacing.md,
+    justifyContent: 'space-between',
+  },
+  desktopProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: palette.page,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: spacing.md,
+  },
+  desktopAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: palette.navActive,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  desktopResponderName: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  desktopResponderTeam: {
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  desktopNavGroup: {
+    flex: 1,
+    gap: 6,
+  },
+  desktopNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+  },
+  desktopNavItemActive: {
+    backgroundColor: '#e0f2fe',
+  },
+  desktopNavItemSpecial: {
+    backgroundColor: palette.unsafe,
+    marginVertical: 4,
+  },
+  desktopNavText: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  desktopNavTextActive: {
+    color: palette.navActive,
+    fontWeight: '800',
+  },
+  desktopSidebarFooter: {
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderColor: palette.border,
+  },
+  desktopLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+  },
+  desktopLogoutText: {
+    color: palette.unsafe,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  desktopMainScroll: {
+    flex: 1,
+  },
+  desktopMainContent: {
+    padding: spacing.lg,
+    maxWidth: 920,
+    width: '100%',
+    alignSelf: 'center',
+    paddingBottom: spacing.xl * 2,
+  },
+  desktopRightRail: {
+    width: 300,
+    borderLeftWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  desktopSummaryCard: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: palette.page,
+    borderWidth: 1,
+    borderColor: palette.border,
+    gap: 12,
+  },
+  desktopSummaryTitle: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  desktopSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  desktopSummaryLabel: {
+    color: palette.textSoft,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  desktopSummaryValue: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '800',
   },
   loadFailure: {
     gap: spacing.md,

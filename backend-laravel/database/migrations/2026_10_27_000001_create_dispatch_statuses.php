@@ -21,7 +21,20 @@ return new class extends Migration {
                 $table->unsignedInteger('sort_order')->default(0);
             });
         }
-        DB::table('dispatch_statuses')->insertOrIgnore(json_decode(file_get_contents(database_path('data/dispatch_statuses.json')), true, 512, JSON_THROW_ON_ERROR));
+        $jsonPath = database_path('data/dispatch_statuses.json');
+        $rows = file_exists($jsonPath)
+            ? json_decode(file_get_contents($jsonPath), true, 512, JSON_THROW_ON_ERROR)
+            : [
+                ['status_key' => 'dispatched', 'label' => 'Dispatched', 'is_open' => true, 'allow_create' => true, 'allow_mobile' => false, 'dashboard_group' => 'dispatched', 'is_alias' => false, 'is_active' => true, 'sort_order' => 1],
+                ['status_key' => 'accepted', 'label' => 'Accepted', 'is_open' => true, 'allow_create' => true, 'allow_mobile' => true, 'dashboard_group' => 'dispatched', 'is_alias' => false, 'is_active' => true, 'sort_order' => 2],
+                ['status_key' => 'en_route', 'label' => 'En route', 'is_open' => true, 'allow_create' => true, 'allow_mobile' => true, 'dashboard_group' => 'en-route', 'is_alias' => false, 'is_active' => true, 'sort_order' => 3],
+                ['status_key' => 'on_scene', 'label' => 'On-scene', 'is_open' => true, 'allow_create' => true, 'allow_mobile' => true, 'dashboard_group' => 'on-scene', 'is_alias' => false, 'is_active' => true, 'sort_order' => 4],
+                ['status_key' => 'onscene', 'label' => 'On-scene (legacy alias)', 'is_open' => true, 'allow_create' => true, 'allow_mobile' => false, 'dashboard_group' => 'on-scene', 'is_alias' => true, 'is_active' => true, 'sort_order' => 5],
+                ['status_key' => 'returning', 'label' => 'Returning', 'is_open' => true, 'allow_create' => true, 'allow_mobile' => false, 'dashboard_group' => 'other', 'is_alias' => false, 'is_active' => true, 'sort_order' => 6],
+                ['status_key' => 'completed', 'label' => 'Completed', 'is_open' => false, 'allow_create' => false, 'allow_mobile' => true, 'dashboard_group' => 'completed', 'is_alias' => false, 'is_active' => true, 'sort_order' => 7],
+                ['status_key' => 'cancelled', 'label' => 'Cancelled', 'is_open' => false, 'allow_create' => false, 'allow_mobile' => true, 'dashboard_group' => 'other', 'is_alias' => false, 'is_active' => true, 'sort_order' => 8],
+            ];
+        DB::table('dispatch_statuses')->insertOrIgnore($rows);
     }
 
     public function down(): void { /* Preserve the status catalog and its operational references. */ }

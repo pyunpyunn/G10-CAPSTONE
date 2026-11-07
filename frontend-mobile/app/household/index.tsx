@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
@@ -48,12 +49,14 @@ import { HouseholdProfileScreen } from '@/components/household/HouseholdProfileS
 import { MobileLogoutOverlay } from '@/components/MobileLogoutOverlay';
 import { HouseholdRouteScreen } from '@/components/household/HouseholdRouteScreen';
 import { HouseholdSetupScreen } from '@/components/household/HouseholdSetupScreen';
-import { HouseholdButton, HouseholdEmpty, HouseholdLoading } from '@/components/household/HouseholdUI';
+import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdLoading } from '@/components/household/HouseholdUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
 import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import { createAdaptivePoller } from '@/utils/networkScheduling';
+import { useWebViewMode } from '@/utils/viewMode';
+import { WebAppShell } from '@/components/WebAppShell';
 
 const deviceUuidKey = 'resq_household_device_uuid';
 type TabKey = 'home' | 'route' | 'trusted' | 'profile';
@@ -70,6 +73,7 @@ const tabs: { key: TabButtonKey; label: string; icon: keyof typeof Ionicons.glyp
 export default function HouseholdHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDesktopSite: isDesktop, isWideDesktop } = useWebViewMode();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const { overview, setOverview, loading, refreshing, error: overviewError, offline, lastSyncedAt, loadOverview: refreshOverview }
     = useMobileOverview<HouseholdOverview>('household', getHouseholdOverview);
@@ -699,70 +703,210 @@ export default function HouseholdHomeScreen() {
     );
   }
 
+  const notificationCount = (overview.trusted?.incoming_requests?.length || 0) + (overview.trusted?.notifications?.length || 0);
+  const householdName = overview.profile?.household?.household_name || overview.profile?.user?.full_name || 'Household';
+  const householdCode = overview.profile?.household?.household_id || 'Household Resident';
+
+  const householdPageTitles: Record<TabKey, string> = {
+    home: 'Household Status',
+    route: 'Mapping',
+    trusted: 'Trusted Households',
+    profile: 'Profile',
+  };
+
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
-      <HouseholdHeader
-        isDisasterMode={Boolean(overview.active_event)}
-        notificationCount={(overview.trusted?.incoming_requests?.length || 0) + (overview.trusted?.notifications?.length || 0)}
-        onOpenNotifications={() => {
-          setShowNotifications(true);
-          void loadOverview(true);
-        }}
-      />
+      {isDesktop && overview.setup?.is_setup_complete ? (
+        <WebAppShell
+          activeKey={activeTab}
+          pageTitle={householdPageTitles[activeTab] || 'Household Status'}
+          dashboardItem={{
+            key: 'home',
+            title: 'Dashboard',
+            icon: 'grid-outline',
+            keywords: 'home status family members broadcast',
+          }}
+          groups={[
+            {
+              title: 'Geospatial & Analytics',
+              items: [
+                {
+                  key: 'route',
+                  title: 'Mapping',
+                  icon: 'map-outline',
+                  keywords: 'evacuation route map centers',
+                },
+                {
+                  key: 'qr',
+                  title: 'Household QR Pass',
+                  icon: 'qr-code-outline',
+                  keywords: 'qr code pass scan',
+                  onPress: () => setShowQr(true),
+                },
+              ],
+            },
+            {
+              title: 'Response Operations',
+              items: [
+                {
+                  key: 'trusted',
+                  title: 'Trusted Households',
+                  icon: 'people-outline',
+                  keywords: 'trusted family network pin',
+                },
+              ],
+            },
+            {
+              title: 'Personnel Access Control',
+              items: [
+                {
+                  key: 'profile',
+                  title: 'Profile',
+                  icon: 'person-outline',
+                  keywords: 'household profile geotag contact',
+                },
+              ],
+            },
+          ]}
+          userName={householdName}
+          userRole={householdCode}
+          notificationCount={notificationCount}
+          onOpenNotifications={() => {
+            setShowNotifications(true);
+            void loadOverview(true);
+          }}
+          onOpenProfile={() => setActiveTab('profile')}
+          onSelectKey={(key) => setActiveTab(key as TabKey)}
+          onLogout={() => void handleLogout()}
+          refreshing={refreshing}
+          onRefresh={() => void loadOverview(true)}
+          banner={<OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />}
+          rightRail={
+            isWideDesktop ? (
+              <>
+                <View style={styles.desktopSummaryCard}>
+                  <Text style={styles.desktopSummaryTitle}>Household Summary</Text>
+                  <View style={styles.desktopSummaryRow}>
+                    <Text style={styles.desktopSummaryLabel}>Mode</Text>
+                    <HouseholdBadge
+                      label={overview.active_event ? 'Disaster Mode' : 'Standby'}
+                      tone={overview.active_event ? 'danger' : 'safe'}
+                    />
+                  </View>
+                  <View style={styles.desktopSummaryRow}>
+                    <Text style={styles.desktopSummaryLabel}>Your Status</Text>
+                    <HouseholdBadge
+                      label={overview.member_status?.status_label || 'Safe'}
+                      tone={overview.member_status?.status_key || 'safe'}
+                    />
+                  </View>
+                  <View style={styles.desktopSummaryRow}>
+                    <Text style={styles.desktopSummaryLabel}>Family Members</Text>
+                    <Text style={styles.desktopSummaryValue}>{(overview.members || []).length}</Text>
+                  </View>
+                  <View style={styles.desktopSummaryRow}>
+                    <Text style={styles.desktopSummaryLabel}>Trusted Households</Text>
+                    <Text style={styles.desktopSummaryValue}>{(overview.trusted?.households || []).length}</Text>
+                  </View>
+                  <View style={styles.desktopSummaryRow}>
+                    <Text style={styles.desktopSummaryLabel}>Evacuation Centers</Text>
+                    <Text style={styles.desktopSummaryValue}>{(overview.evacuation_centers || []).length}</Text>
+                  </View>
+                </View>
 
-      <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />
-      <ScrollView
-        removeClippedSubviews={false}
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.content,
-          overview.setup?.is_setup_complete && { paddingBottom: 104 + insets.bottom },
-        ]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
-      >
-        {overviewError && !offline ? <View style={{ padding: spacing.sm, gap: spacing.xs }}>
-          <Text accessibilityLiveRegion="polite" style={{ color: palette.textSoft }}>
-            Could not refresh. Showing previously loaded data.
-          </Text>
-          <HouseholdButton label="Retry refresh" tone="light" onPress={() => { void loadOverview(true); }} />
-        </View> : null}
-        {renderContent()}
-      </ScrollView>
-
-      {overview.setup?.is_setup_complete ? (
-        <View style={[styles.tabBar, { bottom: Math.max(insets.bottom + 8, spacing.md) }]}>
-          {tabs.map((tab) => {
-            const isQrAction = tab.key === 'qr';
-            const isActive = !isQrAction && activeTab === tab.key;
-
-            return (
-              <Pressable
-                key={tab.key}
-                style={[styles.tabButton, tab.center && styles.centerTab, isActive && !tab.center && styles.activeTab]}
-                onPress={() => {
-                  if (isQrAction) {
-                    setShowQr(true);
-                    return;
-                  }
-
-                  setActiveTab(tab.key as TabKey);
-                }}
-              >
-                <View style={tab.center ? styles.centerTabCircle : undefined}>
-                  <Ionicons
-                    name={tab.icon}
-                    size={tab.center ? 28 : 20}
-                    color={isActive || tab.center ? '#fff' : palette.navMuted}
+                <View style={styles.desktopSummaryCard}>
+                  <Text style={styles.desktopSummaryTitle}>Quick Actions</Text>
+                  <HouseholdButton
+                    label="Open Evacuation Map"
+                    icon="map-outline"
+                    tone="light"
+                    onPress={() => setActiveTab('route')}
+                  />
+                  <HouseholdButton
+                    label="Show Household QR"
+                    icon="qr-code-outline"
+                    onPress={() => setShowQr(true)}
                   />
                 </View>
-                {!tab.center ? (
-                  <Text style={[styles.tabLabel, isActive && styles.activeTabLabel]}>{tab.label}</Text>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
+              </>
+            ) : undefined
+          }
+        >
+          {overviewError && !offline ? <View style={{ padding: spacing.sm, gap: spacing.xs }}>
+            <Text accessibilityLiveRegion="polite" style={{ color: palette.textSoft }}>
+              Could not refresh. Showing previously loaded data.
+            </Text>
+            <HouseholdButton label="Retry refresh" tone="light" onPress={() => { void loadOverview(true); }} />
+          </View> : null}
+          {renderContent()}
+        </WebAppShell>
+      ) : (
+        <>
+          <HouseholdHeader
+            isDisasterMode={Boolean(overview.active_event)}
+            notificationCount={notificationCount}
+            onOpenNotifications={() => {
+              setShowNotifications(true);
+              void loadOverview(true);
+            }}
+          />
+
+          <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />
+
+          <ScrollView
+            removeClippedSubviews={false}
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.content,
+              overview.setup?.is_setup_complete && { paddingBottom: 104 + insets.bottom },
+            ]}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
+          >
+            {overviewError && !offline ? <View style={{ padding: spacing.sm, gap: spacing.xs }}>
+              <Text accessibilityLiveRegion="polite" style={{ color: palette.textSoft }}>
+                Could not refresh. Showing previously loaded data.
+              </Text>
+              <HouseholdButton label="Retry refresh" tone="light" onPress={() => { void loadOverview(true); }} />
+            </View> : null}
+            {renderContent()}
+          </ScrollView>
+
+          {overview.setup?.is_setup_complete ? (
+            <View style={[styles.tabBar, { bottom: Math.max(insets.bottom + 8, spacing.md) }]}>
+              {tabs.map((tab) => {
+                const isQrAction = tab.key === 'qr';
+                const isActive = !isQrAction && activeTab === tab.key;
+
+                return (
+                  <Pressable
+                    key={tab.key}
+                    style={[styles.tabButton, tab.center && styles.centerTab, isActive && !tab.center && styles.activeTab]}
+                    onPress={() => {
+                      if (isQrAction) {
+                        setShowQr(true);
+                        return;
+                      }
+
+                      setActiveTab(tab.key as TabKey);
+                    }}
+                  >
+                    <View style={tab.center ? styles.centerTabCircle : undefined}>
+                      <Ionicons
+                        name={tab.icon}
+                        size={tab.center ? 28 : 20}
+                        color={isActive || tab.center ? '#fff' : palette.navMuted}
+                      />
+                    </View>
+                    {!tab.center ? (
+                      <Text style={[styles.tabLabel, isActive && styles.activeTabLabel]}>{tab.label}</Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+        </>
+      )}
 
       <HouseholdQrModal visible={showQr} householdId={overview.profile.household?.household_id} qr={overview.qr} onClose={() => setShowQr(false)} />
       <HouseholdNotificationsModal
@@ -821,6 +965,141 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     paddingBottom: spacing.xl,
+  },
+  desktopBody: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: palette.page,
+  },
+  desktopSidebar: {
+    width: 260,
+    backgroundColor: palette.card,
+    borderRightWidth: 1,
+    borderColor: palette.border,
+    padding: spacing.md,
+    justifyContent: 'space-between',
+  },
+  desktopProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: palette.page,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: spacing.md,
+  },
+  desktopAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: palette.navActive,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  desktopHouseholdName: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  desktopHouseholdCode: {
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  desktopNavGroup: {
+    flex: 1,
+    gap: 6,
+  },
+  desktopNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+  },
+  desktopNavItemActive: {
+    backgroundColor: '#e0f2fe',
+  },
+  desktopNavItemQr: {
+    backgroundColor: palette.unsafe,
+    marginVertical: 4,
+  },
+  desktopNavText: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  desktopNavTextActive: {
+    color: palette.navActive,
+    fontWeight: '800',
+  },
+  desktopSidebarFooter: {
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderColor: palette.border,
+  },
+  desktopLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+  },
+  desktopLogoutText: {
+    color: palette.unsafe,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  desktopMainScroll: {
+    flex: 1,
+  },
+  desktopMainContent: {
+    padding: spacing.lg,
+    maxWidth: 920,
+    width: '100%',
+    alignSelf: 'center',
+    paddingBottom: spacing.xl * 2,
+  },
+  desktopRightRail: {
+    width: 300,
+    borderLeftWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  desktopSummaryCard: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: palette.page,
+    borderWidth: 1,
+    borderColor: palette.border,
+    gap: 12,
+  },
+  desktopSummaryTitle: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  desktopSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  desktopSummaryLabel: {
+    color: palette.textSoft,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  desktopSummaryValue: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '800',
   },
   tabBar: {
     position: 'absolute',

@@ -9,10 +9,14 @@ class HouseholdMemberIdentity
 {
     public static function prefix(string $householdId): string
     {
-        if (! preg_match('/(\d+)$/', trim($householdId), $matches)) {
-            throw new InvalidArgumentException('Household IDs must end in a numeric household number.');
+        $clean = trim($householdId);
+        if (preg_match('/(\d+)$/', $clean, $matches)) {
+            return 'HM-'.$matches[1].'-';
         }
-        return 'HM-'.$matches[1].'-';
+        if (preg_match('/-([A-Za-z0-9]+)$/', $clean, $matches)) {
+            return 'HM-'.$matches[1].'-';
+        }
+        throw new InvalidArgumentException('Household IDs must end in a numeric household number or alphanumeric code.');
     }
 
     public function next(string $householdId): string
