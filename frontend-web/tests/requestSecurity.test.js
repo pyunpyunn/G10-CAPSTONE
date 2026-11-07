@@ -15,4 +15,6 @@ test('blocks credential exfiltration destinations and insecure production transp
   }
   assert.throws(() => assertApiDestination('/api/v1/auth', '/api/v1', 'http://app.example.com/', true))
   assert.doesNotThrow(() => assertApiDestination('/api/v1/auth', '/api/v1', 'http://localhost/', false))
+  assert.doesNotThrow(() => assertApiDestination('/api/v1/auth', 'http://127.0.0.1:8000/api/v1', 'http://127.0.0.1:8000/', true))
+  assert.doesNotThrow(() => assertApiDestination('/api/v1/auth', 'http://localhost:8000/api/v1', 'http://localhost:8000/', true))
 })

@@ -26,11 +26,15 @@ import { navigationMetadata } from '@/utils/navigationStore';
 import { householdOwnerSelectionRequired, loginMobile, restoreMobileSession } from '@/api/auth';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { askStandardMobilePermissions } from '@/utils/mobilePermissions';
+import { usePwaInstall } from '@/utils/registerPwa';
+import { useWebViewMode } from '@/utils/viewMode';
 import ResQperationLogo from '@/components/ResQperationLogo';
 
 export default function MobileLoginScreen() {
   const router = useRouter();
   const { width: viewportWidth } = useWindowDimensions();
+  const { isDesktopSite: isDesktop } = useWebViewMode();
+  const { isStandalone, canPromptNative, isIos, promptInstall } = usePwaInstall();
   const logoEntrance = useRef(new Animated.Value(0)).current;
   const scrollView = useRef<ScrollView>(null);
   const focusedInput = useRef<number | null>(null);
@@ -164,6 +168,244 @@ export default function MobileLoginScreen() {
     return <SessionHomeSkeleton role={sessionRole} opacity={skeletonOpacity} />;
   }
 
+  const loginCardContent = (
+    <View style={[styles.card, isDesktop && styles.desktopLoginCard]}>
+      <View style={styles.cardTopRow}>
+        <View style={styles.headerBlock}>
+          <Text style={styles.title}>Sign in</Text>
+          {isDesktop && (
+            <Text style={styles.desktopCardSubtitle}>
+              Access your Household Resident or Field Rescuer account
+            </Text>
+          )}
+        </View>
+        <Pressable onPress={() => setEditingServer(!editingServer)} style={styles.serverToggleBtn}>
+          <Ionicons name="settings-outline" size={15} color={palette.navMuted} />
+          <Text style={{ color: palette.navMuted, fontSize: 12, fontWeight: '600' }}>Server settings</Text>
+        </Pressable>
+      </View>
+
+      {editingServer && <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Server API address</Text>
+        <TextInput style={[styles.input, { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 12 }]}
+          onFocus={(event) => focusInput(event.nativeEvent.target)}
+          value={serverUrl} onChangeText={setServerUrl} autoCapitalize="none" autoCorrect={false}
+          keyboardType="url" placeholder="https://your-server/api/v1" />
+        <Pressable style={{ paddingVertical: 10 }} onPress={() => {
+          void setApiServerUrl(serverUrl).then((url) => { setServerUrl(url); setEditingServer(false); setOfflineSession(false); Alert.alert('Server saved', 'You can now sign in.'); })
+            .catch((error) => Alert.alert('Server address', error.message));
+        }}><Text style={{ color: '#38bdf8', fontWeight: '700' }}>Save server address</Text></Pressable>
+      </View>}
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Household ID / Rescuer ID</Text>
+        <View style={styles.inputShell}>
+          <Ionicons name="person-outline" size={19} color={palette.navMuted} />
+          <TextInput
+            style={styles.input}
+            value={login}
+            onFocus={(event) => focusInput(event.nativeEvent.target)}
+            onChangeText={value => { edited.current = true; setLogin(value); }}
+            placeholder="Enter your household ID or rescuer ID"
+            placeholderTextColor={palette.navMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Password</Text>
+        <View style={styles.inputShell}>
+          <Ionicons name="lock-closed-outline" size={19} color={palette.navMuted} />
+          <TextInput
+            style={styles.input}
+            value={password}
+            onFocus={(event) => focusInput(event.nativeEvent.target)}
+            onChangeText={value => { edited.current = true; setPassword(value); }}
+            placeholder="Enter password"
+            placeholderTextColor={palette.navMuted}
+            secureTextEntry={!showPassword}
+            onSubmitEditing={() => void handleLogin()}
+          />
+          <Pressable
+            style={styles.eyeButton}
+            onPress={() => setShowPassword((current) => !current)}
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+          >
+            <Ionicons
+              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+              size={21}
+              color={palette.navText}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      {Platform.OS !== 'web' && <Pressable
+        style={styles.rememberRow}
+        disabled={loading}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: rememberPassword }}
+        onPress={() => {
+          const next = !rememberPassword; setRememberPassword(next);
+          if (!next) void saveRememberedCredentials('', '', false).catch(() => Alert.alert('Unable to forget password', 'Please try again.'));
+        }}
+      ><Ionicons name={rememberPassword ? 'checkbox' : 'square-outline'} size={21} color={palette.brandRed} /><Text style={styles.rememberText}>Remember password</Text></Pressable>}
+      {offlineSession && <Pressable style={{ paddingVertical: 14 }} onPress={() => router.push('/rescuer/navigation' as Href)}>
+        <Text style={{ color: '#1358a4', fontWeight: '700' }}>Open saved offline navigation</Text>
+      </Pressable>}
+      <Pressable style={({ pressed }) => [styles.button, pressed && !loading && styles.buttonPressed, loading && styles.buttonDisabled]} onPress={handleLogin} disabled={loading}>
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <>
+            <Ionicons name="log-in-outline" size={19} color="#fff" />
+            <Text style={styles.buttonText}>Login</Text>
+          </>
+        )}
+      </Pressable>
+
+      <Pressable
+        style={{ alignItems: 'center', paddingVertical: spacing.sm }}
+        disabled={loading}
+        onPress={() => router.push(`/forgot-password?login=${encodeURIComponent(login.trim())}` as Href)}
+      >
+        <Text style={styles.modeButtonText}>Forgot password?</Text>
+      </Pressable>
+
+      {Platform.OS === 'web' && !isStandalone && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.pwaInstallButton,
+            canPromptNative && styles.pwaInstallButtonHighlight,
+            pressed && { opacity: 0.85 },
+          ]}
+          onPress={() => void promptInstall()}
+        >
+          <Ionicons
+            name={isIos ? 'share-outline' : 'download-outline'}
+            size={18}
+            color={palette.navText}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pwaInstallTitle}>
+              {canPromptNative
+                ? 'Install RESQPERATION App'
+                : isIos
+                  ? 'Add RESQPERATION to Home Screen'
+                  : 'Install as App (PWA)'}
+            </Text>
+            <Text style={styles.pwaInstallSubtitle}>
+              Launch standalone with offline route & emergency support
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={palette.navMuted} />
+        </Pressable>
+      )}
+    </View>
+  );
+
+  // Full Desktop Web Layout (when on Desktop browser OR when "Desktop site" is clicked in mobile Chrome)
+  if (isDesktop) {
+    return (
+      <SafeAreaView style={styles.desktopSafe}>
+        <View style={styles.desktopTopBar}>
+          <View style={styles.desktopTopBarInner}>
+            <View style={styles.desktopBrandRow}>
+              <ResQperationLogo width={210} height={44} />
+              <View style={styles.desktopPortalBadge}>
+                <Ionicons name="globe-outline" size={14} color="#38bdf8" />
+                <Text style={styles.desktopPortalBadgeText}>Web & Mobile Portal</Text>
+              </View>
+            </View>
+            {!isStandalone && (
+              <Pressable
+                style={styles.desktopTopInstallBtn}
+                onPress={() => void promptInstall()}
+              >
+                <Ionicons name="download-outline" size={16} color="#ffffff" />
+                <Text style={styles.desktopTopInstallText}>Install App</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        <ScrollView
+          ref={scrollView}
+          style={styles.keyboard}
+          contentContainerStyle={styles.desktopMainScroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.desktopSplitContainer}>
+            <Animated.View
+              style={[
+                styles.desktopHeroColumn,
+                {
+                  opacity: logoEntrance,
+                  transform: [{ translateY: logoEntrance.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+                },
+              ]}
+            >
+              <View style={styles.desktopHeroLogoWrap}>
+                <ResQperationLogo width={340} />
+              </View>
+              <Text style={styles.desktopHeroHeadline}>
+                Household Safety, Evacuation Routing & Field Rescue Operations
+              </Text>
+              <Text style={styles.desktopHeroDescription}>
+                Sign in with your Household ID or Rescuer ID to check in your family during an active disaster broadcast, view live evacuation routes, coordinate trusted households, or manage field rescue assignments on any desktop or mobile device.
+              </Text>
+
+              <View style={styles.desktopFeatureGrid}>
+                <View style={styles.desktopFeatureCard}>
+                  <View style={[styles.desktopFeatureIcon, { backgroundColor: '#1e3a5f' }]}>
+                    <Ionicons name="home-outline" size={20} color="#38bdf8" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.desktopFeatureTitle}>Household Status & QR</Text>
+                    <Text style={styles.desktopFeatureMeta}>
+                      Update family member safety status, view your household QR pass, and monitor trusted households.
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.desktopFeatureCard}>
+                  <View style={[styles.desktopFeatureIcon, { backgroundColor: '#3b1d2e' }]}>
+                    <Ionicons name="map-outline" size={20} color="#f87171" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.desktopFeatureTitle}>Live Evacuation & Rescue Map</Text>
+                    <Text style={styles.desktopFeatureMeta}>
+                      Interactive route guidance to the nearest open evacuation center and live hazard zone awareness.
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.desktopFeatureCard}>
+                  <View style={[styles.desktopFeatureIcon, { backgroundColor: '#14382c' }]}>
+                    <Ionicons name="medkit-outline" size={20} color="#34d399" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.desktopFeatureTitle}>Responder Dispatch & Field Reports</Text>
+                    <Text style={styles.desktopFeatureMeta}>
+                      Accept rescue assignments, submit on-scene field reports, and request emergency resources.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+
+            <View style={styles.desktopFormColumn}>
+              {loginCardContent}
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Automatic ("matik") Mobile View when on phone viewport (< 768px)
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -181,104 +423,10 @@ export default function MobileLoginScreen() {
               },
             ]}
           >
-            <ResQperationLogo width={Math.min(viewportWidth - spacing.xl * 2, 370)} />
+            <ResQperationLogo width={Math.min(viewportWidth - spacing.xl * 2, 340)} />
           </Animated.View>
 
-          <View style={styles.card}>
-            <Pressable onPress={() => setEditingServer(!editingServer)} style={{ paddingVertical: 8 }}>
-              <Text style={{ color: palette.navMuted }}>Server settings</Text>
-            </Pressable>
-            {editingServer && <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Server API address</Text>
-              <TextInput style={[styles.input, { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 12 }]}
-                onFocus={(event) => focusInput(event.nativeEvent.target)}
-                value={serverUrl} onChangeText={setServerUrl} autoCapitalize="none" autoCorrect={false}
-                keyboardType="url" placeholder="https://your-server/api/v1" />
-              <Pressable style={{ paddingVertical: 10 }} onPress={() => {
-                void setApiServerUrl(serverUrl).then((url) => { setServerUrl(url); setEditingServer(false); setOfflineSession(false); Alert.alert('Server saved', 'You can now sign in.'); })
-                  .catch((error) => Alert.alert('Server address', error.message));
-              }}><Text style={{ color: '#1358a4', fontWeight: '700' }}>Save server address</Text></Pressable>
-            </View>}
-            <View style={styles.headerBlock}>
-              <Text style={styles.title}>Sign in</Text>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Household ID / Rescuer ID</Text>
-              <View style={styles.inputShell}>
-                <Ionicons name="person-outline" size={19} color={palette.navMuted} />
-                <TextInput
-                  style={styles.input}
-                  value={login}
-                  onFocus={(event) => focusInput(event.nativeEvent.target)}
-                  onChangeText={value => { edited.current = true; setLogin(value); }}
-                  placeholder="Enter your household ID or rescuer ID"
-                  placeholderTextColor={palette.navMuted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.inputShell}>
-                <Ionicons name="lock-closed-outline" size={19} color={palette.navMuted} />
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  onFocus={(event) => focusInput(event.nativeEvent.target)}
-                  onChangeText={value => { edited.current = true; setPassword(value); }}
-                  placeholder="Enter password"
-                  placeholderTextColor={palette.navMuted}
-                  secureTextEntry={!showPassword}
-                />
-                <Pressable
-                  style={styles.eyeButton}
-                  onPress={() => setShowPassword((current) => !current)}
-                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={21}
-                    color={palette.navText}
-                  />
-                </Pressable>
-              </View>
-            </View>
-
-            {Platform.OS !== 'web' && <Pressable
-              style={styles.rememberRow}
-              disabled={loading}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: rememberPassword }}
-              onPress={() => {
-                const next = !rememberPassword; setRememberPassword(next);
-                if (!next) void saveRememberedCredentials('', '', false).catch(() => Alert.alert('Unable to forget password', 'Please try again.'));
-              }}
-            ><Ionicons name={rememberPassword ? 'checkbox' : 'square-outline'} size={21} color={palette.brandRed} /><Text style={styles.rememberText}>Remember password</Text></Pressable>}
-            {offlineSession && <Pressable style={{ paddingVertical: 14 }} onPress={() => router.push('/rescuer/navigation' as Href)}>
-              <Text style={{ color: '#1358a4', fontWeight: '700' }}>Open saved offline navigation</Text>
-            </Pressable>}
-            <Pressable style={({ pressed }) => [styles.button, pressed && !loading && styles.buttonPressed, loading && styles.buttonDisabled]} onPress={handleLogin} disabled={loading}>
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="log-in-outline" size={19} color="#fff" />
-                  <Text style={styles.buttonText}>Login</Text>
-                </>
-              )}
-            </Pressable>
-
-            <Pressable
-              style={{ alignItems: 'center', paddingVertical: spacing.sm }}
-              disabled={loading}
-              onPress={() => router.push(`/forgot-password?login=${encodeURIComponent(login.trim())}` as Href)}
-            >
-              <Text style={styles.modeButtonText}>Forgot password?</Text>
-            </Pressable>
-          </View>
+          {loginCardContent}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -377,6 +525,165 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: palette.nav,
   },
+  desktopSafe: {
+    flex: 1,
+    backgroundColor: '#09131f',
+  },
+  desktopTopBar: {
+    width: '100%',
+    borderBottomWidth: 1,
+    borderColor: '#172a3e',
+    backgroundColor: '#0c1928',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  desktopTopBarInner: {
+    width: '100%',
+    maxWidth: 1240,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  desktopBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  desktopPortalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: '#10263c',
+    borderWidth: 1,
+    borderColor: '#1f4264',
+  },
+  desktopPortalBadgeText: {
+    color: '#bae6fd',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  desktopTopInstallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#1358a4',
+  },
+  desktopTopInstallText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  desktopMainScroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: 40,
+  },
+  desktopSplitContainer: {
+    width: '100%',
+    maxWidth: 1180,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 48,
+  },
+  desktopHeroColumn: {
+    flex: 1.15,
+    gap: 18,
+  },
+  desktopHeroLogoWrap: {
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+  desktopHeroHeadline: {
+    color: '#f8fafc',
+    fontSize: 32,
+    lineHeight: 40,
+    fontWeight: '900',
+  },
+  desktopHeroDescription: {
+    color: '#94a3b8',
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  desktopFeatureGrid: {
+    gap: 12,
+    marginTop: 8,
+  },
+  desktopFeatureCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: '#0e1d2f',
+    borderWidth: 1,
+    borderColor: '#1a314a',
+  },
+  desktopFeatureIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  desktopFeatureTitle: {
+    color: '#f1f5f9',
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 3,
+  },
+  desktopFeatureMeta: {
+    color: '#94a3b8',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  desktopFormColumn: {
+    flex: 0.95,
+    maxWidth: 460,
+    width: '100%',
+  },
+  desktopLoginCard: {
+    padding: 32,
+    borderRadius: 18,
+    backgroundColor: '#0f1d2d',
+    borderWidth: 1,
+    borderColor: '#1f3a56',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 32,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  serverToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#0b1623',
+    borderWidth: 1,
+    borderColor: '#1f364d',
+  },
+  desktopCardSubtitle: {
+    color: palette.navMuted,
+    fontSize: 13,
+    marginTop: 4,
+  },
   keyboard: {
     flex: 1,
   },
@@ -386,6 +693,7 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xl,
+    paddingBottom: 140,
   },
   brandBlock: {
     alignItems: 'center',
@@ -399,6 +707,7 @@ const styles = StyleSheet.create({
   },
   headerBlock: {
     gap: spacing.xs,
+    flex: 1,
   },
   title: {
     color: palette.navText,
@@ -472,4 +781,31 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   rememberText: { color: palette.navMuted, fontSize: 13, fontWeight: '600' },
+  pwaInstallButton: {
+    marginTop: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#284560',
+    backgroundColor: '#0b1623',
+  },
+  pwaInstallButtonHighlight: {
+    borderColor: '#3b82f6',
+    backgroundColor: '#102338',
+  },
+  pwaInstallTitle: {
+    color: palette.navText,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  pwaInstallSubtitle: {
+    color: palette.navMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
 });

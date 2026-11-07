@@ -1,0 +1,1 @@
+import{t as e}from"./client-C5ftPHUH.js";var t=12e3;async function n(){return(await e.get(`/weather`,{timeout:t})).data.data}async function r(){return(await e.post(`/weather/refresh`,null,{timeout:2e4})).data.data}async function i(){return(await e.get(`/weather/official-advisories`,{timeout:18e3})).data.data}export{n,r,i as t};

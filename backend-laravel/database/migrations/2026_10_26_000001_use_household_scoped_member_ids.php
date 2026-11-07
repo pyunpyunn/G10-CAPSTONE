@@ -12,6 +12,11 @@ return new class extends Migration
         if (! Schema::hasColumn('household_members', 'legacy_member_id')) {
             Schema::table('household_members', fn (Blueprint $table) => $table->string('legacy_member_id')->nullable()->unique());
         }
+        if (Schema::hasColumn('users', 'member_id')) {
+            Schema::table('users', function (Blueprint $table): void {
+                $table->string('member_id', 255)->nullable()->change();
+            });
+        }
         app(HouseholdMemberIdentityUpgrade::class)->run();
         $hasUniqueMember = collect(Schema::getIndexes('users'))->contains(
             fn (array $index): bool => $index['unique'] && $index['columns'] === ['member_id']

@@ -1,7 +1,8 @@
 export function normalizeApiServerUrl(value: string, requireHttps: boolean, allowPrivateHttp = false) {
   const parsed = new URL(value.trim());
   const secureProtocol = parsed.protocol === 'https:';
-  const developmentProtocol = !requireHttps && parsed.protocol === 'http:';
+  const isLoopback = ['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]'].includes(parsed.hostname);
+  const developmentProtocol = (!requireHttps || isLoopback) && parsed.protocol === 'http:';
   const privateNetworkProtocol = allowPrivateHttp && parsed.protocol === 'http:' && isPrivateIpv4(parsed.hostname);
 
   if ((!secureProtocol && !developmentProtocol && !privateNetworkProtocol)

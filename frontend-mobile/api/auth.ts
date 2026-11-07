@@ -41,7 +41,6 @@ export async function householdOwnerSelectionRequired() {
 const mobileRoles = ['household_resident', 'rescuer', 'tl', 'tm'];
 
 export async function restoreMobileSession(): Promise<string | null> {
-  if (Platform.OS === 'web') return null;
   const token = await getStoredItem('resqperation_mobile_token');
   if (!token) return null;
 

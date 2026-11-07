@@ -1,0 +1,1 @@
+import{tt as e}from"./index-BasAMqlL.js";var t=e();function n({title:e,message:n}){return(0,t.jsxs)(`div`,{className:`empty-state`,children:[(0,t.jsx)(`strong`,{children:e}),(0,t.jsx)(`span`,{children:n})]})}export{n as t};
