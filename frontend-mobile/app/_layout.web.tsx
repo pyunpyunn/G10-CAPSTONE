@@ -303,22 +303,6 @@ export default function RootLayout() {
                 </Text>
               </Pressable>
 
-              {showPhoneOverlay && (
-                <Pressable
-                  style={[styles.modeSwitchBtn, phoneDesktopSite && styles.modeSwitchBtnDesktopActive]}
-                  onPress={togglePhoneDesktopSite}
-                >
-                  <Ionicons
-                    name={phoneDesktopSite ? 'checkbox' : 'square-outline'}
-                    size={15}
-                    color="#ffffff"
-                  />
-                  <Text style={[styles.modeSwitchText, { color: '#e2e8f0' }]}>
-                    Phone: Desktop site
-                  </Text>
-                </Pressable>
-              )}
-
               <Pressable
                 style={[styles.modeSwitchBtn, !showPhoneOverlay && styles.modeSwitchBtnActive]}
                 onPress={() => setShowPhoneOverlay(false)}
@@ -338,9 +322,6 @@ export default function RootLayout() {
           {/* Main App Layer (Full Desktop Web View on laptop; Mobile View inside iframe or on mobile devices) */}
           <View style={styles.appContainer}>
             <Slot />
-
-            {/* On a real mobile phone browser (not inside the laptop's floating iPhone iframe), show the bottom sheet directly */}
-            {!isLaptopScreen && !isInsidePhoneFrame && !isStandalone && renderMobileBrowserBottomOverlay()}
 
             <StatusBar style="auto" />
           </View>

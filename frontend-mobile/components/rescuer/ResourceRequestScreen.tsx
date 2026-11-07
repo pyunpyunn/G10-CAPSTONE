@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker } from 'react-native-maps';
+import { MobileLeafletMap } from '@/components/MobileLeafletMap';
 import { getRescuerRequestLocations } from '@/api/rescuer';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
@@ -332,32 +332,29 @@ export function ResourceRequestScreen({
                   placeholderTextColor="#7d8da0"
                 />
               </View>
-              {Platform.OS !== 'web' ? (
-                <MapView
-                  style={styles.locationMap}
-                  initialRegion={mapInitialRegion}
-                  onPress={(event) => {
-                    const coordinate = event.nativeEvent.coordinate;
+              <View style={styles.locationMap}>
+                <MobileLeafletMap
+                  height={220}
+                  center={{
+                    latitude: mapInitialRegion.latitude,
+                    longitude: mapInitialRegion.longitude,
+                  }}
+                  markers={mappedLocationOptions.map((item) => ({
+                    latitude: item.latitude,
+                    longitude: item.longitude,
+                    label: item.label,
+                    description: item.subtitle,
+                    color: palette.navActive,
+                  }))}
+                  routes={[]}
+                  selectedPoint={pinnedLocation}
+                  onMapPress={(coordinate) => {
                     setPinnedLocation(coordinate);
                     setLocation(`Pinned location (${coordinate.latitude.toFixed(5)}, ${coordinate.longitude.toFixed(5)})`);
                     setIsLocationPickerOpen(false);
                   }}
-                >
-                  {mappedLocationOptions.map((item) => (
-                    <Marker
-                      key={item.id}
-                      coordinate={{ latitude: item.latitude, longitude: item.longitude }}
-                      title={item.label}
-                      description={item.subtitle}
-                      onPress={() => {
-                        setLocation(item.address || item.label);
-                        setPinnedLocation({ latitude: item.latitude, longitude: item.longitude });
-                        setIsLocationPickerOpen(false);
-                      }}
-                    />
-                  ))}
-                </MapView>
-              ) : null}
+                />
+              </View>
               <Text style={styles.locationResultsTitle}>
                 {allLocations.length ? `Locations in ${locationsBarangay}` : `No saved locations for ${locationsBarangay}`}
               </Text>
