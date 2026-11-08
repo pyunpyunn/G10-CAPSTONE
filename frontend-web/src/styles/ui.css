@@ -219,30 +219,52 @@
 }
 .data-filter-bar {
   display: flex;
-  align-items: end;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
-  margin: 0 0 14px;
-  padding: 12px;
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 6px 10px;
   border: 1px solid var(--color-border, #d8e0e8);
-  border-radius: 12px;
+  border-radius: 8px;
   background: #fff;
-  box-shadow: 0 2px 8px rgba(15, 35, 55, 0.045);
+  box-shadow: 0 1px 3px rgba(15, 35, 55, 0.04);
+  flex-wrap: wrap;
+}
+
+.data-filter-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.data-filter-bar-trailing {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .data-filter-search {
   display: flex;
-  flex: 1 1 260px;
+  flex: 0 1 240px;
   align-items: center;
-  min-width: 190px;
-  min-height: 42px;
-  gap: 9px;
-  padding: 0 12px;
+  min-width: 160px;
+  min-height: 32px;
+  height: 32px;
+  gap: 8px;
+  padding: 0 10px;
   border: 1px solid var(--color-border, #d8e0e8);
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--color-text-3, #64748b);
   background: #f8fafc;
+  font-size: 12px;
 }
 
 .data-filter-search:focus-within {
@@ -259,16 +281,168 @@
   color: var(--color-text-1, #172b3d);
   background: transparent;
   font: inherit;
+  font-size: 12px;
 }
 
 .data-filter-search input::placeholder {
   color: var(--color-text-3, #64748b);
 }
 
+.data-filter-trigger-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.data-filter-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border, #d8e0e8);
+  border-radius: 6px;
+  color: var(--color-text-2, #334155);
+  background: #f8fafc;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.data-filter-trigger:hover {
+  background: #edf3f8;
+  border-color: #7aa5cc;
+  color: var(--color-nav-active, #244d71);
+}
+
+.data-filter-trigger.is-active {
+  background: #edf3f8;
+  border-color: var(--color-nav-active, #244d71);
+  color: var(--color-nav-active, #244d71);
+  font-weight: 700;
+}
+
+.data-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: var(--color-nav-active, #244d71);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.data-filter-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 270px;
+  background: #fff;
+  border: 1px solid var(--color-border, #d8e0e8);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(15, 35, 55, 0.14), 0 8px 10px -6px rgba(15, 35, 55, 0.08);
+  z-index: 60;
+  padding: 12px;
+  animation: filterPopoverFadeIn 0.12s ease-out;
+}
+
+@keyframes filterPopoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.data-filter-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.data-filter-popover-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-3, #64748b);
+}
+
+.data-filter-popover-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  color: var(--color-nav-active, #244d71);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.data-filter-popover-reset:hover {
+  background: #f1f5f9;
+}
+
+.data-filter-popover-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.data-filter-popover-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.data-filter-popover-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-2, #475569);
+  text-transform: uppercase;
+  letter-spacing: 0.035em;
+}
+
+.data-filter-popover-select {
+  width: 100%;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 24px 0 8px;
+  border: 1px solid var(--color-border, #d8e0e8);
+  border-radius: 6px;
+  color: var(--color-text-2, #334155);
+  background-color: #f8fafc;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.data-filter-popover-select:focus-visible {
+  border-color: #7aa5cc;
+  outline: 2px solid rgba(59, 130, 246, 0.16);
+  outline-offset: 1px;
+}
+
 .data-filter-fields {
   display: grid;
   flex: 1 1 380px;
-  grid-auto-columns: minmax(140px, 1fr);
+  grid-auto-columns: minmax(130px, 1fr);
   grid-auto-flow: column;
   gap: 8px;
   min-width: 0;
@@ -277,16 +451,16 @@
 .data-filter-field {
   display: grid;
   min-width: 0;
-  gap: 4px;
+  gap: 2px;
 }
 
 .data-filter-field > span {
   overflow: hidden;
   color: var(--color-text-3, #64748b);
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.045em;
-  line-height: 1.2;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -295,13 +469,15 @@
 .data-filter-field select {
   width: 100%;
   min-width: 0;
-  min-height: 42px;
-  padding: 0 30px 0 10px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 24px 0 8px;
   border: 1px solid var(--color-border, #d8e0e8);
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--color-text-2, #334155);
   background-color: #f8fafc;
   font: inherit;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -316,8 +492,8 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  align-self: end;
-  min-height: 42px;
+  min-height: 32px;
+  height: 32px;
   gap: 6px;
   color: var(--color-text-3, #64748b);
   font-size: 11px;
@@ -326,23 +502,22 @@
 }
 
 .data-filter-result-count {
-  padding: 6px 9px;
-  border-radius: 7px;
+  padding: 4px 8px;
+  border-radius: 6px;
   color: var(--color-nav-active, #244d71);
   background: #edf3f8;
 }
 
 .data-filter-reset {
   display: inline-flex;
-  flex: 0 0 auto;
   align-items: center;
-  align-self: end;
   justify-content: center;
-  min-height: 42px;
-  gap: 6px;
-  padding: 0 11px;
+  min-height: 32px;
+  height: 32px;
+  gap: 5px;
+  padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 6px;
   color: var(--color-nav-active, #244d71);
   background: transparent;
   font: inherit;

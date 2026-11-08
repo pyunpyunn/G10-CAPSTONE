@@ -269,31 +269,6 @@ export default function RequestWorkflowPage() {
       <PageHeader
         title={external ? 'External Requests' : 'Request Monitoring'}
         subtitle={data?.active_event?.name || (external ? 'Inbound relief requests for command review' : 'Active relief fulfillment and handoff tracking')}
-        actions={
-          <div className="pg-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={refresh}
-              disabled={loading}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-            >
-              <RotateCw size={14} className={loading ? 'spin-icon' : ''} />
-              <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
-            {!external && (
-              <button
-                type="button"
-                className="button review"
-                onClick={() => navigate('/resources-requests/new')}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Plus size={15} />
-                <span>New Request</span>
-              </button>
-            )}
-          </div>
-        }
       />
 
       {/* Standby strip if no active disaster event */}
@@ -314,73 +289,108 @@ export default function RequestWorkflowPage() {
 
       {error && <div className="form-error" role="alert">{error}</div>}
 
-      {/* ResQperation Submodule Segmented Tabs (Native account-management-tabs) */}
-      {!external && (
-        <div className="account-management-tabs" role="tablist" aria-label="Request monitoring categories">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={status === 'all'}
-            className={status === 'all' ? 'active' : ''}
-            onClick={() => { setStatus('all'); setPage(1) }}
-          >
-            Approved Request List
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={status === 'forwarded'}
-            className={status === 'forwarded' ? 'active' : ''}
-            onClick={() => { setStatus('forwarded'); setPage(1) }}
-          >
-            Status Tracking of Requests
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={status === 'fulfilled'}
-            className={status === 'fulfilled' ? 'active' : ''}
-            onClick={() => { setStatus('fulfilled'); setPage(1) }}
-          >
-            Completed Requests
-          </button>
-        </div>
-      )}
-
-      {/* Native ResQperation KPI Stat Row (.rr-stat-row) */}
-      <div className="rr-stat-row">
-        <div className="rr-stat">
-          <div className="k">{external ? 'Pending Approval' : 'Approved Requests'}</div>
-          <div className="v">{Number(external ? summary.needs_validation ?? 0 : summary.verified ?? 0).toLocaleString()}</div>
-          <div className="n">{external ? 'awaiting verification' : 'ready for allocation'}</div>
-        </div>
-        <div className="rr-stat">
-          <div className="k">{external ? 'Validated Requests' : 'Forwarded Today'}</div>
-          <div className="v">{Number(external ? summary.verified ?? 0 : summary.forwarded_today ?? 0).toLocaleString()}</div>
-          <div className="n">{external ? 'validated by command' : 'handoffs recorded today'}</div>
-        </div>
-        <div className="rr-stat">
-          <div className="k">{external ? 'Forwarded to Depot' : 'Completed Requests'}</div>
-          <div className="v">
-            {Number(
-              external
-                ? summary.forwarded_today ?? 0
-                : summary.delivered ?? summary.fulfilled ?? 0
-            ).toLocaleString()}
+      {/* ResQperation Submodule Segmented Tabs with Top-Right Action Controls */}
+      <div className="account-management-tabs-row">
+        {!external ? (
+          <div className="account-management-tabs" role="tablist" aria-label="Request monitoring categories">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={status === 'all'}
+              className={status === 'all' ? 'active' : ''}
+              onClick={() => { setStatus('all'); setPage(1) }}
+            >
+              Approved Request List
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={status === 'forwarded'}
+              className={status === 'forwarded' ? 'active' : ''}
+              onClick={() => { setStatus('forwarded'); setPage(1) }}
+            >
+              Status Tracking of Requests
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={status === 'fulfilled'}
+              className={status === 'fulfilled' ? 'active' : ''}
+              onClick={() => { setStatus('fulfilled'); setPage(1) }}
+            >
+              Completed Requests
+            </button>
           </div>
-          <div className="n">{external ? 'warehouse handoffs' : 'delivered to centers'}</div>
-        </div>
-        <div className="rr-stat">
-          <div className="k">{external ? 'Total Inbound' : 'Total Monitored'}</div>
-          <div className="v">{Number(external ? summary.total_requests ?? totalCount : totalCount).toLocaleString()}</div>
-          <div className="n">{external ? 'all logged intake requests' : 'matching current filters'}</div>
+        ) : (
+          <div />
+        )}
+
+        <div className="account-management-tabs-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={refresh}
+            disabled={loading}
+            title="Refresh requests stream"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <RotateCw size={14} className={loading ? 'spin-icon' : ''} />
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+          {!external && (
+            <button
+              type="button"
+              className="button review"
+              onClick={() => navigate('/resources-requests/new')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Plus size={15} />
+              <span>New Request</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Shared TanStack DataFilterBar */}
+      {/* Compact Popover Filter Bar with Inline Trailing KPI Metric Strip */}
       <DataFilterBar
         filters={filtersConfig}
         onReset={handleResetFilters}
+        trailing={
+          <div className="rr-stat-strip" aria-label="Request statistics summary">
+            <div className="rr-stat-pill" title={external ? 'Awaiting verification' : 'Ready for allocation'}>
+              <span className="pill-dot is-blue" />
+              <span className="pill-k">{external ? 'Pending' : 'Approved'}</span>
+              <span className="pill-v">
+                {Number(external ? summary.needs_validation ?? 0 : summary.verified ?? 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="rr-stat-pill" title={external ? 'Validated by command' : 'Handoffs recorded today'}>
+              <span className="pill-dot is-amber" />
+              <span className="pill-k">{external ? 'Validated' : 'Forwarded'}</span>
+              <span className="pill-v">
+                {Number(external ? summary.verified ?? 0 : summary.forwarded_today ?? 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="rr-stat-pill" title={external ? 'Warehouse handoffs' : 'Delivered to centers'}>
+              <span className="pill-dot is-green" />
+              <span className="pill-k">{external ? 'To Depot' : 'Completed'}</span>
+              <span className="pill-v">
+                {Number(
+                  external
+                    ? summary.forwarded_today ?? 0
+                    : summary.delivered ?? summary.fulfilled ?? 0
+                ).toLocaleString()}
+              </span>
+            </div>
+            <div className="rr-stat-pill" title={external ? 'All logged intake requests' : 'Matching current filters'}>
+              <span className="pill-dot is-gray" />
+              <span className="pill-k">{external ? 'Total Inbound' : 'Total'}</span>
+              <span className="pill-v">
+                {Number(external ? summary.total_requests ?? totalCount : totalCount).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        }
       />
 
       {/* Main Content: Native ResQperation Panel matching Request Types UI */}

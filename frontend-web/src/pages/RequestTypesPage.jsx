@@ -197,45 +197,6 @@ export default function RequestTypesPage() {
             ? 'List of Request Types · Relief goods catalog and emergency dispatch assets'
             : 'Request Type Inventory with Status · Depot stock levels and reservation states'
         }
-        actions={
-          <div className="pg-actions">
-            <div
-              className={`db-sync-indicator ${isTrackingAidLive ? 'is-live' : 'is-fallback'}`}
-              title={
-                isTrackingAidLive
-                  ? 'Connected to TrackingAid shared database (127.0.0.1:3306)'
-                  : 'Operating via local disaster records'
-              }
-            >
-              <span className="db-indicator-dot" />
-              <span className="db-indicator-label">
-                {isTrackingAidLive ? 'TrackingAid Shared DB' : 'Local Fallback'}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={refresh}
-              disabled={loading}
-              title="Refresh inventory and catalog"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-            >
-              <RotateCw size={14} className={loading ? 'spin-icon' : ''} />
-              <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
-
-            <button
-              type="button"
-              className="button review"
-              onClick={() => setIsDeclareModalOpen(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Plus size={15} />
-              <span>Declare Request Type</span>
-            </button>
-          </div>
-        }
       />
 
       {/* Success Notification Banner */}
@@ -246,56 +207,82 @@ export default function RequestTypesPage() {
         </div>
       )}
 
-      {/* ResQperation Submodule Segmented Tabs (Native account-management-tabs) */}
-      <div className="account-management-tabs" role="tablist" aria-label="Request types views">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={viewMode === 'cards'}
-          className={viewMode === 'cards' ? 'active' : ''}
-          onClick={() => setViewMode('cards')}
-        >
-          List of Request Types
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={viewMode === 'inventory'}
-          className={viewMode === 'inventory' ? 'active' : ''}
-          onClick={() => setViewMode('inventory')}
-        >
-          Request Type Inventory with Status
-        </button>
+      {/* ResQperation Submodule Segmented Tabs with Top-Right Action Controls */}
+      <div className="account-management-tabs-row">
+        <div className="account-management-tabs" role="tablist" aria-label="Request types views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'cards'}
+            className={viewMode === 'cards' ? 'active' : ''}
+            onClick={() => setViewMode('cards')}
+          >
+            List of Request Types
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'inventory'}
+            className={viewMode === 'inventory' ? 'active' : ''}
+            onClick={() => setViewMode('inventory')}
+          >
+            Request Type Inventory with Status
+          </button>
+        </div>
+
+        <div className="account-management-tabs-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={refresh}
+            disabled={loading}
+            title="Refresh inventory and catalog"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <RotateCw size={14} className={loading ? 'spin-icon' : ''} />
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="button review"
+            onClick={() => setIsDeclareModalOpen(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Plus size={15} />
+            <span>Declare Request Type</span>
+          </button>
+        </div>
       </div>
 
-      {/* Native ResQperation KPI Stat Row (.rr-stat-row) */}
-      <div className="rr-stat-row">
-        <div className="rr-stat">
-          <div className="k">Total Types</div>
-          <div className="v">{Number(summary.total_types ?? items.length).toLocaleString()}</div>
-          <div className="n">cataloged emergency items</div>
-        </div>
-        <div className="rr-stat">
-          <div className="k">Available in Stock</div>
-          <div className="v">{Number(summary.in_stock_count ?? 0).toLocaleString()}</div>
-          <div className="n">ready for allocation</div>
-        </div>
-        <div className="rr-stat">
-          <div className="k">Out of Stock</div>
-          <div className="v">{Number(summary.out_of_stock_count ?? 0).toLocaleString()}</div>
-          <div className="n">needs depot replenishment</div>
-        </div>
-        <div className="rr-stat">
-          <div className="k">Total Units</div>
-          <div className="v">{Number(summary.total_available_units ?? 0).toLocaleString()}</div>
-          <div className="n">depot warehouse stock</div>
-        </div>
-      </div>
-
-      {/* Shared TanStack DataFilterBar */}
+      {/* Compact Popover Filter Bar with Inline Trailing KPI Metric Strip */}
       <DataFilterBar
         filters={filtersConfig}
         onReset={handleResetFilters}
+        trailing={
+          <div className="rr-stat-strip" aria-label="Request types summary">
+            <div className="rr-stat-pill" title="Cataloged emergency items">
+              <span className="pill-dot is-blue" />
+              <span className="pill-k">Total Types</span>
+              <span className="pill-v">{Number(summary.total_types ?? items.length).toLocaleString()}</span>
+            </div>
+            <div className="rr-stat-pill" title="Ready for allocation">
+              <span className="pill-dot is-green" />
+              <span className="pill-k">In Stock</span>
+              <span className="pill-v">{Number(summary.in_stock_count ?? 0).toLocaleString()}</span>
+            </div>
+            <div className="rr-stat-pill" title="Needs depot replenishment">
+              <span className="pill-dot is-amber" />
+              <span className="pill-k">Out of Stock</span>
+              <span className="pill-v">{Number(summary.out_of_stock_count ?? 0).toLocaleString()}</span>
+            </div>
+            <div className="rr-stat-pill" title="Depot warehouse stock">
+              <span className="pill-dot is-gray" />
+              <span className="pill-k">Total Units</span>
+              <span className="pill-v">{Number(summary.total_available_units ?? 0).toLocaleString()}</span>
+            </div>
+          </div>
+        }
       />
 
       {/* Main Content: Native ResQperation Panel */}
