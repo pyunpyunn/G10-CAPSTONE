@@ -780,7 +780,7 @@ export default function HouseholdHomeScreen() {
           onLogout={() => void handleLogout()}
           refreshing={refreshing}
           onRefresh={() => void loadOverview(true)}
-          banner={<OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />}
+          banner={<OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={loading} />}
           rightRail={
             isWideDesktop ? (
               <>
@@ -851,7 +851,7 @@ export default function HouseholdHomeScreen() {
             }}
           />
 
-          <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />
+          <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={loading} />
 
           <ScrollView
             removeClippedSubviews={false}

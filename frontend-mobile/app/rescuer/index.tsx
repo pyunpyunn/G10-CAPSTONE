@@ -436,7 +436,7 @@ export default function RescuerHomeScreen() {
           onLogout={() => void handleLogout()}
           refreshing={refreshing}
           onRefresh={() => void loadOverview(true)}
-          banner={<OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />}
+          banner={<OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={loading} />}
           rightRail={
             isWideDesktop && overview ? (
               <>
@@ -490,7 +490,7 @@ export default function RescuerHomeScreen() {
         onOpenRadio={() => setActiveTab('radio')}
       />
 
-      <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} />
+      <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={loading} />
 
       <ScrollView
         removeClippedSubviews={false}

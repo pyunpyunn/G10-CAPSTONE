@@ -42,17 +42,45 @@ try {
     # Recover a still-running child after a supervisor restart, without creating
     # duplicate API listeners or workers. Only accept this exact PHP command.
     if (Test-Path -LiteralPath $statePath) {
+        $previous = $null
         try {
             $previous = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+        } catch {
+            Write-ServiceLog 'Previous child state is invalid; starting a fresh child.'
+        }
+        if ($previous) {
             $candidate = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$previous.child_pid)" -ErrorAction SilentlyContinue
             $expected = if ($Role -eq 'Api') {
                 [regex]::Escape((Join-Path $backendPath 'vendor\laravel\framework\src\Illuminate\Foundation\resources\server.php'))
             } else { [regex]::Escape((Join-Path $backendPath 'artisan')) + '"?\s+queue:work\s+operations_outbox\b' }
             if ($candidate -and $candidate.ExecutablePath -eq $executablePath -and $candidate.CommandLine -match $expected) {
-                $child = Get-Process -Id $candidate.ProcessId
-                Write-ServiceLog "Recovered child PID $($child.Id)."
+                $isResponsive = $true
+                if ($Role -eq 'Api') {
+                    try {
+                        $health = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8000/api/v1/health/live' -TimeoutSec 4
+                        $isResponsive = $health.StatusCode -eq 200
+                    } catch {
+                        $isResponsive = $false
+                    }
+                }
+
+                if ($isResponsive) {
+                    $child = Get-Process -Id $candidate.ProcessId
+                    Write-ServiceLog "Recovered child PID $($child.Id)."
+                } else {
+                    Write-ServiceLog "API child PID $($candidate.ProcessId) failed its health check; stopping the unresponsive worker."
+                    Stop-Process -Id $candidate.ProcessId -Force
+                    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+                        if (!(Get-Process -Id $candidate.ProcessId -ErrorAction SilentlyContinue)) { break }
+                        Start-Sleep -Milliseconds 500
+                    }
+                    if (Get-Process -Id $candidate.ProcessId -ErrorAction SilentlyContinue) {
+                        throw "Unresponsive API child PID $($candidate.ProcessId) could not be stopped."
+                    }
+                    Write-ServiceLog "Stopped unresponsive API child PID $($candidate.ProcessId); a fresh worker will be started."
+                }
             }
-        } catch { Write-ServiceLog 'No recoverable child was found.' }
+        }
     }
 
     while ($true) {
