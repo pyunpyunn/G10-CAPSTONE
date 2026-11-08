@@ -379,9 +379,6 @@ export default function RequestWorkflowPage() {
 
       {/* Shared TanStack DataFilterBar */}
       <DataFilterBar
-        search={search}
-        onSearchChange={(value) => { setSearch(value); setPage(1) }}
-        searchPlaceholder={external ? "Search by request ID, item, requester or evacuation site..." : "Search by request ID, item, or center..."}
         filters={filtersConfig}
         onReset={handleResetFilters}
       />

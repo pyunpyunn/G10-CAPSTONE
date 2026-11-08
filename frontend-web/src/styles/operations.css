@@ -1169,21 +1169,21 @@
 .rr-stat-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .rr-stat {
   background: #fff;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 13px 12px;
+  border-radius: 8px;
+  padding: 8px 11px;
 }
 
 .rr-stat .k {
-  margin-bottom: 5px;
+  margin-bottom: 2px;
   color: var(--color-text-3);
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -1191,16 +1191,33 @@
 
 .rr-stat .v {
   color: var(--color-text-1);
-  font-size: 23px;
+  font-size: 18px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.05;
 }
 
 .rr-stat .n {
-  margin-top: 6px;
+  margin-top: 3px;
   color: var(--color-text-3);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.resources-page .app-page-controls-row {
+  margin-bottom: 0;
+}
+
+.resources-page .account-management-tabs {
+  margin-bottom: 2px;
+}
+
+.resources-page .account-management-tabs button {
+  min-height: 34px;
+  font-size: 12px;
+}
+
+.resources-page .rr-stat-row {
+  margin-bottom: 2px;
 }
 
 .resources-page .filter-bar {
@@ -4009,7 +4026,7 @@
 
 .req-types-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
   gap: 16px;
 }
 
@@ -4020,14 +4037,14 @@
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 16px 18px 18px;
+  padding: 18px;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .human-catalog-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px -2px rgba(15, 23, 42, 0.07);
+  box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -2px rgba(15, 23, 42, 0.04);
   border-color: #cbd5e1;
 }
 
@@ -4046,8 +4063,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .card-category-badge {
@@ -4070,8 +4087,8 @@
 }
 
 .card-category-label {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   color: #475569;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4083,10 +4100,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 3px 10px;
+  padding: 3px 8px;
   border-radius: 9999px;
-  font-size: 11.5px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 600;
   flex-shrink: 0;
   line-height: 1.3;
 }
@@ -4108,43 +4125,49 @@
 
 /* Card Main Content: Title with optional 'New' badge, Code, and Location */
 .card-main-content {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .card-title-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  flex-wrap: nowrap;
   gap: 6px;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .human-card-title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 650;
   color: #0f172a;
   margin: 0;
   line-height: 1.35;
   letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .human-new-badge {
   display: inline-flex;
   align-items: center;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: #2563eb;
-  background: #eef2f6;
-  padding: 1px 7px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 1.5px 6px;
   border-radius: 4px;
-  line-height: 1.3;
+  line-height: 1.2;
+  flex-shrink: 0;
 }
 
 .card-code-text {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 400;
   color: #64748b;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   line-height: 1.4;
 }
 
@@ -4171,26 +4194,26 @@
 /* Availability Meter Section: Count & Progress Bar Track/Fill */
 .card-stock-meter-section {
   margin-top: auto;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .card-stock-count-row {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: 5px;
   margin-bottom: 6px;
 }
 
 .stock-count-number {
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 750;
   color: #0f172a;
   line-height: 1;
   letter-spacing: -0.02em;
 }
 
 .stock-count-unit {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
   color: #64748b;
 }
@@ -4225,7 +4248,9 @@
 .human-card-footer {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
 }
 
 .btn-human-specs {
@@ -4233,12 +4258,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 38px;
-  padding: 0 16px;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 12px;
   font-weight: 600;
-  color: #1e293b;
+  color: #334155;
   background: #ffffff;
   border: 1px solid #cbd5e1;
   cursor: pointer;
@@ -4252,14 +4276,13 @@
 }
 
 .btn-human-request {
-  flex: 1.1;
+  flex: 1.2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 38px;
-  padding: 0 16px;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 12px;
   font-weight: 600;
   color: #ffffff;
   background: var(--chart-evacuated, #2a5a90);
@@ -4274,17 +4297,16 @@
 }
 
 .btn-human-disabled {
-  flex: 1.1;
+  flex: 1.2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 38px;
-  padding: 0 16px;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 12px;
   font-weight: 600;
   color: #94a3b8;
-  background: #f1f5f9;
+  background: #f8fafc;
   border: 1px solid #e2e8f0;
   cursor: not-allowed;
 }

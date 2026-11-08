@@ -20,7 +20,7 @@ http.createServer((request, response) => {
     file = path.join(root, 'index.html');
   }
   response.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream',
-    'Cache-Control': /(?:index\.html|sw\.js|webmanifest)$/.test(file) ? 'no-cache' : 'public, max-age=3600',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
     'X-Content-Type-Options': 'nosniff' });
   if (request.method === 'HEAD') response.end(); else fs.createReadStream(file).pipe(response);
 }).listen(port, host, () => console.log(`PWA preview running at http://localhost:${port} (and http://127.0.0.1:${port})`));

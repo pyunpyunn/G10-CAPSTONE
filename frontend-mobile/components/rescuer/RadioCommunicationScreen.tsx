@@ -1,6 +1,13 @@
 import { createRefreshQueue } from '@/utils/networkScheduling';
+import {
+  cancelWebVoiceRecording,
+  playWebVoiceUrl,
+  startWebVoiceRecording,
+  stopWebVoicePlayback,
+  stopWebVoiceRecording,
+} from '@/utils/webRadioAudio';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
@@ -80,6 +87,11 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
   const secondsRef = useRef(0);
   const feedQueue = useRef(createRefreshQueue());
   const playedLogIdsRef = useRef<Set<string | number>>(new Set());
+  const localAudioMapRef = useRef<Map<string, string>>(new Map());
+  const voiceLogs = useMemo(
+    () => logs.filter((log) => log.type === 'ptt_audio'),
+    [logs]
+  );
 
   const profile = overview?.profile || {};
   const responder = profile.responder || {};
@@ -101,6 +113,22 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
     playedVersion
   );
 
+  function clearRecordTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }
+
+  function startLocalTimer() {
+    secondsRef.current = 0;
+    setRecordSeconds(0);
+    timerRef.current = setInterval(() => {
+      secondsRef.current += 1;
+      setRecordSeconds(secondsRef.current);
+    }, 1000);
+  }
+
   useEffect(() => {
     setAudioModeAsync({
       playsInSilentMode: true,
@@ -121,6 +149,8 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
     return () => {
       clearInterval(feedTimer);
       clearRecordTimer();
+      stopWebVoicePlayback();
+      void cancelWebVoiceRecording();
     };
   }, []);
 
@@ -172,15 +202,73 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
     await playClip(nextClip);
   }
 
-  async function playClip(log: RadioLog) {
-    const remoteUrl = log.audio_path ? storageUrl(log.audio_path) : log.audio_url;
+  function audioExtension(log: RadioLog, clipRemoteUrl: string) {
+    const source = log.audio_path || clipRemoteUrl;
+    const extension = source.split('?')[0].split('.').pop()?.toLowerCase() || 'm4a';
+    const supported = ['m4a', 'mp4', 'aac', 'mp3', 'wav', 'webm', 'ogg'];
 
-    if (!remoteUrl) {
+    return supported.includes(extension) ? extension : 'm4a';
+  }
+
+  async function cachedAudioUri(log: RadioLog, clipRemoteUrl: string) {
+    if (!FileSystem.cacheDirectory) {
+      return clipRemoteUrl;
+    }
+
+    const extension = audioExtension(log, clipRemoteUrl);
+    const fileUri = `${FileSystem.cacheDirectory}resq-radio-${log.id}.${extension}`;
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+
+    if (fileInfo.exists) {
+      return fileUri;
+    }
+
+    const downloaded = await FileSystem.downloadAsync(clipRemoteUrl, fileUri);
+
+    if (downloaded.status < 200 || downloaded.status >= 300) {
+      throw new Error('Audio download failed.');
+    }
+
+    return downloaded.uri;
+  }
+
+  async function playClip(log: RadioLog) {
+    const cleanAudioPath = log.audio_path
+      ? log.audio_path
+      : log.audio_url
+        ? log.audio_url.replace(/^https?:\/\/[^/]+/, '').replace(/^\/storage\//, '')
+        : '';
+    const clipRemoteUrl = cleanAudioPath ? storageUrl(cleanAudioPath) : '';
+    const cachedBlobUrl = localAudioMapRef.current.get(String(log.id)) || '';
+
+    if (!clipRemoteUrl && !cachedBlobUrl) {
       return;
     }
 
     try {
       setError('');
+
+      if (Platform.OS === 'web') {
+        if (nowPlayingId === log.id && stopWebVoicePlayback()) {
+          setNowPlayingId(null);
+          return;
+        }
+
+        setNowPlayingId(log.id);
+        playedLogIdsRef.current.add(log.id);
+        setPlayedVersion((current) => current + 1);
+
+        const webTargetUrl = cachedBlobUrl || `${clipRemoteUrl}${clipRemoteUrl.includes('?') ? '&' : '?'}v=${Date.now()}`;
+        const { isSilentClip } = await playWebVoiceUrl(webTargetUrl, () => {
+          setNowPlayingId((current) => (current === log.id ? null : current));
+        });
+
+        if (isSilentClip) {
+          setError('No microphone voice was detected in this recording. Tap to talk and speak into your mic.');
+        }
+        return;
+      }
+
       setNowPlayingId(log.id);
       await setAudioModeAsync({
         playsInSilentMode: true,
@@ -189,7 +277,7 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
         shouldRouteThroughEarpiece: false,
         interruptionMode: 'doNotMix',
       });
-      const localUri = await cachedAudioUri(log, remoteUrl);
+      const localUri = await cachedAudioUri(log, clipRemoteUrl);
       player.replace({ uri: localUri });
       player.play();
       playedLogIdsRef.current.add(log.id);
@@ -200,52 +288,6 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
     }
   }
 
-  async function cachedAudioUri(log: RadioLog, remoteUrl: string) {
-    if (!FileSystem.cacheDirectory) {
-      return remoteUrl;
-    }
-
-    const extension = audioExtension(log, remoteUrl);
-    const fileUri = `${FileSystem.cacheDirectory}resq-radio-${log.id}.${extension}`;
-    const fileInfo = await FileSystem.getInfoAsync(fileUri);
-
-    if (fileInfo.exists) {
-      return fileUri;
-    }
-
-    const downloaded = await FileSystem.downloadAsync(remoteUrl, fileUri);
-
-    if (downloaded.status < 200 || downloaded.status >= 300) {
-      throw new Error('Audio download failed.');
-    }
-
-    return downloaded.uri;
-  }
-
-  function audioExtension(log: RadioLog, remoteUrl: string) {
-    const source = log.audio_path || remoteUrl;
-    const extension = source.split('?')[0].split('.').pop()?.toLowerCase() || 'm4a';
-    const supported = ['m4a', 'mp4', 'aac', 'mp3', 'wav'];
-
-    return supported.includes(extension) ? extension : 'm4a';
-  }
-
-  function clearRecordTimer() {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }
-
-  function startLocalTimer() {
-    secondsRef.current = 0;
-    setRecordSeconds(0);
-    timerRef.current = setInterval(() => {
-      secondsRef.current += 1;
-      setRecordSeconds(secondsRef.current);
-    }, 1000);
-  }
-
   async function startRecording() {
     if (isRecording || isActionLoading) {
       return;
@@ -254,22 +296,26 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
     setIsActionLoading(true);
 
     try {
-      const permission = await requestRecordingPermissionsAsync();
+      if (Platform.OS === 'web') {
+        await startWebVoiceRecording();
+      } else {
+        const permission = await requestRecordingPermissionsAsync();
 
-      if (!permission.granted) {
-        setError('Microphone permission is required for team radio.');
-        return;
+        if (!permission.granted) {
+          setError('Microphone permission is required for team radio.');
+          return;
+        }
+
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          allowsRecording: true,
+          shouldPlayInBackground: false,
+          shouldRouteThroughEarpiece: false,
+          interruptionMode: 'doNotMix',
+        });
+        await recorder.prepareToRecordAsync();
+        recorder.record();
       }
-
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        allowsRecording: true,
-        shouldPlayInBackground: false,
-        shouldRouteThroughEarpiece: false,
-        interruptionMode: 'doNotMix',
-      });
-      await recorder.prepareToRecordAsync();
-      recorder.record();
 
       const data = await startRadioTransmission({
         channel: 'team',
@@ -282,7 +328,10 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
       startLocalTimer();
       setError('');
     } catch (radioError: any) {
-      setError(radioError?.response?.data?.message || 'Voice recording cannot start.');
+      if (Platform.OS === 'web') {
+        await cancelWebVoiceRecording();
+      }
+      setError(radioError?.response?.data?.message || radioError?.message || 'Voice recording cannot start.');
     } finally {
       setIsActionLoading(false);
     }
@@ -304,29 +353,58 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
     setCurrentTransmissionId('');
 
     try {
-      await recorder.stop();
-      const uri = recorder.uri;
+      let uri: string | null = null;
+      let fileName = 'resqperation-ptt.m4a';
+      let mimeType = 'audio/mp4';
+
+      if (Platform.OS === 'web') {
+        const webResult = await stopWebVoiceRecording();
+        uri = webResult.uri;
+        fileName = 'resqperation-ptt.wav';
+        mimeType = 'audio/wav';
+      } else {
+        await recorder.stop();
+        uri = recorder.uri;
+
+        for (let attempt = 0; attempt < 10 && !uri; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          uri = recorder.uri;
+        }
+      }
 
       if (!uri) {
         throw new Error('No voice file was recorded.');
       }
 
-      await uploadRadioClip({
+      const uploaded = await uploadRadioClip({
         channel: 'team',
+        transmission_id: transmissionId || null,
         assignment_id: Number.isFinite(activeAssignmentId) ? activeAssignmentId : null,
         duration_seconds: duration,
         uri,
-        name: 'resqperation-ptt.m4a',
-        type: 'audio/mp4',
+        name: fileName,
+        type: mimeType,
       });
+
+      if (uploaded?.log) {
+        if (Platform.OS === 'web' && uri) {
+          localAudioMapRef.current.set(String(uploaded.log.id), uri);
+        }
+        setLogs((current) => [
+          uploaded.log,
+          ...current.filter((item) => String(item.id) !== String(uploaded.log.id)),
+        ]);
+      }
 
       if (transmissionId) {
         await stopRadioTransmission({
           channel: 'team',
           transmission_id: transmissionId,
           duration_seconds: duration,
-        });
+        }).catch(() => undefined);
       }
+
+      setActiveTransmission(null);
 
       await setAudioModeAsync({
         playsInSilentMode: true,
@@ -334,10 +412,18 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
         shouldPlayInBackground: false,
         shouldRouteThroughEarpiece: false,
         interruptionMode: 'doNotMix',
-      });
+      }).catch(() => undefined);
       await loadRadioFeed(1, true, true);
       setError('');
     } catch (radioError: any) {
+      if (transmissionId) {
+        await stopRadioTransmission({
+          channel: 'team',
+          transmission_id: transmissionId,
+          duration_seconds: duration,
+        }).catch(() => undefined);
+      }
+      setActiveTransmission(null);
       setError(radioError?.response?.data?.message || radioError?.message || 'Voice message could not be sent.');
     } finally {
       setIsActionLoading(false);
@@ -440,23 +526,21 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
       <View style={styles.card}>
         <SectionHeader title="Voice logs" />
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        {logs.length === 0 ? (
+        {voiceLogs.length === 0 ? (
           <Text style={styles.emptyText}>No voice messages yet.</Text>
         ) : (
-          logs
-            .filter((log) => log.type === 'ptt_audio')
-            .map((log) => (
-              <View key={log.id} style={styles.logItem}>
-                <View style={styles.voiceDot} />
-                <View style={styles.logCopy}>
-                  <Text style={styles.logMessage}>{log.responder_name || 'Responder'}</Text>
-                  <Text style={styles.logMeta}>{log.timestamp}</Text>
-                </View>
-                <Pressable style={styles.playButton} onPress={() => playClip(log)}>
-                  <Ionicons name={nowPlayingId === log.id ? 'volume-high' : 'play'} size={15} color={palette.navActive} />
-                </Pressable>
+          voiceLogs.map((log) => (
+            <View key={log.id} style={styles.logItem}>
+              <View style={styles.voiceDot} />
+              <View style={styles.logCopy}>
+                <Text style={styles.logMessage}>{log.responder_name || 'Responder'}</Text>
+                <Text style={styles.logMeta}>{log.timestamp}</Text>
               </View>
-            ))
+              <Pressable style={styles.playButton} onPress={() => playClip(log)}>
+                <Ionicons name={nowPlayingId === log.id ? 'volume-high' : 'play'} size={15} color={palette.navActive} />
+              </Pressable>
+            </View>
+          ))
         )}
 
         {hasMore ? (

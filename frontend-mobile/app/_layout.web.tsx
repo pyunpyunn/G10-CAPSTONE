@@ -323,6 +323,9 @@ export default function RootLayout() {
           <View style={styles.appContainer}>
             <Slot />
 
+            {/* On a real mobile phone browser (not inside the laptop's floating iPhone iframe), show the bottom sheet directly */}
+            {!isLaptopScreen && !isInsidePhoneFrame && !isStandalone && renderMobileBrowserBottomOverlay()}
+
             <StatusBar style="auto" />
           </View>
 
@@ -376,19 +379,19 @@ export default function RootLayout() {
                       },
                       style: phoneDesktopSite
                         ? {
-                            width: '1120px',
-                            height: '2050px',
-                            border: 'none',
-                            transform: 'scale(0.305)',
-                            transformOrigin: 'top left',
-                            backgroundColor: '#0f1d2d',
-                          }
+                          width: '1120px',
+                          height: '2050px',
+                          border: 'none',
+                          transform: 'scale(0.305)',
+                          transformOrigin: 'top left',
+                          backgroundColor: '#0f1d2d',
+                        }
                         : {
-                            width: '100%',
-                            height: '100%',
-                            border: 'none',
-                            backgroundColor: '#0f1d2d',
-                          },
+                          width: '100%',
+                          height: '100%',
+                          border: 'none',
+                          backgroundColor: '#0f1d2d',
+                        },
                     })}
 
                     {/* White "RESQPERATION is better on the app" card + Blue URL pill bar */}

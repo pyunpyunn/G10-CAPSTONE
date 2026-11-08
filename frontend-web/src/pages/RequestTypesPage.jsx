@@ -294,12 +294,6 @@ export default function RequestTypesPage() {
 
       {/* Shared TanStack DataFilterBar */}
       <DataFilterBar
-        search={search}
-        onSearchChange={(value) => {
-          setSearch(value)
-          setPage(1)
-        }}
-        searchPlaceholder="Search request types by name, SKU, or depot..."
         filters={filtersConfig}
         onReset={handleResetFilters}
       />

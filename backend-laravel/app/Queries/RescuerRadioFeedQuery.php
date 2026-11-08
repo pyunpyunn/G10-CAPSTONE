@@ -40,15 +40,18 @@ class RescuerRadioFeedQuery
         $page = max(1, (int) ($validated['page'] ?? 1));
         $perPage = min(20, max(1, (int) ($validated['per_page'] ?? 5)));
         $radioRows = $this->radioRowsForScope($responder, 150);
-        $logs = $this->radioPresenter->logs($radioRows)
+        $allChannelLogs = $this->radioPresenter->logs($radioRows)
             ->filter(fn (array $log): bool => ($log['channel'] ?? 'team') === $channel)
+            ->values();
+        $logs = $allChannelLogs
+            ->reject(fn (array $log): bool => in_array($log['type'] ?? '', ['ptt_start', 'ptt_heartbeat', 'ptt_end'], true))
             ->values();
         $total = $logs->count();
         $pageIds = $logs->forPage($page, $perPage)->pluck('communication_id')->map(fn ($id): string => (string) $id);
         $items = $radioRows
             ->filter(fn (object $row): bool => $pageIds->contains((string) $row->communication_id))
             ->values();
-        $activeTransmission = $this->activeRadioTransmission($responder, $logs);
+        $activeTransmission = $this->activeRadioTransmission($responder, $allChannelLogs);
 
         return [
             'channel' => $channel,

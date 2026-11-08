@@ -316,7 +316,8 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  align-self: center;
+  align-self: end;
+  min-height: 42px;
   gap: 6px;
   color: var(--color-text-3, #64748b);
   font-size: 11px;
@@ -335,10 +336,11 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
+  align-self: end;
   justify-content: center;
-  min-height: 38px;
+  min-height: 42px;
   gap: 6px;
-  padding: 0 9px;
+  padding: 0 11px;
   border: 1px solid transparent;
   border-radius: 7px;
   color: var(--color-nav-active, #244d71);
@@ -505,7 +507,8 @@
 }
 
 .app-page-heading .data-filter-search,
-.app-page-heading .data-filter-field select {
+.app-page-heading .data-filter-field select,
+.app-page-heading .data-filter-reset {
   min-height: 38px;
 }
 

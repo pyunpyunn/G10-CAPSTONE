@@ -142,6 +142,7 @@ class RescuerRadioWorkflow
 
         $validated = $request->validate([
             'channel' => ['required', Rule::in(['command', 'team', 'event'])],
+            'transmission_id' => ['nullable', 'string', 'max:80'],
             'assignment_id' => ['nullable', 'integer'],
             'duration_seconds' => ['nullable', 'integer', 'min:0', 'max:600'],
             'audio' => ['required', 'file', 'max:15360'],
@@ -159,9 +160,11 @@ class RescuerRadioWorkflow
         }
 
         $file = $request->file('audio');
-        $transmissionId = 'PTT-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(5));
+        $transmissionId = ! empty($validated['transmission_id'])
+            ? (string) $validated['transmission_id']
+            : ('PTT-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(5)));
         $extension = strtolower($file->getClientOriginalExtension() ?: 'm4a');
-        $safeExtension = in_array($extension, ['m4a', 'mp4', 'aac', 'wav', 'mp3', 'webm'], true) ? $extension : 'm4a';
+        $safeExtension = in_array($extension, ['m4a', 'mp4', 'aac', 'wav', 'mp3', 'webm', 'ogg'], true) ? $extension : 'm4a';
         $path = $file->storeAs(
             'radio-ptt/' . now()->format('Y/m/d'),
             $transmissionId . '.' . $safeExtension,

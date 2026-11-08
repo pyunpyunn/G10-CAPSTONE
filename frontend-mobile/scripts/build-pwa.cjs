@@ -74,13 +74,17 @@ self.addEventListener('fetch', event => {
         .catch(() => caches.open(CACHE).then(cache => cache.match('/index.html')))
     );
   } else if (asset) {
-    event.respondWith(caches.open(CACHE).then(async cache => {
-      const saved = await cache.match(asset);
-      if (saved) return saved;
-      const response = await fetch(request);
-      if (response.ok) await cache.put(asset, response.clone());
-      return response;
-    }));
+    event.respondWith(
+      fetch(request)
+        .then(async response => {
+          if (response && response.ok) {
+            const cache = await caches.open(CACHE);
+            await cache.put(asset, response.clone());
+          }
+          return response;
+        })
+        .catch(() => caches.open(CACHE).then(cache => cache.match(asset)))
+    );
   }
 });
 `);

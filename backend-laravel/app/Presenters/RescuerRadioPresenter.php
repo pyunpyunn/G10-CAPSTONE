@@ -81,21 +81,36 @@ class RescuerRadioPresenter
     public function activeTransmission(object $responder, Collection $logs): ?array
     {
         $recentLogs = $logs
-            ->filter(fn (array $log): bool => in_array($log['type'], ['ptt_start', 'ptt_heartbeat', 'ptt_end'], true))
+            ->filter(fn (array $log): bool => in_array($log['type'], ['ptt_start', 'ptt_heartbeat', 'ptt_end', 'ptt_audio'], true))
             ->values();
 
         $endedIds = $recentLogs
-            ->where('type', 'ptt_end')
+            ->filter(fn (array $log): bool => in_array($log['type'], ['ptt_end', 'ptt_audio'], true))
             ->pluck('transmission_id')
             ->filter()
             ->unique()
             ->all();
 
+        $latestByResponder = [];
+        foreach ($recentLogs as $log) {
+            $respId = (string) ($log['responder_id'] ?? '');
+            if ($respId !== '' && ! isset($latestByResponder[$respId])) {
+                $latestByResponder[$respId] = $log['type'];
+            }
+        }
+
         $latestOpen = $recentLogs
             ->filter(fn (array $log): bool => in_array($log['type'], ['ptt_start', 'ptt_heartbeat'], true))
-            ->first(fn (array $log): bool => $log['transmission_id'] && ! in_array($log['transmission_id'], $endedIds, true));
+            ->first(function (array $log) use ($endedIds, $latestByResponder): bool {
+                $respId = (string) ($log['responder_id'] ?? '');
+                if ($respId !== '' && in_array($latestByResponder[$respId] ?? '', ['ptt_end', 'ptt_audio'], true)) {
+                    return false;
+                }
 
-        if (! $latestOpen || now()->diffInSeconds(Carbon::parse($latestOpen['raw_timestamp'])) > 12) {
+                return $log['transmission_id'] && ! in_array($log['transmission_id'], $endedIds, true);
+            });
+
+        if (! $latestOpen || abs(now()->diffInSeconds(Carbon::parse($latestOpen['raw_timestamp']))) > 12) {
             return null;
         }
 
