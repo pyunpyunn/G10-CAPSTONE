@@ -1,1 +1,0 @@
-import{tt as e}from"./index-BasAMqlL.js";var t=e();function n({inline:e=!1}){return(0,t.jsxs)(`div`,{className:`page-loading-card ${e?`inline`:``}`,role:`status`,"aria-live":`polite`,children:[(0,t.jsx)(`div`,{className:`page-loading-spinner`,"aria-hidden":`true`}),(0,t.jsx)(`div`,{className:`page-loading-title`,children:`Loading...`})]})}export{n as t};

@@ -1,1 +1,0 @@
-import{d as e,tt as t}from"./index-BasAMqlL.js";var n=t();function r({status:t}){return(0,n.jsx)(`span`,{className:`bg`,style:{"--c":e(t?.key)},children:t?.label||`Status unavailable`})}export{r as t};

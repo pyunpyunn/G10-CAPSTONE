@@ -1,1 +1,0 @@
-import{d as e,tt as t}from"./index-BasAMqlL.js";var n=t();function r({tone:t=`gray`,children:r}){return(0,n.jsx)(`span`,{className:`badge b-${t}`,style:{"--status-color":e(t)},children:r})}export{r as t};

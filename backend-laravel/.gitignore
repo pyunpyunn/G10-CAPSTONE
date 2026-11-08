@@ -15,6 +15,7 @@
 /auth.json
 /node_modules
 /public/storage
+/public/frontend-web
 /storage/*.key
 /storage/**/*.sql
 /storage/pail

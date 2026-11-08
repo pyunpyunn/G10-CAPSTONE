@@ -1,1 +1,0 @@
-import{T as e,nt as t,tt as n}from"./index-BasAMqlL.js";var r=n();function i({id:n,children:i}){return n==null||n===``?i:(0,r.jsx)(t,{className:`personnel-name-link`,...e(n),onClick:e=>e.stopPropagation(),children:i})}export{i as t};
