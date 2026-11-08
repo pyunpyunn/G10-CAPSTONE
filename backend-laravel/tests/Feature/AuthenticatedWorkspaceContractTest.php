@@ -418,16 +418,66 @@ class AuthenticatedWorkspaceContractTest extends TestCase
             $table->string('event_id')->nullable();
             $table->integer('type_id');
         });
+        Schema::table('severity_levels', function (Blueprint $table): void {
+            $table->string('severity_desc')->nullable();
+        });
+        Schema::create('disaster_type_severity_levels', function (Blueprint $table): void {
+            $table->integer('type_id');
+            $table->integer('severity_id');
+            $table->primary(['type_id', 'severity_id']);
+        });
 
-        $response = $this->postJson('/api/v1/disaster-types', ['name' => 'Tsunami'])
+        $response = $this->postJson('/api/v1/disaster-types', [
+            'name' => 'Tsunami',
+            'severity_levels' => [
+                ['label' => 'Extreme', 'description' => 'Severe coastal flood'],
+                ['label' => 'High', 'description' => 'Coastal flooding.'],
+            ],
+        ])
             ->assertCreated()
-            ->assertJsonPath('data.created_type.type_name', 'Tsunami');
+            ->assertJsonPath('data.created_type.type_name', 'Tsunami')
+            ->assertJsonFragment(['severity_label' => 'Extreme', 'severity_desc' => 'Severe coastal flood'])
+            ->assertJsonFragment(['severity_label' => 'High', 'severity_desc' => 'Coastal flooding.']);
         $typeId = $response->json('data.created_type.type_id');
+        $severityId = DB::table('severity_levels')->where('severity_label', 'Extreme')->value('severity_id');
         $this->assertDatabaseHas('disaster_types', ['type_id' => $typeId, 'type_name' => 'Tsunami']);
         $this->assertDatabaseHas('disaster_event_types', ['type_id' => $typeId, 'event_id' => null]);
+        $this->assertDatabaseHas('severity_levels', [
+            'severity_id' => $severityId,
+            'severity_label' => 'Extreme',
+            'severity_desc' => 'Severe coastal flood',
+        ]);
+        $this->assertDatabaseHas('disaster_type_severity_levels', ['type_id' => $typeId, 'severity_id' => $severityId]);
+        $this->assertSame(2, DB::table('disaster_type_severity_levels')->where('type_id', $typeId)->count());
 
+        $this->postJson('/api/v1/disaster-types', [
+            'name' => 'Cyclone',
+            'severity_levels' => [['label' => str_repeat('A', 21), 'description' => 'Description.']],
+        ])->assertUnprocessable();
+        $this->assertDatabaseMissing('disaster_types', ['type_name' => 'Cyclone']);
+
+        $this->postJson('/api/v1/disaster-types', [
+            'name' => 'Storm',
+            'severity_levels' => [['label' => 'High', 'description' => str_repeat('D', 21)]],
+        ])->assertUnprocessable();
+        $this->assertDatabaseMissing('disaster_types', ['type_name' => 'Storm']);
+
+        $this->postJson('/api/v1/disaster-types', [
+            'name' => 'Tornado',
+            'severity_levels' => array_fill(0, 11, ['label' => 'Level', 'description' => 'Description.']),
+        ])->assertUnprocessable();
+        $this->assertDatabaseMissing('disaster_types', ['type_name' => 'Tornado']);
+
+        $createdSeverityIds = DB::table('disaster_type_severity_levels')
+            ->where('type_id', $typeId)
+            ->pluck('severity_id')
+            ->all();
         $this->deleteJson('/api/v1/disaster-types/'.$typeId)->assertOk();
         $this->assertDatabaseMissing('disaster_types', ['type_id' => $typeId]);
+        $this->assertDatabaseMissing('disaster_type_severity_levels', ['type_id' => $typeId]);
+        foreach ($createdSeverityIds as $createdSeverityId) {
+            $this->assertDatabaseMissing('severity_levels', ['severity_id' => $createdSeverityId]);
+        }
     }
 
     public function test_deleting_disaster_type_removes_catalog_and_link_but_preserves_event(): void

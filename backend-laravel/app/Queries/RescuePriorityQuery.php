@@ -120,8 +120,25 @@ class RescuePriorityQuery
             ? DB::table('disaster_events')->where('event_id', $eventId)->value('rescue_priority_version')
             : null;
 
-        return ($version ? RescuePrioritySetting::query()->find($version) : null)
-            ?? RescuePrioritySetting::query()->orderByDesc('version')->firstOrFail();
+        $settings = ($version ? RescuePrioritySetting::query()->find($version) : null)
+            ?? RescuePrioritySetting::query()->orderByDesc('version')->first();
+
+        if ($settings) {
+            return $settings;
+        }
+
+        $settings = new RescuePrioritySetting([
+            'impact_weight' => 30,
+            'vulnerability_weight' => 30,
+            'unreported_weight' => 25,
+            'no_contact_weight' => 15,
+            'high_percent' => config('rescue_priority.high_percent', 40),
+            'medium_percent' => config('rescue_priority.medium_percent', 20),
+            'deploy_first_percent' => config('rescue_priority.deploy_first_percent', 20),
+        ]);
+        $settings->version = 0;
+
+        return $settings;
     }
 
     public function contactMissingExpression(): string

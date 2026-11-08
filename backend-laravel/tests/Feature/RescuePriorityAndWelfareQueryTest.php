@@ -686,6 +686,19 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
         $this->assertSame(2, (int) DB::table('rescue_criteria_line_snapshots')->value('vulnerable_total'));
     }
 
+    public function test_missing_priority_settings_fall_back_to_default_weights(): void
+    {
+        DB::table('rescue_priority_settings')->delete();
+        $settings = app(RescuePriorityQuery::class)->settingsForEvent('EVT-1');
+
+        $this->assertSame(0, (int) $settings->version);
+        $this->assertSame(30, (int) $settings->impact_weight);
+        $this->assertSame(30, (int) $settings->vulnerability_weight);
+        $this->assertSame(25, (int) $settings->unreported_weight);
+        $this->assertSame(15, (int) $settings->no_contact_weight);
+        $this->assertSame(0, DB::table('rescue_priority_settings')->count());
+    }
+
     public function test_live_timeline_saves_only_changed_measurements(): void
     {
         $this->registerFixturePuroks();

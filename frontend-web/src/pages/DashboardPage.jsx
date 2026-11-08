@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getDashboard } from '../api/dashboardApi'
 import DashboardMainContent from '../components/dashboard/DashboardMainContent'
 import DashboardOverview from '../components/dashboard/DashboardOverview'
-import LoadingState from '../components/ui/LoadingState'
+import DashboardSkeleton from '../components/dashboard/DashboardSkeleton'
 import { useModuleData } from '../utils/useModuleData'
 
 export default function DashboardPage() {
@@ -28,7 +28,7 @@ export default function DashboardPage() {
 
   return (
     <section className="page active">
-      {isLoading && <LoadingState />}
+      {isLoading && <DashboardSkeleton />}
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && !error && dashboard && (

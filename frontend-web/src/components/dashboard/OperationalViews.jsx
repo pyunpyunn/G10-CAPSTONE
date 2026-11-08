@@ -60,7 +60,11 @@ function StatusView({ title, totalLabel, total, bars, view, onOpen, progressValu
         </div>
       </div>
       <dl className="dashboard-status-numbers">
-        {bars.map((bar) => <div key={bar.label} className={Number(bar.value || 0) ? '' : 'is-zero'} style={{ '--status-color': colors[bar.class_name] || '#64748b' }}><dt><i style={{ background: colors[bar.class_name] }} />{bar.label}</dt><dd>{Number(bar.value || 0).toLocaleString()}</dd></div>)}
+        {bars.map((bar) => {
+          const value = Number(bar.value || 0)
+          const highlighted = value > 0 && ['unsafe', 'on-scene'].includes(bar.class_name)
+          return <div key={bar.label} className={`${value ? '' : 'is-zero'} ${highlighted ? 'is-highlighted' : ''}`} style={{ '--status-color': colors[bar.class_name] || '#64748b' }}><dt><i style={{ background: colors[bar.class_name] || '#64748b' }} />{bar.label}</dt><dd>{value.toLocaleString()}</dd></div>
+        })}
       </dl>
     </div> : <>
       {(view === 'pie' && hasChartData && bars.some((bar) => bar.class_name === 'safe-total')) && <dl className="dashboard-status-numbers">

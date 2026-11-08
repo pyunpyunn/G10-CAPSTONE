@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
-import { ArrowLeft, Radio, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Plus, Radio, Trash2 } from 'lucide-react'
 
 import { createBroadcast, createDisasterEvent, createDisasterType, createStatusOption, deleteDisasterType, deleteStatusOption, getBroadcastWorkspace, updateDisasterEvent } from '../api/broadcastApi'
 
@@ -11,9 +11,9 @@ import { closeActiveEvent } from '../api/dashboardApi'
 
 import BroadcastComposeForm from '../components/broadcast/BroadcastComposeForm'
 
-import CloseActiveEventModal from '../components/broadcast/CloseActiveEventModal'
+import BroadcastSkeleton from '../components/broadcast/BroadcastSkeleton'
 
-import LoadingState from '../components/ui/LoadingState'
+import CloseActiveEventModal from '../components/broadcast/CloseActiveEventModal'
 
 import Modal from '../components/ui/Modal'
 
@@ -71,6 +71,12 @@ export default function BroadcastPage() {
 
   const [catalogName, setCatalogName] = useState('')
 
+  const [catalogSeverityLevels, setCatalogSeverityLevels] = useState([{ label: '', description: '' }])
+
+  const [catalogMode, setCatalogMode] = useState('add')
+
+  const [expandedCatalogTypes, setExpandedCatalogTypes] = useState({})
+
   const [catalogSafety, setCatalogSafety] = useState('unsafe')
 
   const [isCatalogSaving, setIsCatalogSaving] = useState(false)
@@ -93,7 +99,9 @@ export default function BroadcastPage() {
 
     let nextAreas = []
 
-    let nextStatuses = []
+    let nextStatuses = Array.isArray(currentWorkspace?.status_options)
+      ? currentWorkspace.status_options.slice(0, 4).map((option) => option.key)
+      : []
 
 
 
@@ -226,6 +234,13 @@ export default function BroadcastPage() {
   const puroks = workspace?.puroks || []
 
   const statusOptions = workspace?.status_options || []
+
+  const duplicateCatalogTypeName = catalogName.trim() && disasterTypes.some((item) => item.type_name.trim().toLowerCase() === catalogName.trim().toLowerCase())
+
+  const duplicateCatalogSeverityLabel = catalogSeverityLevels.some((level, index) => {
+    const label = level.label.trim().toLowerCase()
+    return label && catalogSeverityLevels.some((other, otherIndex) => otherIndex !== index && other.label.trim().toLowerCase() === label)
+  })
 
   const deliveryEventId = activeEvent?.event_id
 
@@ -433,6 +448,20 @@ export default function BroadcastPage() {
 
     }
 
+    if (!form.severity_id) {
+      setFormError('Choose a severity.')
+
+      return
+
+    }
+
+    if (!/^\d{1,3}\s*(hours?|days?)$/i.test(String(form.estimated_duration || '').trim())) {
+      setFormError('Enter an estimated duration.')
+
+      return
+
+    }
+
 
 
     if (!form.broadcast_title.trim() || form.broadcast_title.length > 50 || !form.message.trim() || form.message.length > 50) {
@@ -475,7 +504,7 @@ export default function BroadcastPage() {
 
           type_id: form.type_id,
 
-          severity_level_id: form.severity_id || null,
+          severity_level_id: form.severity_id,
 
         })
 
@@ -489,7 +518,7 @@ export default function BroadcastPage() {
 
           type_id: form.type_id,
 
-          severity_level_id: form.severity_id || null,
+          severity_level_id: form.severity_id,
 
         })
 
@@ -507,7 +536,7 @@ export default function BroadcastPage() {
 
         message: form.message,
 
-        severity_id: form.severity_id || null,
+        severity_id: form.severity_id,
 
         scope_type: form.scope_type,
 
@@ -587,6 +616,12 @@ export default function BroadcastPage() {
 
     setCatalogName('')
 
+    setCatalogSeverityLevels([{ label: '', description: '' }])
+
+    setCatalogMode('add')
+
+    setExpandedCatalogTypes({})
+
     setFormError('')
 
     setIsCatalogOpen(true)
@@ -615,17 +650,40 @@ export default function BroadcastPage() {
 
       } else {
 
-        const result = await createDisasterType({ name: catalogName.trim() })
+        const result = await createDisasterType({
+          name: catalogName.trim(),
+          severity_levels: catalogSeverityLevels.map((level) => ({
+            label: level.label.trim(),
+            description: level.description.trim(),
+          })),
+        })
 
-        setWorkspace((current) => current ? { ...current, disaster_types: result.disaster_types || current.disaster_types } : current)
+        setWorkspace((current) => current ? {
+          ...current,
+          disaster_types: result.disaster_types || current.disaster_types,
+          severity_levels: result.severity_levels || current.severity_levels,
+        } : current)
 
-        if (result.created_type?.type_id) setForm((current) => ({ ...current, type_id: String(result.created_type.type_id) }))
+        if (result.created_type?.type_id) {
+          const createdType = result.disaster_types?.find((item) => String(item.type_id) === String(result.created_type.type_id))
+          setForm((current) => ({
+            ...current,
+            type_id: String(result.created_type.type_id),
+            severity_id: String(createdType?.severity_ids?.[0] || ''),
+          }))
+        }
 
         setFormError('Disaster type added.')
+
+        setCatalogMode('saved')
+
+        if (result.created_type?.type_id) setExpandedCatalogTypes((current) => ({ ...current, [result.created_type.type_id]: true }))
 
       }
 
       setCatalogName('')
+
+      setCatalogSeverityLevels([{ label: '', description: '' }])
 
     } catch (saveError) {
 
@@ -665,9 +723,20 @@ export default function BroadcastPage() {
 
         setWorkspace((current) => current ? { ...current, disaster_types: result.disaster_types || current.disaster_types } : current)
 
+        setExpandedCatalogTypes((current) => {
+          const next = { ...current }
+          delete next[pendingCatalogDelete.id]
+          return next
+        })
+
         if (String(form.type_id) === String(pendingCatalogDelete.id)) {
 
-          setForm((current) => ({ ...current, type_id: String(result.disaster_types?.[0]?.type_id || '') }))
+          const nextType = result.disaster_types?.[0]
+          setForm((current) => ({
+            ...current,
+            type_id: String(nextType?.type_id || ''),
+            severity_id: String(nextType?.severity_ids?.[0] || ''),
+          }))
 
         }
 
@@ -733,7 +802,7 @@ export default function BroadcastPage() {
 
 
 
-      {isLoading && <LoadingState />}
+      {isLoading && <BroadcastSkeleton />}
 
       {error && <div className="form-error">{error}</div>}
 
@@ -847,75 +916,133 @@ export default function BroadcastPage() {
 
         title={catalogKind === 'statuses' ? 'Manage household statuses' : 'Manage disaster types'}
 
+        className={`bc-catalog-modal${catalogMode === 'add' ? ' bc-catalog-add-mode' : ''}`}
+
         isOpen={isCatalogOpen}
 
         onClose={() => !isCatalogSaving && setIsCatalogOpen(false)}
 
-        footer={(
-
+        footer={catalogMode === 'add' && (
           <>
-
-            <button className="btn btn-secondary btn-sm" type="button" disabled={isCatalogSaving} onClick={() => setIsCatalogOpen(false)}>Close</button>
-
-            <button className="btn btn-primary btn-sm" type="submit" form="bc-catalog-form" disabled={isCatalogSaving || !catalogName.trim()}>{isCatalogSaving ? 'Saving...' : catalogKind === 'statuses' ? 'Add status' : 'Add disaster type'}</button>
-
+            {catalogKind === 'statuses' && (
+              <button className="bc-catalog-view-toggle" type="button" onClick={() => { setCatalogMode('saved'); setFormError(''); setPendingCatalogDelete(null) }}>
+                View Status Types
+              </button>
+            )}
+            {catalogKind === 'types' && (
+              <button className="bc-catalog-view-toggle" type="button" onClick={() => { setCatalogMode('saved'); setFormError(''); setPendingCatalogDelete(null) }}>
+                View saved disaster types <span className="bc-catalog-count">{disasterTypes.length}</span>
+              </button>
+            )}
+            <button className="btn btn-primary btn-sm" type="submit" form="bc-catalog-form" disabled={isCatalogSaving || !catalogName.trim() || (catalogKind === 'types' && (!catalogSeverityLevels.every((level) => level.label.trim() && level.description.trim()) || duplicateCatalogTypeName || duplicateCatalogSeverityLabel))}>{isCatalogSaving ? 'Saving...' : catalogKind === 'statuses' ? 'Add status' : 'Add disaster type'}</button>
           </>
-
         )}
 
       >
 
-        <div className="bc-catalog-manager">
+        {catalogKind === 'types' ? (
+          <div className="bc-catalog-manager bc-disaster-catalog">
+            {catalogMode === 'saved' && (
+              <div className="bc-catalog-toolbar">
+                <p>Saved disaster types <span className="bc-catalog-count">{disasterTypes.length}</span></p>
+                <button className="bc-catalog-view-toggle" type="button" onClick={() => { setCatalogMode('add'); setFormError(''); setPendingCatalogDelete(null) }}><ArrowLeft size={14} /> Add disaster type</button>
+              </div>
+            )}
 
-          <p>{catalogKind === 'statuses' ? 'Saved household status options' : 'Saved disaster types'}</p>
+            {formError && <p className="bc-catalog-message" role="status">{formError}</p>}
 
-          <div className="bc-catalog-list">
-
-            {(catalogKind === 'statuses' ? statusOptions : disasterTypes).map((item) => {
-
-              const itemKey = catalogKind === 'statuses' ? item.key : item.type_id
-
-              const itemLabel = catalogKind === 'statuses' ? item.label : item.type_name
-
-              return (
-
-                <div className="bc-catalog-row" key={itemKey}>
-
-                  <span>{itemLabel}</span>
-
-                  <button
-
-                    type="button"
-
-                    className="bc-catalog-delete"
-
-                    aria-label={`Delete ${itemLabel}`}
-
-                    disabled={isCatalogSaving}
-
-                    onClick={() => setPendingCatalogDelete({ kind: catalogKind, key: item.key, id: item.type_id, label: itemLabel })}
-
-                  ><Trash2 size={15} /></button>
-
+            {catalogMode === 'add' ? (
+              <form id="bc-catalog-form" onSubmit={handleAddCatalogItem} className="bc-disaster-type-form">
+                <div className="bc-disaster-name-field">
+                  <label htmlFor="bc-disaster-type-name">Disaster Type Name <em>*</em></label>
+                  <input id="bc-disaster-type-name" autoFocus value={catalogName} maxLength={100} onChange={(event) => setCatalogName(event.target.value)} required />
+                  {duplicateCatalogTypeName && <small className="bc-catalog-field-error">This disaster type already exists.</small>}
                 </div>
-
-              )
-
-            })}
-
-            {(catalogKind === 'statuses' ? statusOptions : disasterTypes).length === 0 && <div className="bc-catalog-empty">No saved items.</div>}
-
+                <div className="bc-severity-section">
+                  <div className="bc-severity-section-heading">
+                    <strong>Severity levels</strong>
+                    <button className="bc-add-severity" type="button" aria-label="Add severity level" title="Add severity level" disabled={catalogSeverityLevels.length >= 10} onClick={() => setCatalogSeverityLevels((current) => [...current, { label: '', description: '' }])}><Plus size={17} /></button>
+                  </div>
+                  <div className="bc-severity-grid bc-severity-grid-heading"><span>Severity level label</span><span>Severity description</span><span /></div>
+                  <div className="bc-severity-rows">
+                    {catalogSeverityLevels.map((level, index) => {
+                      const duplicateLabel = Boolean(level.label.trim()) && catalogSeverityLevels.some((other, otherIndex) => otherIndex !== index && other.label.trim().toLowerCase() === level.label.trim().toLowerCase())
+                      return (
+                        <div className="bc-severity-grid bc-severity-entry" key={index}>
+                          <div>
+                            <input value={level.label} maxLength={20} placeholder="e.g. Level 1" aria-label={`Severity level label ${index + 1}`} onChange={(event) => setCatalogSeverityLevels((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} required />
+                            {duplicateLabel && <small className="bc-catalog-field-error">Label already used.</small>}
+                          </div>
+                          <div className="bc-severity-description-field">
+                            <textarea value={level.description} maxLength={20} placeholder="Describe this severity level" aria-label={`Severity description ${index + 1}`} onChange={(event) => setCatalogSeverityLevels((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} required />
+                            <small className="bc-severity-character-count">{level.description.length}/20</small>
+                          </div>
+                          <button className="bc-remove-severity" type="button" aria-label={`Remove severity level ${index + 1}`} hidden={catalogSeverityLevels.length < 2} onClick={() => setCatalogSeverityLevels((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={15} /></button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <div className="bc-disaster-type-list">
+                {disasterTypes.length ? disasterTypes.map((item) => {
+                  const itemLevels = severityLevels.filter((level) => (item.severity_ids || []).some((id) => String(id) === String(level.severity_id)))
+                  const expanded = Boolean(expandedCatalogTypes[item.type_id])
+                  const pendingDelete = pendingCatalogDelete?.kind === 'types' && String(pendingCatalogDelete.id) === String(item.type_id)
+                  return (
+                    <div className={`bc-disaster-type-row${pendingDelete ? ' is-highlighted' : ''}`} key={item.type_id}>
+                      <div className="bc-disaster-type-row-head">
+                        <button className="bc-disaster-type-expand" type="button" aria-expanded={expanded} onClick={() => setExpandedCatalogTypes((current) => ({ ...current, [item.type_id]: !current[item.type_id] }))}>
+                          <ChevronRight className={expanded ? 'is-expanded' : ''} size={15} />
+                          <strong>{item.type_name}</strong>
+                        </button>
+                        {pendingDelete ? (
+                          <div className="bc-inline-delete-confirm">
+                            <span>Delete?</span>
+                            <button className="btn btn-secondary btn-sm" type="button" disabled={isCatalogSaving} onClick={() => setPendingCatalogDelete(null)}>Cancel</button>
+                            <button className="btn btn-warning btn-sm" type="button" disabled={isCatalogSaving} onClick={confirmDeleteCatalogItem}>{isCatalogSaving ? 'Deleting...' : 'Delete'}</button>
+                          </div>
+                        ) : (
+                          <button className="bc-catalog-delete" type="button" aria-label={`Delete ${item.type_name}`} disabled={isCatalogSaving} onClick={() => setPendingCatalogDelete({ kind: 'types', id: item.type_id, label: item.type_name })}><Trash2 size={15} /></button>
+                        )}
+                      </div>
+                      {expanded && <ul className="bc-disaster-severity-list">{itemLevels.map((level) => <li key={level.severity_id}><strong>{level.severity_label}</strong><span>{level.severity_desc || 'No description provided.'}</span></li>)}</ul>}
+                    </div>
+                  )
+                }) : <div className="bc-catalog-empty">No saved disaster types.</div>}
+              </div>
+            )}
           </div>
+        ) : (
+        <div className="bc-catalog-manager bc-status-catalog">
+          {catalogMode === 'saved' && (
+            <div className="bc-catalog-toolbar">
+              <p>Saved household status options</p>
+              <button className="bc-catalog-view-toggle" type="button" onClick={() => { setCatalogMode('add'); setFormError(''); setPendingCatalogDelete(null) }}><ArrowLeft size={14} /> Add household status</button>
+            </div>
+          )}
 
-          <form id="bc-catalog-form" onSubmit={handleAddCatalogItem} className="bc-add-status-form">
+          {formError && <p className="bc-catalog-message" role="status">{formError}</p>}
 
-            <label><span>{catalogKind === 'statuses' ? 'New status name' : 'New disaster type name'}</span><input autoFocus value={catalogName} maxLength={catalogKind === 'statuses' ? 16 : 100} onChange={(event) => setCatalogName(event.target.value)} required /></label>
-
-            {catalogKind === 'statuses' && <label><span>Record reports as</span><select value={catalogSafety} onChange={(event) => setCatalogSafety(event.target.value)} required><option value="safe">Safe</option><option value="unsafe">Unsafe</option></select></label>}
-
-          </form>
-
+          {catalogMode === 'add' ? (
+            <form id="bc-catalog-form" onSubmit={handleAddCatalogItem} className="bc-add-status-form">
+              <label><span>New status name</span><input autoFocus value={catalogName} maxLength={16} onChange={(event) => setCatalogName(event.target.value)} required /></label>
+              <label><span>Record reports as</span><select value={catalogSafety} onChange={(event) => setCatalogSafety(event.target.value)} required><option value="safe">Safe</option><option value="unsafe">Unsafe</option></select></label>
+            </form>
+          ) : (
+            <div className="bc-catalog-list">
+              {statusOptions.map((item) => (
+                <div className="bc-catalog-row" key={item.key}>
+                  <span>{item.label}</span>
+                  <button type="button" className="bc-catalog-delete" aria-label={`Delete ${item.label}`} disabled={isCatalogSaving} onClick={() => setPendingCatalogDelete({ kind: 'statuses', key: item.key, label: item.label })}><Trash2 size={15} /></button>
+                </div>
+              ))}
+              {statusOptions.length === 0 && <div className="bc-catalog-empty">No saved household statuses.</div>}
+            </div>
+          )}
         </div>
+        )}
 
       </Modal>
 
@@ -925,7 +1052,7 @@ export default function BroadcastPage() {
 
         title="Confirm deletion"
 
-        isOpen={Boolean(pendingCatalogDelete)}
+        isOpen={pendingCatalogDelete?.kind === 'statuses'}
 
         onClose={() => !isCatalogSaving && setPendingCatalogDelete(null)}
 

@@ -8,6 +8,8 @@ use App\Services\Web\SituationReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ReportExchangeTest extends TestCase
@@ -32,7 +34,9 @@ class ReportExchangeTest extends TestCase
     public function test_partner_contract_declares_v4_and_rejects_unversioned_or_v2_requests(): void
     {
         $this->withHeader('X-API-KEY','exchange-secret')->postJson('/api/v1/external/reports/handshake')
-            ->assertOk()->assertJsonPath('api_version','4.0')->assertJsonMissingPath('situation_sections.III')->assertJsonPath('situation_sections.VI','Status of Evacuation Centers');
+            ->assertOk()->assertJsonPath('api_version','4.0')->assertJsonPath('situation_requires_review', false)
+            ->assertJsonPath('automatic_acceptance', true)->assertJsonMissingPath('situation_sections.III')
+            ->assertJsonPath('situation_sections.VI','Status of Evacuation Centers');
         foreach ([[],['api_version'=>'2.0']] as $version) {
             $this->withHeader('X-API-KEY','exchange-secret')->postJson('/api/v1/external/report-requests',$version+[
                 'source_system'=>'safetrack','event_id'=>'EV-1','sitio_id'=>'all','included_sections'=>['I'],
@@ -44,9 +48,11 @@ class ReportExchangeTest extends TestCase
     public function test_v4_accepts_six_sections_and_rejects_a_seventh(): void
     {
         $keys=array_keys(\App\Support\SituationReportSections::LABELS);
+        $this->mockSituationSummary();
         $result=$this->submit(['included_sections'=>$keys]);
         $this->assertSame($keys,json_decode(DB::table('external_report_requests')->where('id',$result['request_id'])->value('sections'),true));
         $this->assertSame('4.0',DB::table('external_report_requests')->where('id',$result['request_id'])->value('api_version'));
+        $this->assertSame('accepted',DB::table('external_report_requests')->where('id',$result['request_id'])->value('status'));
         $this->withHeader('X-API-KEY','exchange-secret')->postJson('/api/v1/external/report-requests',[
             'api_version'=>'4.0','source_system'=>'evatrack','event_id'=>'EV-1','sitio_id'=>'all','included_sections'=>[...$keys,'III'],
             'format'=>'csv','purpose'=>'Planning',
@@ -55,7 +61,7 @@ class ReportExchangeTest extends TestCase
 
     public function test_old_pending_requests_require_resubmission(): void
     {
-        $result=$this->submit();
+        $result=$this->submitPending();
         DB::table('external_report_requests')->where('id',$result['request_id'])->update(['api_version'=>'2.0']);
         try { $this->decision($result['request_id'],['decision'=>'accepted']); $this->fail('Must reject retired section meanings.'); }
         catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(422,$e->getStatusCode()); }
@@ -64,7 +70,7 @@ class ReportExchangeTest extends TestCase
 
     public function test_acceptance_freezes_findings_entries_and_leaves_chair_signature_blank(): void
     {
-        $result=$this->submit(['included_sections'=>array_keys(\App\Support\SituationReportSections::LABELS)]);
+        $result=$this->submitPending(['included_sections'=>array_keys(\App\Support\SituationReportSections::LABELS)]);
         $this->mock(SituationReportService::class,fn ($mock)=>$mock->shouldReceive('eventSummary')->with('EV-1')->once()->andReturn(response()->json(['data'=>['summary'=>[
             'schema_version'=>'4.0','event'=>['event_id'=>'EV-1','name'=>'Flood'],
             'report'=>['approved_by'=>'Must not be copied'],
@@ -88,7 +94,37 @@ class ReportExchangeTest extends TestCase
         return $this->withHeader('X-API-KEY', 'exchange-secret')->postJson('/api/v1/external/report-requests', array_merge([
             'api_version'=>'4.0', 'source_system' => 'evatrack', 'included_sections' => ['II'], 'format' => 'csv',
             'purpose' => 'Plan relief distribution by sitio and purok.', 'event_id' => 'EV-1', 'reference' => 'EVA-42', 'sitio_id' => 'all',
-        ], $overrides))->assertStatus(202)->json();
+        ], $overrides))->assertCreated()->assertJsonPath('status', 'accepted')->json();
+    }
+
+    private function submitPending(array $overrides = []): array
+    {
+        $data = array_merge([
+            'api_version'=>'4.0', 'source_system' => 'evatrack', 'included_sections' => ['II'], 'format' => 'csv',
+            'purpose' => 'Plan relief distribution by sitio and purok.', 'event_id' => 'EV-1', 'reference' => 'EVA-42', 'sitio_id' => 'all',
+        ], $overrides);
+        $id = (string) Str::uuid();
+        DB::table('external_report_requests')->insert([
+            'api_version' => $data['api_version'], 'id' => $id, 'source_system' => $data['source_system'],
+            'reference' => $data['reference'], 'event_id' => $data['event_id'], 'sections' => json_encode($data['included_sections']),
+            'sitio_id' => $data['sitio_id'], 'format' => $data['format'], 'purpose' => $data['purpose'],
+            'status' => 'pending', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        return [
+            'request_id' => $id,
+            'prepared_by' => 'Emergency Operations Center: ResQperation System',
+            'status_url' => URL::signedRoute('external.report-requests.status', ['id' => $id]),
+        ];
+    }
+
+    private function mockSituationSummary(?array $summary = null, ?string $sitioId = null): void
+    {
+        $summary ??= ['event' => ['event_id' => 'EV-1', 'name' => 'Flood'], 'report' => [], 'household' => ['total' => 0]];
+        $mock = $this->mock(SituationReportService::class);
+        $expectation = $mock->shouldReceive('eventSummary');
+        if ($sitioId === null) $expectation->with('EV-1');
+        else $expectation->with('EV-1', $sitioId);
+        $expectation->andReturn(response()->json(['data' => ['summary' => $summary]]));
     }
 
     private function decision(string $id, array $data)
@@ -121,7 +157,7 @@ class ReportExchangeTest extends TestCase
 
     public function test_requested_sitio_is_preserved_and_used_when_accepted(): void
     {
-        $result = $this->submit(['sitio_id' => '710']);
+        $result = $this->submitPending(['sitio_id' => '710']);
         $this->getJson($result['status_url'])->assertOk()->assertJsonPath('data.sitio_id', '710');
         $this->mock(SituationReportService::class, function ($mock): void {
             $mock->shouldReceive('eventSummary')->once()->with('EV-1', '710')->andReturn(response()->json(['data'=>['summary'=>[
@@ -147,27 +183,47 @@ class ReportExchangeTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors('included_sections');
     }
 
-    public function test_pending_request_has_signed_status_and_no_file_and_cannot_be_reviewed_anonymously(): void
+    public function test_external_request_is_automatically_accepted_and_signed_status_contains_file(): void
     {
+        $this->mockSituationSummary();
         $result = $this->submit();
-        $this->getJson($result['status_url'])->assertOk()->assertJsonPath('data.status', 'pending')->assertJsonPath('data.file', null);
+        $this->getJson($result['status_url'])->assertOk()->assertJsonPath('data.status', 'accepted')
+            ->assertJsonPath('data.decided_by', 'Automatic report exchange')->assertJsonPath('data.file.file_name', $result['file']['file_name']);
+        $this->assertSame(1, DB::table('external_report_requests')->where('status', 'accepted')->count());
         $this->getJson('/api/v1/external/report-requests/'.$result['request_id'])->assertForbidden();
         $this->postJson('/api/v1/reports/external/requests/'.$result['request_id'].'/decision', ['decision' => 'accepted'])->assertUnauthorized();
         $this->getJson('/api/v1/reports/external/requests')->assertUnauthorized();
     }
 
-    public function test_old_external_situation_generate_endpoint_also_requires_review(): void
+    public function test_unavailable_report_is_logged_as_failed_instead_of_pending_or_rejected(): void
     {
+        $mock = $this->mock(SituationReportService::class);
+        $mock->shouldReceive('eventSummary')->with('EV-1')->andReturn(response()->json(['message' => 'Unavailable'], 404));
+
+        $response = $this->withHeader('X-API-KEY', 'exchange-secret')->postJson('/api/v1/external/report-requests', [
+            'api_version' => '4.0', 'source_system' => 'evatrack', 'event_id' => 'EV-1', 'sitio_id' => 'all',
+            'included_sections' => ['II'], 'format' => 'csv', 'purpose' => 'Planning',
+        ])->assertStatus(503)->assertJsonPath('status', 'failed');
+
+        $this->assertSame('failed', DB::table('external_report_requests')->where('id', $response->json('request_id'))->value('status'));
+        $counts = app(ReportExchangeController::class)->index(Request::create('/', 'GET'))->getData(true)['data']['counts'];
+        $this->assertSame(1, $counts['failed']);
+        $this->assertSame(0, $counts['successful']);
+    }
+
+    public function test_old_external_situation_generate_endpoint_also_automatically_accepts(): void
+    {
+        $this->mockSituationSummary();
         $this->withHeader('X-API-KEY', 'exchange-secret')->postJson('/api/v1/external/reports/generate', [
             'api_version'=>'4.0', 'report_type' => 'situation', 'source_system' => 'safetrack', 'event_id' => 'EV-1', 'sitio_id' => 'all',
             'included_sections' => ['II'], 'format' => 'pdf', 'purpose' => 'Population verification',
-        ])->assertStatus(202)->assertJsonPath('status', 'pending')->assertJsonMissingPath('download_url');
-        $this->assertSame(1, DB::table('external_report_requests')->where('status', 'pending')->count());
+        ])->assertCreated()->assertJsonPath('status', 'accepted')->assertJsonPath('file.format', 'pdf');
+        $this->assertSame(1, DB::table('external_report_requests')->where('status', 'accepted')->count());
     }
 
     public function test_acceptance_produces_only_population_and_keeps_an_approved_snapshot(): void
     {
-        $result = $this->submit();
+        $result = $this->submitPending();
         $this->mock(SituationReportService::class, function ($mock): void {
             $mock->shouldReceive('eventSummary')->once()->with('EV-1')->andReturn(response()->json(['data' => ['summary' => [
                 'event' => ['event_id' => 'EV-1', 'name' => 'Flood'], 'report' => [],
@@ -196,7 +252,7 @@ class ReportExchangeTest extends TestCase
 
     public function test_rejection_is_visible_to_requester_and_cannot_be_overwritten(): void
     {
-        $result = $this->submit();
+        $result = $this->submitPending();
         $this->decision($result['request_id'], ['decision' => 'rejected', 'note' => 'Specify the affected area.']);
         $this->getJson($result['status_url'])->assertOk()->assertJsonPath('data.status', 'rejected')
             ->assertJsonPath('data.decision_note', 'Specify the affected area.')->assertJsonPath('data.file', null);
@@ -210,7 +266,7 @@ class ReportExchangeTest extends TestCase
 
     public function test_rejection_requires_a_reason_and_acceptance_requires_event(): void
     {
-        $result = $this->submit();
+        $result = $this->submitPending();
         // Historical requests may predate the mandatory event selection.
         DB::table('external_report_requests')->where('id', $result['request_id'])->update(['event_id' => null]);
         try {
@@ -230,13 +286,15 @@ class ReportExchangeTest extends TestCase
 
     public function test_inbox_filters_requests_and_returns_totals_for_each_status(): void
     {
+        $this->mockSituationSummary();
         $pending = $this->submit();
-        $rejected = $this->submit(['source_system' => 'trackingaid']);
+        $rejected = $this->submitPending(['source_system' => 'trackingaid']);
         $this->decision($rejected['request_id'], ['decision' => 'rejected', 'note' => 'Incomplete purpose.']);
-        $response = app(ReportExchangeController::class)->index(Request::create('/', 'GET', ['status' => 'pending']))->getData(true)['data'];
+        $response = app(ReportExchangeController::class)->index(Request::create('/', 'GET', ['status' => 'accepted']))->getData(true)['data'];
         $this->assertCount(1, $response['requests']);
         $this->assertSame($pending['request_id'], $response['requests'][0]['id']);
-        $this->assertEquals(1, $response['counts']['pending']);
+        $this->assertEquals(1, $response['counts']['successful']);
+        $this->assertEquals(2, $response['counts']['total']);
         $this->assertEquals(1, $response['counts']['rejected']);
         $this->assertArrayHasKey('IV', $response['sections']);
         $controller = app(ReportExchangeController::class);
@@ -261,7 +319,7 @@ class ReportExchangeTest extends TestCase
     }
     public function test_external_evacuation_section_can_be_requested_and_exported(): void
     {
-        $result = $this->submit(['included_sections' => ['VI']]);
+        $result = $this->submitPending(['included_sections' => ['VI']]);
         $this->mock(SituationReportService::class, function ($mock): void {
             $mock->shouldReceive('eventSummary')->with('EV-1')->andReturn(response()->json(['data' => ['summary' => [
                 'report' => [], 'event' => ['name' => 'Flood'], 'evacuation' => ['households' => [], 'members' => [], 'sites' => [
@@ -285,7 +343,7 @@ class ReportExchangeTest extends TestCase
             ]]]));
         });
         foreach (['pdf', 'csv', 'xlsx'] as $format) {
-            $result = $this->submit(['format' => $format]);
+            $result = $this->submitPending(['format' => $format]);
             $this->assertSame($preparer, $result['prepared_by']);
             $this->getJson($result['status_url'])->assertJsonPath('data.prepared_by', $preparer);
             $row = $this->decision($result['request_id'], ['decision' => 'accepted'])->getData(true)['data'];

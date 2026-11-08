@@ -278,11 +278,12 @@ class DisasterBroadcastQuery
 
         return $query->orderByRaw("CASE severity_key WHEN 'low' THEN 0 WHEN 'medium' THEN 1 WHEN 'high' THEN 2 WHEN 'critical' THEN 3 ELSE 4 END")
             ->orderBy('severity_id')
-            ->get(['severity_id', 'severity_key', 'severity_label'])
+            ->get(['severity_id', 'severity_key', 'severity_label', 'severity_desc'])
             ->map(fn (object $severity): array => [
                 'severity_id' => $severity->severity_id,
                 'severity_key' => $severity->severity_key,
                 'severity_label' => $severity->severity_label,
+                'severity_desc' => $severity->severity_desc,
             ])
             ->values()
             ->all();

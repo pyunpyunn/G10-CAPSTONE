@@ -2,17 +2,23 @@ param([string]$CloudflaredPath = 'C:/backend/tools/cloudflared.exe')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot
 $webRoot = Join-Path $projectRoot 'frontend-web'
-$tunnelLog = Join-Path $PSScriptRoot 'storage/logs/web-cloudflare.stderr.log'
+$logDirectory = Join-Path $PSScriptRoot 'storage/logs'
+$tunnelLog = Join-Path $logDirectory 'web-cloudflare.stderr.log'
+New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
 if (-not (Test-Path -LiteralPath $CloudflaredPath)) { throw 'Install cloudflared and pass its executable path with -CloudflaredPath.' }
 $tunnel = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'cloudflared.exe' -and $_.CommandLine -match '127\.0\.0\.1:5175' }
 if (-not $tunnel) {
-    Start-Process -FilePath $CloudflaredPath -ArgumentList @('tunnel','--url','http://127.0.0.1:5175','--no-autoupdate') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $PSScriptRoot 'storage/logs/web-cloudflare.stdout.log') -RedirectStandardError $tunnelLog | Out-Null
+    Set-Content -LiteralPath $tunnelLog -Value ''
+    Start-Process -FilePath $CloudflaredPath -ArgumentList @('tunnel','--url','http://127.0.0.1:5175','--no-autoupdate') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logDirectory 'web-cloudflare.stdout.log') -RedirectStandardError $tunnelLog | Out-Null
 }
 $secureUrl = $null
 for ($attempt = 0; $attempt -lt 20; $attempt++) {
     if (Test-Path -LiteralPath $tunnelLog) {
-        $matches = [regex]::Matches((Get-Content -LiteralPath $tunnelLog -Raw), 'https://[a-z0-9-]+\.trycloudflare\.com')
-        if ($matches.Count) { $secureUrl = $matches[$matches.Count-1].Value; break }
+        $logText = Get-Content -LiteralPath $tunnelLog -Raw
+        if ($logText) {
+            $urlMatches = [regex]::Matches($logText, 'https://[a-z0-9-]+\.trycloudflare\.com')
+            if ($urlMatches.Count) { $secureUrl = $urlMatches[$urlMatches.Count-1].Value; break }
+        }
     }
     Start-Sleep -Seconds 1
 }

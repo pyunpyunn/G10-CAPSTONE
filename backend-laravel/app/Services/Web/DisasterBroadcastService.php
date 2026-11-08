@@ -132,8 +132,42 @@ class DisasterBroadcastService
 
     public function storeDisasterType(Request $request): JsonResponse
     {
-        $validated = $request->validate(['name' => ['required', 'string', 'max:100']]);
+        $rules = ['name' => ['required', 'string', 'max:100']];
+        $hasSeverityLevels = $request->exists('severity_levels');
+        $hasLegacySeverity = $request->hasAny(['severity_label', 'severity_desc']);
+        if ($hasSeverityLevels) {
+            $rules['severity_levels'] = ['required', 'array', 'min:1', 'max:10'];
+            $rules['severity_levels.*.label'] = ['required', 'string', 'max:20'];
+            $rules['severity_levels.*.description'] = ['required', 'string', 'max:20'];
+        } elseif ($hasLegacySeverity) {
+            $rules['severity_label'] = ['required', 'string', 'max:20'];
+            $rules['severity_desc'] = ['required', 'string', 'max:20'];
+        }
+        $validated = $request->validate($rules);
+        $severityEntries = $validated['severity_levels'] ?? (
+            $hasLegacySeverity
+                ? [['label' => $validated['severity_label'], 'description' => $validated['severity_desc']]]
+                : []
+        );
+        $hasSeverity = count($severityEntries) > 0;
+        $severityLabels = array_map(fn (array $level): string => Str::lower(trim($level['label'])), $severityEntries);
+        if (count($severityLabels) !== count(array_unique($severityLabels))) {
+            throw ValidationException::withMessages(['severity_levels' => ['Severity level labels must be unique.']]);
+        }
+
         abort_unless(Schema::hasTable('disaster_types'), 422, 'Disaster type catalog is unavailable.');
+        if ($hasSeverity) {
+            abort_unless(
+                Schema::hasTable('severity_levels')
+                && Schema::hasColumn('severity_levels', 'severity_id')
+                && Schema::hasColumn('severity_levels', 'severity_key')
+                && Schema::hasColumn('severity_levels', 'severity_label')
+                && Schema::hasColumn('severity_levels', 'severity_desc')
+                && Schema::hasTable('disaster_type_severity_levels'),
+                422,
+                'Severity level catalog is unavailable.',
+            );
+        }
 
         $name = trim($validated['name']);
         $slug = Str::slug($name, '_');
@@ -141,7 +175,7 @@ class DisasterBroadcastService
             throw ValidationException::withMessages(['name' => ['Enter a valid disaster type name.']]);
         }
 
-        $type = DB::transaction(function () use ($name, $slug): array {
+        $type = DB::transaction(function () use ($name, $slug, $validated, $hasSeverity, $severityEntries): array {
             $duplicate = DB::table('disaster_types')->whereRaw('LOWER(type_name) = ?', [Str::lower($name)])->exists();
             if ($duplicate) {
                 throw ValidationException::withMessages(['name' => ['That disaster type already exists.']]);
@@ -162,15 +196,46 @@ class DisasterBroadcastService
             DB::table('disaster_types')->insert($row);
             $this->createUnassignedEventTypeAssociation($typeId);
 
+            if ($hasSeverity) {
+                foreach ($severityEntries as $index => $level) {
+                    $severityId = ((int) DB::table('severity_levels')->lockForUpdate()->max('severity_id')) + 1;
+                    $baseKey = Str::limit(Str::slug($code.'_'.$level['label'], '_'), 50, '');
+                    $severityKey = $baseKey;
+                    $suffix = $typeId.'_'.$index;
+                    $attempt = 0;
+                    while (DB::table('severity_levels')->where('severity_key', $severityKey)->exists()) {
+                        $attempt++;
+                        $uniqueSuffix = '_'.$suffix.($attempt > 1 ? '_'.$attempt : '');
+                        $severityKey = Str::limit($baseKey, 50 - strlen($uniqueSuffix), '').$uniqueSuffix;
+                    }
+
+                    DB::table('severity_levels')->insert([
+                        'severity_id' => $severityId,
+                        'severity_key' => $severityKey,
+                        'severity_label' => trim($level['label']),
+                        'severity_desc' => trim($level['description']),
+                    ]);
+                    DB::table('disaster_type_severity_levels')->insert([
+                        'type_id' => $typeId,
+                        'severity_id' => $severityId,
+                    ]);
+                }
+            }
+
             return ['type_id' => $typeId, 'type_name' => $name, 'type_code' => $row['type_code'] ?? null];
         });
 
+        $data = [
+            'created_type' => $type,
+            'disaster_types' => $this->query->getDisasterTypes(),
+        ];
+        if ($hasSeverity) {
+            $data['severity_levels'] = $this->query->getSeverityLevels();
+        }
+
         return response()->json([
             'message' => 'Disaster type saved.',
-            'data' => [
-                'created_type' => $type,
-                'disaster_types' => $this->query->getDisasterTypes(),
-            ],
+            'data' => $data,
         ], 201);
     }
 
@@ -182,8 +247,33 @@ class DisasterBroadcastService
             $type = DB::table('disaster_types')->where('type_id', $typeId)->lockForUpdate()->first();
             if (! $type) return 'not_found';
 
+            $severityIds = [];
+            if (Schema::hasTable('disaster_type_severity_levels')
+                && Schema::hasColumn('disaster_type_severity_levels', 'type_id')
+                && Schema::hasColumn('disaster_type_severity_levels', 'severity_id')) {
+                $severityIds = DB::table('disaster_type_severity_levels')
+                    ->where('type_id', $typeId)
+                    ->pluck('severity_id')
+                    ->all();
+            }
+
             if (Schema::hasTable('disaster_event_types') && Schema::hasColumn('disaster_event_types', 'type_id')) {
                 DB::table('disaster_event_types')->where('type_id', $typeId)->delete();
+            }
+            if (Schema::hasTable('disaster_type_severity_levels') && Schema::hasColumn('disaster_type_severity_levels', 'type_id')) {
+                DB::table('disaster_type_severity_levels')->where('type_id', $typeId)->delete();
+            }
+
+            if ($severityIds && Schema::hasTable('severity_levels') && Schema::hasColumn('severity_levels', 'severity_id')) {
+                foreach ($severityIds as $severityId) {
+                    $isStillAssigned = Schema::hasTable('disaster_type_severity_levels')
+                        && Schema::hasColumn('disaster_type_severity_levels', 'severity_id')
+                        && DB::table('disaster_type_severity_levels')->where('severity_id', $severityId)->exists();
+
+                    if (! $isStillAssigned) {
+                        $this->deleteCatalogRow('severity_levels', 'severity_id', $severityId);
+                    }
+                }
             }
 
             $this->deleteCatalogRow('disaster_types', 'type_id', $typeId);
@@ -229,10 +319,4 @@ class DisasterBroadcastService
         }
     }
 }
-
-
-
-
-
-
 

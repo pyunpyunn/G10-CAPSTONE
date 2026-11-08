@@ -57,3 +57,44 @@
   .account-html .account-form-top>.seg{margin-top:0;width:100%}
   .account-html .account-role-access{flex:auto;min-width:0;width:100%;margin-left:0}
 }
+
+.account-html .bar{
+  max-width:min(100%, 1600px);
+  padding:clamp(10px, 1.4vw, 18px) clamp(12px, 2vw, 28px);
+}
+.account-html .grid{
+  width:min(100%, 1600px);
+  grid-template-columns:minmax(230px, clamp(230px, 23vw, 320px)) minmax(0, 1fr);
+  gap:clamp(10px, 1.2vw, 18px);
+  padding:0 clamp(12px, 2vw, 28px) clamp(20px, 3vw, 36px);
+}
+.account-html .ros,
+.account-html .grid>div,
+.account-html .card{min-width:0}
+.account-html .ra-profile-hero,
+.account-html .ra-profile-section{min-width:0}
+.account-html .ra-profile-layout{grid-template-columns:minmax(0, 1fr) minmax(240px, 320px)}
+.account-html .kp{grid-template-columns:repeat(auto-fit, minmax(min(100%, 150px), 1fr))}
+.account-html .cols{grid-template-columns:repeat(auto-fit, minmax(min(100%, 280px), 1fr))}
+
+@media(max-width:900px){
+  .account-html .grid{grid-template-columns:minmax(0, 1fr)}
+  .account-html .ros{position:static}
+  .account-html .rl{max-height:min(38dvh, 340px);overflow-y:auto}
+  .account-html .ra-profile-layout{grid-template-columns:minmax(0, 1fr)}
+}
+
+@media(max-width:600px){
+  .account-html .bar{gap:7px;padding:10px 12px}
+  .account-html .grid{gap:10px;padding:0 12px 24px}
+  .account-html .seg{max-width:100%;overflow-x:auto}
+  .account-html .seg button{flex:none;padding:0 10px}
+  .account-html .bar>.btn{flex:1 1 auto}
+  .account-html .rl{max-height:34dvh}
+  .account-html .hdr{align-items:flex-start}
+  .account-html .who{min-width:0;flex-basis:100%}
+  .account-html .acts{width:100%}
+  .account-html .kp,
+  .account-html .cols{grid-template-columns:minmax(0, 1fr)}
+  .account-html .dr{grid-template-columns:minmax(88px, .4fr) minmax(0, 1fr)}
+}

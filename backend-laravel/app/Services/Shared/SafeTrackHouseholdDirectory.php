@@ -19,9 +19,16 @@ class SafeTrackHouseholdDirectory
         return $saved;
     }
 
-    public function changes(array $records): array
+    public function changes(array $records, ?string $sitioId = null): array
     {
         $previous = collect($this->saved()['records'])->keyBy('household_id');
+        if ($sitioId !== null) {
+            $previous = $previous->filter(static function (array $record) use ($sitioId): bool {
+                $location = $record['location'] ?? [];
+                $recordSitioId = $location['sitio_id'] ?? $location['registered_sitio_id'] ?? null;
+                return is_scalar($recordSitioId) && (string) $recordSitioId === $sitioId;
+            });
+        }
         $new = 0;
         $updated = 0;
         foreach ($records as $record) {
@@ -44,6 +51,34 @@ class SafeTrackHouseholdDirectory
         if (! Storage::disk('local')->put(self::PATH, json_encode($saved, JSON_THROW_ON_ERROR))) {
             throw new RuntimeException('SafeTrack household data could not be saved.');
         }
+        return array_merge($changes, ['synced_at' => $saved['synced_at'], 'total' => count($records)]);
+    }
+
+    public function syncSitio(array $records, string $sitioId): array
+    {
+        $changes = $this->changes($records, $sitioId);
+        if (collect($records)->pluck('household_id')->unique()->count() !== count($records)) {
+            throw new RuntimeException('SafeTrack returned duplicate household IDs.');
+        }
+        foreach ($records as $record) {
+            $location = $record['location'] ?? [];
+            $recordSitioId = is_array($location) ? ($location['sitio_id'] ?? $location['registered_sitio_id'] ?? null) : null;
+            if (! is_scalar($recordSitioId) || (string) $recordSitioId !== $sitioId) {
+                throw new RuntimeException('SafeTrack returned a household outside the selected sitio.');
+            }
+        }
+
+        $previousRecords = $this->saved()['records'];
+        $otherSitios = array_values(array_filter($previousRecords, static function (array $record) use ($sitioId): bool {
+            $location = $record['location'] ?? [];
+            $recordSitioId = $location['sitio_id'] ?? $location['registered_sitio_id'] ?? null;
+            return ! is_scalar($recordSitioId) || (string) $recordSitioId !== $sitioId;
+        }));
+        $saved = ['records' => array_merge($otherSitios, $records), 'synced_at' => now()->toIso8601String()];
+        if (! Storage::disk('local')->put(self::PATH, json_encode($saved, JSON_THROW_ON_ERROR))) {
+            throw new RuntimeException('SafeTrack household data could not be saved.');
+        }
+
         return array_merge($changes, ['synced_at' => $saved['synced_at'], 'total' => count($records)]);
     }
 

@@ -10,7 +10,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    allowedHosts: ['mc15a.tail1e9a11.ts.net'],
+    allowedHosts: ['mc15a.tail1e9a11.ts.net', '.trycloudflare.com'],
     host: '0.0.0.0',
     port: 5175,
     proxy: {

@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 import { getHouseholdDirectory } from '../api/householdApi'
 import api from '../api/client'
 import { HouseholdPagination, RefreshButton } from '../components/households/HouseholdPrototype'
 import { useModuleData } from '../utils/useModuleData'
 
-const perPage = 25
+const perPage = 10
 const geographicLabels = {
   source_record: 'SafeTrack census',
   assigned: 'Assigned',
@@ -43,51 +45,157 @@ function SummaryCard({ label, value }) {
   return <div className="household-directory-summary"><span>{label}</span><strong>{recorded(value ?? 0)}</strong></div>
 }
 
-function MemberDetails({ members }) {
-  if (!members.length) return <p>No household member records are linked.</p>
+const detailTabs = [
+  { id: 'household', label: 'Household' },
+  { id: 'members', label: 'Members' },
+  { id: 'accounts', label: 'Accounts' },
+]
 
-  return <div className="household-directory-records">
-    {members.map(member => <article className="household-directory-record" key={member.member_id}>
-      <h4>{member.display_name || fullName(member)} <small>{member.is_household_head ? '· Household head' : ''}</small></h4>
-      <dl>
-        <div><dt>Member ID</dt><dd>{recorded(member.member_id)}</dd></div>
-        <div><dt>Relationship</dt><dd>{recorded(member.relation || member.relationship_id)}</dd></div>
-        <div><dt>Birth date</dt><dd>{recorded(member.birth_date)}</dd></div>
-        <div><dt>Gender</dt><dd>{recorded(member.gender || member.sex || member.gender_id)}</dd></div>
-        <div><dt>Civil status</dt><dd>{recorded(member.civil_status || member.civil_status_id)}</dd></div>
-        <div><dt>Occupation</dt><dd>{recorded(member.occupation)}</dd></div>
-        <div><dt>Education</dt><dd>{recorded(member.education_level || member.education_level_id)}</dd></div>
-        <div><dt>Contact</dt><dd>{recorded(member.contact_number)}</dd></div>
-        <div><dt>Religion</dt><dd>{recorded(member.religion)}</dd></div>
-        <div><dt>Special needs</dt><dd>{recorded(member.special_needs)}</dd></div>
-        <div><dt>PWD / Senior / Pregnant</dt><dd>{[member.is_pwd && 'PWD', member.is_senior && 'Senior', member.is_pregnant && 'Pregnant'].filter(Boolean).join(', ') || 'None recorded'}</dd></div>
-        <div><dt>Can report for household</dt><dd>{recorded(member.can_report_for_household)}</dd></div>
-      </dl>
-    </article>)}
-  </div>
+const householdColumns = [
+  { id: 'name', label: 'Household name', default: true, value: row => row.household.household_name },
+  { id: 'id', label: 'Household ID', value: row => row.household.household_id },
+  { id: 'code', label: 'Code / number', value: row => row.household.household_code || row.household.household_number },
+  { id: 'email', label: 'Email', value: row => row.household.email },
+  { id: 'contact', label: 'Contact', default: true, value: row => row.household.contact_number },
+  { id: 'emergency', label: 'Emergency contact', value: row => row.household.emergency_contact },
+  { id: 'member_count', label: 'Recorded member count', default: true, value: row => row.household.member_count },
+  { id: 'created_by', label: 'Created by', value: row => row.household.created_by },
+  { id: 'address', label: 'Address', default: true, value: row => addressLabel(row.address) },
+  { id: 'barangay', label: 'Site / barangay', default: true, value: row => row.address?.barangay_name || row.address?.barangay_id },
+  { id: 'sitio', label: 'Sitio', default: true, value: row => row.address?.sitio_name || row.address?.registered_sitio_id || row.address?.sitio_id },
+  { id: 'purok', label: 'Purok', default: true, value: row => row.address?.purok_name || row.address?.purok_id },
+  { id: 'geography', label: 'Geographic assignment', value: row => geographicLabels[row.geographic_status] || 'Geography unavailable' },
+  { id: 'address_id', label: 'Address ID', value: row => row.address?.address_id },
+  { id: 'legacy_area', label: 'Legacy area text', value: row => row.address?.purok_sitio },
+  { id: 'zip', label: 'ZIP code', value: row => row.address?.zip_code },
+]
+
+const memberColumns = [
+  { id: 'name', label: 'Member name', default: true, value: member => `${member.display_name || fullName(member)}${member.is_household_head ? ' (Household head)' : ''}` },
+  { id: 'relationship', label: 'Relationship', default: true, value: member => member.relation || member.relationship_id },
+  { id: 'birth_date', label: 'Birth date', default: true, value: member => member.birth_date },
+  { id: 'gender', label: 'Gender', value: member => member.gender || member.sex || member.gender_id },
+  { id: 'id', label: 'Member ID', value: member => member.member_id },
+  { id: 'civil_status', label: 'Civil status', value: member => member.civil_status || member.civil_status_id },
+  { id: 'occupation', label: 'Occupation', value: member => member.occupation },
+  { id: 'education', label: 'Education', value: member => member.education_level || member.education_level_id },
+  { id: 'contact', label: 'Contact', value: member => member.contact_number },
+  { id: 'religion', label: 'Religion', value: member => member.religion },
+  { id: 'special_needs', label: 'Special needs', value: member => member.special_needs },
+  { id: 'vulnerability', label: 'PWD / Senior / Pregnant', value: member => [member.is_pwd && 'PWD', member.is_senior && 'Senior', member.is_pregnant && 'Pregnant'].filter(Boolean).join(', ') },
+  { id: 'can_report', label: 'Can report for household', value: member => member.can_report_for_household },
+]
+
+const accountColumns = [
+  { id: 'name', label: 'Account name', default: true, value: account => fullName(account) },
+  { id: 'username', label: 'Username', default: true, value: account => account.username },
+  { id: 'status', label: 'Status', default: true, value: account => activeLabel(account.is_active) },
+  { id: 'email', label: 'Email', value: account => account.email },
+  { id: 'contact', label: 'Contact', value: account => account.contact_number },
+  { id: 'user_id', label: 'User ID', value: account => account.user_id },
+  { id: 'household_id', label: 'Household ID', value: account => account.household_id },
+  { id: 'member_id', label: 'Member ID', value: account => account.member_id },
+  { id: 'member_link', label: 'Member link', value: account => account.member_link_status === 'matched' ? 'Matched' : account.member_link_status === 'unmatched' ? 'Member ID does not belong to this household' : 'No member assigned' },
+  { id: 'role_id', label: 'Role ID', value: account => account.role_id },
+]
+
+const columnsByTab = { household: householdColumns, members: memberColumns, accounts: accountColumns }
+const detailRowsPerPage = 7
+
+function HouseholdDetailsModal({ item, onClose }) {
+  const dialog = useRef(null)
+  const [activeTab, setActiveTab] = useState('household')
+  const [detailPage, setDetailPage] = useState(1)
+  const [visibleColumns, setVisibleColumns] = useState(() => Object.fromEntries(
+    Object.entries(columnsByTab).map(([tab, columns]) => [tab, columns.filter(column => column.default).map(column => column.id)]),
+  ))
+  const records = {
+    household: [item],
+    members: item.members || [],
+    accounts: item.accounts || [],
+  }[activeTab]
+  const columns = columnsByTab[activeTab].filter(column => visibleColumns[activeTab].includes(column.id))
+  const pageCount = Math.ceil(records.length / detailRowsPerPage)
+  const visibleRecords = records.slice((detailPage - 1) * detailRowsPerPage, detailPage * detailRowsPerPage)
+
+  useEffect(() => {
+    const element = dialog.current
+    const previous = document.activeElement
+    const overflow = document.body.style.overflow
+    element.showModal()
+    document.body.style.overflow = 'hidden'
+    return () => {
+      element.close()
+      document.body.style.overflow = overflow
+      previous?.focus()
+    }
+  }, [])
+
+  function toggleColumn(id) {
+    setVisibleColumns(current => {
+      const selected = current[activeTab]
+      return {
+        ...current,
+        [activeTab]: selected.includes(id) ? selected.filter(value => value !== id) : [...selected, id],
+      }
+    })
+  }
+
+  function changeTab(tab) {
+    setActiveTab(tab)
+    setDetailPage(1)
+  }
+
+  return createPortal(<dialog ref={dialog} className="household-directory-modal" aria-labelledby="household-directory-modal-title" onCancel={event => { event.preventDefault(); onClose() }} onClick={event => {
+    if (event.target !== event.currentTarget) return
+    const bounds = event.currentTarget.getBoundingClientRect()
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose()
+  }}>
+    <header className="household-directory-modal-head">
+      <div><h2 id="household-directory-modal-title">{item.household.household_name || 'Unnamed household'}</h2></div>
+      <button type="button" aria-label="Close household details" onClick={onClose}><X size={20} /></button>
+    </header>
+    <div className="household-directory-modal-body">
+      <nav className="household-directory-modal-tabs" aria-label="Household details">
+        {detailTabs.map(tab => <button key={tab.id} type="button" className={activeTab === tab.id ? 'active' : ''} aria-pressed={activeTab === tab.id} onClick={() => changeTab(tab.id)}>
+          {tab.label}<span>{tab.id === 'members' ? item.member_count : tab.id === 'accounts' ? item.account_count : ''}</span>
+        </button>)}
+        <details className="household-directory-column-menu">
+          <summary>{activeTab === 'household' ? 'Fields' : 'Table columns'}</summary>
+          <fieldset className="household-directory-column-picker">
+            <legend>{activeTab === 'household' ? 'Show fields' : 'Show columns'}</legend>
+            {columnsByTab[activeTab].map(column => <label key={column.id}>
+              <input type="checkbox" checked={visibleColumns[activeTab].includes(column.id)} onChange={() => toggleColumn(column.id)} />
+              {column.label}
+            </label>)}
+          </fieldset>
+        </details>
+      </nav>
+      {activeTab === 'household'
+        ? columns.length ? <form className="household-directory-field-view" onSubmit={event => event.preventDefault()}>
+          {columns.map(column => <label key={column.id}>
+            <span>{column.label}</span>
+            <input type="text" value={String(recorded(column.value(item)))} readOnly />
+          </label>)}
+        </form> : <p className="household-directory-no-columns">Select at least one field to display.</p>
+        : columns.length ? <div className="household-directory-table-wrap">
+        <table className="household-directory-detail-table">
+          <thead><tr>{columns.map(column => <th key={column.id}>{column.label}</th>)}</tr></thead>
+          <tbody>{records.length ? visibleRecords.map((record, index) => <tr key={record.household?.household_id || record.member_id || record.user_id || (detailPage - 1) * detailRowsPerPage + index}>
+            {columns.map(column => <td key={column.id}>{recorded(column.value(record))}</td>)}
+          </tr>) : <tr><td colSpan={columns.length}>{activeTab === 'members' ? 'No household member records are linked.' : 'No account is linked to this household.'}</td></tr>}</tbody>
+        </table>
+      </div> : <p className="household-directory-no-columns">Select at least one column to display data.</p>}
+      {pageCount > 1 && <div className="household-directory-detail-pagination" aria-label="Detail table pagination">
+        <button type="button" onClick={() => setDetailPage(current => Math.max(1, current - 1))} disabled={detailPage === 1}>Previous</button>
+        <span>Page {detailPage} of {pageCount}</span>
+        <button type="button" onClick={() => setDetailPage(current => Math.min(pageCount, current + 1))} disabled={detailPage === pageCount}>Next</button>
+      </div>}
+    </div>
+  </dialog>, document.body)
 }
 
-function AccountDetails({ accounts }) {
-  if (!accounts.length) return <p>No active account is linked by household ID.</p>
-
-  return <div className="household-directory-records">
-    {accounts.map(account => <article className="household-directory-record" key={account.user_id}>
-      <h4>{fullName(account)} <small>· {activeLabel(account.is_active)}</small></h4>
-      <dl>
-        <div><dt>User ID</dt><dd>{recorded(account.user_id)}</dd></div>
-        <div><dt>Username</dt><dd>{recorded(account.username)}</dd></div>
-        <div><dt>Household ID</dt><dd>{recorded(account.household_id)}</dd></div>
-        <div><dt>Member ID</dt><dd>{recorded(account.member_id)}</dd></div>
-        <div><dt>Member link</dt><dd>{account.member_link_status === 'matched' ? 'Matched' : account.member_link_status === 'unmatched' ? 'Member ID does not belong to this household' : 'No member assigned'}</dd></div>
-        <div><dt>Role ID</dt><dd>{recorded(account.role_id)}</dd></div>
-        <div><dt>Email</dt><dd>{recorded(account.email)}</dd></div>
-        <div><dt>Contact</dt><dd>{recorded(account.contact_number)}</dd></div>
-      </dl>
-    </article>)}
-  </div>
-}
-
-function HouseholdRecord({ item }) {
+function HouseholdRecord({ item, onView }) {
   const household = item.household
   const address = item.address
   const purok = address?.purok_name || (address?.purok_id ? `Purok #${address.purok_id}` : null)
@@ -99,55 +207,32 @@ function HouseholdRecord({ item }) {
     <td>
       <strong>{household.household_name || 'Unnamed household'}</strong>
       <small>{household.household_code || household.household_number || household.household_id}</small>
-      <details className="household-directory-details">
-        <summary>View household, address, members, and accounts</summary>
-        <div className="household-directory-detail-grid">
-          <section>
-            <h3>Household details</h3>
-            <dl>
-              <div><dt>Household ID</dt><dd>{recorded(household.household_id)}</dd></div>
-              <div><dt>Code / number</dt><dd>{recorded(household.household_code || household.household_number)}</dd></div>
-              <div><dt>Email</dt><dd>{recorded(household.email)}</dd></div>
-              <div><dt>Contact</dt><dd>{recorded(household.contact_number)}</dd></div>
-              <div><dt>Emergency contact</dt><dd>{recorded(household.emergency_contact)}</dd></div>
-              <div><dt>Recorded member count</dt><dd>{recorded(household.member_count)}</dd></div>
-              <div><dt>Created by</dt><dd>{recorded(household.created_by)}</dd></div>
-            </dl>
-          </section>
-          <section>
-            <h3>Address and registered area</h3>
-            <dl>
-              <div><dt>Address ID</dt><dd>{recorded(address?.address_id)}</dd></div>
-              <div><dt>Address</dt><dd>{addressLabel(address)}</dd></div>
-              <div><dt>Site / barangay</dt><dd>{recorded(address?.barangay_name || address?.barangay_id)}</dd></div>
-              <div><dt>Sitio</dt><dd>{recorded(address?.sitio_name || address?.registered_sitio_id || address?.sitio_id)}</dd></div>
-              <div><dt>Purok</dt><dd>{recorded(address?.purok_name || address?.purok_id)}</dd></div>
-              <div><dt>Legacy area text</dt><dd>{recorded(address?.purok_sitio)}</dd></div>
-              <div><dt>Geographic assignment</dt><dd>{status}</dd></div>
-              <div><dt>ZIP code</dt><dd>{recorded(address?.zip_code)}</dd></div>
-            </dl>
-          </section>
-          <section>
-            <h3>Household members ({item.member_count})</h3>
-            <MemberDetails members={item.members} />
-          </section>
-          <section>
-            <h3>Household accounts ({item.account_count})</h3>
-            <AccountDetails accounts={item.accounts} />
-          </section>
-        </div>
-      </details>
     </td>
     <td>{area || 'Area not assigned'}<small>{status}</small></td>
     <td>{addressLabel(address)}</td>
     <td>{item.member_count}<small>{household.member_count === null ? 'Recorded total unavailable' : `Recorded: ${household.member_count}`}</small></td>
     <td>{item.account_count}</td>
+    <td><button className="household-directory-view-button" type="button" onClick={() => onView(item)}>View details</button></td>
   </tr>
+}
+
+function getSitioGroup(item) {
+  const address = item.address
+  const sitioId = address?.sitio_id ?? address?.registered_sitio_id
+  const sitioName = address?.sitio_name || (sitioId !== null && sitioId !== undefined ? `Sitio #${sitioId}` : 'Sitio not assigned')
+  return {
+    id: sitioId === null || sitioId === undefined ? null : String(sitioId),
+    key: sitioId === null || sitioId === undefined ? `name:${sitioName.toLocaleLowerCase()}` : `id:${sitioId}`,
+    name: sitioName,
+  }
 }
 
 export default function HouseholdDataDirectoryPage() {
   const [page, setPage] = useState(1)
+  const [groupBy, setGroupBy] = useState('')
+  const [selectedHousehold, setSelectedHousehold] = useState(null)
   const [syncing, setSyncing] = useState(false)
+  const [syncingSitio, setSyncingSitio] = useState(null)
   const [syncNotice, setSyncNotice] = useState('')
   const loader = useCallback(() => getHouseholdDirectory({
     page,
@@ -156,6 +241,14 @@ export default function HouseholdDataDirectoryPage() {
   const { data, error, loading, refresh } = useModuleData(loader, ['households', 'accounts'])
   const households = data?.households
   const summary = data?.summary
+  const groupedHouseholds = groupBy === 'sitio'
+    ? Object.values((households?.data || []).reduce((groups, item) => {
+      const sitio = getSitioGroup(item)
+      groups[sitio.key] ||= { ...sitio, items: [] }
+      groups[sitio.key].items.push(item)
+      return groups
+    }, {}))
+    : []
 
   useEffect(() => {
     let cancelled = false
@@ -189,10 +282,23 @@ export default function HouseholdDataDirectoryPage() {
     } finally { setSyncing(false) }
   }
 
+  async function syncSitio(group) {
+    if (group.id === null) return
+    setSyncingSitio(group.id)
+    try {
+      const { data: response } = await api.post('/households/directory/sync', { sitio_id: group.id }, { timeout: 90000 })
+      const result = response.data
+      setSyncNotice(`Synced ${result.total} households from ${group.sitio_name}. ${result.new_households} new, ${result.updated_households} updated.`)
+      refresh()
+    } catch (failure) {
+      setSyncNotice(failure.response?.data?.message || `Unable to sync households from ${group.sitio_name}. Please try again.`)
+    } finally { setSyncingSitio(null) }
+  }
+
   return <section className="hh-prototype" aria-label="Household data directory">
     <div className="hd">
       <Link className="bk" to="/households" title="Back to household status" aria-label="Back to household status">‹</Link>
-      <b className="ttl">Household data directory</b>
+      <b className="ttl">New Household Data</b>
       <span className="sp" />
       <button className="bt" type="button" onClick={syncHouseholds} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync from SafeTrack'}</button>
       <RefreshButton onClick={refresh} loading={loading} />
@@ -208,24 +314,46 @@ export default function HouseholdDataDirectoryPage() {
     </div>}
     {error && <div className="emp" role="alert">{error}</div>}
     <div className="cd" style={{ flex: 1 }}>
+      <div className="household-directory-group-control">
+        <label htmlFor="household-directory-group-by">Group by</label>
+        <select id="household-directory-group-by" value={groupBy} onChange={event => { setGroupBy(event.target.value); setPage(1) }}>
+          <option value="">None</option>
+          <option value="sitio">Sitio</option>
+        </select>
+      </div>
       <div className="tw">
         <table aria-busy={loading}>
-          <thead><tr><th>Household</th><th>Sitio / purok</th><th>Address</th><th>Members</th><th>Accounts</th></tr></thead>
+          <thead><tr><th>Household</th><th>Sitio / purok</th><th>Address</th><th>Members</th><th>Accounts</th><th>Action</th></tr></thead>
           <tbody>
             {loading && !households
               ? Array.from({ length: 5 }, (_, rowIndex) => <tr key={`skeleton-${rowIndex}`}>
-                {Array.from({ length: 5 }, (_, columnIndex) => <td key={columnIndex}>
+                {Array.from({ length: 6 }, (_, columnIndex) => <td key={columnIndex}>
                   <span className="household-directory-skeleton" aria-hidden="true" />
                   {rowIndex === 0 && columnIndex === 0 && <span className="household-directory-sr-only">Loading household records…</span>}
                 </td>)}
               </tr>)
               : households?.data?.length
-                ? households.data.map(item => <HouseholdRecord key={item.household.household_id} item={item} />)
-                : <tr><td className="household-directory-empty" colSpan={5}>{error ? 'Household records could not be loaded.' : 'There are no household records at the moment.'}</td></tr>}
+                ? groupBy === 'sitio'
+                  ? groupedHouseholds.flatMap(group => [
+                    <tr className="household-directory-group-row" key={`group:${group.key}`}>
+                      <th scope="rowgroup" colSpan={6}>
+                        <div className="household-directory-group-heading">
+                          <span>GROUP BY SITIO: {group.name} <small>({group.items.length} households)</small></span>
+                          <button className="household-directory-view-button" type="button" onClick={() => syncSitio(group)} disabled={syncing || syncingSitio !== null || group.id === null} title={group.id === null ? 'A registered sitio ID is required to sync this group.' : undefined}>
+                            {syncingSitio === group.id ? 'Syncing…' : 'SYNC DATA'}
+                          </button>
+                        </div>
+                      </th>
+                    </tr>,
+                    ...group.items.map(item => <HouseholdRecord key={item.household.household_id} item={item} onView={setSelectedHousehold} />),
+                  ])
+                  : households.data.map(item => <HouseholdRecord key={item.household.household_id} item={item} onView={setSelectedHousehold} />)
+                : <tr><td className="household-directory-empty" colSpan={6}>{error ? 'Household records could not be loaded.' : 'There are no household records at the moment.'}</td></tr>}
           </tbody>
         </table>
       </div>
       <HouseholdPagination meta={households?.meta} loading={loading} onPageChange={setPage} />
     </div>
+    {selectedHousehold && <HouseholdDetailsModal key={selectedHousehold.household.household_id} item={selectedHousehold} onClose={() => setSelectedHousehold(null)} />}
   </section>
 }

@@ -51,6 +51,9 @@ class DisasterSeverityCatalogTest extends TestCase
         DB::table('severity_levels')->where('severity_key', 'landslide_medium')->update(['severity_key' => 'landslide_medium_medium']);
         $normalizeMigration = require database_path('migrations/2026_11_01_000003_normalize_disaster_severity_keys.php');
         $normalizeMigration->up();
+        $descriptionMigration = require database_path('migrations/2026_11_07_000001_add_severity_description.php');
+        $descriptionMigration->up();
+        $descriptionMigration->up();
 
         $this->assertSame(6, DB::table('disaster_types')->count());
         $this->assertDatabaseHas('disaster_types', [
@@ -64,9 +67,20 @@ class DisasterSeverityCatalogTest extends TestCase
             ->count());
         $this->assertDatabaseHas('severity_levels', [
             'severity_key' => 'tcws_5_critical',
-            'severity_label' => 'TCWS 5 - 185 km/h or higher winds',
+            'severity_label' => 'TCWS 5',
+            'severity_desc' => '185 km/h or higher winds',
+        ]);
+        $this->assertDatabaseHas('severity_levels', [
+            'severity_key' => 'peis_i_low',
+            'severity_label' => 'PEIS I',
+            'severity_desc' => 'Scarcely Perceptible',
         ]);
         $this->assertDatabaseHas('severity_levels', ['severity_key' => 'landslide_medium']);
+
+        $tcws5 = collect(app(DisasterBroadcastQuery::class)->getSeverityLevels())
+            ->firstWhere('severity_key', 'tcws_5_critical');
+        $this->assertSame('TCWS 5', $tcws5['severity_label']);
+        $this->assertSame('185 km/h or higher winds', $tcws5['severity_desc']);
 
         $volcanoId = DB::table('disaster_types')->where('type_code', 'VOLCANIC_ERUPTION')->value('type_id');
         $this->assertSame(6, DB::table('disaster_type_severity_levels')->where('type_id', $volcanoId)->count());
@@ -76,7 +90,7 @@ class DisasterSeverityCatalogTest extends TestCase
         $this->assertCount(5, $typhoon['severity_ids']);
     }
 
-    public function test_event_and_broadcast_accept_missing_severity_but_reject_another_types_level(): void
+    public function test_event_accepts_missing_severity_but_broadcast_rejects_another_types_level(): void
     {
         $migration = require database_path('migrations/2026_11_01_000001_create_disaster_type_severity_catalog.php');
         $migration->up();
@@ -96,11 +110,15 @@ class DisasterSeverityCatalogTest extends TestCase
         $broadcast = $validator->validateBroadcast(Request::create('/broadcasts', 'POST', [
             'broadcast_title' => 'Safety advisory',
             'message' => 'Follow official instructions.',
+            'severity_id' => DB::table('severity_levels')->where('severity_key', 'tcws_1_low')->value('severity_id'),
             'scope_type' => 'barangay_wide',
             'estimated_duration' => '12 hours',
             'allowed_statuses' => $statusKeys,
         ]), (int) $types['TYPHOON']);
-        $this->assertArrayNotHasKey('severity_id', $broadcast);
+        $this->assertSame(
+            DB::table('severity_levels')->where('severity_key', 'tcws_1_low')->value('severity_id'),
+            $broadcast['severity_id'],
+        );
 
         $earthquakeSeverityId = DB::table('severity_levels')->where('severity_key', 'peis_i_low')->value('severity_id');
         $this->expectException(ValidationException::class);
@@ -109,5 +127,25 @@ class DisasterSeverityCatalogTest extends TestCase
             'type_id' => $types['TYPHOON'],
             'severity_level_id' => $earthquakeSeverityId,
         ]));
+    }
+
+    public function test_broadcast_requires_severity(): void
+    {
+        $migration = require database_path('migrations/2026_11_01_000001_create_disaster_type_severity_catalog.php');
+        $migration->up();
+        $types = DB::table('disaster_types')->pluck('type_id', 'type_code');
+        $statusKeys = collect(app(\App\Presenters\DisasterBroadcastPresenter::class)->statusOptions())
+            ->take(4)
+            ->pluck('key')
+            ->all();
+
+        $this->expectException(ValidationException::class);
+        app(DisasterBroadcastRequestValidator::class)->validateBroadcast(Request::create('/broadcasts', 'POST', [
+            'broadcast_title' => 'Safety advisory',
+            'message' => 'Follow official instructions.',
+            'scope_type' => 'barangay_wide',
+            'estimated_duration' => '12 hours',
+            'allowed_statuses' => $statusKeys,
+        ]), (int) $types['TYPHOON']);
     }
 }

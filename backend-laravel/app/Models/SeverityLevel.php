@@ -12,7 +12,7 @@ class SeverityLevel extends Model
     protected $primaryKey = 'severity_id';
     public $incrementing = false;
     public $timestamps = false;
-    protected $fillable = ['severity_key', 'severity_label'];
+    protected $fillable = ['severity_key', 'severity_label', 'severity_desc'];
 
     public function disasters(): HasMany
     {
@@ -31,4 +31,3 @@ class SeverityLevel extends Model
         );
     }
 }
-

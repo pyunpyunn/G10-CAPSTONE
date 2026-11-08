@@ -233,3 +233,11 @@
   .exchange-panel-heading { padding: 12px; }
   .exchange-dialog > header { padding: 14px 16px; }
 }
+
+.exchange-badge.failed{background:#fbf0f2;color:#a05b6b;border-color:#ecd8df}
+.exchange-detail-grid{grid-template-columns:repeat(12,minmax(0,1fr))}
+.exchange-detail-prepared{grid-column:span 3}
+.exchange-detail-purpose{grid-column:span 6}
+.exchange-detail-format{grid-column:span 3}
+.exchange-footer-status{align-self:center;color:var(--color-text-2);font-size:12px}
+@media(max-width:550px){.exchange-detail-grid{grid-template-columns:1fr}.exchange-detail-prepared,.exchange-detail-purpose,.exchange-detail-format{grid-column:1}}

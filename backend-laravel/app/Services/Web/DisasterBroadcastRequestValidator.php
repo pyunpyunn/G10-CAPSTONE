@@ -46,7 +46,7 @@ class DisasterBroadcastRequestValidator
         $validated = $request->validate([
             'broadcast_title' => ['required', 'string', 'max:50'],
             'message' => ['required', 'string', 'max:50'],
-            'severity_id' => ['nullable', 'integer', 'exists:severity_levels,severity_id'],
+            'severity_id' => ['required', 'integer', 'exists:severity_levels,severity_id'],
             'scope_type' => ['required', 'string', Rule::in(['barangay_wide', 'selected_puroks'])],
             'target_area' => ['nullable', 'string', 'max:150'],
             'estimated_duration' => ['required', 'string', 'regex:/^\\d{1,3}\\s*(hours?|days?)$/i'],
@@ -138,7 +138,6 @@ class DisasterBroadcastRequestValidator
         }
     }
 }
-
 
 
 

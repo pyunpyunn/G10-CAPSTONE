@@ -12,6 +12,9 @@ import AppShell from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import HouseholdReviewPage from './pages/HouseholdReviewPage'
+import DashboardSkeleton from './components/dashboard/DashboardSkeleton'
+import BroadcastSkeleton from './components/broadcast/BroadcastSkeleton'
+import PageErrorBoundary, { RuntimeErrorNotice } from './components/ui/PageErrorBoundary'
 import { getCurrentUser, loginUser, logoutUser, saveRememberedPassword } from './api/authApi'
 import { clearToken, getToken, saveToken } from './api/token'
 import { clearSessionCache, readSessionCache, removeSessionCache, writeSessionCache } from './api/sessionCache'
@@ -167,7 +170,7 @@ const modulePages = [
     kicker: 'Reports',
     summary: 'Generate saved event snapshots for household, dispatch, resources, weather, and casualty summaries.',
   },
-  { path: '/situation/external-reports', title: 'External Reports', kicker: 'Reports', summary: 'Request reports from connected systems and review incoming section requests.' },
+  { path: '/situation/external-reports', title: 'External Reports', kicker: 'Reports', summary: 'Automatically prepare partner-requested reports and track successful exchanges.' },
   {
     path: '/archive',
     title: 'Archive',
@@ -179,6 +182,7 @@ const modulePages = [
 function App() {
   return (
     <BrowserRouter>
+      <RuntimeErrorNotice />
       <AuthRoutes />
     </BrowserRouter>
   )
@@ -331,6 +335,7 @@ function AuthRoutes() {
   }
 
   return (
+    <PageErrorBoundary>
     <Routes>
       <Route
         path="/login"
@@ -378,6 +383,7 @@ function AuthRoutes() {
 
       <Route path="*" element={<Navigate to={user ? webHomeForUser(user) : '/login'} replace />} />
     </Routes>
+    </PageErrorBoundary>
   )
 }
 
@@ -394,7 +400,11 @@ function LazyPage({ page }) {
   }
 
   return (
-    <Suspense fallback={<div className="screen-loader">Loading...</div>}>
+    <Suspense fallback={page.path === '/dashboard'
+      ? <section className="page active"><DashboardSkeleton /></section>
+      : page.path === '/broadcast'
+        ? <section className="page broadcast-page active"><BroadcastSkeleton includeNavigation /></section>
+        : <div className="screen-loader">Loading...</div>}>
       <PageComponent />
     </Suspense>
   )

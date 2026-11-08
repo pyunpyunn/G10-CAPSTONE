@@ -66,7 +66,9 @@ return [
             'password' => env('SHARED_DB_PASSWORD'),
             'charset' => 'utf8mb4', 'collation' => 'utf8mb4_unicode_ci',
             'prefix' => '', 'strict' => true, 'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? [PDO::ATTR_TIMEOUT => 10] : [],
+            'options' => extension_loaded('pdo_mysql') ? [
+                PDO::ATTR_TIMEOUT => min(30, max(1, (int) env('SHARED_DB_CONNECTION_TIMEOUT', 5))),
+            ] : [],
         ],
 
         'resq_local' => $localConnection,

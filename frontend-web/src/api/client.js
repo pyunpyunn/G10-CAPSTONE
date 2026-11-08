@@ -92,6 +92,9 @@ api.interceptors.response.use(
         || path === '/dashboard/active-event/close')) {
       window.dispatchEvent(new Event('rescue-criteria:changed'))
     }
+    if (method === 'post' && path === '/households/directory/sync') {
+      window.dispatchEvent(new CustomEvent('operations:changed', { detail: { topics: ['households', 'dispatch'] } }))
+    }
     return response
   },
   (error) => {

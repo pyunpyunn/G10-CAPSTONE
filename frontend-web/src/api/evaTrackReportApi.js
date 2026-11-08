@@ -30,11 +30,6 @@ export async function getReportRequestInbox(params = {}) {
   return data.data
 }
 
-export async function decideReportRequest(id, payload) {
-  const { data } = await api.post(`/reports/external/requests/${id}/decision`, payload, { timeout: 90000 })
-  return data.data
-}
-
 export async function refreshReportRequestFile(id) {
   const { data } = await api.post(`/reports/external/requests/${id}/file`, {}, { timeout: 90000 })
   return data.data

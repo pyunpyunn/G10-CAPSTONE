@@ -32,7 +32,7 @@ class ReportExchangeController extends Controller
     public function index(Request $request)
     {
         $data = $request->validate([
-            'status' => ['nullable', Rule::in(['pending', 'accepted', 'rejected'])], 'page' => 'nullable|integer|min:1',
+            'status' => ['nullable', Rule::in(['pending', 'accepted', 'rejected', 'failed'])], 'page' => 'nullable|integer|min:1',
             'source_system' => ['nullable', Rule::in(['evatrack', 'safetrack', 'trackingaid'])], 'search' => 'nullable|string|max:160',
         ]);
         $rows = DB::table('external_report_requests')->when($data['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
@@ -46,6 +46,8 @@ class ReportExchangeController extends Controller
             })
             ->orderByDesc('created_at')->orderByDesc('id')->paginate(20);
         $counts = DB::table('external_report_requests')->selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
+        $counts['total'] = (int) $counts->sum();
+        $counts['successful'] = (int) ($counts['accepted'] ?? 0);
         return response()->json(['data' => [
             'requests' => collect($rows->items())->map(fn ($row) => $this->present($row)),
             'counts' => $counts, 'sections' => SituationReportSections::LABELS,
@@ -83,10 +85,41 @@ class ReportExchangeController extends Controller
             'format' => $data['format'], 'purpose' => $data['purpose'], 'status' => 'pending',
             'created_at' => now(), 'updated_at' => now(),
         ]);
-        return response()->json(['status' => 'pending', 'request_id' => $id, 'prepared_by' => self::REPORT_PREPARER,
-            'message' => 'Request received. A RESQPERATION operator must accept it before a file is released.',
+        $automaticRequest = Request::create('/', 'POST', ['decision' => 'accepted', 'sitrep_type' => 'progress']);
+        $automaticRequest->setUserResolver(fn () => new \App\Models\User(['name' => 'Automatic report exchange']));
+        try {
+            $result = $this->decide($automaticRequest, $id, app(SituationReportService::class), app(ReportFileService::class))
+                ->getData(true)['data'];
+        } catch (\Throwable $failure) {
+            \Illuminate\Support\Facades\Log::warning('External report request could not be prepared automatically.', [
+                'request_id' => $id,
+                'exception' => $failure::class,
+            ]);
+            $message = 'The request was recorded, but automatic report preparation failed. Please retry the request later.';
+            DB::table('external_report_requests')->where('id', $id)->update([
+                'status' => 'failed',
+                'decision_note' => $message,
+                'decided_by' => 'Automatic report exchange',
+                'decided_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return response()->json([
+                'status' => 'failed',
+                'request_id' => $id,
+                'message' => $message,
+                'status_url' => URL::signedRoute('external.report-requests.status', ['id' => $id]),
+            ], 503)->header('Cache-Control', 'no-store');
+        }
+
+        return response()->json([
+            'status' => 'accepted',
+            'request_id' => $id,
+            'prepared_by' => self::REPORT_PREPARER,
+            'message' => 'Request automatically accepted and report prepared.',
+            'file' => $result['file'],
             'status_url' => URL::signedRoute('external.report-requests.status', ['id' => $id]),
-        ], 202)->header('Cache-Control', 'no-store');
+        ], 201)->header('Cache-Control', 'no-store');
     }
 
     public function externalStatus(string $id)
@@ -117,7 +150,7 @@ class ReportExchangeController extends Controller
             $row = DB::table('external_report_requests')->where('id', $id)->lockForUpdate()->first();
             abort_unless($row, 404);
             abort_unless($row->status === 'pending', 409, 'This request has already been reviewed. Refresh the inbox.');
-            $operator = $request->user()?->name ?: $request->user()?->getAuthIdentifier();
+            $operator = $request->user()?->name ?: $request->user()?->getAuthIdentifier() ?: 'Automatic report exchange';
             $update = ['status' => $data['decision'], 'decision_note' => $data['note'] ?? null,
                 'decided_by' => $operator, 'decided_at' => now(), 'updated_at' => now()];
             if ($data['decision'] === 'accepted') {

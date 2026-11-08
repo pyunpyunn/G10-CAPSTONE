@@ -40,7 +40,7 @@ export default function BroadcastComposeForm({
         <StepHeading number="1" title="Disaster Details" />
         <div className="bc-fields bc-fields-details">
           <div className="bc-field">
-            <span className="bc-field-label">Disaster type</span>
+            <span className="bc-field-label">Disaster type <RequiredMark /></span>
             <div className="bc-catalog-control">
               <select value={form.type_id} onChange={(event) => onChange('type_id', event.target.value)} required>
                 <option value="">Select type</option>
@@ -49,34 +49,49 @@ export default function BroadcastComposeForm({
               <button className="bc-catalog-trigger" type="button" onClick={onManageDisasterTypes}>Manage types</button>
             </div>
           </div>
-          <Field label="Disaster name" counter={`${form.event_name.length}/20`} limitReached={form.event_name.length >= 20}>
+          <Field label="Disaster name" required counter={`${form.event_name.length}/20`} limitReached={form.event_name.length >= 20}>
             <input value={form.event_name} maxLength={20} onChange={(event) => onChange('event_name', event.target.value)} required />
           </Field>
-          <Field label="Severity (optional)">
-            <select value={form.severity_id} onChange={(event) => onChange('severity_id', event.target.value)}>
-              <option value="">No severity selected</option>
-              {availableSeverityLevels.map((item) => <option value={item.severity_id} key={item.severity_id}>{item.severity_label}</option>)}
-            </select>
-          </Field>
-          <Field label="Est. duration">
-            <div className="bc-duration-input">
-              <input
-                type="number"
-                min="1"
-                max="999"
-                value={durationValue}
-                onChange={(event) => onChange('estimated_duration', `${event.target.value} ${durationUnit.toLowerCase()}`)}
-                required
-              />
-              <select
-                aria-label="Duration unit"
-                value={durationUnit}
-                onChange={(event) => onChange('estimated_duration', `${durationValue} ${event.target.value.toLowerCase()}`)}
-              >
-                <option>Hours</option><option>Days</option>
+          <div className="bc-severity-duration-row">
+            <Field label="Severity" required>
+              <select id="broadcast-severity" value={form.severity_id} onChange={(event) => onChange('severity_id', event.target.value)} required>
+                <option value="">Select severity</option>
+                {availableSeverityLevels.map((item) => (
+                  <option value={item.severity_id} key={item.severity_id}>
+                    {item.severity_label}
+                  </option>
+                ))}
               </select>
-            </div>
-          </Field>
+            </Field>
+            <Field label="Description">
+              <input
+                id="broadcast-severity-description"
+                type="text"
+                value={severity?.severity_desc || ''}
+                placeholder="Select a severity to see its description"
+                readOnly
+              />
+            </Field>
+            <Field label="Est. duration" required>
+              <div className="bc-duration-input">
+                <input
+                  type="number"
+                  min="1"
+                  max="999"
+                  value={durationValue}
+                  onChange={(event) => onChange('estimated_duration', `${event.target.value} ${durationUnit.toLowerCase()}`)}
+                  required
+                />
+                <select
+                  aria-label="Duration unit"
+                  value={durationUnit}
+                  onChange={(event) => onChange('estimated_duration', `${durationValue} ${event.target.value.toLowerCase()}`)}
+                >
+                  <option>Hours</option><option>Days</option>
+                </select>
+              </div>
+            </Field>
+          </div>
         </div>
       </section>
 
@@ -123,7 +138,7 @@ export default function BroadcastComposeForm({
         <StepHeading number="3" title="Mobile Push" aside={`${selectedStatuses.filter(Boolean).length} / 4 pushed`} />
         <div className="bc-status-slots">
           {[0, 1, 2, 3].map((slot) => (
-            <Field label={`Status ${slot + 1}`} key={slot}>
+            <Field label={`Status ${slot + 1}`} required key={slot}>
               <select
                 value={selectedStatuses[slot] || ''}
                 onChange={(event) => onStatusChange(slot, event.target.value)}
@@ -141,7 +156,7 @@ export default function BroadcastComposeForm({
           <button className="bc-add-status" type="button" onClick={onAddStatus} aria-label="Manage status types"><Plus size={15} /> Manage statuses</button>
         </div>
         <div className="bc-message-fields">
-          <Field label="Broadcast title" counter={`${form.broadcast_title.length}/50`} limitReached={form.broadcast_title.length >= 50}>
+          <Field label="Broadcast title" required counter={`${form.broadcast_title.length}/50`} limitReached={form.broadcast_title.length >= 50}>
             <input
               value={form.broadcast_title}
               maxLength={50}
@@ -149,7 +164,7 @@ export default function BroadcastComposeForm({
               required
             />
           </Field>
-          <Field label="Official instruction" counter={`${form.message.length}/50`} limitReached={form.message.length >= 50}>
+          <Field label="Official instruction" required counter={`${form.message.length}/50`} limitReached={form.message.length >= 50}>
             <input
               value={form.message}
               maxLength={50}
@@ -174,8 +189,12 @@ function StepHeading({ number, title, aside }) {
   return <div className="bc-step-heading"><span className="bc-step-number">{number}</span><h2>{title}</h2>{aside && <span className="bc-step-aside">{aside}</span>}</div>
 }
 
-function Field({ label, counter, limitReached, children }) {
-  return <label className="bc-field"><span className="bc-field-label">{label}{counter && <small className={limitReached ? 'at-limit' : ''}>{counter}</small>}</span>{children}</label>
+function Field({ label, required = false, counter, limitReached, children }) {
+  return <label className="bc-field"><span className="bc-field-label"><span>{label}{required && <RequiredMark />}</span>{counter && <small className={limitReached ? 'at-limit' : ''}>{counter}</small>}</span>{children}</label>
+}
+
+function RequiredMark() {
+  return <span className="bc-required-mark" aria-hidden="true"> *</span>
 }
 
 function targetHouseholds(scope, directPuroks, puroks, householdCount) {

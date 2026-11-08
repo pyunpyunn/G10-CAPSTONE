@@ -73,7 +73,8 @@ export default function AppShell({ user, pages, onLogout, onUserChange }) {
   }
 
   function hideFromTopbar(event) {
-    if (event?.currentTarget?.contains(event.relatedTarget)) return
+    const relatedTarget = event?.relatedTarget
+    if (relatedTarget instanceof window.Node && event.currentTarget?.contains(relatedTarget)) return
 
     setIsTopbarHovered(false)
   }

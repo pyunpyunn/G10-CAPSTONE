@@ -175,3 +175,52 @@
   font-size: 12px;
   font-weight: 500;
 }
+
+.page-error-boundary {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin: 24px;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--chart-unsafe);
+  border-radius: var(--radius);
+  padding: 20px;
+  color: var(--color-text-2);
+  background: var(--color-bg-card);
+}
+
+.page-error-boundary h2,
+.page-error-boundary p {
+  margin: 0;
+}
+
+.page-error-boundary button,
+.app-runtime-error button {
+  min-height: 36px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  padding: 0 12px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-runtime-error {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 15000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(560px, calc(100vw - 32px));
+  border: 1px solid #d19090;
+  border-radius: var(--radius);
+  padding: 12px;
+  color: var(--color-unsafe-text);
+  background: #fff7f7;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, .18);
+  font-size: 13px;
+}
