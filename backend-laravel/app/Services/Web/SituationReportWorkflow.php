@@ -31,7 +31,7 @@ class SituationReportWorkflow
                 throw \Illuminate\Validation\ValidationException::withMessages(['supersedes_sit_rep_id'=>'Select a saved report from the same event.']);
             }
             $sitRepId = $this->query->nextId('situation_reports', 'sit_rep_id');
-            $reportNumber = $this->query->nextReportNumber($event->event_id);
+            $reportNumber = $this->query->nextReportNumber($event->event_id, $now);
             $summary = $this->presenter->buildSummary($event, $this->query->summarySources($event->event_id), $this->barangayProfile->current(), [
                 ...array_intersect_key($validated, array_flip(\App\Support\SituationReportSections::INPUTS)),
                 'supersedes' => $supersedes ? ['sit_rep_id'=>$supersedes->sit_rep_id,'report_number'=>$supersedes->report_number] : null,
@@ -67,7 +67,7 @@ class SituationReportWorkflow
         $event = $this->query->findEvent($eventId);
         if (! $event) return null;
         $sitRepId = $this->query->nextId('situation_reports', 'sit_rep_id');
-        $reportNumber = $this->query->nextReportNumber($eventId);
+        $reportNumber = $this->query->nextReportNumber($eventId, $endedAt);
         $summary = $this->presenter->buildSummary($event, $this->query->summarySources($eventId), $this->barangayProfile->current(), [
             'report_number' => $reportNumber, 'period_start' => $event->started_at, 'period_end' => $endedAt->toDateTimeString(),
             'prepared_by' => \App\Models\User::query()->where('user_id', $adminId)->first()?->name, 'reviewed_by' => null, 'actions_text' => $closureNote,
@@ -104,7 +104,6 @@ class SituationReportWorkflow
         ]);
     }
 }
-
 
 
 

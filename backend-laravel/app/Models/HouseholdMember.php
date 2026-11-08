@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HouseholdMember extends Model
@@ -40,6 +41,11 @@ class HouseholdMember extends Model
         return $this->belongsTo(Household::class, 'household_id', 'household_id');
     }
 
+    public function user(): HasOne
+    {
+        return $this->hasOne(User::class, 'member_id', 'member_id');
+    }
+
     public function gender(): BelongsTo
     {
         return $this->belongsTo(Gender::class, 'gender_id', 'gender_id');
@@ -60,5 +66,3 @@ class HouseholdMember extends Model
         return $this->hasMany(MemberDisasterStatus::class, 'member_id', 'member_id');
     }
 }
-
-

@@ -450,8 +450,8 @@ class HouseholdMobileReadQuery
             $membersQuery->orderBy('full_name');
         }
 
-        $members = $membersQuery
-            ->get($memberColumns)
+        $memberRows = $membersQuery->get($memberColumns);
+        $members = $memberRows
             ->map(function (object $member) use ($devicesByMember, $statusesByMember): array {
                 $device = $devicesByMember->get($member->member_id);
                 $memberStatus = $statusesByMember[(string) $member->member_id] ?? null;

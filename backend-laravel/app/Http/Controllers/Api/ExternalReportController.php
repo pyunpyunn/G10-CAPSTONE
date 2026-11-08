@@ -32,6 +32,7 @@ class ExternalReportController extends Controller
 
     public function generate(Request $request, \App\Services\Web\ReportGenerationService $reports)
     {
+        abort_unless($request->user() || in_array($request->input('report_type'), ['archive', 'situation'], true), 403);
         if (!$request->user() && $request->input('report_type') === 'situation') {
             return app(ReportExchangeController::class)->store($request);
         }

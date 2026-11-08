@@ -2,22 +2,21 @@ import PlanningModal from '../ui/PlanningModal'
 import { useState } from 'react'
 import { importHazardLayer, deleteHazardLayer } from '../../api/mappingApi'
 import './hazard-planning.css'
-import { hazardFeatures, visibleHazardLayers } from '../../utils/hazardMapping'
+import { visibleHazardLayers } from '../../utils/hazardMapping'
 
 function download(name, content, type = 'application/json') {
   const url = URL.createObjectURL(new Blob([content], { type }))
   const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url)
 }
-export default function HazardPlanning({ workspace, purokId, hazardType, user, refresh }) {
+export default function HazardPlanning({ workspace, hazardType, user, refresh }) {
   const [success, setSuccess] = useState('')
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('')
   const layers = workspace.hazard_layers || []
-  const features = hazardFeatures(layers, purokId, hazardType)
   const visible = visibleHazardLayers(layers, hazardType)
   const government = visible.filter(layer => layer.builtin)
-  const localFeatures = features.filter(f => !f.properties.builtin)
   const canEdit = user?.permissions?.can_manage_hazard_maps === true
   const options = workspace.filters.purok_options || []
+  const exposure = workspace.household_exposure || []
   function template() {
     download('hazard-layer-template.json', JSON.stringify({ name: 'Official hazard assessment', source: 'C/MDRRMO', source_url: 'https://hazardhunter.georisk.gov.ph/', assessed_at: new Date().toLocaleDateString('en-CA'), geojson: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { kind: 'hazard', name: 'Replace with assessed area', hazard_type: 'Flood', risk_level: 'high', purok_id: options[0]?.purok_id || 1, individuals: null, families: null, reviewed_by: 'Replace with reviewing office/person' }, geometry: { type: 'Polygon', coordinates: [] } }] } }, null, 2))
   }
@@ -46,10 +45,9 @@ export default function HazardPlanning({ workspace, purokId, hazardType, user, r
       {!layers.length && <p>No official hazard maps imported. Request maps from C/MPDO or C/MDRRMO, or obtain GeoRisk data. Unmapped areas have unknown risk.</p>}
       <p><a href="https://hazardhunter.georisk.gov.ph/" target="_blank" rel="noreferrer">GeoRisk HazardHunterPH</a> · <a href="https://cdn.lga.gov.ph/publication/attachments/1704791931.pdf" target="_blank" rel="noreferrer">LGA guidance, items 5 and 7.1</a></p>
       {visible.map(layer => <div className="hazard-source" key={layer.id}><b>{layer.name}</b><span>{layer.source} · {layer.builtin ? `Source: ${layer.source_date} · Retrieved ${layer.retrieved_at}` : `Assessed ${layer.assessed_at}`}</span>{layer.source_url && <a href={layer.source_url} target="_blank" rel="noreferrer">Source</a>}<button type="button" onClick={() => download(`${layer.name}.json`, JSON.stringify(layer, null, 2))}>Export map</button>{canEdit && !layer.builtin && <button type="button" disabled={busy} onClick={() => remove(layer.id)}>Remove</button>}</div>)}
-      <details><summary>Local exposure records and assessment tools</summary>
-      <p>Government layers do not include individual or family counts per purok. No exposure totals or safe routes are inferred from these maps.</p>
-      <p>Exposure is recorded by the assessing office per area and hazard. “Unknown” means no count supplied. Overlapping areas or different hazards must not be added together.</p>
-      <div className="hazard-table"><table><caption>Individuals and families at risk by purok / sitio</caption><thead><tr>{['Hazard / area','Purok / sitio','Risk','Individuals','Families'].map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{localFeatures.filter(f => f.properties.kind === 'hazard').map(f => { const p = f.properties, area = options.find(o => String(o.purok_id) === String(p.purok_id)); return <tr key={f.id}><td>{p.hazard_type} · {p.name}</td><td>{area ? `${area.purok_name} / ${area.sitio_name}` : p.purok_id}</td><td>{p.risk_level}</td><td>{p.individuals ?? 'Unknown'}</td><td>{p.families ?? 'Unknown'}</td></tr> })}</tbody></table></div>
+      <details><summary>Disaster impact reports and assessment tools</summary>
+      <p>Counts come from the latest household reports for the active disaster. Individuals are registered members of households reported unsafe, needing help, or evacuated; families count affected households. These are report counts, not estimates inferred from government hazard maps.</p>
+      <div className="hazard-table"><table><caption>Individuals and families in affected households by purok / sitio</caption><thead><tr>{['Active disaster','Purok / sitio','Reported status','Registered individuals','Families'].map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{exposure.map(row => <tr key={`${row.purok_id}-${row.status_key}`}><td>{workspace.active_event?.name || 'Active disaster'}</td><td>{row.purok_name} / {row.sitio_name}</td><td>{row.status_label}</td><td>{row.individuals}</td><td>{row.families}</td></tr>)}</tbody></table>{!exposure.length && <p>{workspace.active_event ? 'No unsafe, needs-help, or evacuated household reports are recorded for the active disaster.' : 'No active disaster event is available.'}</p>}</div>
       {canEdit && <><p>Optional local assessment import. Coordinates use WGS84 [longitude, latitude]. Supported kinds: hazard (Polygon/MultiPolygon), evacuation_center (Point), safe_route (LineString). Every feature requires a hazard type, risk level, purok ID, and reviewer. Safe routes also require properties.destination with the designated center name. Replace the empty template geometry with official surveyed coordinates.</p><button type="button" onClick={template}>Download template</button><label className="hazard-upload">{busy ? 'Saving…' : 'Import official map'}<input type="file" accept=".json,.geojson,application/json" disabled={busy} onChange={upload} /></label></>}
       </details>
       {success && <p role="status">{success}</p>}

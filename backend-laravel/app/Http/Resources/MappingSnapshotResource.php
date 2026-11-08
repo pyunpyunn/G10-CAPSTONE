@@ -23,6 +23,7 @@ class MappingSnapshotResource extends JsonResource
             $data['evacuation_sites'] = $snapshot->evacuationSites;
             $data['rescue_teams'] = $snapshot->rescueTeams;
             $data['dispatch_routes'] = $snapshot->dispatchRoutes;
+            $data['household_exposure'] = $snapshot->householdExposure;
             $office = config('rescue_office');
             $latitude = $office['latitude'] ?? null;
             $longitude = $office['longitude'] ?? null;

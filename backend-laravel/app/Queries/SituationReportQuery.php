@@ -11,6 +11,7 @@ use App\Models\ResponderAssignment;
 use App\Models\ResourceRequest;
 use App\Models\SituationReport;
 use App\Models\WeatherLog;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use App\Support\RequestSchema as Schema;
 
@@ -69,7 +70,7 @@ class SituationReportQuery
             ->orderByDesc('sr.generated_at')->limit(20)->select('sr.*', 'de.name as event_name')->get();
     }
 
-    public function summarySources(string $eventId, ?string $sitioId = null): array
+    public function summarySources(string $eventId, ?string $sitioId = null, bool $includePopulationRoster = false): array
     {
         $households = Household::query()->whereIn('households.household_id', HouseholdEligibilityQuery::ids());
         if ($sitioId !== null) {
@@ -140,6 +141,11 @@ class SituationReportQuery
             'household_details' => app(SituationHouseholdQuery::class)->rows(clone $base, $eventId),
             'household_total' => $households->count(), 'household_counts' => $counts,
             'household_reported' => $reported, 'purok_rows' => $puroks,
+            'member_status_by_purok' => app(SituationMemberStatusQuery::class)->byPurok($eventId, $sitioId),
+            'broadcast_status_by_purok' => app(SituationBroadcastStatusQuery::class)->byPurok($eventId, $sitioId),
+            'population_roster' => $includePopulationRoster
+                ? app(SituationPopulationRosterQuery::class)->rows($eventId, $sitioId)
+                : null,
             'weather' => $weather, 'assignments' => $assignments,
             'assignment_outcomes' => $assignmentOutcomes,
             'broadcasts' => $broadcasts, 'requests' => $requests,
@@ -168,25 +174,28 @@ class SituationReportQuery
         });
     }
 
-    public function nextReportNumber(?string $eventId = null): string
+    public function nextReportNumber(?string $eventId = null, ?Carbon $generatedAt = null): string
     {
         if ($eventId === null) throw new \InvalidArgumentException('An event is required for SitRep numbering.');
-        return DB::transaction(function () use ($eventId) {
-            $global = collect(DB::connection()->getSchemaBuilder()->getIndexes('situation_reports'))
-                ->contains(fn ($index) => $index['unique'] && $index['columns'] === ['report_number']);
-            $key = 'sitrep-series:'.($global ? 'global' : hash('sha256', $eventId));
+        $date = ($generatedAt ?? now())->format('Ymd');
+        $prefix = 'SITREP-'.$date.'-';
+        return DB::transaction(function () use ($prefix, $date) {
+            $key = 'sitrep-series:'.$date;
             DB::table('operational_sequences')->insertOrIgnore([
                 'sequence_key'=>$key,
                 'next_value'=>1,
             ]);
             $sequence=DB::table('operational_sequences')->where('sequence_key',$key)->lockForUpdate()->first();
-            $scope = SituationReport::query()->when(! $global, fn ($query) => $query->where('disaster_id', $eventId));
-            $existing = (clone $scope)->pluck('report_number');
-            $seed = max($existing->count(), (int) $existing->filter(fn ($v) => ctype_digit((string) $v))->map(fn ($v) => (int) $v)->max()) + 1;
+            $existing = SituationReport::query()->where('report_number', 'like', $prefix.'%')->pluck('report_number');
+            $seed = (int) $existing->map(fn ($value) => preg_match('/^SITREP-'.$date.'-(\d+)$/', (string) $value, $match) ? (int) $match[1] : 0)->max() + 1;
             $number = max((int) $sequence->next_value, $seed);
-            while ((clone $scope)->where('report_number', (string) $number)->exists()) $number++;
+            $reportNumber = $prefix.str_pad((string) $number, 4, '0', STR_PAD_LEFT);
+            while (SituationReport::query()->where('report_number', $reportNumber)->exists()) {
+                $number++;
+                $reportNumber = $prefix.str_pad((string) $number, 4, '0', STR_PAD_LEFT);
+            }
             DB::table('operational_sequences')->where('sequence_key',$key)->update(['next_value'=>$number+1]);
-            return (string) $number;
+            return $reportNumber;
         }, 3);
     }
 
@@ -195,5 +204,3 @@ class SituationReportQuery
         return app(\App\Services\Shared\OperationalSequence::class)->nextNumericId($table, $column);
     }
 }
-
-

@@ -11,10 +11,14 @@ class DashboardImpactQuery
     public function history(string $period): array
     {
         $empty = ['deaths' => 0, 'injured' => 0, 'missing' => 0, 'damaged_houses' => 0];
-        $events = DB::table('disaster_events')->whereNotNull('ended_at')
+        $eventQuery = DB::table('disaster_events')->whereNotNull('ended_at')
             ->when(Schema::hasColumn('disaster_events', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
-            ->orderBy('ended_at')->get(['event_id', 'ended_at']);
+            ->orderBy('ended_at');
+        $eventColumns = ['event_id', 'ended_at'];
+        if (Schema::hasColumn('disaster_events', 'name')) $eventColumns[] = 'name';
+        $events = $eventQuery->get($eventColumns);
         $eventCounts = [];
+        $eventAssessed = [];
         $assessed = 0;
         if ($events->isNotEmpty() && Schema::hasTable('responder_field_reports')) {
             // Reassessments replace earlier household counts; never sum report revisions.
@@ -39,11 +43,13 @@ class DashboardImpactQuery
                     $counts['damaged_houses']++;
                 }
                 $eventCounts[$report->disaster_id] = $counts;
+                $eventAssessed[$report->disaster_id] = ($eventAssessed[$report->disaster_id] ?? 0) + 1;
                 $assessed++;
             }
         }
         $groups = [];
         $totals = $empty;
+        $eventRows = [];
         foreach ($events as $event) {
             $date = Carbon::parse($event->ended_at, config('app.timezone'))->setTimezone('Asia/Manila');
             $start = match ($period) {
@@ -64,8 +70,14 @@ class DashboardImpactQuery
                 $groups[$key][$metric] += $value;
                 $totals[$metric] += $value;
             }
+            $eventRows[] = array_merge([
+                'event_id' => $event->event_id,
+                'name' => $event->name ?? $event->event_id,
+                'ended_at' => Carbon::parse($event->ended_at, config('app.timezone'))->setTimezone('Asia/Manila')->toIso8601String(),
+                'assessed_households' => $eventAssessed[$event->event_id] ?? 0,
+            ], $eventCounts[$event->event_id] ?? $empty);
         }
         ksort($groups);
-        return ['periods' => array_values($groups), 'totals' => $totals, 'event_count' => $events->count(), 'assessed_households' => $assessed];
+        return ['periods' => array_values($groups), 'totals' => $totals, 'event_count' => $events->count(), 'assessed_households' => $assessed, 'events' => $eventRows];
     }
 }

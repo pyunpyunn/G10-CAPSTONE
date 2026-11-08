@@ -35,6 +35,25 @@ export async function getApiServerUrl() {
   return stored || getApiBaseUrl();
 }
 
+export async function getAuthenticatedImageSource(path: string) {
+  const [serverUrl, token, deviceUuid] = await Promise.all([
+    selectReadyServer(),
+    getStoredItem(tokenKey),
+    getStoredItem(rescuerDeviceUuidKey),
+  ]);
+  if (!token) return null;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+  };
+  Object.assign(headers, ngrokHeaders(serverUrl));
+  if (deviceUuid) headers['X-Device-UUID'] = deviceUuid;
+  return {
+    uri: `${serverUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`,
+    headers,
+    cache: 'reload' as const,
+  };
+}
+
 export async function setApiServerUrl(value: string) {
   const next = normalizeApiServerUrl(value);
   if (next === await getApiServerUrl()) return next;
@@ -120,7 +139,11 @@ async function getApiServerCandidates() {
       console.warn('Ignoring an invalid saved API URL in the Android release; configured HTTPS routes will be used.');
     }
   }
-  if (Platform.OS === 'android' && !__DEV__) return orderedConfigured;
+  if (Platform.OS === 'android' && !__DEV__) {
+    return normalizedSavedUrl
+      ? [...orderedConfigured, ...(orderedConfigured.includes(normalizedSavedUrl) ? [] : [normalizedSavedUrl])]
+      : orderedConfigured;
+  }
   if (!normalizedSavedUrl) return orderedConfigured;
   return [normalizedSavedUrl, ...orderedConfigured.filter((url) => url !== normalizedSavedUrl)];
 }

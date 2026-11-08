@@ -19,7 +19,7 @@ class SituationReportPresenter
             'operator_inputs' => array_intersect_key($meta, array_flip(\App\Support\SituationReportSections::INPUTS)),
             'report' => [
                 'supersedes' => $meta['supersedes'] ?? null,
-                'report_number' => $meta['report_number'] ?? 'SITREP-DRAFT-'.now()->format('Ymd'),
+                'report_number' => $meta['report_number'] ?? null,
                 'period_start' => $this->formatDateTime($meta['period_start'] ?? $event->started_at),
                 'period_end' => $this->formatDateTime($meta['period_end'] ?? now()->toDateTimeString()),
                 'prepared_by' => $meta['prepared_by'] ?? null,
@@ -41,6 +41,9 @@ class SituationReportPresenter
                 'scope' => 'All registered family units in barangay scope', 'coverage' => $household['total'].' registered family units in scope',
             ],
             'population_tables' => app(SituationReportPopulation::class)->data(['household'=>$household,'evacuation'=>$sources['evacuation'] ?? []]),
+            'broadcast_statuses' => $sources['broadcast_status_by_purok']['statuses'] ?? [],
+            'broadcast_status_by_purok' => $sources['broadcast_status_by_purok']['counts'] ?? [],
+            'population_roster' => $sources['population_roster'],
             'weather' => $weather, 'household' => $household, 'casualties' => $casualties,
             'dispatch' => $dispatch, 'evacuation' => $sources['evacuation'] ?? ['households' => [], 'members' => [], 'sites' => []],
             'damage' => ['partial' => null, 'total' => null, 'cost' => null],
@@ -87,7 +90,9 @@ class SituationReportPresenter
         $safeTotal = $safeOnly + $evacuated;
         $unchecked = max($total - $reported, 0);
         $progress = $total > 0 ? round(($reported / $total) * 100) : 0;
-        $purokRows = collect($sources['purok_rows'])->map(function (object $row): array {
+        $memberStatuses = $sources['member_status_by_purok'] ?? null;
+        $purokRows = collect($sources['purok_rows'])->map(function (object $row) use ($memberStatuses): array {
+            $memberStatus = $memberStatuses?->get((string) ($row->purok_id ?? ''));
             return ['purok' => $row->purok, 'sitio' => $row->sitio_name ?? 'Not recorded',
                 'persons' => isset($row->persons) ? (int) $row->persons : null,
                 'affected_persons' => isset($row->affected_persons) ? (int) $row->affected_persons : null,
@@ -96,6 +101,12 @@ class SituationReportPresenter
                 'coverage' => $this->percent((int) $row->reported, (int) $row->total).'%',
                 'purok_id' => $row->purok_id ?? null, 'sitio_id' => $row->sitio_id ?? null, 'total' => (int) $row->total, 'safe' => (int) $row->safe,
                 'evacuated' => (int) $row->evacuated, 'unsafe' => (int) $row->unsafe,
+                'status_counts' => $memberStatuses === null ? null : [
+                    'safe' => (int) ($memberStatus->safe ?? 0), 'unsafe' => (int) ($memberStatus->unsafe ?? 0),
+                    'evacuated' => (int) ($memberStatus->evacuated ?? 0), 'dead' => (int) ($memberStatus->dead ?? 0),
+                    'missing' => (int) ($memberStatus->missing ?? 0), 'injured' => (int) ($memberStatus->injured ?? 0),
+                    'reported_members' => (int) ($memberStatus->reported_members ?? 0),
+                ],
                 'unchecked' => max((int) $row->total - (int) $row->reported, 0)];
         })->values()->all();
 
@@ -188,4 +199,3 @@ class SituationReportPresenter
     private function formatDate(?string $value): ?string { return $value ? Carbon::parse($value)->format('M Y') : null; }
     private function formatTime(?string $value): ?string { return $value ? Carbon::parse($value)->format('g:i A') : null; }
 }
-

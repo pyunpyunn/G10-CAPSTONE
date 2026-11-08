@@ -117,6 +117,11 @@ class RescuerMobileService
         return $this->fieldReportWorkflow->assignmentHousehold($request, $assignmentId);
     }
 
+    public function assignedMemberProfilePhoto(Request $request, int $assignmentId, string $memberId)
+    {
+        return $this->fieldReportWorkflow->assignedMemberProfilePhoto($request, $assignmentId, $memberId);
+    }
+
     public function updateAssignmentStatus(Request $request, int $assignmentId): JsonResponse|array
     {
         $result = $this->assignmentWorkflow->updateAssignmentStatus($request, $assignmentId);
@@ -253,7 +258,6 @@ class RescuerMobileService
     }
 
 }
-
 
 
 

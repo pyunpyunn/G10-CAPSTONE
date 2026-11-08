@@ -1,4 +1,12 @@
 import { api } from './client';
+import { Platform } from 'react-native';
+
+export type HouseholdProfilePhotoAsset = {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  file?: Blob;
+};
 
 export type HouseholdOverview = {
   profile: {
@@ -41,6 +49,26 @@ export async function getHouseholdOverview(refresh = false) {
 export async function completeHouseholdSetup(payload: any) {
   const response = await api.post('/household/setup', payload);
   return response.data;
+}
+
+export async function uploadHouseholdProfilePhoto(asset: HouseholdProfilePhotoAsset) {
+  const formData = new FormData();
+  const fileName = asset.fileName || 'profile-photo.jpg';
+  if (Platform.OS === 'web') {
+    const blob: Blob = asset.file ?? await fetch(asset.uri).then((response) => response.blob());
+    formData.append('photo', blob, fileName);
+  } else {
+    formData.append('photo', {
+      uri: asset.uri,
+      name: fileName,
+      type: asset.mimeType || 'image/jpeg',
+    } as any);
+  }
+  const response = await api.post('/household/profile-photo', formData, {
+    headers: Platform.OS === 'web' ? undefined : { 'Content-Type': 'multipart/form-data' },
+    timeout: 30000,
+  });
+  return response.data.data.user;
 }
 
 export async function previewHouseholdSetupLocation(latitude: number, longitude: number) {

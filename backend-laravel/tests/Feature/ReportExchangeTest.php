@@ -21,7 +21,7 @@ class ReportExchangeTest extends TestCase
         (require database_path('migrations/2026_10_17_000002_add_sitio_to_external_report_requests.php'))->up();
         (require database_path('migrations/2026_10_18_000022_add_external_report_contract_version.php'))->up();
         $this->mock(\App\Queries\SituationReportQuery::class, function ($mock): void {
-            $mock->shouldReceive('nextReportNumber')->andReturn('1');
+            $mock->shouldReceive('nextReportNumber')->andReturn('SITREP-20261108-0001');
             $mock->shouldReceive('findEvent')->with('EV-1')->andReturn((object) ['event_id' => 'EV-1']);
             $mock->shouldReceive('findEvent')->with('UNKNOWN')->andReturn(null);
             $mock->shouldReceive('sitioOptions')->andReturn(collect([(object) ['sitio_id' => 710, 'sitio_name' => 'Sitio Alaska']]));
@@ -71,7 +71,7 @@ class ReportExchangeTest extends TestCase
     public function test_acceptance_freezes_findings_entries_and_leaves_chair_signature_blank(): void
     {
         $result=$this->submitPending(['included_sections'=>array_keys(\App\Support\SituationReportSections::LABELS)]);
-        $this->mock(SituationReportService::class,fn ($mock)=>$mock->shouldReceive('eventSummary')->with('EV-1')->once()->andReturn(response()->json(['data'=>['summary'=>[
+        $this->mock(SituationReportService::class,fn ($mock)=>$mock->shouldReceive('eventSummary')->with('EV-1', null, true)->once()->andReturn(response()->json(['data'=>['summary'=>[
             'schema_version'=>'4.0','event'=>['event_id'=>'EV-1','name'=>'Flood'],
             'report'=>['approved_by'=>'Must not be copied'],
         ]]])));
@@ -81,7 +81,7 @@ class ReportExchangeTest extends TestCase
         ]);
         $snapshot=json_decode(DB::table('external_report_requests')->where('id',$result['request_id'])->value('approved_summary'),true);
         $this->assertSame('4.0',$snapshot['schema_version']);
-        $this->assertSame('1',$snapshot['report']['report_number']);
+        $this->assertSame('SITREP-20261108-0001', $snapshot['report']['report_number']);
         $this->assertSame('initial',$snapshot['report']['report_type']);
         $this->assertSame('Emergency Operations Center: ResQperation System',$snapshot['report']['prepared_by']);
         $this->assertSame('Duty officer',$snapshot['report']['reviewed_by']);
@@ -122,8 +122,8 @@ class ReportExchangeTest extends TestCase
         $summary ??= ['event' => ['event_id' => 'EV-1', 'name' => 'Flood'], 'report' => [], 'household' => ['total' => 0]];
         $mock = $this->mock(SituationReportService::class);
         $expectation = $mock->shouldReceive('eventSummary');
-        if ($sitioId === null) $expectation->with('EV-1');
-        else $expectation->with('EV-1', $sitioId);
+        if ($sitioId === null) $expectation->with('EV-1', null, true);
+        else $expectation->with('EV-1', $sitioId, true);
         $expectation->andReturn(response()->json(['data' => ['summary' => $summary]]));
     }
 
@@ -160,7 +160,7 @@ class ReportExchangeTest extends TestCase
         $result = $this->submitPending(['sitio_id' => '710']);
         $this->getJson($result['status_url'])->assertOk()->assertJsonPath('data.sitio_id', '710');
         $this->mock(SituationReportService::class, function ($mock): void {
-            $mock->shouldReceive('eventSummary')->once()->with('EV-1', '710')->andReturn(response()->json(['data'=>['summary'=>[
+            $mock->shouldReceive('eventSummary')->once()->with('EV-1', '710', true)->andReturn(response()->json(['data'=>['summary'=>[
                 'event'=>['name'=>'Flood', 'sitio_name'=>'Sitio Alaska'], 'report'=>[],
                 'household'=>['total'=>3], 'included_sections'=>[],
             ]]]));
@@ -198,7 +198,7 @@ class ReportExchangeTest extends TestCase
     public function test_unavailable_report_is_logged_as_failed_instead_of_pending_or_rejected(): void
     {
         $mock = $this->mock(SituationReportService::class);
-        $mock->shouldReceive('eventSummary')->with('EV-1')->andReturn(response()->json(['message' => 'Unavailable'], 404));
+        $mock->shouldReceive('eventSummary')->with('EV-1', null, true)->andReturn(response()->json(['message' => 'Unavailable'], 404));
 
         $response = $this->withHeader('X-API-KEY', 'exchange-secret')->postJson('/api/v1/external/report-requests', [
             'api_version' => '4.0', 'source_system' => 'evatrack', 'event_id' => 'EV-1', 'sitio_id' => 'all',
@@ -225,7 +225,7 @@ class ReportExchangeTest extends TestCase
     {
         $result = $this->submitPending();
         $this->mock(SituationReportService::class, function ($mock): void {
-            $mock->shouldReceive('eventSummary')->once()->with('EV-1')->andReturn(response()->json(['data' => ['summary' => [
+            $mock->shouldReceive('eventSummary')->once()->with('EV-1', null, true)->andReturn(response()->json(['data' => ['summary' => [
                 'event' => ['event_id' => 'EV-1', 'name' => 'Flood'], 'report' => [],
                 'household' => ['total' => 12, 'affected' => 4, 'puroks' => [['sitio' => 'Sitio A', 'purok' => 'Purok 1', 'total' => 12, 'affected'=>4, 'affected_persons'=>15]]],
                 'casualties' => ['injured' => 999], 'actions_text' => 'Private unrelated operations note', 'included_sections' => [],
@@ -235,7 +235,8 @@ class ReportExchangeTest extends TestCase
         $row = $response->getData(true)['data'];
         $this->assertSame('accepted', $row['status']);
         $bytes = Storage::disk('local')->get('reports/'.$row['file']['file_name']);
-        $this->assertStringContainsString('"Sitio A","Purok 1",4,15', $bytes);
+        $this->assertStringContainsString('Part 1 — Population by selected sitio and purok', $bytes);
+        $this->assertStringContainsString('"Sitio A","Purok 1",12,"Not recorded"', $bytes);
         $this->assertStringNotContainsString('Private unrelated operations note', $bytes);
         $this->assertStringNotContainsString('Injured', $bytes);
         $stored = DB::table('external_report_requests')->where('id', $row['id'])->first();
@@ -338,7 +339,7 @@ class ReportExchangeTest extends TestCase
     {
         $preparer = 'Emergency Operations Center: ResQperation System';
         $this->mock(SituationReportService::class, function ($mock): void {
-            $mock->shouldReceive('eventSummary')->with('EV-1')->times(3)->andReturn(response()->json(['data' => ['summary' => [
+            $mock->shouldReceive('eventSummary')->with('EV-1', null, true)->times(3)->andReturn(response()->json(['data' => ['summary' => [
                 'report' => ['prepared_by' => 'Original preparer'], 'event' => ['name' => 'Flood'], 'household' => ['total' => 0],
             ]]]));
         });

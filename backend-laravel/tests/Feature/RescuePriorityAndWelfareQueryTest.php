@@ -619,6 +619,12 @@ class RescuePriorityAndWelfareQueryTest extends TestCase
         $this->assertSame(0.0, $points[1]['no_contact']);
         $this->assertSame(100.0, $points[0]['no_contact']);
 
+        $site = collect($history->sitioSeries('EVT-1', $startedAt))->firstWhere('sitio', 'Registered A');
+        $atStart = collect($site['points'])->first(fn ($point) => \Illuminate\Support\Carbon::parse($point['observed_at'])->equalTo($startedAt));
+        $afterHouseholdReport = collect($site['points'])->first(fn ($point) => \Illuminate\Support\Carbon::parse($point['observed_at'])->equalTo($startedAt->copy()->addHour()));
+        $this->assertSame([], $atStart['counts']['status_counts']);
+        $this->assertSame(['unsafe' => 1], $afterHouseholdReport['counts']['status_counts']);
+
         DB::table('households')->where('household_id', 'HH-1')->update(['contact_number' => '09170000001']);
         $history->refresh('EVT-1', $startedAt);
         $this->assertSame(100.0, $history->forEvent('EVT-1', $startedAt)[0]['no_contact']);

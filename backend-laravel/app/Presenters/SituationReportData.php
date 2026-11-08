@@ -45,7 +45,8 @@ class SituationReportData
             'puroks' => array_map(fn ($row) => ['name' => $row['purok'] ?? 'Not recorded', 'sitio' => $row['sitio'] ?? 'Not recorded',
                 'households' => $row['total'] ?? null, 'persons' => $row['persons'] ?? null, 'affected' => $row['affected'] ?? null,
                 'affected_persons' => $row['affected_persons'] ?? null, 'safe' => $row['safe'] ?? null, 'evacuated' => $row['evacuated'] ?? null,
-                'unsafe' => $row['unsafe'] ?? null, 'unchecked' => $row['unchecked'] ?? null], $h['puroks'] ?? []),
+                'unsafe' => $row['unsafe'] ?? null, 'unchecked' => $row['unchecked'] ?? null,
+                'status_counts' => $row['status_counts'] ?? null], $h['puroks'] ?? []),
             'timeline' => array_map(fn ($row) => ['category' => $row['title'] ?? '', 'title' => $row['actor'] ?? '',
                 'actor' => $row['actor'] ?? '', 'detail' => $row['detail'] ?? '', 'logged_at' => $this->date($row['time'] ?? null), 'status' => $row['status'] ?? ''], $s['dispatch']['timeline'] ?? []),
             'teams' => array_map(function ($row) {

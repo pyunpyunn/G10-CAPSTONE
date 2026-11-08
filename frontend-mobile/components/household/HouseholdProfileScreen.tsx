@@ -4,9 +4,11 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Path } from 'react-native-svg';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
+import type { HouseholdProfilePhotoAsset } from '@/api/household';
 
 type ProfileProps = {
   overview: any;
@@ -14,6 +16,7 @@ type ProfileProps = {
   onLogout: () => void;
   onSaveContact: (contactNumber: string) => Promise<void>;
   onResetDeviceOwner: () => Promise<void>;
+  onUploadProfilePhoto: (asset: HouseholdProfilePhotoAsset) => Promise<void>;
 };
 
 export function HouseholdProfileScreen({
@@ -21,6 +24,7 @@ export function HouseholdProfileScreen({
   onUpdateGeotag,
   onSaveContact,
   onResetDeviceOwner,
+  onUploadProfilePhoto,
   onLogout,
 }: ProfileProps) {
   const household = overview.profile?.household || {};
@@ -40,6 +44,7 @@ export function HouseholdProfileScreen({
   );
   const [contactNumber, setContactNumber] = useState(user.contact_number || '');
   const [savingContact, setSavingContact] = useState(false);
+  const [savingProfilePhoto, setSavingProfilePhoto] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
   const [resettingOwner, setResettingOwner] = useState(false);
   const ownerResetPending = useRef(false);
@@ -59,6 +64,24 @@ export function HouseholdProfileScreen({
     } finally {
       contactSubmitting.current = false;
       setSavingContact(false);
+    }
+  }
+
+  async function pickProfilePhoto() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.75,
+    });
+    if (result.canceled || !result.assets[0]?.uri) return;
+    setSavingProfilePhoto(true);
+    try {
+      await onUploadProfilePhoto(result.assets[0]);
+      Alert.alert('Profile picture saved', 'Your profile picture was updated.');
+    } catch (error: any) {
+      Alert.alert('Unable to upload profile picture', error?.response?.data?.message || 'Please try again.');
+    } finally {
+      setSavingProfilePhoto(false);
     }
   }
 
@@ -184,6 +207,13 @@ export function HouseholdProfileScreen({
 
         <Text style={styles.panelLabel}>Member ID: {user.member_id}</Text>
         <Text style={styles.panelMeta}>Your contact: {user.contact_number || 'Not recorded'}</Text>
+        <HouseholdButton
+          label={savingProfilePhoto ? 'Uploading profile picture...' : user.profile_photo_uploaded ? 'Change profile picture' : 'Upload profile picture'}
+          icon="image-outline"
+          tone="light"
+          disabled={savingProfilePhoto || resettingOwner}
+          onPress={() => void pickProfilePhoto()}
+        />
 
         {householdMembers.length ? (
           <View style={styles.memberProfilePanel}>
@@ -309,7 +339,7 @@ export function HouseholdProfileScreen({
         <Text style={styles.geotagMessage} accessibilityLiveRegion="polite">{geotagMessage}</Text>
         </> : null}
         <HouseholdButton label={resettingOwner ? 'Resetting owner...' : 'Reset device owner'} icon="person-circle-outline" tone="light"
-          disabled={resettingOwner || savingContact || savingGeotag} onPress={() => Alert.alert('Reset this phone’s owner?',
+          disabled={resettingOwner || savingContact || savingGeotag} onPress={() => Alert.alert('Reset this phoneï¿½s owner?',
             'You will choose a household member again for this phone. Other phones will keep their owners.', [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Reset owner', onPress: async () => {

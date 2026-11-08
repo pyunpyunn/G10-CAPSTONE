@@ -281,20 +281,54 @@ test('configured Ngrok route is preferred over a saved API route in Android rele
   assert.equal(request.baseURL, configured);
 });
 
-test('Android releases do not use saved server settings instead of the configured Ngrok route', async () => {
+test('Android releases use a saved server only when configured routes are unavailable', async () => {
+  const saved = 'https://resq.example.ts.net/api/v1';
+  const configured = 'https://api.example.test/api/v1';
+  const unavailable = loadApiClient(saved, {
+    baseUrl: configured,
+    probe: async (url) => {
+      if (url === `${configured}/health/ready`) {
+        throw Object.assign(new Error('Network Error'), { isAxiosError: true, code: 'ERR_NETWORK' });
+      }
+      if (url === `${saved}/health/ready`) return { data: { status: 'ready' } };
+      throw new Error('Unexpected API route.');
+    },
+  });
+
+  const request = await unavailable.request({ headers: {}, method: 'post', url: '/auth/login' });
+  assert.equal(request.baseURL, saved);
+  assert.deepEqual(unavailable.probedUrls.map(({ url }) => url), [
+    `${configured}/health/ready`,
+    `${saved}/health/ready`,
+  ]);
+});
+
+test('Android releases still prefer the configured route when it is healthy', async () => {
   const saved = 'https://resq.example.ts.net/api/v1';
   const configured = 'https://api.example.test/api/v1';
   const client = loadApiClient(saved, {
     baseUrl: configured,
-    probe: async () => { throw Object.assign(new Error('Network Error'), { isAxiosError: true, code: 'ERR_NETWORK' }); },
+    probe: async (url) => {
+      if (url !== `${configured}/health/ready`) throw new Error('Saved route must not be preferred.');
+      return { data: { status: 'ready' } };
+    },
   });
 
-  await assert.rejects(client.request({ headers: {}, method: 'post', url: '/auth/login' }), (error) => {
-    assert.match(error.userMessage, /api\.example\.test: ERR_NETWORK/);
-    assert.doesNotMatch(error.userMessage, /resq\.example\.ts\.net/);
-    return true;
-  });
+  const request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
+  assert.equal(request.baseURL, configured);
   assert.deepEqual(client.probedUrls.map(({ url }) => url), [`${configured}/health/ready`]);
+});
+
+test('Android Ngrok DNS fallback bootstraps DoH over validated HTTPS without system DNS', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../plugins/android/NgrokDnsFallback.kt'), 'utf8');
+
+  assert.match(source, /cloudflare-dns\.com\/dns-query[\s\S]*cloudflare-dns\.com", listOf\("1\.1\.1\.1", "1\.0\.0\.1"\)/);
+  assert.match(source, /dns\.google\/resolve[\s\S]*dns\.google", listOf\("8\.8\.8\.8", "8\.8\.4\.4"\)/);
+  assert.match(source, /\.dns\(object : Dns \{/);
+  assert.match(source, /override fun lookup\(requestedHostname: String\)/);
+  assert.match(source, /InetAddress\.getByAddress\(address,/);
+  assert.match(source, /\.url\("\$\{resolver\.url\}\?name=\$query&type=A"\)/);
+  assert.doesNotMatch(source, /HttpsURLConnection/);
 });
 
 test('login POST requests fail over only after a connection loss, not an HTTP response', async () => {

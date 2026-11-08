@@ -44,11 +44,13 @@ if the task is missing or the Ngrok account/domain changes.
 
 ## 2. API route in the current APK
 
-Build 61 uses only the Ngrok HTTPS API route below. It does not need the phone
-to be on the laptop's Wi-Fi or Tailscale, and it ignores saved server
-addresses. Android resolves the Ngrok address over HTTPS DNS inside the app
-when the phone's normal DNS cannot resolve it; there is no need to change
-Private DNS:
+Build 68 tries the Ngrok HTTPS API route below first, followed by any other
+configured release routes. A validated address saved under **Server settings**
+is used only if those routes are unreachable. It does not need the phone to be
+on the laptop's Wi-Fi or Tailscale. Android resolves Ngrok through
+Cloudflare DNS-over-HTTPS, then Google DNS-over-HTTPS, using bootstrap IPs when
+normal DNS cannot resolve the host. API TLS certificate checks remain enabled;
+there is no need to change Private DNS:
 
 ```text
 EXPO_PUBLIC_API_BASE_URL=https://sturdily-morse-sitter.ngrok-free.dev/api/v1
@@ -93,8 +95,8 @@ separately.
 
 | Problem | Check |
 | --- | --- |
-| The phone browser cannot find the Ngrok hostname | Browser DNS is controlled by the phone's network; the app's HTTPS DNS fallback does not change browser behavior. Install build 61 or newer to use the fallback inside RESQPERATION. |
-| The APK still cannot reach the API | Confirm build 61 or newer is installed, then retry after closing/reopening it. Make sure the laptop is awake, online, and signed in to Windows. The health check proves API reachability, not the account password. |
+| The phone browser cannot find the Ngrok hostname | Browser DNS is controlled by the phone's network; the app's HTTPS DNS fallback does not change browser behavior. Use build 68 or newer to use the fallback inside RESQPERATION. |
+| The APK still cannot reach the API | Confirm build 68 or newer is installed, then retry after closing/reopening it. Make sure the laptop is awake, online, and signed in to Windows. You can save another reachable API URL under **Server settings** as a fallback. The health check proves API reachability, not the account password. |
 | Health endpoint reports a database error | Verify `DB_CONNECTION` and its host/database credentials in the backend `.env`; run `php artisan db:show`. |
 | Tailscale hostname does not work | The tailnet administrator must enable Tailscale Serve or provide another tested HTTPS endpoint. |
 | A local Wi-Fi route does not work | Use a stable LAN hostname with trusted HTTPS; release APKs do not allow plain HTTP. |

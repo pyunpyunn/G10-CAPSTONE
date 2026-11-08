@@ -65,6 +65,7 @@ class MappingService
             $full && $hasEvent ? $this->query->getRescueTeamMarkers($eventId) : [],
             $full && $hasEvent ? $this->routesInsideBoundary($this->query->getDispatchRoutes($eventId), $focus) : [],
             $this->query->getPurokOptions($focus['barangay_id']),
+            $full && $hasEvent ? $this->query->getHouseholdExposureByPurok($eventId, $focus['barangay_id']) : [],
         );
     }
 

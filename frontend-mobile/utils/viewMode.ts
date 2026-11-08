@@ -23,7 +23,7 @@ function notify() {
   listeners.forEach((listener) => listener());
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('message', (event) => {
     if (event.data?.type === 'RESQ_SET_VIEW_MODE') {
       const nextMode = event.data.mode as WebViewMode;

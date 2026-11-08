@@ -66,6 +66,11 @@ class RescuerMobileController extends Controller
             : (new RescuerMobileAssignmentDetailResource($result))->response();
     }
 
+    public function assignedMemberProfilePhoto(Request $request, int $assignmentId, string $memberId)
+    {
+        return $this->service->assignedMemberProfilePhoto($request, $assignmentId, $memberId);
+    }
+
     public function updateAssignmentStatus(Request $request, int $assignmentId): JsonResponse
     {
         $result = $this->service->updateAssignmentStatus($request, $assignmentId);
@@ -154,6 +159,5 @@ class RescuerMobileController extends Controller
         return $this->service->storeRadioSignal($request);
     }
 }
-
 
 

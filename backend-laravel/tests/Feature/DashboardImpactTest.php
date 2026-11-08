@@ -55,6 +55,8 @@ class DashboardImpactTest extends TestCase
         $this->assertSame(2, $monthly['event_count']);
         $this->assertSame(5, $monthly['assessed_households']);
         $this->assertCount(2, $monthly['periods']);
+        $this->assertSame('E1', $monthly['events'][0]['event_id']);
+        $this->assertSame(['deaths' => 1, 'injured' => 2, 'missing' => 1, 'damaged_houses' => 3], array_intersect_key($monthly['events'][0], $monthly['totals']));
         $this->assertSame('Oct 2026', $monthly['periods'][0]['label']);
         $this->assertSame('2026-09-28', $query->history('weekly')['periods'][0]['key']);
         $yearly = $query->history('yearly');

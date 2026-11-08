@@ -180,9 +180,10 @@ class RescueCriteriaHistoryQuery
 
 
     /** One fixed-weight impact series per sitio, pooling the counts of its puroks. */
-    public function sitioSeries(string $eventId, Carbon $startedAt): array
+    public function sitioSeries(string $eventId, Carbon $startedAt, ?Carbon $endedAt = null): array
     {
-        $until = now()->startOfSecond();
+        $until = $endedAt && $endedAt->lt(now()) ? $endedAt->copy()->startOfSecond() : now()->startOfSecond();
+        $useLiveState = $endedAt === null;
         $barangayId = $this->barangay->current()['barangay_id'] ?? null;
         if ($barangayId === null) return [];
         $sitios = DB::table('sitios')->where('barangay_id', $barangayId)->orderBy('sitio_name')
@@ -224,32 +225,51 @@ class RescueCriteriaHistoryQuery
         foreach ($members as $m) $memberStates[$m->member_id] = ['household_id' => $m->household_id,
             'created_at' => $m->created_at, 'deleted_at' => $m->deleted_at, 'status' => null, 'vulnerable' => (bool) $m->vulnerable];
         $reports = [];
+        $observations = [];
         if ($ids !== []) {
             $rows = DB::table('household_status_logs as l')->join('household_statuses as s', 's.status_id', '=', 'l.status_id')
                 ->where('l.disaster_id', $eventId)->whereIn('l.household_id', $ids)->whereBetween('l.submitted_at', [$startedAt, $until])
-                ->orderBy('l.submitted_at')->orderBy('l.status_log_id')->get(['l.household_id as id', 's.status_key as status', 'l.submitted_at as at']);
-            foreach ($rows as $r) $reports[] = ['kind' => 'household', 'id' => $r->id, 'status' => $r->status, 'at' => $r->at];
+                ->orderBy('l.submitted_at')->orderBy('l.status_log_id')->get([
+                    'l.household_id as id', 's.status_key as status', 'l.submitted_at as at', 'l.status_log_id as sequence',
+                ]);
+            foreach ($rows as $r) {
+                $reports[] = ['kind' => 'household', 'id' => $r->id, 'status' => $r->status, 'at' => $r->at, 'sequence' => $r->sequence];
+                $observations[] = Carbon::parse($r->at);
+            }
             if (Schema::hasColumn('responder_assignments', 'dispatch_type')) {
                 $rows = DB::table('responder_assignments')->where('disaster_id', $eventId)->whereIn('household_id', $ids)
                     ->where('dispatch_type', 'welfare_check')->where('status', 'completed')->whereBetween('completed_at', [$startedAt, $until])
-                    ->orderBy('completed_at')->orderBy('assignment_id')->get(['household_id as id', 'completed_at as at']);
-                foreach ($rows as $r) $reports[] = ['kind' => 'welfare', 'id' => $r->id, 'at' => $r->at];
+                    ->orderBy('completed_at')->orderBy('assignment_id')->get([
+                        'household_id as id', 'completed_at as at', 'assignment_id as sequence',
+                    ]);
+                foreach ($rows as $r) {
+                    $reports[] = ['kind' => 'welfare', 'id' => $r->id, 'at' => $r->at, 'sequence' => $r->sequence];
+                    $observations[] = Carbon::parse($r->at);
+                }
             }
         }
         if ($memberStates !== []) {
             $rows = DB::table('member_status_logs as l')->join('member_statuses as s', 's.status_id', '=', 'l.to_status_id')
                 ->where('l.disaster_id', $eventId)->whereIn('l.member_id', array_keys($memberStates))->whereBetween('l.reported_at', [$startedAt, $until])
-                ->orderBy('l.reported_at')->orderBy('l.member_status_log_id')->get(['l.member_id as id', 's.status_key as status', 'l.reported_at as at']);
-            foreach ($rows as $r) $reports[] = ['kind' => 'member', 'id' => $r->id, 'status' => $r->status, 'at' => $r->at];
+                ->orderBy('l.reported_at')->orderBy('l.member_status_log_id')->get([
+                    'l.member_id as id', 's.status_key as status', 'l.reported_at as at', 'l.member_status_log_id as sequence',
+                ]);
+            foreach ($rows as $r) {
+                $reports[] = ['kind' => 'member', 'id' => $r->id, 'status' => $r->status, 'at' => $r->at, 'sequence' => $r->sequence];
+                $observations[] = Carbon::parse($r->at);
+            }
         }
-        usort($reports, fn ($a, $b) => strcmp($a['at'], $b['at']));
+        usort($reports, fn ($a, $b) => strcmp($a['at'], $b['at']) ?: ((int) $a['sequence'] <=> (int) $b['sequence']));
         $series = [];
         foreach ($sitios as $sitio) $series[$sitio->sitio_id] = ['sitio_id' => $sitio->sitio_id, 'sitio' => $sitio->sitio_name,
             'is_demo' => false, 'points' => []];
         $times = [];
         $hours = max(0, (int) $startedAt->diffInHours($until, false));
         for ($hour = 0; $hour <= $hours; $hour += 3) $times[] = $startedAt->copy()->addHours($hour);
-        if (! end($times)->equalTo($until)) $times[] = $until;
+        $timeMap = [];
+        foreach ([...$times, ...$observations, $until] as $at) $timeMap[$at->format('Y-m-d H:i:s.u')] = $at;
+        ksort($timeMap);
+        $times = array_values($timeMap);
         $next = 0;
         foreach ($times as $at) {
             while (isset($reports[$next]) && Carbon::parse($reports[$next]['at'])->lte($at)) {
@@ -261,7 +281,7 @@ class RescueCriteriaHistoryQuery
                 }
             }
             // The live endpoint uses authoritative current status, including imported reports without logs.
-            if ($at->equalTo($until)) {
+            if ($useLiveState && $at->equalTo($until)) {
                 if ($ids !== []) {
                     $live = DB::table('household_disasters as hd')->leftJoin('household_statuses as s', 's.status_id', '=', 'hd.current_status_id')
                         ->where('hd.disaster_id', $eventId)->whereIn('hd.household_id', $ids)->get(['hd.household_id', 'hd.last_reported_at', 's.status_key']);
@@ -290,7 +310,7 @@ class RescueCriteriaHistoryQuery
             foreach ($sitios as $sitio) {
                 $hh = $groupedHouseholds[$sitio->sitio_id] ?? [];
                 $mm = $groupedMembers[$sitio->sitio_id] ?? [];
-                $point = $this->weightedImpact($this->counts($hh, $mm));
+                $point = $this->weightedImpact($this->countsWithStatuses($hh, $mm));
                 $point['observed_at'] = $at->toIso8601String();
                 $point['hours_since_alert'] = max(0, round($startedAt->diffInSeconds($at, false) / 3600, 6));
                 $point['puroks'] = [];
@@ -298,13 +318,13 @@ class RescueCriteriaHistoryQuery
                     $ph = array_filter($hh, fn ($h) => $h['purok_id'] == $purok->purok_id);
                     $pm = array_filter($mm, fn ($m) => isset($ph[$m['household_id']]));
                     $point['puroks'][] = ['purok_id' => $purok->purok_id, 'purok' => $purok->purok_name]
-                        + $this->weightedImpact($this->counts($ph, $pm));
+                        + $this->weightedImpact($this->countsWithStatuses($ph, $pm));
                 }
                 $unlinked = array_filter($hh, fn ($h) => $h['purok_id'] === null);
                 if ($unlinked !== []) {
                     $unlinkedMembers = array_filter($mm, fn ($m) => isset($unlinked[$m['household_id']]));
                     $point['puroks'][] = ['purok_id' => null, 'purok' => 'Unassigned purok']
-                        + $this->weightedImpact($this->counts($unlinked, $unlinkedMembers));
+                        + $this->weightedImpact($this->countsWithStatuses($unlinked, $unlinkedMembers));
                 }
                 $series[$sitio->sitio_id]['points'][] = $point;
             }
@@ -370,6 +390,19 @@ class RescueCriteriaHistoryQuery
             'special_open' => $special, 'vulnerable_total' => $vulnerable,
             'unreported_open' => $unreported, 'member_total' => count($members),
             'no_contact_open' => $noContact, 'no_contact_total' => $noneTotal];
+    }
+
+    private function countsWithStatuses(array $households, array $members): array
+    {
+        $counts = $this->counts($households, $members);
+        $statusCounts = [];
+        foreach ($households as $household) {
+            if ($household['status'] !== null && $household['status'] !== '') {
+                $statusCounts[$household['status']] = ($statusCounts[$household['status']] ?? 0) + 1;
+            }
+        }
+
+        return [...$counts, 'status_counts' => $statusCounts];
     }
 
     private function percent(int $open, int $total): ?float

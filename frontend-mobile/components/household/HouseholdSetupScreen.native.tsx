@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import MapView, { Marker } from 'react-native-maps';
@@ -8,11 +8,13 @@ import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { useHouseholdSetup } from '@/hooks/useHouseholdSetup';
 import { HouseholdSetupAddressForm } from './HouseholdSetupAddressForm';
 import { HouseholdBadge, HouseholdButton, HouseholdSection } from './HouseholdUI';
+import type { HouseholdProfilePhotoAsset } from '@/api/household';
 
 type SetupProps = {
   overview: any;
   deviceUuid: string;
   onComplete: (payload: any) => Promise<void>;
+  onUploadProfilePhoto: (asset: HouseholdProfilePhotoAsset) => Promise<void>;
 };
 
 const defaultRegion = {
@@ -22,7 +24,7 @@ const defaultRegion = {
   longitudeDelta: 0.025,
 };
 
-export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: SetupProps) {
+export function HouseholdSetupScreen({ overview, deviceUuid, onComplete, onUploadProfilePhoto }: SetupProps) {
   const user = overview.profile?.user || {};
   const member = (overview.members || []).find((item: any) => String(item.member_id) === String(user.member_id));
   const memberId = user.member_id || '';
@@ -30,7 +32,8 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
   const [photoUri, setPhotoUri] = useState('');
   const [locationMode, setLocationMode] = useState<'gps' | 'map'>('map');
   const { pin, address, details, setDetails, saving, findingAddress, geotagMessage, beginPinMove,
-    applyPinnedCoordinate, requestGpsLocation, handleSave } = useHouseholdSetup({ overview, deviceUuid, onComplete, photoUri });
+    applyPinnedCoordinate, requestGpsLocation, handleSave } = useHouseholdSetup({ overview, deviceUuid, onComplete });
+  const [savingPhoto, setSavingPhoto] = useState(false);
 
   async function pickPhoto() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -40,7 +43,17 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
     });
 
     if (!result.canceled) {
-      setPhotoUri(result.assets[0]?.uri || '');
+      const asset = result.assets[0];
+      if (!asset?.uri) return;
+      setSavingPhoto(true);
+      try {
+        await onUploadProfilePhoto(asset);
+        setPhotoUri(asset.uri);
+      } catch (error: any) {
+        Alert.alert('Unable to upload profile picture', error?.response?.data?.message || 'Please try again.');
+      } finally {
+        setSavingPhoto(false);
+      }
     }
   }
 
@@ -94,8 +107,8 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
             {photoUri ? <Image source={{ uri: photoUri }} style={styles.photo} /> : <Ionicons name="image-outline" size={26} color={palette.navMuted} />}
           </View>
           <View style={styles.photoActions}>
-            <Text style={styles.photoTitle}>Family photo</Text>
-            <HouseholdButton label={photoUri ? 'Change photo' : 'Upload photo'} icon="image-outline" tone="light" onPress={pickPhoto} />
+            <Text style={styles.photoTitle}>Profile picture</Text>
+            <HouseholdButton label={savingPhoto ? 'Uploading...' : photoUri ? 'Change photo' : 'Upload photo'} icon="image-outline" tone="light" disabled={savingPhoto} onPress={() => void pickPhoto()} />
           </View>
         </View>
       </View>

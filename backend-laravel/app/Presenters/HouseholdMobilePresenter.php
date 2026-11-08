@@ -33,6 +33,7 @@ class HouseholdMobilePresenter
             'username' => $user->username,
             'email' => $user->email,
             'contact_number' => $member?->contact_number ?? $user->contact_number,
+            'profile_photo_uploaded' => is_string($user->profile_photo) && $user->profile_photo !== '',
             'role' => [
                 'role_key' => $user->role?->role_key,
                 'role_name' => $user->role?->role_name,
@@ -153,4 +154,3 @@ class HouseholdMobilePresenter
         ];
     }
 }
-

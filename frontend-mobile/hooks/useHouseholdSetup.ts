@@ -14,8 +14,8 @@ export type SetupDetails = {
   landmark: string;
 };
 
-export function useHouseholdSetup({ overview, deviceUuid, onComplete, photoUri = '' }: {
-  overview: any; deviceUuid: string; onComplete: (payload: any) => Promise<void>; photoUri?: string;
+export function useHouseholdSetup({ overview, deviceUuid, onComplete }: {
+  overview: any; deviceUuid: string; onComplete: (payload: any) => Promise<void>;
 }) {
   const registered = overview.setup?.address;
   const [address, setAddress] = useState<any>(registered || null);
@@ -91,7 +91,7 @@ export function useHouseholdSetup({ overview, deviceUuid, onComplete, photoUri =
     setSaving(true);
     try {
       await onComplete({
-        ...device, ...pin, ...details, photo_uri: photoUri || null,
+        ...device, ...pin, ...details,
         house_number: details.house_number.trim(), unit_number: details.is_apartment ? details.unit_number.trim() : null,
       });
     } finally {

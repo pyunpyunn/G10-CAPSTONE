@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { api } from './client';
+import { api, getAuthenticatedImageSource } from './client';
 import { submitReport } from './reportSubmission';
 
 export type RescuerOverview = {
@@ -32,6 +32,12 @@ export async function getRescuerOverview(refresh = false) {
 export async function getAssignedHousehold(assignmentId: number) {
   const response = await api.get(`/rescuer/assignments/${assignmentId}/household`);
   return response.data.data;
+}
+
+export async function getAssignedMemberProfilePhoto(assignmentId: number, memberId: string) {
+  return getAuthenticatedImageSource(
+    `/rescuer/assignments/${assignmentId}/members/${encodeURIComponent(memberId)}/profile-photo`,
+  );
 }
 
 export async function getRescuerProfile() {

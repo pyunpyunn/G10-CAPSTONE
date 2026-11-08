@@ -2,6 +2,7 @@
 
 namespace App\Services\Web;
 
+use App\Presenters\SituationReportDocument;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -12,22 +13,52 @@ use OpenSpout\Writer\XLSX\Writer;
 
 class ReportFileService
 {
+    public function generateImpactReport(string $format, array $report): array
+    {
+        $format = $format === 'excel' ? 'xlsx' : $format;
+        if (! in_array($format, ['pdf', 'xlsx'], true)) {
+            throw ValidationException::withMessages(['format' => 'Select PDF or Excel for graph reports.']);
+        }
+
+        $type = $report['type'];
+        $filename = $type.'_'.now()->format('Ymd_His').'_'.Str::random(16).'.'.$format;
+        $path = tempnam(sys_get_temp_dir(), 'impact-report-');
+        try {
+            if ($format === 'xlsx') {
+                app(ImpactReportSpreadsheet::class)->write($path, $report);
+            } else {
+                Pdf::loadHTML(view('reports.impact', ['report' => $report])->render())
+                    ->setPaper('a4', 'landscape')->save($path);
+            }
+
+            return $this->persistReportFile($filename, $path, $type, $format);
+        } finally {
+            if (file_exists($path)) {
+                unlink($path);
+            }
+        }
+    }
+
     public function generate(string $type, string $format, array $headers, iterable $rows): array
     {
         $format = $format === 'excel' ? 'xlsx' : $format;
-        if (!in_array($format, ['pdf', 'csv', 'xlsx'], true)) {
+        if (! in_array($format, ['pdf', 'csv', 'xlsx'], true)) {
             throw ValidationException::withMessages(['format' => 'Select PDF, CSV, or Excel.']);
         }
         $filename = $type.'_'.now()->format('Ymd_His').'_'.Str::random(16).'.'.$format;
         $path = tempnam(sys_get_temp_dir(), 'report-');
         try {
             if ($format === 'xlsx') {
-                $writer = new Writer();
+                $writer = new Writer;
                 $writer->openToFile($path);
                 try {
                     $writer->addRow(Row::fromValues(array_values($headers)));
-                    foreach ($rows as $row) $writer->addRow(Row::fromValues(array_map(fn ($value) => (string) ($value ?? ''), $row)));
-                } finally { $writer->close(); }
+                    foreach ($rows as $row) {
+                        $writer->addRow(Row::fromValues(array_map(fn ($value) => (string) ($value ?? ''), $row)));
+                    }
+                } finally {
+                    $writer->close();
+                }
             } elseif ($format === 'csv') {
                 $handle = fopen($path, 'w');
                 try {
@@ -36,10 +67,13 @@ class ReportFileService
                     foreach ($rows as $row) {
                         fputcsv($handle, array_map(function ($value) {
                             $text = (string) ($value ?? '');
+
                             return preg_match('/^[\s]*[=+@-]/u', $text) ? "'".$text : $text;
                         }, $row), ',', '"', '');
                     }
-                } finally { fclose($handle); }
+                } finally {
+                    fclose($handle);
+                }
             } else {
                 $pdfRows = [];
                 foreach ($rows as $row) {
@@ -51,8 +85,13 @@ class ReportFileService
                 Pdf::loadView('reports.table', ['title' => str_replace('-', ' ', $type), 'headers' => $headers, 'rows' => $pdfRows, 'generatedAt' => now()])
                     ->setPaper('a4', 'landscape')->save($path);
             }
+
             return $this->persistReportFile($filename, $path, $type, $format);
-        } finally { if (file_exists($path)) unlink($path); }
+        } finally {
+            if (file_exists($path)) {
+                unlink($path);
+            }
+        }
     }
 
     public function generateSituationPdf(array $summary): array
@@ -65,31 +104,43 @@ class ReportFileService
                 'summary' => $summary,
                 'generatedAt' => now()->toDateTimeString(),
             ])->render())->setPaper('a4', 'portrait');
-            {
-                $pdf->render();
-                $pdf->getDomPDF()->getCanvas()->page_text(460, 815, 'Page {PAGE_NUM} of {PAGE_COUNT}', null, 8);
-            }
+
+            $pdf->render();
+            $pdf->getDomPDF()->getCanvas()->page_text(460, 815, 'Page {PAGE_NUM} of {PAGE_COUNT}', null, 8);
+
             $pdf->save($path);
 
             return $this->persistReportFile($filename, $path, 'situation', 'pdf');
         } finally {
-            if (file_exists($path)) unlink($path);
+            if (file_exists($path)) {
+                unlink($path);
+            }
         }
     }
 
     public function generateSituationSpreadsheet(array $summary, string $format): array
     {
         $format = $format === 'excel' ? 'xlsx' : $format;
-        if (!in_array($format, ['csv','xlsx'], true)) throw ValidationException::withMessages(['format'=>'Select CSV or Excel.']);
+        if (! in_array($format, ['csv', 'xlsx'], true)) {
+            throw ValidationException::withMessages(['format' => 'Select CSV or Excel.']);
+        }
         $filename = 'situation_'.now()->format('Ymd_His').'_'.Str::random(16).'.'.$format;
         $path = tempnam(sys_get_temp_dir(), 'sitrep-');
         try {
-            $document = app(\App\Presenters\SituationReportDocument::class)->data($summary);
+            $document = app(SituationReportDocument::class)->data($summary);
             $writer = app(SituationReportSpreadsheet::class);
-            if ($format === 'xlsx') $writer->writeXlsx($path, $document);
-            else $writer->writeCsv($path, $document);
+            if ($format === 'xlsx') {
+                $writer->writeXlsx($path, $document);
+            } else {
+                $writer->writeCsv($path, $document);
+            }
+
             return $this->persistReportFile($filename, $path, 'situation', $format);
-        } finally { if (file_exists($path)) unlink($path); }
+        } finally {
+            if (file_exists($path)) {
+                unlink($path);
+            }
+        }
     }
 
     private function persistReportFile(string $filename, string $path, string $type, string $format): array
@@ -97,8 +148,12 @@ class ReportFileService
         $disk = Storage::disk(config('reports.disk'));
         $handle = fopen($path, 'r');
         try {
-            if (!$disk->put('reports/'.$filename, $handle)) throw new \RuntimeException('Report storage failed.');
-        } finally { fclose($handle); }
+            if (! $disk->put('reports/'.$filename, $handle)) {
+                throw new \RuntimeException('Report storage failed.');
+            }
+        } finally {
+            fclose($handle);
+        }
 
         $expires = now()->addMinutes(config('reports.expires_minutes'));
         $url = config('reports.disk') === 's3'

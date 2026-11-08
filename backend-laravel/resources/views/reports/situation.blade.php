@@ -17,6 +17,13 @@ table { border-collapse: collapse; width: 100%; margin: 8px 0; table-layout: fix
 th, td { border: 1px solid #999999; padding: 5px; vertical-align: top; overflow-wrap: break-word; }
 th { background: #eeeeee; text-align: left; } thead { display: table-header-group; }
 tr { page-break-inside: avoid; } .closing { page-break-inside: avoid; } .text { white-space: pre-wrap; }
+.sitio-group th { background: #dce6f1; font-size: 9pt; }
+.purok-group th { background: #edf2f7; }
+.household-family-row, .household-family-table { page-break-inside: avoid; break-inside: avoid; }
+.household-family-row > td { padding: 0; border: 0; }
+.household-family-table { margin: 0; }
+.household-member-last td { border-bottom: 2.5px solid #334155; }
+.household-name-span { border-bottom: 2.5px solid #334155; }
 footer { position: fixed; bottom: -12mm; font-size: 7pt; }
 </style></head><body>
 <header>@foreach ($r['letterhead'] as $line)<div>{{ $line }}</div>@endforeach

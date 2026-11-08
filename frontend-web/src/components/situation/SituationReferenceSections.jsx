@@ -16,10 +16,13 @@ function Content({section,summary:s}) {
   const population=situationPopulation(s), h=s.household || {}, w=s.weather || {}
   const damageDetails=(h.details || []).filter(r => ['minor_damage','major_damage','completely_destroyed','no_damage'].includes(r.damage))
   const damageRows=[['minor_damage','Minor damage'],['major_damage','Major damage'],['completely_destroyed','Completely destroyed']].map(([code,label]) => [label,damageDetails.length ? damageDetails.filter(r => r.damage === code).length : null])
-  const areaRows=items => items.map(p => [p.sitio,p.purok,p.families,p.persons])
+  const statusSummary = counts => counts == null ? 'Not recorded'
+    : `${[['safe','Safe'],['unsafe','Unsafe'],['evacuated','Evacuated'],['dead','Dead'],['missing','Missing'],['injured','Injured']]
+      .map(([key,label]) => `${label}: ${Number(counts[key] ?? 0)}`).join('; ')} (${Number(counts.reported_members ?? 0)} member assessments)`
+  const areaRows=items => items.map(p => [p.sitio,p.purok,p.families,p.persons,statusSummary(p.status_counts)])
   switch(section) {
     case 'I': return <Table headings={['Finding','Recorded value']} rows={[["Event",s.event?.name],["Hazard",s.event?.type],["Alert level",s.event?.severity],["Area coverage",s.event?.coverage],["Weather",w.condition],["Advisory",w.advisory]]} />
-    case 'II': return <Table headings={['Sitio','Purok','Families','Persons']} rows={areaRows(population.affected)} />
+    case 'II': return <Table headings={['Sitio','Purok','Families','Persons','Status']} rows={areaRows(population.affected)} />
     case 'IV': return <><Table headings={['Recorded category','Recorded assessments']} rows={damageRows} /><Table headings={['Family reference','Sitio','Purok','Recorded damage']} rows={(h.details || []).filter(r => r.damage && !['no_damage','not_yet_assessed'].includes(r.damage)).map(r => [r.household,r.sitio,r.purok,r.damage.replaceAll('_',' ')])} /></>
     case 'V': return <><Table headings={['Team','Assigned area','Deployed at','Results']} rows={(s.dispatch?.rows || []).map(r => [r.team,r.area,r.deployed_at,r.outcomes])} /><Table headings={['Date/time','Team / responder','Assigned area','Status']} rows={(s.dispatch?.timeline || []).filter(r => r.title === 'Dispatch assignment').map(r => [r.time,r.actor,r.detail,r.status])} /></>
     case 'VI': return <Table headings={['Center','Status','Capacity (persons)','Occupancy (persons)','Vacancy (persons)']} rows={(s.evacuation?.sites || []).map(r => [r.name,r.status,r.capacity,r.occupancy,r.vacancy])} />

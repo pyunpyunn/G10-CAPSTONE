@@ -33,13 +33,13 @@ class SituationReportService
         return response()->json(['data' => ['sitios' => $this->query->sitioOptions()]]);
     }
 
-    public function eventSummary(string $eventId, ?string $sitioId = null): JsonResponse
+    public function eventSummary(string $eventId, ?string $sitioId = null, bool $includePopulationRoster = false): JsonResponse
     {
         $event = $this->query->findEvent($eventId);
         if (! $event) return response()->json(['message' => 'Disaster event was not found.'], 404);
         $sitio = $sitioId !== null ? $this->query->sitioOptions()->firstWhere('sitio_id', $sitioId) : null;
         if ($sitioId !== null && !$sitio) throw ValidationException::withMessages(['sitio_id' => 'Select a registered sitio in this barangay.']);
-        $summary = $this->presenter->buildSummary($event, $this->query->summarySources($eventId, $sitioId), $this->barangayProfile->current());
+        $summary = $this->presenter->buildSummary($event, $this->query->summarySources($eventId, $sitioId, $includePopulationRoster), $this->barangayProfile->current());
         if ($sitio) {
             $summary['event']['sitio_id'] = $sitio->sitio_id;
             $summary['event']['sitio_name'] = $sitio->sitio_name;

@@ -29,6 +29,7 @@ import {
   saveHouseholdMemberStatus,
   saveHouseholdGeotag,
   saveTrustedHouseholdMemberStatus,
+  uploadHouseholdProfilePhoto,
   saveHouseholdStatus,
   saveTrustedPin,
   respondToTrustedHousehold,
@@ -36,7 +37,7 @@ import {
   updateHouseholdMember,
   verifyTrustedPin,
 } from '@/api/household';
-import type { HouseholdOverview } from '@/api/household';
+import type { HouseholdOverview, HouseholdProfilePhotoAsset } from '@/api/household';
 import { HouseholdDashboardScreen, HouseholdTrustedScreen } from '@/components/household/HouseholdDashboardScreen';
 import { HouseholdHeader } from '@/components/household/HouseholdHeader';
 import {
@@ -310,6 +311,17 @@ export default function HouseholdHomeScreen() {
     const saved = await updateHouseholdMember(memberId, payload);
     setOverview((current) => current && saved.user ? { ...current, profile: { ...current.profile, user: saved.user } } : current);
     void loadOverview(true, true, true);
+  }
+
+  async function handleUploadProfilePhoto(asset: HouseholdProfilePhotoAsset) {
+    const savedUser = await uploadHouseholdProfilePhoto(asset);
+    setOverview((current) => current ? {
+      ...current,
+      profile: { ...current.profile, user: { ...current.profile.user, profile_photo_uploaded: savedUser.profile_photo_uploaded } },
+      members: current.members.map((member) => String(member.member_id) === String(savedUser.member_id)
+        ? { ...member, profile_photo_uploaded: savedUser.profile_photo_uploaded }
+        : member),
+    } : current);
   }
 
   async function handleSaveStatus() {
@@ -621,7 +633,7 @@ export default function HouseholdHomeScreen() {
     }
 
     if (!overview.setup?.is_setup_complete) {
-      return <HouseholdSetupScreen overview={overview} deviceUuid={deviceUuid} onComplete={handleSetupComplete} />;
+      return <HouseholdSetupScreen overview={overview} deviceUuid={deviceUuid} onComplete={handleSetupComplete} onUploadProfilePhoto={handleUploadProfilePhoto} />;
     }
 
     if (activeTab === 'route') {
@@ -659,6 +671,7 @@ export default function HouseholdHomeScreen() {
           overview={overview}
           onUpdateGeotag={handleUpdateGeotag}
           onSaveContact={(contactNumber) => handleUpdateMember(String(overview.profile.user.member_id), { contact_number: contactNumber })}
+          onUploadProfilePhoto={handleUploadProfilePhoto}
           onResetDeviceOwner={async () => { await resetHouseholdDeviceOwner(); router.replace('/household-owner' as Href); }}
           onLogout={handleLogout}
         />

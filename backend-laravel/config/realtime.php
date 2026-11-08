@@ -2,7 +2,7 @@
 
 return [
     'durable' => (bool) env('REALTIME_DURABLE', false),
-    'connection' => env('REALTIME_DB_CONNECTION', env('DB_CONNECTION', 'mysql')),
+    'connection' => env('REALTIME_DB_CONNECTION', env('DB_CONNECTION', 'ResQperation')),
     'queue_connection' => env('REALTIME_QUEUE_CONNECTION', 'realtime_database'),
     'batch_size' => (int) env('REALTIME_BATCH_SIZE', 500),
     'retention_days' => (int) env('REALTIME_RETENTION_DAYS', 7),

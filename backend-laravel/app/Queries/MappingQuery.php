@@ -304,6 +304,55 @@ class MappingQuery
                 'sitio_id' => (int) $p->sitio_id, 'sitio_name' => $p->sitio_name])->all();
     }
 
+    public function getHouseholdExposureByPurok(?string $eventId, int|string|null $barangayId): array
+    {
+        if (! $eventId || ! Schema::hasTable('household_status_logs')
+            || ! Schema::hasTable('household_statuses') || ! Schema::hasTable('household_members')) {
+            return [];
+        }
+
+        $memberCounts = DB::table('household_members as hm')
+            ->select('hm.household_id')
+            ->selectRaw('COUNT(DISTINCT hm.member_id) as individuals')
+            ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('hm.deleted_at'))
+            ->groupBy('hm.household_id');
+
+        return DB::table('households as h')
+            ->join('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->join('puroks as p', 'p.purok_id', '=', 'a.purok_id')
+            ->join('sitios as s', 's.sitio_id', '=', 'p.sitio_id')
+            ->joinSub(HouseholdEventStatusQuery::latestReports($eventId), 'latest_report', 'latest_report.household_id', '=', 'h.household_id')
+            ->join('household_statuses as hs', 'hs.status_id', '=', 'latest_report.status_id')
+            ->leftJoinSub($memberCounts, 'member_counts', 'member_counts.household_id', '=', 'h.household_id')
+            ->whereIn('h.household_id', HouseholdEligibilityQuery::ids($barangayId))
+            ->whereIn('hs.status_key', [...HouseholdEventStatusQuery::UNSAFE_KEYS, ...HouseholdEventStatusQuery::EVACUATED_KEYS])
+            ->select([
+                'p.purok_id',
+                'p.purok_name',
+                's.sitio_id',
+                's.sitio_name',
+                'hs.status_key',
+                'hs.status_label',
+            ])
+            ->selectRaw('COUNT(DISTINCT h.household_id) as families')
+            ->selectRaw('SUM(COALESCE(member_counts.individuals, 0)) as individuals')
+            ->groupBy('p.purok_id', 'p.purok_name', 's.sitio_id', 's.sitio_name', 'hs.status_key', 'hs.status_label')
+            ->orderBy('s.sitio_name')
+            ->orderBy('p.purok_name')
+            ->orderBy('hs.status_label')
+            ->get()
+            ->map(fn (object $row): array => [
+                'purok_id' => (int) $row->purok_id,
+                'purok_name' => $row->purok_name,
+                'sitio_id' => (int) $row->sitio_id,
+                'sitio_name' => $row->sitio_name,
+                'status_key' => $row->status_key,
+                'status_label' => $row->status_label,
+                'families' => (int) $row->families,
+                'individuals' => (int) $row->individuals,
+            ])->all();
+    }
+
     public function householdSelectColumns(): array
     {
         $columns = [
@@ -526,5 +575,4 @@ class MappingQuery
         return Schema::hasTable($table) && Schema::hasColumn($table, $column);
     }
 }
-
 

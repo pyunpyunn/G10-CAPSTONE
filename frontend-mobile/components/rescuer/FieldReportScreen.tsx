@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
-import { getAssignedHousehold } from '@/api/rescuer';
+import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { getAssignedHousehold, getAssignedMemberProfilePhoto } from '@/api/rescuer';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { ActionButton, SectionHeader, StatTile } from './RescuerUI';
 import { ReportSelect, type ReportOption } from './ReportSelect';
@@ -10,6 +10,7 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
 }) {
   const [household, setHousehold] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
+  const [memberPhotos, setMemberPhotos] = useState<Record<string, any>>({});
   const [statusOptions, setStatusOptions] = useState<ReportOption[]>([]);
   const [damageOptions, setDamageOptions] = useState<ReportOption[]>([]);
   const [damage, setDamage] = useState('');
@@ -26,7 +27,7 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
 
   useEffect(() => {
     let active = true;
-    setHousehold(null); setMembers([]); setStatusOptions([]); setDamageOptions([]); setDamage(''); setNotes(''); setSaved(false); setError('');
+    setHousehold(null); setMembers([]); setMemberPhotos({}); setStatusOptions([]); setDamageOptions([]); setDamage(''); setNotes(''); setSaved(false); setError('');
     requestKey.current = `field-report-${assignmentId}-${householdId}`;
     if (!assignmentId || !householdId) { setLoading(false); setError('No current household.'); return; }
     setLoading(true);
@@ -34,7 +35,13 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
       if (!active) return;
       if (String(data.household?.household_id) !== String(householdId)) throw new Error('The current household changed. Refresh your queue.');
       setHousehold(data.household); setStatusOptions(data.member_status_options || []); setDamageOptions(data.property_damage_options || []); setDamage(data.saved_property_damage || '');
-      setMembers((data.members || []).map((member: any) => ({ id: String(member.member_id), name: member.name, head: member.is_household_head, statusKey: member.member_status?.key || '' })));
+      const assignedMembers = data.members || [];
+      setMembers(assignedMembers.map((member: any) => ({ id: String(member.member_id), name: member.name, head: member.is_household_head, statusKey: member.member_status?.key || '' })));
+      void Promise.all(assignedMembers
+        .filter((member: any) => member.has_profile_photo)
+        .map(async (member: any) => [String(member.member_id), await getAssignedMemberProfilePhoto(assignmentId, String(member.member_id))] as const))
+        .then(photos => { if (active) setMemberPhotos(Object.fromEntries(photos.filter(([, source]) => source))); })
+        .catch(photoError => { if (active) console.warn('Assigned household profile photos could not be loaded.', photoError); });
     }).catch(failure => { if (active) setError(failure.message || 'Unable to load report.'); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [assignmentId, householdId, revision]);
@@ -58,7 +65,7 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
       {loading && <Text style={styles.meta}>Loading…</Text>}
       {household && <><Text style={styles.name}>{household.household_name || household.household_id}</Text><Text style={styles.meta}>{household.household_id}</Text></>}
       {!!members.length && <View style={styles.columns}><Text style={styles.columnLabel}>Member</Text><Text style={styles.columnLabel}>Status check-in</Text></View>}
-      {members.map(member => <View style={styles.member} key={member.id}><Text style={styles.memberName}>{member.name}{member.head ? ' · Head' : ''}</Text>
+      {members.map(member => <View style={styles.member} key={member.id}>{memberPhotos[member.id] && <Image source={memberPhotos[member.id]} style={styles.memberPhoto} accessibilityLabel={`${member.name} profile picture`} />}<Text style={styles.memberName}>{member.name}{member.head ? ' · Head' : ''}</Text>
         <View style={styles.selectColumn}><ReportSelect label={`${member.name} status`} showLabel={false} value={member.statusKey} options={statusOptions} disabled={busy || submitted} onChange={statusKey => setMembers(current => current.map(item => item.id === member.id ? { ...item, statusKey } : item))} /></View>
       </View>)}
     </View>
@@ -76,6 +83,6 @@ const styles = StyleSheet.create({
   stack: { gap: spacing.md }, card: { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
   name: { color: palette.text, fontSize: 18, fontWeight: '700' }, meta: { color: palette.textSoft, fontSize: 13 },
   columns: { flexDirection: 'row', gap: 8, marginTop: 8 }, columnLabel: { flex: 1, color: palette.textSoft, fontSize: 12 },
-  member: { flexDirection: 'row', alignItems: 'center', paddingTop: 6, gap: 8, borderTopWidth: 1, borderColor: palette.border }, memberName: { flex: 1, color: palette.text, fontSize: 15, fontWeight: '600' }, selectColumn: { flex: 1, minWidth: 0 },
+  member: { flexDirection: 'row', alignItems: 'center', paddingTop: 6, gap: 8, borderTopWidth: 1, borderColor: palette.border }, memberPhoto: { width: 36, height: 36, borderRadius: 18 }, memberName: { flex: 1, color: palette.text, fontSize: 15, fontWeight: '600' }, selectColumn: { flex: 1, minWidth: 0 },
   counts: { flexDirection: 'row', gap: spacing.sm }, input: { minHeight: 78, borderWidth: 1, borderColor: palette.border, borderRadius: radius.md, padding: spacing.sm, color: palette.text }, error: { color: palette.unsafe, fontSize: 13 },
 });

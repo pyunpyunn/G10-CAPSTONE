@@ -72,6 +72,11 @@ class HouseholdMobileService
         return $this->memberProfileWorkflow->updateMember($request, $memberId);
     }
 
+    public function uploadProfilePhoto(Request $request): JsonResponse
+    {
+        return $this->memberProfileWorkflow->uploadProfilePhoto($request);
+    }
+
     public function trustedHouseholds(Request $request): JsonResponse
     {
         return $this->trustedWorkflow->trustedHouseholds($request);
@@ -103,7 +108,6 @@ class HouseholdMobileService
     }
 
 }
-
 
 
 

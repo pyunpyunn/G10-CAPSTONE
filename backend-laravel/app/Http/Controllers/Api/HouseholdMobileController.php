@@ -61,6 +61,11 @@ class HouseholdMobileController extends Controller
         return $this->service->updateMember($request, $memberId);
     }
 
+    public function uploadProfilePhoto(Request $request): JsonResponse
+    {
+        return $this->service->uploadProfilePhoto($request);
+    }
+
     public function storeMemberStatus(Request $request, string $memberId): JsonResponse
     {
         return app(\App\Services\Mobile\HouseholdMobileStatusWorkflow::class)->storeMemberStatus($request, $memberId);

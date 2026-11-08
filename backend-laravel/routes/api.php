@@ -249,6 +249,7 @@ Route::prefix('v1')->group(function () {
             Route::put('/household/geotag', [HouseholdMobileController::class, 'updateGeotag']);
             Route::post('/household/device-location', [HouseholdMobileController::class, 'updateDeviceLocation']);
             Route::patch('/household/members/{memberId}', [HouseholdMobileController::class, 'updateMember']);
+            Route::post('/household/profile-photo', [HouseholdMobileController::class, 'uploadProfilePhoto']);
             Route::post('/household/members/{memberId}/status', [HouseholdMobileController::class, 'storeMemberStatus']);
             Route::post('/household/trusted-households/{connectionId}/members/{memberId}/status', [HouseholdMobileController::class, 'storeTrustedMemberStatus']);
             Route::post('/household/status', [HouseholdMobileController::class, 'storeStatus']);
@@ -279,6 +280,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/rescuer/assignments', [RescuerMobileController::class, 'assignments']);
             Route::get('/rescuer/assignments/{assignmentId}', [RescuerMobileController::class, 'assignment']);
             Route::get('/rescuer/assignments/{assignmentId}/household', [RescuerMobileController::class, 'assignmentHousehold']);
+            Route::get('/rescuer/assignments/{assignmentId}/members/{memberId}/profile-photo', [RescuerMobileController::class, 'assignedMemberProfilePhoto'])->whereNumber('assignmentId');
             Route::patch('/rescuer/assignments/{assignmentId}/status', [RescuerMobileController::class, 'updateAssignmentStatus']);
             Route::post('/rescuer/assignments/{assignmentId}/location', [RescuerMobileController::class, 'storeLocation']);
             Route::get('/rescuer/field-reports', [RescuerMobileController::class, 'fieldReports']);

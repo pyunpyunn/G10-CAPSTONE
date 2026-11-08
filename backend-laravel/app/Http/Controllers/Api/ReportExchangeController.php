@@ -158,7 +158,10 @@ class ReportExchangeController extends Controller
                 $eventId = $row->event_id ?: ($data['event_id'] ?? null);
                 abort_unless($eventId, 422, 'Select the disaster event to include in this report.');
                 $sitioId = $row->sitio_id ?? 'all';
-                $response = $sitioId === 'all' ? $situations->eventSummary($eventId) : $situations->eventSummary($eventId, $sitioId);
+                $includePopulationRoster = in_array('II', json_decode($row->sections, true) ?: [], true);
+                $response = $sitioId === 'all'
+                    ? ($includePopulationRoster ? $situations->eventSummary($eventId, null, true) : $situations->eventSummary($eventId))
+                    : ($includePopulationRoster ? $situations->eventSummary($eventId, $sitioId, true) : $situations->eventSummary($eventId, $sitioId));
                 abort_unless($response->getStatusCode() === 200, 422, 'The requested disaster event is unavailable.');
                 $summary = $response->getData(true)['data']['summary'];
                 $summary=app(\App\Services\Web\SituationReportSync::class)->apply($summary,$sync);

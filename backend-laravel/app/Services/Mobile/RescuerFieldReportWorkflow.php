@@ -10,7 +10,9 @@ use App\Queries\RescuerFieldReportQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use App\Support\RequestSchema as Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -108,6 +110,21 @@ class RescuerFieldReportWorkflow
                     ? ['key' => $member->member_status_key, 'label' => $member->member_status_label]
                     : null,
             ])->values();
+        $photoMemberIds = collect();
+        if (Schema::hasTable('users') && Schema::hasColumn('users', 'profile_photo')
+            && Schema::hasColumn('users', 'household_id') && Schema::hasColumn('users', 'member_id')) {
+            $photoMemberIds = DB::table('users')
+                ->where('household_id', $assignment->household_id)
+                ->whereIn('member_id', $members->pluck('member_id'))
+                ->whereNotNull('profile_photo')
+                ->where('profile_photo', '<>', '')
+                ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+                ->pluck('member_id')->mapWithKeys(fn ($id) => [(string) $id => true]);
+            $members = $members->map(fn (array $member): array => [
+                ...$member,
+                'has_profile_photo' => $photoMemberIds->has((string) $member['member_id']),
+            ]);
+        }
 
         $household->full_address = app(\App\Queries\HouseholdAddressQuery::class)->forHouseholds([$household->household_id])->get($household->household_id);
         $head = $members->firstWhere('is_household_head', true);
@@ -136,6 +153,79 @@ class RescuerFieldReportWorkflow
             'saved_property_damage' => Schema::hasColumn('responder_field_reports','property_damage') ? DB::table('responder_field_reports')->where('assignment_id',$assignmentId)->where('responder_id',$responder->responder_id)->where('household_id',$household->household_id)->value('property_damage') : null,
             'property_damage_options' => Schema::hasTable('property_damage_levels') ? DB::table('property_damage_levels')->where('is_active',true)->orderBy('sort_order')->get(['damage_key as key','label'])->all() : [],
         ]]);
+    }
+
+    public function assignedMemberProfilePhoto(Request $request, int $assignmentId, string $memberId)
+    {
+        $responder = $this->support->responderForUser($request->user());
+        $assignment = $this->assignments->find($assignmentId, $responder?->responder_id);
+        abort_unless($assignment && $assignment->household_id && $this->assignmentIsActive($assignment), 404);
+
+        $activeEvent = $this->support->activeEvent();
+        abort_unless($activeEvent && (string) $assignment->disaster_id === (string) $activeEvent->event_id, 404);
+
+        abort_unless(Schema::hasTable('household_members'), 404);
+        $member = DB::table('household_members')
+            ->where('member_id', $memberId)
+            ->where('household_id', $assignment->household_id)
+            ->when(Schema::hasColumn('household_members', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->first(['member_id']);
+        abort_unless($member, 404);
+
+        abort_unless(Schema::hasTable('users') && Schema::hasColumn('users', 'profile_photo')
+            && Schema::hasColumn('users', 'member_id') && Schema::hasColumn('users', 'household_id'), 404);
+        $account = DB::table('users')
+            ->where('household_id', $assignment->household_id)
+            ->where('member_id', $memberId)
+            ->whereNotNull('profile_photo')
+            ->where('profile_photo', '<>', '')
+            ->when(Schema::hasColumn('users', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+            ->first(['profile_photo']);
+        abort_unless($account && $this->isManagedProfilePhotoPath((string) $account->profile_photo), 404);
+        $path = (string) $account->profile_photo;
+
+        if (! Storage::disk('local')->exists($path) && Storage::disk('public')->exists($path)) {
+            $legacyStream = Storage::disk('public')->readStream($path);
+            abort_unless(is_resource($legacyStream), 404);
+            try {
+                $stored = Storage::disk('local')->writeStream($path, $legacyStream);
+            } finally {
+                fclose($legacyStream);
+            }
+            abort_unless($stored, 500, 'Profile photo could not be moved to private storage.');
+            abort_unless(Storage::disk('public')->delete($path), 500, 'Legacy public profile photo could not be removed.');
+        }
+
+        abort_unless(Storage::disk('local')->exists($path), 404);
+        $stream = Storage::disk('local')->readStream($path);
+        abort_unless(is_resource($stream), 404);
+        $contentType = match (Str::lower(pathinfo($path, PATHINFO_EXTENSION))) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            default => 'application/octet-stream',
+        };
+
+        return response()->stream(function () use ($stream): void {
+            try {
+                fpassthru($stream);
+            } finally {
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type' => $contentType,
+            'Content-Disposition' => 'inline',
+            'Cache-Control' => 'private, no-store, no-cache, max-age=0, must-revalidate',
+            'Pragma' => 'no-cache',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cross-Origin-Resource-Policy' => 'same-origin',
+            'Referrer-Policy' => 'no-referrer',
+        ]);
+    }
+
+    private function isManagedProfilePhotoPath(string $path): bool
+    {
+        return preg_match('~^household-profile-photos/[a-f0-9]{64}/[a-f0-9]{64}/[a-f0-9-]{36}\.(jpg|png|webp)$~i', $path) === 1;
     }
 
     public function fieldReports(Request $request): array
@@ -693,8 +783,6 @@ class RescuerFieldReportWorkflow
         return response()->json(['message' => 'The required '.$table.' table is not available in the current database.'], 503);
     }
 }
-
-
 
 
 

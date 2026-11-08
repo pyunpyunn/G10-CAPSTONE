@@ -167,6 +167,15 @@
 .exchange-section-name small { color: var(--muted); font-size: 10px; }
 .exchange-icon { border: 1px solid var(--line); border-radius: 8px; background: var(--color-bg-secondary); color: var(--nav-strong); }
 .exchange-section-action { color: var(--nav-strong); }
+.impact-report-card { display: flex; flex-direction: column; min-height: 220px; }
+.impact-report-card > .exchange-icon { margin-bottom: 4px; }
+.impact-report-card h3 { margin: 12px 0 7px; font-size: 15px; line-height: 1.4; }
+.impact-report-card p { flex: 1; margin: 0 0 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.exchange-panel-heading > p { margin: 0; color: var(--muted); font-size: 12px; }
+.impact-report-description { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.impact-report-note { margin: -4px 0 14px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.impact-ranking-options label { min-height: 42px; }
+.impact-ranking-options input { width: auto; }
 
 .exchange-dialog {
   border: 1px solid var(--line);
@@ -239,5 +248,7 @@
 .exchange-detail-prepared{grid-column:span 3}
 .exchange-detail-purpose{grid-column:span 6}
 .exchange-detail-format{grid-column:span 3}
+.exchange-dialog .exchange-signatories{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.exchange-dialog .exchange-signatories>.exchange-field{min-width:0;margin:0}
 .exchange-footer-status{align-self:center;color:var(--color-text-2);font-size:12px}
-@media(max-width:550px){.exchange-detail-grid{grid-template-columns:1fr}.exchange-detail-prepared,.exchange-detail-purpose,.exchange-detail-format{grid-column:1}}
+@media(max-width:550px){.exchange-detail-grid{grid-template-columns:1fr}.exchange-dialog .exchange-signatories{grid-template-columns:1fr}.exchange-detail-prepared,.exchange-detail-purpose,.exchange-detail-format{grid-column:1}}

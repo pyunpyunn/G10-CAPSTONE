@@ -56,11 +56,22 @@ try {
             if ($candidate -and $candidate.ExecutablePath -eq $executablePath -and $candidate.CommandLine -match $expected) {
                 $isResponsive = $true
                 if ($Role -eq 'Api') {
-                    try {
-                        $health = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8000/api/v1/health/live' -TimeoutSec 4
-                        $isResponsive = $health.StatusCode -eq 200
-                    } catch {
-                        $isResponsive = $false
+                    $environmentFile = Join-Path $backendPath '.env'
+                    if (Test-Path -LiteralPath $environmentFile) {
+                        $environmentUpdatedAt = (Get-Item -LiteralPath $environmentFile).LastWriteTimeUtc
+                        $childStartedAt = $candidate.CreationDate.ToUniversalTime()
+                        if ($environmentUpdatedAt -gt $childStartedAt) {
+                            $isResponsive = $false
+                            Write-ServiceLog "API child PID $($candidate.ProcessId) predates the environment file; replacing it to reload configuration."
+                        }
+                    }
+                    if ($isResponsive) {
+                        try {
+                            $health = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8000/api/v1/health/live' -TimeoutSec 4
+                            $isResponsive = $health.StatusCode -eq 200
+                        } catch {
+                            $isResponsive = $false
+                        }
                     }
                 }
 
@@ -68,7 +79,7 @@ try {
                     $child = Get-Process -Id $candidate.ProcessId
                     Write-ServiceLog "Recovered child PID $($child.Id)."
                 } else {
-                    Write-ServiceLog "API child PID $($candidate.ProcessId) failed its health check; stopping the unresponsive worker."
+                    Write-ServiceLog "API child PID $($candidate.ProcessId) failed its configuration freshness or health check; stopping it."
                     Stop-Process -Id $candidate.ProcessId -Force
                     for ($attempt = 0; $attempt -lt 10; $attempt++) {
                         if (!(Get-Process -Id $candidate.ProcessId -ErrorAction SilentlyContinue)) { break }

@@ -2,7 +2,7 @@ const sum = values => !values.length || values.some(v => v == null) ? null : val
 const areaKey = row => JSON.stringify([row.sitio ?? null,row.purok ?? null])
 export function situationPopulation(s) {
   if (s.population_tables) return {...s.population_tables, insideDemographics:s.population_tables.inside_demographics.map(([label,persons]) => [label,null,persons])}
-  const areas = new Map((s.household?.puroks || []).map(p => [areaKey(p),{sitio:p.sitio,purok:p.purok,families:p.affected_families ?? p.affected,persons:p.affected_persons}]))
+  const areas = new Map((s.household?.puroks || []).map(p => [areaKey(p),{sitio:p.sitio,purok:p.purok,families:p.affected_families ?? p.affected,persons:p.affected_persons,status_counts:p.status_counts ?? null}]))
   const members = s.evacuation?.members || [], groups = new Map()
   for (const h of s.evacuation?.households || []) {
     const id = h.household_id ?? h.household

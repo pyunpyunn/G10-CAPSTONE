@@ -16,7 +16,10 @@ class SituationReportPopulation
         foreach ($s['household']['puroks'] ?? [] as $p) {
             $key=$this->key($p);
             $areas[$key]=['sitio'=>$p['sitio'] ?? null,'purok'=>$p['purok'] ?? null,
-                'families'=>$p['affected_families'] ?? $p['affected'] ?? null,'persons'=>$p['affected_persons'] ?? null];
+                'sitio_id'=>$p['sitio_id'] ?? null,'purok_id'=>$p['purok_id'] ?? null,
+                'families'=>$p['affected_families'] ?? $p['affected'] ?? null,'persons'=>$p['affected_persons'] ?? null,
+                'registered_households'=>$p['total'] ?? null,'registered_members'=>$p['persons'] ?? null,
+                'status_counts'=>$p['status_counts'] ?? null];
         }
         $members=$s['evacuation']['members'] ?? [];
         $families=[];
@@ -42,7 +45,9 @@ class SituationReportPopulation
         }
         foreach ($families as $h) {
             $key=$this->key($h);
-            $areas[$key] ??= ['sitio'=>$h['sitio'] ?? null,'purok'=>$h['purok'] ?? null,'families'=>null,'persons'=>null];
+            $areas[$key] ??= ['sitio'=>$h['sitio'] ?? null,'purok'=>$h['purok'] ?? null,
+                'sitio_id'=>$h['sitio_id'] ?? null,'purok_id'=>$h['purok_id'] ?? null,
+                'families'=>null,'persons'=>null,'registered_households'=>null,'registered_members'=>null,'status_counts'=>null];
         }
         $displaced=['inside'=>[],'outside'=>[],'total'=>[]];
         foreach ($areas as $key=>$area) {
@@ -67,6 +72,20 @@ class SituationReportPopulation
         }
         return ['affected'=>array_values($areas),'displaced'=>$displaced,
             'inside_demographics'=>$this->demographics(array_values(array_filter($members,fn ($m)=>($m['displacement_location'] ?? null)==='inside')))];
+    }
+
+    public static function statusSummary(?array $counts): string
+    {
+        if ($counts === null) return 'Not recorded';
+
+        $labels = ['safe' => 'Safe', 'unsafe' => 'Unsafe', 'evacuated' => 'Evacuated', 'dead' => 'Dead', 'missing' => 'Missing', 'injured' => 'Injured'];
+        $summary = implode('; ', array_map(
+            fn (string $key, string $label): string => $label.': '.(int) ($counts[$key] ?? 0),
+            array_keys($labels),
+            array_values($labels),
+        ));
+
+        return $summary.' ('.(int) ($counts['reported_members'] ?? 0).' member assessments)';
     }
 
     public function demographics(array $members): array

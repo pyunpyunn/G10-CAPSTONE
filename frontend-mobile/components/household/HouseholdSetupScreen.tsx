@@ -1,22 +1,41 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { useHouseholdSetup } from '@/hooks/useHouseholdSetup';
 import { HouseholdSetupAddressForm } from './HouseholdSetupAddressForm';
 import { HouseholdBadge, HouseholdButton, HouseholdSection } from './HouseholdUI';
+import type { HouseholdProfilePhotoAsset } from '@/api/household';
 
 type SetupProps = {
   overview: any;
   deviceUuid: string;
   onComplete: (payload: any) => Promise<void>;
+  onUploadProfilePhoto: (asset: HouseholdProfilePhotoAsset) => Promise<void>;
 };
 
-export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: SetupProps) {
+export function HouseholdSetupScreen({ overview, deviceUuid, onComplete, onUploadProfilePhoto }: SetupProps) {
   const user = overview.profile?.user || {};
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [photoUri, setPhotoUri] = useState('');
+  const [savingPhoto, setSavingPhoto] = useState(false);
   const { pin, address, details, setDetails, saving, findingAddress, geotagMessage,
     requestGpsLocation, handleSave } = useHouseholdSetup({ overview, deviceUuid, onComplete });
+
+  async function pickPhoto() {
+    const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.75 });
+    if (result.canceled || !result.assets[0]?.uri) return;
+    setSavingPhoto(true);
+    try {
+      await onUploadProfilePhoto(result.assets[0]);
+      setPhotoUri(result.assets[0].uri);
+    } catch (error: any) {
+      Alert.alert('Unable to upload profile picture', error?.response?.data?.message || 'Please try again.');
+    } finally {
+      setSavingPhoto(false);
+    }
+  }
 
   function completeSetup() {
     if (!privacyAccepted) {
@@ -47,6 +66,10 @@ export function HouseholdSetupScreen({ overview, deviceUuid, onComplete }: Setup
         <HouseholdSection title="Device user" />
         <Text style={styles.previewText}>{user.full_name || 'Member unavailable'}</Text>
         <Text style={styles.helperText}>Member ID: {user.member_id}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          {photoUri ? <Image source={{ uri: photoUri }} style={{ width: 64, height: 64, borderRadius: radius.pill }} /> : <Ionicons name="person-circle-outline" size={56} color={palette.navMuted} />}
+          <HouseholdButton label={savingPhoto ? 'Uploading...' : photoUri ? 'Change profile picture' : 'Upload profile picture'} icon="image-outline" tone="light" disabled={savingPhoto} onPress={() => void pickPhoto()} />
+        </View>
       </View>
       <Pressable style={styles.privacyRow} onPress={() => setPrivacyAccepted((value) => !value)}>
         <View style={[styles.checkBox, privacyAccepted && styles.checkBoxActive]}>

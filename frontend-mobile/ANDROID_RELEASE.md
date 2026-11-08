@@ -1,12 +1,15 @@
 # Standalone Android APK
 
-## Latest local APK — version 2.0.0, build 61
+## Latest local APK — version 2.0.0, build 68
 
-Installable file: [`releases/RESQPERATION-build61.apk`](./releases/RESQPERATION-build61.apk).
+Installable file: [`releases/RESQPERATION-build68.apk`](./releases/RESQPERATION-build68.apk).
 
-- Android app networking falls back to Cloudflare DNS-over-HTTPS, then Google DNS-over-HTTPS, when normal DNS cannot resolve an Ngrok host. API traffic still uses the original Ngrok HTTPS hostname and validates its certificate; phone DNS settings are not changed.
+- 24,456,585 bytes; version code 68; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `4AC5E1788007A84D846F94923560350A3D69E542D139F57CBB004C02317C0576`.
+- Android release builds prefer the configured HTTPS API routes, then try a validated saved **Server settings** address if those routes are unavailable.
+- Ngrok DNS fallback bootstraps Cloudflare and Google DNS-over-HTTPS connections using their IP addresses. TLS certificate validation still checks the resolver hostnames, and API traffic still validates the original Ngrok hostname.
 - The `RESQPERATION Ngrok Tunnel` Windows scheduled task starts and supervises Ngrok at sign-in, including on battery. No terminal needs to remain open; the laptop must be awake, online, and signed in to the configured Windows account.
-- Verification: native Android release build, existing release signing certificate, TypeScript, mobile transport tests, and plugin checks passed. The laptop API and public Ngrok endpoint were reachable. A physical phone login was not available to verify.
+- Verification: native Android release build, existing release signing certificate, TypeScript, 29 focused mobile tests, Android emulator install/login screen, and public API readiness passed. A physical phone login was not available to verify.
 
 ## Previous local APK — version 2.0.0, build 60
 
