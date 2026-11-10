@@ -8,7 +8,7 @@ import { ActionButton, SectionHeader, StatusBadge } from './RescuerUI';
 
 type ProfileProps = {
   profile: any;
-  onSaveProfile: (payload: ProfileForm) => Promise<void>;
+  onSaveProfile: (payload: ProfileForm) => Promise<boolean>;
   onLogout: () => void;
 };
 
@@ -45,11 +45,56 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
     setSaving(true);
 
     try {
-      await onSaveProfile(form);
-      setIsEditing(false);
+      if (await onSaveProfile(form)) {
+        setIsEditing(false);
+      }
     } finally {
       setSaving(false);
     }
+  }
+
+  function cancelEditing() {
+    setForm(profileForm(user, responder));
+    setIsEditing(false);
+  }
+
+  if (isEditing) {
+    return (
+      <View style={styles.stack}>
+        <View style={styles.card}>
+          <SectionHeader
+            title="Edit profile"
+            action={(
+              <Pressable
+                style={styles.iconButton}
+                onPress={cancelEditing}
+                accessibilityRole="button"
+                accessibilityLabel="Back to profile"
+              >
+                <Ionicons name="arrow-back" size={18} color={palette.navActive} />
+              </Pressable>
+            )}
+          />
+          <View style={styles.formGrid}>
+            <ProfileInput label="Username" value={form.username} onChangeText={(value) => updateForm(setForm, 'username', value)} />
+            <ProfileInput label="First name" value={form.first_name} onChangeText={(value) => updateForm(setForm, 'first_name', value)} />
+            <ProfileInput label="MI" value={form.middle_initial} onChangeText={(value) => updateForm(setForm, 'middle_initial', value)} />
+            <ProfileInput label="Last name" value={form.last_name} onChangeText={(value) => updateForm(setForm, 'last_name', value)} />
+            <ProfileInput label="Email" value={form.email} onChangeText={(value) => updateForm(setForm, 'email', value)} keyboardType="email-address" />
+            <ProfileInput label="Mobile" value={form.contact_number} onChangeText={(value) => updateForm(setForm, 'contact_number', value)} keyboardType="phone-pad" />
+            <ProfileInput label="Emergency contact name" value={form.emergency_contact_name} onChangeText={(value) => updateForm(setForm, 'emergency_contact_name', value)} />
+            <ProfileInput label="Emergency contact mobile" value={form.emergency_contact_number} onChangeText={(value) => updateForm(setForm, 'emergency_contact_number', value)} keyboardType="phone-pad" />
+            <ProfileInput label="Blood type" value={form.blood_type} onChangeText={(value) => updateForm(setForm, 'blood_type', value)} />
+            <ProfileInput label="Address" value={form.address} onChangeText={(value) => updateForm(setForm, 'address', value)} multiline />
+            <ProfileInput label="Skills" value={form.skills} onChangeText={(value) => updateForm(setForm, 'skills', value)} multiline />
+          </View>
+          <View style={styles.actionRow}>
+            <ActionButton label="Cancel" icon="close" tone="light" disabled={saving} onPress={cancelEditing} />
+            <ActionButton label={saving ? 'Saving...' : 'Save profile'} icon="save-outline" disabled={saving} onPress={handleSave} />
+          </View>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -72,8 +117,13 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
         <SectionHeader
           title="Account"
           action={
-            <Pressable style={styles.iconButton} onPress={() => setIsEditing((value) => !value)}>
-              <Ionicons name={isEditing ? 'close' : 'create-outline'} size={18} color={palette.navActive} />
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => setIsEditing(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+            >
+              <Ionicons name="create-outline" size={18} color={palette.navActive} />
             </Pressable>
           }
         />
@@ -83,29 +133,6 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
         <InfoRow label="Email" value={user.email || 'Not recorded'} />
         <InfoRow label="Mobile" value={user.contact_number || responder.contact_number || 'Not recorded'} />
       </View>
-
-      {isEditing ? (
-        <View style={styles.card}>
-          <SectionHeader title="Edit profile" />
-          <View style={styles.formGrid}>
-            <ProfileInput label="Username" value={form.username} onChangeText={(value) => updateForm(setForm, 'username', value)} />
-            <ProfileInput label="First name" value={form.first_name} onChangeText={(value) => updateForm(setForm, 'first_name', value)} />
-            <ProfileInput label="MI" value={form.middle_initial} onChangeText={(value) => updateForm(setForm, 'middle_initial', value)} />
-            <ProfileInput label="Last name" value={form.last_name} onChangeText={(value) => updateForm(setForm, 'last_name', value)} />
-            <ProfileInput label="Email" value={form.email} onChangeText={(value) => updateForm(setForm, 'email', value)} keyboardType="email-address" />
-            <ProfileInput label="Mobile" value={form.contact_number} onChangeText={(value) => updateForm(setForm, 'contact_number', value)} keyboardType="phone-pad" />
-            <ProfileInput label="Emergency contact name" value={form.emergency_contact_name} onChangeText={(value) => updateForm(setForm, 'emergency_contact_name', value)} />
-            <ProfileInput label="Emergency contact mobile" value={form.emergency_contact_number} onChangeText={(value) => updateForm(setForm, 'emergency_contact_number', value)} keyboardType="phone-pad" />
-            <ProfileInput label="Blood type" value={form.blood_type} onChangeText={(value) => updateForm(setForm, 'blood_type', value)} />
-            <ProfileInput label="Address" value={form.address} onChangeText={(value) => updateForm(setForm, 'address', value)} multiline />
-            <ProfileInput label="Skills" value={form.skills} onChangeText={(value) => updateForm(setForm, 'skills', value)} multiline />
-          </View>
-          <View style={styles.actionRow}>
-            <ActionButton label="Cancel" icon="close" tone="light" onPress={() => setIsEditing(false)} />
-            <ActionButton label={saving ? 'Saving...' : 'Save profile'} icon="save-outline" disabled={saving} onPress={handleSave} />
-          </View>
-        </View>
-      ) : null}
 
       <View style={styles.card}>
         <SectionHeader title="Responder details" />
@@ -247,6 +274,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.md,
     borderRadius: radius.lg,
@@ -271,6 +299,7 @@ const styles = StyleSheet.create({
   },
   heroText: {
     flex: 1,
+    minWidth: 160,
   },
   role: {
     color: palette.navMuted,

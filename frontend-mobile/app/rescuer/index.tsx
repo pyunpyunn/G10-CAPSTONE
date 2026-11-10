@@ -12,7 +12,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
@@ -243,18 +242,20 @@ export default function RescuerHomeScreen() {
     setActiveTab('report');
   }
 
-  async function handleSubmitResourceRequest(payload: any) {
-    if (!payload.location || !payload.resource_type || !payload.quantity) {
-      Alert.alert('Missing request details', 'Enter location, need type, and quantity.');
-      return;
+  async function handleSubmitResourceRequest(payload: any): Promise<boolean> {
+    if (!payload.complete_address || !payload.location || !payload.resource_type || !payload.quantity) {
+      Alert.alert('Missing request details', 'Enter the location and quantity, and complete the required request fields.');
+      return false;
     }
 
     try {
       await createResourceRequest(payload);
       Alert.alert('Request submitted', 'Your request is waiting for HQ validation.');
       void loadOverview(true, true, true);
+      return true;
     } catch (error: any) {
       Alert.alert('Unable to submit request', errorMessage(error));
+      return false;
     }
   }
 
@@ -267,14 +268,15 @@ export default function RescuerHomeScreen() {
     }
   }
 
-  async function handleUpdateProfile(payload: any) {
+  async function handleUpdateProfile(payload: any): Promise<boolean> {
     try {
       await updateRescuerProfile(payload);
       Alert.alert('Profile updated', 'Your profile changes were saved.');
       void loadOverview(true, true, true);
+      return true;
     } catch (error: any) {
       Alert.alert('Unable to update profile', errorMessage(error));
-      throw error;
+      return false;
     }
   }
 
@@ -336,7 +338,6 @@ export default function RescuerHomeScreen() {
       return (
         <ResourceRequestScreen
           requests={overview.resource_requests || []}
-          assignments={assignments}
           categoryOptions={overview.category_options || []}
           onSubmitRequest={handleSubmitResourceRequest}
           onCancelRequest={handleCancelResourceRequest}

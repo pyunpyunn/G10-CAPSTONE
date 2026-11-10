@@ -99,6 +99,33 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_store_accepts_personnel_request_without_cluster_or_need_type(): void
+    {
+        $request = Request::create('/api/v1/rescuer/resource-requests', 'POST', [
+            'location' => 'Zone 2',
+            'request_category' => 'personnel',
+            'resource_type' => 'Personnel',
+            'item_name' => 'Search and rescue team',
+            'quantity' => 3,
+            'unit' => 'persons',
+            'description' => 'Assist with evacuation',
+        ]);
+
+        $response = app(RescuerMobileResourceRequestWorkflow::class)->store($request);
+        $requestId = $response->getData(true)['data']['request_id'];
+
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertDatabaseHas('resource_requests', [
+            'request_id' => $requestId,
+            'request_category' => 'personnel',
+            'resource_type' => 'Personnel',
+            'item_name' => 'Search and rescue team',
+            'quantity' => 3,
+            'unit' => 'persons',
+            'description' => "Location: Zone 2\nAssist with evacuation",
+        ]);
+    }
+
     public function test_cancel_keeps_not_found_conflict_and_success_contracts(): void
     {
         $workflow = app(RescuerMobileResourceRequestWorkflow::class);
