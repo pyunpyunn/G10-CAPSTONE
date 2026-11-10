@@ -81,6 +81,33 @@ class MonitoringRedesignTest extends TestCase
             $this->assertNull($result['daily_forecast'][0]['rain_probability']);
             $this->assertSame('Not recorded', $result['daily_forecast'][0]['condition_name']);
             $this->assertSame('2026-10-15T00:00:00+08:00', $result['daily_forecast'][0]['date_iso']);
+            $this->assertSame('not_provided', $result['temperature_accuracy']['status']);
+            $this->assertNull($result['temperature_accuracy']['documentation_url']);
+            $this->assertNull($result['temperature_accuracy']['interval_seconds']);
         } finally { Carbon::setTestNow(); }
+    }
+
+    public function test_open_meteo_temperature_accuracy_is_not_fabricated_from_snapshot_freshness(): void
+    {
+        $log = (object) [
+            'weather_log_id' => 1, 'disaster_id' => null,
+            'source_name' => 'Open-Meteo Forecast API', 'source_url' => 'https://api.open-meteo.com/v1/forecast',
+            'condition_name' => 'Clear sky', 'temperature' => 30.5, 'humidity' => 70, 'rainfall_mm' => 0,
+            'wind_speed' => 0, 'wind_direction' => 'N', 'advisory_title' => null, 'advisory_text' => null,
+            'observed_at' => now()->toDateTimeString(), 'created_at' => now()->toDateTimeString(),
+            'raw_payload' => ['current' => ['temperature_2m' => 30.5, 'interval' => 900], 'current_units' => ['interval' => 'seconds']],
+        ];
+        $presenter = app(WeatherSnapshotPresenter::class);
+        $fresh = $presenter->formatWeatherLog($log);
+        $this->assertSame(30.5, $fresh['temperature']);
+        $this->assertSame('not_provided', $fresh['temperature_accuracy']['status']);
+        $this->assertSame(900.0, $fresh['temperature_accuracy']['interval_seconds']);
+        $this->assertSame('https://open-meteo.com/en/docs#current-weather', $fresh['temperature_accuracy']['documentation_url']);
+        $log->observed_at = now()->subHours(5)->toDateTimeString();
+        $stale = $presenter->formatWeatherLog($log);
+        $this->assertTrue($stale['is_stale']);
+        $this->assertSame($fresh['temperature_accuracy'], $stale['temperature_accuracy']);
+        $log->raw_payload = [];
+        $this->assertNull($presenter->formatWeatherLog($log)['temperature_accuracy']['interval_seconds']);
     }
 }

@@ -34,6 +34,7 @@ function AccountsWorkspace() {
   const [modal,setModal]=useState(null),[newTeam,setNewTeam]=useState('')
   const detailVersion=useRef(0),savedSelection=useRef(null)
   useEffect(() => {
+    if(view==='roles') return
     let active=true
     async function load() {
       const cachedRoster=getCachedRescuers({page,per_page:8,team:teamFilter,account_type:category})
@@ -66,7 +67,7 @@ function AccountsWorkspace() {
       await Promise.all([rosterRequest,teamsRequest])
     }
     load();return () => {active=false}
-  },[page,teamFilter,category,revision,requestedId])
+  },[page,teamFilter,category,revision,requestedId,view])
   useEffect(() => {
     const needsAccountOptions=route==='new' || route==='edit' || modal?.kind==='account'
     if(view!=='roles' && !needsAccountOptions) return
@@ -161,12 +162,77 @@ function AccountsWorkspace() {
   return <section className="account-html" aria-label="Account Management"><div className="bar">{view==='accounts' ? <><div className="seg" role="tablist" aria-label="Account category">{[['rescuer','Field teams'],['command_center','Committee / Operations']].map(([key,label]) => <button key={key} role="tab" aria-selected={category===key} disabled={busy} onClick={() => {setCategory(key);setPage(1);setTeamFilter('all');setSelectedId(null);setDetail(null)}}>{label} <small>{teams?.responders?.filter(r => r.account_type===key).length || 0}</small></button>)}</div><span className="sp" /><button className="btn" disabled={busy} onClick={() => navigate('/rescuers?manage=roles')}>Manage roles</button><button className="btn" disabled={busy} onClick={() => navigate('/rescuers/teams')}>Manage teams</button><button className="btn p" disabled={busy || !payload?.form_options || roleOptionsLoading} onClick={() => setModal({kind:'account',account:null})}>+ Create account</button></> : <><button className="btn" onClick={closeManagement}>‹ Back to accounts</button><h2 className="vt">Manage {view}</h2></>}</div>{error && <div className="notices"><div className="err" role="alert">{error} <button className="btn" disabled={busy} onClick={() => setRevision(current => current+1)}>Retry</button></div></div>}{roleOptionsLoading && (view==='roles' || modal?.kind==='account' || route==='new' || route==='edit') && <p role="status">Loading account options…</p>}
     {view==='accounts' && <div className="grid"><aside className="ros"><div className="rh"><b>{hqCategory ? 'Committee / Operations' : 'Field teams'}</b><span className="chip">{pager.total || 0} total</span></div>{!hqCategory && <><label className="l" htmlFor="account-team-filter">Team</label><select id="account-team-filter" value={teamFilter} disabled={busy} onChange={event => {setTeamFilter(event.target.value);setPage(1)}}><option value="all">All teams</option>{(payload?.team_options || []).filter(t => String(t.team_code).toUpperCase()!=='HQCC').map(t => <option key={t.team_id} value={String(t.team_id)}>{t.team_name}</option>)}</select></>}<div className="rl">{loading ? Array.from({length:4},(_,i) => <div className="skl" key={i} role={i===0 ? 'status' : undefined} aria-label={i===0 ? 'Loading accounts' : undefined} />) : rows.length ? rows.map(r => <button key={r.responder_id} type="button" className={`row ${String(selectedId)===String(r.responder_id) ? 'sel' : ''}`} aria-pressed={String(selectedId)===String(r.responder_id)} onClick={() => setSelectedId(r.responder_id)}><span className="av s">{initials(r.full_name)}</span><span className="rt"><b>{r.full_name}</b><small>{r.title}{r.is_active===false ? ' · Inactive' : ''}</small></span></button>) : <div className="empty">No accounts{teamFilter!=='all' ? ' in this team' : ''}.{teamFilter!=='all' && <p><button className="btn" onClick={() => {setTeamFilter('all');setPage(1)}}>Show all teams</button></p>}</div>}</div><div className="pgn"><span>{pager.total ? `${pager.from}–${pager.to} of ${pager.total}` : '0 of 0'}</span><span><button type="button" className="btn" disabled={loading || page<=1} aria-label="Previous page" onClick={() => setPage(p => p-1)}>‹</button> <button type="button" className="btn" disabled={loading || page>=(pager.last_page || 1)} aria-label="Next page" onClick={() => setPage(p => p+1)}>›</button></span></div></aside><div>{loading || detailLoading ? <div className="card"><div className="skl" /><div className="skl" /></div> : selectedDetail ? <Profile key={selectedDetail.responder_id} account={selectedDetail} dutyStatuses={payload?.form_options?.duty_statuses || []} onDutyChange={saveDutyStatus} onEdit={() => setModal({kind:'account',account:selectedDetail})} onAction={action => ask(action,selectedDetail)} busy={busy} /> : <div className="card empty">Select an account to view its profile.</div>}</div></div>}
     {view==='teams' && <div className="grid management-grid"><div className="card"><label className="l" htmlFor="new-team-name">New team</label><form style={{display:'flex',gap:8,maxWidth:420}} onSubmit={event => {event.preventDefault();setModal({kind:'team',record:{...teams.form_defaults,team_name:newTeam,member_ids:[]},creating:true})}}><input id="new-team-name" required placeholder="Team name" value={newTeam} onChange={event => setNewTeam(event.target.value)} /><button type="submit" className="btn p" disabled={loading || !teams}>Add team</button></form><div className="tbl"><table><thead><tr><th>Team</th><th className="n">Members</th><th>Leader</th><th className="n">Actions</th></tr></thead><tbody>{(teams?.teams || []).map(t => <tr key={t.team_id}><td><b>{t.team_name}</b></td><td className="n">{t.member_count}</td><td>{t.leader_name || 'Not recorded'}</td><td className="n"><button className="btn" onClick={() => setModal({kind:'team',record:t})}>Edit</button> <button className="btn dg" disabled={!t.can_delete} onClick={() => ask('team',t)}>Delete</button></td></tr>)}</tbody></table></div><p className="note">Renaming a team updates its members. Deleting a team leaves its members unassigned and preserves past dispatch records.</p></div></div>}
-    {view==='roles' && <div className="grid management-grid"><div className="card"><p className="note">Access roles follow the BDRRMC committee structure. Role definitions are fixed; assign the appropriate role when creating or editing an account.</p>{roleOptionsLoading ? <p role="status">Loading access roles…</p> : <div className="tbl"><table><thead><tr><th>Role</th><th>Account type</th><th>Web access</th><th className="n">Accounts</th></tr></thead><tbody>{roles.map(r => <tr key={r.role_id}><td><b>{r.role_name}</b></td><td>{r.base_role_key.replaceAll('_',' ')}</td><td>{r.web_modules.map(key => key.replaceAll('_',' ')).join(', ') || 'Mobile field access'}</td><td className="n">{r.member_count}</td></tr>)}</tbody></table></div>}</div></div>}
+    {view==='roles' && <RoleCatalog roles={roles} loading={roleOptionsLoading} />}
     {editor && payload && roleWorkspace && <AccountEditor key={editor.account?.responder_id || 'new-account'} account={editor.account} category={editorCategory} payload={payload} roles={roles} hqNextIds={hq?.next_account_ids} busy={busy} onClose={closeModal} onSave={saveAccount} />}
     {modal?.kind==='team' && <AccountReferenceTeamEditor key={modal.record?.team_id || 'new-team'} team={modal.record} workspace={teams} busy={busy} onClose={closeModal} onSave={saveTeam} />}
     {modal?.kind==='confirm' && <Confirmation action={modal.action} record={modal.record} roles={roles} busy={busy} onClose={closeModal} onConfirm={confirmAction} />}
     {notice && <div className="toast" role="status">{notice}</div>}
   </section>
+}
+const ROLE_MODULE_LABELS={
+  dashboard:'Dashboard',
+  geospatial_analytics:'Geospatial analytics',
+  response_operations:'Response operations',
+  resources_requests:'Resource requests',
+  reports_documentation:'Reports & documentation',
+  personnel_access:'Personnel access',
+  profile:'Profile',
+  notifications:'Notifications',
+  inquiries:'Public inquiries',
+}
+const ROLE_CAPABILITIES={
+  operations_admin:[
+    'Access all web modules and actions covered by the web access policy',
+    'Manage personnel accounts, roles, and teams',
+    'Manage public inquiries and access inquiry history',
+    'Access the protected realtime health endpoint',
+  ],
+  chair:[
+    'Approve, validate, forward, return, and complete resource requests',
+    'Publish disaster broadcasts',
+    'Create rescue dispatches and assignments',
+    'Create and update disaster events; close the active event',
+    'Manage hazard map layers',
+  ],
+  mitigation_prevention:['Manage hazard map layers'],
+  preparedness:['Manage hazard map layers'],
+  response:[
+    'Create rescue dispatches and assignments',
+    'Update response operations and close the active event',
+    'Submit web resource requests (not approve them)',
+  ],
+  recovery_rehabilitation:['View resource requests and submit web resource requests (not approve them)'],
+  tl:[
+    'Use rescuer mobile assignments, navigation, and offline sync',
+    'Submit rescuer field reports',
+    'Submit field resource requests (Team Leader only)',
+  ],
+  tm:[
+    'Use rescuer mobile assignments, navigation, and offline sync',
+    'Submit rescuer field reports',
+    'Cannot submit the Team Leader-only field resource request',
+  ],
+  household_resident:[
+    'Use household mobile setup, profile, trusted-household, and status workflows',
+    'Submit status updates for linked household members',
+  ],
+}
+function RoleCatalog({roles,loading}) {
+  const activeRoles=roles.filter(role=>role.role_key!=='rescuer')
+  return <div className="grid management-grid role-management-grid"><div className="card role-catalog"><div className="tbl"><table className="role-table"><thead><tr><th>Role</th><th>Role key</th><th>Account type</th><th>Web access</th><th>Specific capabilities</th><th className="n">Accounts</th></tr></thead><tbody>
+    {loading?<tr><td colSpan="6" role="status">Loading roles…</td></tr>:activeRoles.length?activeRoles.map(role=>{
+      const modules=Array.isArray(role.web_modules)?role.web_modules:[]
+      const capabilities=ROLE_CAPABILITIES[role.role_key] || []
+      return <tr key={role.role_id}>
+        <td><b>{role.role_name}</b></td>
+        <td><code>{role.role_key}</code></td>
+        <td>{String(role.base_role_key||role.role_key).replaceAll('_',' ')}</td>
+        <td>{modules.map(key=>ROLE_MODULE_LABELS[key]||key.replaceAll('_',' ')).join(', ') || 'None'}</td>
+        <td>{capabilities.join('; ') || 'None'}</td>
+        <td className="n">{Number(role.member_count)||0}</td>
+      </tr>
+    }):<tr><td colSpan="6">No roles</td></tr>}
+  </tbody></table></div></div></div>
 }
 function Profile({account:p,dutyStatuses,onDutyChange,onEdit,onAction,busy}) {
   const hq=String(p.team_code).toUpperCase()==='HQCC' || ['chair','operations_admin','mitigation_prevention','preparedness','response','recovery_rehabilitation'].includes(p.role_key),active=p.is_active!==false

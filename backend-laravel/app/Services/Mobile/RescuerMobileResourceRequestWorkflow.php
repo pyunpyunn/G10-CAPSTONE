@@ -57,7 +57,7 @@ class RescuerMobileResourceRequestWorkflow
             'source_reference' => $activeEvent->event_id ?? null,
             'request_category' => $validated['request_category'],
             'evacuation_center_id' => null,
-            'requested_by' => $responder?->full_name ?? $user?->full_name ?? $user?->username ?? 'Rescuer mobile',
+            'requested_by' => $user?->user_id,
             'handled_by' => $user?->user_id,
             'resource_type' => $validated['resource_type'],
             'item_name' => $validated['item_name'] ?? null,

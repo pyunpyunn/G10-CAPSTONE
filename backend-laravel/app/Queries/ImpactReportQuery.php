@@ -9,11 +9,12 @@ use Illuminate\Validation\ValidationException;
 
 class ImpactReportQuery
 {
-    private const COLORS = ['#2563eb', '#dc2626', '#059669', '#7c3aed', '#d97706', '#0891b2', '#db2777', '#65a30d'];
+    private const COLORS = ['#2563eb', '#dc2626', '#059669', '#7c3aed', '#d97706', '#0891b2', '#db2777', '#65a30d', '#4f46e5', '#ea580c', '#0d9488', '#9333ea', '#a16207', '#0284c7', '#be123c', '#15803d', '#6d28d9', '#475569'];
 
     public function __construct(
         private RescueCriteriaHistoryQuery $history,
         private DashboardImpactQuery $dashboardImpact,
+        private SitioPriorityQuery $sitioPriorities,
     ) {}
 
     public function sitioRanking(string $eventId, array $rankingTypes): array
@@ -107,6 +108,7 @@ class ImpactReportQuery
             'event_id' => $event->event_id,
             'generated_at' => now()->toDateTimeString(),
             'ranking_types' => $rankingTypes,
+            'ui_rows' => $this->sitioPriorities->ranked($eventId),
             'status_groups' => in_array('status', $rankingTypes, true) ? $statusGroups : [],
             'priority_rows' => in_array('priority', $rankingTypes, true) ? $priorityRows : [],
             'chart' => [
@@ -139,6 +141,8 @@ class ImpactReportQuery
         }
         asort($timeline, SORT_NUMERIC);
         $hours = array_values($timeline);
+        $elapsedHours = max(0, Carbon::parse($event->started_at)->diffInSeconds($event->ended_at ? Carbon::parse($event->ended_at) : now(), false) / 3600,
+            ...($hours ?: [0]));
 
         foreach ($sitios as $index => $sitio) {
             $points = $sitio['points'];
@@ -159,9 +163,22 @@ class ImpactReportQuery
                 'peak' => (float) $peak,
                 'peak_at' => $peakPoint['observed_at'] ?? null,
             ];
+            $samples = [];
+            foreach ($points as $point) {
+                $samples[sprintf('%.8F', (float) $point['hours_since_alert'])] = [
+                    'x' => (float) $point['hours_since_alert'],
+                    'y' => $point['purok_impact'] === null ? null : (float) $point['purok_impact'],
+                ];
+            }
+            $samples = array_values($samples);
+            usort($samples, fn ($a, $b) => $a['x'] <=> $b['x']);
+            if ($samples && $samples[array_key_last($samples)]['x'] < $elapsedHours) {
+                $samples[] = ['x' => $elapsedHours, 'y' => $samples[array_key_last($samples)]['y']];
+            }
             $series[] = [
                 'label' => $sitio['sitio'],
                 'color' => self::COLORS[$index % count(self::COLORS)],
+                'samples' => $samples,
                 'values' => array_map(fn (float $hour): ?float => $valuesByHour[sprintf('%.8F', $hour)] ?? null, $hours),
             ];
         }
@@ -179,6 +196,7 @@ class ImpactReportQuery
                 'value_label' => 'Weighted purok impact per sitio',
                 'max_value' => 100,
                 'x_values' => $hours,
+                'x_max_value' => max(1 / 3600, $elapsedHours),
                 'labels' => array_map(fn (float $hour): string => $this->hoursLabel($hour), $hours),
                 'series' => $series,
             ],

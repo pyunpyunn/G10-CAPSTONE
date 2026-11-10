@@ -190,7 +190,7 @@ function ImpactReportExport({ reportType, events, onClose }) {
       {reportType === 'sitio-ranking' && <fieldset className="exchange-formats impact-ranking-options"><legend>Ranking types</legend>
         { [['status', 'Status ranking'], ['priority', 'Priority ranking']].map(([key, label]) => <label key={key} className={rankingTypes.includes(key) ? 'active' : ''}><input type="checkbox" checked={rankingTypes.includes(key)} disabled={busy} onChange={() => toggleRanking(key)} />{label}</label>)}
       </fieldset>}
-      {reportType === 'sitio-ranking' && <p className="impact-report-note">The report page presents rankings as readable highlights. Excel also includes separate bar graphs for the selected ranking type(s).</p>}
+      {reportType === 'sitio-ranking' && <p className="impact-report-note">Includes the household page’s stacked percentage graphs and current ranking table, plus historical peak quantities and recording times. Excel opens on the graph sheet.</p>}
       {reportType === 'purok-impact' && <p className="impact-report-note">The report graph follows the dashboard’s sitio impact timeline. Excel includes a separate graph sheet; sample/demo sitios are excluded.</p>}
       {reportType === 'past-event-impact' && <>
         <label className="exchange-field">Group impact by<select value={period} disabled={busy} onChange={event => { setPeriod(event.target.value); setDone(false) }}><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></label>

@@ -179,7 +179,18 @@
 .hh-prototype button.rk{display:block;width:100%;text-align:left;font:inherit;color:inherit}
 .hh-prototype .bt.p{color:#fff}
 .hh-prototype .bk{flex:none}
-.hh-prototype .pin{min-width:100%;width:max-content}
+.hh-prototype .household-chart .ch{flex-wrap:wrap}
+.hh-prototype .household-chart .sg2{flex-shrink:0}
+.hh-prototype .household-chart .lgd{margin-left:auto;min-width:0;max-width:100%}
+.hh-prototype .household-chart .cht{min-width:0;padding-top:12px}
+.hh-prototype .household-chart .yax{flex:0 0 80px;padding-bottom:112px}
+.hh-prototype .household-chart .plot{overflow:visible}
+.hh-prototype .household-chart .pin{width:100%;min-width:0}
+.hh-prototype .household-chart .cols,.hh-prototype .household-chart .xls{display:grid;grid-template-columns:repeat(var(--sitio-columns),minmax(0,1fr));gap:clamp(2px,.5vw,8px);padding-left:4px;padding-right:4px}
+.hh-prototype .household-chart .cols>button,.hh-prototype .household-chart .xls>span{min-width:0;max-width:none;width:100%}
+.hh-prototype .household-chart .xls{flex:0 0 112px;height:112px;padding-top:0}
+.hh-prototype .household-chart .xls>span>span{position:absolute;top:8px;right:calc(50% + 12px);width:max-content;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;font-size:11px;line-height:1.2;transform:rotate(-55deg);transform-origin:top right}
+.hh-prototype .household-chart .bar{left:15%;right:15%;max-width:56px;margin:0 auto}
 .hh-prototype .ovg{overflow:hidden}
 .hh-prototype .ov{z-index:1100}
 .hh-prototype .md{max-height:90vh;overflow:auto}

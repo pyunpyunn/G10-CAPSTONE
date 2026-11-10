@@ -35,6 +35,12 @@
 .weather-reference .mx em{display:block;color:#9fb4d3;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
 .weather-reference .mx b{font-size:15px}
 .weather-reference .mx small{color:#9fb4d3;font-size:12px}
+.weather-reference .temperature-accuracy{position:relative;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.25);font-size:12px}
+.weather-reference .temperature-accuracy>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+.weather-reference .temperature-accuracy strong{font-weight:600}
+.weather-reference .temperature-accuracy p{margin:6px 0;color:#e2eaf5;line-height:1.5;max-width:75ch}
+.weather-reference .temperature-source{color:#e2eaf5}
+.weather-reference .temperature-source a{color:#fff;text-decoration:underline;text-underline-offset:3px}
 .weather-reference .fc{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .weather-reference .fd{background:var(--cd);border:1px solid var(--ln);border-radius:14px;padding:12px 14px;text-align:left;transition:.2s;display:flex;flex-direction:column;gap:6px}
 .weather-reference .fd:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(15,28,45,.1)}

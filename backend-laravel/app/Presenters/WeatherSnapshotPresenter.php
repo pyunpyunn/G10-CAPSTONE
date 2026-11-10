@@ -23,6 +23,7 @@ class WeatherSnapshotPresenter
             'condition_name' => $log->condition_name ?? 'Weather update',
             'condition_key' => $this->conditionKey($log->condition_name),
             'temperature' => $this->numberOrNull($log->temperature),
+            'temperature_accuracy' => $this->temperatureAccuracy($log, is_array($payload) ? $payload : []),
             'apparent_temperature' => $this->numberOrNull($current['apparent_temperature'] ?? null),
             'humidity' => $log->humidity,
             'rainfall_mm' => $this->numberOrNull($log->rainfall_mm),
@@ -41,6 +42,24 @@ class WeatherSnapshotPresenter
             'risk_label' => match ($risk['level']) { 'critical' => 'Critical', 'warning' => 'Moderate', default => 'Low' },
             'observed_time' => $this->formatTime($log->observed_at),
             'created_at' => $this->formatDateTime($log->created_at),
+        ];
+    }
+
+    private function temperatureAccuracy(object $log, array $payload): array
+    {
+        $isOpenMeteo = parse_url((string) $log->source_url, PHP_URL_HOST) === 'api.open-meteo.com'
+            && parse_url((string) $log->source_url, PHP_URL_PATH) === '/v1/forecast';
+        $interval = $payload['current']['interval'] ?? null;
+
+        return [
+            'status' => 'not_provided',
+            'label' => 'Not provided by source',
+            'explanation' => $isOpenMeteo
+                ? 'Open-Meteo provides modelled air temperature at 2 metres above ground. Its Forecast API does not supply a verified accuracy percentage or ±°C error margin for this reading.'
+                : 'No verified temperature accuracy percentage or °C error margin is available for this saved reading.',
+            'documentation_url' => $isOpenMeteo ? 'https://open-meteo.com/en/docs#current-weather' : null,
+            'interval_seconds' => $isOpenMeteo && ($payload['current_units']['interval'] ?? null) === 'seconds'
+                && is_numeric($interval) && (float) $interval > 0 ? (float) $interval : null,
         ];
     }
 

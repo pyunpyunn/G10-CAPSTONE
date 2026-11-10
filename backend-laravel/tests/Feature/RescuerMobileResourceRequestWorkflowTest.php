@@ -15,6 +15,9 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
     {
         parent::setUp();
 
+        Schema::create('users', function (Blueprint $table): void {
+            $table->string('user_id')->primary();
+        });
         Schema::create('resource_requests', function (Blueprint $table): void {
             $table->string('request_id')->primary();
             $table->string('request_source')->nullable();
@@ -22,6 +25,7 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
             $table->string('request_category')->nullable();
             $table->string('evacuation_center_id')->nullable();
             $table->string('requested_by')->nullable();
+            $table->foreign('requested_by')->references('user_id')->on('users');
             $table->string('handled_by')->nullable();
             $table->string('resource_type')->nullable();
             $table->string('item_name')->nullable();
@@ -55,6 +59,8 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
 
     public function test_store_keeps_success_contract_and_persists_the_composed_location(): void
     {
+        $userId = 'USR-RESCUER-TEST-1';
+        DB::table('users')->insert(['user_id' => $userId]);
         $request = Request::create('/api/v1/rescuer/resource-requests', 'POST', [
             'location' => 'Zone 2',
             'request_category' => 'resource',
@@ -64,6 +70,11 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
             'unit' => 'packs',
             'description' => 'Family supply',
             'urgency_key' => 'high',
+        ]);
+        $request->setUserResolver(fn () => (object) [
+            'user_id' => $userId,
+            'full_name' => 'Test Rescuer',
+            'username' => 'test.rescuer',
         ]);
 
         $response = app(RescuerMobileResourceRequestWorkflow::class)->store($request);
@@ -79,6 +90,7 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
             'request_id' => $requestId,
             'request_source' => 'rescuer_mobile',
             'request_category' => 'resource',
+            'requested_by' => $userId,
             'resource_type' => 'Water',
             'urgency_id' => 3,
             'status_id' => 1,
@@ -124,6 +136,5 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
         ]);
     }
 }
-
 
 
