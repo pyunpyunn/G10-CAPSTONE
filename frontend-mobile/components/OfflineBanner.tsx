@@ -7,6 +7,6 @@ export function OfflineBanner({ offline, lastSyncedAt, loading }: { offline: boo
   if (!offline && network.isConnected !== false && network.isInternetReachable !== false) return null;
   return <View accessibilityLiveRegion="polite" style={{ backgroundColor: '#fff3cd', padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
     <Text style={{ color: '#664d03', fontWeight: '700' }}>Offline mode</Text>
-    {lastSyncedAt ? <Text style={{ color: '#664d03', textAlign: 'right' }}>{new Date(lastSyncedAt).toLocaleString()}</Text> : null}
+    <Text style={{ color: '#664d03', textAlign: 'right', flex: 1 }}>{lastSyncedAt ? `Last synced: ${new Date(lastSyncedAt).toLocaleString()}` : 'No saved data yet'}</Text>
   </View>;
 }

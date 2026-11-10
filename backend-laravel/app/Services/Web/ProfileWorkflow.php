@@ -67,14 +67,13 @@ class ProfileWorkflow
     {
         $validated = $request->validate([
             'current_password' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'min:8', 'max:128', 'confirmed'],
+            'password' => [...\App\Support\PasswordPolicy::rules(), 'confirmed'],
             'password_confirmation' => ['required', 'string', 'max:128'],
         ], [
             'current_password.required' => 'Current password is required.',
             'password.required' => 'New password is required.',
-            'password.min' => 'New password must be at least 8 characters.',
             'password.confirmed' => 'Password confirmation does not match.',
-        ]);
+        ] + \App\Support\PasswordPolicy::messages());
 
         $user = $request->user();
         $credential = $user->roleKey() === 'household_resident'
@@ -224,7 +223,6 @@ class ProfileWorkflow
         ]);
     }
 }
-
 
 
 

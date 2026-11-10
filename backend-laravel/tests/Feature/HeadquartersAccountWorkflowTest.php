@@ -77,7 +77,7 @@ class HeadquartersAccountWorkflowTest extends TestCase
     {
         $this->withoutMiddleware()->postJson('/api/v1/headquarters-accounts', [
             'account_type' => 'retired_role',
-            'first_name' => 'Alicia', 'last_name' => 'Reyes', 'password' => 'temporary-password',
+            'first_name' => 'Alicia', 'last_name' => 'Reyes', 'password' => 'Temporary-Password-1',
         ])->assertUnprocessable()->assertJsonValidationErrors('account_type');
 
         $this->assertSame(0, DB::table('users')->count());
@@ -92,7 +92,7 @@ class HeadquartersAccountWorkflowTest extends TestCase
             'last_name' => 'Santos',
             'email' => 'mara@example.test',
             'contact_number' => '09171111111',
-            'password' => 'temporary-password',
+            'password' => 'Temporary-Password-1',
             'role_id' => 1,
         ])->assertCreated()->assertJsonPath('data.account.account_id', 'BDRRM-HQCC-11000');
 
@@ -100,5 +100,18 @@ class HeadquartersAccountWorkflowTest extends TestCase
             ->where('u.username', 'BDRRM-HQCC-11000')->value('r.role_key'));
         $this->assertSame(1, DB::table('responders')->where('username', 'BDRRM-HQCC-11000')->count());
         $this->assertSame(1, DB::table('rescue_teams')->where('team_code', 'HQCC')->count());
+    }
+
+    public function test_hq_account_rejects_temporary_password_without_policy_characters(): void
+    {
+        $this->withoutMiddleware()->postJson('/api/v1/headquarters-accounts', [
+            'account_type' => 'command_center',
+            'first_name' => 'Mara',
+            'last_name' => 'Santos',
+            'password' => 'temporary-password',
+            'role_id' => 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors('password');
+
+        $this->assertSame(0, DB::table('users')->count());
     }
 }

@@ -6,6 +6,7 @@ import { palette, radius, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
 
 type RouteProps = {
+  active?: boolean;
   geotag: any;
   evacuationCenters: any[];
 };

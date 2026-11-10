@@ -30,7 +30,7 @@ function fixture(complete = false, offline = false) {
     if (!node || !node.props) return null;
     return node.type === 'Map' ? node : findMap(node.props.children);
   }
-  return { render() { cursor = 0; const map = findMap(context.exports.RescueMapScreen({ assignments: [], evacuationCenters: [], activeAssignment: null })); mounted = true; return map; },
+  return { render(active = true) { cursor = 0; const map = findMap(context.exports.RescueMapScreen({ active, assignments: [], evacuationCenters: [], activeAssignment: null })); mounted = true; return map; },
     async mountEffects() { effects.forEach(effect => effect()); await new Promise(setImmediate); } };
 }
 test('rescuer Map tab mounts its native map without a GPS fix or assignment', () => {
@@ -38,6 +38,13 @@ test('rescuer Map tab mounts its native map without a GPS fix or assignment', ()
   const map = app.render();
   assert.ok(map);
   assert.equal(map.props.androidView, 'texture');
+});
+
+test('switching away from the map retains the map surface instead of remounting it', () => {
+  const app = fixture();
+  assert.ok(app.render());
+  assert.ok(app.render(false));
+  assert.ok(app.render(true));
 });
 test('an undownloaded offline-pack manifest cannot replace the working street map', async () => {
   const app = fixture(); app.render(); await app.mountEffects();

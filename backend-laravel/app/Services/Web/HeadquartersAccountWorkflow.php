@@ -50,8 +50,8 @@ class HeadquartersAccountWorkflow
             'gender' => ['nullable', 'string', 'max:20'], 'blood_type' => ['nullable', 'string', 'max:10'],
             'address' => ['nullable', 'string', 'max:1000'], 'date_of_birth' => ['nullable', 'date', 'before:today'],
             'emergency_contact_name' => ['nullable', 'string', 'max:150'], 'emergency_contact_number' => ['nullable', 'string', 'max:30'],
-            'password' => ['nullable', 'string', 'min:8', 'max:100'],
-        ]);
+            'password' => \App\Support\PasswordPolicy::rules(false),
+        ], \App\Support\PasswordPolicy::messages());
 
         $role = app(PersonnelRoleService::class)->selected($validated, true);
         if (! $role) {

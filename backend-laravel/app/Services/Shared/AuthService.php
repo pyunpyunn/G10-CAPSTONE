@@ -258,8 +258,8 @@ class AuthService
         $values = $request->validate([
             'login' => ['required', 'string', 'max:255'],
             'current_password' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'min:8', 'max:128', 'confirmed'],
-        ]);
+            'password' => [...\App\Support\PasswordPolicy::rules(), 'confirmed'],
+        ], \App\Support\PasswordPolicy::messages());
         $user = $this->accounts->userFromLogin(trim($values['login']));
         if (! $user) {
             throw ValidationException::withMessages(['login' => ['Account ID does not exist. Check the ID issued by your administrator.']]);
@@ -393,8 +393,8 @@ class AuthService
             'login' => ['required', 'string', 'max:255'],
             'contact_number' => ['required', 'string', 'max:40'],
             'code' => ['required', 'digits:6'],
-            'password' => ['required', 'string', 'min:8', 'max:128', 'confirmed'],
-        ]);
+            'password' => [...\App\Support\PasswordPolicy::rules(), 'confirmed'],
+        ], \App\Support\PasswordPolicy::messages());
         $details = $this->householdRecoveryDetails(trim($values['login']));
 
         if (! $details) {

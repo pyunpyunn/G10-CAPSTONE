@@ -50,7 +50,7 @@ function fixture(read, snapshot = null, persisted = null) {
     assert.ok(mocks[name], `Unexpected dependency ${name}`)
     return mocks[name]
   } })
-  return { render() { cursor = 0; return output.useMobileOverview('household', read) }, saved: () => saved }
+  return { render() { cursor = 0; return output.useMobileOverview('household', read) }, saved: () => saved, persisted: () => persisted }
 }
 
 function deferred() {
@@ -128,4 +128,64 @@ test('an old slow read cannot overwrite a confirmed write before its queued refr
   assert.equal(app.render().overview.status, 'confirmed-saved')
   assert.equal(app.saved().value.status, 'confirmed-saved')
   assert.equal(calls, 2)
+})
+
+test('the initial screen stays loading until the first read resolves', async () => {
+  const response = deferred()
+  const app = fixture(() => response.promise)
+  assert.equal(app.render().loading, true)
+  const pending = app.render().loadOverview()
+  await new Promise(setImmediate)
+  assert.equal(app.render().loading, true)
+  assert.equal(app.render().overview, null)
+  response.resolve({ members: [] })
+  await pending
+  assert.equal(app.render().loading, false)
+  assert.deepEqual(app.render().overview, { members: [] })
+})
+
+test('reopening a warm screen does not fetch until explicitly refreshed', async () => {
+  let calls = 0
+  const app = fixture(async () => { calls++; return { status: 'new' } }, { value: { status: 'saved' }, savedAt: 123 })
+  await app.render().loadOverview()
+  await app.render().loadOverview()
+  assert.equal(calls, 0)
+  assert.equal(app.render().overview.status, 'saved')
+  await app.render().loadOverview(true)
+  assert.equal(calls, 1)
+  assert.equal(app.render().overview.status, 'new')
+})
+
+test('manual refresh retains the current page while saving the latest successful sync for offline use', async () => {
+  const response = deferred()
+  const app = fixture(() => response.promise, { value: { status: 'old' }, savedAt: 123 })
+  const pending = app.render().loadOverview(true)
+  await new Promise(setImmediate)
+  assert.equal(app.render().overview.status, 'old')
+  assert.equal(app.render().loading, false)
+  assert.equal(app.render().refreshing, true)
+  response.resolve({ status: 'latest', members: [{ id: 2 }] })
+  await pending
+  assert.deepEqual(app.persisted().value, { status: 'latest', members: [{ id: 2 }] })
+  assert.equal(app.render().refreshing, false)
+  const offline = fixture(async () => { throw new Error('offline') }, null, app.persisted())
+  await offline.render().loadOverview()
+  assert.equal(offline.render().overview.status, 'latest')
+  assert.equal(offline.render().offline, true)
+})
+
+test('a confirmed local update is preserved offline even when the follow-up read fails', async () => {
+  const app = fixture(async () => { throw new Error('offline') }, { value: { status: 'old' }, savedAt: 123 })
+  await app.render().loadOverview()
+  app.render().setOverview({ status: 'server-confirmed' })
+  await app.render().loadOverview(true, true, true)
+  assert.equal(app.persisted().value.status, 'server-confirmed')
+  assert.equal(app.render().overview.status, 'server-confirmed')
+})
+
+test('an empty successful response becomes a retryable error instead of a false empty screen', async () => {
+  const app = fixture(async () => null)
+  await app.render().loadOverview()
+  assert.equal(app.render().loading, false)
+  assert.match(app.render().error, /no page data/)
 })

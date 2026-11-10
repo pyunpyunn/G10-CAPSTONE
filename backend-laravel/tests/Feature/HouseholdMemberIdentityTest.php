@@ -337,9 +337,9 @@ class HouseholdMemberIdentityTest extends TestCase
         $this->ownerAccess();
         $pending = $this->householdLogin('phone-b')['token'];
         $token = $this->ownerRequest($pending, 'POST', 'household/device-owner/select', ['member_id' => 'HM-8560-2'])->assertOk()->json('token');
-        $this->ownerRequest($token, 'PATCH', 'profile/password', ['current_password' => 'existing-password', 'password' => 'new-shared-password', 'password_confirmation' => 'new-shared-password'])->assertOk();
-        $this->assertTrue(Hash::check('new-shared-password', User::findOrFail('U1')->password));
-        $this->assertFalse($this->householdLogin('phone-b', 'new-shared-password')['owner_selection_required']);
+        $this->ownerRequest($token, 'PATCH', 'profile/password', ['current_password' => 'existing-password', 'password' => 'New-Shared-Password-1', 'password_confirmation' => 'New-Shared-Password-1'])->assertOk();
+        $this->assertTrue(Hash::check('New-Shared-Password-1', User::findOrFail('U1')->password));
+        $this->assertFalse($this->householdLogin('phone-b', 'New-Shared-Password-1')['owner_selection_required']);
     }
 
 }

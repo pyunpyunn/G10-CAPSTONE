@@ -33,7 +33,7 @@ export function RescuerDashboardScreen({ overview, pendingAssignmentId, onOpenMa
     }).catch(() => { if (active) setHistoryError('History unavailable.'); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [historyOpen, page, revision]);
-  function openHistory() { setHistory([]); setPage(1); setHistoryOpen(true); }
+  function openHistory() { setLoading(true); setHistoryError(''); setHistory([]); setPage(1); setHistoryOpen(true); }
   const next = current?.status_key === 'dispatched' ? ['Accept','accepted'] : current?.status_key === 'accepted' ? ['En route','en_route'] : current?.status_key === 'en_route' ? ['Arrived','on_scene'] : null;
   const updating = pendingAssignmentId != null && Number(pendingAssignmentId) === Number(current?.assignment_id);
   return <View style={styles.stack}>

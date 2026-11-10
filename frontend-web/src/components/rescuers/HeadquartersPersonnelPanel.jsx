@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { getHeadquartersAccounts, saveHeadquartersAccount } from '../../api/headquartersAccountsApi'
 import { AccountProfile } from './RescuerAccountModal'
 
@@ -13,6 +14,7 @@ export default function HeadquartersPersonnelPanel({ editor = false, roleSelecto
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [section, setSection] = useState('personal')
+  const [showPassword, setShowPassword] = useState(false)
   const selected = workspace?.accounts?.find(account => account.account_id === selectedId) || workspace?.accounts?.[0]
 
   useEffect(() => {
@@ -140,15 +142,15 @@ export default function HeadquartersPersonnelPanel({ editor = false, roleSelecto
                 <label className="fl s3">
                   <span>Temporary password</span>
                   <div className="tm-password">
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      minLength={8}
-                      maxLength={100}
-                      required
-                      value={form.password}
-                      onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
-                    />
+                    <div className="password-eye-field">
+                      <input type={showPassword ? 'text' : 'password'} autoComplete="new-password"
+                        minLength={8} maxLength={128} required value={form.password}
+                        onChange={event => setForm(current => ({ ...current, password: event.target.value }))} />
+                      <button type="button" className="password-eye-toggle" aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowPassword(value => !value)}>
+                        {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
+                    </div>
                     <button
                       className="bt sm"
                       type="button"

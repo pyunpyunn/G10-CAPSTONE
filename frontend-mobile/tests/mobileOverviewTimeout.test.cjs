@@ -27,6 +27,7 @@ function loadOverviewModule(file, extraMocks = {}) {
         };
       }
       if (name === './reportSubmission') return {};
+      if (name === 'react-native') return { Platform: { OS: 'android' } };
       if (name in extraMocks) return extraMocks[name];
       throw new Error(`Unexpected import ${name}`);
     },

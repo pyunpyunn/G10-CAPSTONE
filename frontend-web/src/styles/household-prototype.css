@@ -182,15 +182,21 @@
 .hh-prototype .household-chart .ch{flex-wrap:wrap}
 .hh-prototype .household-chart .sg2{flex-shrink:0}
 .hh-prototype .household-chart .lgd{margin-left:auto;min-width:0;max-width:100%}
-.hh-prototype .household-chart .cht{min-width:0;padding-top:12px}
-.hh-prototype .household-chart .yax{flex:0 0 80px;padding-bottom:112px}
-.hh-prototype .household-chart .plot{overflow:visible}
-.hh-prototype .household-chart .pin{width:100%;min-width:0}
-.hh-prototype .household-chart .cols,.hh-prototype .household-chart .xls{display:grid;grid-template-columns:repeat(var(--sitio-columns),minmax(0,1fr));gap:clamp(2px,.5vw,8px);padding-left:4px;padding-right:4px}
-.hh-prototype .household-chart .cols>button,.hh-prototype .household-chart .xls>span{min-width:0;max-width:none;width:100%}
-.hh-prototype .household-chart .xls{flex:0 0 112px;height:112px;padding-top:0}
-.hh-prototype .household-chart .xls>span>span{position:absolute;top:8px;right:calc(50% + 12px);width:max-content;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;font-size:11px;line-height:1.2;transform:rotate(-55deg);transform-origin:top right}
+.hh-prototype .household-chart{width:100%;max-width:100%;--sitio-gap:min(10px,calc(25% / var(--sitio-columns)))}
+.hh-prototype .household-chart-body{flex:1;min-width:0;min-height:280px;display:grid;grid-template-columns:72px minmax(0,1fr);grid-template-rows:minmax(160px,1fr) 108px;column-gap:8px;padding:14px 12px 10px 6px}
+.hh-prototype .household-chart-axis{position:relative;grid-column:1;grid-row:1;color:var(--mu);font-size:11px}
+.hh-prototype .household-chart-axis>span{position:absolute;right:0;transform:translateY(-50%)}
+.hh-prototype .household-chart-plot{position:relative;min-width:0;grid-column:2;grid-row:1}
+.hh-prototype .household-chart-bars,.hh-prototype .household-chart-labels{display:grid;grid-template-columns:repeat(var(--sitio-columns),minmax(0,1fr));gap:var(--sitio-gap)}
+.hh-prototype .household-chart-bars{position:absolute;inset:0}
+.hh-prototype .household-chart-bars>button{position:relative;min-width:0;width:100%;padding:0;background:none;border:0}
+.hh-prototype .household-chart-labels{min-width:0;grid-column:2;grid-row:2;color:var(--mu);font-size:11px}
+.hh-prototype .household-chart-labels>span{position:relative;min-width:0}
+.hh-prototype .household-chart-labels>span>span{position:absolute;top:9px;right:calc(50% + 10px);width:max-content;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;transform:rotate(-55deg);transform-origin:top right}
 .hh-prototype .household-chart .bar{left:15%;right:15%;max-width:56px;margin:0 auto}
+.hh-prototype .household-chart-bars>button:hover .bar{filter:brightness(1.08)}
+.hh-prototype .household-chart-bars>button.on .bar{box-shadow:0 0 0 2px var(--nv)}
+.hh-prototype .household-chart-bars.sel>button:not(.on){opacity:.55}
 .hh-prototype .ovg{overflow:hidden}
 .hh-prototype .ov{z-index:1100}
 .hh-prototype .md{max-height:90vh;overflow:auto}

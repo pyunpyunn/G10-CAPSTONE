@@ -117,26 +117,33 @@ test('GPS writes invalidate map reads while retaining unrelated cached directory
   assert.equal(calls, 4)
 })
 
-test('session snapshots survive GPS heartbeats but clear after other writes and account changes', async () => {
+test('visible snapshots survive writes until explicitly replaced, but clear on account changes', async () => {
   const api = client(async config => response(config))
   await api.get('/household/overview')
   saveViewState('mobile:household', { household: 'own-household' })
   await api.post('/household/device-location', { latitude: 10, longitude: 123 })
   assert.equal(getViewState('mobile:household').value.household, 'own-household')
   await api.post('/household/status', { status_key: 'safe' })
-  assert.equal(getViewState('mobile:household'), null)
+  assert.equal(getViewState('mobile:household').value.household, 'own-household')
   saveViewState('mobile:household', { household: 'own-household' })
   resetApiState()
   assert.equal(getViewState('mobile:household'), null)
 })
 
-test('snapshots older than two minutes are not shown on remount', () => {
+test('visible snapshots do not disappear when two minutes elapse', () => {
   resetApiState()
   saveViewState('mobile:rescuer', { assignments: [] })
   const clock = Date.now
   const savedAt = clock()
   try {
     Date.now = () => savedAt + 120001
-    assert.equal(getViewState('mobile:rescuer'), null)
+    assert.deepEqual(getViewState('mobile:rescuer').value, { assignments: [] })
   } finally { Date.now = clock }
+})
+
+test('the first API request does not discard an already restored offline screen', async () => {
+  const api = client(async config => response(config))
+  saveViewState('mobile:household', { members: [{ id: 1 }] })
+  await api.get('/household/overview')
+  assert.deepEqual(getViewState('mobile:household').value, { members: [{ id: 1 }] })
 })

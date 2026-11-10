@@ -7,7 +7,7 @@ import {
   stopWebVoiceRecording,
 } from '@/utils/webRadioAudio';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
@@ -142,12 +142,7 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
   useEffect(() => {
     loadRadioFeed(1, true);
 
-    const feedTimer = setInterval(() => {
-      if (AppState.currentState === 'active') void loadRadioFeed(1, true, true);
-    }, 4000);
-
     return () => {
-      clearInterval(feedTimer);
       clearRecordTimer();
       stopWebVoicePlayback();
       void cancelWebVoiceRecording();
@@ -524,9 +519,9 @@ export function RadioCommunicationScreen({ overview }: RadioProps) {
       </View>
 
       <View style={styles.card}>
-        <SectionHeader title="Voice logs" />
+        <SectionHeader title="Voice logs" action={<Pressable accessibilityRole="button" accessibilityLabel="Refresh radio messages" disabled={isLoadingLogs} onPress={() => void loadRadioFeed(1, true)}><Ionicons name="refresh-outline" size={22} color={palette.navActive} /></Pressable>} />
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        {voiceLogs.length === 0 ? (
+        {isLoadingLogs && voiceLogs.length === 0 ? <Text style={styles.emptyText}>Loading voice messages...</Text> : !error && voiceLogs.length === 0 ? (
           <Text style={styles.emptyText}>No voice messages yet.</Text>
         ) : (
           voiceLogs.map((log) => (

@@ -1,10 +1,9 @@
 import { useMobileOverview } from '@/hooks/useMobileOverview';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { MobileTabPanels } from '@/components/MobileTabPanels';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import {
   Alert,
-  AppState,
   Platform,
   Pressable,
   RefreshControl,
@@ -41,7 +40,6 @@ import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
 import { configureRescuerTracking, stopRescuerTracking, trackingAssignmentFor } from '@/utils/rescuerLiveLocation';
 import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
-import { createAdaptivePoller } from '@/utils/networkScheduling';
 import { rescueActionGps } from '@/utils/rescueActionGps';
 import { useWebViewMode } from '@/utils/viewMode';
 import { WebAppShell } from '@/components/WebAppShell';
@@ -72,14 +70,6 @@ export default function RescuerHomeScreen() {
   const [pendingAssignment, setPendingAssignment] = useState<number | null>(null);
   useEffect(() => Platform.OS === 'web' ? undefined : mountNavigationSync(), []);
 
-
-  useEffect(() => {
-    const removeBroadcast = onDisasterBroadcast(() => { void loadOverview(true); });
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void loadOverview(true, true);
-    });
-    return () => { removeBroadcast(); subscription.remove(); };
-  }, [loadOverview]);
 
   useEffect(() => {
     loadOverview();
@@ -127,7 +117,6 @@ export default function RescuerHomeScreen() {
   );
 
   const trackingAssignmentId = trackingAssignmentFor(activeAssignment);
-  const queueAssignmentId = activeAssignment?.assignment_id || null;
   useEffect(() => {
     if (Platform.OS === 'web') return;
     void configureRescuerTracking(trackingAssignmentId).catch((error) => {
@@ -135,12 +124,6 @@ export default function RescuerHomeScreen() {
     });
     return () => { void stopRescuerTracking(); };
   }, [trackingAssignmentId]);
-  useEffect(() => {
-    return createAdaptivePoller(
-      () => AppState.currentState === 'active' ? loadOverview(true, true) : null,
-      { intervalMs: 30000, maxIntervalMs: 60000 },
-    ).start();
-  }, [queueAssignmentId, loadOverview]);
 
   async function handleLogout() {
     if (logoutPending.current) return;
@@ -280,7 +263,7 @@ export default function RescuerHomeScreen() {
     }
   }
 
-  function renderContent() {
+  function renderContent(tab: TabKey) {
     if (loading && !overview) {
       return <LoadingState label="Loading rescuer console..." />;
     }
@@ -294,7 +277,7 @@ export default function RescuerHomeScreen() {
       );
     }
 
-    if (activeTab === 'dashboard') {
+    if (tab === 'dashboard') {
       return (
         <RescuerDashboardScreen
           pendingAssignmentId={pendingAssignment}
@@ -306,9 +289,10 @@ export default function RescuerHomeScreen() {
       );
     }
 
-    if (activeTab === 'map') {
+    if (tab === 'map') {
       return (
         <RescueMapScreen
+          active={activeTab === 'map'}
           assignments={assignments}
           evacuationCenters={overview.evacuation_centers || []}
           activeAssignment={activeAssignment}
@@ -322,7 +306,7 @@ export default function RescuerHomeScreen() {
       );
     }
 
-    if (activeTab === 'report') {
+    if (tab === 'report') {
       return (
         <FieldReportScreen
           reports={overview.field_reports || []}
@@ -334,7 +318,7 @@ export default function RescuerHomeScreen() {
       );
     }
 
-    if (activeTab === 'resource') {
+    if (tab === 'resource') {
       return (
         <ResourceRequestScreen
           requests={overview.resource_requests || []}
@@ -345,8 +329,8 @@ export default function RescuerHomeScreen() {
       );
     }
 
-    if (activeTab === 'radio') {
-      return <RadioCommunicationScreen overview={overview} />;
+    if (tab === 'radio') {
+      return activeTab === 'radio' ? <RadioCommunicationScreen overview={overview} /> : null;
     }
 
     return <ResponderProfileScreen profile={overview.profile} onSaveProfile={handleUpdateProfile} onLogout={handleLogout} />;
@@ -478,7 +462,7 @@ export default function RescuerHomeScreen() {
               </Pressable>
             </View>
           ) : null}
-          {renderContent()}
+          <MobileTabPanels activeKey={activeTab} renderPanel={renderContent} />
         </WebAppShell>
         <MobileLogoutOverlay visible={loggingOut} />
       </SafeAreaView>
@@ -497,8 +481,9 @@ export default function RescuerHomeScreen() {
         removeClippedSubviews={false}
         style={styles.scroll}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
+        refreshControl={<RefreshControl enabled={activeTab !== 'map'} refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
+        {activeTab === 'map' ? <ActionButton label={refreshing ? 'Syncing...' : 'Refresh map data'} icon="refresh-outline" disabled={refreshing} onPress={() => void loadOverview(true)} /> : null}
         {!!overviewError && !offline && overview ? (
           <View style={styles.refreshError}>
             <Text style={styles.refreshErrorText}>Could not refresh. Showing previously loaded data. {overviewError}</Text>
@@ -507,7 +492,7 @@ export default function RescuerHomeScreen() {
             </Pressable>
           </View>
         ) : null}
-        {renderContent()}
+        <MobileTabPanels activeKey={activeTab} renderPanel={renderContent} />
       </ScrollView>
 
       <View style={styles.tabBar}>

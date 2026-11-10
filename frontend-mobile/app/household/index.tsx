@@ -1,9 +1,9 @@
 import { useMobileOverview } from '@/hooks/useMobileOverview';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { MobileTabPanels } from '@/components/MobileTabPanels';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  AppState,
   Platform,
   Pressable,
   RefreshControl,
@@ -11,7 +11,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
@@ -54,8 +53,6 @@ import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdLoading } fro
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
-import { onDisasterBroadcast } from '@/utils/mobileReadCache';
-import { createAdaptivePoller } from '@/utils/networkScheduling';
 import { useWebViewMode } from '@/utils/viewMode';
 import { WebAppShell } from '@/components/WebAppShell';
 
@@ -79,6 +76,7 @@ export default function HouseholdHomeScreen() {
   const { overview, setOverview, loading, refreshing, error: overviewError, offline, lastSyncedAt, loadOverview: refreshOverview }
     = useMobileOverview<HouseholdOverview>('household', getHouseholdOverview);
   const [deviceUuid, setDeviceUuid] = useState('');
+  const [deviceKeyError, setDeviceKeyError] = useState('');
   const [realBatteryLevel, setRealBatteryLevel] = useState<number | null>(null);
   const [pendingStatus, setPendingStatus] = useState('safe');
   const [editingStatus, setEditingStatus] = useState(true);
@@ -109,15 +107,19 @@ export default function HouseholdHomeScreen() {
   }, [statusOptionsSignature]);
 
   const loadLocalKeys = useCallback(async () => {
-    const existingDeviceUuid = await getStoredItem(deviceUuidKey);
-    if (existingDeviceUuid) {
-      setDeviceUuid(existingDeviceUuid);
-    } else {
-      const nextUuid = `hh-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      await setStoredItem(deviceUuidKey, nextUuid);
-      setDeviceUuid(nextUuid);
+    setDeviceKeyError('');
+    try {
+      const existingDeviceUuid = await getStoredItem(deviceUuidKey);
+      if (existingDeviceUuid) {
+        setDeviceUuid(existingDeviceUuid);
+      } else {
+        const nextUuid = `hh-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        await setStoredItem(deviceUuidKey, nextUuid);
+        setDeviceUuid(nextUuid);
+      }
+    } catch {
+      setDeviceKeyError('Your device identity could not be loaded. Please try again.');
     }
-
   }, []);
 
   const loadOverview = useCallback(async (isRefresh = false, silent = false, afterWrite = false) => {
@@ -135,30 +137,6 @@ export default function HouseholdHomeScreen() {
       ? overview.trusted?.households?.find((household: any) => household.connection_id === current.connection_id
         && ['active', 'validated'].includes(household.validation_status)) || null : null);
   }, [overview]);
-
-  useEffect(() => {
-    let pending = false;
-    let disposed = false;
-    const refreshAlerts = async () => {
-      if (disposed || pending || AppState.currentState !== 'active') return;
-      pending = true;
-      try { await loadOverview(true, true); } finally { pending = false; }
-    };
-    const unsubscribe = onDisasterBroadcast(() => { void refreshAlerts(); });
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void refreshAlerts();
-    });
-    const stopPolling = createAdaptivePoller(
-      () => AppState.currentState === 'active' ? loadOverview(true, true) : null,
-      { intervalMs: 30000, maxIntervalMs: 300000 },
-    ).start();
-    return () => {
-      disposed = true;
-      unsubscribe();
-      subscription.remove();
-      stopPolling();
-    };
-  }, [loadOverview]);
 
   const refreshDeviceSensors = useCallback(async () => {
     try {
@@ -202,12 +180,6 @@ export default function HouseholdHomeScreen() {
     loadOverview();
     refreshDeviceSensors();
   }, [loadLocalKeys, loadOverview, refreshDeviceSensors]);
-
-  useEffect(() => {
-    if (activeTab === 'trusted') {
-      void loadOverview(true);
-    }
-  }, [activeTab, loadOverview]);
 
   useEffect(() => {
     refreshDeviceSensors();
@@ -627,7 +599,7 @@ export default function HouseholdHomeScreen() {
     }
   }
 
-  function renderContent() {
+  function renderContent(tab: TabKey) {
     if (!overview) {
       return null;
     }
@@ -636,16 +608,17 @@ export default function HouseholdHomeScreen() {
       return <HouseholdSetupScreen overview={overview} deviceUuid={deviceUuid} onComplete={handleSetupComplete} onUploadProfilePhoto={handleUploadProfilePhoto} />;
     }
 
-    if (activeTab === 'route') {
+    if (tab === 'route') {
       return (
         <HouseholdRouteScreen
+          active={activeTab === 'route'}
           geotag={overview.geotag}
           evacuationCenters={overview.evacuation_centers || []}
         />
       );
     }
 
-    if (activeTab === 'trusted') {
+    if (tab === 'trusted') {
       return (
         <HouseholdTrustedScreen
           overview={overview}
@@ -665,7 +638,7 @@ export default function HouseholdHomeScreen() {
       );
     }
 
-    if (activeTab === 'profile') {
+    if (tab === 'profile') {
       return (
         <HouseholdProfileScreen
           overview={overview}
@@ -695,15 +668,16 @@ export default function HouseholdHomeScreen() {
     );
   }
 
-  if (!loading && !overview && overviewError) {
+  if ((!loading && !overview && overviewError) || (deviceKeyError && !deviceUuid)) {
     return <SafeAreaView style={styles.safe}>
+      <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={false} />
       <View style={{ padding: spacing.lg, gap: spacing.md }}>
         <HouseholdEmpty
           icon="cloud-offline-outline"
-          title="Unable to sync household data"
-          body={overviewError || 'Connect to the internet and try again. When you are away from the local network, your laptop, Laravel API, and Ngrok tunnel must be running.'}
+          title={deviceKeyError ? 'Unable to prepare this device' : 'Unable to sync household data'}
+          body={deviceKeyError || overviewError || 'Connect to the internet and try again.'}
         />
-        <HouseholdButton label="Try again" icon="refresh-outline" onPress={() => { void loadOverview(); }} />
+        <HouseholdButton label="Try again" icon="refresh-outline" onPress={() => { if (deviceKeyError) void loadLocalKeys(); else void loadOverview(); }} />
       </View>
     </SafeAreaView>;
   }
@@ -786,7 +760,6 @@ export default function HouseholdHomeScreen() {
           notificationCount={notificationCount}
           onOpenNotifications={() => {
             setShowNotifications(true);
-            void loadOverview(true);
           }}
           onOpenProfile={() => setActiveTab('profile')}
           onSelectKey={(key) => setActiveTab(key as TabKey)}
@@ -851,7 +824,7 @@ export default function HouseholdHomeScreen() {
             </Text>
             <HouseholdButton label="Retry refresh" tone="light" onPress={() => { void loadOverview(true); }} />
           </View> : null}
-          {renderContent()}
+          <MobileTabPanels activeKey={activeTab} renderPanel={renderContent} />
         </WebAppShell>
       ) : (
         <>
@@ -860,7 +833,6 @@ export default function HouseholdHomeScreen() {
             notificationCount={notificationCount}
             onOpenNotifications={() => {
               setShowNotifications(true);
-              void loadOverview(true);
             }}
           />
 
@@ -873,15 +845,16 @@ export default function HouseholdHomeScreen() {
               styles.content,
               overview.setup?.is_setup_complete && { paddingBottom: 104 + insets.bottom },
             ]}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
+            refreshControl={<RefreshControl enabled={activeTab !== 'route' && activeTab !== 'profile'} refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
           >
+            {['route', 'profile'].includes(activeTab) ? <HouseholdButton label={refreshing ? 'Syncing...' : 'Refresh page data'} icon="refresh-outline" tone="light" disabled={refreshing} onPress={() => void loadOverview(true)} /> : null}
             {overviewError && !offline ? <View style={{ padding: spacing.sm, gap: spacing.xs }}>
               <Text accessibilityLiveRegion="polite" style={{ color: palette.textSoft }}>
                 Could not refresh. Showing previously loaded data.
               </Text>
               <HouseholdButton label="Retry refresh" tone="light" onPress={() => { void loadOverview(true); }} />
             </View> : null}
-            {renderContent()}
+            <MobileTabPanels activeKey={activeTab} renderPanel={renderContent} />
           </ScrollView>
 
           {overview.setup?.is_setup_complete ? (

@@ -10,7 +10,6 @@ const cache = createSlice({
     reset(state) { state.generation++; state.session++; state.queries = {}; state.views = {} },
     invalidate(state, { payload: paths }) {
       state.generation++
-      if (!paths) state.views = {}
       for (const [key, entry] of Object.entries(state.queries)) {
         if (!paths || paths.some(path => entry.path.includes(path))) delete state.queries[key]
       }
@@ -44,7 +43,7 @@ export const saveViewState = (key, value, savedAt = Date.now()) => store.dispatc
 export const subscribeViewState = (listener) => store.subscribe(listener)
 export const getViewState = (key) => {
   const view = store.getState().serverData.views[key]
-  return view && Date.now() - view.savedAt < 120000 ? view : null
+  return view || null
 }
 export const removeViewState = (prefix) => store.dispatch(cache.actions.removedView(prefix))
 
@@ -68,7 +67,12 @@ export function installReduxTransport(client) {
   let scope
   client.defaults.adapter = async config => {
     const nextScope = `${config.baseURL || ''}|${config.headers?.get?.('Authorization') || config.headers?.Authorization || ''}|${config.headers?.get?.('X-Device-UUID') || ''}`
-    if (scope !== nextScope) { scope = nextScope; resetApiState(); inFlight.clear() }
+    if (scope !== nextScope) {
+      // The first request may follow offline snapshot restoration in this session.
+      if (scope !== undefined) resetApiState()
+      scope = nextScope
+      inFlight.clear()
+    }
     const session = store.getState().serverData.session
     const path = config.url || ''
     const method = String(config.method || 'get').toLowerCase()

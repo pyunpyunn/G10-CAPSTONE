@@ -186,3 +186,42 @@
 .profile-form-grid select {
   font: inherit;
 }
+
+.password-eye-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.password-eye-field input {
+  width: 100%;
+  min-width: 0;
+  padding-right: 42px;
+}
+
+.password-eye-toggle {
+  position: absolute;
+  right: 4px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  color: var(--color-text-3);
+  background: transparent;
+  cursor: pointer;
+}
+
+.password-eye-toggle:hover,
+.password-eye-toggle:focus-visible {
+  color: var(--color-nav-text);
+  background: var(--color-nav-hover);
+  outline: none;
+}
+
+.tm-password .password-eye-field {
+  flex: 1;
+}

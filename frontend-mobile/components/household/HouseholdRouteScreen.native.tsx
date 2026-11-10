@@ -8,6 +8,7 @@ import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI'
 import { useMapGps } from '@/hooks/useMapGps';
 
 type RouteProps = {
+  active?: boolean;
   geotag: any;
   evacuationCenters: any[];
 };
@@ -19,7 +20,7 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
-export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) {
+export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true }: RouteProps) {
   const centers = useMemo(() => (evacuationCenters || []).filter((center) => {
     const status = String(center.status || 'active').trim().toLowerCase();
     return center.route_available !== false
@@ -35,7 +36,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
   const [roadRoute, setRoadRoute] = useState<{ coordinates: { latitude: number; longitude: number }[]; distance_km: number; duration_min: number } | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
-  const gps = useMapGps(originMode === 'live');
+  const gps = useMapGps(active && originMode === 'live');
 
   useEffect(() => {
     if (!centers.some((center) => String(center.evacuation_center_id) === selectedId)) {

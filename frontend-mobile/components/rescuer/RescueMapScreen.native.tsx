@@ -13,6 +13,7 @@ import { decodePolyline6, downsampleRouteCoordinates, type Coordinate } from '@/
 import { ActionButton, EmptyState, SectionHeader } from './RescuerUI';
 
 type RescueMapProps = {
+  active?: boolean;
   assignments: any[];
   evacuationCenters: any[];
   activeAssignment: any;
@@ -40,6 +41,7 @@ const streetStyle = {
 };
 
 export function RescueMapScreen({
+  active = true,
   assignments,
   evacuationCenters = [],
   activeAssignment,
@@ -47,7 +49,8 @@ export function RescueMapScreen({
   showNavigationButton = false,
   onOpenNavigation,
 }: RescueMapProps) {
-  const isFocused = useIsFocused();
+  const navigationFocused = useIsFocused();
+  const isFocused = active && navigationFocused;
   const [tracking, setTracking] = useState(false);
   const { position, error: gpsError } = useMapGps(tracking && isFocused, !activeAssignment?.assignment_id, true);
   const [selectedCenterId, setSelectedCenterId] = useState<string | null>(null);
@@ -62,6 +65,7 @@ export function RescueMapScreen({
   const requestSequence = useRef(0);
   const routeRequest = useRef<AbortController | null>(null);
   const gpsCentered = useRef(false);
+  const fittedRoute = useRef<Coordinate[] | null>(null);
 
   const visibleCenters = useMemo(() => evacuationCenters.filter((center) =>
     center.latitude !== null && center.latitude !== undefined && center.latitude !== ''
@@ -107,21 +111,20 @@ export function RescueMapScreen({
       requestSequence.current++;
       routeRequest.current?.abort();
       routeRequest.current = null;
-      setMapReady(false);
       setRouteLoading(false);
       return;
     }
-    gpsCentered.current = false;
   }, [isFocused]);
 
   useEffect(() => {
-    if (!mapReady || !position || gpsCentered.current) return;
+    if (!isFocused || !mapReady || !position || gpsCentered.current) return;
     gpsCentered.current = true;
     camera.current?.jumpTo({ center: [position.longitude, position.latitude], zoom: 15 });
-  }, [mapReady, position]);
+  }, [isFocused, mapReady, position]);
 
   useEffect(() => {
-    if (!isFocused || !mapReady || routePoints.length < 2) return;
+    if (!isFocused || !mapReady || routePoints.length < 2 || fittedRoute.current === routePoints) return;
+    fittedRoute.current = routePoints;
     const bounds = routePoints.reduce<[number, number, number, number]>((value, point) => [
       Math.min(value[0], point[0]), Math.min(value[1], point[1]),
       Math.max(value[2], point[0]), Math.max(value[3], point[1]),
@@ -239,7 +242,7 @@ export function RescueMapScreen({
   const assignmentId = focusedAssignment?.assignment_id;
   const positionLatitude = position?.latitude;
   const positionLongitude = position?.longitude;
-  const mapCanvas = useMemo(() => isFocused ? (
+  const mapCanvas = useMemo(() => (
     <View collapsable={false} style={styles.map}>
       <Map
         style={StyleSheet.absoluteFill}
@@ -274,7 +277,7 @@ export function RescueMapScreen({
         ) : null}
       </Map>
     </View>
-  ) : null, [isFocused, mapStyle, onMapReady, onMapFailure, initialViewState, routeFeature, visibleCenters,
+  ), [mapStyle, onMapReady, onMapFailure, initialViewState, routeFeature, visibleCenters,
     selectedCenterId, assignmentId, assignmentLatitude, assignmentLongitude, positionLatitude, positionLongitude]);
 
   return (

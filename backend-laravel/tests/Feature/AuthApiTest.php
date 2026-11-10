@@ -301,7 +301,7 @@ class AuthApiTest extends TestCase
     private function passwordChangePayload(): array
     {
         return ['login' => 'BDRRM-SAR-001', 'current_password' => 'password',
-            'password' => 'new-secure-password', 'password_confirmation' => 'new-secure-password'];
+            'password' => 'New-Secure-Password-1', 'password_confirmation' => 'New-Secure-Password-1'];
     }
 
     public function test_old_password_change_requires_no_security_questions_and_revokes_sessions(): void
@@ -309,10 +309,10 @@ class AuthApiTest extends TestCase
         $user = \App\Models\User::findOrFail('USR-RESCUER-BDRRM-SAR-001');
         $user->createToken('old-session');
         $this->postJson('/api/v1/auth/password-recovery/reset', $this->passwordChangePayload())->assertOk();
-        $this->assertTrue(Hash::check('new-secure-password', $user->fresh()->password));
+        $this->assertTrue(Hash::check('New-Secure-Password-1', $user->fresh()->password));
         $this->assertSame(0, $user->tokens()->count());
         $this->postJson('/api/v1/auth/login', ['login' => 'BDRRM-SAR-001', 'password' => 'password'])->assertUnprocessable();
-        $this->postJson('/api/v1/auth/login', ['login' => 'BDRRM-SAR-001', 'password' => 'new-secure-password'])
+        $this->postJson('/api/v1/auth/login', ['login' => 'BDRRM-SAR-001', 'password' => 'New-Secure-Password-1'])
             ->assertOk()->assertJsonPath('user.user_id', $user->user_id);
 
     }
@@ -351,7 +351,7 @@ class AuthApiTest extends TestCase
         $user = \App\Models\User::findOrFail('USR-RESCUER-BDRRM-SAR-001');
         \Laravel\Sanctum\Sanctum::actingAs($user);
         $this->patchJson('/api/v1/profile/password', $this->passwordChangePayload())->assertOk();
-        $this->assertTrue(Hash::check('new-secure-password', $user->fresh()->password));
+        $this->assertTrue(Hash::check('New-Secure-Password-1', $user->fresh()->password));
         $this->assertFalse((bool) $user->fresh()->must_change_password);
     }
 
@@ -365,6 +365,9 @@ class AuthApiTest extends TestCase
             ['current_password' => 'wrong-password'],
             ['password_confirmation' => 'mismatch'],
             ['password' => 'short', 'password_confirmation' => 'short'],
+            ['password' => 'NoNumber-Password!', 'password_confirmation' => 'NoNumber-Password!'],
+            ['password' => 'NoSymbolPassword1', 'password_confirmation' => 'NoSymbolPassword1'],
+            ['password' => 'no-uppercase-password1!', 'password_confirmation' => 'no-uppercase-password1!'],
             ['password' => 'password', 'password_confirmation' => 'password'],
             ['current_password' => ''],
             ['password_confirmation' => ''],
@@ -391,7 +394,7 @@ class AuthApiTest extends TestCase
             $this->app['auth']->forgetGuards();
             $this->withToken($current->plainTextToken)
                 ->patchJson('/api/v1/profile/password', $this->passwordChangePayload())->assertOk();
-            $this->assertTrue(Hash::check('new-secure-password', $user->fresh()->password));
+            $this->assertTrue(Hash::check('New-Secure-Password-1', $user->fresh()->password));
             $this->assertDatabaseHas('personal_access_tokens', ['id' => $current->accessToken->id]);
             $this->assertDatabaseMissing('personal_access_tokens', ['id' => $other->accessToken->id]);
             $this->app['auth']->forgetGuards();
@@ -501,11 +504,11 @@ class AuthApiTest extends TestCase
             'login' => 'HH-OTP-001',
             'contact_number' => '09171234512',
             'code' => $sentCode,
-            'password' => 'new-household-password',
-            'password_confirmation' => 'new-household-password',
+            'password' => 'New-Household-Password-1',
+            'password_confirmation' => 'New-Household-Password-1',
         ]);
         $response->assertOk()->assertJsonPath('household_id', 'HH-OTP-001');
-        $this->assertTrue(Hash::check('new-household-password', $user->fresh()->password));
+        $this->assertTrue(Hash::check('New-Household-Password-1', $user->fresh()->password));
         $this->assertSame(0, $user->tokens()->count());
         $this->assertDatabaseHas('password_reset_requests', ['user_id' => $user->user_id, 'code_hash' => null]);
     }
@@ -561,8 +564,8 @@ class AuthApiTest extends TestCase
                 'login' => 'HH-OTP-001',
                 'contact_number' => '09171234512',
                 'code' => '000000',
-                'password' => 'new-household-password',
-                'password_confirmation' => 'new-household-password',
+                'password' => 'New-Household-Password-1',
+                'password_confirmation' => 'New-Household-Password-1',
             ])->assertUnprocessable()->assertJsonValidationErrors('code');
         }
 
@@ -802,14 +805,14 @@ class AuthApiTest extends TestCase
             'login' => 'system.admin',
             'contact_number' => '09178889912',
             'code' => $sentCode,
-            'password' => 'new-admin-password',
-            'password_confirmation' => 'new-admin-password',
+            'password' => 'New-Admin-Password-1',
+            'password_confirmation' => 'New-Admin-Password-1',
         ])->assertOk()
             ->assertJsonPath('account_identifier', 'system.admin')
             ->assertJsonPath('household_id', 'system.admin');
 
         $this->assertTrue(Hash::check(
-            'new-admin-password',
+            'New-Admin-Password-1',
             DB::table('users')->where('user_id', 'USR-SYSTEM-ADMIN-001')->value('password')
         ));
     }

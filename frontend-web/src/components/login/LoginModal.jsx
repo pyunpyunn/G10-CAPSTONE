@@ -12,6 +12,7 @@ import {
   validateHouseholdRecoveryContact,
 } from '../../api/authApi'
 import ResQperationLogo from '../layout/ResQperationLogo'
+import { passwordPolicyError } from '../../utils/passwordPolicy'
 
 const RECOVERY_RESEND_COOLDOWN_SECONDS = 5 * 60
 
@@ -31,6 +32,8 @@ export default function LoginModal({ onClose, onLogin }) {
   const [codeSent, setCodeSent] = useState(false)
   const [sendCooldownSeconds, setSendCooldownSeconds] = useState(0)
   const [showPassword, setShowPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
   const dialog = useRef(null)
   const currentForm = useRef(form)
   const checkVersion = useRef(0)
@@ -244,7 +247,8 @@ export default function LoginModal({ onClose, onLogin }) {
     try {
       if (recovering) {
         if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit code from your notification or SMS.')
-        if (newPassword.length < 8 || newPassword.length > 128) throw new Error('Your new password must contain 8 to 128 characters.')
+        const policyError = passwordPolicyError(newPassword)
+        if (policyError) throw new Error(policyError)
         if (newPassword !== confirmation) throw new Error('The new passwords do not match.')
         const response = await resetHouseholdPassword({
           login: currentForm.current.login.trim(),
@@ -281,6 +285,8 @@ export default function LoginModal({ onClose, onLogin }) {
     setCode('')
     setNewPassword('')
     setConfirmation('')
+    setShowNewPassword(false)
+    setShowConfirmation(false)
     setCodeSent(false)
     if (currentForm.current.login.trim()) void lookupAccount()
   }
@@ -364,30 +370,24 @@ export default function LoginModal({ onClose, onLogin }) {
                 disabled={busy}
                 required
               />
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={event => setNewPassword(event.target.value)}
-                placeholder="New password"
-                aria-label="New password"
-                minLength={8}
-                maxLength={128}
-                disabled={busy}
-                required
-              />
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={confirmation}
-                onChange={event => setConfirmation(event.target.value)}
-                placeholder="Confirm new password"
-                aria-label="Confirm new password"
-                minLength={8}
-                maxLength={128}
-                disabled={busy}
-                required
-              />
+              <div className="login-password-field">
+                <input type={showNewPassword ? 'text' : 'password'} autoComplete="new-password" value={newPassword}
+                  onChange={event => setNewPassword(event.target.value)} aria-label="New password" minLength={8}
+                  maxLength={128} disabled={busy} required />
+                <button className="login-password-toggle" type="button" aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                  title={showNewPassword ? 'Hide password' : 'Show password'} onClick={() => setShowNewPassword(value => !value)}>
+                  {showNewPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
+              <div className="login-password-field">
+                <input type={showConfirmation ? 'text' : 'password'} autoComplete="new-password" value={confirmation}
+                  onChange={event => setConfirmation(event.target.value)} aria-label="Confirm new password" minLength={8}
+                  maxLength={128} disabled={busy} required />
+                <button className="login-password-toggle" type="button" aria-label={showConfirmation ? 'Hide password' : 'Show password'}
+                  title={showConfirmation ? 'Hide password' : 'Show password'} onClick={() => setShowConfirmation(value => !value)}>
+                  {showConfirmation ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
               <div className="login-actions">
                 <button className="primary-button" type="submit" disabled={busy}>{busy ? 'Please wait...' : 'Change password'}</button>
               </div>

@@ -6,6 +6,7 @@ import { palette, radius, spacing } from '@/constants/resqTheme';
 import { SectionHeader } from './RescuerUI';
 
 type RescueMapProps = {
+  active?: boolean;
   assignments: any[];
   evacuationCenters: any[];
   activeAssignment: any;

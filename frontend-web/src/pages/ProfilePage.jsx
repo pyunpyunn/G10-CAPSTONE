@@ -10,6 +10,7 @@ import ProfileEditModal from '../components/profile/ProfileEditModal'
 import ProfileIdentity from '../components/profile/ProfileIdentity'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
+import { passwordPolicyError } from '../utils/passwordPolicy'
 import {
   passwordForm,
   profileErrorMessage,
@@ -105,7 +106,8 @@ export default function ProfilePage() {
 
     try {
       if (!passwordValues.current_password) throw new Error('Enter your current password.')
-      if (passwordValues.password.length < 8 || passwordValues.password.length > 128) throw new Error('New password must contain 8 to 128 characters.')
+      const policyError = passwordPolicyError(passwordValues.password)
+      if (policyError) throw new Error(policyError)
       if (passwordValues.password !== passwordValues.password_confirmation) throw new Error('New password and confirmation do not match.')
       const data = await changePassword(passwordValues)
       const rememberedLogin = getRememberedLogin()

@@ -18,6 +18,7 @@ function render(status = 'dispatched', next = false) {
       if (name === '@/constants/resqTheme') return { palette: {}, radius: {}, shadow: {}, spacing: {} };
       if (name === '@/utils/time') return { formatPhilippineDateTime: x => x };
       if (name === '@/api/rescuer') return { getRescuerDispatchHistory() { throw Error('History should load only when opened'); } };
+      if (name === '@/components/household/DisasterBroadcastBanner') return { DisasterBroadcastBanner: 'DisasterBroadcastBanner' };
       if (name === './RescuerUI') return Object.fromEntries(['ActionButton','EmptyState','SectionHeader','StatTile','StatusBadge'].map(x => [x,x]));
       throw Error('Unexpected import '+name);
     },

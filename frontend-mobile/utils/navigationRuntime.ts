@@ -160,14 +160,13 @@ export function mountNavigationSync() {
     if (started) await Location.stopLocationUpdatesAsync(taskName);
   }).catch(error => { lastNavigationError = error.message; });
   const foreground = AppState.addEventListener('change', (state) => {
-    if (state === 'active') { void syncNavigation(); void refreshNavigation().catch(() => {}); }
+    if (state === 'active') void syncNavigation();
   });
   const timer = setInterval(() => {
     void activeLocalTrip().then((trip) => { if (trip) void syncNavigation(); })
       .catch(error => { lastNavigationError = error.message; });
   }, 60000);
   void syncNavigation();
-  void refreshNavigation().catch(() => {});
   stopSync = () => { foreground.remove(); clearInterval(timer); };
   return () => { if (--syncMounts === 0) { stopSync?.(); stopSync = null; } };
 }

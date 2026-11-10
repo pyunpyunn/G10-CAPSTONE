@@ -21,6 +21,7 @@ import {
   sendHouseholdRecoveryCode,
 } from '@/api/auth';
 import { palette, spacing } from '@/constants/resqTheme';
+import { passwordPolicyError } from '@/utils/passwordPolicy';
 
 const RECOVERY_RESEND_COOLDOWN_SECONDS = 60;
 
@@ -36,6 +37,8 @@ export default function ForgotPasswordScreen() {
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [accountError, setAccountError] = useState('');
   const [contactError, setContactError] = useState('');
   const [requestError, setRequestError] = useState('');
@@ -157,8 +160,9 @@ export default function ForgotPasswordScreen() {
       setRequestError('Enter the 6-digit code from your SMS.');
       return;
     }
-    if (password.length < 8 || password.length > 128) {
-      setRequestError('Your new password must contain 8 to 128 characters.');
+    const policyError = passwordPolicyError(password);
+    if (policyError) {
+      setRequestError(policyError);
       return;
     }
     if (password !== confirmation) {
@@ -304,12 +308,14 @@ export default function ForgotPasswordScreen() {
                       value={password}
                       onFocus={(event) => scrollToFocusedInput(event.nativeEvent.target)}
                       onChangeText={setPassword}
-                      placeholder="8 to 128 characters"
-                      placeholderTextColor={palette.navMuted}
-                      secureTextEntry
+                      secureTextEntry={!showPassword}
                       autoComplete="new-password"
                       maxLength={128}
                     />
+                    <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                      onPress={() => setShowPassword((current) => !current)} style={styles.eyeButton}>
+                      <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={palette.navText} />
+                    </Pressable>
                   </View>
                 </View>
                 <View style={styles.fieldGroup}>
@@ -320,12 +326,14 @@ export default function ForgotPasswordScreen() {
                       value={confirmation}
                       onFocus={(event) => scrollToFocusedInput(event.nativeEvent.target)}
                       onChangeText={setConfirmation}
-                      placeholder="Re-enter your new password"
-                      placeholderTextColor={palette.navMuted}
-                      secureTextEntry
+                      secureTextEntry={!showConfirmation}
                       autoComplete="new-password"
                       maxLength={128}
                     />
+                    <Pressable accessibilityRole="button" accessibilityLabel={showConfirmation ? 'Hide password' : 'Show password'}
+                      onPress={() => setShowConfirmation((current) => !current)} style={styles.eyeButton}>
+                      <Ionicons name={showConfirmation ? 'eye-off-outline' : 'eye-outline'} size={20} color={palette.navText} />
+                    </Pressable>
                   </View>
                 </View>
                 <Pressable
@@ -381,6 +389,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0e1c2b',
   },
   input: { flex: 1, minHeight: 52, color: palette.navText, fontSize: 15, fontWeight: '600' },
+  eyeButton: { minWidth: 42, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   error: { color: '#ff9797', fontSize: 13, lineHeight: 18 },
   status: { color: palette.navMuted, fontSize: 13, lineHeight: 19 },
   button: {

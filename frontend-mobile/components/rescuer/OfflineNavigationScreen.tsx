@@ -33,7 +33,6 @@ export default function OfflineNavigationScreen() {
   const [route, setRoute] = useState<any>(null), [trip, setTrip] = useState<LocalTrip | null>(null);
   const [message, setMessage] = useState(''), [guidance, setGuidance] = useState('');
   const [remaining, setRemaining] = useState(0), [distance, setDistance] = useState(0), [mapReady, setMapReady] = useState(false);
-  useEffect(() => { if (!appActive) setMapReady(false); }, [appActive]);
   const [busy, setBusy] = useState(false), [packMessage, setPackMessage] = useState('Map has not been downloaded.');
   const camera = useRef<CameraRef>(null), marker = useRef<MarkerRef>(null);
   const [gpsFix, setGpsFix] = useState<LocationObject | null>(null);
@@ -50,7 +49,15 @@ export default function OfflineNavigationScreen() {
     && (!item.assignment_id || String(item.assignment_id) === String(dispatch?.assignment_id)) && householdIds.includes(String(item.household_id)));
 
   async function load() {
-    const [data, manifest, active] = await Promise.all([getLocalNavigationSnapshot(), getActivePack(), activeLocalTrip()]);
+    let [data, manifest, active] = await Promise.all([getLocalNavigationSnapshot(), getActivePack(), activeLocalTrip()]);
+    if (!loaded && data.dispatches.length === 0) {
+      try {
+        await refreshNavigation();
+        data = await getLocalNavigationSnapshot();
+      } catch (error: any) {
+        setMessage(error.userMessage || error.message || 'Assigned routes could not be loaded. Tap Refresh assigned routes to retry.');
+      }
+    }
     setSnapshot(data); setTrip(active);
     const selectedProfile = active?.profile || profile;
     if (active) { setProfile(active.profile); setDistance(active.distanceM); }
@@ -64,7 +71,9 @@ export default function OfflineNavigationScreen() {
     setPackMessage(status?.state === 'complete' ? 'Map saved for offline use.' : status ? `Map ${Math.round(status.percentage)}% downloaded. Resume on Wi-Fi.` : 'Download the map on Wi-Fi before going offline.');
   }
 
-  useEffect(() => { void action(load); }, [dispatchId]);
+  const loadOnOpen = useRef(() => action(load));
+  loadOnOpen.current = () => action(load);
+  useEffect(() => { void loadOnOpen.current(); }, [dispatchId]);
   useEffect(() => {
     setRemaining(Number(route?.distance_m || 0));
     setGuidance(steps[0]?.instruction || 'Follow the highlighted route.');
@@ -190,7 +199,7 @@ export default function OfflineNavigationScreen() {
     {!trip && eligible.map((item: any) => <NavButton key={`${item.household_id || item.evac_center_id}:${item.profile}`}
       title={`Directions: ${snapshot?.households.find((h: any) => String(h.household_id) === String(item.household_id))?.household_name || snapshot?.evacuation_centers.find((c: any) => String(c.evacuation_center_id) === String(item.evac_center_id))?.name || item.household_id || item.evac_center_id}`}
       onPress={() => { setRoute(item); lastStep.current = 0; arrivalShown.current = false; }} />)}
-    {!eligible.length && <Text>No cached routes available for this profile. Refresh while online; ask HQ to precompute missing routes.</Text>}
+    {!loaded ? <Text>Loading assigned routes...</Text> : !eligible.length && <Text>No cached routes available for this profile. Refresh while online; ask HQ to precompute missing routes.</Text>}
     {!trip && householdIds.map((id) => <NavButton key={`live-${id}`} disabled={busy || !gpsFix} title={`Route from my GPS: ${snapshot?.households.find((h: any) => String(h.household_id) === id)?.household_name || id}`}
       onPress={() => void action(async () => {
         const fix = gpsFix;
