@@ -64,14 +64,18 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
     <View style={styles.card}><SectionHeader title="Field report" />
       {loading && <Text style={styles.meta}>Loading…</Text>}
       {household && <><Text style={styles.name}>{household.household_name || household.household_id}</Text><Text style={styles.meta}>{household.household_id}</Text></>}
-      {!!members.length && <View style={styles.columns}><Text style={styles.columnLabel}>Member</Text><Text style={styles.columnLabel}>Status check-in</Text></View>}
-      {members.map(member => <View style={styles.member} key={member.id}>{memberPhotos[member.id] && <Image source={memberPhotos[member.id]} style={styles.memberPhoto} accessibilityLabel={`${member.name} profile picture`} />}<Text style={styles.memberName}>{member.name}{member.head ? ' · Head' : ''}</Text>
+      {!!members.length && <View style={styles.columns}><View style={styles.memberPhotoSlot} /><Text style={styles.columnLabel}>Member</Text><Text style={styles.columnLabel}>Status check-in</Text></View>}
+      {members.map(member => <View style={styles.member} key={member.id}>
+        <View style={styles.memberPhotoSlot}>
+          {memberPhotos[member.id] && <Image source={memberPhotos[member.id]} style={styles.memberPhoto} accessibilityLabel={`${member.name} profile picture`} />}
+        </View>
+        <Text style={styles.memberName}>{member.name}{member.head ? ' · Head' : ''}</Text>
         <View style={styles.selectColumn}><ReportSelect label={`${member.name} status`} showLabel={false} value={member.statusKey} options={statusOptions} disabled={busy || submitted} onChange={statusKey => setMembers(current => current.map(item => item.id === member.id ? { ...item, statusKey } : item))} /></View>
       </View>)}
     </View>
     {household && <><View style={styles.card}><SectionHeader title="Property damage" /><ReportSelect label="Damage level" value={damage} options={damageOptions} onChange={setDamage} disabled={busy || submitted} />{!damageOptions.length && <Text style={styles.error}>Damage levels are unavailable.</Text>}</View>
       <View style={styles.counts}><StatTile label="Deaths" value={deathCount} tone="danger" /><StatTile label="Injured" value={injuredCount} tone="warning" /></View>
-      <View style={styles.card}><Text style={styles.meta}>Notes (optional)</Text><TextInput accessibilityLabel="Notes for HQ" style={styles.input} value={notes} onChangeText={setNotes} editable={!busy && !submitted} multiline maxLength={2000} textAlignVertical="top" />
+      <View style={styles.card}><SectionHeader title="Notes (optional)" /><TextInput accessibilityLabel="Notes for HQ" style={styles.input} value={notes} onChangeText={setNotes} editable={!busy && !submitted} multiline maxLength={2000} textAlignVertical="top" />
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <ActionButton label={submitted ? 'Report saved' : busy ? 'Saving…' : 'Submit report'} icon="send-outline" onPress={submit} disabled={busy || submitted || !damageOptions.length} />
         {submitted && onCompleteHousehold && <ActionButton label="Complete household" icon="flag-outline" onPress={onCompleteHousehold} />}
@@ -80,9 +84,9 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
   </View>;
 }
 const styles = StyleSheet.create({
-  stack: { gap: spacing.md }, card: { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
+  stack: { gap: spacing.md }, card: { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
   name: { color: palette.text, fontSize: 18, fontWeight: '700' }, meta: { color: palette.textSoft, fontSize: 13 },
-  columns: { flexDirection: 'row', gap: 8, marginTop: 8 }, columnLabel: { flex: 1, color: palette.textSoft, fontSize: 12 },
-  member: { flexDirection: 'row', alignItems: 'center', paddingTop: 6, gap: 8, borderTopWidth: 1, borderColor: palette.border }, memberPhoto: { width: 36, height: 36, borderRadius: 18 }, memberName: { flex: 1, color: palette.text, fontSize: 15, fontWeight: '600' }, selectColumn: { flex: 1, minWidth: 0 },
-  counts: { flexDirection: 'row', gap: spacing.sm }, input: { minHeight: 78, borderWidth: 1, borderColor: palette.border, borderRadius: radius.md, padding: spacing.sm, color: palette.text }, error: { color: palette.unsafe, fontSize: 13 },
+  columns: { flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }, columnLabel: { flex: 1, minWidth: 0, color: palette.textSoft, fontSize: 12 },
+  member: { flexDirection: 'row', alignItems: 'center', paddingTop: spacing.sm, gap: 8, borderTopWidth: 1, borderColor: palette.border }, memberPhotoSlot: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }, memberPhoto: { width: 36, height: 36, borderRadius: 18 }, memberName: { flex: 1, minWidth: 0, color: palette.text, fontSize: 15, fontWeight: '600' }, selectColumn: { flex: 1, minWidth: 0 },
+  counts: { flexDirection: 'row', gap: spacing.sm }, input: { minHeight: 78, borderWidth: 1, borderColor: palette.borderStrong, borderRadius: radius.md, padding: spacing.sm, color: palette.text, backgroundColor: palette.page }, error: { color: palette.unsafe, fontSize: 13 },
 });

@@ -100,17 +100,21 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
   return (
     <View style={styles.stack}>
       <View style={styles.hero}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
+        <View style={styles.heroIdentity}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+          <View style={styles.heroText}>
+            <Text style={styles.role}>Verified rescuer</Text>
+            <Text style={styles.name}>{responder.full_name || user.full_name || 'Responder'}</Text>
+            <Text style={styles.meta}>
+              @{user.username || 'username'} · {responder.responder_code || 'No account ID'} · {responder.team_name || 'No team'}
+            </Text>
+          </View>
+          <View style={styles.heroStatus}>
+            <StatusBadge label={responder.duty_status || 'Stand-by'} tone={responder.duty_status || 'neutral'} />
+          </View>
         </View>
-        <View style={styles.heroText}>
-          <Text style={styles.role}>Verified rescuer</Text>
-          <Text style={styles.name}>{responder.full_name || user.full_name || 'Responder'}</Text>
-          <Text style={styles.meta}>
-            @{user.username || 'username'} · {responder.responder_code || 'No account ID'} · {responder.team_name || 'No team'}
-          </Text>
-        </View>
-        <StatusBadge label={responder.duty_status || 'Stand-by'} tone={responder.duty_status || 'neutral'} />
       </View>
 
       <View style={styles.card}>
@@ -273,14 +277,19 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   hero: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: palette.navActive,
     ...shadow,
+  },
+  heroIdentity: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  heroStatus: {
+    alignSelf: 'flex-start',
   },
   avatar: {
     width: 62,
@@ -299,7 +308,7 @@ const styles = StyleSheet.create({
   },
   heroText: {
     flex: 1,
-    minWidth: 160,
+    minWidth: 0,
   },
   role: {
     color: palette.navMuted,
@@ -379,6 +388,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
   },
   infoLabel: {
+    width: 104,
+    flexShrink: 0,
     color: palette.textSoft,
     fontSize: 12,
     fontWeight: '800',
