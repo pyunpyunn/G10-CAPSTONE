@@ -154,7 +154,7 @@ class ResourceRequestController extends Controller
 
         // Pagination
         $page = max(1, (int) $request->query('page', 1));
-        $perPage = min(100, max(1, (int) $request->query('per_page', 24)));
+        $perPage = min(100, max(1, (int) $request->query('per_page', 10)));
         $total = $sorted->count();
         $offset = ($page - 1) * $perPage;
         $pageItems = $sorted->slice($offset, $perPage)->values()->all();

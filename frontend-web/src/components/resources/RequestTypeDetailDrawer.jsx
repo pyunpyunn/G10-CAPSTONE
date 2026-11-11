@@ -6,10 +6,8 @@ import {
   Check,
   CheckCircle2,
   Copy,
-  Database,
   MapPin,
   Package,
-  Sparkles,
   Tag,
   X,
   XCircle,
@@ -63,17 +61,6 @@ export default function RequestTypeDetailDrawer({
 
         {/* Body */}
         <div className="rr-drawer-body">
-          {/* 1st Card Priority / NEW Banner */}
-          {isNew && (
-            <div className="rtd-alert-banner rtd-new-banner">
-              <Sparkles size={18} className="sparkle-icon" />
-              <div>
-                <strong>Priority 1st Card: Newly Registered Type</strong>
-                <p>This request type was recently added to the central disaster inventory catalog.</p>
-              </div>
-            </div>
-          )}
-
           {/* Stock Status Banner */}
           <div className={`rtd-stock-hero ${isOutOfStock ? 'hero-out-of-stock' : 'hero-in-stock'}`}>
             <div className="hero-icon-box">
@@ -143,18 +130,6 @@ export default function RequestTypeDetailDrawer({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* TrackingAid Shared Database Status */}
-          <div className="rtd-sync-card">
-            <div className="sync-card-head">
-              <Database size={16} className="text-primary" />
-              <span>TrackingAid Shared Database Sync</span>
-            </div>
-            <p className="sync-card-desc">
-              This request type is directly mapped to the central warehouse database (<code>trackingaid_db</code>).
-              Handoff dispatches and stock adjustments are automatically reflected across ResQperation and TrackingAid.
-            </p>
           </div>
         </div>
 

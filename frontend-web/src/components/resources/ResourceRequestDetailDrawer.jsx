@@ -324,17 +324,6 @@ export default function ResourceRequestDetailDrawer({
                       )}
                     </div>
                   </div>
-                  <div className="rr-stream-row">
-                    <span className="rr-stream-label">TrackingAid Shared DB:</span>
-                    <span className={`rr-sync-pill ${request.handoff?.tracking_reference ? 'connected' : 'pending'}`}>
-                      <span className={`rr-sync-dot ${request.handoff?.tracking_reference ? 'live' : 'pulse'}`} />
-                      <span>
-                        {request.handoff?.tracking_reference
-                          ? `Connected (${request.handoff.tracking_reference})`
-                          : 'Pending Sync to Shared DB'}
-                      </span>
-                    </span>
-                  </div>
                 </div>
 
                 <div style={{ marginTop: '4px' }}>

@@ -28,7 +28,6 @@ import PaginationBar from '../components/ui/PaginationBar'
 import Badge from '../components/ui/Badge'
 import EmptyState from '../components/ui/EmptyState'
 import LoadingState from '../components/ui/LoadingState'
-import TrackingAidMirror from '../components/resources/TrackingAidMirror'
 import { canApproveRequests } from '../utils/personnelAccess'
 import ResourceRequestDetailDrawer from '../components/resources/ResourceRequestDetailDrawer'
 
@@ -134,7 +133,7 @@ export default function RequestWorkflowPage() {
   }
 
   const { data, error: queryError, isFetching: loading, refetch: refresh } = useResourceRequestsQuery({
-    page, per_page: 20, search, urgency,
+    page, per_page: 10, search, urgency,
     status: status.startsWith('resource:') ? 'all' : status,
     status_id: status.startsWith('resource:') ? status.slice('resource:'.length) : undefined,
     source: source === 'all' ? undefined : source,
@@ -651,9 +650,6 @@ export default function RequestWorkflowPage() {
           <PaginationBar meta={data?.requests || {}} onPageChange={setPage} label="requests" />
         </div>
       </section>
-
-      {/* TrackingAid Mirror for Monitoring */}
-      {!external && <TrackingAidMirror items={data?.tracking_mirror || []} />}
 
       {/* Live Tracking & Handoff Inspection Drawer */}
       <ResourceRequestDetailDrawer

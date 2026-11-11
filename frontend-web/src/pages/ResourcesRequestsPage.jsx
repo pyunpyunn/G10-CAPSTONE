@@ -11,7 +11,6 @@ import ResourceRequestBatchBar from '../components/resources/ResourceRequestBatc
 import ResourceRequestDetailDrawer from '../components/resources/ResourceRequestDetailDrawer'
 import ResourceRequestQueueTable from '../components/resources/ResourceRequestQueueTable'
 import ResourceRequestStats from '../components/resources/ResourceRequestStats'
-import TrackingAidMirror from '../components/resources/TrackingAidMirror'
 import LoadingState from '../components/ui/LoadingState'
 import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
@@ -229,7 +228,6 @@ export default function ResourcesRequestsPage() {
                   onSync={handleSyncEvaTrack}
                 />
               </RefreshOverlay>
-              <TrackingAidMirror items={payload?.tracking_mirror || []} />
             </div>
             <aside className="rr-side-column">
               <ResourceRequestStats
