@@ -70,7 +70,7 @@ export function HouseholdQrModal({ visible, qr, householdId, onClose }: QrModalP
   );
 }
 
-export function HouseholdNotificationsModal({ visible, requests, notices = [], busyId, onClose, onAccept, onReject }: {
+export function HouseholdNotificationsModal({ visible, requests, notices = [], busyId, onClose, onAccept, onReject, onDeleteNotice }: {
   visible: boolean;
   requests: any[];
   notices?: any[];
@@ -78,6 +78,7 @@ export function HouseholdNotificationsModal({ visible, requests, notices = [], b
   onClose: () => void;
   onAccept: (request: any) => void;
   onReject: (request: any) => void;
+  onDeleteNotice: (notice: any) => void;
 }) {
   const [expandedId, setExpandedId] = useState('');
 
@@ -93,14 +94,25 @@ export function HouseholdNotificationsModal({ visible, requests, notices = [], b
           <Text style={styles.note}>Trusted household requests and updates for your household.</Text>
           <ScrollView contentContainerStyle={styles.notificationList}>
             {notices.map((notice) => (
-              <View key={`notice-${notice.notification_id}`} style={styles.infoNotificationCard}>
+              <Pressable
+                key={`notice-${notice.notification_id}`}
+                style={({ pressed, hovered }) => [
+                  styles.infoNotificationCard,
+                  (pressed || hovered) && styles.notificationCardInteraction,
+                ]}
+                onLongPress={() => onDeleteNotice(notice)}
+                delayLongPress={500}
+                disabled={busyId === String(notice.notification_id)}
+                accessibilityRole="button"
+                accessibilityHint="Long press to delete this notification"
+              >
                 <View style={styles.notificationIcon}><Ionicons name="information-circle-outline" size={19} color={palette.navActive} /></View>
                 <View style={styles.notificationCopy}>
                   <Text style={styles.notificationTitle}>{notice.title}</Text>
                   <Text style={styles.notificationDetailText}>{notice.message}</Text>
                   <Text style={styles.notificationDate}>{notice.created_label || ''}</Text>
                 </View>
-              </View>
+              </Pressable>
             ))}
             {requests.length ? requests.map((request) => {
               const id = String(request.connection_id);
@@ -630,6 +642,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
     backgroundColor: `${palette.navActive}0b`,
+  },
+  notificationCardInteraction: {
+    backgroundColor: palette.secondary,
   },
   notificationRow: {
     minHeight: 68,

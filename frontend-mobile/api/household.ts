@@ -46,6 +46,14 @@ export async function getHouseholdOverview(refresh = false) {
   return response.data.data;
 }
 
+export async function markHouseholdNotificationsRead() {
+  return (await api.post('/household/notifications/read')).data;
+}
+
+export async function deleteHouseholdNotification(notificationId: string | number) {
+  return (await api.delete(`/household/notifications/${notificationId}`)).data;
+}
+
 export async function completeHouseholdSetup(payload: any) {
   const response = await api.post('/household/setup', payload);
   return response.data;

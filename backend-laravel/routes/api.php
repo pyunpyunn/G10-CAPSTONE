@@ -244,6 +244,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/household/device-owner/select', [HouseholdMobileController::class, 'selectOwner']);
             Route::post('/household/device-owner/reset', [HouseholdMobileController::class, 'resetOwner']);
             Route::get('/household/overview', [HouseholdMobileController::class, 'overview']);
+            Route::post('/household/notifications/read', [HouseholdMobileController::class, 'markNotificationsRead']);
+            Route::delete('/household/notifications/{notificationId}', [HouseholdMobileController::class, 'deleteNotification']);
             Route::post('/household/setup', [HouseholdMobileController::class, 'completeSetup']);
             Route::post('/household/setup/location', [HouseholdMobileController::class, 'previewSetupLocation']);
             Route::put('/household/geotag', [HouseholdMobileController::class, 'updateGeotag']);

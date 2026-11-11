@@ -384,7 +384,7 @@ function TrustedHouseholdList({
         return (
           <Pressable
             key={householdItem.connection_id}
-            style={({ pressed }) => [styles.trustedRow, pressed && styles.trustedRowPressed]}
+            style={({ pressed, hovered }) => [styles.trustedRow, (pressed || hovered) && styles.trustedRowPressed]}
             onPress={isAccepted ? () => onOpenTrusted(householdItem) : undefined}
             onLongPress={() => onDeleteTrusted(householdItem)}
             delayLongPress={500}

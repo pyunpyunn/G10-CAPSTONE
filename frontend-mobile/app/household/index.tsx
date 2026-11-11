@@ -25,8 +25,10 @@ import {
   completeHouseholdSetup,
   createTrustedHousehold,
   deleteTrustedHousehold,
+  deleteHouseholdNotification,
   getHouseholdOverview,
   lookupTrustedHousehold,
+  markHouseholdNotificationsRead,
   saveHouseholdGeotag,
   saveTrustedHouseholdMemberStatus,
   uploadHouseholdProfilePhoto,
@@ -107,6 +109,23 @@ export default function HouseholdHomeScreen() {
   const overviewTrustedPinConfigured = Boolean(overview?.trusted?.pin_configured);
   const hasTrustedPin = overviewTrustedPinConfigured || trustedPinConfigured;
   const statusOptionsSignature = JSON.stringify(overview?.status_options || []);
+
+  const openNotifications = useCallback(() => {
+    setShowNotifications(true);
+    void markHouseholdNotificationsRead()
+      .then(() => {
+        setOverview((current) => current ? {
+          ...current,
+          trusted: {
+            ...current.trusted,
+            notifications: (current.trusted?.notifications || []).map((notice: any) => ({ ...notice, read: true })),
+          },
+        } : current);
+      })
+      .catch(() => {
+        // The panel remains usable; the next overview refresh can retry marking them read.
+      });
+  }, [setOverview]);
 
   const refreshStatusQueueCounts = useCallback(async () => {
     setStatusQueueCounts(await getHouseholdStatusOutboxCounts());
@@ -604,6 +623,37 @@ export default function HouseholdHomeScreen() {
     }
   }
 
+  function handleDeleteNotification(notification: any) {
+    const notificationId = String(notification.notification_id);
+    Alert.alert(
+      'Delete notification?',
+      'This notification will be permanently removed from your notification list.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setNotificationBusyId(notificationId);
+            void deleteHouseholdNotification(notificationId)
+              .then(() => {
+                setOverview((current) => current ? {
+                  ...current,
+                  trusted: {
+                    ...current.trusted,
+                    notifications: (current.trusted?.notifications || [])
+                      .filter((notice: any) => String(notice.notification_id) !== notificationId),
+                  },
+                } : current);
+              })
+              .catch((error) => Alert.alert('Unable to delete notification', errorMessage(error)))
+              .finally(() => setNotificationBusyId(''));
+          },
+        },
+      ],
+    );
+  }
+
   function handleRejectTrustedRequest(request: any) {
     if (!requireTrustedPin()) return;
 
@@ -824,7 +874,8 @@ export default function HouseholdHomeScreen() {
     );
   }
 
-  const notificationCount = (overview.trusted?.incoming_requests?.length || 0) + (overview.trusted?.notifications?.length || 0);
+  const unreadNotificationCount = (overview.trusted?.notifications || []).filter((notice: any) => !notice.read).length;
+  const notificationCount = (overview.trusted?.incoming_requests?.length || 0) + unreadNotificationCount;
   const householdName = overview.profile?.household?.household_name || overview.profile?.user?.full_name || 'Household';
   const householdCode = overview.profile?.household?.household_id || 'Household Resident';
 
@@ -893,7 +944,7 @@ export default function HouseholdHomeScreen() {
           userRole={householdCode}
           notificationCount={notificationCount}
           onOpenNotifications={() => {
-            setShowNotifications(true);
+            openNotifications();
           }}
           onOpenProfile={() => setActiveTab('profile')}
           onSelectKey={(key) => setActiveTab(key as TabKey)}
@@ -966,7 +1017,7 @@ export default function HouseholdHomeScreen() {
             isDisasterMode={Boolean(overview.active_event)}
             notificationCount={notificationCount}
             onOpenNotifications={() => {
-              setShowNotifications(true);
+              openNotifications();
             }}
           />
 
@@ -1041,6 +1092,7 @@ export default function HouseholdHomeScreen() {
         onClose={() => setShowNotifications(false)}
         onAccept={handleAcceptTrustedRequest}
         onReject={handleRejectTrustedRequest}
+        onDeleteNotice={handleDeleteNotification}
       />
       <TrustedPinModal
         visible={showPin}

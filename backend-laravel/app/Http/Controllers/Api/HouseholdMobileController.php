@@ -91,6 +91,16 @@ class HouseholdMobileController extends Controller
         return $this->service->qr($request);
     }
 
+    public function markNotificationsRead(Request $request): JsonResponse
+    {
+        return $this->service->markNotificationsRead($request);
+    }
+
+    public function deleteNotification(Request $request, string $notificationId): JsonResponse
+    {
+        return $this->service->deleteNotification($request, $notificationId);
+    }
+
     public function trustedHouseholds(Request $request): JsonResponse
     {
         return $this->service->trustedHouseholds($request);

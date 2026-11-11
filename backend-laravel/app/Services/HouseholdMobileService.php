@@ -365,6 +365,46 @@ class HouseholdMobileService
         ]);
     }
 
+    public function markNotificationsRead(Request $request): JsonResponse
+    {
+        $householdId = $this->householdId($request->user());
+        if (! $householdId) {
+            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
+        }
+
+        if (Schema::hasTable('household_mobile_notifications')) {
+            DB::table('household_mobile_notifications')
+                ->where('household_id', $householdId)
+                ->whereNull('read_at')
+                ->update(['read_at' => now(), 'updated_at' => now()]);
+        }
+
+        return response()->json(['message' => 'Household notifications marked as read.']);
+    }
+
+    public function deleteNotification(Request $request, string $notificationId): JsonResponse
+    {
+        $householdId = $this->householdId($request->user());
+        if (! $householdId) {
+            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
+        }
+
+        if (! Schema::hasTable('household_mobile_notifications')) {
+            return $this->missingTableResponse('household_mobile_notifications');
+        }
+
+        $deleted = DB::table('household_mobile_notifications')
+            ->where('notification_id', $notificationId)
+            ->where('household_id', $householdId)
+            ->delete();
+
+        if (! $deleted) {
+            return response()->json(['message' => 'Notification was not found.'], 404);
+        }
+
+        return response()->json(['message' => 'Notification deleted.']);
+    }
+
     public function trustedHouseholds(Request $request): JsonResponse
     {
         $householdId = $this->householdId($request->user());
@@ -864,6 +904,22 @@ class HouseholdMobileService
         DB::table('trusted_households')
             ->where('connection_id', $connectionId)
             ->delete();
+
+        $otherHouseholdId = (string) $connection->requesting_household_id === $householdId
+            ? (string) $connection->trusted_household_id
+            : (string) $connection->requesting_household_id;
+        if ($otherHouseholdId !== '' && $otherHouseholdId !== $householdId) {
+            $wasPending = $connection->validation_status === 'pending';
+            $this->storeMobileNotification(
+                $otherHouseholdId,
+                $wasPending ? 'trusted_household_request_cancelled' : 'trusted_household_connection_removed',
+                $wasPending ? 'Trusted household request cancelled' : 'Trusted household connection removed',
+                $wasPending
+                    ? 'A trusted household request involving your household was cancelled.'
+                    : 'A trusted household removed your household from its trusted households.',
+                $connectionId
+            );
+        }
 
         $this->writeAuditLog($request, 'mobile_trusted_household_deleted', 'trusted_households', $connectionId, [
             'requesting_household_id' => $connection->requesting_household_id,
