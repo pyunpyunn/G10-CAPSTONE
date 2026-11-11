@@ -97,6 +97,7 @@ export function RescuerSelect({
   value,
   onChange,
   accessibilityLabel,
+  showLabel = true,
 }: {
   title: string;
   placeholder: string;
@@ -104,13 +105,14 @@ export function RescuerSelect({
   value: string;
   onChange: (value: string) => void;
   accessibilityLabel?: string;
+  showLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((option) => option.key === value)?.label || placeholder;
 
   return (
     <View style={styles.selectField}>
-      <Text style={styles.selectLabel}>{title}</Text>
+      {showLabel ? <Text style={styles.selectLabel}>{title}</Text> : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel || `${title}: ${selected}`}

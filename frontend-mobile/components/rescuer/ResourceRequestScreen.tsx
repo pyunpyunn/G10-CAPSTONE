@@ -234,18 +234,17 @@ export function ResourceRequestScreen({
         </View>
 
         <View style={styles.locationSection}>
-          <Text style={styles.fieldLabel}>Location</Text>
           <TextInput
             style={styles.input}
             value={location}
             onChangeText={setLocation}
-            placeholder="Enter location"
+            placeholder={isPersonnelRequest ? 'Enter location' : 'Delivery address'}
             placeholderTextColor="#7d8da0"
             autoCapitalize="words"
             autoCorrect={false}
             multiline={false}
             returnKeyType="next"
-            accessibilityLabel="Location"
+            accessibilityLabel={isPersonnelRequest ? 'Location' : 'Delivery address'}
           />
         </View>
 
@@ -268,12 +267,13 @@ export function ResourceRequestScreen({
         ) : (
           <>
             <RescuerSelect
-              title="Resource category"
-              placeholder="Select category"
+              title="Select resource category"
+              placeholder="Select resource category"
               options={resourceTypeOptions.map((option) => ({ key: option, label: option }))}
               value={resourceType}
               onChange={setResourceType}
               accessibilityLabel="Choose resource category"
+              showLabel={false}
             />
 
             <TextInput
