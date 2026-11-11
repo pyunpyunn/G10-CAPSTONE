@@ -162,19 +162,22 @@ type PinModalProps = {
   saving: boolean;
   error: string;
   onClose: () => void;
-  onConfirm: (payload: { pin: string; currentPin?: string }) => Promise<void>;
+  onConfirm: (payload: { pin: string; currentPin?: string; currentPassword?: string }) => Promise<void>;
 };
 
 export function TrustedPinModal({ visible, mode, householdName, saving, error, onClose, onConfirm }: PinModalProps) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [currentPin, setCurrentPin] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [validationError, setValidationError] = useState('');
   const [showCurrentPin, setShowCurrentPin] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [forgotPin, setForgotPin] = useState(false);
   const needsConfirmation = mode === 'set' || mode === 'change';
-  const needsCurrentPin = mode === 'change';
+  const needsCurrentPin = mode === 'change' && !forgotPin;
 
   const title = mode === 'change'
     ? 'Change Household PIN'
@@ -187,14 +190,22 @@ export function TrustedPinModal({ visible, mode, householdName, saving, error, o
       setPin('');
       setConfirmPin('');
       setCurrentPin('');
+      setCurrentPassword('');
       setValidationError('');
       setShowCurrentPin(false);
       setShowPin(false);
       setShowConfirmPin(false);
+      setShowCurrentPassword(false);
+      setForgotPin(false);
     }
   }, [visible]);
 
   function submit() {
+    if (mode === 'change' && forgotPin && !currentPassword) {
+      setValidationError('Enter your account password to change your PIN.');
+      return;
+    }
+
     if (needsCurrentPin && currentPin.length !== 4) {
       setValidationError('Enter your current 4-digit PIN.');
       return;
@@ -221,7 +232,11 @@ export function TrustedPinModal({ visible, mode, householdName, saving, error, o
     }
 
     setValidationError('');
-    onConfirm({ pin, currentPin: needsCurrentPin ? currentPin : undefined });
+    onConfirm({
+      pin,
+      currentPin: needsCurrentPin ? currentPin : undefined,
+      currentPassword: mode === 'change' && forgotPin ? currentPassword : undefined,
+    });
   }
 
   return (
@@ -231,11 +246,39 @@ export function TrustedPinModal({ visible, mode, householdName, saving, error, o
           <ModalHeader title={title} onClose={onClose} />
           <Text style={styles.note}>
             {mode === 'change'
-              ? 'Enter your current PIN, then choose a new 4-digit PIN.'
+              ? forgotPin
+                ? 'Verify your account password, then choose a new 4-digit PIN.'
+                : 'Enter your current PIN, then choose a new 4-digit PIN.'
               : mode === 'verify'
                 ? `Enter ${householdName || 'this trusted household'}'s 4-digit PIN to view members and update their status.`
                 : 'This PIN protects trusted household details for your household.'}
           </Text>
+          {mode === 'change' && forgotPin ? (
+            <View style={styles.pinInputWrap}>
+              <TextInput
+                style={styles.pinInput}
+                value={currentPassword}
+                onChangeText={(value) => {
+                  setCurrentPassword(value);
+                  setValidationError('');
+                }}
+                placeholder="Account password"
+                placeholderTextColor="#7d8da0"
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry={!showCurrentPassword}
+                autoComplete="current-password"
+              />
+              <Pressable
+                style={styles.pinVisibilityButton}
+                onPress={() => setShowCurrentPassword((current) => !current)}
+                accessibilityRole="button"
+                accessibilityLabel={showCurrentPassword ? 'Hide password' : 'Show password'}
+              >
+                <Ionicons name={showCurrentPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={palette.textSoft} />
+              </Pressable>
+            </View>
+          ) : null}
           {needsCurrentPin ? (
             <PinInput
               value={currentPin}
@@ -269,6 +312,21 @@ export function TrustedPinModal({ visible, mode, householdName, saving, error, o
               isVisible={showConfirmPin}
               onToggleVisibility={() => setShowConfirmPin((current) => !current)}
             />
+          ) : null}
+          {mode === 'change' ? (
+            <Pressable
+              onPress={() => {
+                setForgotPin((current) => !current);
+                setCurrentPin('');
+                setCurrentPassword('');
+                setValidationError('');
+              }}
+              accessibilityRole="button"
+            >
+              <Text style={styles.forgotPinText}>
+                {forgotPin ? 'Enter my PIN' : 'Forgot PIN?'}
+              </Text>
+            </Pressable>
           ) : null}
           {error || validationError ? <Text style={styles.error}>{error || validationError}</Text> : null}
           <HouseholdButton
@@ -739,6 +797,12 @@ const styles = StyleSheet.create({
     height: 46,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  forgotPinText: {
+    alignSelf: 'flex-end',
+    color: palette.navActive,
+    fontSize: 13,
+    fontWeight: '800',
   },
   textArea: {
     minHeight: 90,

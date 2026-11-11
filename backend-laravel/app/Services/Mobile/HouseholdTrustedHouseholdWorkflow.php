@@ -54,11 +54,30 @@ class HouseholdTrustedHouseholdWorkflow
         $existing = HouseholdTrustedPin::query()->find($householdId);
         $validated = $request->validate([
             'pin' => ['required', 'digits:4', 'confirmed'],
-            'current_pin' => [$existing ? 'required' : 'nullable', 'digits:4'],
+            'current_pin' => ['nullable', 'digits:4'],
+            'current_password' => ['nullable', 'string', 'max:255'],
         ]);
 
-        if ($existing && ! Hash::check($validated['current_pin'], $existing->pin_hash)) {
-            return response()->json(['message' => 'Current household PIN did not match.'], 422);
+        if ($existing) {
+            if (filled($validated['current_pin'] ?? null)) {
+                if (! Hash::check($validated['current_pin'], $existing->pin_hash)) {
+                    return response()->json(['message' => 'Current household PIN did not match.'], 422);
+                }
+            } else {
+                if (blank($validated['current_password'] ?? null)) {
+                    throw ValidationException::withMessages([
+                        'current_pin' => ['Enter your current household PIN or account password.'],
+                    ]);
+                }
+
+                $credential = $user instanceof \App\Models\User && $user->roleKey() === 'household_resident'
+                    ? app(\App\Services\Mobile\HouseholdAccessService::class)->credentialUser($user)
+                    : $user;
+
+                if (! $credential->password || ! Hash::check($validated['current_password'], $credential->password)) {
+                    return response()->json(['message' => 'Account password is incorrect.'], 422);
+                }
+            }
         }
 
         if ($existing && Hash::check($validated['pin'], $existing->pin_hash)) {
@@ -473,7 +492,6 @@ class HouseholdTrustedHouseholdWorkflow
         ]);
     }
 }
-
 
 
 

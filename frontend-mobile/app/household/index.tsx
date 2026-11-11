@@ -456,7 +456,15 @@ export default function HouseholdHomeScreen() {
     setShowPin(true);
   }
 
-  async function handlePinConfirm({ pin, currentPin }: { pin: string; currentPin?: string }) {
+  async function handlePinConfirm({
+    pin,
+    currentPin,
+    currentPassword,
+  }: {
+    pin: string;
+    currentPin?: string;
+    currentPassword?: string;
+  }) {
     setPinSaving(true);
     setPinError('');
 
@@ -466,6 +474,7 @@ export default function HouseholdHomeScreen() {
           pin,
           pin_confirmation: pin,
           current_pin: pinAction === 'change' ? currentPin : undefined,
+          current_password: pinAction === 'change' ? currentPassword : undefined,
         });
         setTrustedPinConfigured(true);
       }

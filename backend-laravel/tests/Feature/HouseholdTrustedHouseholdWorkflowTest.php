@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\HouseholdMobileService;
+use App\Models\User;
 use App\Services\Mobile\HouseholdTrustedHouseholdWorkflow;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
@@ -52,6 +53,42 @@ class HouseholdTrustedHouseholdWorkflowTest extends TestCase
         ], 'HH-2'));
 
         $this->assertSame(200, $verifyResponse->getStatusCode());
+    }
+
+    public function test_household_can_recover_pin_with_account_password(): void
+    {
+        $this->createHouseholdTables();
+        DB::table('household_trusted_pins')->insert([
+            'household_id' => 'HH-2',
+            'pin_hash' => Hash::make('1234'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $user = new User([
+            'user_id' => 'USR-HH-2',
+            'household_id' => 'HH-2',
+            'role' => 'admin',
+            'password' => Hash::make('account-password'),
+        ]);
+        $service = app(HouseholdMobileService::class);
+
+        $denied = $service->saveTrustedPin($this->householdRequest('/household/trusted-pin', 'PUT', [
+            'pin' => '5678',
+            'pin_confirmation' => '5678',
+            'current_password' => 'incorrect-password',
+        ], 'HH-2', $user));
+
+        $this->assertSame(422, $denied->getStatusCode());
+        $this->assertTrue(Hash::check('1234', DB::table('household_trusted_pins')->where('household_id', 'HH-2')->value('pin_hash')));
+
+        $recovered = $service->saveTrustedPin($this->householdRequest('/household/trusted-pin', 'PUT', [
+            'pin' => '5678',
+            'pin_confirmation' => '5678',
+            'current_password' => 'account-password',
+        ], 'HH-2', $user));
+
+        $this->assertSame(200, $recovered->getStatusCode());
+        $this->assertTrue(Hash::check('5678', DB::table('household_trusted_pins')->where('household_id', 'HH-2')->value('pin_hash')));
     }
 
     public function test_only_the_target_household_can_accept_an_incoming_request(): void
@@ -168,10 +205,10 @@ class HouseholdTrustedHouseholdWorkflowTest extends TestCase
         });
     }
 
-    private function householdRequest(string $uri, string $method, array $input, string $householdId): Request
+    private function householdRequest(string $uri, string $method, array $input, string $householdId, ?User $user = null): Request
     {
         $request = Request::create($uri, $method, $input);
-        $request->setUserResolver(fn () => (object) [
+        $request->setUserResolver(fn () => $user ?? (object) [
             'household_id' => $householdId,
             'user_id' => 'USR-'.$householdId,
         ]);

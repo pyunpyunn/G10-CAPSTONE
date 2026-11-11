@@ -110,7 +110,12 @@ export async function getHouseholdQr() {
   return response.data.data;
 }
 
-export async function saveTrustedPin(payload: { pin: string; pin_confirmation: string; current_pin?: string }) {
+export async function saveTrustedPin(payload: {
+  pin: string;
+  pin_confirmation: string;
+  current_pin?: string;
+  current_password?: string;
+}) {
   const response = await api.put('/household/trusted-pin', payload);
   return response.data;
 }
