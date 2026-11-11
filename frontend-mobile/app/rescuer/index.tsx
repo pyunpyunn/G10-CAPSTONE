@@ -481,9 +481,8 @@ export default function RescuerHomeScreen() {
         removeClippedSubviews={false}
         style={styles.scroll}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl enabled={activeTab !== 'map'} refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
-        {activeTab === 'map' ? <ActionButton label={refreshing ? 'Syncing...' : 'Refresh map data'} icon="refresh-outline" disabled={refreshing} onPress={() => void loadOverview(true)} /> : null}
         {!!overviewError && !offline && overview ? (
           <View style={styles.refreshError}>
             <Text style={styles.refreshErrorText}>Could not refresh. Showing previously loaded data. {overviewError}</Text>

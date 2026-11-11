@@ -845,9 +845,8 @@ export default function HouseholdHomeScreen() {
               styles.content,
               overview.setup?.is_setup_complete && { paddingBottom: 104 + insets.bottom },
             ]}
-            refreshControl={<RefreshControl enabled={activeTab !== 'route' && activeTab !== 'profile'} refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
           >
-            {['route', 'profile'].includes(activeTab) ? <HouseholdButton label={refreshing ? 'Syncing...' : 'Refresh page data'} icon="refresh-outline" tone="light" disabled={refreshing} onPress={() => void loadOverview(true)} /> : null}
             {overviewError && !offline ? <View style={{ padding: spacing.sm, gap: spacing.xs }}>
               <Text accessibilityLiveRegion="polite" style={{ color: palette.textSoft }}>
                 Could not refresh. Showing previously loaded data.
