@@ -287,7 +287,7 @@ export function HouseholdProfileScreen({
           keyboardType="phone-pad" maxLength={30} editable={!savingContact && !resettingOwner}
           style={{ minHeight: 44, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: palette.border, borderRadius: radius.md, color: palette.text }} />
         <HouseholdButton label={savingContact ? 'Saving...' : 'Save contact number'} icon="save-outline"
-          disabled={savingContact || resettingOwner || contactNumber.trim() === (user.contact_number || '')} onPress={saveContact} />
+          tone="nav" disabled={savingContact || resettingOwner || contactNumber.trim() === (user.contact_number || '')} onPress={saveContact} />
 
         </> : null}
         <HouseholdButton label={editingGeotag ? 'Close geotag update' : 'Update geotag'} icon="location-outline" tone="light"

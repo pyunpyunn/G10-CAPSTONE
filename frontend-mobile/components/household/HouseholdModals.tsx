@@ -62,7 +62,7 @@ export function HouseholdQrModal({ visible, qr, householdId, onClose }: QrModalP
             </View>
             {qr?.household_name ? <Text style={styles.qrTitle}>{qr.household_name}</Text> : null}
             <Text style={styles.qrMeta} selectable>Household ID: {qrValue}</Text>
-            <HouseholdButton label={saving ? 'Saving PNG...' : 'Download QR'} icon="download-outline" disabled={saving} onPress={downloadQr} />
+            <HouseholdButton label={saving ? 'Saving PNG...' : 'Download QR'} icon="download-outline" tone="nav" disabled={saving} onPress={downloadQr} />
           </> : <Text style={styles.qrMeta} accessibilityRole="alert">Household QR unavailable. Refresh your household data and try again.</Text>}
         </View>
       </View>
@@ -578,10 +578,10 @@ const styles = StyleSheet.create({
   notificationDate: { color: palette.textSoft, fontSize: 11 },
   notificationActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.xs },
   notificationAction: { minWidth: 88, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, paddingHorizontal: spacing.md },
-  rejectAction: { backgroundColor: '#fff', borderWidth: 1, borderColor: palette.border },
-  acceptAction: { backgroundColor: palette.navActive },
+  rejectAction: { backgroundColor: palette.nav, opacity: 0.55 },
+  acceptAction: { backgroundColor: palette.nav },
   notificationActionText: { fontSize: 12, fontWeight: '800' },
-  rejectText: { color: palette.text },
+  rejectText: { color: '#fff' },
   acceptText: { color: '#fff' },
   targetPinGroup: { gap: spacing.xs },
   stepContent: {
