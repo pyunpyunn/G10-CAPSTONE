@@ -5,10 +5,17 @@ import { api } from '@/api/client';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getRememberedCredentials, saveRememberedCredentials } from '@/utils/secureStorage';
 import { passwordPolicyError } from '@/utils/passwordPolicy';
+import { HouseholdButton } from '@/components/household/HouseholdUI';
 
 const emptyForm = { current_password: '', password: '', password_confirmation: '' };
 
-export function ChangePasswordSection({ accountIdentifiers }: { accountIdentifiers: (string | undefined)[] }) {
+export function ChangePasswordSection({
+  accountIdentifiers,
+  standaloneButton = false,
+}: {
+  accountIdentifiers: (string | undefined)[];
+  standaloneButton?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -49,6 +56,20 @@ export function ChangePasswordSection({ accountIdentifiers }: { accountIdentifie
       submitting.current = false;
       setSaving(false);
     }
+  }
+
+  if (!open && standaloneButton) {
+    return (
+      <>
+        {message ? <Text accessibilityRole="alert" style={styles.success}>{message}</Text> : null}
+        <HouseholdButton
+          label="Change password"
+          icon="lock-closed-outline"
+          tone="nav"
+          onPress={() => { setOpen(true); setMessage(''); }}
+        />
+      </>
+    );
   }
 
   return (

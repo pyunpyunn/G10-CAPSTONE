@@ -353,7 +353,7 @@ export function HouseholdProfileScreen({
             ])} />
       </View>
 
-      <ChangePasswordSection accountIdentifiers={[household.household_id]} />
+      <ChangePasswordSection accountIdentifiers={[household.household_id]} standaloneButton />
 
       <HouseholdButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
     </View>
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    backgroundColor: palette.navActive,
+    backgroundColor: palette.nav,
     ...shadow,
   },
   heroTop: {

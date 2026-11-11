@@ -7,17 +7,30 @@ import { palette, radius, spacing } from '@/constants/resqTheme';
 type ButtonProps = {
   label: string;
   icon?: keyof typeof Ionicons.glyphMap;
-  tone?: 'primary' | 'light' | 'danger' | 'gray';
+  tone?: 'primary' | 'nav' | 'light' | 'danger' | 'gray';
   disabled?: boolean;
+  pressedBackgroundColor?: string;
   onPress: () => void;
 };
 
-export function HouseholdButton({ label, icon, tone = 'primary', disabled = false, onPress }: ButtonProps) {
+export function HouseholdButton({
+  label,
+  icon,
+  tone = 'primary',
+  disabled = false,
+  pressedBackgroundColor,
+  onPress,
+}: ButtonProps) {
   return (
     <Pressable
-      style={[styles.button, styles[tone], disabled && styles.disabled]}
+      style={({ pressed }) => [
+        styles.button,
+        styles[tone],
+        disabled && styles.disabled,
+        pressed && pressedBackgroundColor ? { backgroundColor: pressedBackgroundColor } : null,
+      ]}
       onPress={onPress}
-        android_ripple={{ color: '#236a7333' }}
+      android_ripple={{ color: pressedBackgroundColor || '#236a7333' }}
       disabled={disabled}
     >
       {icon ? <Ionicons name={icon} size={17} color={tone === 'light' || tone === 'gray' ? palette.nav : '#fff'} /> : null}
@@ -80,6 +93,9 @@ const styles = StyleSheet.create({
   },
   primary: {
     backgroundColor: palette.navActive,
+  },
+  nav: {
+    backgroundColor: palette.nav,
   },
   light: {
     borderWidth: 1,

@@ -866,7 +866,12 @@ export default function HouseholdHomeScreen() {
                 return (
                   <Pressable
                     key={tab.key}
-                    style={[styles.tabButton, tab.center && styles.centerTab, isActive && !tab.center && styles.activeTab]}
+                    style={({ pressed }) => [
+                      styles.tabButton,
+                      tab.center && styles.centerTab,
+                      isActive && !tab.center && styles.activeTab,
+                      pressed && !tab.center && styles.tabPressed,
+                    ]}
                     onPress={() => {
                       if (isQrAction) {
                         setShowQr(true);
@@ -1111,7 +1116,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   activeTab: {
-    backgroundColor: palette.navActive,
+    backgroundColor: '#ffffff20',
+  },
+  tabPressed: {
+    backgroundColor: '#ffffff20',
   },
   centerTab: {
     width: 70,

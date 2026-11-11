@@ -137,6 +137,7 @@ export function HouseholdDashboardScreen({
                 <HouseholdButton
                   label={savingStatus ? 'Saving...' : 'Save update'}
                   icon="save-outline"
+                  tone="nav"
                   disabled={savingStatus || !hasStatusChanged}
                   onPress={onSaveStatus}
                 />
@@ -405,16 +406,16 @@ function TrustedHouseholdList({
   const addButton = (
     <View style={styles.trustedAddSlot}>
       <Pressable
-        style={styles.trustedAddButton}
+        style={({ pressed }) => [styles.trustedAddButton, pressed && styles.trustedAddButtonPressed]}
         onPress={onAddTrusted}
         accessibilityRole="button"
         accessibilityLabel={addLabel}
       >
         <View style={styles.trustedAddIcon}>
-          <Ionicons name="add" size={18} color={palette.navActive} />
+          <Ionicons name="add" size={18} color="#fff" />
         </View>
         <Text style={styles.trustedAddText}>{addLabel}</Text>
-        <Ionicons name="arrow-forward" size={18} color={palette.navActive} />
+        <Ionicons name="arrow-forward" size={18} color="#fff" />
       </Pressable>
     </View>
   );
@@ -668,6 +669,7 @@ function MemberRow({
               <HouseholdButton
                 label={saving ? 'Saving...' : 'Save member status'}
                 icon="save-outline"
+                tone="nav"
                 disabled={saving || !hasStatusChanged}
                 onPress={handleSave}
               />
@@ -1076,11 +1078,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: palette.borderStrong,
+    borderColor: palette.nav,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    backgroundColor: palette.secondary,
+    backgroundColor: palette.nav,
+  },
+  trustedAddButtonPressed: {
+    backgroundColor: '#ffffff20',
+    borderColor: palette.borderStrong,
   },
   trustedAddIcon: {
     width: 28,
@@ -1088,11 +1093,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
-    backgroundColor: palette.card,
+    backgroundColor: '#ffffff20',
   },
   trustedAddText: {
     flex: 1,
-    color: palette.navActive,
+    color: '#fff',
     fontSize: 13,
     fontWeight: '900',
   },

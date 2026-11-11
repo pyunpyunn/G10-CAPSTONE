@@ -250,6 +250,8 @@ export function TrustedPinModal({ visible, mode, saving, error, onClose, onConfi
           <HouseholdButton
             label={saving ? 'Saving...' : mode === 'change' ? 'Change PIN' : mode === 'set' ? 'Save PIN' : 'Open trusted household'}
             icon={mode === 'change' ? 'lock-closed-outline' : 'lock-open-outline'}
+            tone="nav"
+            pressedBackgroundColor="#ffffff20"
             disabled={saving}
             onPress={submit}
           />
@@ -365,7 +367,7 @@ export function AddTrustedHouseholdModal({
           <ModalHeader title="Add trusted household" onClose={onClose} />
           <ScrollView contentContainerStyle={styles.modalScroll}>
             <View style={styles.stepRow}>
-              <StepPill label="1. Identify" active={step === 1} complete={step > 1} />
+              <StepPill label="1. Identity" active={step === 1} complete={step > 1} />
               <StepPill label="2. Relationship" active={step === 2} complete={step > 2} />
               <StepPill label="3. Verify PIN" active={step === 3} />
             </View>
@@ -374,26 +376,23 @@ export function AddTrustedHouseholdModal({
               <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>Find a household</Text>
                 <Text style={styles.note}>Enter the trusted household ID or the household account username.</Text>
-                <View style={styles.identifierInputRow}>
-                  <TextInput
-                    style={[styles.input, styles.identifierInput]}
-                    value={householdIdentifier}
-                    onChangeText={setHouseholdIdentifier}
-                    placeholder="Household ID or username"
-                    placeholderTextColor="#7d8da0"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="search"
-                    onSubmitEditing={() => onLookup(householdIdentifier.trim())}
-                    accessibilityLabel="Trusted household ID or username"
-                  />
-                  <View style={styles.scanIconButton} accessible accessibilityRole="image" accessibilityLabel="Scan household code">
-                    <Ionicons name="scan-outline" size={21} color={palette.navActive} />
-                  </View>
-                </View>
+                <TextInput
+                  style={styles.input}
+                  value={householdIdentifier}
+                  onChangeText={setHouseholdIdentifier}
+                  placeholder="Household ID or username"
+                  placeholderTextColor="#7d8da0"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                  onSubmitEditing={() => onLookup(householdIdentifier.trim())}
+                  accessibilityLabel="Trusted household ID or username"
+                />
                 <HouseholdButton
                   label={loading ? 'Looking up household...' : 'Continue'}
                   icon="arrow-forward-outline"
+                  tone="nav"
+                  pressedBackgroundColor="#ffffff20"
                   disabled={loading || !householdIdentifier.trim()}
                   onPress={() => onLookup(householdIdentifier.trim())}
                 />
@@ -475,6 +474,8 @@ export function AddTrustedHouseholdModal({
             <HouseholdButton
               label={loading ? 'Verifying PIN...' : 'Send request'}
               icon="send-outline"
+              tone="nav"
+              pressedBackgroundColor="#ffffff20"
               disabled={loading || !lookupResult || !relationship || targetPin.length !== 4}
               onPress={submit}
             />
@@ -605,8 +606,8 @@ const styles = StyleSheet.create({
     backgroundColor: palette.secondary,
   },
   stepPillActive: {
-    borderColor: palette.navActive,
-    backgroundColor: palette.navActive,
+    borderColor: palette.nav,
+    backgroundColor: palette.nav,
   },
   stepText: {
     color: palette.textSoft,
@@ -775,8 +776,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   relationshipChoicePressed: {
-    borderColor: palette.navActive,
-    backgroundColor: `${palette.navActive}0b`,
+    borderColor: palette.borderStrong,
+    backgroundColor: palette.secondary,
   },
   relationshipChoiceIcon: {
     width: 34,

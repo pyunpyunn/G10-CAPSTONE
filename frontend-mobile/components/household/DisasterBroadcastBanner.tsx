@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   event: { flex: 1, gap: 4 },
   eventName: { color: palette.navText, fontSize: 20, fontWeight: '700' },
   eventType: { color: palette.navMuted, fontSize: 13, fontWeight: '500' },
-  history: { width: 44, height: 44, borderWidth: 1, borderColor: palette.navHover, borderRadius: radius.md, backgroundColor: palette.navActive, alignItems: 'center', justifyContent: 'center' },
+  history: { width: 44, height: 44, borderWidth: 1, borderColor: palette.navText, borderRadius: radius.md, backgroundColor: palette.nav, alignItems: 'center', justifyContent: 'center' },
   body: { padding: spacing.md, gap: spacing.md },
   title: { color: palette.text, fontSize: 17, fontWeight: '700', lineHeight: 24 },
   instruction: { gap: spacing.xs },
