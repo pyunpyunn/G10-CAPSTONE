@@ -1,0 +1,351 @@
+import { statusColor } from '@/constants/statusPalette';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Location from 'expo-location';
+import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
+import { palette, radius, spacing } from '@/constants/resqTheme';
+import { ActionButton, EmptyState, SectionHeader } from './RescuerUI';
+
+type RescueMapProps = {
+  active?: boolean;
+  assignments: any[];
+  evacuationCenters?: any[];
+  activeAssignment: any;
+  selectedAssignment?: any;
+  showNavigationButton?: boolean;
+  onOpenNavigation?: () => void;
+};
+
+const defaultRegion = {
+  latitude: 10.2898,
+  longitude: 123.879,
+  latitudeDelta: 0.035,
+  longitudeDelta: 0.035,
+};
+
+export function RescueMapScreen({ assignments, activeAssignment, selectedAssignment, showNavigationButton = false, onOpenNavigation }: RescueMapProps) {
+  const watcher = useRef<Location.LocationSubscription | null>(null);
+  const autoStartedAssignment = useRef<number | null>(null);
+  const [tracking, setTracking] = useState(false);
+  const [position, setPosition] = useState<any>(null);
+  const [locError, setLocError] = useState('');
+  const mapAssignment = selectedAssignment || activeAssignment;
+  const routeCoordinates = useMemo(() => normalizeRoute(mapAssignment?.route?.coordinates), [mapAssignment?.route?.coordinates]);
+  const trailCoordinates = useMemo(() => normalizeRoute(mapAssignment?.route?.trail_coordinates), [mapAssignment?.route?.trail_coordinates]);
+  const activeTarget = mapAssignment?.latitude && mapAssignment?.longitude
+    ? {
+        latitude: Number(mapAssignment.latitude),
+        longitude: Number(mapAssignment.longitude),
+      }
+    : null;
+  const mapRegion = position
+    ? { ...position, latitudeDelta: 0.018, longitudeDelta: 0.018 }
+    : routeCoordinates[0]
+      ? { ...routeCoordinates[0], latitudeDelta: 0.025, longitudeDelta: 0.025 }
+      : activeTarget
+        ? { ...activeTarget, latitudeDelta: 0.025, longitudeDelta: 0.025 }
+        : defaultRegion;
+
+  useEffect(() => {
+    return () => {
+      watcher.current?.remove();
+    };
+  }, []);
+
+  const startTracking = useCallback(async () => {
+    if (tracking) {
+      return;
+    }
+
+    const permission = await Location.requestForegroundPermissionsAsync();
+
+    if (permission.status !== 'granted') {
+      setLocError('Location permission denied. Enable location access to sync your field position.');
+      return;
+    }
+
+    setLocError('');
+    setTracking(true);
+
+    watcher.current = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.High,
+        timeInterval: 5000,
+        distanceInterval: 3,
+      },
+      (location) => {
+        const nextPosition = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          accuracy_m: location.coords.accuracy,
+        };
+
+        setPosition(nextPosition);
+      }
+    );
+  }, [tracking]);
+
+  useEffect(() => {
+    const shouldAutoTrack = activeAssignment?.assignment_id
+      && ['accepted', 'en_route'].includes(activeAssignment.status_key)
+      && autoStartedAssignment.current !== activeAssignment.assignment_id;
+
+    if (shouldAutoTrack) {
+      autoStartedAssignment.current = activeAssignment.assignment_id;
+      startTracking();
+    }
+  }, [activeAssignment?.assignment_id, activeAssignment?.status_key, startTracking]);
+
+  function stopTracking() {
+    watcher.current?.remove();
+    watcher.current = null;
+    setTracking(false);
+    setPosition(null);
+  }
+
+  function handleTrackPress() {
+    if (tracking) {
+      stopTracking();
+      return;
+    }
+
+    if (!activeAssignment?.assignment_id) {
+      Alert.alert('No active assignment', 'You can open the map, but location sync needs an active dispatch assignment.');
+    }
+
+    startTracking();
+  }
+
+  const mappedAssignments = assignments.filter((item) => item.latitude && item.longitude);
+  return (
+    <View style={styles.stack}>
+      {showNavigationButton && onOpenNavigation ? (
+        <Pressable
+          style={({ pressed }) => [styles.navigationButton, pressed && styles.navigationButtonPressed]}
+          onPress={onOpenNavigation}
+        >
+          <Ionicons name="navigate-outline" size={20} color="#fff" />
+          <Text style={styles.navigationButtonText}>View directions / Offline navigation</Text>
+        </Pressable>
+      ) : null}
+      <View style={styles.card}>
+        <SectionHeader
+          title="Barangay rescue map"
+          action={
+            <ActionButton
+              label={tracking ? 'Stop' : 'Track Me'}
+              icon={tracking ? 'stop-outline' : 'navigate-outline'}
+              tone={tracking ? 'danger' : 'primary'}
+              onPress={handleTrackPress}
+            />
+          }
+        />
+
+        {locError ? (
+          <View style={styles.errorStrip}>
+            <Ionicons name="alert-circle-outline" size={18} color={palette.unsafe} />
+            <Text style={styles.errorText}>{locError}</Text>
+          </View>
+        ) : null}
+
+        <MapView style={styles.map} region={mapRegion}>
+          {routeCoordinates.length >= 2 ? (
+            <Polyline coordinates={routeCoordinates} strokeColor={palette.evacuated} strokeWidth={5} />
+          ) : null}
+
+          {trailCoordinates.length >= 2 ? (
+            <Polyline coordinates={trailCoordinates} strokeColor={palette.safe} strokeWidth={3} />
+          ) : null}
+
+          {mappedAssignments.map((assignment) => (
+            <Marker
+              key={assignment.assignment_id}
+              coordinate={{
+                latitude: Number(assignment.latitude),
+                longitude: Number(assignment.longitude),
+              }}
+              title={assignment.assigned_area || assignment.household_id || 'Assignment'}
+              description={assignment.destination_label || assignment.status_label}
+              pinColor={statusColor(assignment.status_key)}
+            />
+          ))}
+
+          {activeTarget ? (
+            <Marker
+              coordinate={activeTarget}
+              title="Dispatch destination"
+              description={mapAssignment?.destination_label || mapAssignment?.assigned_area || mapAssignment?.household_id}
+              pinColor={palette.unsafe}
+            />
+          ) : null}
+
+          {position ? (
+            <>
+              <Marker coordinate={position} title="My location" pinColor={palette.navActive} />
+              <Circle
+                center={position}
+                radius={position.accuracy_m || 30}
+                strokeColor="#2a5a9055"
+                fillColor="#2a5a9018"
+              />
+            </>
+          ) : null}
+        </MapView>
+
+        {mappedAssignments.length === 0 ? (
+          <EmptyState icon="location-outline" title="No mapped assignments" />
+        ) : null}
+
+        {mapAssignment ? (
+          <View style={styles.routeInfo}>
+            <Ionicons name="navigate-outline" size={18} color={palette.evacuated} />
+            <Text style={styles.routeInfoText}>
+              {routeCoordinates.length >= 2
+                ? `${mapAssignment.route?.distance_km || '-'} km · ${mapAssignment.route?.duration_min || '-'} min road route`
+                : activeTarget
+                  ? 'Waiting for road route. Tap Track Me or Accept/En route with GPS enabled.'
+                  : 'This assignment has no household geotag target yet.'}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.card}>
+        <SectionHeader title="Map queue" />
+        {assignments.length === 0 ? (
+          <Text style={styles.smallText}>No dispatch assignments yet.</Text>
+        ) : (
+          <View style={styles.assignmentList}>
+            {assignments.map((assignment) => (
+              <View key={assignment.assignment_id} style={styles.assignmentRow}>
+                <View style={styles.rowIcon}>
+                  <Ionicons name="pin-outline" size={17} color={palette.navActive} />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowTitle}>{assignment.assigned_area || assignment.household_id || 'Assigned location'}</Text>
+                  <Text style={styles.rowMeta}>
+                    {assignment.destination_label || (assignment.latitude && assignment.longitude ? 'Geotag available' : 'No household geotag yet')}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function normalizeRoute(points: any[] = []) {
+  return points
+    .map((point) => ({
+      latitude: Number(point.latitude ?? point.lat ?? point[0]),
+      longitude: Number(point.longitude ?? point.lng ?? point[1]),
+    }))
+    .filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
+}
+
+const styles = StyleSheet.create({
+  stack: {
+    gap: spacing.md,
+  },
+  navigationButton: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: palette.nav,
+  },
+  navigationButtonPressed: {
+    opacity: 0.85,
+  },
+  navigationButtonText: {
+    color: palette.navText,
+    fontWeight: '800',
+  },
+  card: {
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    backgroundColor: palette.card,
+  },
+  errorStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: '#96202012',
+  },
+  errorText: {
+    flex: 1,
+    color: palette.unsafe,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  routeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: palette.secondary,
+  },
+  routeInfoText: {
+    flex: 1,
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  map: {
+    height: 340,
+    overflow: 'hidden',
+    borderRadius: radius.md,
+  },
+  smallText: {
+    color: palette.textSoft,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  assignmentList: {
+    gap: spacing.sm,
+  },
+  assignmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: palette.secondary,
+  },
+  rowIcon: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    backgroundColor: palette.secondary,
+  },
+  rowText: {
+    flex: 1,
+  },
+  rowTitle: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  rowMeta: {
+    marginTop: 2,
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+});

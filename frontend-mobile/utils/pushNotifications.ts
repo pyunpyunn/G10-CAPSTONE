@@ -50,8 +50,7 @@ export async function getPushRegistration(_deviceUuid?: string): Promise<PushReg
   const oneSignalAppId = oneSignalAppIdFromConfig();
 
   if (!supportsRemotePushNotifications()) {
-    await explainNotificationBuildRequirement();
-
+    if (!isExpoGoRuntime()) await explainNotificationBuildRequirement();
     return emptyOneSignalRegistration('unavailable');
   }
 
@@ -257,11 +256,11 @@ function oneSignalAppIdFromConfig() {
 
 function supportsRemotePushNotifications() {
   const isMobile = Platform.OS === 'android' || Platform.OS === 'ios';
-  const isExpoGo =
-    Constants.executionEnvironment === 'storeClient' ||
-    Constants.appOwnership === 'expo';
+  return isMobile && !isExpoGoRuntime();
+}
 
-  return isMobile && !isExpoGo;
+function isExpoGoRuntime() {
+  return Constants.executionEnvironment === 'storeClient' || Constants.appOwnership === 'expo';
 }
 
 function wait(ms: number) {
@@ -280,6 +279,20 @@ function emptyOneSignalRegistration(
   };
 }
 
+function explainNotificationBuildRequirement(): Promise<void> {
+  if (unsupportedNoticeShown) return Promise.resolve();
+  unsupportedNoticeShown = true;
+
+  return new Promise((resolve) => {
+    Alert.alert(
+      'Notifications need the installed app',
+      'Expo Go can open RESQPERATION for screen testing, but OneSignal notifications require the RESQPERATION development or production app. Install that build, then log in and allow notifications to create a OneSignal subscription record.',
+      [{ text: 'OK', onPress: () => resolve() }],
+      { cancelable: false }
+    );
+  });
+}
+
 function confirmNotificationConsent(): Promise<boolean> {
   return new Promise((resolve) => {
     Alert.alert(
@@ -294,30 +307,6 @@ function confirmNotificationConsent(): Promise<boolean> {
         {
           text: 'Continue',
           onPress: () => resolve(true),
-        },
-      ],
-      {
-        cancelable: false,
-      }
-    );
-  });
-}
-
-function explainNotificationBuildRequirement(): Promise<void> {
-  if (unsupportedNoticeShown) {
-    return Promise.resolve();
-  }
-
-  unsupportedNoticeShown = true;
-
-  return new Promise((resolve) => {
-    Alert.alert(
-      'Notifications need the installed app',
-      'Expo Go can open RESQPERATION for screen testing, but OneSignal notifications require the RESQPERATION development or production app. Install that build, then log in and allow notifications to create a OneSignal subscription record.',
-      [
-        {
-          text: 'OK',
-          onPress: () => resolve(),
         },
       ],
       {

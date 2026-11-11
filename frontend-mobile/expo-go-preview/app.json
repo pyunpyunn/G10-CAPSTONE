@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "RESQPERATION Preview",
+    "slug": "resqperation-expo-go-preview",
+    "version": "1.0.0",
+    "scheme": "resqperation-preview",
+    "platforms": ["ios", "android"],
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

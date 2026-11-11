@@ -49,7 +49,7 @@ export default function DashboardOverview({
         reportedHouseholds={dashboard.households.reported}
         onOpenMap={() => onOpenModule('/mapping')}
       />
-      <RequestCard requests={dashboard.requests} onOpenRequests={() => onOpenModule('/resources-requests')} />
+      <RequestCard requests={dashboard.requests} onOpenRequests={() => onOpenModule('/external-requests')} />
     </aside>
   )
 }
