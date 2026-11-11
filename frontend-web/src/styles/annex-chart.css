@@ -5,7 +5,7 @@
 @media (max-width:900px){.annex-chart-page .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.annex-chart-page .work{grid-template-columns:minmax(0,1fr);min-height:0}.annex-chart-page .panel,.annex-chart-page .work.wide .panel,.annex-chart-page .work.closed .panel{width:auto;border-left:0;border-top:1px solid var(--border)}.annex-chart-page .pbody,.annex-chart-page .work.wide .pbody{min-width:0}.annex-chart-page .pbody{max-height:1600px}.annex-chart-page .work.closed .pbody{max-height:0;padding-top:0;padding-bottom:0;opacity:0;visibility:hidden}.annex-chart-page .work.closed .ptitle{display:block}.annex-chart-page .work.closed .phead{padding:12px 14px;justify-content:space-between}.annex-chart-page .work.closed .rail{display:none}.annex-chart-page #close .ch{transform:rotate(90deg)}.annex-chart-page .work.closed #close .ch{transform:rotate(-90deg)}.annex-chart-page #wide{display:none}
 }
 
-.annex-chart-page{margin:0;width:100%;min-width:0}.annex-chart-page .wrap{margin:0;max-width:none}.annex-chart-page .work{margin:0}.app-shell.annex-chart-shell .main{margin:0}.annex-chart-page .chart{flex:none}
+.annex-chart-page{margin:0;width:100%;min-width:0}.annex-chart-page .wrap{margin:0;max-width:none;padding-top:0}.annex-chart-page .work{margin:0}.app-shell.annex-chart-shell .main{margin:0}.annex-chart-page .chart{flex:none}
 .app-shell.annex-chart-shell > .main{margin:0;padding:0}.annex-h-workspace{width:100%;min-width:0;margin:0}
 
 /* Collapse to the same compact edge tab used by the mapping panel. */

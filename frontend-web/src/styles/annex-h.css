@@ -1,7 +1,7 @@
 .annex-h-view-switch {
   display: flex;
   gap: 4px;
-  margin: 0 0 12px;
+  margin: 0;
   padding: 4px;
   border: 1px solid #d7dee8;
   border-radius: 9px;
@@ -9,14 +9,14 @@
   width: fit-content;
 }
 
-.annex-h-view-switch button {
+.tm-page .annex-h-view-switch button,
+.annex-chart-page .annex-h-view-switch button {
   padding: 8px 13px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: #52657a;
-  font: inherit;
-  font-weight: 650;
+  font: 650 13px/1.45 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   cursor: pointer;
 }
 
