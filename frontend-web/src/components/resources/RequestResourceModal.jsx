@@ -41,16 +41,9 @@ function formatItemTitle(name = '') {
     .join(' ')
 }
 
+// Dynamic category display from database record
 function getCategoryDisplay(item) {
-  const catKey = String(
-    item?.category_key || item?.category || item?.category_label || '',
-  ).toLowerCase()
-  if (catKey.includes('med') || catKey.includes('health')) return 'Medical kit'
-  if (catKey.includes('food') || catKey.includes('water')) return 'Food & water'
-  if (catKey.includes('comm')) return 'Communications'
-  if (catKey.includes('rescue') || catKey.includes('gear')) return 'Rescue equipment'
-  if (catKey.includes('shelter') || catKey.includes('tent')) return 'Emergency shelter'
-  return item?.category_label || item?.category || 'Relief Goods'
+  return item?.category_label || item?.category || 'General'
 }
 
 export default function RequestResourceModal({

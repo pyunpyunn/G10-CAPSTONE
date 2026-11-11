@@ -1,16 +1,8 @@
 import { Box, MapPin } from 'lucide-react'
 
-// Helper to format category labels to match clean sentence case styling
+// Dynamic category display from database record
 function getCategoryDisplay(item) {
-  const catKey = String(
-    item.category_key || item.category || item.category_label || '',
-  ).toLowerCase()
-  if (catKey.includes('med') || catKey.includes('health')) return 'Medical kit'
-  if (catKey.includes('food') || catKey.includes('water')) return 'Food & water'
-  if (catKey.includes('comm')) return 'Communications'
-  if (catKey.includes('rescue') || catKey.includes('gear')) return 'Rescue equipment'
-  if (catKey.includes('shelter') || catKey.includes('tent')) return 'Emergency shelter'
-  return item.category_label || item.category || 'Relief goods'
+  return item?.category_label || item?.category || 'General'
 }
 
 export default function RequestTypeCard({
@@ -57,9 +49,8 @@ export default function RequestTypeCard({
 
   return (
     <article
-      className={`human-catalog-card ${isOutOfStock ? 'is-out-of-stock' : 'is-in-stock'} ${
-        isSelected ? 'is-selected' : ''
-      }`}
+      className={`human-catalog-card ${isOutOfStock ? 'is-out-of-stock' : 'is-in-stock'} ${isSelected ? 'is-selected' : ''
+        }`}
       onClick={() => onSelect?.(item)}
       role="button"
       tabIndex={0}
@@ -69,9 +60,8 @@ export default function RequestTypeCard({
           onSelect?.(item)
         }
       }}
-      aria-label={`${item.name || item.label} - ${
-        isOutOfStock ? 'Out of stock' : `${quantity} available in stock`
-      }`}
+      aria-label={`${item.name || item.label} - ${isOutOfStock ? 'Out of stock' : `${quantity} available in stock`
+        }`}
     >
       {/* Header Bar: Category with soft-blue cube icon & clean Stock Pill */}
       <div className="card-header-bar">
@@ -127,9 +117,8 @@ export default function RequestTypeCard({
 
         <div className="card-stock-progress-track">
           <div
-            className={`card-stock-progress-fill ${
-              isOutOfStock ? 'fill-out' : isLowStock ? 'fill-low' : 'fill-in'
-            }`}
+            className={`card-stock-progress-fill ${isOutOfStock ? 'fill-out' : isLowStock ? 'fill-low' : 'fill-in'
+              }`}
             style={{ width: `${progressPercent}%` }}
           />
         </div>

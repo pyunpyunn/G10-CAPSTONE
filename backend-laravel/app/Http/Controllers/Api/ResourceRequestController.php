@@ -53,7 +53,7 @@ class ResourceRequestController extends Controller
                         'RESCUE' => 'Rescue Equipment',
                         'RELIEF' => 'Relief Goods',
                         'SHELTER' => 'Emergency Shelter',
-                        default => ucfirst(strtolower($categoryCode)),
+                        default => ucfirst(strtolower(str_replace('_', ' ', $categoryCode))),
                     },
                     'sku' => $item->sku,
                     'unit' => $item->unit_type ?: 'units',
@@ -71,53 +71,8 @@ class ResourceRequestController extends Controller
                 ]);
             }
         } catch (\Throwable $e) {
-            $source = 'resq_local_fallback';
-            // Fallback to local resource requests
-            $localRequests = \Illuminate\Support\Facades\DB::table('resource_requests')
-                ->leftJoin('evacuation_centers', 'evacuation_centers.evacuation_center_id', '=', 'resource_requests.evacuation_center_id')
-                ->select([
-                    'resource_requests.request_id',
-                    'resource_requests.request_category',
-                    'resource_requests.resource_type',
-                    'resource_requests.item_name',
-                    'resource_requests.quantity',
-                    'resource_requests.unit',
-                    'resource_requests.validation_status',
-                    'resource_requests.tracking_reference',
-                    'resource_requests.description',
-                    'resource_requests.created_at',
-                    'evacuation_centers.name as evacuation_center_name',
-                ])
-                ->orderByDesc('resource_requests.created_at')
-                ->get();
-
-            $latestReqId = $localRequests->first()?->request_id;
-
-            foreach ($localRequests as $lr) {
-                $qty = max(0, (int) $lr->quantity);
-                $isOut = strtolower($lr->validation_status ?? '') === 'returned' || $qty <= 0;
-                $rawItems->push([
-                    'id' => $lr->request_id,
-                    'name' => $lr->item_name ?: (ucfirst($lr->resource_type ?? 'Resource').' Supplies'),
-                    'label' => $lr->item_name ?: (ucfirst($lr->resource_type ?? 'Resource').' Supplies'),
-                    'category' => strtoupper(trim($lr->request_category ?: 'RESOURCE')),
-                    'category_key' => strtolower(trim($lr->request_category ?: 'resource')),
-                    'category_label' => ucfirst(strtolower($lr->request_category ?: 'Resource')),
-                    'sku' => $lr->tracking_reference ?: $lr->request_id,
-                    'unit' => $lr->unit ?: 'units',
-                    'type' => ucfirst(strtolower($lr->resource_type ?: 'General')),
-                    'quantity' => $qty,
-                    'is_out_of_stock' => $isOut,
-                    'stock_status' => $isOut ? 'out_of_stock' : 'in_stock',
-                    'status' => $isOut ? 'Out of stock' : 'Available',
-                    'status_label' => $isOut ? 'Out of stock' : 'Available',
-                    'storage_location' => $lr->evacuation_center_name ? 'Evacuation: '.$lr->evacuation_center_name : 'Barangay Resource Depot',
-                    'detail' => $lr->evacuation_center_name ? 'Evacuation: '.$lr->evacuation_center_name : 'Barangay Resource Depot',
-                    'expiration_date' => null,
-                    'is_new' => $lr->request_id === $latestReqId,
-                    'created_at' => (string) ($lr->created_at ?? now()),
-                ]);
-            }
+            $source = 'database_empty';
+            $rawItems = collect();
         }
 
         // Apply filters

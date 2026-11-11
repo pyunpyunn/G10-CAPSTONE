@@ -130,27 +130,6 @@ export default function ResourceRequestDetailDrawer({
             )}
           </div>
 
-          {/* Depot Stock Pre-Check Banner for Approval */}
-          {!isTrackingMode && isAwaitingApproval && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                padding: '10px 14px',
-                borderRadius: '8px',
-              }}
-            >
-              <CheckCircle2 size={18} style={{ color: '#16a34a', flexShrink: 0 }} />
-              <div style={{ fontSize: '12px', color: '#166534', lineHeight: 1.4 }}>
-                <strong>Depot Inventory Pre-Check: Stock Available</strong>
-                <div>Requested supplies are verified in warehouse bays. Approving this request will immediately deduct stock and sync allocation to TrackingAid Shared DB.</div>
-              </div>
-            </div>
-          )}
-
           {/* VIEW MODE: Request & Validation Details ONLY (No status tracking) */}
           {!isTrackingMode ? (
             <>

@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import {
   AlertCircle,
-  Database,
   Loader2,
   Plus,
-  Sparkles,
   X,
 } from 'lucide-react'
 import { createResourceRequestType } from '../../api/resourceRequestApi'
@@ -105,14 +103,7 @@ export default function DeclareRequestTypeModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">
-          <div className="modal-title-with-badge">
-            <h2>
-              <Plus size={18} className="inline-icon" /> Declare New Request Type
-            </h2>
-            <span className="badge-sync-notice">
-              <Database size={12} /> Syncs to TrackingAid
-            </span>
-          </div>
+          <h2>Declare New Request Type</h2>
           <button
             className="modal-close"
             type="button"
@@ -131,13 +122,6 @@ export default function DeclareRequestTypeModal({
                 <span>{error}</span>
               </div>
             )}
-
-            <div className="form-info-note">
-              <Sparkles size={16} className="sparkle-icon" />
-              <span>
-                Newly registered request types will be prioritized and displayed as the <strong>1st Card</strong> in the Available Request catalog.
-              </span>
-            </div>
 
             <div className="form-grid-2">
               <div className="form-field full-width">

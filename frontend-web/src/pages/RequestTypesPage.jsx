@@ -28,36 +28,9 @@ import RequestTypeFilterDrawer from '../components/resources/RequestTypeFilterDr
 import DeclareRequestTypeModal from '../components/resources/DeclareRequestTypeModal'
 import RequestResourceModal from '../components/resources/RequestResourceModal'
 
+// Dynamic category display from database record
 function getCategoryDisplay(item) {
-  const catKey = [
-    item.category_key,
-    item.category_label,
-    item.category,
-    item.type,
-    item.classification,
-    item.name,
-    item.label,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase()
-
-  if (catKey.includes('med') || catKey.includes('health') || catKey.includes('trauma') || catKey.includes('first aid'))
-    return 'Medical kit'
-  if (catKey.includes('food') || catKey.includes('water') || catKey.includes('meal') || catKey.includes('ration') || catKey.includes('noodle'))
-    return 'Food & water'
-  if (catKey.includes('comm') || catKey.includes('radio') || catKey.includes('cable'))
-    return 'Communications'
-  if (catKey.includes('rescue') || catKey.includes('gear') || catKey.includes('boat') || catKey.includes('vest'))
-    return 'Rescue equipment'
-  if (catKey.includes('shelter') || catKey.includes('tent') || catKey.includes('blanket'))
-    return 'Emergency shelter'
-
-  if (item.type && item.type.toLowerCase() !== 'resource') return item.type
-  if (item.classification && item.classification.toLowerCase() !== 'resource') return item.classification
-  if (item.category_label && item.category_label.toLowerCase() !== 'resource') return item.category_label
-  if (item.category && item.category.toLowerCase() !== 'resource') return item.category
-  return 'Relief goods'
+  return item?.category_label || item?.category || item?.type || 'General'
 }
 
 export default function RequestTypesPage() {
