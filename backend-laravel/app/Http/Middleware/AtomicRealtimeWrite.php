@@ -13,15 +13,23 @@ class AtomicRealtimeWrite
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! config('realtime.durable') || ! in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+        if (! in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
             return $next($request);
         }
         $isReport = (bool) preg_match('#^api/v1/(?:household/(?:status|members/[^/]+/status|trusted-households/[^/]+/members/[^/]+/status)|rescuer/(?:field-reports|resource-requests|assignments/[^/]+/status))$#', $request->path());
         $key = $isReport ? $request->header('Idempotency-Key') : null;
+        if (! config('realtime.durable') && $key === null) {
+            return $next($request);
+        }
         if ($key !== null && ! preg_match('/^[A-Za-z0-9_-]{16,128}$/', $key)) {
             return response()->json(['message' => 'Idempotency-Key must contain 16 to 128 letters, digits, underscores or hyphens.'], 422);
         }
         $db = DB::connection(config('realtime.connection'));
+        if ($key !== null && ! $db->getSchemaBuilder()->hasTable('report_idempotency')) {
+            return response()->json([
+                'message' => 'Idempotent report storage is not configured. The status report was not processed.',
+            ], 503);
+        }
         $db->beginTransaction();
         try {
             $scope = null;

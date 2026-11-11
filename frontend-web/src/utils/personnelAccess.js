@@ -11,6 +11,7 @@ export function canManagePersonnel(user) {
 }
 
 export function webHomeForUser(user) {
+  if (user?.is_active !== false && user?.permissions?.web_modules?.includes('field_assignments')) return '/my-assignments'
   if (user?.is_active !== false && user?.role?.role_key === 'operations_admin') return '/dashboard'
   const homes=[['dashboard','/dashboard'],['geospatial_analytics','/mapping'],['response_operations','/rescue-management'],['resources_requests','/resources-requests'],['reports_documentation','/situation'],['personnel_access','/rescuers'],['profile','/profile'],['notifications','/notifications']]
   return user?.is_active===false ? '/login' : homes.find(([key]) => user?.permissions?.web_modules?.includes(key))?.[1] || '/login'
@@ -21,7 +22,8 @@ export function canOpenWebPage(user, path) {
   const route = String(path || '').split('?')[0]
   if (route === '/rescuers/view') return hasWebAccess(user)
   let module
-  if (route === '/super-admin') module = 'inquiries'
+  if (route === '/my-assignments') return Boolean(user?.permissions?.web_modules?.includes('field_assignments'))
+  else if (route === '/super-admin') module = 'inquiries'
   else if (route === '/dashboard') module = 'dashboard'
   else if (route === '/notifications') module = 'notifications'
   else if (route === '/profile') module = 'profile'

@@ -1,13 +1,15 @@
 import { useMobileOverview } from '@/hooks/useMobileOverview';
 import { OfflineBanner } from '@/components/OfflineBanner';
-import { MobileTabPanels } from '@/components/MobileTabPanels';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { onDisasterBroadcast } from '@/utils/mobileReadCache';
 import {
   Alert,
+  AppState,
   Platform,
   Pressable,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -36,15 +38,15 @@ import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScr
 import { MobileLogoutOverlay } from '@/components/MobileLogoutOverlay';
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
 import { ActionButton, EmptyState, LoadingState, StatusBadge } from '@/components/rescuer/RescuerUI';
+import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
 import { configureRescuerTracking, stopRescuerTracking, trackingAssignmentFor } from '@/utils/rescuerLiveLocation';
 import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
+import { createAdaptivePoller } from '@/utils/networkScheduling';
 import { rescueActionGps } from '@/utils/rescueActionGps';
 import { useWebViewMode } from '@/utils/viewMode';
 import { WebAppShell } from '@/components/WebAppShell';
-import { palette } from '@/constants/resqTheme';
-import { styles } from '@/utils/rescuerStyles';
 
 type TabKey = 'dashboard' | 'map' | 'report' | 'resource' | 'profile' | 'radio';
 const deviceUuidKey = 'resq_rescuer_device_uuid';
@@ -70,6 +72,14 @@ export default function RescuerHomeScreen() {
   const [pendingAssignment, setPendingAssignment] = useState<number | null>(null);
   useEffect(() => Platform.OS === 'web' ? undefined : mountNavigationSync(), []);
 
+
+  useEffect(() => {
+    const removeBroadcast = onDisasterBroadcast(() => { void loadOverview(true); });
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void loadOverview(true, true);
+    });
+    return () => { removeBroadcast(); subscription.remove(); };
+  }, [loadOverview]);
 
   useEffect(() => {
     loadOverview();
@@ -117,6 +127,7 @@ export default function RescuerHomeScreen() {
   );
 
   const trackingAssignmentId = trackingAssignmentFor(activeAssignment);
+  const queueAssignmentId = activeAssignment?.assignment_id || null;
   useEffect(() => {
     if (Platform.OS === 'web') return;
     void configureRescuerTracking(trackingAssignmentId).catch((error) => {
@@ -124,6 +135,12 @@ export default function RescuerHomeScreen() {
     });
     return () => { void stopRescuerTracking(); };
   }, [trackingAssignmentId]);
+  useEffect(() => {
+    return createAdaptivePoller(
+      () => AppState.currentState === 'active' ? loadOverview(true, true) : null,
+      { intervalMs: 30000, maxIntervalMs: 60000 },
+    ).start();
+  }, [queueAssignmentId, loadOverview]);
 
   async function handleLogout() {
     if (logoutPending.current) return;
@@ -263,7 +280,7 @@ export default function RescuerHomeScreen() {
     }
   }
 
-  function renderContent(tab: TabKey) {
+  function renderContent() {
     if (loading && !overview) {
       return <LoadingState label="Loading rescuer console..." />;
     }
@@ -277,7 +294,7 @@ export default function RescuerHomeScreen() {
       );
     }
 
-    if (tab === 'dashboard') {
+    if (activeTab === 'dashboard') {
       return (
         <RescuerDashboardScreen
           pendingAssignmentId={pendingAssignment}
@@ -289,10 +306,9 @@ export default function RescuerHomeScreen() {
       );
     }
 
-    if (tab === 'map') {
+    if (activeTab === 'map') {
       return (
         <RescueMapScreen
-          active={activeTab === 'map'}
           assignments={assignments}
           evacuationCenters={overview.evacuation_centers || []}
           activeAssignment={activeAssignment}
@@ -306,7 +322,7 @@ export default function RescuerHomeScreen() {
       );
     }
 
-    if (tab === 'report') {
+    if (activeTab === 'report') {
       return (
         <FieldReportScreen
           reports={overview.field_reports || []}
@@ -318,7 +334,7 @@ export default function RescuerHomeScreen() {
       );
     }
 
-    if (tab === 'resource') {
+    if (activeTab === 'resource') {
       return (
         <ResourceRequestScreen
           requests={overview.resource_requests || []}
@@ -329,8 +345,8 @@ export default function RescuerHomeScreen() {
       );
     }
 
-    if (tab === 'radio') {
-      return activeTab === 'radio' ? <RadioCommunicationScreen overview={overview} /> : null;
+    if (activeTab === 'radio') {
+      return <RadioCommunicationScreen overview={overview} />;
     }
 
     return <ResponderProfileScreen profile={overview.profile} onSaveProfile={handleUpdateProfile} onLogout={handleLogout} />;
@@ -462,7 +478,7 @@ export default function RescuerHomeScreen() {
               </Pressable>
             </View>
           ) : null}
-          <MobileTabPanels activeKey={activeTab} renderPanel={renderContent} />
+          {renderContent()}
         </WebAppShell>
         <MobileLogoutOverlay visible={loggingOut} />
       </SafeAreaView>
@@ -491,7 +507,7 @@ export default function RescuerHomeScreen() {
             </Pressable>
           </View>
         ) : null}
-        <MobileTabPanels activeKey={activeTab} renderPanel={renderContent} />
+        {renderContent()}
       </ScrollView>
 
       <View style={styles.tabBar}>
@@ -546,3 +562,220 @@ function errorMessage(error: any) {
 
   return error?.response?.data?.message || 'Please check the API connection and try again.';
 }
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: palette.page,
+  },
+  scroll: {
+    flex: 1,
+  },
+  content: {
+    padding: spacing.md,
+    paddingBottom: 100,
+  },
+  desktopBody: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: palette.page,
+  },
+  desktopSidebar: {
+    width: 260,
+    backgroundColor: palette.card,
+    borderRightWidth: 1,
+    borderColor: palette.border,
+    padding: spacing.md,
+    justifyContent: 'space-between',
+  },
+  desktopProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: palette.page,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: spacing.md,
+  },
+  desktopAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: palette.navActive,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  desktopResponderName: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  desktopResponderTeam: {
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  desktopNavGroup: {
+    flex: 1,
+    gap: 6,
+  },
+  desktopNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+  },
+  desktopNavItemActive: {
+    backgroundColor: '#e0f2fe',
+  },
+  desktopNavItemSpecial: {
+    backgroundColor: palette.unsafe,
+    marginVertical: 4,
+  },
+  desktopNavText: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  desktopNavTextActive: {
+    color: palette.navActive,
+    fontWeight: '800',
+  },
+  desktopSidebarFooter: {
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderColor: palette.border,
+  },
+  desktopLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+  },
+  desktopLogoutText: {
+    color: palette.unsafe,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  desktopMainScroll: {
+    flex: 1,
+  },
+  desktopMainContent: {
+    padding: spacing.lg,
+    maxWidth: 920,
+    width: '100%',
+    alignSelf: 'center',
+    paddingBottom: spacing.xl * 2,
+  },
+  desktopRightRail: {
+    width: 300,
+    borderLeftWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  desktopSummaryCard: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: palette.page,
+    borderWidth: 1,
+    borderColor: palette.border,
+    gap: 12,
+  },
+  desktopSummaryTitle: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  desktopSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  desktopSummaryLabel: {
+    color: palette.textSoft,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  desktopSummaryValue: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  loadFailure: {
+    gap: spacing.md,
+    alignItems: 'stretch',
+    paddingTop: spacing.xl,
+  },
+  refreshError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: '#96202012',
+  },
+  refreshErrorText: {
+    flex: 1,
+    color: palette.unsafe,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  refreshErrorAction: {
+    color: palette.navActive,
+    fontWeight: '900',
+  },
+  tabBar: {
+    position: 'absolute',
+    right: spacing.md,
+    bottom: spacing.md,
+    left: spacing.md,
+    minHeight: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: palette.nav,
+  },
+  tabButton: {
+    minWidth: 54,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    borderRadius: radius.md,
+  },
+  activeTab: {
+    backgroundColor: palette.navActive,
+  },
+  specialTab: {
+    width: 56,
+    height: 56,
+    marginTop: -26,
+    borderWidth: 4,
+    borderColor: palette.page,
+    borderRadius: 28,
+    backgroundColor: palette.unsafe,
+  },
+  tabLabel: {
+    color: palette.navMuted,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  activeTabLabel: {
+    color: '#fff',
+  },
+});

@@ -1,5 +1,14 @@
 # Standalone Android APK
 
+## Latest local APK — version 2.0.0, build 69
+
+Installable file: [`releases/RESQPERATION-build69.apk`](./releases/RESQPERATION-build69.apk).
+
+- 24,453,441 bytes; version code 69; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified.
+- SHA-256: `9E8A7FD172821C82666D635679054073ADC6B1AB23155EA56F7741BD2608AFCF`.
+- Rescuer screens refresh after disaster broadcasts and app resume, with adaptive polling while the app is active. Only the selected tab's screen is mounted.
+- Verification: TypeScript, rescuer-screen lint, 25 focused mobile regressions, signed Android release build, APK identity/version, and existing release certificate passed.
+
 ## Latest local APK — version 2.0.0, build 68
 
 Installable file: [`releases/RESQPERATION-build68.apk`](./releases/RESQPERATION-build68.apk).

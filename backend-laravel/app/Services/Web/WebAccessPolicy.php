@@ -14,7 +14,7 @@ class WebAccessPolicy
         'preparedness' => ['dashboard', 'geospatial_analytics', 'reports_documentation', 'profile', 'notifications'],
         'response' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
         'recovery_rehabilitation' => ['dashboard', 'geospatial_analytics', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
-        'rescuer' => [],
+        'rescuer' => ['field_assignments', 'profile', 'notifications'],
         'household_resident' => [],
     ];
 
@@ -27,6 +27,8 @@ class WebAccessPolicy
         $roleKey = $user->roleKey();
         $role = $user->relationLoaded('role') ? $user->getRelation('role') : null;
         $allowedModules = self::MODULES[$roleKey] ?? [];
+        // Legacy TL/TM records explicitly stored []; field web access is now supported.
+        if ($roleKey === 'rescuer') return $allowedModules;
         if ($roleKey === 'operations_admin') return $allowedModules;
         if ($role?->web_modules !== null) return array_values(array_intersect((array) $role->web_modules, $allowedModules));
         return $allowedModules;

@@ -294,6 +294,20 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_queued_status_for_a_different_event_is_rejected_without_writing_a_report(): void
+    {
+        $response = app(HouseholdMobileStatusWorkflow::class)->storeStatus(
+            $this->householdRequest(['status_key' => 'safe', 'expected_event_id' => 'EVT-OLD'])
+        );
+
+        $this->assertSame(409, $response->getStatusCode());
+        $this->assertSame(
+            'The disaster event changed while this report was waiting to sync. Review the current event and submit again.',
+            $response->getData(true)['message'],
+        );
+        $this->assertDatabaseCount('household_status_logs', 0);
+    }
+
     public function test_member_status_rejects_missing_member_before_persisting(): void
     {
         Schema::create('household_members', function (Blueprint $table): void {
@@ -391,6 +405,5 @@ class HouseholdMobileStatusWorkflowTest extends TestCase
         return $request;
     }
 }
-
 
 

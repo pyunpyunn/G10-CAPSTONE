@@ -51,6 +51,7 @@ import './styles/situation-workspace.css'
 import './styles/annex-h.css'
 
 const pageComponents = {
+  '/my-assignments': lazy(() => import('./pages/MyAssignmentsPage')),
   '/super-admin': lazy(() => import('./pages/SuperAdminPage')),
   '/dashboard': lazy(() => import('./pages/DashboardPage')),
   '/broadcast': lazy(() => import('./pages/BroadcastPage')),
@@ -82,6 +83,7 @@ const pageComponents = {
 }
 
 const modulePages = [
+  { path: '/my-assignments', title: 'My Assignments', summary: 'View your assigned field operations.' },
   {
     path: '/super-admin',
     title: 'Inquiries',
@@ -268,7 +270,7 @@ function AuthRoutes() {
           clearToken()
           clearSessionCache()
           setUser(null)
-          setLoginError('This account is for the mobile app.')
+          setLoginError('This account does not have web access.')
         }
       } catch (error) {
         clearToken()
@@ -296,7 +298,7 @@ function AuthRoutes() {
       if (!isWebUser(nextUser)) {
         clearToken()
         clearSessionCache()
-        throw new Error('Household and rescuer accounts should use the mobile app.')
+        throw new Error('This account does not have web access.')
       }
 
       await saveRememberedPassword(form.login, form.password, form.rememberPassword)
@@ -304,7 +306,7 @@ function AuthRoutes() {
       setUser(nextUser)
       navigate(webHomeForUser(nextUser), { replace: true })
     } catch (error) {
-      throw new Error(error.message === 'Household and rescuer accounts should use the mobile app.' ? error.message : getLoginMessage(error), { cause: error })
+      throw new Error(error.message === 'This account does not have web access.' ? error.message : getLoginMessage(error), { cause: error })
     }
   }
 

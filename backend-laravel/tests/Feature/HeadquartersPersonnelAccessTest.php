@@ -13,6 +13,68 @@ use Tests\TestCase;
 
 class HeadquartersPersonnelAccessTest extends TestCase
 {
+    public function test_confirmed_hq_accounts_receive_their_exact_roles_without_changing_credentials(): void
+    {
+        $chair = $this->account('CHAIR-0001', 1);
+        $ops = $this->account('OPS-0001', 2);
+        $chair->update(['username' => 'BDRRM-HQCC-11000']);
+        $ops->update(['username' => 'BDRRM-HQCC-11001']);
+        foreach ([$chair, $ops] as $index => $user) {
+            DB::table('responders')->insert(['responder_id' => $index + 1,
+                'user_id' => $user->user_id, 'username' => $user->username, 'team_id' => 9]);
+        }
+        $passwords = [$chair->password, $ops->password];
+        $migration = require database_path('migrations/2026_11_11_000002_correct_confirmed_hq_account_roles.php');
+        $migration->up();
+        $migration->up();
+        $this->assertSame('chair', $chair->fresh()->roleKey());
+        $this->assertSame('operations_admin', $ops->fresh()->roleKey());
+        $this->assertSame($passwords, [$chair->fresh()->password, $ops->fresh()->password]);
+        $this->assertSame('BDRRM-HQCC-11000', $chair->fresh()->username);
+        $this->assertSame('BDRRM-HQCC-11001', $ops->fresh()->username);
+        $this->assertSame(2, DB::table('responders')->where('team_id', 9)->count());
+        foreach ([$chair, $ops] as $user) {
+            \Laravel\Sanctum\Sanctum::actingAs($user->fresh());
+            $this->getJson('/api/v1/auth/me')->assertOk()
+                ->assertJsonPath('data.permissions.can_manage_personnel', $user->user_id === $ops->user_id);
+        }
+    }
+
+    public function test_field_web_access_preserves_hq_boundaries_and_rejects_inactive_users(): void
+    {
+        foreach (['tl', 'tm'] as $index => $key) {
+            $roleId = 80 + $index;
+            DB::table('roles')->insert(['role_id' => $roleId, 'role_key' => $key,
+                'role_name' => $key, 'base_role_key' => 'rescuer', 'web_modules' => '[]']);
+            $user = $this->account('FIELD-'.$key, $roleId);
+            $policy = app(WebAccessPolicy::class);
+            $this->assertSame(['field_assignments', 'profile', 'notifications'], $policy->modulesFor($user));
+            \Laravel\Sanctum\Sanctum::actingAs($user);
+            $this->getJson('/api/v1/auth/me')->assertOk()->assertJsonPath('data.role.assigned_role_key', $key);
+            $this->getJson('/api/v1/rescuer/assignments')->assertOk()->assertJsonPath('data.assignments', []);
+            foreach (['dashboard', 'map/overview', 'rescuers', 'resource-requests', 'situation-reports'] as $path) {
+                $this->getJson('/api/v1/'.$path)->assertForbidden();
+            }
+            $this->postJson('/api/v1/dispatches', [])->assertForbidden();
+            $this->postJson('/api/v1/disaster-events', [])->assertForbidden();
+            $this->postJson('/api/v1/resource-requests/1/validate', [])->assertForbidden();
+            $user->update(['is_active' => false]);
+            $this->getJson('/api/v1/rescuer/assignments')->assertForbidden();
+            $this->assertSame([], $policy->modulesFor($user->fresh()));
+        }
+    }
+
+    public function test_subcommittees_are_created_idempotently_without_reassigning_field_users(): void
+    {
+        $user = $this->account('UNCHANGED', 3);
+        $migration = require database_path('migrations/2026_11_11_000001_enable_field_web_access_and_hq_subcommittees.php');
+        $migration->up();
+        $migration->up();
+        $this->assertSame(4, DB::table('rescue_teams')->where('team_type', 'HQ')->count());
+        $this->assertSame(3, $user->fresh()->role_id);
+        $this->assertSame(0, DB::table('responders')->count());
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -115,7 +177,7 @@ class HeadquartersPersonnelAccessTest extends TestCase
         $this->getJson('/api/v1/personnel-profiles/91')->assertUnauthorized();
         DB::table('roles')->insert(['role_id' => 90, 'role_key' => 'rescuer', 'role_name' => 'Rescuer']);
         \Laravel\Sanctum\Sanctum::actingAs($this->account('MOBILE', 90));
-        $this->getJson('/api/v1/personnel-profiles/91')->assertForbidden();
+        $this->getJson('/api/v1/personnel-profiles/91')->assertNotFound();
         $web = $this->account('WEB', 2);
         \Laravel\Sanctum\Sanctum::actingAs($web);
         $this->getJson('/api/v1/personnel-profiles/99999')->assertNotFound();

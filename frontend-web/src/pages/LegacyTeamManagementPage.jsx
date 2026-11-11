@@ -16,7 +16,7 @@ export default function LegacyTeamManagementPage() {
   const navigate = useNavigate()
   const { onUserChange } = useOutletContext()
   const [workspace, setWorkspace] = useState(getCachedRescueTeamConfig)
-  const [activeView, setActiveView] = useState('hierarchy')
+  const [activeView, setActiveView] = useState('teams')
   const [revision, setRevision] = useState(0)
   const [, setSelectedId] = useState(null)
   const [editor, setEditor] = useState(null)
@@ -108,7 +108,6 @@ export default function LegacyTeamManagementPage() {
   } : workspace
 
   return <div className={activeView === 'teams' ? 'tm-page' : 'annex-h-workspace'} aria-label="Team management">
-    {activeView === 'teams' && <div className="annex-h-view-switch"><button type="button" onClick={() => setActiveView('hierarchy')}>Annex H hierarchy</button></div>}
     {activeView === 'teams' ? <>
       {notice && <div className="tm-feedback tm-success" role="status">{notice}<button className="bt sm" type="button" onClick={() => setNotice('')}>Dismiss</button></div>}
       <RescueTeamConfigModal
@@ -121,6 +120,7 @@ export default function LegacyTeamManagementPage() {
         onRetry={() => { setLoading(true); setError(''); setReload(value => value + 1) }}
         onClose={() => navigate('/rescuers')}
         onSave={saveTeam}
+        onShowHierarchy={() => setActiveView('hierarchy')}
         onDelete={(id, name) => {
           const team = teams.find(candidate => String(candidate.team_id) === String(id))
           if (team) setConfirmation({ team: { ...team, team_name: name } })

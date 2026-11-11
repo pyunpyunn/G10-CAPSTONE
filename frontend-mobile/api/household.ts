@@ -65,7 +65,6 @@ export async function uploadHouseholdProfilePhoto(asset: HouseholdProfilePhotoAs
     } as any);
   }
   const response = await api.post('/household/profile-photo', formData, {
-    headers: Platform.OS === 'web' ? undefined : { 'Content-Type': 'multipart/form-data' },
     timeout: 30000,
   });
   return response.data.data.user;
@@ -90,8 +89,9 @@ export async function updateHouseholdMember(memberId: string, payload: any) {
   return response.data.data;
 }
 
-export async function saveHouseholdMemberStatus(memberId: string, payload: any) {
-  const response = await api.post(`/household/members/${memberId}/status`, payload);
+export async function saveHouseholdMemberStatus(memberId: string, payload: any, idempotencyKey?: string) {
+  const config = idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined;
+  const response = await api.post(`/household/members/${memberId}/status`, payload, config);
   return response.data.data;
 }
 
@@ -100,8 +100,9 @@ export async function saveTrustedHouseholdMemberStatus(connectionId: string, mem
   return response.data.data;
 }
 
-export async function saveHouseholdStatus(payload: any) {
-  const response = await api.post('/household/status', payload);
+export async function saveHouseholdStatus(payload: any, idempotencyKey?: string) {
+  const config = idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined;
+  const response = await api.post('/household/status', payload, config);
   return response.data;
 }
 

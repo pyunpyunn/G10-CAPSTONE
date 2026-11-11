@@ -3,6 +3,7 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { MobileTabPanels } from '@/components/MobileTabPanels';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
   Alert,
   Platform,
   Pressable,
@@ -15,6 +16,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
+import * as Network from 'expo-network';
 import { type Href, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logoutMobile, resetHouseholdDeviceOwner } from '@/api/auth';
@@ -25,11 +27,9 @@ import {
   deleteTrustedHousehold,
   getHouseholdOverview,
   lookupTrustedHousehold,
-  saveHouseholdMemberStatus,
   saveHouseholdGeotag,
   saveTrustedHouseholdMemberStatus,
   uploadHouseholdProfilePhoto,
-  saveHouseholdStatus,
   saveTrustedPin,
   respondToTrustedHousehold,
   updateHouseholdDeviceLocation,
@@ -53,6 +53,12 @@ import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdLoading } fro
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getStoredItem, setStoredItem } from '@/utils/secureStorage';
 import { getPushRegistration } from '@/utils/pushNotifications';
+import {
+  discardFailedHouseholdStatusReports,
+  enqueueHouseholdStatusReport,
+  getHouseholdStatusOutboxCounts,
+  syncPendingHouseholdStatuses,
+} from '@/utils/householdStatusOutbox';
 import { useWebViewMode } from '@/utils/viewMode';
 import { WebAppShell } from '@/components/WebAppShell';
 
@@ -81,6 +87,7 @@ export default function HouseholdHomeScreen() {
   const [pendingStatus, setPendingStatus] = useState('safe');
   const [editingStatus, setEditingStatus] = useState(true);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [statusQueueCounts, setStatusQueueCounts] = useState({ pending: 0, failed: 0 });
   const [showHistory, setShowHistory] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [trustedPinConfigured, setTrustedPinConfigured] = useState(false);
@@ -100,6 +107,66 @@ export default function HouseholdHomeScreen() {
   const overviewTrustedPinConfigured = Boolean(overview?.trusted?.pin_configured);
   const hasTrustedPin = overviewTrustedPinConfigured || trustedPinConfigured;
   const statusOptionsSignature = JSON.stringify(overview?.status_options || []);
+
+  const refreshStatusQueueCounts = useCallback(async () => {
+    setStatusQueueCounts(await getHouseholdStatusOutboxCounts());
+  }, []);
+
+  const syncQueuedStatusReports = useCallback(async () => {
+    const result = await syncPendingHouseholdStatuses();
+    await refreshStatusQueueCounts();
+    if (result.syncedIds.length) void refreshOverview(true, true, true);
+    const rejected = result.failures.find((failure) => !failure.retryable);
+    if (rejected) {
+      Alert.alert('Status not synced', `The status is stored on this device but was not saved to the server. ${rejected.message}`);
+    }
+    return result;
+  }, [refreshOverview, refreshStatusQueueCounts]);
+
+  const handleDiscardFailedStatusReports = useCallback(() => {
+    Alert.alert(
+      'Dismiss unsynced reports?',
+      'These reports were rejected and were not saved to the server. Removing them from this device cannot be undone.',
+      [
+        { text: 'Keep reports', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            void discardFailedHouseholdStatusReports()
+              .then(refreshStatusQueueCounts)
+              .catch((error) => Alert.alert('Unable to remove reports', errorMessage(error)));
+          },
+        },
+      ],
+    );
+  }, [refreshStatusQueueCounts]);
+
+  useEffect(() => {
+    let active = true;
+    const runSync = () => {
+      void syncQueuedStatusReports().catch((error) => {
+        if (active) Alert.alert('Unable to sync saved status reports', errorMessage(error));
+      });
+    };
+    void refreshStatusQueueCounts().catch((error) => {
+      if (active) Alert.alert('Unable to read saved status reports', errorMessage(error));
+    });
+    runSync();
+    const networkSubscription = Network.addNetworkStateListener((state) => {
+      if (state.isConnected && state.isInternetReachable !== false) runSync();
+    });
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') runSync();
+    });
+    const retryTimer = setInterval(runSync, 30000);
+    return () => {
+      active = false;
+      clearInterval(retryTimer);
+      networkSubscription.remove();
+      appStateSubscription.remove();
+    };
+  }, [refreshStatusQueueCounts, syncQueuedStatusReports]);
 
   useEffect(() => {
     const options: { key: string }[] = JSON.parse(statusOptionsSignature);
@@ -305,6 +372,29 @@ export default function HouseholdHomeScreen() {
     } : current);
   }
 
+  async function submitQueuedStatus(
+    kind: 'household' | 'member',
+    payload: Record<string, unknown>,
+    memberId?: string,
+  ): Promise<boolean> {
+    const expectedEventId = String(overview?.active_event?.event_id || '');
+    if (!expectedEventId) throw new Error('A status can only be reported during an active disaster event.');
+
+    const reportId = await enqueueHouseholdStatusReport({ kind, memberId, expectedEventId, payload });
+    await refreshStatusQueueCounts();
+    const result = await syncQueuedStatusReports();
+    if (result.syncedIds.includes(reportId)) return true;
+
+    const failure = result.failures.find((item) => item.id === reportId);
+    if (!failure || failure.retryable) {
+      Alert.alert(
+        'Status saved on this device',
+        'This report has not yet been saved to the server. It will sync automatically when the internet connection returns.',
+      );
+    }
+    return false;
+  }
+
   async function handleSaveStatus() {
     if (!overview?.active_event) {
       Alert.alert('No active disaster', 'Status updates can only be saved during an active disaster event.');
@@ -327,16 +417,17 @@ export default function HouseholdHomeScreen() {
     setSavingStatus(true);
 
     try {
-      const saved = await saveHouseholdStatus({
+      const saved = await submitQueuedStatus('household', {
         status_key: pendingStatus,
         device_uuid: deviceUuid,
         battery_level: realBatteryLevel ?? undefined,
         ...locationPayload,
         notes: pendingStatus === 'needs_help' ? 'Household requested assistance from mobile.' : null,
       });
+      if (!saved) return;
       const selected = overview.status_options.find((option) => option.key === pendingStatus);
       setOverview((current) => current ? { ...current, member_status: {
-        member_id: current.profile.user.member_id, status_log_id: saved.data?.status_log_id,
+        member_id: current.profile.user.member_id,
         status_key: pendingStatus, status_label: selected?.label || pendingStatus,
         submitted_label: 'Just saved',
       } } : current);
@@ -368,18 +459,16 @@ export default function HouseholdHomeScreen() {
     }
 
     try {
-      const saved = await saveHouseholdMemberStatus(memberId, {
+      const saved = await submitQueuedStatus('member', {
         status_key: statusKey,
         device_uuid: deviceUuid,
         battery_level: realBatteryLevel ?? undefined,
         ...locationPayload,
-      });
-      setOverview((current) => current ? { ...current, members: current.members.map((member) =>
-        String(member.member_id) === memberId ? { ...member, current_status: saved.member_status } : member) } : current);
+      }, memberId);
+      if (!saved) return;
       void loadOverview(true, true, true);
     } catch (error: any) {
       Alert.alert('Unable to save member status', errorMessage(error));
-      throw error;
     }
   }
 
@@ -720,7 +809,7 @@ export default function HouseholdHomeScreen() {
 
   if ((!loading && !overview && overviewError) || (deviceKeyError && !deviceUuid)) {
     return <SafeAreaView style={styles.safe}>
-      <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={false} />
+      <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={false} pendingStatuses={statusQueueCounts.pending} failedStatuses={statusQueueCounts.failed} onDiscardFailedStatuses={handleDiscardFailedStatusReports} />
       <View style={{ padding: spacing.lg, gap: spacing.md }}>
         <HouseholdEmpty
           icon="cloud-offline-outline"
@@ -816,7 +905,7 @@ export default function HouseholdHomeScreen() {
           onLogout={() => void handleLogout()}
           refreshing={refreshing}
           onRefresh={() => void loadOverview(true)}
-          banner={<OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={loading} />}
+          banner={<OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={loading} pendingStatuses={statusQueueCounts.pending} failedStatuses={statusQueueCounts.failed} onDiscardFailedStatuses={handleDiscardFailedStatusReports} />}
           rightRail={
             isWideDesktop ? (
               <>
@@ -886,7 +975,7 @@ export default function HouseholdHomeScreen() {
             }}
           />
 
-          <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={loading} />
+          <OfflineBanner offline={offline} lastSyncedAt={lastSyncedAt} loading={loading} pendingStatuses={statusQueueCounts.pending} failedStatuses={statusQueueCounts.failed} onDiscardFailedStatuses={handleDiscardFailedStatusReports} />
 
           <ScrollView
             removeClippedSubviews={false}

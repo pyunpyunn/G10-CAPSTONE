@@ -11,6 +11,37 @@ use Tests\TestCase;
 
 class AnnexHRoleAccessTest extends TestCase
 {
+    public function test_all_nine_roles_obey_the_fixed_module_and_action_matrix(): void
+    {
+        $expected = [
+            'operations_admin' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'personnel_access', 'profile', 'notifications', 'inquiries'],
+            'chair' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
+            'mitigation_prevention' => ['dashboard', 'geospatial_analytics', 'reports_documentation', 'profile', 'notifications'],
+            'preparedness' => ['dashboard', 'geospatial_analytics', 'reports_documentation', 'profile', 'notifications'],
+            'response' => ['dashboard', 'geospatial_analytics', 'response_operations', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
+            'recovery_rehabilitation' => ['dashboard', 'geospatial_analytics', 'resources_requests', 'reports_documentation', 'profile', 'notifications'],
+            'tl' => ['field_assignments', 'profile', 'notifications'],
+            'tm' => ['field_assignments', 'profile', 'notifications'],
+            'household_resident' => [],
+        ];
+        $allModules = array_values(array_unique(array_merge(...array_values($expected))));
+        $policy = app(WebAccessPolicy::class);
+        foreach ($expected as $key => $modules) {
+            // Even a DB record claiming every module must not exceed the fixed allowlist.
+            $user = $this->userFor($key, in_array($key, ['tl', 'tm']) ? 'rescuer' : $key, $allModules, true, true);
+            foreach ($allModules as $module) {
+                $this->assertSame(in_array($module, $modules), $policy->allows($user, $module), "$key: $module");
+            }
+            $this->assertSame(in_array($key, ['operations_admin', 'chair']), $policy->allows($user, 'resources_requests', 'approve'));
+            $this->assertSame(in_array($key, ['operations_admin', 'chair']), $policy->allows($user, 'response_operations', 'publish_alert'));
+            $this->assertSame(in_array($key, ['operations_admin', 'chair', 'response']), $policy->allows($user, 'response_operations', 'create_dispatch'));
+            $this->assertSame(in_array($key, ['operations_admin', 'chair', 'mitigation_prevention', 'preparedness']), $policy->allows($user, 'geospatial_analytics', 'manage_hazards'));
+            $this->assertSame($key === 'operations_admin', $user->canManagePersonnel());
+            $user->is_active = false;
+            $this->assertSame([], $policy->modulesFor($user));
+        }
+    }
+
     private function userFor(string $key, string $base, array $modules, bool $manage = false, bool $approve = false): User
     {
         $role = new Role();

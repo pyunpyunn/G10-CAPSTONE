@@ -58,6 +58,7 @@ class HouseholdMobileStatusWorkflow
         $options = $this->readQuery->statusOptions($householdId, $activeEvent['event_id']);
         $validated = $request->validate([
             'status_key' => ['required', Rule::in(array_column($options, 'key'))],
+            'expected_event_id' => ['nullable', 'string', 'max:100'],
             'device_uuid' => ['nullable', 'string', 'max:150'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -70,6 +71,12 @@ class HouseholdMobileStatusWorkflow
             'status_key.required' => 'Choose a family member status first.',
             'status_key.in' => 'Choose a valid family member status.',
         ]);
+
+        if (isset($validated['expected_event_id']) && (string) $validated['expected_event_id'] !== (string) $activeEvent['event_id']) {
+            return response()->json([
+                'message' => 'The disaster event changed while this report was waiting to sync. Review the current event and submit again.',
+            ], 409);
+        }
 
         $status = $this->readQuery->resolveStatus($validated['status_key'], collect($options)->firstWhere('key', $validated['status_key']));
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { annexHTeamCode, annexHTeamName, roleAccountsForCommittee, teamsForCommittee } from '../utils/annexHTeamHierarchy'
+import { annexHTeamCode, annexHTeamName, committeeKeyForTeam, roleAccountsForCommittee, teamsForCommittee } from '../utils/annexHTeamHierarchy'
 import '../styles/annex-chart.css'
 const cs=[166,304,442,580,718,856,994],C='Sub-committee';
 const layout=[
@@ -33,7 +33,7 @@ export default function AnnexHierarchyChart({workspace,onAccounts,onTeams}) {
  const teams=workspace.teams||[], responders=workspace.responders||[]
  const nodes=layout.map(n=>({...n,teams:teams.filter(t=>annexHTeamCode(t)===codes[n.id])}))
  const used=new Set(nodes.flatMap(n=>n.teams.map(t=>String(t.team_id))))
- const extra=teams.filter(t=>t.team_code!=='HQCC'&&!used.has(String(t.team_id)))
+ const extra=teams.filter(t=>committeeKeyForTeam(t)!=='leadership'&&!used.has(String(t.team_id)))
  extra.forEach((t,i)=>nodes.push({id:'team-'+t.team_id,label:annexHTeamName(t),tag:'Team',k:'unc',p:'root',x:10+(i%5)*226,y:610+Math.floor(i/5)*76,w:210,h:60,teams:[t]}))
  const normalize=value=>String(value||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim()
  const tokens=normalize(query).split(/\s+/).filter(Boolean)

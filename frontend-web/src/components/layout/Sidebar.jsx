@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 
 const navGroups = [
+  { title: 'Field Operations', paths: ['/my-assignments'] },
   { title: 'Geospatial & Analytics', paths: ['/households', '/mapping', '/weather'] },
   { title: 'Response Operations', paths: ['/dispatch', '/rescue-management', '/field-reports'] },
   { title: 'Personnel Access Control', paths: ['/rescuers', '/rescuers/teams'] },
@@ -28,6 +29,7 @@ const navGroups = [
 ]
 
 const icons = {
+  '/my-assignments': Route,
   '/dashboard': LayoutDashboard,
   '/super-admin': Inbox,
   '/broadcast': Radio,

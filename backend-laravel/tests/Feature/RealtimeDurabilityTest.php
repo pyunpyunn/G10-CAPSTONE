@@ -225,6 +225,30 @@ class RealtimeDurabilityTest extends TestCase
         }
     }
 
+    public function test_report_idempotency_is_enforced_even_when_realtime_outbox_is_disabled(): void
+    {
+        config(['realtime.durable' => false]);
+        $middleware = app(AtomicRealtimeWrite::class);
+        $calls = 0;
+        $save = function () use (&$calls) {
+            $calls++;
+            DB::table('household_status_logs')->insert(['status' => 'safe']);
+
+            return response()->json(['report_id' => 456], 201);
+        };
+
+        $first = $middleware->handle($this->reportRequest('USER-1'), $save);
+        $retry = $middleware->handle($this->reportRequest('USER-1'), $save);
+
+        $this->assertSame(201, $first->getStatusCode());
+        $this->assertSame($first->getContent(), $retry->getContent());
+        $this->assertSame('true', $retry->headers->get('Idempotency-Replayed'));
+        $this->assertSame(1, $calls);
+        $this->assertDatabaseCount('household_status_logs', 1);
+        $this->assertDatabaseCount('report_idempotency', 1);
+        $this->assertDatabaseCount('realtime_outbox', 0);
+    }
+
     private function reportRequest(string $userId, string $status = 'safe'): Request
     {
         $request = Request::create('/api/v1/household/status', 'POST', ['status_key' => $status]);

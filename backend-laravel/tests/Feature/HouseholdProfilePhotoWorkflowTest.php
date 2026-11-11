@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\HouseholdMember;
 use App\Models\User;
-use App\Services\Mobile\HouseholdMemberProfileWorkflow;
 use App\Services\Mobile\RescuerFieldReportWorkflow;
 use App\Services\Mobile\RescuerMobileSupport;
 use App\Queries\RescuerAssignmentQuery;
@@ -68,7 +67,7 @@ class HouseholdProfilePhotoWorkflowTest extends TestCase
             $request->files->set('photo', UploadedFile::fake()->createWithContent('profile.png', $image));
             $request->setUserResolver(fn () => $user);
 
-            $response = app(HouseholdMemberProfileWorkflow::class)->uploadProfilePhoto($request);
+            $response = app(\App\Services\HouseholdMobileService::class)->uploadProfilePhoto($request);
 
             $this->assertSame(200, $response->getStatusCode());
             $savedUser = $response->getData(true)['data']['user'];

@@ -99,6 +99,64 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $this->assertSame('completed', $completed['assignment']->status);
     }
 
+    public function test_rescuer_member_assessment_replaces_the_current_status_and_remains_in_report_history(): void
+    {
+        DB::table('member_statuses')->insert([
+            'status_id' => 3, 'status_key' => 'unsafe', 'status_label' => 'Unsafe', 'is_active' => true,
+        ]);
+        DB::table('member_disaster_statuses')->insert([
+            'disaster_id' => 'EVT-1',
+            'household_id' => 'HH-4',
+            'member_id' => 'M-1',
+            'status_id' => 3,
+            'report_source' => 'household',
+            'reported_at' => now()->subMinute(),
+        ]);
+        DB::table('responder_assignments')->where('assignment_id', 7)->update(['status' => 'en-route']);
+
+        $workflow = app(RescuerFieldReportWorkflow::class);
+        $before = $workflow->assignmentHousehold($this->request([]), 7)->getData(true)['data'];
+        $this->assertSame('unsafe', collect($before['members'])->firstWhere('member_id', 'M-1')['member_status']['key']);
+
+        $payload = $this->validPayload();
+        $payload['members'] = [
+            ['member_id' => 'M-1', 'status_key' => 'safe'],
+            ['member_id' => 'M-2', 'status_key' => 'safe'],
+        ];
+        $payload['injured_count'] = 0;
+        $response = $workflow->store($this->request($payload));
+        $reportId = $response->getData(true)['data']['report_id'];
+
+        $this->assertDatabaseHas('member_disaster_statuses', [
+            'disaster_id' => 'EVT-1',
+            'household_id' => 'HH-4',
+            'member_id' => 'M-1',
+            'status_id' => 1,
+            'report_source' => 'responder',
+            'reported_by_user_id' => 'rescuer-5',
+            'responder_id' => 5,
+        ]);
+        $this->assertDatabaseHas('responder_field_report_members', [
+            'report_id' => $reportId,
+            'member_id' => 'M-1',
+            'status_id' => 1,
+            'status_key' => 'safe',
+        ]);
+        $this->assertDatabaseHas('household_status_logs', [
+            'household_id' => 'HH-4',
+            'disaster_id' => 'EVT-1',
+            'source' => 'responder_field_report',
+        ]);
+        $this->assertDatabaseHas('household_disasters', [
+            'household_id' => 'HH-4',
+            'disaster_id' => 'EVT-1',
+            'current_status_id' => 1,
+        ]);
+
+        $after = $workflow->assignmentHousehold($this->request([]), 7)->getData(true)['data'];
+        $this->assertSame('safe', collect($after['members'])->firstWhere('member_id', 'M-1')['member_status']['key']);
+    }
+
     public function test_field_report_route_allows_assigned_rescuers_and_team_members_but_not_residents(): void
     {
         $route = app('router')->getRoutes()->match(Request::create('/api/v1/rescuer/field-reports', 'POST'));

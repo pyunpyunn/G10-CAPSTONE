@@ -6536,8 +6536,25 @@ main.tm-page {
 .tm-page .sec p { font-size: 12px; }
 .tm-page .tm-feedback { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border: 1px solid #b9c6d9; border-radius: 10px; background: #f7f9fc; color: #334155; flex: none; }
 .tm-page .tm-success { background: #edf7fa; border-color: #a5d4df; color: #155e75; }
-.tm-page .tm-team-workspace { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 10px; }
-.tm-page .tm-team-panel { padding: 12px; gap: 12px; overflow: auto; }
+.tm-page .tm-team-workspace { --tx: #1e293b; --mu: #475569; display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 10px; color: var(--tx); }
+.tm-page .tm-team-panel { padding: 12px; gap: 12px; overflow: auto; background: #ffffff; border-color: #c8d5e5; }
+.tm-page .tm-team-panel > .annex-h-view-switch { align-self: flex-end; margin: 0; }
+.tm-page .tm-team-panel .th { padding: 12px; border-radius: 9px; background: #e1e7f2; color: #172b46; }
+.tm-page .tm-team-panel .ln { padding: 12px; border: 1px solid #c9d2e3; border-radius: 9px; background: #eef1f8; }
+.tm-page .tm-team-panel .ln b { color: #1e293b; }
+.tm-page .tm-team-panel .mr { background: #fff; border-color: #d4deea; }
+.tm-page .tm-team-panel .mr:nth-child(even) { background: #f3f4fa; }
+.tm-page .tm-team-panel .mr .personnel-name-link { color: #203d5c; font-weight: 600; }
+.tm-page .tm-team-list { background: #ffffff; border-color: #c8d5e5; }
+.tm-page .tm-team-list .ch { padding: 14px 12px; margin-bottom: 10px; background: #e1e7f2; border-radius: 11px 11px 0 0; color: #172b46; font-weight: 600; }
+.tm-page .tm-team-list .tr { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px; margin-bottom: 8px; }
+.tm-page .tm-team-list .tr > b { font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.tm-page .tm-team-list .tr > em { align-self: start; padding: 2px 6px; border-radius: 5px; background: #eef1f8; font-style: normal; }
+.tm-page .tm-team-list .tr { background: #fff; color: #1e293b; border-color: #cdd9e6; }
+.tm-page .tm-team-list .tr:hover { background: #eef1f8; border-color: #7b8ca9; }
+.tm-page .tm-team-list .tr.on { background: #e0e6f1; border-color: #536b90; box-shadow: inset 3px 0 #536b90; }
+.tm-page .tm-team-list .tr:focus-visible { outline: 2px solid var(--nv); outline-offset: 2px; }
+.tm-page .tm-team-list .pgr { padding: 12px; }
 .tm-page .tm-team-form { display: flex; flex-direction: column; gap: 12px; }
 .tm-page .tm-team-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .tm-page .xl .pgr { border: 0; padding: 6px 0 0; margin-top: auto; }

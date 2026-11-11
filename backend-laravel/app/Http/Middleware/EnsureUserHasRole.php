@@ -21,7 +21,7 @@ class EnsureUserHasRole
 
         $roleMatches = in_array($roleKey, $roles, true)
             || in_array($assignedRoleKey, array_intersect($roles, ['tl', 'tm']), true);
-        if (! $user || ! $roleMatches) {
+        if (! $user || ! $roleMatches || ! $user->is_active || $user->getAttribute('deleted_at')) {
             return response()->json([
                 'message' => 'You are not allowed to access this resource.',
             ], 403);

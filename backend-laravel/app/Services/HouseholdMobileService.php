@@ -136,6 +136,11 @@ class HouseholdMobileService
         return app(\App\Services\Mobile\HouseholdMemberProfileWorkflow::class)->updateMember($request, $memberId);
     }
 
+    public function uploadProfilePhoto(Request $request): JsonResponse
+    {
+        return app(\App\Services\Mobile\HouseholdMemberProfileWorkflow::class)->uploadProfilePhoto($request);
+    }
+
     public function storeMemberStatus(Request $request, string $memberId): JsonResponse
     {
         $householdId = $this->householdId($request->user());

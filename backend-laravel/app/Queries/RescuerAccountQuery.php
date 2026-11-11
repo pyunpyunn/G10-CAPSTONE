@@ -20,9 +20,9 @@ class RescuerAccountQuery
         $dutyStatus = $filters['duty_status'];
         $purok = $filters['purok'];
         if (($filters['account_type'] ?? 'all') === 'rescuer') {
-            $query->where('rt.team_code', '<>', 'HQCC');
+            $query->where('rt.team_code', '<>', 'HQCC')->whereNotIn('rt.team_type', ['HQ', 'HQCC', 'HEADQUARTERS']);
         } elseif (($filters['account_type'] ?? 'all') === 'command_center') {
-            $query->where('rt.team_code', 'HQCC');
+            $query->where(fn ($team) => $team->where('rt.team_code', 'HQCC')->orWhereIn('rt.team_type', ['HQ', 'HQCC', 'HEADQUARTERS']));
         }
         if ($search !== '') {
             $query->where(function ($inner) use ($search): void {

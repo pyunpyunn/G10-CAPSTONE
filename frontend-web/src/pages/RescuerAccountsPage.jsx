@@ -176,6 +176,7 @@ const ROLE_MODULE_LABELS={
   resources_requests:'Resource requests',
   reports_documentation:'Reports & documentation',
   personnel_access:'Personnel access',
+  field_assignments:'My assignments',
   profile:'Profile',
   notifications:'Notifications',
   inquiries:'Public inquiries',
@@ -203,11 +204,13 @@ const ROLE_CAPABILITIES={
   ],
   recovery_rehabilitation:['View resource requests and submit web resource requests (not approve them)'],
   tl:[
+    'Access own assignments, profile, and notifications on the web',
     'Use rescuer mobile assignments, navigation, and offline sync',
     'Submit rescuer field reports',
     'Submit field resource requests (Team Leader only)',
   ],
   tm:[
+    'Access own assignments, profile, and notifications on the web',
     'Use rescuer mobile assignments, navigation, and offline sync',
     'Submit rescuer field reports',
     'Cannot submit the Team Leader-only field resource request',
