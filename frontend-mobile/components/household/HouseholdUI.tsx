@@ -8,6 +8,7 @@ type ButtonProps = {
   label: string;
   icon?: keyof typeof Ionicons.glyphMap;
   tone?: 'primary' | 'nav' | 'light' | 'danger' | 'gray';
+  layout?: 'default' | 'settings';
   disabled?: boolean;
   pressedBackgroundColor?: string;
   onPress: () => void;
@@ -17,6 +18,7 @@ export function HouseholdButton({
   label,
   icon,
   tone = 'primary',
+  layout = 'default',
   disabled = false,
   pressedBackgroundColor,
   onPress,
@@ -26,6 +28,7 @@ export function HouseholdButton({
       style={({ pressed }) => [
         styles.button,
         styles[tone],
+        layout === 'settings' && styles.settingsButton,
         disabled && styles.disabled,
         pressed && pressedBackgroundColor ? { backgroundColor: pressedBackgroundColor } : null,
       ]}
@@ -33,8 +36,11 @@ export function HouseholdButton({
       android_ripple={{ color: pressedBackgroundColor || '#236a7333' }}
       disabled={disabled}
     >
-      {icon ? <Ionicons name={icon} size={17} color={tone === 'light' || tone === 'gray' ? palette.nav : '#fff'} /> : null}
-      <Text style={[styles.buttonText, (tone === 'light' || tone === 'gray') && styles.darkButtonText]}>{label}</Text>
+      {icon ? <View style={layout === 'settings' ? styles.settingsIcon : null}>
+        <Ionicons name={icon} size={17} color={layout === 'settings' ? palette.navActive : (tone === 'light' || tone === 'gray' ? palette.nav : '#fff')} />
+      </View> : null}
+      <Text style={[styles.buttonText, (tone === 'light' || tone === 'gray') && styles.darkButtonText, layout === 'settings' && styles.settingsText]}>{label}</Text>
+      {layout === 'settings' ? <Ionicons name="chevron-forward" size={18} color={palette.navMuted} style={styles.settingsChevron} /> : null}
     </Pressable>
   );
 }
@@ -90,6 +96,29 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
+  },
+  settingsButton: {
+    justifyContent: 'flex-start',
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    backgroundColor: palette.card,
+  },
+  settingsIcon: {
+    width: 29,
+    height: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    backgroundColor: '#e8f1f6',
+  },
+  settingsText: {
+    marginLeft: spacing.xs,
+    textAlign: 'left',
+    color: palette.nav,
+  },
+  settingsChevron: {
+    marginLeft: 'auto',
   },
   primary: {
     backgroundColor: palette.navActive,

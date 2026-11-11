@@ -12,9 +12,11 @@ const emptyForm = { current_password: '', password: '', password_confirmation: '
 export function ChangePasswordSection({
   accountIdentifiers,
   standaloneButton = false,
+  settingsRow = false,
 }: {
   accountIdentifiers: (string | undefined)[];
   standaloneButton?: boolean;
+  settingsRow?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -23,6 +25,7 @@ export function ChangePasswordSection({
   const [message, setMessage] = useState('');
   const [visible, setVisible] = useState<Record<string, boolean>>({});
   const submitting = useRef(false);
+  const canSubmit = Boolean(form.current_password.trim() && form.password.trim() && form.password_confirmation.trim());
 
   async function submit() {
     if (submitting.current) return;
@@ -66,6 +69,7 @@ export function ChangePasswordSection({
           label="Change password"
           icon="lock-closed-outline"
           tone="nav"
+          layout={settingsRow ? 'settings' : 'default'}
           onPress={() => { setOpen(true); setMessage(''); }}
         />
       </>
@@ -73,8 +77,16 @@ export function ChangePasswordSection({
   }
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>Change password</Text>
+    <View style={settingsRow ? styles.settingsForm : styles.card}>
+      {settingsRow ? (
+        <HouseholdButton
+          label="Cancel password change"
+          icon="lock-closed-outline"
+          tone="light"
+          layout="settings"
+          onPress={() => { setOpen(false); setForm(emptyForm); setError(''); }}
+        />
+      ) : <Text style={styles.title}>Change password</Text>}
       {message ? <Text accessibilityRole="alert" style={styles.success}>{message}</Text> : null}
       {open ? <>
         {([
@@ -97,9 +109,13 @@ export function ChangePasswordSection({
           </View>
         ))}
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-        <Pressable accessibilityRole="button" disabled={saving} onPress={submit} style={styles.button}>
-          <Text style={styles.buttonText}>{saving ? 'Updating...' : 'Update password'}</Text>
-        </Pressable>
+        <HouseholdButton
+          label={saving ? 'Updating...' : 'Update password'}
+          icon="save-outline"
+          tone="nav"
+          disabled={saving || !canSubmit}
+          onPress={submit}
+        />
         <Pressable accessibilityRole="button" disabled={saving} onPress={() => { setOpen(false); setForm(emptyForm); setError(''); }}>
           <Text style={styles.label}>Cancel</Text>
         </Pressable>
@@ -112,6 +128,7 @@ export function ChangePasswordSection({
 
 const styles = StyleSheet.create({
   card: { gap: spacing.sm, padding: spacing.lg, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, backgroundColor: palette.card },
+  settingsForm: { gap: spacing.sm },
   title: { fontSize: 18, fontWeight: '800', color: palette.text },
   field: { gap: spacing.xs },
   label: { color: palette.textSoft, fontWeight: '700' },

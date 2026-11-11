@@ -47,9 +47,25 @@ export function HouseholdProfileScreen({
   const [savingProfilePhoto, setSavingProfilePhoto] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
   const [resettingOwner, setResettingOwner] = useState(false);
+  const [resetOwnerConfirmVisible, setResetOwnerConfirmVisible] = useState(false);
   const ownerResetPending = useRef(false);
   const contactSubmitting = useRef(false);
   useEffect(() => { setContactNumber(user.contact_number || ''); }, [user.contact_number]);
+
+  async function confirmResetDeviceOwner() {
+    if (ownerResetPending.current) return;
+    ownerResetPending.current = true;
+    setResettingOwner(true);
+    try {
+      await onResetDeviceOwner();
+      setResetOwnerConfirmVisible(false);
+    } catch (error: any) {
+      Alert.alert('Unable to reset owner', error?.response?.data?.message || 'Check your connection and retry.');
+    } finally {
+      ownerResetPending.current = false;
+      setResettingOwner(false);
+    }
+  }
 
   async function saveContact() {
     if (contactSubmitting.current) return;
@@ -279,7 +295,7 @@ export function HouseholdProfileScreen({
 
       <View style={styles.card}>
         <HouseholdSection title="Profile settings" />
-        <HouseholdButton label={editingContact ? 'Cancel contact update' : 'Update contact number'} icon="call-outline" tone="light"
+        <HouseholdButton label={editingContact ? 'Cancel contact update' : 'Update contact number'} icon="call-outline" tone="nav" layout="settings"
           disabled={savingContact || resettingOwner} onPress={() => setEditingContact((value) => !value)} />
         {editingContact ? <>
         <Text style={styles.panelLabel}>Your contact number</Text>
@@ -290,7 +306,7 @@ export function HouseholdProfileScreen({
           tone="nav" disabled={savingContact || resettingOwner || contactNumber.trim() === (user.contact_number || '')} onPress={saveContact} />
 
         </> : null}
-        <HouseholdButton label={editingGeotag ? 'Close geotag update' : 'Update geotag'} icon="location-outline" tone="light"
+        <HouseholdButton label={editingGeotag ? 'Close geotag update' : 'Update geotag'} icon="location-outline" tone="nav" layout="settings"
           disabled={savingGeotag || resettingOwner} onPress={() => {
             editorStartPoint.current = geotag ? { latitude: geotag.latitude, longitude: geotag.longitude } : null;
             setGeotagMapVisible(false);
@@ -299,26 +315,30 @@ export function HouseholdProfileScreen({
         {editingGeotag ? <>
           <Text style={styles.panelMeta}>Update the saved home location for everyone in this household. Use GPS while at home or choose your home on the map.</Text>
         <View style={styles.mapActions}>
-          <View style={styles.gpsButton}>
-            <HouseholdButton
-              label={savingGeotag ? 'Saving geotag...' : 'Update geotag from GPS'}
-              icon="locate-outline"
-              tone="light"
-              disabled={savingGeotag || resettingOwner}
-              onPress={handleUpdateGeotag}
-            />
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={savingGeotag || resettingOwner}
+            style={[styles.geotagAction, styles.geotagActionPrimary, (savingGeotag || resettingOwner) && styles.geotagActionDisabled]}
+            onPress={handleUpdateGeotag}
+          >
+            <Ionicons name="locate-outline" size={18} color="#fff" />
+            <View style={styles.geotagActionText}>
+              <Text style={styles.geotagActionTitle}>{savingGeotag ? 'Saving geotag...' : 'Update geotag from GPS'}</Text>
+              <Text style={styles.geotagActionSubtitle}>Use GPS while you're at home</Text>
+            </View>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ expanded: geotagMapVisible }}
-            style={[styles.mapOptionButton, geotagMapVisible && styles.mapOptionButtonActive]}
+            style={[styles.geotagAction, styles.geotagActionSecondary, geotagMapVisible && styles.geotagActionSecondaryActive, (savingGeotag || resettingOwner) && styles.geotagActionSecondaryDisabled]}
             disabled={savingGeotag || resettingOwner}
             onPress={() => setGeotagMapVisible((visible) => !visible)}
           >
-            <Ionicons name="map-outline" size={18} color={geotagMapVisible ? '#fff' : palette.nav} />
-            <Text style={[styles.mapOptionText, geotagMapVisible && styles.mapOptionTextActive]}>
-              {geotagMapVisible ? 'Close map' : 'Choose on map'}
-            </Text>
+            <Ionicons name="map-outline" size={18} color="#fff" />
+            <View style={styles.geotagActionText}>
+              <Text style={[styles.geotagActionTitle, styles.geotagActionTitleSecondary]}>{geotagMapVisible ? 'Close map' : 'Choose on map'}</Text>
+              <Text style={[styles.geotagActionSubtitle, (geotagMapVisible || savingGeotag || resettingOwner) && styles.geotagActionSubtitleActive]}>Set your home location manually</Text>
+            </View>
           </Pressable>
         </View>
         {geotagMapVisible ? (
@@ -338,7 +358,20 @@ export function HouseholdProfileScreen({
         ) : null}
         <Text style={styles.geotagMessage} accessibilityLiveRegion="polite">{geotagMessage}</Text>
         </> : null}
-        <HouseholdButton label={resettingOwner ? 'Resetting owner...' : 'Reset device owner'} icon="person-circle-outline" tone="light"
+        <HouseholdButton label={resettingOwner ? 'Resetting owner...' : 'Reset device owner'} icon="person-circle-outline" tone="nav" layout="settings"
+          disabled={resettingOwner || savingContact || savingGeotag} onPress={() => setResetOwnerConfirmVisible((visible) => !visible)} />
+        {resetOwnerConfirmVisible ? (
+          <View style={styles.resetOwnerPanel}>
+            <Text style={styles.resetOwnerTitle}>Reset this phone's owner?</Text>
+            <Text style={styles.resetOwnerSubtitle}>You will choose a household member again for this phone. Other phones will keep their owners.</Text>
+            <View style={styles.resetOwnerActions}>
+              <View style={styles.resetOwnerAction}><HouseholdButton label="Cancel" tone="light" onPress={() => setResetOwnerConfirmVisible(false)} /></View>
+              <View style={styles.resetOwnerAction}><HouseholdButton label="Reset owner" tone="nav" disabled={resettingOwner} onPress={confirmResetDeviceOwner} /></View>
+            </View>
+          </View>
+        ) : null}
+        <View style={styles.hiddenLegacyResetButton}>
+        <HouseholdButton label={resettingOwner ? 'Resetting owner...' : 'Reset device owner'} icon="person-circle-outline" tone="nav" layout="settings"
           disabled={resettingOwner || savingContact || savingGeotag} onPress={() => Alert.alert('Reset this phone�s owner?',
             'You will choose a household member again for this phone. Other phones will keep their owners.', [
               { text: 'Cancel', style: 'cancel' },
@@ -351,9 +384,9 @@ export function HouseholdProfileScreen({
                 finally { ownerResetPending.current = false; setResettingOwner(false); }
               } },
             ])} />
+        </View>
+        <ChangePasswordSection accountIdentifiers={[household.household_id]} standaloneButton settingsRow />
       </View>
-
-      <ChangePasswordSection accountIdentifiers={[household.household_id]} standaloneButton />
 
       <HouseholdButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
     </View>
@@ -476,6 +509,34 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     backgroundColor: palette.card,
+  },
+  hiddenLegacyResetButton: {
+    display: 'none',
+  },
+  resetOwnerPanel: {
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: palette.secondary,
+  },
+  resetOwnerTitle: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  resetOwnerSubtitle: {
+    color: palette.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  resetOwnerActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  resetOwnerAction: {
+    flex: 1,
   },
   devicePanel: {
     flexDirection: 'row',
@@ -607,36 +668,60 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   mapActions: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
     gap: spacing.sm,
     width: '100%',
   },
-  gpsButton: {
-    flex: 1,
-  },
-  mapOptionButton: {
-    minHeight: 46,
+  geotagAction: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    borderWidth: 1,
-    borderColor: palette.border,
+    gap: spacing.sm,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    backgroundColor: palette.card,
+    paddingVertical: spacing.sm,
   },
-  mapOptionButtonActive: {
-    borderColor: palette.navActive,
-    backgroundColor: palette.navActive,
+  geotagActionPrimary: {
+    backgroundColor: palette.nav,
+    borderWidth: 1,
+    borderColor: palette.nav,
   },
-  mapOptionText: {
-    color: palette.nav,
-    fontSize: 12,
+  geotagActionSecondary: {
+    borderWidth: 1,
+    borderColor: palette.nav,
+    backgroundColor: palette.nav,
+  },
+  geotagActionSecondaryActive: {
+    borderColor: palette.nav,
+    backgroundColor: palette.nav,
+  },
+  geotagActionSecondaryDisabled: {
+    borderColor: palette.nav,
+    backgroundColor: palette.nav,
+    opacity: 0.55,
+  },
+  geotagActionDisabled: {
+    opacity: 0.55,
+  },
+  geotagActionText: {
+    flex: 1,
+    gap: 4,
+  },
+  geotagActionTitle: {
+    color: '#fff',
+    fontSize: 13,
     fontWeight: '900',
   },
-  mapOptionTextActive: {
+  geotagActionTitleSecondary: {
     color: '#fff',
+  },
+  geotagActionTitleActive: {
+    color: '#fff',
+  },
+  geotagActionSubtitle: {
+    color: '#e8eef5',
+    fontSize: 11,
+  },
+  geotagActionSubtitleActive: {
+    color: '#e8eef5',
   },
 });
