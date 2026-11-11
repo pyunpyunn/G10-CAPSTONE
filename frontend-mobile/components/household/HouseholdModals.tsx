@@ -158,16 +158,18 @@ export function HouseholdNotificationsModal({ visible, requests, notices = [], b
 type PinModalProps = {
   visible: boolean;
   mode: 'set' | 'verify' | 'change';
+  householdName?: string;
   saving: boolean;
   error: string;
   onClose: () => void;
   onConfirm: (payload: { pin: string; currentPin?: string }) => Promise<void>;
 };
 
-export function TrustedPinModal({ visible, mode, saving, error, onClose, onConfirm }: PinModalProps) {
+export function TrustedPinModal({ visible, mode, householdName, saving, error, onClose, onConfirm }: PinModalProps) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [currentPin, setCurrentPin] = useState('');
+  const [validationError, setValidationError] = useState('');
   const [showCurrentPin, setShowCurrentPin] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
@@ -175,16 +177,17 @@ export function TrustedPinModal({ visible, mode, saving, error, onClose, onConfi
   const needsCurrentPin = mode === 'change';
 
   const title = mode === 'change'
-    ? 'Change household PIN'
+    ? 'Change Household PIN'
     : mode === 'set'
-      ? 'Set household PIN'
-      : 'Enter household PIN';
+      ? 'Set Household PIN'
+      : 'Enter Trusted Household PIN';
 
   useEffect(() => {
     if (!visible) {
       setPin('');
       setConfirmPin('');
       setCurrentPin('');
+      setValidationError('');
       setShowCurrentPin(false);
       setShowPin(false);
       setShowConfirmPin(false);
@@ -192,14 +195,32 @@ export function TrustedPinModal({ visible, mode, saving, error, onClose, onConfi
   }, [visible]);
 
   function submit() {
+    if (needsCurrentPin && currentPin.length !== 4) {
+      setValidationError('Enter your current 4-digit PIN.');
+      return;
+    }
+
+    if (pin.length !== 4) {
+      setValidationError('Enter a 4-digit PIN.');
+      return;
+    }
+
+    if (needsConfirmation && confirmPin.length !== 4) {
+      setValidationError('Confirm your 4-digit PIN.');
+      return;
+    }
+
     if (needsConfirmation && pin !== confirmPin) {
+      setValidationError('PIN confirmation does not match.');
       return;
     }
 
     if (needsCurrentPin && pin === currentPin) {
+      setValidationError('New PIN must be different from the current PIN.');
       return;
     }
 
+    setValidationError('');
     onConfirm({ pin, currentPin: needsCurrentPin ? currentPin : undefined });
   }
 
@@ -212,13 +233,16 @@ export function TrustedPinModal({ visible, mode, saving, error, onClose, onConfi
             {mode === 'change'
               ? 'Enter your current PIN, then choose a new 4-digit PIN.'
               : mode === 'verify'
-                ? 'Required before opening trusted household details.'
+                ? `Enter ${householdName || 'this trusted household'}'s 4-digit PIN to view members and update their status.`
                 : 'This PIN protects trusted household details for your household.'}
           </Text>
           {needsCurrentPin ? (
             <PinInput
               value={currentPin}
-              onChangeText={(value) => setCurrentPin(value.replace(/[^0-9]/g, '').slice(0, 4))}
+              onChangeText={(value) => {
+                setCurrentPin(value.replace(/[^0-9]/g, '').slice(0, 4));
+                setValidationError('');
+              }}
               placeholder="Current 4-digit PIN"
               isVisible={showCurrentPin}
               onToggleVisibility={() => setShowCurrentPin((current) => !current)}
@@ -226,7 +250,10 @@ export function TrustedPinModal({ visible, mode, saving, error, onClose, onConfi
           ) : null}
           <PinInput
             value={pin}
-            onChangeText={(value) => setPin(value.replace(/[^0-9]/g, '').slice(0, 4))}
+            onChangeText={(value) => {
+              setPin(value.replace(/[^0-9]/g, '').slice(0, 4));
+              setValidationError('');
+            }}
             placeholder="4-digit PIN"
             isVisible={showPin}
             onToggleVisibility={() => setShowPin((current) => !current)}
@@ -234,19 +261,16 @@ export function TrustedPinModal({ visible, mode, saving, error, onClose, onConfi
           {needsConfirmation ? (
             <PinInput
               value={confirmPin}
-              onChangeText={(value) => setConfirmPin(value.replace(/[^0-9]/g, '').slice(0, 4))}
+              onChangeText={(value) => {
+                setConfirmPin(value.replace(/[^0-9]/g, '').slice(0, 4));
+                setValidationError('');
+              }}
               placeholder="Confirm PIN"
               isVisible={showConfirmPin}
               onToggleVisibility={() => setShowConfirmPin((current) => !current)}
             />
           ) : null}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {needsConfirmation && pin !== confirmPin && confirmPin.length === 4 ? (
-            <Text style={styles.error}>PIN confirmation does not match.</Text>
-          ) : null}
-          {needsCurrentPin && pin === currentPin && pin.length === 4 ? (
-            <Text style={styles.error}>New PIN must be different from the current PIN.</Text>
-          ) : null}
+          {error || validationError ? <Text style={styles.error}>{error || validationError}</Text> : null}
           <HouseholdButton
             label={saving ? 'Saving...' : mode === 'change' ? 'Change PIN' : mode === 'set' ? 'Save PIN' : 'Open trusted household'}
             icon={mode === 'change' ? 'lock-closed-outline' : 'lock-open-outline'}

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\HouseholdMobileService;
 use App\Services\Mobile\HouseholdTrustedHouseholdWorkflow;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
@@ -85,6 +86,57 @@ class HouseholdTrustedHouseholdWorkflowTest extends TestCase
             'validation_status' => 'validated',
             'validated_by_user_id' => 'USR-HH-2',
         ]);
+    }
+
+    public function test_trusted_household_pin_verification_uses_the_selected_households_pin(): void
+    {
+        $this->createHouseholdTables();
+        DB::table('trusted_households')->insert([
+            'connection_id' => 'TH-3',
+            'requesting_household_id' => 'HH-1',
+            'trusted_household_id' => 'HH-2',
+            'validation_status' => 'validated',
+            'created_by_user_id' => 'USR-1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('household_trusted_pins')->insert([
+            ['household_id' => 'HH-1', 'pin_hash' => Hash::make('1111'), 'created_at' => now(), 'updated_at' => now()],
+            ['household_id' => 'HH-2', 'pin_hash' => Hash::make('2222'), 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $service = app(HouseholdMobileService::class);
+        $targetPinResponse = $service->verifyTrustedHouseholdPin($this->householdRequest(
+            '/household/trusted-households/TH-3/pin/verify',
+            'POST',
+            ['pin' => '2222'],
+            'HH-1'
+        ), 'TH-3');
+        $ownPinResponse = $service->verifyTrustedHouseholdPin($this->householdRequest(
+            '/household/trusted-households/TH-3/pin/verify',
+            'POST',
+            ['pin' => '1111'],
+            'HH-1'
+        ), 'TH-3');
+        $unrelatedHouseholdResponse = $service->verifyTrustedHouseholdPin($this->householdRequest(
+            '/household/trusted-households/TH-3/pin/verify',
+            'POST',
+            ['pin' => '2222'],
+            'HH-3'
+        ), 'TH-3');
+        DB::table('household_trusted_pins')->where('household_id', 'HH-2')->delete();
+        $missingPinResponse = $service->verifyTrustedHouseholdPin($this->householdRequest(
+            '/household/trusted-households/TH-3/pin/verify',
+            'POST',
+            ['pin' => '2222'],
+            'HH-1'
+        ), 'TH-3');
+
+        $this->assertSame(200, $targetPinResponse->getStatusCode());
+        $this->assertSame(422, $ownPinResponse->getStatusCode());
+        $this->assertSame(404, $unrelatedHouseholdResponse->getStatusCode());
+        $this->assertSame(409, $missingPinResponse->getStatusCode());
+        $this->assertSame('The selected household has not set a trusted PIN yet.', $missingPinResponse->getData(true)['message']);
     }
 
     private function createHouseholdTables(): void

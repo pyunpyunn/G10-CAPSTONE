@@ -106,6 +106,11 @@ class HouseholdMobileController extends Controller
         return $this->service->verifyTrustedPin($request);
     }
 
+    public function verifyTrustedHouseholdPin(Request $request, string $connectionId): JsonResponse
+    {
+        return $this->service->verifyTrustedHouseholdPin($request, $connectionId);
+    }
+
     public function lookupTrustedHousehold(Request $request, string $householdId): JsonResponse
     {
         return $this->service->lookupTrustedHousehold($request, $householdId);

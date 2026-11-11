@@ -258,6 +258,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/household/trusted-households', [HouseholdMobileController::class, 'trustedHouseholds']);
             Route::put('/household/trusted-pin', [HouseholdMobileController::class, 'saveTrustedPin']);
             Route::post('/household/trusted-pin/verify', [HouseholdMobileController::class, 'verifyTrustedPin']);
+            Route::post('/household/trusted-households/{connectionId}/pin/verify', [HouseholdMobileController::class, 'verifyTrustedHouseholdPin']);
             Route::get('/household/trusted-households/lookup/{householdId}', [HouseholdMobileController::class, 'lookupTrustedHousehold']);
             Route::post('/household/trusted-households', [HouseholdMobileController::class, 'storeTrustedHousehold']);
             Route::delete('/household/trusted-households/{connectionId}', [HouseholdMobileController::class, 'deleteTrustedHousehold']);

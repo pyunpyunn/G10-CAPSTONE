@@ -120,6 +120,11 @@ export async function verifyTrustedPin(pin: string) {
   return response.data;
 }
 
+export async function verifyTrustedHouseholdPin(connectionId: string, pin: string) {
+  const response = await api.post(`/household/trusted-households/${connectionId}/pin/verify`, { pin });
+  return response.data;
+}
+
 export async function lookupTrustedHousehold(householdId: string) {
   const response = await api.get(`/household/trusted-households/lookup/${householdId}`);
   return response.data.data;

@@ -453,6 +453,54 @@ class HouseholdMobileService
         return response()->json(['message' => 'Household PIN verified.']);
     }
 
+    public function verifyTrustedHouseholdPin(Request $request, string $connectionId): JsonResponse
+    {
+        if (! Schema::hasTable('trusted_households')) {
+            return $this->missingTableResponse('trusted_households');
+        }
+
+        if (! Schema::hasTable('household_trusted_pins')) {
+            return $this->missingTableResponse('household_trusted_pins');
+        }
+
+        $reportingHouseholdId = $this->householdId($request->user());
+
+        if (! $reportingHouseholdId) {
+            return response()->json(['message' => 'This account is not linked to a household record.'], 403);
+        }
+
+        $connection = DB::table('trusted_households')
+            ->where('connection_id', $connectionId)
+            ->whereIn('validation_status', ['validated', 'approved'])
+            ->where(function ($query) use ($reportingHouseholdId): void {
+                $query->where('requesting_household_id', $reportingHouseholdId)
+                    ->orWhere('trusted_household_id', $reportingHouseholdId);
+            })
+            ->first(['requesting_household_id', 'trusted_household_id']);
+
+        if (! $connection) {
+            return response()->json(['message' => 'Trusted household connection was not found.'], 404);
+        }
+
+        $targetHouseholdId = (string) ((string) $connection->requesting_household_id === $reportingHouseholdId
+            ? $connection->trusted_household_id
+            : $connection->requesting_household_id);
+        $validated = $request->validate(['pin' => ['required', 'digits:4']]);
+        $storedPin = DB::table('household_trusted_pins')
+            ->where('household_id', $targetHouseholdId)
+            ->first(['pin_hash']);
+
+        if (! $storedPin) {
+            return response()->json(['message' => 'The selected household has not set a trusted PIN yet.'], 409);
+        }
+
+        if (! Hash::check($validated['pin'], $storedPin->pin_hash)) {
+            return response()->json(['message' => 'The selected household PIN did not match.'], 422);
+        }
+
+        return response()->json(['message' => 'Trusted household PIN verified.']);
+    }
+
     public function lookupTrustedHousehold(Request $request, string $householdId): JsonResponse
     {
         $currentHouseholdId = $this->householdId($request->user());

@@ -23,6 +23,9 @@ type DashboardProps = {
 type TrustedScreenProps = {
   overview: any;
   viewingTrusted: any;
+  canChangeTrustedPin: boolean;
+  pinSetupRequired: boolean;
+  onRequireTrustedPin: () => void;
   onAddTrusted: () => void;
   onChangeTrustedPin: () => void;
   onOpenTrusted: (household: any) => void;
@@ -204,6 +207,9 @@ export function HouseholdDashboardScreen({
 export function HouseholdTrustedScreen({
   overview,
   viewingTrusted,
+  canChangeTrustedPin,
+  pinSetupRequired,
+  onRequireTrustedPin,
   onAddTrusted,
   onChangeTrustedPin,
   onOpenTrusted,
@@ -276,6 +282,14 @@ export function HouseholdTrustedScreen({
             })
           )}
         </View>
+        {pinSetupRequired ? (
+          <Pressable
+            style={styles.trustedPinInteractionGate}
+            onPress={onRequireTrustedPin}
+            accessibilityRole="button"
+            accessibilityLabel="Set Household PIN to use Trusted households"
+          />
+        ) : null}
       </View>
     );
   }
@@ -305,7 +319,7 @@ export function HouseholdTrustedScreen({
               style={styles.trustedPinButton}
               onPress={onChangeTrustedPin}
               accessibilityRole="button"
-              accessibilityLabel="Change household PIN"
+              accessibilityLabel={canChangeTrustedPin ? 'Change household PIN' : 'Set household PIN'}
             >
               <Ionicons name="lock-closed" size={15} color={palette.navActive} />
             </Pressable>
@@ -319,6 +333,14 @@ export function HouseholdTrustedScreen({
           onDeleteTrusted={onDeleteTrusted}
         />
       </View>
+      {pinSetupRequired ? (
+        <Pressable
+          style={styles.trustedPinInteractionGate}
+          onPress={onRequireTrustedPin}
+          accessibilityRole="button"
+          accessibilityLabel="Set Household PIN to use Trusted households"
+        />
+      ) : null}
     </View>
   );
 }
@@ -1071,6 +1093,10 @@ const styles = StyleSheet.create({
     borderColor: palette.navActive,
     borderRadius: 13,
     backgroundColor: palette.card,
+  },
+  trustedPinInteractionGate: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
   },
   trustedAddButton: {
     minHeight: 56,
