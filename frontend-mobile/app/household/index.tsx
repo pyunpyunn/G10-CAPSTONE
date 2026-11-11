@@ -767,11 +767,6 @@ export default function HouseholdHomeScreen() {
           onOpenTrusted={openTrusted}
           onDeleteTrusted={handleDeleteTrusted}
           onBackFamily={() => setViewingTrusted(null)}
-          respondingConnectionId={notificationBusyId || null}
-          onRespondToIncomingRequest={(request, decision) => {
-            if (decision === 'accept') void handleAcceptTrustedRequest(request);
-            else handleRejectTrustedRequest(request);
-          }}
           onSaveTrustedMemberStatus={handleSaveTrustedMemberStatus}
         />
       );
