@@ -15,3 +15,7 @@ export function topicsForPath(path, superAdmin = false) {
   }[root] || operationTopics
   return topics.filter((topic) => superAdmin || !['inquiries', 'accounts'].includes(topic))
 }
+
+export function shouldRefreshSituation(topics) {
+  return !topics || topics.some(topic => ['weather', 'households', 'dispatch', 'field-reports', 'disasters', 'requests'].includes(topic))
+}

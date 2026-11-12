@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRefreshScheduler } from '../src/utils/refreshScheduler.js'
-import { topicsForPath } from '../src/utils/realtimeTopics.js'
+import { shouldRefreshSituation, topicsForPath } from '../src/utils/realtimeTopics.js'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 
@@ -38,11 +38,17 @@ test('all requested pages subscribe to their domains, with privileged topics res
   assert.deepEqual(topicsForPath('/super-admin', false), [])
 })
 
+test('mobile field reports refresh the Situation view', () => {
+  assert.equal(shouldRefreshSituation(['field-reports']), true)
+  assert.equal(shouldRefreshSituation(['accounts']), false)
+  assert.equal(shouldRefreshSituation(undefined), true)
+})
+
 test('connected sockets still reconcile missed changes without reloading the page', () => {
   const timers = new Map(), events = [], channels = []
   let timerId = 0
   const source = readFileSync(new URL('../src/api/realtimeNotifications.js', import.meta.url), 'utf8')
-    .replace(/^import .*\n/gm, '').replace(/export /g, '').replace(/import\.meta\.env/g, 'env')
+    .replace(/\r\n/g, '\n').replace(/^import .*\n/gm, '').replace(/export /g, '').replace(/import\.meta\.env/g, 'env')
   class Echo {
     connector = { pusher: { connection: { state: 'connected', bind() {}, unbind() {} } } }
     private() {

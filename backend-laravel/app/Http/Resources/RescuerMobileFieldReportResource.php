@@ -32,6 +32,7 @@ class RescuerMobileFieldReportResource extends JsonResource
             'death_count' => $row->death_count ?? null,
             'injured_count' => $row->injured_count ?? null,
             'missing_count' => $row->missing_count ?? null,
+            'members' => $this->memberAssessments($row),
             'latitude' => $row->latitude,
             'longitude' => $row->longitude,
             'battery_level' => $row->battery_level,
@@ -50,6 +51,26 @@ class RescuerMobileFieldReportResource extends JsonResource
 
         return $storedNotes;
     }
-}
 
+    private function memberAssessments(object $row): array
+    {
+        $members = $row->members ?? [];
+        if (is_array($members) && $members !== []) {
+            return $members;
+        }
+
+        $details = json_decode($row->notes ?? '', true);
+        if (! is_array($details) || ! is_array($details['members'] ?? null)) {
+            return [];
+        }
+
+        return collect($details['members'])->filter(fn ($member) => is_array($member))->map(fn (array $member): array => [
+            'member_id' => $member['member_id'] ?? null,
+            'name' => $member['name'] ?? null,
+            'status_key' => $member['status_key'] ?? null,
+            'status_label' => $member['status_label'] ?? null,
+            'condition' => $member['condition'] ?? null,
+        ])->values()->all();
+    }
+}
 

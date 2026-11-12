@@ -125,7 +125,7 @@ const modulePages = [
   },
   {
     path: '/dispatch',
-    title: 'Dispatch Dashboard',
+    title: 'Field Communication',
     kicker: 'Operations',
     summary: 'Assign teams, monitor progress, and record field outcomes from rescuer updates.',
   },

@@ -364,7 +364,7 @@ export default function RescuerHomeScreen() {
   const summary: any = overview?.summary || {};
 
   const rescuerPageTitles: Record<TabKey, string> = {
-    dashboard: 'Dispatch Dashboard',
+    dashboard: 'Field Communication',
     map: 'Mapping',
     report: 'Field Reports',
     resource: 'Request Monitoring',

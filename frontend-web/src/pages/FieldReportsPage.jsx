@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUpRight, CircleDot } from 'lucide-react'
+import { CircleDot } from 'lucide-react'
 import { ResponseOperationsLayout } from '../components/ui/PageHeader'
 import { useWorkspaceQuery } from '../state/operationsApi'
 import PaginationBar from '../components/ui/PaginationBar'
@@ -18,6 +18,9 @@ export default function FieldReportsPage() {
   const selected = reports.find(row => row.status_log_id === selection?.status_log_id) || selection
   const badge = (row) => <DispatchStatusBadge status={row.assignment_status} />
   const location = (row) => row.latitude != null && row.longitude != null ? `${row.latitude}, ${row.longitude}` : null
+  const count = (value) => value == null ? 'Not reported' : Number(value)
+  const memberStatus = (member) => member.status_label || member.condition
+    || member.status_key?.replaceAll('_', ' ') || 'Not reported'
   return <ResponseOperationsLayout active={2}><section className="pg on">
     <div className="fb"><select aria-label="Dispatch status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }}><option value="all">All dispatch statuses</option>{(data?.status_options || []).map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select><button className="bt" type="button" onClick={() => { setStatus('all'); setPage(1) }}>Reset</button></div>
     <div className="cd" style={{ flex: 1 }}><div className="tw">
@@ -25,6 +28,6 @@ export default function FieldReportsPage() {
     </div><PaginationBar reference meta={data?.reports_meta || {}} onPageChange={setPage} label="reports" /></div>
   </section>
   <Modal className="reference-drawer" title={selected ? `${selected.household_head_name || 'Household'} · ${selected.household_code || selected.household_id}` : 'Report'} isOpen={Boolean(selected)} onClose={() => setSelected(null)}>
-    {selected && <dl className="dl"><dt>Dispatch status</dt><dd>{badge(selected)}</dd><dt>Submitted</dt><dd>{selected.submitted_at || 'Not recorded'}</dd><dt>Reporter</dt><dd>{selected.reporter_name || 'Not recorded'} <span className="mu">{selected.reporter_team_name ? `· ${selected.reporter_team_name}` : ''}</span></dd><dt>Battery</dt><dd>{selected.battery_level != null ? <><span className="mtr"><i style={{ width: `${Math.max(0, Math.min(100, Number(selected.battery_level)))}%` }} /></span>{selected.battery_level}%</> : 'Not reported'}</dd><dt>Location</dt><dd>{location(selected) ? <>{location(selected)} <a className="mp" target="_blank" rel="noreferrer" href={`https://www.openstreetmap.org/?mlat=${selected.latitude}&mlon=${selected.longitude}#map=18/${selected.latitude}/${selected.longitude}`}>Open to map <ArrowUpRight size={12} /></a></> : <span className="mu">No geotag</span>}</dd><dt>Household</dt><dd><Link to={`/households/${selected.household_id}`}>Open account →</Link></dd><dt>Notes</dt><dd className="nts">{selected.notes || 'No notes'}</dd></dl>}
+    {selected && <dl className="dl"><dt>Dispatch status</dt><dd>{badge(selected)}</dd><dt>Household status</dt><dd>{selected.status_label || selected.status_key?.replaceAll('_', ' ') || 'Not reported'}</dd><dt>Submitted</dt><dd>{selected.submitted_at || 'Not recorded'}</dd><dt>Reporter</dt><dd>{selected.reporter_name || 'Not recorded'} <span className="mu">{selected.reporter_team_name ? `· ${selected.reporter_team_name}` : ''}</span></dd><dt>Property damage</dt><dd>{selected.property_damage?.replaceAll('_', ' ') || 'Not reported'}</dd><dt>Deaths</dt><dd>{count(selected.death_count)}</dd><dt>Injured</dt><dd>{count(selected.injured_count)}</dd><dt>Missing</dt><dd>{count(selected.missing_count)}</dd><dt>Member assessment</dt><dd className="assessment-detail">{selected.members?.length ? <ul className="assessment-members">{selected.members.map((member, index) => <li key={member.member_id || index}><span>{member.name || member.member_id || `Member ${index + 1}`}</span><strong>{memberStatus(member)}</strong></li>)}</ul> : <span className="mu">No individual assessments recorded</span>}</dd><dt>Household</dt><dd><Link to={`/households/${selected.household_id}`}>Open account →</Link></dd><dt>Notes</dt><dd className="nts">{selected.notes || 'No notes'}</dd></dl>}
   </Modal></ResponseOperationsLayout>
 }

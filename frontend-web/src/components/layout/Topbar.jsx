@@ -437,7 +437,7 @@ function getPageTitle(pathname, state) {
   if (pathname === '/situation/external-reports') return 'External Reports'
   const normalizedPath = pathname.replace(/\/$/, '') || '/dashboard'
   const navigationTitles = {
-    '/dispatch': 'Dispatch Dashboard',
+    '/dispatch': 'Field Communication',
     '/dispatch/communication': 'Field Communication',
     '/rescue-management': 'Rescue Management',
     '/rescue-management/new': 'Create New Dispatch Assignment',

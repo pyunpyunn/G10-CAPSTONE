@@ -59,6 +59,49 @@ class ArchivePresenterTest extends TestCase
         $this->assertSame('disaster-events', $group['category']);
         $this->assertSame([], $group['records']);
     }
-}
 
+    public function test_household_status_archive_formats_mobile_field_report_assessment(): void
+    {
+        $record = app(ArchivePresenter::class)->formatHouseholdStatus((object) [
+            'status_log_id' => 3,
+            'disaster_id' => 'EV-1',
+            'status_key' => 'needs_help',
+            'status_label' => 'Needs help',
+            'household_name' => 'Rivera Household',
+            'household_code' => 'HH-1',
+            'purok_sitio' => 'Purok 1',
+            'source' => 'responder_field_report',
+            'notes' => json_encode([
+                'report_type' => 'rescuer_field_report',
+                'incident_type' => 'flood',
+                'property_damage' => 'major',
+                'death_count' => 1,
+                'injured_count' => 2,
+                'missing_count' => 0,
+                'user_notes' => 'Evacuation required.',
+                'members' => [['member_id' => 'M-1', 'status_key' => 'injured']],
+            ]),
+            'event_name' => 'Flood response',
+            'event_ended_at' => null,
+            'submitted_at' => '2026-11-12 12:00:00',
+            'location_label' => null,
+            'location_accuracy_m' => null,
+            'battery_level' => null,
+            'latitude' => null,
+            'longitude' => null,
+            'responder_name' => 'Responder',
+        ]);
+
+        $details = collect($record['details'])->keyBy('label')->map(fn (array $detail) => $detail['value']);
+
+        $this->assertStringContainsString('Deaths: 1', $record['source']['meta']);
+        $this->assertSame('Flood', $details['Incident type']);
+        $this->assertSame('Major', $details['Property damage']);
+        $this->assertSame('1', $details['Deaths']);
+        $this->assertSame('2', $details['Injured']);
+        $this->assertSame('0', $details['Missing']);
+        $this->assertSame('M-1: Injured', $details['Member assessments']);
+        $this->assertSame('Evacuation required.', $details['Field notes']);
+    }
+}
 

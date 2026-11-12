@@ -83,6 +83,10 @@
 .ro-reference .cl2{background:#f1f5f9;border-radius:10px;padding:9px 14px;font-weight:500;color:#475569}
 .ro-reference .dl{display:grid;grid-template-columns:auto 1fr;gap:14px 18px;padding:22px;overflow:auto}.ro-reference .dl dt{color:var(--mu);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;padding-top:2px}.ro-reference .dl dd{margin:0;font-weight:500}
 .ro-reference .nts{white-space:pre-wrap;word-break:break-word;font-weight:500;background:#f8fafc;border:1px solid var(--ln);border-radius:10px;padding:12px}
+.ro-reference .assessment-detail{min-width:0}
+.ro-reference .assessment-members{display:grid;gap:6px;list-style:none;margin:0;padding:0}
+.ro-reference .assessment-members li{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;background:#f8fafc;border:1px solid var(--ln);border-radius:8px}
+.ro-reference .assessment-members strong{text-align:right;text-transform:capitalize}
 .ro-reference .mtr{height:7px;width:120px;background:#eef2f7;border-radius:9px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:8px}.ro-reference .mtr i{display:block;height:100%;background:var(--nv)}
 .ro-reference #toast{position:fixed;right:24px;bottom:24px;background:var(--nv);color:#fff;padding:11px 18px;border-radius:99px;font-weight:500;transform:translateY(80px);opacity:0;transition:.25s;z-index:40}.ro-reference #toast.s{transform:none;opacity:1}
 @media(max-width:1100px){.ro-reference .dash{grid-template-columns:1fr;grid-template-rows:auto;min-height:0}.ro-reference .dash .cd:not(.strip){max-height:420px}.ro-reference .strip{grid-template-columns:1fr 1fr}.ro-reference .strip .pg-b{grid-column:1/-1}}

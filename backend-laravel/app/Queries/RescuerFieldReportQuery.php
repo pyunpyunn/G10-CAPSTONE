@@ -30,7 +30,10 @@ class RescuerFieldReportQuery
             && DB::table('household_statuses')->where('status_key', $status)->exists()) {
             $assignmentFilter = false;
         }
-        return $this->reportQuery(null, null, array_merge($filters, ['assignment_status_filter' => $assignmentFilter]))->paginate($perPage);
+        $reports = $this->reportQuery(null, null, array_merge($filters, ['assignment_status_filter' => $assignmentFilter]))->paginate($perPage);
+        $this->attachMemberAssessments($reports);
+
+        return $reports;
     }
 
     private function reportQuery(?int $responderId, ?string $userId, array $filters): \Illuminate\Database\Query\Builder
@@ -80,6 +83,7 @@ class RescuerFieldReportQuery
             && Schema::hasColumn('responder_field_reports', 'assignment_id')) {
             $query->leftJoin('responder_field_reports as rfr', 'rfr.status_log_id', '=', 'hsl.status_log_id');
             $columns[] = 'rfr.assignment_id';
+            $columns[] = $this->optional('responder_field_reports', 'report_id', 'report_id', 'rfr');
             if (Schema::hasTable('responder_assignments')) {
                 $query->leftJoin('responder_assignments as assignment', 'assignment.assignment_id', '=', 'rfr.assignment_id');
                 if (Schema::hasColumn('responder_assignments', 'route_notes') && Schema::hasColumn('household_status_logs', 'responder_id')) {
@@ -136,6 +140,68 @@ class RescuerFieldReportQuery
         }
         $orderColumn = Schema::hasColumn('household_status_logs', 'submitted_at') ? 'hsl.submitted_at' : 'hsl.status_log_id';
         return $query->select($columns)->orderByDesc($orderColumn)->orderByDesc('hsl.status_log_id');
+    }
+
+    private function attachMemberAssessments(\Illuminate\Contracts\Pagination\LengthAwarePaginator $reports): void
+    {
+        if (! Schema::hasTable('responder_field_report_members')
+            || ! Schema::hasColumn('responder_field_report_members', 'report_id')
+            || ! Schema::hasColumn('responder_field_reports', 'report_id')) {
+            return;
+        }
+
+        $reportIds = $reports->getCollection()
+            ->pluck('report_id')
+            ->filter(fn ($id) => $id !== null)
+            ->unique()
+            ->values();
+        if ($reportIds->isEmpty()) {
+            return;
+        }
+
+        $query = DB::table('responder_field_report_members as assessment')
+            ->whereIn('assessment.report_id', $reportIds)
+            ->select([
+                'assessment.report_id',
+                $this->optional('responder_field_report_members', 'member_id', 'member_id', 'assessment'),
+                $this->optional('responder_field_report_members', 'status_key', 'status_key', 'assessment'),
+            ]);
+
+        if (Schema::hasTable('household_members')
+            && Schema::hasColumn('responder_field_report_members', 'household_id')
+            && Schema::hasColumn('household_members', 'household_id')) {
+            $query->leftJoin('household_members as member', function ($join): void {
+                $join->on('member.member_id', '=', 'assessment.member_id')
+                    ->on('member.household_id', '=', 'assessment.household_id');
+            });
+            foreach (['first_name', 'middle_name', 'last_name'] as $column) {
+                if (Schema::hasColumn('household_members', $column)) {
+                    $query->addSelect("member.{$column}");
+                }
+            }
+        }
+        if (Schema::hasTable('member_statuses')
+            && Schema::hasColumn('responder_field_report_members', 'status_id')) {
+            $query->leftJoin('member_statuses as member_status', 'member_status.status_id', '=', 'assessment.status_id');
+            $query->addSelect($this->firstExisting('member_statuses', ['status_label', 'status_name'], 'status_label', 'member_status'));
+        }
+
+        $query->orderBy('assessment.report_id')->orderBy('assessment.member_id');
+        $assessments = $query->get()->groupBy(fn (object $row): string => (string) $row->report_id);
+
+        foreach ($reports->getCollection() as $report) {
+            $report->members = $assessments->get((string) ($report->report_id ?? ''), collect())
+                ->map(fn (object $member): array => [
+                    'member_id' => $member->member_id,
+                    'name' => trim(implode(' ', array_filter([
+                        $member->first_name ?? null,
+                        $member->middle_name ?? null,
+                        $member->last_name ?? null,
+                    ]))) ?: null,
+                    'status_key' => $member->status_key,
+                    'status_label' => $member->status_label ?? null,
+                ])->values()->all();
+        }
     }
 
     public function summary(?string $eventId = null): array
@@ -215,6 +281,4 @@ class RescuerFieldReportQuery
         return DB::raw('NULL as status_label');
     }
 }
-
-
 

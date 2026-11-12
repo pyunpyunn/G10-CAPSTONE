@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { createSituationReport, exportSituationReport, getSituationReport, getSituationSummary, getSituationWorkspace, syncSituationReports } from '../api/situationReportApi'
+import { shouldRefreshSituation } from '../utils/realtimeTopics'
 import HouseholdExportScope from '../components/situation/HouseholdExportScope'
 import SituationReferenceSections from '../components/situation/SituationReferenceSections'
 import { reportSections } from '../utils/situationSections'
@@ -88,7 +89,7 @@ export default function SituationReportPage() {
     async function update(event) {
       if (running || document.hidden) return
       const topics = event?.detail?.topics
-      if (topics && !topics.some(topic => ['weather','households','dispatch','disasters','requests'].includes(topic))) return
+      if (!shouldRefreshSituation(topics)) return
       running = true; setSyncing(true)
       try {
         const data = await syncSituationReports(selectedEventId)
