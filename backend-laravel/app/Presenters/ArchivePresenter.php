@@ -30,6 +30,25 @@ class ArchivePresenter
             $meta .= ' - '.$row->location_accuracy_m.'m accuracy';
         }
 
+        // Clean author/logger formatting (follows Picture 2: 'Logged by <Name>')
+        $loggedBy = null;
+        if (!empty($row->responder_name)) {
+            $loggedBy = 'Logged by '.$row->responder_name;
+        } elseif (!empty($row->submitter_name)) {
+            $loggedBy = 'Logged by '.$row->submitter_name;
+        } else {
+            $notesData = is_string($row->notes ?? null) ? json_decode($row->notes, true) : null;
+            if (is_array($notesData) && !empty($notesData['member_name'])) {
+                $loggedBy = 'Logged by '.$notesData['member_name'];
+            } elseif (!empty($row->household_name) && $row->household_name !== 'Household') {
+                $loggedBy = 'Logged by '.$row->household_name;
+            } elseif (!empty($householdName) && $householdName !== 'Household') {
+                $loggedBy = 'Logged by '.$householdName;
+            } else {
+                $loggedBy = 'Logged by Household Mobile';
+            }
+        }
+
         $record = [
             'id' => $row->status_log_id,
             'event_id' => $row->disaster_id,
@@ -49,20 +68,37 @@ class ArchivePresenter
             ],
             'source' => [
                 'title' => $source,
-                'meta' => $row->notes ?: ($row->responder_name ? 'Logged by '.$row->responder_name : 'No remarks'),
+                'meta' => $loggedBy,
             ],
         ];
 
-        $record['details'] = $this->details([
+        // Format clean remarks for details popup (without raw JSON strings)
+        $rawNotes = $row->notes ?? '';
+        $cleanRemarks = null;
+        if (is_string($rawNotes) && str_starts_with(trim($rawNotes), '{')) {
+            $decoded = json_decode($rawNotes, true);
+            if (is_array($decoded)) {
+                $cleanRemarks = $decoded['user_notes'] ?? $decoded['member_notes'] ?? null;
+            }
+        } elseif (!empty($rawNotes)) {
+            $cleanRemarks = $rawNotes;
+        }
+
+        $detailFields = [
             'Date / time' => $record['datetime'],
             'Event' => $record['event'],
             'Household / geotag' => $householdName.' - '.$meta,
             'Purok' => $purok,
             'Status change' => $record['status_change']['label'],
-            'Source / remarks' => $source.' - '.$record['source']['meta'],
-            'Battery level' => $row->battery_level !== null ? $row->battery_level.'%' : 'Not recorded',
-            'Coordinates' => $row->latitude && $row->longitude ? $row->latitude.', '.$row->longitude : 'Not recorded',
-        ]);
+            'Source / remarks' => $source.' - '.$loggedBy,
+        ];
+        if (!empty($cleanRemarks)) {
+            $detailFields['Remarks / Notes'] = $cleanRemarks;
+        }
+        $detailFields['Battery level'] = $row->battery_level !== null ? $row->battery_level.'%' : 'Not recorded';
+        $detailFields['Coordinates'] = $row->latitude && $row->longitude ? $row->latitude.', '.$row->longitude : 'Not recorded';
+
+        $record['details'] = $this->details($detailFields);
         $record['export'] = [
             'datetime' => $record['datetime'],
             'event' => $record['event'],
@@ -70,7 +106,7 @@ class ArchivePresenter
             'household' => $householdName,
             'purok' => $purok,
             'status' => $record['status_change']['label'],
-            'source' => $source,
+            'source' => $source.' - '.$loggedBy,
         ];
 
         return $record;

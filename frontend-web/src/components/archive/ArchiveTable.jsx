@@ -165,7 +165,19 @@ function compactMeta(meta, columnKey, category) {
     return ''
   }
 
-  const text = String(meta)
+  let text = String(meta).trim()
+
+  // Prevent raw JSON string from ever rendering as unformatted code in table cells
+  if (text.startsWith('{') && text.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(text)
+      text = parsed.member_name
+        ? `Logged by ${parsed.member_name}`
+        : (parsed.user_notes ? `Logged by ${parsed.user_notes}` : 'Logged by Household Mobile')
+    } catch {
+      text = 'Logged by Household Mobile'
+    }
+  }
 
   if (text.length <= 72) {
     return text

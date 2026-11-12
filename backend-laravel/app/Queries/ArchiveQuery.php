@@ -85,6 +85,7 @@ class ArchiveQuery
                 'hsl.source', 'hsl.notes', 'hsl.submitted_at', 'hsl.battery_level', 'hsl.latitude', 'hsl.longitude',
                 'de.name as event_name', 'de.ended_at as event_ended_at', 'h.household_code', 'h.household_name',
                 'a.purok_sitio', 'hs.status_key', 'hs.status_label', 'r.full_name as responder_name',
+                DB::raw("COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.name, u.username) as submitter_name"),
             ],
             'dispatch-logs' => [
                 'ra.assignment_id', 'ra.disaster_id', 'ra.assigned_area', 'ra.status', 'ra.route_notes',
@@ -125,8 +126,31 @@ class ArchiveQuery
 
     private function householdStatusRows(Request $request, int $perPage, bool $asQuery = false): mixed
     {
-        $query = DB::table('household_status_logs as hsl')->leftJoin('disaster_events as de', 'de.event_id', '=', 'hsl.disaster_id')->leftJoin('households as h', 'h.household_id', '=', 'hsl.household_id')->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')->leftJoin('responders as r', 'r.responder_id', '=', 'hsl.responder_id')->select(['hsl.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'h.household_code', 'h.household_name', 'a.purok_sitio', 'hs.status_key', 'hs.status_label', 'r.full_name as responder_name']);
-        $this->applySearch($query, $request, ['hsl.status_log_id', 'de.name', 'h.household_code', 'h.household_name', 'hsl.location_label', 'hsl.notes', 'hsl.source', 'hs.status_label']); $this->applyEventFilter($query, $request, 'hsl.disaster_id'); $this->applyPurokFilter($query, $request, 'a.purok_sitio'); $this->applyHouseholdStatusFilter($query, $request); if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'household-status-logs', 'hsl.status_log_id');
+        $query = DB::table('household_status_logs as hsl')
+            ->leftJoin('disaster_events as de', 'de.event_id', '=', 'hsl.disaster_id')
+            ->leftJoin('households as h', 'h.household_id', '=', 'hsl.household_id')
+            ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
+            ->leftJoin('responders as r', 'r.responder_id', '=', 'hsl.responder_id')
+            ->leftJoin('users as u', 'u.user_id', '=', 'hsl.submitted_by_user_id')
+            ->select([
+                'hsl.*',
+                'de.name as event_name',
+                'de.started_at as event_started_at',
+                'de.ended_at as event_ended_at',
+                'h.household_code',
+                'h.household_name',
+                'a.purok_sitio',
+                'hs.status_key',
+                'hs.status_label',
+                'r.full_name as responder_name',
+                DB::raw("COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.name, u.username) as submitter_name"),
+            ]);
+        $this->applySearch($query, $request, ['hsl.status_log_id', 'de.name', 'h.household_code', 'h.household_name', 'hsl.location_label', 'hsl.notes', 'hsl.source', 'hs.status_label', 'r.full_name', 'u.name']);
+        $this->applyEventFilter($query, $request, 'hsl.disaster_id');
+        $this->applyPurokFilter($query, $request, 'a.purok_sitio');
+        $this->applyHouseholdStatusFilter($query, $request);
+        if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'household-status-logs', 'hsl.status_log_id');
         if ($asQuery) return $query;
         $paginator = $query->orderByDesc('hsl.submitted_at')->orderByDesc('hsl.status_log_id')->paginate($this->perPage($request, $perPage));
         return [$paginator, collect($paginator->items())->map(fn (object $row): array => $this->presenter->formatHouseholdStatus($row))->values()->all()];
