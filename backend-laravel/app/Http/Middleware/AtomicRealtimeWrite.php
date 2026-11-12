@@ -16,7 +16,7 @@ class AtomicRealtimeWrite
         if (! in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
             return $next($request);
         }
-        $isReport = (bool) preg_match('#^api/v1/(?:household/(?:status|members/[^/]+/status|trusted-households/[^/]+/members/[^/]+/status)|rescuer/(?:field-reports|resource-requests|assignments/[^/]+/status))$#', $request->path());
+        $isReport = (bool) preg_match('#^api/v1/(?:household/(?:status|members/[^/]+/status|trusted-households/[^/]+/members/[^/]+/status)|rescuer/(?:field-reports(?:/[^/]+)?|resource-requests|assignments/[^/]+/status))$#', $request->path());
         $key = $isReport ? $request->header('Idempotency-Key') : null;
         if (! config('realtime.durable') && $key === null) {
             return $next($request);

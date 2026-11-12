@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Location from 'expo-location';
@@ -36,6 +36,8 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
   const [roadRoute, setRoadRoute] = useState<{ coordinates: { latitude: number; longitude: number }[]; distance_km: number; duration_min: number } | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
+  const [routeRetry, setRouteRetry] = useState(0);
+  const successfulRoute = useRef<{ key: string; route: { coordinates: { latitude: number; longitude: number }[]; distance_km: number; duration_min: number } } | null>(null);
   const gps = useMapGps(active && originMode === 'live');
 
   useEffect(() => {
@@ -67,13 +69,14 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
   const originLongitude = originPoint?.longitude;
   const centerLatitude = selectedPoint?.latitude;
   const centerLongitude = selectedPoint?.longitude;
+  const routeKey = JSON.stringify([originLatitude, originLongitude, centerLatitude, centerLongitude]);
 
   useEffect(() => {
+    if (!active) return;
     let cancelled = false;
     const controller = new AbortController();
 
     async function loadRoute() {
-      setRoadRoute(null);
       if (originLatitude === undefined || originLongitude === undefined || centerLatitude === undefined || centerLongitude === undefined) {
         setRoadRoute(null);
         setRouteError('');
@@ -81,6 +84,15 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
         return;
       }
 
+      const cachedRoute = successfulRoute.current;
+      if (cachedRoute?.key === routeKey) {
+        setRoadRoute(cachedRoute.route);
+        setRouteError('');
+        setRouteLoading(false);
+        return;
+      }
+
+      setRoadRoute(null);
       setRouteLoading(true);
       setRouteError('');
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -97,11 +109,13 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
         }
 
         if (!cancelled) {
-          setRoadRoute({
+          const nextRoute = {
             distance_km: Number((route.distance / 1000).toFixed(2)),
             duration_min: Math.max(1, Math.round(route.duration / 60)),
             coordinates: route.geometry.coordinates.map((point: number[]) => ({ latitude: point[1], longitude: point[0] })),
-          });
+          };
+          successfulRoute.current = { key: routeKey, route: nextRoute };
+          setRoadRoute(nextRoute);
         }
       } catch {
         if (!cancelled) {
@@ -116,7 +130,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
 
     loadRoute();
     return () => { cancelled = true; controller.abort(); };
-  }, [originLatitude, originLongitude, centerLatitude, centerLongitude]);
+  }, [active, originLatitude, originLongitude, centerLatitude, centerLongitude, routeKey, routeRetry]);
 
   async function useLiveGps() {
     setRouteError('');
@@ -175,9 +189,21 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
           </Pressable>
         </View>
 
-        <MobileLeafletMap markers={mapMarkers} routes={mapRoutes} center={originPoint || selectedPoint || defaultRegion} followPosition={originMode === 'live' ? gps.position || livePoint : null} />
+        {active ? (
+          <MobileLeafletMap markers={mapMarkers} routes={mapRoutes} center={originPoint || selectedPoint || defaultRegion} followPosition={originMode === 'live' ? gps.position || livePoint : null} />
+        ) : null}
         {gps.error ? <Text style={styles.routeError}>{gps.error}</Text> : null}
         {routeError ? <Text style={styles.routeError}>{routeError}</Text> : null}
+        {active && routeError ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setRouteRetry((attempt) => attempt + 1)}
+            style={styles.retryRoute}
+          >
+            <Ionicons name="refresh-outline" size={16} color={palette.navActive} />
+            <Text style={styles.retryRouteText}>Retry directions</Text>
+          </Pressable>
+        ) : null}
 
         {!householdPoint ? (
           <HouseholdEmpty
@@ -264,6 +290,8 @@ const styles = StyleSheet.create({
   originOptionText: { color: palette.textSoft, fontSize: 12, fontWeight: '800' },
   originOptionTextActive: { color: palette.nav, fontWeight: '900' },
   routeError: { color: palette.unsafe, fontSize: 12, fontWeight: '800' },
+  retryRoute: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, paddingVertical: 6 },
+  retryRouteText: { color: palette.navActive, fontSize: 12, fontWeight: '900' },
   selectedBox: {
     flexDirection: 'row',
     alignItems: 'center',

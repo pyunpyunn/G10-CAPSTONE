@@ -100,6 +100,59 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $this->assertSame('completed', $completed['assignment']->status);
     }
 
+    public function test_assigned_rescuer_can_correct_a_saved_field_report_without_creating_duplicate_records(): void
+    {
+        DB::table('responder_assignments')->where('assignment_id', 7)->update(['status' => 'on_scene']);
+        $workflow = app(RescuerFieldReportWorkflow::class);
+        $saved = $workflow->store($this->request($this->validPayload()))->getData(true)['data'];
+        $correction = $this->validPayload();
+        $correction['idempotency_key'] = 'field-report-correction-7';
+        $correction['property_damage'] = 'major_damage';
+        $correction['death_count'] = 0;
+        $correction['injured_count'] = 0;
+        $correction['missing_count'] = 0;
+        $correction['notes'] = 'Correction: both household members are safe.';
+        $correction['members'] = [
+            ['member_id' => 'M-1', 'status_key' => 'safe'],
+            ['member_id' => 'M-2', 'status_key' => 'safe'],
+        ];
+
+        $updated = $workflow->update($this->request($correction), (int) $saved['report_id'])->getData(true)['data'];
+        $retried = $workflow->update($this->request($correction), (int) $saved['report_id'])->getData(true)['data'];
+
+        $this->assertSame($saved['report_id'], $updated['report_id']);
+        $this->assertSame($updated['report_id'], $retried['report_id']);
+        $this->assertDatabaseCount('responder_field_reports', 1);
+        $this->assertDatabaseCount('responder_field_report_members', 2);
+        $this->assertDatabaseCount('household_status_logs', 1);
+        $this->assertDatabaseHas('responder_field_reports', [
+            'report_id' => $saved['report_id'],
+            'property_damage' => 'major_damage',
+            'death_count' => 0,
+            'injured_count' => 0,
+            'missing_count' => 0,
+            'idempotency_key' => 'field-report-correction-7',
+        ]);
+        $this->assertDatabaseHas('responder_field_report_members', [
+            'report_id' => $saved['report_id'],
+            'member_id' => 'M-1',
+            'status_key' => 'safe',
+        ]);
+        $this->assertDatabaseHas('member_disaster_statuses', [
+            'disaster_id' => 'EVT-1',
+            'member_id' => 'M-1',
+            'status_id' => 1,
+        ]);
+        $this->assertDatabaseHas('household_status_logs', [
+            'status_log_id' => $saved['status_log_id'],
+            'status_id' => 1,
+        ]);
+        $savedDetails = $workflow->assignmentHousehold($this->request([]), 7)->getData(true)['data'];
+        $this->assertSame($saved['report_id'], $savedDetails['saved_report_id']);
+        $this->assertSame('Correction: both household members are safe.', $savedDetails['saved_notes']);
+        $this->assertSame('safe', collect($savedDetails['members'])->firstWhere('member_id', 'M-1')['member_status']['key']);
+    }
+
     public function test_rescuer_member_assessment_replaces_the_current_status_and_remains_in_report_history(): void
     {
         DB::table('member_statuses')->insert([
@@ -165,6 +218,8 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $deviceMiddleware = array_values(array_filter($route->gatherMiddleware(), fn ($middleware) => str_starts_with($middleware, 'mobile.device:')));
         $this->assertCount(1, $roleMiddleware);
         $this->assertContains('mobile.device:if-bound', $deviceMiddleware);
+        $correctionRoute = app('router')->getRoutes()->match(Request::create('/api/v1/rescuer/field-reports/91', 'PATCH'));
+        $this->assertSame('App\Http\Controllers\Api\RescuerMobileController@updateFieldReport', $correctionRoute->getActionName());
         $roles = explode(',', substr($roleMiddleware[0], 5));
         foreach (['rescuer', 'tl', 'tm', 'household_resident'] as $role) {
             $request = $this->request($this->validPayload());

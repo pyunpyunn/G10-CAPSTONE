@@ -160,7 +160,7 @@ export function configureRescuerTracking(assignmentId: number | null) {
       if (!(await Location.requestForegroundPermissionsAsync()).granted) { report('Enable precise location for active rescue tracking.'); return; }
       if (requestGeneration !== generation) return;
       void acquireCurrent(requestGeneration);
-      const subscription = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: 10000, distanceInterval: 10, mayShowUserSettingsDialog: true }, fix => { void publish(fix, requestGeneration); });
+      const subscription = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: 15000, distanceInterval: 15, mayShowUserSettingsDialog: true }, fix => { void publish(fix, requestGeneration); });
       if (requestGeneration !== generation || AppState.currentState !== 'active') subscription.remove(); else watcher = subscription;
     };
     const appState = AppState.addEventListener('change', state => {

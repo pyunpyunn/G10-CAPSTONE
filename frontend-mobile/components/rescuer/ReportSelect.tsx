@@ -10,7 +10,7 @@ export function ReportSelect({ label, value, options, onChange, disabled = false
   const [open, setOpen] = useState(false);
   return <View style={styles.field}>
     {showLabel && <Text style={styles.label}>{label}</Text>}
-    <Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${options.find(option => option.key === value)?.label || 'Select'}`} accessibilityState={{ expanded: open, disabled }} disabled={disabled} style={styles.select} onPress={() => setOpen(true)}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${options.find(option => option.key === value)?.label || 'Select'}`} accessibilityState={{ expanded: open, disabled }} disabled={disabled} style={[styles.select, disabled && styles.selectDisabled]} onPress={() => setOpen(true)}>
       <Text style={styles.value} numberOfLines={2}>{options.find(option => option.key === value)?.label || 'Select'}</Text><Ionicons name="chevron-down" size={18} color={palette.textSoft} />
     </Pressable>
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -26,6 +26,7 @@ export function ReportSelect({ label, value, options, onChange, disabled = false
 const styles = StyleSheet.create({
   field: { gap: 6 }, label: { color: palette.textSoft, fontSize: 12, fontWeight: '600' },
   select: { minHeight: 46, borderWidth: 1, borderColor: palette.border, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.card },
+  selectDisabled: { opacity: 0.55 },
   value: { color: palette.text, fontSize: 14, flexShrink: 1 }, overlay: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: '#0008' },
   dialog: { backgroundColor: palette.card, borderRadius: radius.lg, maxHeight: '75%', overflow: 'hidden' },
   heading: { paddingLeft: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: palette.border },

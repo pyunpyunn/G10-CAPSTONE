@@ -95,6 +95,11 @@ class RescuerMobileController extends Controller
         return $this->service->storeFieldReport($request);
     }
 
+    public function updateFieldReport(Request $request, int $reportId): JsonResponse
+    {
+        return $this->service->updateFieldReport($request, $reportId);
+    }
+
     public function fieldReportsAdmin(\App\Http\Requests\ListRequest $request): JsonResponse
     {
         return (new RescuerMobileAdminFieldReportsResource($this->service->fieldReportsAdmin($request)))->response();
@@ -159,5 +164,4 @@ class RescuerMobileController extends Controller
         return $this->service->storeRadioSignal($request);
     }
 }
-
 

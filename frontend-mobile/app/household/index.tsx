@@ -164,6 +164,7 @@ export default function HouseholdHomeScreen() {
   useEffect(() => {
     let active = true;
     const runSync = () => {
+      if (AppState.currentState !== 'active') return;
       void syncQueuedStatusReports().catch((error) => {
         if (active) Alert.alert('Unable to sync saved status reports', errorMessage(error));
       });
@@ -285,7 +286,9 @@ export default function HouseholdHomeScreen() {
       }
     });
 
-    const intervalId = setInterval(refreshDeviceSensors, 60000);
+    const intervalId = setInterval(() => {
+      if (AppState.currentState === 'active') void refreshDeviceSensors();
+    }, 60000);
 
     return () => {
       batterySubscription.remove();
@@ -829,6 +832,7 @@ export default function HouseholdHomeScreen() {
     if (tab === 'profile') {
       return (
         <HouseholdProfileScreen
+          active={activeTab === 'profile'}
           overview={overview}
           onUpdateGeotag={handleUpdateGeotag}
           onSaveContact={(contactNumber) => handleUpdateMember(String(overview.profile.user.member_id), { contact_number: contactNumber })}
@@ -1060,6 +1064,8 @@ export default function HouseholdHomeScreen() {
                       isActive && !tab.center && styles.activeTab,
                       pressed && !tab.center && styles.tabPressed,
                     ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
                     onPress={() => {
                       if (isQrAction) {
                         setShowQr(true);

@@ -11,6 +11,7 @@ import { HouseholdBadge, HouseholdButton, HouseholdEmpty, HouseholdSection } fro
 import type { HouseholdProfilePhotoAsset } from '@/api/household';
 
 type ProfileProps = {
+  active?: boolean;
   overview: any;
   onUpdateGeotag: (payload: any) => Promise<any>;
   onLogout: () => void;
@@ -20,6 +21,7 @@ type ProfileProps = {
 };
 
 export function HouseholdProfileScreen({
+  active = true,
   overview,
   onUpdateGeotag,
   onSaveContact,
@@ -324,7 +326,7 @@ export function HouseholdProfileScreen({
             <Ionicons name="locate-outline" size={18} color="#fff" />
             <View style={styles.geotagActionText}>
               <Text style={styles.geotagActionTitle}>{savingGeotag ? 'Saving geotag...' : 'Update geotag from GPS'}</Text>
-              <Text style={styles.geotagActionSubtitle}>Use GPS while you're at home</Text>
+              <Text style={styles.geotagActionSubtitle}>Use GPS while you&apos;re at home</Text>
             </View>
           </Pressable>
           <Pressable
@@ -341,7 +343,7 @@ export function HouseholdProfileScreen({
             </View>
           </Pressable>
         </View>
-        {geotagMapVisible ? (
+        {active && geotagMapVisible ? (
           <>
             <MobileLeafletMap
               markers={[]}
@@ -362,7 +364,7 @@ export function HouseholdProfileScreen({
           disabled={resettingOwner || savingContact || savingGeotag} onPress={() => setResetOwnerConfirmVisible((visible) => !visible)} />
         {resetOwnerConfirmVisible ? (
           <View style={styles.resetOwnerPanel}>
-            <Text style={styles.resetOwnerTitle}>Reset this phone's owner?</Text>
+            <Text style={styles.resetOwnerTitle}>Reset this phone&apos;s owner?</Text>
             <Text style={styles.resetOwnerSubtitle}>You will choose a household member again for this phone. Other phones will keep their owners.</Text>
             <View style={styles.resetOwnerActions}>
               <View style={styles.resetOwnerAction}><HouseholdButton label="Cancel" tone="light" onPress={() => setResetOwnerConfirmVisible(false)} /></View>

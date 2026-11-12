@@ -75,6 +75,11 @@ export async function createFieldReport(payload: any) {
   return response.data;
 }
 
+export async function correctFieldReport(reportId: number, payload: any) {
+  const response = await submitReport('patch', `/rescuer/field-reports/${reportId}`, payload);
+  return response.data;
+}
+
 export async function createResourceRequest(payload: any) {
   const response = await submitReport('post', '/rescuer/resource-requests', payload);
   return response.data;

@@ -298,6 +298,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/rescuer/radio/signal', [RescuerMobileController::class, 'storeRadioSignal']);
         });
         Route::post('/rescuer/field-reports', [RescuerMobileController::class, 'storeFieldReport'])->middleware(['role:rescuer,tl,tm', 'mobile.device:if-bound']);
+        Route::patch('/rescuer/field-reports/{reportId}', [RescuerMobileController::class, 'updateFieldReport'])->whereNumber('reportId')->middleware(['role:rescuer,tl,tm', 'mobile.device:if-bound']);
         Route::post('/rescuer/resource-requests', [RescuerMobileController::class, 'storeResourceRequest'])->middleware('role:tl');
     });
 });

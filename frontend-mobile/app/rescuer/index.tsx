@@ -22,6 +22,7 @@ import { logoutMobile } from '@/api/auth';
 import { savePushRegistration } from '@/api/device';
 import {
   cancelResourceRequest,
+  correctFieldReport,
   createFieldReport,
   createResourceRequest,
   getRescuerOverview,
@@ -36,6 +37,7 @@ import { RadioCommunicationScreen } from '@/components/rescuer/RadioCommunicatio
 import { RescueMapScreen } from '@/components/rescuer/RescueMapScreen';
 import { ResponderProfileScreen } from '@/components/rescuer/ResponderProfileScreen';
 import { MobileLogoutOverlay } from '@/components/MobileLogoutOverlay';
+import { MobileScreenErrorBoundary } from '@/components/MobileScreenErrorBoundary';
 import { ResourceRequestScreen } from '@/components/rescuer/ResourceRequestScreen';
 import { ActionButton, EmptyState, LoadingState, StatusBadge } from '@/components/rescuer/RescuerUI';
 import { palette, radius, spacing } from '@/constants/resqTheme';
@@ -144,7 +146,7 @@ export default function RescuerHomeScreen() {
   useEffect(() => {
     return createAdaptivePoller(
       () => AppState.currentState === 'active' ? loadOverview(true, true) : null,
-      { intervalMs: 30000, maxIntervalMs: 60000 },
+      { intervalMs: 45000, maxIntervalMs: 90000 },
     ).start();
   }, [queueAssignmentId, loadOverview]);
 
@@ -235,6 +237,11 @@ export default function RescuerHomeScreen() {
 
   async function handleSubmitFieldReport(payload: any) {
     await createFieldReport(payload);
+    void loadOverview(true, true, true);
+  }
+
+  async function handleCorrectFieldReport(reportId: number, payload: any) {
+    await correctFieldReport(reportId, payload);
     void loadOverview(true, true, true);
   }
 
@@ -335,6 +342,7 @@ export default function RescuerHomeScreen() {
           assignmentId={Number(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || 0)}
           householdId={String(selectedAssignment?.household_id || activeAssignment?.household_id || '')}
           onSubmitReport={handleSubmitFieldReport}
+          onCorrectReport={handleCorrectFieldReport}
           onCompleteHousehold={() => handleStatusChange(Number(selectedAssignment?.assignment_id || activeAssignment?.assignment_id || 0), 'completed')}
         />
       );
@@ -484,7 +492,7 @@ export default function RescuerHomeScreen() {
               </Pressable>
             </View>
           ) : null}
-          {renderContent()}
+          <MobileScreenErrorBoundary key={activeTab}>{renderContent()}</MobileScreenErrorBoundary>
         </WebAppShell>
         <MobileLogoutOverlay visible={loggingOut} />
       </SafeAreaView>
@@ -524,6 +532,8 @@ export default function RescuerHomeScreen() {
             <Pressable
               key={tab.key}
               style={[styles.tabButton, tab.special && styles.specialTab, isActive && styles.activeTab]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
               onPress={() => setActiveTab(tab.key)}
               android_ripple={{ color: '#ffffff33' }}
             >

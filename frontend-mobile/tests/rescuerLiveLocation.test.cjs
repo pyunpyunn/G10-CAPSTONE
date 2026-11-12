@@ -26,7 +26,7 @@ function fixture() {
 test('active dispatch uses paced foreground and background GPS without starting a trip',async()=>{
  const f=fixture();await f.runtime.configureRescuerTracking(71);await flush();
  const watch=f.calls.find(x=>x[0]==='watch')[1],background=f.calls.find(x=>x[0]==='background')[1];
- assert.equal(watch.accuracy,4);assert.equal(watch.timeInterval,10000);assert.equal(watch.distanceInterval,10);
+ assert.equal(watch.accuracy,4);assert.equal(watch.timeInterval,15000);assert.equal(watch.distanceInterval,15);
  assert.equal(background.timeInterval,15000);assert.equal(background.distanceInterval,15);assert.equal(background.pausesUpdatesAutomatically,false);
  assert.equal(f.calls.find(x=>x[0]==='post')[1],'/rescuer/assignments/71/location');assert.ok(f.background());
  await f.runtime.stopRescuerTracking();

@@ -191,6 +191,11 @@ class RescuerMobileService
         return $this->fieldReportWorkflow->store($request);
     }
 
+    public function updateFieldReport(Request $request, int $reportId): JsonResponse
+    {
+        return $this->fieldReportWorkflow->update($request, $reportId);
+    }
+
     public function fieldReportsAdmin(Request $request): array
     {
         return $this->fieldReportWorkflow->fieldReportsAdmin($request);
@@ -258,7 +263,6 @@ class RescuerMobileService
     }
 
 }
-
 
 
 

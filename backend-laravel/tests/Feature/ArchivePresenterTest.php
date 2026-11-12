@@ -60,7 +60,7 @@ class ArchivePresenterTest extends TestCase
         $this->assertSame([], $group['records']);
     }
 
-    public function test_household_status_archive_formats_mobile_field_report_assessment(): void
+    public function test_household_status_archive_does_not_show_member_notes_or_assessments(): void
     {
         $record = app(ArchivePresenter::class)->formatHouseholdStatus((object) [
             'status_log_id' => 3,
@@ -94,14 +94,40 @@ class ArchivePresenterTest extends TestCase
 
         $details = collect($record['details'])->keyBy('label')->map(fn (array $detail) => $detail['value']);
 
-        $this->assertStringContainsString('Deaths: 1', $record['source']['meta']);
+        $this->assertSame('Logged by Responder', $record['source']['meta']);
         $this->assertSame('Flood', $details['Incident type']);
         $this->assertSame('Major', $details['Property damage']);
         $this->assertSame('1', $details['Deaths']);
         $this->assertSame('2', $details['Injured']);
         $this->assertSame('0', $details['Missing']);
-        $this->assertSame('M-1: Injured', $details['Member assessments']);
-        $this->assertSame('Evacuation required.', $details['Field notes']);
+        $this->assertArrayNotHasKey('Member assessments', $details->all());
+        $this->assertArrayNotHasKey('Field notes', $details->all());
+        $this->assertSame('Evacuation required.', $details['Remarks / Notes']);
+    }
+
+    public function test_household_status_archive_ignores_member_notes(): void
+    {
+        $record = app(ArchivePresenter::class)->formatHouseholdStatus((object) [
+            'status_log_id' => 4,
+            'disaster_id' => 'EV-1',
+            'status_key' => 'needs_help',
+            'status_label' => 'Needs help',
+            'household_name' => 'Rivera Household',
+            'purok_sitio' => 'Purok 1',
+            'source' => 'household_mobile',
+            'notes' => json_encode(['member_notes' => 'Private member note']),
+            'event_name' => 'Flood response',
+            'event_ended_at' => null,
+            'submitted_at' => '2026-11-12 12:00:00',
+            'location_label' => null,
+            'location_accuracy_m' => null,
+            'battery_level' => null,
+            'latitude' => null,
+            'longitude' => null,
+        ]);
+
+        $labels = collect($record['details'])->pluck('label');
+        $this->assertFalse($labels->contains('Remarks / Notes'));
+        $this->assertStringNotContainsString('Private member note', json_encode($record));
     }
 }
-

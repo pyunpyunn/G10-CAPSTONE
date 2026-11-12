@@ -172,10 +172,12 @@ export const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   activeTab: {
-    backgroundColor: '#ffffff20',
+    backgroundColor: '#ffffff35',
+    borderWidth: 1,
+    borderColor: '#ffffff66',
   },
   tabPressed: {
-    backgroundColor: '#ffffff20',
+    opacity: 0.75,
   },
   centerTab: {
     width: 70,

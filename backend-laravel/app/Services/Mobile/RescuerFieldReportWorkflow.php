@@ -129,8 +129,34 @@ class RescuerFieldReportWorkflow
         $household->full_address = app(\App\Queries\HouseholdAddressQuery::class)->forHouseholds([$household->household_id])->get($household->household_id);
         $head = $members->firstWhere('is_household_head', true);
         $memberStatusOptions = $this->memberStatusOptions();
+        $savedFieldReport = Schema::hasTable('responder_field_reports')
+            ? DB::table('responder_field_reports')
+            ->where('assignment_id', $assignmentId)
+            ->where('responder_id', $responder->responder_id)
+            ->where('household_id', $household->household_id)
+            ->first(array_values(array_filter([
+                'report_id',
+                'death_count',
+                'injured_count',
+                Schema::hasColumn('responder_field_reports', 'missing_count') ? 'missing_count' : null,
+                'property_damage',
+                'notes',
+            ])))
+            : null;
+        $savedMemberStatuses = $savedFieldReport && Schema::hasTable('responder_field_report_members')
+            ? DB::table('responder_field_report_members')->where('report_id', $savedFieldReport->report_id)->pluck('status_key', 'member_id')
+            : collect();
         $defaultStatus = collect($memberStatusOptions)->first(fn ($option) => in_array($option['key'], ['unknown','unchecked','unreported'], true));
-        $members = $members->map(fn ($member) => array_merge($member, ['member_status' => $member['member_status'] ?? $defaultStatus]));
+        $members = $members->map(function (array $member) use ($memberStatusOptions, $savedMemberStatuses, $defaultStatus): array {
+            $savedStatusKey = $savedMemberStatuses->get($member['member_id']);
+            $savedStatus = $savedStatusKey
+                ? collect($memberStatusOptions)->firstWhere('key', $savedStatusKey)
+                : null;
+
+            return array_merge($member, ['member_status' => $savedStatus
+                ? ['key' => $savedStatus['key'], 'label' => $savedStatus['label']]
+                : ($member['member_status'] ?? $defaultStatus)]);
+        });
         if ($memberStatusOptions === []) {
             return response()->json(['message' => 'No active member status options are configured for field reports.'], 503);
         }
@@ -150,8 +176,14 @@ class RescuerFieldReportWorkflow
             ],
             'members' => $members,
             'member_status_options' => $memberStatusOptions,
-            'saved_counts' => Schema::hasColumn('responder_field_reports', 'missing_count') ? DB::table('responder_field_reports')->where('assignment_id', $assignmentId)->where('responder_id', $responder->responder_id)->where('household_id', $household->household_id)->first(['death_count', 'injured_count', 'missing_count']) : null,
-            'saved_property_damage' => Schema::hasColumn('responder_field_reports','property_damage') ? DB::table('responder_field_reports')->where('assignment_id',$assignmentId)->where('responder_id',$responder->responder_id)->where('household_id',$household->household_id)->value('property_damage') : null,
+            'saved_counts' => $savedFieldReport ? [
+                'death_count' => $savedFieldReport->death_count,
+                'injured_count' => $savedFieldReport->injured_count,
+                'missing_count' => $savedFieldReport->missing_count ?? 0,
+            ] : null,
+            'saved_property_damage' => $savedFieldReport?->property_damage,
+            'saved_notes' => $savedFieldReport ? (json_decode((string) $savedFieldReport->notes, true)['user_notes'] ?? '') : '',
+            'saved_report_id' => $savedFieldReport?->report_id,
             'property_damage_options' => Schema::hasTable('property_damage_levels') ? DB::table('property_damage_levels')->where('is_active',true)->orderBy('sort_order')->get(['damage_key as key','label'])->all() : [],
         ]]);
     }
@@ -361,7 +393,12 @@ class RescuerFieldReportWorkflow
         ], 201);
     }
 
-    private function storeAssignmentReport(Request $request): JsonResponse
+    public function update(Request $request, int $reportId): JsonResponse
+    {
+        return $this->storeAssignmentReport($request, $reportId);
+    }
+
+    private function storeAssignmentReport(Request $request, ?int $correctionReportId = null): JsonResponse
     {
         foreach ([
             'household_status_logs', 'responder_field_reports', 'responder_field_report_members',
@@ -478,7 +515,7 @@ class RescuerFieldReportWorkflow
         }
 
         $now = now();
-        $reportId = $this->support->nextId('responder_field_reports', 'report_id');
+        $reportId = $correctionReportId ?? $this->support->nextId('responder_field_reports', 'report_id');
         $reportNotes = json_encode([
             'report_type' => 'rescuer_field_report',
             'assignment_id' => (int) $assignment->assignment_id,
@@ -494,7 +531,7 @@ class RescuerFieldReportWorkflow
 
         $result = DB::transaction(function () use (
             $request, $user, $responder, $assignment, $activeEvent, $validated, $members,
-            $householdMembers, $memberStatuses, $statusKey, $statusId, $reportId,
+            $householdMembers, $memberStatuses, $statusKey, $statusId, $reportId, $correctionReportId,
             $payloadHash, $incidentTypeOther, $reportNotes, $now,
         ): array {
             $lockedAssignment = DB::table('responder_assignments')
@@ -525,35 +562,53 @@ class RescuerFieldReportWorkflow
                 ->lockForUpdate()
                 ->first();
             if ($existing) {
+                if ($correctionReportId !== null && (int) $existing->report_id !== $correctionReportId) {
+                    abort(404, 'The saved field report was not found for this assignment.');
+                }
                 if ((string) $existing->idempotency_key === (string) $validated['idempotency_key']
                     && hash_equals((string) $existing->payload_hash, $payloadHash)) {
                     return ['report_id' => $existing->report_id, 'status_log_id' => $existing->status_log_id, 'duplicate' => true];
                 }
 
-                abort(409, 'A field report has already been saved for this assignment.');
+                if ($correctionReportId === null) {
+                    abort(409, 'A field report has already been saved for this assignment.');
+                }
+            } elseif ($correctionReportId !== null) {
+                abort(404, 'The saved field report was not found for this assignment.');
             }
 
-            $statusLogId = $this->support->nextId('household_status_logs', 'status_log_id');
-            DB::table('household_status_logs')->insert($this->support->filterColumns('household_status_logs', [
-                'status_log_id' => $statusLogId,
+            $statusLogId = $correctionReportId !== null
+                ? (int) $existing->status_log_id
+                : $this->support->nextId('household_status_logs', 'status_log_id');
+            if ($correctionReportId !== null && $statusLogId <= 0) {
+                abort(409, 'The saved field report has no linked household status log and cannot be corrected.');
+            }
+            $statusLogData = $this->support->filterColumns('household_status_logs', [
+                'responder_id' => $responder->responder_id,
                 'disaster_id' => $activeEvent->event_id,
                 'household_id' => $assignment->household_id,
                 'status_id' => $statusId,
                 'source' => 'responder_field_report',
                 'submitted_by_user_id' => $user?->user_id,
-                'responder_id' => $responder->responder_id,
                 'assignment_id' => $assignment->assignment_id,
                 'latitude' => $validated['latitude'] ?? null,
                 'longitude' => $validated['longitude'] ?? null,
                 'battery_level' => $validated['battery_level'] ?? null,
                 'notes' => $reportNotes,
                 'submitted_at' => $now,
-                'created_at' => $now,
                 'updated_at' => $now,
-            ]));
+            ]);
+            if ($correctionReportId !== null) {
+                DB::table('household_status_logs')->where('status_log_id', $statusLogId)->update($statusLogData);
+                DB::table('responder_field_report_members')->where('report_id', $reportId)->delete();
+            } else {
+                DB::table('household_status_logs')->insert($statusLogData + [
+                    'status_log_id' => $statusLogId,
+                    'created_at' => $now,
+                ]);
+            }
 
-            ResponderFieldReport::query()->insert($this->support->filterColumns('responder_field_reports', [
-                'report_id' => $reportId,
+            $reportData = $this->support->filterColumns('responder_field_reports', [
                 'responder_id' => $responder->responder_id,
                 'disaster_id' => $activeEvent->event_id,
                 'household_id' => $assignment->household_id,
@@ -572,8 +627,15 @@ class RescuerFieldReportWorkflow
                 'longitude' => $validated['longitude'] ?? null,
                 'notes' => $reportNotes,
                 'submitted_at' => $now,
-                'created_at' => $now,
-            ]));
+            ]);
+            if ($correctionReportId !== null) {
+                DB::table('responder_field_reports')->where('report_id', $reportId)->update($reportData);
+            } else {
+                ResponderFieldReport::query()->insert($reportData + [
+                    'report_id' => $reportId,
+                    'created_at' => $now,
+                ]);
+            }
 
             foreach ($members as $member) {
                 $memberStatusId = $memberStatuses[$member['status_key']]->status_id;
@@ -617,7 +679,7 @@ class RescuerFieldReportWorkflow
                 null,
                 false,
             );
-            $this->support->writeAuditLog($request, 'mobile_field_report', 'responder_field_reports', (string) $reportId, [
+            $this->support->writeAuditLog($request, $correctionReportId === null ? 'mobile_field_report' : 'mobile_field_report_corrected', 'responder_field_reports', (string) $reportId, [
                 'assignment_id' => $assignment->assignment_id,
                 'household_id' => $assignment->household_id,
                 'event_id' => $activeEvent->event_id,
@@ -789,7 +851,3 @@ class RescuerFieldReportWorkflow
         return response()->json(['message' => 'The required '.$table.' table is not available in the current database.'], 503);
     }
 }
-
-
-
-

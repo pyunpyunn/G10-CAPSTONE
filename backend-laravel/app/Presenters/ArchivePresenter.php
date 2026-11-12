@@ -26,31 +26,38 @@ class ArchivePresenter
         $source = $this->label($row->source ?: 'mobile_report');
         $meta = $row->location_label ?: 'No location label';
         $fieldReport = $this->fieldReportPayload($row->notes);
-        $remarks = $fieldReport
-            ? $this->fieldReportSummary($fieldReport)
-            : ($row->notes ?: ($row->responder_name ? 'Logged by '.$row->responder_name : 'No remarks'));
 
         if ($row->location_accuracy_m !== null) {
             $meta .= ' - '.$row->location_accuracy_m.'m accuracy';
         }
 
-        // Clean author/logger formatting (follows Picture 2: 'Logged by <Name>')
-        $loggedBy = null;
-        if (!empty($row->responder_name)) {
+        if (! empty($row->responder_name)) {
             $loggedBy = 'Logged by '.$row->responder_name;
-        } elseif (!empty($row->submitter_name)) {
+        } elseif (! empty($row->submitter_name)) {
             $loggedBy = 'Logged by '.$row->submitter_name;
         } else {
             $notesData = is_string($row->notes ?? null) ? json_decode($row->notes, true) : null;
-            if (is_array($notesData) && !empty($notesData['member_name'])) {
+            if (is_array($notesData) && ! empty($notesData['member_name'])) {
                 $loggedBy = 'Logged by '.$notesData['member_name'];
-            } elseif (!empty($row->household_name) && $row->household_name !== 'Household') {
+            } elseif (! empty($row->household_name) && $row->household_name !== 'Household') {
                 $loggedBy = 'Logged by '.$row->household_name;
-            } elseif (!empty($householdName) && $householdName !== 'Household') {
+            } elseif (! empty($householdName) && $householdName !== 'Household') {
                 $loggedBy = 'Logged by '.$householdName;
             } else {
                 $loggedBy = 'Logged by Household Mobile';
             }
+        }
+
+        $notesData = is_string($row->notes ?? null) ? json_decode($row->notes, true) : null;
+        $cleanRemarks = null;
+        if (is_array($notesData)) {
+            if ($fieldReport) {
+                $cleanRemarks = $fieldReport['user_notes'] ?? null;
+            } else {
+                $cleanRemarks = $notesData['user_notes'] ?? null;
+            }
+        } elseif (! empty($row->notes)) {
+            $cleanRemarks = $row->notes;
         }
 
         $record = [
@@ -72,74 +79,25 @@ class ArchivePresenter
             ],
             'source' => [
                 'title' => $source,
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
                 'meta' => $loggedBy,
             ],
         ];
 
-        // Format clean remarks for details popup (without raw JSON strings)
-        $rawNotes = $row->notes ?? '';
-        $cleanRemarks = null;
-        if (is_string($rawNotes) && str_starts_with(trim($rawNotes), '{')) {
-            $decoded = json_decode($rawNotes, true);
-            if (is_array($decoded)) {
-                $cleanRemarks = $decoded['user_notes'] ?? $decoded['member_notes'] ?? null;
-            }
-        } elseif (!empty($rawNotes)) {
-            $cleanRemarks = $rawNotes;
-        }
-
         $detailFields = [
-=======
-                'meta' => $remarks,
-            ],
-        ];
-
-        $record['details'] = array_merge($this->details([
->>>>>>> Stashed changes
-=======
-                'meta' => $remarks,
-            ],
-        ];
-
-        $record['details'] = array_merge($this->details([
->>>>>>> Stashed changes
-=======
-                'meta' => $remarks,
-            ],
-        ];
-
-        $record['details'] = array_merge($this->details([
->>>>>>> Stashed changes
             'Date / time' => $record['datetime'],
             'Event' => $record['event'],
             'Household / geotag' => $householdName.' - '.$meta,
             'Purok' => $purok,
             'Status change' => $record['status_change']['label'],
-<<<<<<< Updated upstream
             'Source / remarks' => $source.' - '.$loggedBy,
         ];
-        if (!empty($cleanRemarks)) {
+        if (! empty($cleanRemarks)) {
             $detailFields['Remarks / Notes'] = $cleanRemarks;
         }
         $detailFields['Battery level'] = $row->battery_level !== null ? $row->battery_level.'%' : 'Not recorded';
         $detailFields['Coordinates'] = $row->latitude && $row->longitude ? $row->latitude.', '.$row->longitude : 'Not recorded';
-
         $record['details'] = $this->details($detailFields);
-=======
-            'Source / remarks' => $source.' - '.$record['source']['meta'],
-            'Battery level' => $row->battery_level !== null ? $row->battery_level.'%' : 'Not recorded',
-            'Coordinates' => $row->latitude && $row->longitude ? $row->latitude.', '.$row->longitude : 'Not recorded',
-        ]), $this->fieldReportDetails($fieldReport));
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+        $record['details'] = array_merge($record['details'], $this->fieldReportDetails($fieldReport));
         $record['export'] = [
             'datetime' => $record['datetime'],
             'event' => $record['event'],
@@ -160,33 +118,6 @@ class ArchivePresenter
         return is_array($payload) && ($payload['report_type'] ?? null) === 'rescuer_field_report'
             ? $payload
             : null;
-    }
-
-    private function fieldReportSummary(array $report): string
-    {
-        $parts = [];
-        $incident = ($report['incident_type'] ?? null) === 'other'
-            ? ($report['incident_type_other'] ?? 'Other')
-            : ($report['incident_type'] ?? null);
-        if (is_string($incident) && $incident !== '') {
-            $parts[] = 'Incident: '.$this->label($incident);
-        }
-        if (! empty($report['property_damage'])) {
-            $parts[] = 'Property damage: '.$this->label((string) $report['property_damage']);
-        }
-        foreach (['death_count' => 'Deaths', 'injured_count' => 'Injured', 'missing_count' => 'Missing'] as $key => $label) {
-            if (array_key_exists($key, $report)) {
-                $parts[] = $label.': '.(int) $report[$key];
-            }
-        }
-        if (! empty($report['members']) && is_array($report['members'])) {
-            $parts[] = count($report['members']).' members assessed';
-        }
-        if (! empty($report['user_notes'])) {
-            $parts[] = 'Notes: '.trim((string) $report['user_notes']);
-        }
-
-        return implode(' · ', $parts) ?: 'Field assessment submitted';
     }
 
     private function fieldReportDetails(?array $report): array
@@ -210,16 +141,6 @@ class ArchivePresenter
                 $values[$label] = (string) (int) $report[$key];
             }
         }
-        if (! empty($report['members']) && is_array($report['members'])) {
-            $values['Member assessments'] = implode('; ', array_map(
-                fn (array $member): string => trim((string) ($member['member_id'] ?? 'Member')).': '.$this->label((string) ($member['status_key'] ?? 'Not reported')),
-                array_filter($report['members'], 'is_array'),
-            ));
-        }
-        if (! empty($report['user_notes'])) {
-            $values['Field notes'] = trim((string) $report['user_notes']);
-        }
-
         return $this->details($values);
     }
 
