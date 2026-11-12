@@ -7,8 +7,18 @@ import { topicsForPath } from '../../utils/realtimeTopics'
 import { hasAdminWebAccess } from '../../utils/personnelAccess'
 import BrowserNotificationPrompt from '../notifications/BrowserNotificationPrompt'
 
+const PINNED_STORAGE_KEY = 'resqperation_sidebar_pinned'
+
+function getInitialPinnedState() {
+  try {
+    return localStorage.getItem(PINNED_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
 export default function AppShell({ user, pages, onLogout, onUserChange }) {
-  const [isPinned, setIsPinned] = useState(false)
+  const [isPinned, setIsPinned] = useState(getInitialPinnedState)
   const [isPeeking, setIsPeeking] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [isTopbarHovered, setIsTopbarHovered] = useState(false)
@@ -79,13 +89,23 @@ export default function AppShell({ user, pages, onLogout, onUserChange }) {
     setIsTopbarHovered(false)
   }
 
+  function handleTogglePin() {
+    setIsPinned((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(PINNED_STORAGE_KEY, String(next))
+      } catch {}
+      return next
+    })
+  }
+
   return (
     <div className={shellClass}>
       <Sidebar
         notificationControl={notificationsAccess ? <BrowserNotificationPrompt key={userId} /> : null}
         pages={pages}
         isPinned={isPinned}
-        onTogglePin={() => setIsPinned(!isPinned)}
+        onTogglePin={handleTogglePin}
         onPeekStart={() => setIsPeeking(true)}
         onPeekEnd={() => setIsPeeking(false)}
         onLogout={onLogout}

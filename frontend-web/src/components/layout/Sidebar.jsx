@@ -49,13 +49,45 @@ const icons = {
   '/archive': Database,
 }
 
+const OPEN_GROUPS_STORAGE_KEY = 'resqperation_sidebar_open_groups'
+
+function loadSavedOpenGroups(activeGroup) {
+  try {
+    const raw = localStorage.getItem(OPEN_GROUPS_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        const set = new Set(parsed)
+        if (activeGroup) set.add(activeGroup)
+        return set
+      }
+    }
+  } catch {}
+  return new Set(activeGroup ? [activeGroup] : [])
+}
+
+function persistOpenGroups(groups) {
+  try {
+    localStorage.setItem(OPEN_GROUPS_STORAGE_KEY, JSON.stringify(Array.from(groups)))
+  } catch {}
+}
+
 export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onPeekEnd, onLogout, notificationControl }) {
   const location = useLocation()
   const activeGroup = getActiveGroup(location.pathname, pages)
-  const [navigation, setNavigation] = useState(() => ({ activeGroup, openGroups: new Set([activeGroup]) }))
+  const [navigation, setNavigation] = useState(() => {
+    const initialGroups = loadSavedOpenGroups(activeGroup)
+    persistOpenGroups(initialGroups)
+    return { activeGroup, openGroups: initialGroups }
+  })
   const openGroups = navigation.openGroups
   if (navigation.activeGroup !== activeGroup) {
-    setNavigation({ activeGroup, openGroups: new Set(openGroups).add(activeGroup) })
+    const nextGroups = new Set(openGroups)
+    if (activeGroup) {
+      nextGroups.add(activeGroup)
+      persistOpenGroups(nextGroups)
+    }
+    setNavigation({ activeGroup, openGroups: nextGroups })
   }
 
   function toggleGroup(title) {
@@ -68,6 +100,7 @@ export default function Sidebar({ pages, isPinned, onTogglePin, onPeekStart, onP
         nextGroups.add(title)
       }
 
+      persistOpenGroups(nextGroups)
       return { ...current, openGroups: nextGroups }
     })
   }
