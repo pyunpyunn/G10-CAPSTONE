@@ -153,6 +153,7 @@ export default function RescueCriteriaChart({ eventId }) {
   const data = useMemo(() => ({
     datasets: plotSeries.map((sitio, index) => ({
       label: `${sitio.sitio}${sitio.is_demo ? ' (demo)' : ''}`,
+      sitioName: sitio.sitio,
       hidden: hiddenSitios.has(sitio.sitio_id),
       data: sitio.points.map((point) => ({
         x: Number(point.hours_since_alert), y: point.purok_impact == null ? null : Number(point.purok_impact),
@@ -177,10 +178,13 @@ export default function RescueCriteriaChart({ eventId }) {
     maintainAspectRatio: false,
     animation: false,
     layout: { padding: { top: 8, right: 8, bottom: 8, left: 8 } },
-    events: [],
+    interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
     plugins: {
       legend: { display: false },
-      tooltip: { enabled: false },
+      tooltip: {
+        enabled: true,
+        callbacks: { title: () => '', label: (context) => context.dataset.sitioName },
+      },
     },
     scales: {
       x: {

@@ -264,3 +264,9 @@
 .ro-reference .ar .sitio-priority-list h3{padding:4px 10px}
 
 .ro-reference .dispatch-communication-only{display:flex;flex:1;min-width:0;min-height:0}
+
+.ro-reference .communication-page{display:grid;grid-template-columns:232px minmax(0,1fr);flex:1;min-width:0;min-height:360px;overflow:hidden}
+.ro-reference .communication-page .rl{flex-direction:column}
+.ro-reference .communication-page .rg{display:block}
+.ro-reference .communication-page .ri{width:100%;white-space:normal;text-align:left}
+@media(max-width:640px){.ro-reference .communication-page{grid-template-columns:1fr;grid-template-rows:auto minmax(260px,1fr)}.ro-reference .communication-page .rl{max-height:180px}.ro-reference .communication-page .cth{flex-wrap:wrap}}
