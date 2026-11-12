@@ -13,12 +13,14 @@ export function ChangePasswordSection({
   accountIdentifiers,
   standaloneButton = false,
   settingsRow = false,
-  rescuerActions = false,
+  pairedActions = false,
+  pairedUpdateTone = 'primary',
 }: {
   accountIdentifiers: (string | undefined)[];
   standaloneButton?: boolean;
   settingsRow?: boolean;
-  rescuerActions?: boolean;
+  pairedActions?: boolean;
+  pairedUpdateTone?: 'primary' | 'nav';
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -76,7 +78,7 @@ export function ChangePasswordSection({
         <HouseholdButton
           label="Change password"
           icon="lock-closed-outline"
-          tone={rescuerActions ? 'primary' : 'nav'}
+          tone={pairedActions ? 'primary' : 'nav'}
           layout={settingsRow ? 'settings' : 'default'}
           onPress={() => { setOpen(true); setMessage(''); }}
         />
@@ -117,7 +119,7 @@ export function ChangePasswordSection({
           </View>
         ))}
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-        {rescuerActions ? (
+        {pairedActions ? (
           <View style={styles.actionRow}>
             <View style={styles.actionButton}>
               <HouseholdButton label="Cancel" tone="light" disabled={saving} onPress={cancelChange} />
@@ -125,7 +127,7 @@ export function ChangePasswordSection({
             <View style={styles.actionButton}>
               <HouseholdButton
                 label={saving ? 'Updating...' : 'Update password'}
-                tone="primary"
+                tone={pairedUpdateTone}
                 disabled={saving || !canSubmit}
                 onPress={submit}
               />

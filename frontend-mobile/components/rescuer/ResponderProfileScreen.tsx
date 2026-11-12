@@ -156,7 +156,7 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
       <ChangePasswordSection
         accountIdentifiers={[user.user_id, user.username, user.email, responder.responder_code]}
         standaloneButton
-        rescuerActions
+        pairedActions
       />
 
       <ActionButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />

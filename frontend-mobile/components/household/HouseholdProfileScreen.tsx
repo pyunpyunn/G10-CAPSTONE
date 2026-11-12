@@ -387,7 +387,13 @@ export function HouseholdProfileScreen({
               } },
             ])} />
         </View>
-        <ChangePasswordSection accountIdentifiers={[household.household_id]} standaloneButton settingsRow />
+        <ChangePasswordSection
+          accountIdentifiers={[household.household_id]}
+          standaloneButton
+          settingsRow
+          pairedActions
+          pairedUpdateTone="nav"
+        />
       </View>
 
       <HouseholdButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
