@@ -45,6 +45,7 @@ class RescuerAccountWriteWorkflow
                 'login_id' => $validated['account_id'],
                 'email' => $validated['email'] ?? null,
                 'password' => $passwordHash,
+                'temporary_password_expires_at' => $now->copy()->addHours(24),
                 'role_id' => $roleId,
                 'contact_number' => $validated['contact_number'],
                 'is_active' => $validated['account_status'] === 'disabled' ? 0 : 1,
@@ -153,6 +154,7 @@ class RescuerAccountWriteWorkflow
             if (! empty($validated['password'])) {
                 $passwordHash = Hash::make($validated['password']);
                 $userUpdate['password'] = $passwordHash;
+                $userUpdate['temporary_password_expires_at'] = $now->copy()->addHours(24);
                 $userUpdate['must_change_password'] = 0;
             }
 

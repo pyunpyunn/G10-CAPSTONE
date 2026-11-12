@@ -1,4 +1,4 @@
-const { withAndroidManifest, withDangerousMod } = require('@expo/config-plugins');
+const { withAndroidManifest, withDangerousMod, withMainApplication } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
@@ -19,10 +19,19 @@ module.exports = function withDispatchAlarm(config) {
     app.service.push({ $: { 'android:name': `${pkg}.DispatchAlarmService`, 'android:exported': 'false', 'android:foregroundServiceType': 'mediaPlayback' } });
     return mod;
   });
+  config = withMainApplication(config, (mod) => {
+    const registration = 'add(DispatchAlarmPackage())';
+    if (!mod.modResults.contents.includes(registration)) {
+      const marker = 'PackageList(this).packages.apply {';
+      if (!mod.modResults.contents.includes(marker)) throw new Error('Cannot register DispatchAlarmPackage in MainApplication.');
+      mod.modResults.contents = mod.modResults.contents.replace(marker, `${marker}\n              ${registration}`);
+    }
+    return mod;
+  });
   return withDangerousMod(config, ['android', (mod) => {
     const target = path.join(mod.modRequest.platformProjectRoot, 'app/src/main/java', ...pkg.split('.'));
     fs.mkdirSync(target, { recursive: true });
-    for (const name of ['DispatchNotificationExtension', 'DispatchAlarmService']) {
+    for (const name of ['DispatchNotificationExtension', 'DispatchAlarmService', 'DispatchAlarmPackage']) {
       const source = fs.readFileSync(path.join(__dirname, 'android', `${name}.java`), 'utf8');
       fs.writeFileSync(path.join(target, `${name}.java`), source.replaceAll('__PACKAGE__', pkg));
     }

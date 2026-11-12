@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Support\TemporaryResponderPassword;
 
 class RescuerAccountPayloadValidator
 {
@@ -35,6 +36,13 @@ class RescuerAccountPayloadValidator
         $numericAdminId = $isUpdate && in_array(strtolower((string) ($existing->role_key ?? '')),
             ['operations_admin', 'super_admin', 'superadmin', 'admin'], true);
         $rules = $this->rules($isUpdate, $numericAdminId);
+        $password = $request->input('password');
+        if (is_string($password) && TemporaryResponderPassword::matches(
+            $password,
+            (string) $request->input('first_name', '')
+        )) {
+            $rules['password'] = ['nullable', 'string', 'max:128'];
+        }
         if ($isUpdate && str_starts_with(strtoupper((string) ($existing->username ?? '')), 'BDRRM-')) {
             foreach (['account_id', 'responder_code'] as $field) {
                 if ($request->input($field) === $existing->username) {

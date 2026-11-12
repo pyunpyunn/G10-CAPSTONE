@@ -33,6 +33,7 @@ class ResponderFieldReport extends Model
         'property_damage',
         'death_count',
         'injured_count',
+        'missing_count',
         'idempotency_key',
         'payload_hash',
         'submitted_at',

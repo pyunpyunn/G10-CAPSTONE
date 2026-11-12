@@ -8,6 +8,7 @@ use App\Presenters\HouseholdMobilePresenter;
 use App\Queries\HouseholdMobileReadQuery;
 use Illuminate\Support\Facades\DB;
 use App\Support\RequestSchema as Schema;
+use Illuminate\Validation\ValidationException;
 
 class HouseholdMobileStatusWriter
 {
@@ -23,12 +24,13 @@ class HouseholdMobileStatusWriter
             $eventId,
             $householdId,
             $statusId,
-            $validated['safety_basis'] ?? $validated['canonical_status_key'] ?? $validated['status_key'],
+            $validated['canonical_status_key'] ?? $validated['safety_basis'] ?? $validated['status_key'],
             $validated['status_source'] ?? 'household_mobile',
             $validated['notes'] ?? null,
             $userId,
             $deviceId,
             $validated,
+            reportedAt: $now,
         );
     }
 
@@ -38,7 +40,7 @@ class HouseholdMobileStatusWriter
         $status = $this->readQuery->resolveStatus($statusKey);
 
         if (! $status) {
-            return;
+            throw ValidationException::withMessages(['status_key' => 'The household status catalog is incomplete. Contact HQ before retrying.']);
         }
 
         $notes = json_encode([
@@ -77,10 +79,10 @@ class HouseholdMobileStatusWriter
     public function saveMemberDisasterStatus(string $eventId, string $householdId, string $memberId, array $validated, ?string $userId, ?int $deviceId, $now): void
     {
         if (! Schema::hasTable('member_disaster_statuses') || ! Schema::hasTable('member_statuses')) {
-            return;
+            throw ValidationException::withMessages(['status_key' => 'Member status storage is unavailable. Contact HQ before retrying.']);
         }
 
-        $memberKey = $validated['safety_basis'] ?? $validated['status_key'];
+        $memberKey = $validated['canonical_status_key'] ?? $validated['safety_basis'] ?? $validated['status_key'];
         $statusId = DB::table('member_statuses')
             ->where('status_key', $memberKey)
             ->where('is_active', true)
@@ -97,7 +99,7 @@ class HouseholdMobileStatusWriter
         }
 
         if (! $statusId) {
-            return;
+            throw ValidationException::withMessages(['status_key' => 'The member status catalog is incomplete. Contact HQ before retrying.']);
         }
 
         $payload = [

@@ -23,7 +23,12 @@ class ArchiveGroupManager
         return DB::table('incident_archives')->where('archive_type', 'saved_log_group')
             ->where('reference_table', $category)->pluck('archive_note')
             ->flatMap(fn (?string $note): array => collect($this->payload->records($note))
-                ->map(fn (array $record): string => trim((string) $record['id']))->all())
+                ->flatMap(fn (array $record): array => collect(array_merge(
+                    [$record['id'] ?? null],
+                    $record['communication_ids'] ?? [],
+                ))
+                    ->map(fn (mixed $id): string => trim((string) $id))->all())
+                ->all())
             ->unique()->values()->all();
     }
 
@@ -32,7 +37,7 @@ class ArchiveGroupManager
         $unavailableMessage = $this->storageMessage();
         if ($unavailableMessage !== '') return response()->json(['success' => false, 'message' => $unavailableMessage, 'data' => ['groups' => []]], 503);
         $groups = DB::table('incident_archives')->where('archive_type', 'saved_log_group')->orderByDesc('archived_at')->orderByDesc('archive_id')->limit(50)->get()->map(fn (object $row): array => $this->presenter->savedGroup($row, self::CATEGORIES))->values()->all();
-        $ids = collect($groups)->where('category', 'radio-communication-logs')->flatMap(fn ($group) => array_column($group['records'], 'id'))->map(fn ($id) => (string) $id)->unique()->all();
+        $ids = collect($groups)->where('category', 'radio-communication-logs')->flatMap(fn ($group) => collect($group['records'])->flatMap(fn (array $record) => $record['communication_ids'] ?? [$record['id'] ?? null]))->map(fn ($id) => (string) $id)->unique()->all();
         $messages = [];
         if ($ids && Schema::hasTable('responder_communication_logs')) {
             foreach (array_chunk($ids, 500) as $chunk) {
@@ -42,16 +47,25 @@ class ArchiveGroupManager
         foreach ($groups as &$group) {
             if ($group['category'] !== 'radio-communication-logs') continue;
             foreach ($group['records'] as &$record) {
-                if (isset($messages[(string) $record['id']])) {
-                    $record['recording'] = $this->presenter->recording($messages[(string) $record['id']]);
-                } elseif (is_string($record['recording']['url'] ?? null) && str_starts_with($record['recording']['url'], '/storage/')) {
+                $storedRecording = $record['recording'] ?? null;
+                $recordIds = $record['communication_ids'] ?? [(string) $record['id']];
+                $record['recordings'] = collect($recordIds)
+                    ->filter(fn ($id): bool => isset($messages[(string) $id]))
+                    ->map(function ($id) use ($messages): ?array {
+                        $recording = $this->presenter->recording($messages[(string) $id]);
+                        return $recording ? ['communication_id' => (string) $id, 'recording' => $recording] : null;
+                    })
+                    ->filter()
+                    ->values()
+                    ->all();
+                $record['recording'] = $record['recordings'][0]['recording'] ?? null;
+                if (! $record['recording'] && is_string($storedRecording['url'] ?? null) && str_starts_with($storedRecording['url'], '/storage/')) {
                     $record['recording'] = $this->presenter->recording(json_encode([
-                        'type' => 'ptt_audio', 'audio_path' => substr($record['recording']['url'], strlen('/storage/')),
-                        'duration_seconds' => $record['recording']['duration_seconds'] ?? null,
+                        'type' => 'ptt_audio', 'audio_path' => substr($storedRecording['url'], strlen('/storage/')),
+                        'duration_seconds' => $storedRecording['duration_seconds'] ?? null,
                     ]));
-                } else {
-                    $record['recording'] = ($record['status_key'] ?? null) === 'ptt_audio'
-                        ? ['url' => null, 'available' => false, 'status' => 'The original recording entry is unavailable.'] : null;
+                } elseif (! $record['recording'] && ($record['status_key'] ?? null) === 'ptt_audio') {
+                    $record['recording'] = ['url' => null, 'available' => false, 'status' => 'The original recording entry is unavailable.'];
                 }
             }
             unset($record);
@@ -72,7 +86,8 @@ class ArchiveGroupManager
         $ids = collect($records)->pluck('id')->map(fn ($id) => (string) $id)->unique()->sort()->values()->all();
         [, $source] = app(\App\Queries\ArchiveQuery::class)->exportRows($validated['category'], Request::create('/', 'GET', ['ids' => $ids]));
         $records = $source->values()->all();
-        $found = collect($records)->pluck('id')->map(fn ($id) => (string) $id)->unique()->sort()->values()->all();
+        $found = collect($records)->flatMap(fn (array $record) => $record['communication_ids'] ?? [$record['id']])
+            ->map(fn ($id) => (string) $id)->unique()->sort()->values()->all();
         if ($found !== $ids) return response()->json(['success' => false, 'message' => 'Some selected records are no longer available. Refresh the archive before saving.'], 422);
         $archiveNote = $this->payload->encode($validated['category'], $records);
         $group = DB::transaction(function () use ($request, $validated, $groupId, $archiveNote, $now): array {
@@ -118,9 +133,6 @@ class ArchiveGroupManager
         return '';
     }
 }
-
-
-
 
 
 

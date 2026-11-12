@@ -262,3 +262,5 @@
 
 .ro-reference .ar .sitio-priority-list{flex:none}
 .ro-reference .ar .sitio-priority-list h3{padding:4px 10px}
+
+.ro-reference .dispatch-communication-only{display:flex;flex:1;min-width:0;min-height:0}

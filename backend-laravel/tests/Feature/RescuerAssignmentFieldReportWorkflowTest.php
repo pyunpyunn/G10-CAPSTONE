@@ -22,6 +22,7 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
     {
         parent::setUp();
         $this->createTables();
+        (require database_path('migrations/2026_11_12_000003_add_missing_count_to_responder_field_reports.php'))->up();
         DB::table('disaster_events')->insert(['event_id' => 'EVT-1', 'name' => 'Flood response', 'started_at' => now()]);
         DB::table('household_statuses')->insert([
             ['status_id' => 1, 'status_key' => 'safe', 'status_label' => 'Safe'],
@@ -169,6 +170,8 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
             $request = $this->request($this->validPayload());
             $user = new class($role) {
                 public string $user_id = 'rescuer-5';
+                public bool $is_active = true;
+                public function getAttribute(string $key): mixed { return null; }
                 public function __construct(private string $role) {}
                 public function refresh(): static { return $this; }
                 public function roleKey(): string { return $this->role; }
@@ -280,6 +283,7 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
             ['member_id' => 'M-2', 'status_key' => 'safe'],
         ];
 
+        $payload['injured_count'] = 0;
         app(RescuerFieldReportWorkflow::class)->store($this->request($payload));
 
         $this->assertDatabaseHas('responder_assignments', ['assignment_id' => 7, 'status' => 'dispatched']);
@@ -523,9 +527,54 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $payload=$this->validPayload(); unset($payload['incident_type']);
         $payload['property_damage']='custom_level';
         $payload['members']=[['member_id'=>'M-1','status_key'=>'injured'],['member_id'=>'M-2','status_key'=>'fatal_case']];
-        $payload['death_count']=999; $payload['injured_count']=999;
+        unset($payload['death_count'], $payload['injured_count']);
         app(RescuerFieldReportWorkflow::class)->store($this->request($payload));
         $this->assertDatabaseHas('responder_field_reports',['assignment_id'=>7,'property_damage'=>'custom_level','incident_type'=>null,'death_count'=>1,'injured_count'=>1]);
+    }
+
+    public function test_manual_casualty_quantities_are_saved_and_returned_without_being_recalculated(): void
+    {
+        $payload = $this->validPayload();
+        $payload['death_count'] = 2;
+        $payload['injured_count'] = 3;
+        $payload['missing_count'] = 4;
+        $workflow = app(RescuerFieldReportWorkflow::class);
+        $this->assertSame(201, $workflow->store($this->request($payload))->getStatusCode());
+        $this->assertDatabaseHas('responder_field_reports', [
+            'assignment_id' => 7, 'death_count' => 2, 'injured_count' => 3, 'missing_count' => 4,
+        ]);
+        $notes = json_decode(DB::table('household_status_logs')->value('notes'), true);
+        $this->assertSame(4, $notes['missing_count']);
+        $saved = $workflow->assignmentHousehold($this->request([]), 7)->getData(true)['data']['saved_counts'];
+        $this->assertSame(['death_count' => 2, 'injured_count' => 3, 'missing_count' => 4], $saved);
+        $query = app(\App\Queries\RescuerFieldReportQuery::class);
+        $row = $query->paginateAdmin([], 20)->items()[0];
+        $resource = (new \App\Http\Resources\RescuerMobileFieldReportResource($row))->resolve(Request::create('/'));
+        $this->assertSame(4, $resource['missing_count']);
+        $this->assertSame(201, $workflow->store($this->request($payload))->getStatusCode());
+        $this->assertDatabaseCount('responder_field_reports', 1);
+        $payload['missing_count'] = 5;
+        try {
+            $workflow->store($this->request($payload));
+            $this->fail('Changed counts must not be accepted as an identical retry.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $error) {
+            $this->assertSame(409, $error->getStatusCode());
+        }
+    }
+
+    public function test_casualty_quantities_reject_negative_and_fractional_values(): void
+    {
+        foreach (['death_count' => -1, 'injured_count' => 1.5, 'missing_count' => -1] as $field => $value) {
+            $payload = $this->validPayload();
+            $payload[$field] = $value;
+            try {
+                app(RescuerFieldReportWorkflow::class)->store($this->request($payload));
+                $this->fail('Invalid casualty count was accepted.');
+            } catch (ValidationException $error) {
+                $this->assertArrayHasKey($field, $error->errors());
+            }
+        }
+        $this->assertDatabaseCount('responder_field_reports', 0);
     }
 
     public function test_dispatch_history_is_paginated_and_limited_to_the_rescuer(): void

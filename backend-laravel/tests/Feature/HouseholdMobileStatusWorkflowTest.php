@@ -12,6 +12,51 @@ use Tests\TestCase;
 
 class HouseholdMobileStatusWorkflowTest extends TestCase
 {
+    public function test_missing_member_catalog_rolls_back_the_entire_report(): void
+    {
+        $request = $this->householdRequest(['status_key' => 'safe']);
+        DB::table('member_statuses')->delete();
+
+        try {
+            app(HouseholdMobileStatusWorkflow::class)->storeStatus($request);
+            $this->fail('An incomplete catalog must not acknowledge a history-only report.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('status_key', $exception->errors());
+        }
+        $this->assertDatabaseCount('household_status_logs', 0);
+        $this->assertDatabaseCount('member_disaster_statuses', 0);
+        $this->assertDatabaseCount('household_disasters', 0);
+    }
+
+    public function test_catalog_repair_restores_reporting_and_is_idempotent(): void
+    {
+        $request = $this->householdRequest(['status_key' => 'safe']);
+        DB::table('member_statuses')->delete();
+        $migration = require database_path('migrations/2026_11_12_000001_restore_mobile_member_status_catalog.php');
+        $migration->up();
+        $migration->up();
+        $this->assertDatabaseCount('member_statuses', 4);
+        $this->assertSame(201, app(HouseholdMobileStatusWorkflow::class)->storeStatus($request)->getStatusCode());
+        $this->assertDatabaseHas('household_disasters', ['current_status_id' => 1, 'needs_dispatch' => 0]);
+        $history = app(\App\Queries\HouseholdMobileReadQuery::class)->statusHistoryRows('HH-1', 'EVT-1');
+        $this->assertCount(1, $history);
+        $this->assertSame('safe', $history[0]['status_key']);
+    }
+
+    public function test_evacuated_status_is_not_flattened_to_safe(): void
+    {
+        $this->configureBroadcastStatuses();
+        DB::table('household_statuses')->insert(['status_id' => 5, 'status_key' => 'evacuated', 'status_label' => 'Evacuated', 'safety_basis' => 'safe']);
+        $request = $this->householdRequest(['status_key' => 'evacuated']);
+        (require database_path('migrations/2026_11_12_000001_restore_mobile_member_status_catalog.php'))->up();
+        DB::table('disaster_broadcasts')->update(['allowed_statuses_json' => json_encode(['safe', 'unsafe', 'evacuated'])]);
+        DB::table('responder_assignments')->insert(['assignment_id' => 1, 'disaster_id' => 'EVT-1', 'household_id' => 'HH-1', 'status' => 'en_route']);
+        $this->assertSame(201, app(HouseholdMobileStatusWorkflow::class)->storeStatus($request)->getStatusCode());
+        $this->assertDatabaseHas('household_disasters', ['current_status_id' => 5, 'needs_dispatch' => 0]);
+        $this->assertDatabaseHas('member_disaster_statuses', ['status_id' => DB::table('member_statuses')->where('status_key', 'evacuated')->value('status_id')]);
+        $this->assertDatabaseHas('responder_assignments', ['assignment_id' => 1, 'status' => 'en_route']);
+    }
+
     public function test_member_reports_keep_individual_statuses_and_write_an_unsafe_household_rollup(): void
     {
         Schema::create('responder_assignments', function (Blueprint $table): void {

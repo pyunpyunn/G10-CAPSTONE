@@ -49,6 +49,14 @@ class ArchiveQuery
         };
         if ($request->filled('start_date')) $query->whereDate($dateColumn, '>=', $request->query('start_date'));
         if ($request->filled('end_date')) $query->whereDate($dateColumn, '<=', $request->query('end_date'));
+        if ($category === 'radio-communication-logs') {
+            $rows = $query->orderByDesc('rcl.timestamp')->orderByDesc('rcl.communication_id')->get();
+            $records = $this->groupRadioCommunicationRows($rows, $request)
+                ->map(fn (array $group): array => $this->presenter->formatRadioTransmission($group))
+                ->values();
+
+            return [$records->count(), $records];
+        }
         $alias = substr($column, strpos($column, '.') + 1);
         $total = (clone $query)->count();
 
@@ -144,11 +152,109 @@ class ArchiveQuery
 
     private function radioCommunicationRows(Request $request, int $perPage, bool $asQuery = false): mixed
     {
-        $query = DB::table('responder_communication_logs as rcl')->leftJoin('disaster_events as de', 'de.event_id', '=', 'rcl.disaster_id')->leftJoin('responders as r', 'r.responder_id', '=', 'rcl.responder_id')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'rcl.team_id')->select(['rcl.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'r.full_name as responder_name', 'r.responder_code', 'rt.team_code', 'rt.team_type']);
-        $this->applySearch($query, $request, ['rcl.communication_id', 'rcl.team_name', 'rcl.message', 'de.name', 'r.full_name', 'r.responder_code', 'rt.team_code']); $this->applyEventFilter($query, $request, 'rcl.disaster_id'); $this->applyRadioStatusFilter($query, $request); if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'radio-communication-logs', 'rcl.communication_id');
+        $query = $this->radioCommunicationQuery($request);
         if ($asQuery) return $query;
-        $paginator = $query->orderByDesc('rcl.timestamp')->orderByDesc('rcl.communication_id')->paginate($this->perPage($request, $perPage));
-        return [$paginator, collect($paginator->items())->map(fn (object $row): array => $this->presenter->formatRadioCommunication($row))->values()->all()];
+
+        $groupKey = $this->radioTransmissionKeyExpression();
+        $matchingQuery = clone $query;
+        $this->applySearch($matchingQuery, $request, ['rcl.communication_id', 'rcl.team_name', 'rcl.message', 'de.name', 'r.full_name', 'r.responder_code', 'rt.team_code']);
+        $this->applyRadioStatusFilter($matchingQuery, $request);
+        if (! $request->filled('ids')) $this->excludeSavedGroupRecords($matchingQuery, 'radio-communication-logs', 'rcl.communication_id');
+        $pageSize = $this->perPage($request, $perPage);
+        $paginator = $matchingQuery
+            ->select([])
+            ->selectRaw($groupKey.' as archive_group_key, MAX(rcl.timestamp) as latest_timestamp')
+            ->groupByRaw($groupKey)
+            ->orderByDesc('latest_timestamp')
+            ->orderByDesc('archive_group_key')
+            ->paginate($pageSize);
+        $groupKeys = collect($paginator->items())->pluck('archive_group_key')->values();
+        if ($groupKeys->isEmpty()) return [$paginator, []];
+
+        $rowQuery = $this->radioCommunicationQuery($request, false);
+        $this->applyEventFilter($rowQuery, $request, 'rcl.disaster_id');
+        $rowQuery->whereRaw(
+            $groupKey.' in ('.implode(', ', array_fill(0, $groupKeys->count(), '?')).')',
+            $groupKeys->all(),
+        );
+        $rowsByGroup = $rowQuery
+            ->orderByDesc('rcl.timestamp')
+            ->orderByDesc('rcl.communication_id')
+            ->get()
+            ->groupBy(fn (object $row): string => $this->radioTransmissionGroupKey($row));
+        $records = $groupKeys
+            ->map(fn (string $key) => $rowsByGroup->get($key, collect())->all())
+            ->filter(fn (array $group): bool => $group !== [])
+            ->map(fn (array $group): array => $this->presenter->formatRadioTransmission($group))
+            ->values()
+            ->all();
+
+        return [$paginator, $records];
+    }
+
+    private function radioCommunicationQuery(Request $request, bool $excludeSaved = true): object
+    {
+        $query = DB::table('responder_communication_logs as rcl')
+            ->leftJoin('disaster_events as de', 'de.event_id', '=', 'rcl.disaster_id')
+            ->leftJoin('responders as r', 'r.responder_id', '=', 'rcl.responder_id')
+            ->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'rcl.team_id')
+            ->select(['rcl.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'r.full_name as responder_name', 'r.responder_code', 'rt.team_code', 'rt.team_type']);
+        $this->applyEventFilter($query, $request, 'rcl.disaster_id');
+        if ($excludeSaved && ! $request->filled('ids')) $this->excludeSavedGroupRecords($query, 'radio-communication-logs', 'rcl.communication_id');
+
+        return $query;
+    }
+
+    private function radioTransmissionKeyExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'mysql' => "COALESCE(NULLIF(CONCAT('ptt:', NULLIF(JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(rcl.message) THEN rcl.message ELSE '{}' END, '$.transmission_id')), 'null')), 'ptt:'), CONCAT('log:', rcl.communication_id))",
+            'pgsql' => "COALESCE(NULLIF('ptt:' || (rcl.message::jsonb ->> 'transmission_id'), 'ptt:'), 'log:' || rcl.communication_id::text)",
+            default => "COALESCE(NULLIF('ptt:' || CASE WHEN json_valid(rcl.message) THEN json_extract(rcl.message, '$.transmission_id') END, 'ptt:'), 'log:' || rcl.communication_id)",
+        };
+    }
+
+    private function radioTransmissionGroupKey(object $row): string
+    {
+        $transmissionId = $this->presenter->decodeJson($row->message)['transmission_id'] ?? null;
+
+        return is_string($transmissionId) && trim($transmissionId) !== ''
+            ? 'ptt:'.$transmissionId
+            : 'log:'.$row->communication_id;
+    }
+
+    private function groupRadioCommunicationRows(iterable $rows, Request $request): \Illuminate\Support\Collection
+    {
+        $groups = collect($rows)->groupBy(fn (object $row): string => $this->radioTransmissionGroupKey($row));
+        $search = trim((string) $request->query('search', ''));
+        $status = $this->presenter->statusKey((string) $request->query('status', 'all'));
+
+        return $groups->filter(function ($group) use ($search, $status): bool {
+            $matchesStatus = $status === 'all' || $group->contains(
+                fn (object $row): bool => $this->presenter->statusKey(
+                    (string) ($this->presenter->decodeJson($row->message)['type'] ?? 'message'),
+                ) === $status,
+            );
+            if (! $matchesStatus) return false;
+            if ($search === '') return true;
+
+            return $group->contains(function (object $row) use ($search): bool {
+                $fields = [
+                    $row->communication_id,
+                    $row->team_name,
+                    $row->message,
+                    $row->event_name,
+                    $row->responder_name,
+                    $row->responder_code,
+                    $row->team_code,
+                ];
+                foreach ($fields as $field) {
+                    if ($field !== null && mb_stripos((string) $field, $search) !== false) return true;
+                }
+
+                return false;
+            });
+        })->map(fn ($group): array => $group->values()->all())->values();
     }
 
     private function situationReportRows(Request $request, int $perPage, bool $asQuery = false): mixed
@@ -217,4 +323,3 @@ class ArchiveQuery
         return app(\App\Services\Archive\ArchiveGroupManager::class)->savedRecordIds($category);
     }
 }
-

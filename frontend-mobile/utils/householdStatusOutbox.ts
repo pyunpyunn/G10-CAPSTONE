@@ -143,10 +143,14 @@ async function synchronize(): Promise<HouseholdStatusSyncResult> {
   return result;
 }
 
-export function syncPendingHouseholdStatuses(): Promise<HouseholdStatusSyncResult> {
-  if (activeSync) return activeSync;
-  activeSync = synchronize();
-  return activeSync.finally(() => {
-    activeSync = null;
-  });
+export async function syncPendingHouseholdStatuses(): Promise<HouseholdStatusSyncResult> {
+  // A report may have been queued after the running sync read its queue.
+  while (activeSync) await activeSync;
+  const sync = synchronize();
+  activeSync = sync;
+  try {
+    return await sync;
+  } finally {
+    if (activeSync === sync) activeSync = null;
+  }
 }

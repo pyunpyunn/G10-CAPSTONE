@@ -21,7 +21,7 @@ async function screen() {
   vm.runInNewContext(code,{exports,require(name) {
     if(name==='react/jsx-runtime')return require(name);
     if(name==='react')return {useEffect(fn){if(initial)effects.push(fn);},useRef:()=>({current:'test-key'}),useState(value){const index=cursor++;if(!(index in state))state[index]=value;return [state[index],value=>{state[index]=typeof value==='function'?value(state[index]):value;}];}};
-    if(name==='react-native')return {Alert:{alert(){}},Text:'Text',View:'View',TextInput:'TextInput',StyleSheet:{create:x=>x}};
+    if(name==='react-native')return {Alert:{alert(){}},Text:'Text',View:'View',TextInput:'TextInput',Pressable:'Pressable',StyleSheet:{create:x=>x}};
     if(name==='@/api/rescuer')return {getAssignedHousehold:async()=>data};
     if(name==='@/constants/resqTheme')return {palette:{},radius:{},spacing:{}};
     if(name==='./ReportSelect')return {ReportSelect:'ReportSelect'};
@@ -34,7 +34,7 @@ async function screen() {
 }
 function nodes(node) {
   if(Array.isArray(node))return node.flatMap(nodes);
-  return node?.props?[node,...nodes(node.props.children)]:[];
+  return node?.props?[node,...nodes(node.props.children),...nodes(node.props.action)]:[];
 }
 
 test('member dropdowns preserve database statuses including Unchecked and use database damage options',async()=>{
@@ -55,4 +55,31 @@ test('submission sends selected statuses and calculated counts without an incide
   all=nodes(app.render());await all.find(x=>x.type==='ActionButton'&&x.props.label==='Submit report').props.onPress();
   assert.equal(app.submitted.length,1);assert.equal(app.submitted[0].injured_count,1);assert.equal(app.submitted[0].death_count,0);
   assert.equal(app.submitted[0].property_damage,'db_level');assert.equal(app.submitted[0].incident_type,undefined);
+});
+
+
+test('all three quantity cards have working plus/minus controls and submit their quantities', async () => {
+  const app = await screen();
+  let all = nodes(app.render());
+  const press = label => {
+    const button = nodes(app.render()).find(node => node.type === 'Pressable' && node.props.accessibilityLabel === label);
+    assert.ok(button, label);
+    assert.equal(button.props.disabled, false);
+    button.props.onPress();
+  };
+  const zero = all.find(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Decrease deaths');
+  assert.equal(zero.props.disabled, true);
+  for (const label of ['deaths', 'injured', 'missing']) {
+    press(`Increase ${label}`);
+    press(`Increase ${label}`);
+    press(`Decrease ${label}`);
+    assert.equal(nodes(app.render()).find(node => node.type === 'StatTile' && node.props.label.toLowerCase() === label).props.value, 1);
+  }
+  all = nodes(app.render());
+  all.filter(node => node.type === 'ReportSelect')[2].props.onChange('db_level');
+  await nodes(app.render()).find(node => node.type === 'ActionButton' && node.props.label === 'Submit report').props.onPress();
+  assert.equal(app.submitted[0].death_count, 1);
+  assert.equal(app.submitted[0].injured_count, 1);
+  assert.equal(app.submitted[0].missing_count, 1);
+  assert.ok(nodes(app.render()).filter(node => node.type === 'Pressable').every(node => node.props.disabled));
 });

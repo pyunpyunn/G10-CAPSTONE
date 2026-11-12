@@ -45,11 +45,11 @@ window.addEventListener('operations:changed', event => {
   const changes = event.detail?.topics
   const paths = {
     mapping: ['/map/', '/dashboard'],
-    dispatch: ['/dispatch', '/rescue-teams', '/field-reports', '/dashboard', '/notifications'],
-    households: ['/household', '/dispatch', '/field-reports', '/dashboard', '/map/', '/situation'],
-    'field-reports': ['/field-reports', '/household', '/dispatch', '/situation'],
+    dispatch: ['/dispatch', '/rescue-teams', '/field-reports', '/dashboard', '/notifications', '/archive'],
+    households: ['/household', '/dispatch', '/field-reports', '/dashboard', '/map/', '/situation', '/archive'],
+    'field-reports': ['/field-reports', '/household', '/dispatch', '/situation', '/archive'],
     requests: ['/resource-request', '/notifications', '/dashboard', '/situation'],
-    communications: ['/communications', '/radio'], weather: ['/weather', '/dashboard'],
+    communications: ['/communications', '/radio', '/archive'], weather: ['/weather', '/dashboard'],
     inquiries: ['/inquiries', '/archive'],
   }
   invalidateApiState(changes?.length && changes.every(topic => paths[topic]) ? changes.flatMap(topic => paths[topic]) : undefined)

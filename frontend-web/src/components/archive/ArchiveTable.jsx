@@ -94,8 +94,18 @@ export default function ArchiveTable({
                       </td>
                       {columns.map((column) => (
                         <td key={column.key}>
-                          {renderCell(record[column.key], column.key, category)}
-                          {column.key === 'transmission' && <ArchiveRecording recording={record.recording} recordId={record.id} />}
+                          {column.key !== 'recording' && renderCell(record[column.key], column.key, category)}
+                          {column.key === 'recording' && (record.recordings?.length
+                            ? record.recordings.map(({ communication_id, recording }) => (
+                              <ArchiveRecording
+                                key={communication_id}
+                                recording={recording}
+                                recordId={communication_id}
+                              />
+                            ))
+                            : record.recording
+                              ? <ArchiveRecording recording={record.recording} recordId={record.id} />
+                              : 'No recording was saved')}
                         </td>
                       ))}
                       <td>
@@ -131,7 +141,9 @@ function renderCell(value, columnKey = '', category = '') {
   }
 
   if (value.title || value.meta) {
-    const meta = compactMeta(value.meta, columnKey, category)
+    const meta = category === 'radio-communication-logs' && columnKey === 'team_route'
+      ? ''
+      : compactMeta(value.meta, columnKey, category)
 
     return (
       <>

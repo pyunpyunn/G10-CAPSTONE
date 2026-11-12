@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Camera, GeoJSONSource, Layer, Map, Marker, type CameraRef, type MarkerRef } from '@maplibre/maplibre-react-native';
+import { Camera, GeoJSONSource, Layer, Map, Marker, type CameraRef } from '@maplibre/maplibre-react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { activeLocalTrip, getActivePack, getLocalNavigationSnapshot, getLocalTrip, queueOutboxEvent, type LocalTrip } from '@/utils/navigationStore';
 import * as Crypto from 'expo-crypto';
@@ -34,7 +34,7 @@ export default function OfflineNavigationScreen() {
   const [message, setMessage] = useState(''), [guidance, setGuidance] = useState('');
   const [remaining, setRemaining] = useState(0), [distance, setDistance] = useState(0), [mapReady, setMapReady] = useState(false);
   const [busy, setBusy] = useState(false), [packMessage, setPackMessage] = useState('Map has not been downloaded.');
-  const camera = useRef<CameraRef>(null), marker = useRef<MarkerRef>(null);
+  const camera = useRef<CameraRef>(null);
   const [gpsFix, setGpsFix] = useState<LocationObject | null>(null);
   const arrivalShown = useRef(false), lastStep = useRef(0), lastProcessedFix = useRef(0);
   const firstGps = useRef(true);
@@ -132,7 +132,6 @@ export default function OfflineNavigationScreen() {
         bearing: fix.coords.heading !== null && fix.coords.heading >= 0
           ? fix.coords.heading : bearingDegrees(points[progress.segment], points[progress.segment + 1]),
       });
-      marker.current?.getAnimatableRef()?.setNativeProps({ lngLat: position });
     }
     const next = steps.findIndex((step, index) =>
       index >= lastStep.current && (progress.cumulative[step.polyline_index] ?? 0) > progress.alongM + 8
@@ -168,7 +167,7 @@ export default function OfflineNavigationScreen() {
       }}>
       <Camera ref={camera} initialViewState={{ center: [123.8854, 10.3157], zoom: 11 }} />
       {displayPoints.length >= 2 && <RouteLine points={displayPoints} />}
-      {gpsFix && <Marker ref={marker} lngLat={[gpsFix.coords.longitude, gpsFix.coords.latitude]}><View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: palette.navActive, borderColor: '#fff', borderWidth: 3 }} /></Marker>}
+      {gpsFix && <Marker lngLat={[gpsFix.coords.longitude, gpsFix.coords.latitude]}><View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: palette.navActive, borderColor: '#fff', borderWidth: 3 }} /></Marker>}
       {points.length > 1 && <Marker lngLat={points[points.length - 1]}><View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: palette.brandRed, borderColor: '#fff', borderWidth: 3 }} /></Marker>}
     </Map>
     <View style={{ position: 'absolute', top: 16, left: 16, right: 16, padding: 16, borderRadius: 14, backgroundColor: palette.nav, elevation: 5 }}>

@@ -19,7 +19,9 @@ export function OfflineBanner({
   const network = useNetworkState();
   if (loading && !lastSyncedAt && !pendingStatuses && !failedStatuses) return null;
   if (!offline && network.isConnected !== false && network.isInternetReachable !== false && !pendingStatuses && !failedStatuses) return null;
-  const title = failedStatuses ? 'Status needs attention' : pendingStatuses ? 'Status not synced' : 'Offline mode';
+  const isOffline = offline || network.isConnected === false || network.isInternetReachable === false;
+  if (!isOffline && !failedStatuses) return null;
+  const title = failedStatuses ? 'Status needs attention' : pendingStatuses && isOffline ? 'Status not synced' : 'Offline mode';
   const message = failedStatuses
     ? `${failedStatuses} report${failedStatuses === 1 ? '' : 's'} could not be saved to the server. Submit a fresh report after reviewing.`
     : pendingStatuses

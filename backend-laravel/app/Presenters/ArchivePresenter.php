@@ -259,6 +259,94 @@ class ArchivePresenter
         ];
     }
 
+    public function formatRadioTransmission(array $rows): array
+    {
+        usort($rows, static fn (object $left, object $right): int => strcmp((string) $left->timestamp, (string) $right->timestamp));
+        $messages = array_map(fn (object $row): array => $this->decodeJson($row->message), $rows);
+        $primaryIndex = count($rows) - 1;
+        foreach (['ptt_end', 'ptt_audio', 'ptt_start'] as $preferredType) {
+            $candidate = array_search($preferredType, array_column($messages, 'type'), true);
+            if ($candidate !== false) {
+                $primaryIndex = $candidate;
+                break;
+            }
+        }
+
+        $record = $this->formatRadioCommunication($rows[$primaryIndex]);
+        $types = [];
+        $communicationIds = [];
+        $recordings = [];
+        $timeline = [];
+        $signals = [];
+        $audioStatuses = [];
+        $duration = null;
+        $startDate = $rows[0]->timestamp;
+        $endDate = $rows[count($rows) - 1]->timestamp;
+
+        foreach ($rows as $index => $row) {
+            $message = $messages[$index];
+            $type = (string) ($message['type'] ?? 'message');
+            $typeLabel = $this->radioTypeLabel($type, $message);
+            $types[$typeLabel] = $typeLabel;
+            $communicationIds[] = (string) $row->communication_id;
+            $timeline[] = 'COM-'.$row->communication_id.' - '.$this->formatDateTime($row->timestamp).' - '.$typeLabel;
+            if (! empty($message['signal'])) $signals[] = (string) $message['signal'];
+            if (! empty($message['audio_status'])) $audioStatuses[] = (string) $message['audio_status'];
+            if (isset($message['duration_seconds'])) $duration = (float) $message['duration_seconds'];
+
+            if ($type === 'ptt_audio') {
+                $recordings[] = [
+                    'communication_id' => (string) $row->communication_id,
+                    'recording' => $this->recording($row->message),
+                ];
+            }
+        }
+
+        $record['id'] = (string) $rows[0]->communication_id;
+        $record['communication_ids'] = $communicationIds;
+        $record['transmission_id'] = $messages[0]['transmission_id'] ?? null;
+        $record['datetime'] = $this->formatDateTime($startDate);
+        $record['recordings'] = $recordings;
+        $record['recording'] = $recordings[0]['recording'] ?? null;
+        $record['channel']['meta'] = implode(' · ', array_values($types));
+        $record['transmission']['meta'] = $record['transmission_id'] ?: 'Signal / metadata log';
+        $record['status']['label'] = $this->radioTypeLabel((string) ($messages[$primaryIndex]['type'] ?? 'message'), $messages[$primaryIndex]);
+
+        $record['details'] = $this->details([
+            'Communication IDs' => implode(', ', $communicationIds),
+            'Date / time' => count($rows) > 1
+                ? $this->formatDateTime($startDate).' - '.$this->formatDateTime($endDate)
+                : $this->formatDateTime($startDate),
+            'Event' => $record['event']['title'],
+            'Responder' => $rows[$primaryIndex]->responder_name ?: ($messages[$primaryIndex]['responder_name'] ?? 'Responder'),
+            'Responder code' => $this->radioDetailValue($rows[$primaryIndex]->responder_code ?: ($messages[$primaryIndex]['responder_code'] ?? null)),
+            'Team' => $record['team_route']['title'],
+            'Channel' => $record['channel']['title'],
+            'PTT activity' => implode(' · ', array_values($types)),
+            'Transmission ID' => $record['transmission_id'] ?: 'Not recorded',
+            'Duration' => $duration !== null ? rtrim(rtrim(number_format($duration, 2, '.', ''), '0'), '.').' seconds' : 'Not recorded',
+            'Signal' => implode(' · ', array_unique($signals)),
+            'Audio status' => implode(' · ', array_unique($audioStatuses)),
+            'Communication details' => implode(' | ', $timeline),
+        ]);
+        $record['export'] = [
+            'datetime' => $record['datetime'],
+            'event' => $record['event_name'],
+            'reference' => $record['transmission_id'] ?: 'COM-'.$record['id'],
+            'team_responder' => $record['team_route']['title'].' - '.$record['team_route']['meta'],
+            'channel' => $record['channel']['title'],
+            'transmission' => implode('; ', $timeline),
+            'status' => $record['status']['label'],
+        ];
+
+        return $record;
+    }
+
+    private function radioDetailValue(mixed $value): string
+    {
+        return is_string($value) && trim($value) !== '' ? $value : 'Not recorded';
+    }
+
     public function recording(?string $rawMessage): ?array
     {
         $message = $this->decodeJson($rawMessage);
@@ -480,5 +568,3 @@ class ArchivePresenter
         return $value ? Carbon::parse($value)->format('g:i A') : 'No time';
     }
 }
-
-

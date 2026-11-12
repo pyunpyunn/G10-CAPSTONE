@@ -150,6 +150,7 @@ class RescuerFieldReportWorkflow
             ],
             'members' => $members,
             'member_status_options' => $memberStatusOptions,
+            'saved_counts' => Schema::hasColumn('responder_field_reports', 'missing_count') ? DB::table('responder_field_reports')->where('assignment_id', $assignmentId)->where('responder_id', $responder->responder_id)->where('household_id', $household->household_id)->first(['death_count', 'injured_count', 'missing_count']) : null,
             'saved_property_damage' => Schema::hasColumn('responder_field_reports','property_damage') ? DB::table('responder_field_reports')->where('assignment_id',$assignmentId)->where('responder_id',$responder->responder_id)->where('household_id',$household->household_id)->value('property_damage') : null,
             'property_damage_options' => Schema::hasTable('property_damage_levels') ? DB::table('property_damage_levels')->where('is_active',true)->orderBy('sort_order')->get(['damage_key as key','label'])->all() : [],
         ]]);
@@ -372,7 +373,7 @@ class RescuerFieldReportWorkflow
             }
         }
 
-        foreach (['assignment_id', 'idempotency_key', 'payload_hash'] as $column) {
+        foreach (['assignment_id', 'idempotency_key', 'payload_hash', 'missing_count'] as $column) {
             if (! Schema::hasColumn('responder_field_reports', $column)) {
                 return response()->json(['message' => 'The field report schema is out of date. Apply the latest Laravel migrations.'], 503);
             }
@@ -387,6 +388,7 @@ class RescuerFieldReportWorkflow
             'property_damage' => ['required', 'string', 'max:80'],
             'death_count' => ['sometimes', 'integer', 'min:0', 'max:4294967295'],
             'injured_count' => ['sometimes', 'integer', 'min:0', 'max:4294967295'],
+            'missing_count' => ['sometimes', 'integer', 'min:0', 'max:4294967295'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -449,8 +451,9 @@ class RescuerFieldReportWorkflow
         }
         $validated['incident_type'] ??= null;
         $catalog = collect($this->memberStatusOptions())->keyBy('key');
-        $validated['death_count'] = $submittedMembers->filter(fn ($member) => $catalog->get($member['status_key'])['counts_as_death'] ?? false)->count();
-        $validated['injured_count'] = $submittedMembers->filter(fn ($member) => $catalog->get($member['status_key'])['counts_as_injury'] ?? false)->count();
+        $validated['death_count'] ??= $submittedMembers->filter(fn ($member) => $catalog->get($member['status_key'])['counts_as_death'] ?? false)->count();
+        $validated['injured_count'] ??= $submittedMembers->filter(fn ($member) => $catalog->get($member['status_key'])['counts_as_injury'] ?? false)->count();
+        $validated['missing_count'] ??= $submittedMembers->where('status_key', 'missing')->count();
         $members = $submittedMembers->all();
         $incidentTypeOther = $validated['incident_type'] === 'other' ? trim((string) ($validated['incident_type_other'] ?? '')) : null;
         $payloadHash = hash('sha256', json_encode([
@@ -461,11 +464,12 @@ class RescuerFieldReportWorkflow
             'property_damage' => $validated['property_damage'],
             'death_count' => (int) $validated['death_count'],
             'injured_count' => (int) $validated['injured_count'],
+            'missing_count' => (int) $validated['missing_count'],
             'notes' => trim((string) ($validated['notes'] ?? '')),
             'members' => $members,
         ], JSON_UNESCAPED_SLASHES));
 
-        $statusKey = $this->householdStatusFromMemberAssessments($members, $validated['death_count'] > 0 || $validated['injured_count'] > 0);
+        $statusKey = $this->householdStatusFromMemberAssessments($members, $validated['death_count'] > 0 || $validated['injured_count'] > 0 || $validated['missing_count'] > 0);
         $statusId = $statusKey ? $this->support->resolveHouseholdStatusId($statusKey) : null;
         if (! $statusId) {
             throw ValidationException::withMessages([
@@ -483,6 +487,7 @@ class RescuerFieldReportWorkflow
             'property_damage' => $validated['property_damage'],
             'death_count' => (int) $validated['death_count'],
             'injured_count' => (int) $validated['injured_count'],
+            'missing_count' => (int) $validated['missing_count'],
             'user_notes' => trim((string) ($validated['notes'] ?? '')),
             'members' => $members,
         ], JSON_UNESCAPED_SLASHES);
@@ -560,6 +565,7 @@ class RescuerFieldReportWorkflow
                 'property_damage' => $validated['property_damage'],
                 'death_count' => (int) $validated['death_count'],
                 'injured_count' => (int) $validated['injured_count'],
+                'missing_count' => (int) $validated['missing_count'],
                 'idempotency_key' => $validated['idempotency_key'],
                 'payload_hash' => $payloadHash,
                 'latitude' => $validated['latitude'] ?? null,

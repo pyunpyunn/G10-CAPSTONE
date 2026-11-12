@@ -41,6 +41,15 @@ class DisasterBroadcastPushTest extends TestCase
     {
         Schema::table('device_tokens', fn (Blueprint $table) => $table->integer('responder_id')->nullable());
         DB::table('device_tokens')->where('player_id', 'subscription-1')->update(['responder_id' => 7]);
+        DB::table('device_tokens')->insert([
+            'player_id' => 'subscription-4',
+            'platform' => 'android',
+            'app_role' => 'rescuer',
+            'push_provider' => 'onesignal',
+            'notification_permission_status' => 'granted',
+            'is_active' => true,
+            'responder_id' => 8,
+        ]);
         Http::fake(['*' => Http::response(['id' => 'notification-id'], 200)]);
         $job = new \App\Jobs\SendDispatchPush([7], 42, 'DSP-42', 'Sitio A', 'EVT-TEST', 12);
         $job->handle(app(OneSignalNotificationService::class));
@@ -52,6 +61,39 @@ class DisasterBroadcastPushTest extends TestCase
             && $request['data']['assigned_sitio'] === 'Sitio A'
             && $request['data']['alarm'] === ['sound_seconds' => 60, 'pause_seconds' => 15, 'cycles' => 4]
             && str_contains($request['contents']['en'], 'Total target households: 12'));
+    }
+
+    public function test_dispatch_alarm_targets_only_the_selected_responder_when_tokens_are_linked_by_user(): void
+    {
+        Schema::table('device_tokens', fn (Blueprint $table) => $table->string('user_id')->nullable());
+        Schema::create('responders', function (Blueprint $table): void {
+            $table->integer('responder_id')->primary();
+            $table->string('user_id');
+        });
+        DB::table('responders')->insert([
+            ['responder_id' => 7, 'user_id' => 'rescuer-user-7'],
+            ['responder_id' => 8, 'user_id' => 'rescuer-user-8'],
+        ]);
+        DB::table('device_tokens')->where('player_id', 'subscription-1')->update(['user_id' => 'rescuer-user-7']);
+        DB::table('device_tokens')->insert([
+            'player_id' => 'subscription-4',
+            'platform' => 'android',
+            'app_role' => 'rescuer',
+            'push_provider' => 'onesignal',
+            'notification_permission_status' => 'granted',
+            'is_active' => true,
+            'user_id' => 'rescuer-user-8',
+        ]);
+        Http::fake(['*' => Http::response(['id' => 'notification-id'], 200)]);
+
+        (new \App\Jobs\SendDispatchPush([7], 42, 'DSP-42', 'Sitio A', 'EVT-TEST'))->handle(
+            app(OneSignalNotificationService::class)
+        );
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request['include_subscription_ids'] === ['subscription-1']
+            && ! isset($request['included_segments'])
+            && ! isset($request['include_aliases']));
     }
 
     public function test_missing_android_setup_returns_a_clear_provider_error(): void

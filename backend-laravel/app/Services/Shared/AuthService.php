@@ -69,6 +69,14 @@ class AuthService
             throw ValidationException::withMessages(['login' => ['The login details are incorrect.']]);
         }
 
+        if ($user->temporary_password_expires_at !== null
+            && \Illuminate\Support\Carbon::parse($user->temporary_password_expires_at)->lessThanOrEqualTo(now())) {
+            return response()->json([
+                'message' => 'Your temporary password has expired. Contact HQ/Admin to generate a new one, or use Forgot password.',
+                'code' => 'temporary_password_expired',
+            ], 403);
+        }
+
         if ($user->is_active !== null && ! (bool) $user->is_active) {
             return response()->json(['message' => 'This account is inactive. Please contact HQ/Admin.'], 403);
         }
@@ -275,6 +283,7 @@ class AuthService
         }
         DB::transaction(function () use ($user, $values): void {
             $updates = ['password' => Hash::make($values['password']), 'updated_at' => now()];
+            if (Schema::hasColumn('users', 'temporary_password_expires_at')) $updates['temporary_password_expires_at'] = null;
             if (Schema::hasColumn('users', 'password_changed_at')) $updates['password_changed_at'] = now();
             if (Schema::hasColumn('users', 'must_change_password')) $updates['must_change_password'] = 0;
             User::query()->whereKey($user->getKey())->update($updates);
@@ -451,6 +460,7 @@ class AuthService
             }
 
             $updates = ['password' => Hash::make($values['password']), 'updated_at' => now()];
+            if (Schema::hasColumn('users', 'temporary_password_expires_at')) $updates['temporary_password_expires_at'] = null;
             if (Schema::hasColumn('users', 'password_changed_at')) {
                 $updates['password_changed_at'] = now();
             }

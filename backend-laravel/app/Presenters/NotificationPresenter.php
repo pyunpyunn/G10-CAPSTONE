@@ -152,7 +152,7 @@ class NotificationPresenter
 
     private function actionUrlForType(string $type): string
     {
-        return match ($type) {'Broadcast'=>'/broadcast','Household status'=>'/households','Dispatch status'=>'/rescue-management','Dispatch log'=>'/rescue-management','Approval request'=>'/resources-requests','PAGASA advisory sync'=>'/weather','PHIVOLCS advisory sync'=>'/mapping','Weather'=>'/weather',default=>'/notifications'};
+        return match ($type) {'Broadcast'=>'/broadcast','Household status'=>'/households','Dispatch status'=>'/rescue-management','Dispatch log'=>'/rescue-management','Approval request'=>'/external-requests','PAGASA advisory sync'=>'/weather','PHIVOLCS advisory sync'=>'/mapping','Weather'=>'/weather',default=>'/notifications'};
     }
     private function priorityTone(string $priority): string { return match($priority) {'Critical'=>'red','High'=>'amber','Medium'=>'blue',default=>'gray'}; }
     private function dateLabel(Carbon $date): string { return $date->isToday() ? 'Today' : ($date->isYesterday() ? 'Yesterday' : $date->format('M d, Y')); }

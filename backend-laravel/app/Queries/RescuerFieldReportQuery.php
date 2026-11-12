@@ -93,10 +93,11 @@ class RescuerFieldReportQuery
             $columns[] = $this->optional('responder_field_reports', 'property_damage', 'property_damage', 'rfr');
             $columns[] = $this->optional('responder_field_reports', 'death_count', 'death_count', 'rfr');
             $columns[] = $this->optional('responder_field_reports', 'injured_count', 'injured_count', 'rfr');
+            $columns[] = $this->optional('responder_field_reports', 'missing_count', 'missing_count', 'rfr');
         } else {
             array_push($columns, DB::raw('NULL as assignment_id'), DB::raw('NULL as incident_type'),
                 DB::raw('NULL as incident_type_other'), DB::raw('NULL as property_damage'),
-                DB::raw('NULL as death_count'), DB::raw('NULL as injured_count'));
+                DB::raw('NULL as death_count'), DB::raw('NULL as injured_count'), DB::raw('NULL as missing_count'));
         }
         if (! $hasAssignmentStatus) $columns[] = DB::raw('NULL as assignment_status');
         if ($responderId && Schema::hasColumn('household_status_logs', 'responder_id')) $query->where('hsl.responder_id', $responderId);

@@ -112,7 +112,8 @@ export default function ArchivePage() {
 
   async function downloadSelectedRecord(type) {
     try {
-      await exportArchive(selectedRecordCategory, type, { ids: [String(selectedRecord.id)] })
+      const ids = selectedRecord.communication_ids || [selectedRecord.id]
+      await exportArchive(selectedRecordCategory, type, { ids: ids.map(String) })
       setMessage('Archive record export generated.')
     } catch (downloadError) {
       setMessage(archiveErrorMessage(downloadError, 'Archive record cannot be exported.'))
@@ -209,7 +210,10 @@ export default function ArchivePage() {
     }
 
     try {
-      const result = await createSavedArchiveGroup(activeCategory, recordsToSave)
+      const records = recordsToSave.flatMap((record) =>
+        (record.communication_ids || [record.id]).map((id) => ({ id: String(id) })),
+      )
+      const result = await createSavedArchiveGroup(activeCategory, records)
       const group = result.group
 
       setSavedGroups((current) => [group, ...current.filter((item) => item.id !== group.id)])
@@ -291,15 +295,18 @@ export default function ArchivePage() {
   }
 
   async function deleteSelectedForever() {
-    const ids = selectedIds()
+    const recordsById = new Map(selectedRecords().map(record => [String(record.id), record]))
+    const selectedGroupIds = selectedIds()
+    const ids = activeCategory === 'radio-communication-logs'
+      ? [...new Set(selectedGroupIds.flatMap((id) => recordsById.get(String(id))?.communication_ids || [id]).map(String))]
+      : selectedGroupIds
 
     if (ids.length === 0) {
       return
     }
 
-    const recordsById = new Map(selectedRecords().map(record => [String(record.id), record]))
-    const selection = ids.slice(0, 10).map(id => `${id}: ${archiveRecordTitle(recordsById.get(String(id)) || { id })}`).join('\n')
-    const confirmedText = window.prompt(`Type DELETE to permanently delete ${ids.length} selected archive log(s).\n\n${selection}${ids.length > 10 ? '\n…more selected records' : ''}`)
+    const selection = selectedGroupIds.slice(0, 10).map(id => `${id}: ${archiveRecordTitle(recordsById.get(String(id)) || { id })}`).join('\n')
+    const confirmedText = window.prompt(`Type DELETE to permanently delete ${selectedGroupIds.length} selected archive log(s).\n\n${selection}${selectedGroupIds.length > 10 ? '\n…more selected records' : ''}`)
 
     if (confirmedText !== 'DELETE') {
       setMessage('Delete cancelled. Type DELETE exactly to confirm permanent deletion.')

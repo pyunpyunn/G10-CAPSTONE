@@ -74,6 +74,24 @@
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
 }
 
+.archive-page .data-filter-bar.archive-filter-bar {
+  flex-wrap: nowrap;
+}
+
+.archive-page .data-filter-bar.archive-filter-bar .data-filter-bar-left {
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+}
+
+.archive-page .data-filter-bar.archive-filter-bar .data-filter-search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.archive-page .data-filter-bar.archive-filter-bar .data-filter-trigger-wrapper {
+  flex: 0 0 auto;
+}
+
 .archive-page .search-input {
   min-width: 0;
 }

@@ -199,6 +199,71 @@ class AuthApiTest extends TestCase
             ]);
     }
 
+    public function test_edit_profile_generated_password_replaces_both_hashes_and_logs_in(): void
+    {
+        (require database_path('migrations/2026_11_12_000002_add_temporary_password_expiry_to_users.php'))->up();
+        $this->freezeTime();
+        $responderId = 2024035502;
+        $userId = 'USR-RESCUER-BDRRM-SAR-001';
+        Schema::table('users', function (Blueprint $table): void {
+            if (! Schema::hasColumn('users', 'must_change_password')) $table->boolean('must_change_password')->default(false);
+        });
+        Schema::table('responders', function (Blueprint $table): void {
+            foreach (['emergency_contact_name', 'emergency_contact_number', 'date_of_birth', 'gender', 'blood_type', 'address', 'skills', 'training_notes', 'certification_reference', 'equipment_notes', 'duty_status'] as $column) {
+                if (! Schema::hasColumn('responders', $column)) $table->string($column)->nullable();
+            }
+            if (! Schema::hasColumn('responders', 'is_deployed')) $table->boolean('is_deployed')->default(false);
+        });
+        $existing = (object) ['user_id' => $userId, 'username' => 'BDRRM-SAR-001',
+            'responder_code' => 'BDRRM-SAR-001', 'team_id' => null, 'team_code' => 'SAR', 'role_key' => 'rescuer'];
+        $this->mock(\App\Queries\RescuerAccountQuery::class, function ($mock) use ($existing): void {
+            $mock->shouldReceive('findResponder')->andReturn($existing);
+        });
+        $this->mock(\App\Presenters\RescuerAccountPresenter::class, function ($mock): void {
+            $mock->shouldReceive('formatResponder')->andReturn([]);
+        });
+        $this->mock(\App\Services\Mobile\RescuerAccountSupport::class, function ($mock): void {
+            $mock->shouldReceive('validatePayload')->andReturnUsing(fn ($request) => app(\App\Http\Requests\RescuerAccountPayloadValidator::class)->validate($request, true));
+            $mock->shouldReceive('ensureAccountTeamType')->once();
+            $mock->shouldReceive('teamIdFromPayload')->andReturn(null);
+            $mock->shouldReceive('fullNameFromPayload')->andReturn('Venzina Reyes');
+        });
+        $this->mock(\App\Services\Web\PersonnelAccessNotifier::class, function ($mock): void {
+            $mock->shouldReceive('notify')->once();
+        });
+        $this->mock(\App\Services\Mobile\RescuerAccountAuditLogger::class, function ($mock): void {
+            $mock->shouldReceive('writeAuditLog')->once();
+        });
+        DB::table('responders')->where('responder_id', $responderId)->update(['team_id' => null]);
+        $password = \App\Support\TemporaryResponderPassword::generate('Venzina', 2026);
+        $request = \Illuminate\Http\Request::create('/api/v1/rescuers/'.$responderId, 'PUT', [
+            'first_name' => 'Venzina', 'last_name' => 'Reyes', 'contact_number' => '09170001001',
+            'title' => 'Responder', 'account_status' => 'active', 'duty_status' => 'available', 'password' => $password,
+        ]);
+        $this->assertSame(200, app(\App\Services\Mobile\RescuerAccountWriteWorkflow::class)->update($request, $responderId)->getStatusCode());
+        $hash = DB::table('users')->where('user_id', $userId)->value('password');
+        $expiresAt = DB::table('users')->where('user_id', $userId)->value('temporary_password_expires_at');
+        $this->assertSame(now()->addHours(24)->toDateTimeString(), $expiresAt);
+        $this->assertNotSame($password, $hash);
+        $this->assertTrue(Hash::check($password, $hash));
+        $this->assertSame($hash, DB::table('responders')->where('responder_id', $responderId)->value('password_hash'));
+        $this->postJson('/api/v1/auth/login', ['login' => 'BDRRM-SAR-001', 'password' => $password])->assertOk();
+        $this->postJson('/api/v1/auth/login', ['login' => 'BDRRM-SAR-001', 'password' => 'password'])->assertUnprocessable()->assertJsonValidationErrors('login');
+        $this->travel(24)->hours();
+        $this->postJson('/api/v1/auth/login', ['login' => 'BDRRM-SAR-001', 'password' => $password])
+            ->assertForbidden()->assertJsonPath('code', 'temporary_password_expired');
+        $this->postJson('/api/v1/mobile/login', ['login' => 'BDRRM-SAR-001', 'password' => $password, 'device_uuid' => 'expired-password-device'])
+            ->assertForbidden()->assertJsonPath('code', 'temporary_password_expired');
+        $permanent = 'PermanentPassword@2026!';
+        $this->postJson('/api/v1/auth/password-recovery/reset', [
+            'login' => 'BDRRM-SAR-001', 'current_password' => $password,
+            'password' => $permanent, 'password_confirmation' => $permanent,
+        ])->assertOk();
+        $this->assertNull(DB::table('users')->where('user_id', $userId)->value('temporary_password_expires_at'));
+        $this->travel(48)->hours();
+        $this->postJson('/api/v1/auth/login', ['login' => 'BDRRM-SAR-001', 'password' => $permanent])->assertOk();
+    }
+
     public function test_login_returns_password_reset_guidance_for_an_unsupported_stored_hash(): void
     {
         DB::table('users')->where('user_id', 'USR-RESCUER-BDRRM-SAR-001')

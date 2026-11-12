@@ -28,6 +28,15 @@ export function emptyRescuerForm(defaults = {}) {
   }
 }
 
+export function temporaryResponderPassword(firstName, year = new Date().getFullYear()) {
+  const consonants = String(firstName || '')
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .replace(/[AEIOU]/g, '')
+
+  return `${consonants}@${year}!`
+}
+
 export function formFromRescuer(rescuer) {
   const nameParts = rescuer
 
@@ -97,7 +106,7 @@ export function buildRescuerPayload(form, mode) {
     payload.account_id = form.account_id
   }
 
-  if (mode === 'create' && form.password) {
+  if (form.password) {
     payload.password = form.password
   }
 

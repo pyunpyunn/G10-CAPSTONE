@@ -87,4 +87,23 @@ class UpdateHouseholdStatusTest extends TestCase
         $this->assertDatabaseHas('household_disasters', ['household_id' => 'HH-1', 'needs_dispatch' => 1, 'priority_level' => 'urgent']);
         Queue::assertNotPushed(SendDispatchChangePush::class);
     }
+
+    public function test_all_unsafe_statuses_require_dispatch_and_keep_the_live_task(): void
+    {
+        Queue::fake();
+        foreach (\App\Queries\HouseholdEventStatusQuery::UNSAFE_KEYS as $key) {
+            DB::table('household_disasters')->update(['needs_dispatch' => false, 'priority_level' => 'monitor']);
+            app(UpdateHouseholdStatus::class)->apply('EVT-1', 'HH-1', 4, $key, 'household_mobile', null, null, null);
+            $this->assertDatabaseHas('household_disasters', ['needs_dispatch' => 1, 'priority_level' => 'urgent']);
+            $this->assertDatabaseHas('responder_assignments', ['assignment_id' => 8, 'status' => 'en_route']);
+        }
+    }
+
+    public function test_safe_at_home_withdraws_the_live_task(): void
+    {
+        Queue::fake();
+        app(UpdateHouseholdStatus::class)->apply('EVT-1', 'HH-1', 1, 'safe_at_home', 'household_mobile', null, null, null);
+        $this->assertDatabaseHas('household_disasters', ['needs_dispatch' => 0]);
+        $this->assertDatabaseHas('responder_assignments', ['assignment_id' => 8, 'status' => 'cancelled']);
+    }
 }

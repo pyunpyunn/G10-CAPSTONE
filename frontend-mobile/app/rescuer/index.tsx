@@ -44,6 +44,7 @@ import { getPushRegistration } from '@/utils/pushNotifications';
 import { configureRescuerTracking, stopRescuerTracking, trackingAssignmentFor } from '@/utils/rescuerLiveLocation';
 import { endNavigationTrip, mountNavigationSync } from '@/utils/navigationRuntime';
 import { createAdaptivePoller } from '@/utils/networkScheduling';
+import { stopAcceptedDispatchAlarm } from '@/utils/dispatchAlarm';
 import { rescueActionGps } from '@/utils/rescueActionGps';
 import { useWebViewMode } from '@/utils/viewMode';
 import { WebAppShell } from '@/components/WebAppShell';
@@ -65,6 +66,11 @@ export default function RescuerHomeScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
   const { overview, loading, refreshing, error: overviewError, offline, lastSyncedAt, loadOverview }
     = useMobileOverview<RescuerOverview>('rescuer', getRescuerOverview);
+  useEffect(() => {
+    for (const assignment of overview?.assignments || []) {
+      void stopAcceptedDispatchAlarm(Number(assignment.assignment_id), assignment.status_key);
+    }
+  }, [overview?.assignments]);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const logoutPending = useRef(false);

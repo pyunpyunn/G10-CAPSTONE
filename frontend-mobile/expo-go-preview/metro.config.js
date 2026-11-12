@@ -3,10 +3,8 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const previewRoot = __dirname;
 const sourceRoot = path.resolve(previewRoot, '..');
-const appRoot = path.join(sourceRoot, 'app');
 const config = getDefaultConfig(previewRoot);
 
-process.env.EXPO_ROUTER_APP_ROOT = appRoot;
 require('dotenv').config({ path: path.join(sourceRoot, '.env') });
 
 config.watchFolders = [sourceRoot];

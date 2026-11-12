@@ -31,6 +31,7 @@ class RescuerMobileFieldReportResource extends JsonResource
             'property_damage' => $row->property_damage ?? null,
             'death_count' => $row->death_count ?? null,
             'injured_count' => $row->injured_count ?? null,
+            'missing_count' => $row->missing_count ?? null,
             'latitude' => $row->latitude,
             'longitude' => $row->longitude,
             'battery_level' => $row->battery_level,

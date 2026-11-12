@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { api, getAuthenticatedImageSource } from './client';
 import { submitReport } from './reportSubmission';
+import { stopAcceptedDispatchAlarm } from '@/utils/dispatchAlarm';
 
 export type RescuerOverview = {
   profile: {
@@ -59,6 +60,7 @@ export async function updateAssignmentStatus(
     status,
     ...payload,
   });
+  await stopAcceptedDispatchAlarm(assignmentId, status);
 
   return response.data.data;
 }

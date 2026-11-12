@@ -51,12 +51,12 @@ export function StatusBadge({ label, tone = 'neutral' }: { label: string; tone?:
   );
 }
 
-export function StatTile({ label, value, tone = 'neutral' }: { label: string; value: string | number; tone?: string }) {
+export function StatTile({ label, value, tone = 'neutral', action }: { label: string; value: string | number; tone?: string; action?: ReactNode }) {
   const color = toneColor(tone);
 
   return (
-    <View style={styles.statTile}>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={[styles.statTile, !!action && { minWidth: 160 }]}>
+      <View style={[styles.sectionHeader, !!action && { gap: 4 }]}><Text style={styles.statLabel}>{label}</Text>{action}</View>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
     </View>
   );

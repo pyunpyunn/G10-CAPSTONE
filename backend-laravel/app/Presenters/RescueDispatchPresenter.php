@@ -27,7 +27,7 @@ class RescueDispatchPresenter
 
     public function activeEvent(object $event): array
     {
-        return ['event_id' => $event->event_id, 'name' => $event->name, 'type' => $event->type_name ?? $event->type?->type_name ?? 'Disaster event', 'severity' => $event->severity_label ?? $event->severity?->severity_label ?? 'Unspecified', 'severity_key' => $event->severity_key ?? $event->severity?->severity_key, 'started_at' => $this->dateTime($event->started_at), 'started_time' => $this->time($event->started_at)];
+        return ['event_id' => $event->event_id, 'name' => $event->name, 'type' => $event->type_name ?? $event->type?->type_name ?? 'Disaster event', 'severity' => $event->severity_label ?? $event->severity?->severity_label ?? 'Unspecified', 'severity_key' => $event->severity_key ?? $event->severity?->severity_key ?? null, 'started_at' => $this->dateTime($event->started_at), 'started_time' => $this->time($event->started_at)];
     }
 
     public function dateTime(?string $dateTime): ?string { return $dateTime ? Carbon::parse($dateTime)->format('M d, Y h:i A') : null; }

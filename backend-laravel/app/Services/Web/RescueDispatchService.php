@@ -201,8 +201,6 @@ class RescueDispatchService
         $dispatch = $creation['dispatch'];
         $assignmentId = (int) $dispatch['assignment_id'];
         $selectedResponderIds = $creation['responder_ids'];
-        $leaderId = RescueTeam::query()->where('team_id', $validated['team_id'])->value('leader_responder_id');
-        if ($leaderId) $selectedResponderIds = array_values(array_unique([...$selectedResponderIds, (int) $leaderId]));
 
         $pushJob = new SendDispatchPush($selectedResponderIds, $assignmentId, (string) $dispatch['assignment_code'],
             (string) $dispatch['assigned_area'], (string) $activeEvent->event_id,
@@ -376,7 +374,6 @@ class RescueDispatchService
     private function getDispatchById(int $assignmentId): array { return $this->presenter->dispatch($this->query->dispatchRecord($assignmentId)); }
 
 }
-
 
 
 

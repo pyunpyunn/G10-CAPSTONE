@@ -25,18 +25,19 @@ class UpdateHouseholdStatus
         array $location = [],
         ?bool $dispatchOverride = null,
         bool $withdrawSafeAssignments = true,
+        ?\Carbon\CarbonInterface $reportedAt = null,
     ): void {
-        DB::transaction(function () use ($eventId, $householdId, $statusId, $statusKey, $source, $notes, $userId, $deviceId, $location, $dispatchOverride, $withdrawSafeAssignments): void {
-            $now = now();
+        DB::transaction(function () use ($eventId, $householdId, $statusId, $statusKey, $source, $notes, $userId, $deviceId, $location, $dispatchOverride, $withdrawSafeAssignments, $reportedAt): void {
+            $now = $reportedAt ?? now();
             $existing = DB::table('household_disasters')
                 ->where('disaster_id', $eventId)->where('household_id', $householdId)
                 ->lockForUpdate()->first();
 
-            $urgent = in_array($statusKey, ['unsafe', 'needs_help', 'need_help', 'needs_assistance', 'injured', 'missing', 'not_evacuated', 'displaced'], true);
-            $knownSafe = in_array($statusKey, ['safe', 'active', 'returned', 'evacuated', 'relocated'], true);
+            $urgent = in_array($statusKey, \App\Queries\HouseholdEventStatusQuery::UNSAFE_KEYS, true);
+            $knownSafe = in_array($statusKey, [...\App\Queries\HouseholdEventStatusQuery::SAFE_KEYS, ...\App\Queries\HouseholdEventStatusQuery::EVACUATED_KEYS], true);
             // A confirmed safe report withdraws the live task even if an older
             // administrative override requested dispatch.
-            $reportedSafe = in_array($statusKey, ['safe', 'active', 'returned'], true);
+            $reportedSafe = in_array($statusKey, \App\Queries\HouseholdEventStatusQuery::SAFE_KEYS, true);
             $needsDispatch = $reportedSafe ? false : ($dispatchOverride ?? ($urgent ? true : ($knownSafe ? false : (bool) ($existing->needs_dispatch ?? false))));
             $priority = $needsDispatch ? 'urgent' : ($knownSafe ? 'monitor' : ($existing->priority_level ?? 'monitor'));
 

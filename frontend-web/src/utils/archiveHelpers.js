@@ -1,6 +1,5 @@
 export const ARCHIVE_TABS = [
   { key: 'household-status-logs', label: 'Household Status Logs' },
-  { key: 'inquiry-logs', label: 'Inquiry Logs' },
   { key: 'disaster-events', label: 'Disaster Event Logs' },
   { key: 'dispatch-logs', label: 'Rescue Dispatch Logs' },
   { key: 'radio-communication-logs', label: 'Radio Logs' },
@@ -64,9 +63,8 @@ export const ARCHIVE_COLUMNS = {
     { key: 'datetime', label: 'Date / time' },
     { key: 'event', label: 'Event' },
     { key: 'transmission', label: 'Transmission' },
-    { key: 'team', label: 'Team' },
-    { key: 'channel', label: 'Channel' },
-    { key: 'status', label: 'Status' },
+    { key: 'team_route', label: 'Team' },
+    { key: 'recording', label: 'Recording' },
   ],
   'resource-requests': [
     { key: 'datetime', label: 'Date / time' },

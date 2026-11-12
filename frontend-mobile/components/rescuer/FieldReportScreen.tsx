@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { getAssignedHousehold, getAssignedMemberProfilePhoto } from '@/api/rescuer';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { ActionButton, SectionHeader, StatTile } from './RescuerUI';
@@ -15,6 +15,7 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
   const [damageOptions, setDamageOptions] = useState<ReportOption[]>([]);
   const [damage, setDamage] = useState('');
   const [notes, setNotes] = useState('');
+  const [counts, setCounts] = useState<Partial<Record<'death_count' | 'injured_count' | 'missing_count', number>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -22,12 +23,21 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
   const [revision, setRevision] = useState(0);
   const requestKey = useRef('');
   const submitted = saved || reports.some(report => String(report.assignment_id) === String(assignmentId) && String(report.household_id) === String(householdId));
-  const deathCount = members.filter(member => statusOptions.find(option => option.key === member.statusKey)?.counts_as_death).length;
-  const injuredCount = members.filter(member => statusOptions.find(option => option.key === member.statusKey)?.counts_as_injury).length;
+  const deathCount = counts.death_count ?? members.filter(member => statusOptions.find(option => option.key === member.statusKey)?.counts_as_death).length;
+  const injuredCount = counts.injured_count ?? members.filter(member => statusOptions.find(option => option.key === member.statusKey)?.counts_as_injury).length;
+
+  const missingCount = counts.missing_count ?? members.filter(member => member.statusKey === 'missing').length;
+  function countControls(key: 'death_count' | 'injured_count' | 'missing_count', label: string, value: number) {
+    return <View style={styles.counterControls}>{([-1, 1] as const).map(delta => <Pressable key={delta}
+      accessibilityRole="button" accessibilityLabel={`${delta < 0 ? 'Decrease' : 'Increase'} ${label.toLowerCase()}`}
+      disabled={busy || submitted || (delta < 0 && value === 0) || (delta > 0 && value >= 4294967295)}
+      onPress={() => setCounts(current => ({ ...current, [key]: Math.max(0, Math.min(4294967295, (current[key] ?? value) + delta)) }))}
+      style={[styles.counterButton, (busy || submitted || (delta < 0 && value === 0)) && { opacity: 0.4 }]}><Text style={styles.counterText}>{delta < 0 ? '-' : '+'}</Text></Pressable>)}</View>;
+  }
 
   useEffect(() => {
     let active = true;
-    setHousehold(null); setMembers([]); setMemberPhotos({}); setStatusOptions([]); setDamageOptions([]); setDamage(''); setNotes(''); setSaved(false); setError('');
+    setHousehold(null); setMembers([]); setMemberPhotos({}); setStatusOptions([]); setDamageOptions([]); setDamage(''); setNotes(''); setCounts({}); setSaved(false); setError('');
     requestKey.current = `field-report-${assignmentId}-${householdId}`;
     if (!assignmentId || !householdId) { setLoading(false); setError('No current household.'); return; }
     setLoading(true);
@@ -35,6 +45,7 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
       if (!active) return;
       if (String(data.household?.household_id) !== String(householdId)) throw new Error('The current household changed. Refresh your queue.');
       setHousehold(data.household); setStatusOptions(data.member_status_options || []); setDamageOptions(data.property_damage_options || []); setDamage(data.saved_property_damage || '');
+      setCounts(data.saved_counts || {});
       const assignedMembers = data.members || [];
       setMembers(assignedMembers.map((member: any) => ({ id: String(member.member_id), name: member.name, head: member.is_household_head, statusKey: member.member_status?.key || '' })));
       void Promise.all(assignedMembers
@@ -54,7 +65,7 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
     setBusy(true); setError('');
     try {
       await onSubmitReport({ assignment_id: assignmentId, household_id: householdId, idempotency_key: requestKey.current, property_damage: damage,
-        death_count: deathCount, injured_count: injuredCount, notes: notes.trim() || undefined, members: members.map(member => ({ member_id: member.id, status_key: member.statusKey })) });
+        death_count: deathCount, injured_count: injuredCount, missing_count: missingCount, notes: notes.trim() || undefined, members: members.map(member => ({ member_id: member.id, status_key: member.statusKey })) });
       setSaved(true);
     } catch (failure: any) { setError(failure.response?.data?.message || 'Unable to save report.'); }
     finally { setBusy(false); }
@@ -74,7 +85,7 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
       </View>)}
     </View>
     {household && <><View style={styles.card}><SectionHeader title="Property damage" /><ReportSelect label="Damage level" value={damage} options={damageOptions} onChange={setDamage} disabled={busy || submitted} />{!damageOptions.length && <Text style={styles.error}>Damage levels are unavailable.</Text>}</View>
-      <View style={styles.counts}><StatTile label="Deaths" value={deathCount} tone="danger" /><StatTile label="Injured" value={injuredCount} tone="warning" /></View>
+      <View style={styles.counts}><StatTile label="Deaths" value={deathCount} tone="danger" action={countControls('death_count', 'Deaths', deathCount)} /><StatTile label="Injured" value={injuredCount} tone="warning" action={countControls('injured_count', 'Injured', injuredCount)} /><StatTile label="Missing" value={missingCount} tone="warning" action={countControls('missing_count', 'Missing', missingCount)} /></View>
       <View style={styles.card}><SectionHeader title="Notes (optional)" /><TextInput accessibilityLabel="Notes for HQ" style={styles.input} value={notes} onChangeText={setNotes} editable={!busy && !submitted} multiline maxLength={2000} textAlignVertical="top" />
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <ActionButton label={submitted ? 'Report saved' : busy ? 'Saving…' : 'Submit report'} icon="send-outline" onPress={submit} disabled={busy || submitted || !damageOptions.length} />
@@ -88,5 +99,6 @@ const styles = StyleSheet.create({
   name: { color: palette.text, fontSize: 18, fontWeight: '700' }, meta: { color: palette.textSoft, fontSize: 13 },
   columns: { flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }, columnLabel: { flex: 1, minWidth: 0, color: palette.textSoft, fontSize: 12 },
   member: { flexDirection: 'row', alignItems: 'center', paddingTop: spacing.sm, gap: 8, borderTopWidth: 1, borderColor: palette.border }, memberPhotoSlot: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }, memberPhoto: { width: 36, height: 36, borderRadius: 18 }, memberName: { flex: 1, minWidth: 0, color: palette.text, fontSize: 15, fontWeight: '600' }, selectColumn: { flex: 1, minWidth: 0 },
-  counts: { flexDirection: 'row', gap: spacing.sm }, input: { minHeight: 78, borderWidth: 1, borderColor: palette.borderStrong, borderRadius: radius.md, padding: spacing.sm, color: palette.text, backgroundColor: palette.page }, error: { color: palette.unsafe, fontSize: 13 },
+  counterControls: { flexDirection: 'row', gap: 4 }, counterButton: { minWidth: 32, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.border, borderRadius: radius.sm }, counterText: { color: palette.text, fontSize: 20, fontWeight: '700' },
+  counts: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, input: { minHeight: 78, borderWidth: 1, borderColor: palette.borderStrong, borderRadius: radius.md, padding: spacing.sm, color: palette.text, backgroundColor: palette.page }, error: { color: palette.unsafe, fontSize: 13 },
 });

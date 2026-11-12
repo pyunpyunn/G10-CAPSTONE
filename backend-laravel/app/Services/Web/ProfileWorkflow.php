@@ -94,6 +94,7 @@ class ProfileWorkflow
                 'password' => Hash::make($validated['password']),
                 'updated_at' => now(),
             ];
+            if (Schema::hasColumn('users', 'temporary_password_expires_at')) $updates['temporary_password_expires_at'] = null;
             if (Schema::hasColumn('users', 'password_changed_at')) $updates['password_changed_at'] = now();
             if (Schema::hasColumn('users', 'must_change_password')) $updates['must_change_password'] = 0;
             User::query()->whereKey($credential->getKey())->update($updates);

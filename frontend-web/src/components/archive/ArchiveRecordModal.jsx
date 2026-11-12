@@ -29,7 +29,15 @@ export default function ArchiveRecordModal({ record, categoryLabel, onClose, onD
 
         <div className="archive-view-body">
           <p>Record ID: {record.id}</p>
-          <ArchiveRecording key={record.id} recording={record.recording} recordId={record.id} />
+          {record.recordings?.length
+            ? record.recordings.map(({ communication_id, recording }) => (
+              <ArchiveRecording
+                key={communication_id}
+                recording={recording}
+                recordId={communication_id}
+              />
+            ))
+            : <ArchiveRecording key={record.id} recording={record.recording} recordId={record.id} />}
           <div className="archive-detail-grid">
             {(record.details || []).map((item) => (
               <div className="archive-detail-item" key={item.label}>

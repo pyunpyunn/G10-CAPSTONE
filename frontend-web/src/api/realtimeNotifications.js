@@ -18,10 +18,10 @@ export function connectRealtimeNotifications(userId, topics = [], { adminAccess 
   }
   const scheduleFallback = () => {
     window.clearTimeout(fallbackTimer)
-    if (disposed || realtimeConnected) return
+    if (disposed) return
     fallbackTimer = window.setTimeout(() => {
       if (!document.hidden) reconcile()
-      fallbackDelay = Math.min(60000, fallbackDelay * 2)
+      fallbackDelay = realtimeConnected ? 15000 : Math.min(15000, fallbackDelay * 2)
       scheduleFallback()
     }, fallbackDelay * (0.8 + Math.random() * 0.4))
   }
@@ -55,8 +55,8 @@ export function connectRealtimeNotifications(userId, topics = [], { adminAccess 
     if (connection.state !== 'connected') subscribed.clear()
     realtimeConnected = connection.state === 'connected' && subscribed.size === channelNames.length
     window.dispatchEvent(new CustomEvent('notifications:connection', { detail: realtimeConnected }))
-    if (realtimeConnected) { window.clearTimeout(fallbackTimer); fallbackDelay = 5000 }
-    else scheduleFallback()
+    fallbackDelay = realtimeConnected ? 15000 : 5000
+    scheduleFallback()
   }
   const seen = new Set()
   const receiveOperations = (event) => {

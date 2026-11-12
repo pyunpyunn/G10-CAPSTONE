@@ -4,8 +4,8 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start --go --lan --port 8082",
-    "start:clear": "expo start --go --lan --port 8082 --clear",
+    "start": "node ./start-preview.cjs start --go --lan --port 8082",
+    "start:clear": "node ./start-preview.cjs start --go --lan --port 8082 --clear",
     "check": "tsc --noEmit"
   },
   "dependencies": {

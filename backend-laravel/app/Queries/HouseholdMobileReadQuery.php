@@ -38,14 +38,20 @@ class HouseholdMobileReadQuery
         if (Schema::hasTable('addresses') && Schema::hasColumn('households', 'address_id') && Schema::hasColumn('addresses', 'address_id')) {
             $query->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id');
             $columns[] = $this->optionalColumnSelect('addresses', 'full_address', 'full_address', 'a');
-            $columns[] = $this->optionalColumnSelect('addresses', 'sitio_id', 'sitio_id', 'a');
+            $hasPurok = Schema::hasTable('puroks') && Schema::hasColumn('addresses', 'purok_id')
+                && Schema::hasColumn('puroks', 'sitio_id');
+            if ($hasPurok) $query->leftJoin('puroks as p', 'p.purok_id', '=', 'a.purok_id');
+            $sitioId = $hasPurok
+                ? (Schema::hasColumn('addresses', 'sitio_id') ? 'COALESCE(p.sitio_id, a.sitio_id)' : 'p.sitio_id')
+                : (Schema::hasColumn('addresses', 'sitio_id') ? 'a.sitio_id' : null);
+            $columns[] = $sitioId ? DB::raw($sitioId.' as sitio_id') : DB::raw('NULL as sitio_id');
             $columns[] = $this->optionalColumnSelect('addresses', 'purok_sitio', 'purok_sitio', 'a');
             $columns[] = $this->optionalColumnSelect('addresses', 'barangay_name', 'barangay_name', 'a');
             $columns[] = $this->optionalColumnSelect('addresses', 'city_municipality', 'city_municipality', 'a');
             $columns[] = $this->optionalColumnSelect('addresses', 'province', 'province', 'a');
-            if (Schema::hasTable('sitios') && Schema::hasColumn('addresses', 'sitio_id')
+            if (Schema::hasTable('sitios') && $sitioId !== null
                 && Schema::hasColumn('sitios', 'sitio_id') && Schema::hasColumn('sitios', 'sitio_name')) {
-                $query->leftJoin('sitios as s', 's.sitio_id', '=', 'a.sitio_id');
+                $query->leftJoin('sitios as s', 's.sitio_id', '=', DB::raw($sitioId));
                 $columns[] = 's.sitio_name as sitio_name';
             } else {
                 $columns[] = DB::raw('NULL as sitio_name');
@@ -61,6 +67,11 @@ class HouseholdMobileReadQuery
         }
 
         $record = $query->first($columns);
+        if ($record && Schema::hasTable('barangays') && Schema::hasColumn('addresses', 'barangay_id')) {
+            $barangayId = DB::table('households as h')->join('addresses as a', 'a.address_id', '=', 'h.address_id')
+                ->where('h.household_id', $householdId)->value('a.barangay_id');
+            if ($barangayId) $record->barangay_name = DB::table('barangays')->where('barangay_id', $barangayId)->value('barangay_name') ?: $record->barangay_name;
+        }
         if ($record) $record->full_address = app(HouseholdAddressQuery::class)->forHouseholds([$householdId])->get($householdId);
         return $record;
     }
@@ -614,14 +625,6 @@ class HouseholdMobileReadQuery
             ->where('hsl.household_id', $householdId)
             ->when($eventId && Schema::hasColumn('household_status_logs', 'disaster_id'), fn ($query) => $query->where('hsl.disaster_id', $eventId));
 
-        if (Schema::hasColumn('household_status_logs', 'source')) {
-            $query->where(function ($sourceQuery): void {
-                $sourceQuery
-                    ->whereNull('hsl.source')
-                    ->orWhere('hsl.source', '!=', 'household_member_mobile');
-            });
-        }
-
         $columns = [
             $this->optionalColumnSelect('household_status_logs', 'status_log_id', 'status_log_id', 'hsl'),
             $this->optionalColumnSelect('household_status_logs', 'location_label', 'location_label', 'hsl'),
@@ -647,6 +650,7 @@ class HouseholdMobileReadQuery
             ->orderByDesc($orderColumn)
             ->limit(30)
             ->get($columns)
+            ->reject(fn (object $log): bool => ($this->decodeJson($log->notes ?? null)['report_type'] ?? null) === 'household_member_rollup')
             ->map(function (object $log): array {
                 $notes = $this->decodeJson($log->notes ?? null);
                 $displayStatusKey = $this->presenter->displayStatusKey($log->status_key, $notes);
@@ -796,10 +800,11 @@ class HouseholdMobileReadQuery
             $original = DB::table('household_statuses')->where('status_key', $mobileKey)->first();
             if (! $original && ! $selection && ! in_array($mobileKey, ['safe', 'evacuated', 'unsafe', 'needs_help'], true)) return null;
             $basis = \App\Support\StatusSafety::basis($mobileKey, $selection['safety_basis'] ?? $original?->safety_basis);
-            $canonical = DB::table('household_statuses')->where('status_key', $basis)->first();
+            $canonicalKey = $mobileKey === 'evacuated' && $basis === 'safe' ? 'evacuated' : $basis;
+            $canonical = DB::table('household_statuses')->where('status_key', $canonicalKey)->first();
             if (! $canonical) return null;
             return [
-                'status_id' => $canonical->status_id, 'status_key' => $basis, 'safety_basis' => $basis,
+                'status_id' => $canonical->status_id, 'status_key' => $canonicalKey, 'safety_basis' => $basis,
                 'status_label' => $selection['label'] ?? $original?->status_label ?? $original?->status_name ?? ucwords(str_replace('_', ' ', $mobileKey)),
             ];
         }

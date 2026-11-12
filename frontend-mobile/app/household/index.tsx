@@ -134,10 +134,10 @@ export default function HouseholdHomeScreen() {
   const syncQueuedStatusReports = useCallback(async () => {
     const result = await syncPendingHouseholdStatuses();
     await refreshStatusQueueCounts();
-    if (result.syncedIds.length) void refreshOverview(true, true, true);
+    if (result.syncedIds.length) await refreshOverview(true, true, true);
     const rejected = result.failures.find((failure) => !failure.retryable);
     if (rejected) {
-      Alert.alert('Status not synced', `The status is stored on this device but was not saved to the server. ${rejected.message}`);
+      Alert.alert('Status could not be saved', `The status is stored on this device but was not saved to the server. ${rejected.message}`);
     }
     return result;
   }, [refreshOverview, refreshStatusQueueCounts]);
@@ -405,7 +405,11 @@ export default function HouseholdHomeScreen() {
     if (result.syncedIds.includes(reportId)) return true;
 
     const failure = result.failures.find((item) => item.id === reportId);
-    if (!failure || failure.retryable) {
+    const network = await Network.getNetworkStateAsync();
+    const disconnected = network.isConnected === false || network.isInternetReachable === false;
+    if (failure?.retryable && !disconnected) {
+      Alert.alert('Unable to save status', `${failure.message} The report is kept on this device for automatic retry.`);
+    } else if (!failure || failure.retryable) {
       Alert.alert(
         'Status saved on this device',
         'This report has not yet been saved to the server. It will sync automatically when the internet connection returns.',

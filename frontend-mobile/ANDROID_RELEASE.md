@@ -1,5 +1,15 @@
 # Standalone Android APK
 
+## Latest local APK — version 2.0.0, build 70
+
+Installable file: [`releases/RESQPERATION-build70.apk`](./releases/RESQPERATION-build70.apk).
+
+- Built from local `main` commit `69427d6da811bf8e75d6e2e6b28e7207dcb4f25e`, which includes fetched `origin/main` commit `850012d73e3301720d554f80803d93f7a2b1744d` and the latest MapLibre/Expo Go changes. Uncommitted standalone Expo Go preview files were preserved.
+- Version code 70; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified; non-debuggable and HTTPS-only manifest checks passed.
+- SHA-256: `E69ED0D2F67629167B33BDF53FF459DF143160C5DE893747E9E3D7824AF06467`.
+- Verification: TypeScript and signed Android release build passed. Mobile regressions: 150 passed, 8 failed. Failures involve stale fixtures: two password tests lack the password-policy mock, five map tests still target the pre-wrapper native component, and one push-registration test supplies a user without the required role. App source was not changed for this release.
+- Physical-device installation and runtime behavior remain unverified; no Android device was connected. Backend changes require separate deployment.
+
 ## Latest local APK — version 2.0.0, build 69
 
 Installable file: [`releases/RESQPERATION-build69.apk`](./releases/RESQPERATION-build69.apk).
