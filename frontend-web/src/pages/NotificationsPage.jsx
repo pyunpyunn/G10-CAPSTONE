@@ -25,7 +25,6 @@ export default function NotificationsPage() {
   const [items, setItems] = useState([])
   const [, setSummary] = useState({})
   const [pagination, setPagination] = useState({})
-  const [scopeNote, setScopeNote] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -40,7 +39,6 @@ export default function NotificationsPage() {
       setItems(nextItems)
       setSummary(data.summary || {})
       setPagination(data.notifications || {})
-      setScopeNote(data.scope_note || '')
       setSelectedIds((ids) => ids.filter((id) => nextItems.some((item) => item.id === id)))
       setError('')
       setIsLoading(false)
@@ -180,18 +178,15 @@ export default function NotificationsPage() {
       {error && <div className="form-error">{error}</div>}
 
       {!isLoading && (!error || hasLoaded) && (
-        <>
-          {scopeNote && <div className="notification-scope-note">{scopeNote}</div>}
-          <NotificationList
-            notifications={items}
-            selectedIds={selectedIds}
-            pagination={pagination}
-            onToggleSelected={toggleSelected}
-            onOpenNotification={openNotification}
-            onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-            onNext={() => setPage((currentPage) => currentPage + 1)}
-          />
-        </>
+        <NotificationList
+          notifications={items}
+          selectedIds={selectedIds}
+          pagination={pagination}
+          onToggleSelected={toggleSelected}
+          onOpenNotification={openNotification}
+          onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+          onNext={() => setPage((currentPage) => currentPage + 1)}
+        />
       )}
     </section>
   )

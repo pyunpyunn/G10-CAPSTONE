@@ -35,7 +35,6 @@ class NotificationPresenter
             ],
             'preview' => $allItems->values()->all(),
             'status_filter' => $status,
-            'scope_note' => 'Notification actions affect only your role-scoped view. Delivery logs stay unchanged for audit.',
         ];
     }
 
