@@ -23,6 +23,7 @@ let activeServerUrl: string | null = null;
 let activeServerCheckedAt = 0;
 
 export async function getApiServerUrl() {
+  if (process.env.EXPO_PUBLIC_API_NGROK_ONLY === 'true') return normalizeApiServerUrl(getApiBaseUrl());
   const stored = await getStoredItem(serverUrlKey);
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
@@ -77,12 +78,19 @@ export async function setApiServerUrl(value: string) {
 }
 
 function normalizeApiServerUrl(value: string) {
+  if (process.env.EXPO_PUBLIC_API_NGROK_ONLY === 'true') {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || !isNgrokHostname(url.hostname.toLowerCase())) {
+      throw new Error('This mobile app requires an HTTPS Ngrok API address.');
+    }
+  }
   const isLocal = isLocalhostUrl(value) || (Platform.OS === 'web' && typeof window !== 'undefined' && ['127.0.0.1', 'localhost'].includes(window.location.hostname));
   return normalizeServerUrl(value, isLocal ? false : !__DEV__, Platform.OS === 'android' && !__DEV__);
 }
 
 function getApiBaseUrl() {
   const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (process.env.EXPO_PUBLIC_API_NGROK_ONLY === 'true' && configuredUrl) return configuredUrl;
 
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
@@ -106,6 +114,9 @@ function getApiBaseUrl() {
 }
 
 async function getApiServerCandidates() {
+  if (process.env.EXPO_PUBLIC_API_NGROK_ONLY === 'true') {
+    return [normalizeApiServerUrl(getApiBaseUrl())];
+  }
   const fallbacks = (process.env.EXPO_PUBLIC_API_FALLBACK_URLS || '')
     .split(',')
     .map((url) => url.trim())

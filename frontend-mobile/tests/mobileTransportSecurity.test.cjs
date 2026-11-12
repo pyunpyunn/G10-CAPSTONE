@@ -92,6 +92,7 @@ function loadApiClient(savedServerUrl, options = {}) {
     process: { env: {
       EXPO_PUBLIC_API_BASE_URL: options.baseUrl || 'https://api.example.test/api/v1',
       EXPO_PUBLIC_API_FALLBACK_URLS: options.fallbackUrls,
+      EXPO_PUBLIC_API_NGROK_ONLY: options.ngrokOnly ? 'true' : undefined,
     } },
     require(name) {
       if (!(name in mocks)) throw Error(`Unexpected import: ${name}`);
@@ -216,6 +217,28 @@ test('Android release routes prefer Ngrok over Tailscale and other HTTPS routes'
   assert.equal(client.probedUrls[0].config.timeout, 4000);
   assert.equal(client.clientOptions.timeout, 20000);
   assert.equal(request.baseURL, ngrok);
+});
+
+test('Ngrok-only mode ignores saved and fallback Tailscale addresses', async () => {
+  const ngrok = 'https://sturdily-morse-sitter.ngrok-free.dev/api/v1';
+  const client = loadApiClient('http://100.121.155.55:8000/api/v1', {
+    baseUrl: ngrok, ngrokOnly: true, fallbackUrls: 'https://resq.example.ts.net/api/v1',
+    probe: async () => ({ data: { status: 'ready' } }),
+  });
+  const request = await client.request({ headers: {}, method: 'post', url: '/auth/login' });
+  assert.equal(request.baseURL, ngrok);
+  assert.deepEqual(client.probedUrls.map(({ url }) => url), [`${ngrok}/health/ready`]);
+});
+
+test('Ngrok-only mode does not connect to Tailscale when Ngrok is unavailable', async () => {
+  const ngrok = 'https://sturdily-morse-sitter.ngrok-free.dev/api/v1';
+  const client = loadApiClient('http://100.121.155.55:8000/api/v1', {
+    baseUrl: ngrok, ngrokOnly: true, fallbackUrls: 'https://resq.example.ts.net/api/v1',
+    probe: async () => { throw new Error('Tunnel unavailable'); },
+  });
+  await assert.rejects(client.request({ headers: {}, method: 'post', url: '/auth/login' }));
+  assert.ok(client.probedUrls.length > 0);
+  assert.ok(client.probedUrls.every(({ url }) => url === `${ngrok}/health/ready`));
 });
 
 test('Android release routes prefer Ngrok, then local subnet and Tailscale IP', async () => {
