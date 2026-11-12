@@ -194,12 +194,32 @@ class RescueDispatchQuery
         $activeTeams = $eventId ? ResponderAssignment::query()->where('disaster_id', $eventId)
             ->whereIn('status', app(DispatchStatusQuery::class)->keys(true))
             ->whereIn('team_id', $realTeams->pluck('team_id'))->distinct()->count('team_id') : 0;
+
+        $statusCounts = [];
+        $activeKeys = app(DispatchStatusQuery::class)->keys(true);
+        $closedKeys = app(DispatchStatusQuery::class)->keys(false);
+        $activeCount = 0;
+        $closedCount = 0;
+        foreach ($counts as $k => $c) {
+            $normalizedKey = ($k === 'onscene') ? 'on_scene' : $k;
+            $statusCounts[$normalizedKey] = ($statusCounts[$normalizedKey] ?? 0) + (int) $c;
+            if (in_array($k, $activeKeys, true) || in_array($normalizedKey, $activeKeys, true)) {
+                $activeCount += (int) $c;
+            }
+            if (in_array($k, $closedKeys, true) || in_array($normalizedKey, $closedKeys, true)) {
+                $closedCount += (int) $c;
+            }
+        }
+        $statusCounts['active'] = $activeCount;
+        $statusCounts['closed'] = $closedCount;
+
         return ['total_teams' => $realTeams->count(), 'dispatched' => $dispatched, 'on_scene' => $onScene,
             'available_responders' => (int) $realTeams->sum('available_responder_count'),
             'total_responders' => (int) $realTeams->sum('member_count'),
             'available' => $available, 'completed' => $completed,
             'response_rate' => $realTeams->count() ? (int) round($activeTeams / $realTeams->count() * 100) : 0,
             'active_units' => $dispatched + $onScene + $returning,
+            'status_counts' => $statusCounts,
             'dispatch_progress' => ['total' => (int) $counts->sum(), 'dispatched' => $dispatched,
                 'on_scene' => $onScene, 'returning' => $returning, 'completed' => $completed,
                 'cancelled' => (int) ($counts['cancelled'] ?? 0)]];

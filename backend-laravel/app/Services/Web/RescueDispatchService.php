@@ -150,12 +150,15 @@ class RescueDispatchService
         }
         if ($request->query('view') === 'management') {
             $page = $eventId ? $this->query->dispatches($request, (string) $eventId) : null;
-            return response()->json(['data' => $data + ['dispatches' => [
-                'data' => $page ? collect($page->items())->map(fn ($row) => $this->presenter->managementDispatch($row))->values() : [],
-                'meta' => ['current_page' => $page?->currentPage() ?? 1, 'per_page' => $page?->perPage() ?? 20,
-                    'total' => $page?->total() ?? 0, 'last_page' => $page?->lastPage() ?? 1,
-                    'from' => $page?->firstItem(), 'to' => $page?->lastItem()],
-            ]]]);
+            return response()->json(['data' => $data + [
+                'summary' => $this->query->summary($eventId),
+                'dispatches' => [
+                    'data' => $page ? collect($page->items())->map(fn ($row) => $this->presenter->managementDispatch($row))->values() : [],
+                    'meta' => ['current_page' => $page?->currentPage() ?? 1, 'per_page' => $page?->perPage() ?? 20,
+                        'total' => $page?->total() ?? 0, 'last_page' => $page?->lastPage() ?? 1,
+                        'from' => $page?->firstItem(), 'to' => $page?->lastItem()],
+                ],
+            ]]);
         }
         $teams = $this->query->teamCards($eventId);
         $priorities = $eventId ? app(\App\Queries\SitioPriorityQuery::class)->ranked((string) $eventId) : [];
