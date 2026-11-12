@@ -31,7 +31,7 @@ export default function LegacyTeamManagementPage() {
     let active = true
     getRescueTeamConfig().then(data => {
       if (!active) return
-      const initialTeamId = data.selected_team_id || data.teams.find(team => team.team_code !== 'HQCC' && teamGroupKey(team) !== 'unassigned')?.team_id || null
+      const initialTeamId = data.teams[0]?.team_id || null
       setWorkspace({ ...data, selected_team_id: initialTeamId })
       setSelectedId(current => data.teams.some(team => String(team.team_id) === String(current))
         ? current
@@ -111,7 +111,7 @@ export default function LegacyTeamManagementPage() {
     {activeView === 'teams' ? <>
       {notice && <div className="tm-feedback tm-success" role="status">{notice}<button className="bt sm" type="button" onClick={() => setNotice('')}>Dismiss</button></div>}
       <RescueTeamConfigModal
-        key={revision}
+        key={`${revision}-${workspace?.selected_team_id ?? 'loading'}`}
         isOpen
         workspace={workspace}
         isLoading={loading}
