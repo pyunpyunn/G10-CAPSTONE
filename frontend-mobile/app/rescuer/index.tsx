@@ -17,7 +17,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logoutMobile } from '@/api/auth';
 import { savePushRegistration } from '@/api/device';
 import {
@@ -63,6 +63,7 @@ const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; 
 ];
 
 export default function RescuerHomeScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isDesktopSite: isDesktop, isWideDesktop } = useWebViewMode();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
@@ -511,7 +512,7 @@ export default function RescuerHomeScreen() {
       <ScrollView
         removeClippedSubviews={false}
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: 104 + insets.bottom }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}
       >
         {!!overviewError && !offline && overview ? (
@@ -525,7 +526,7 @@ export default function RescuerHomeScreen() {
         {renderContent()}
       </ScrollView>
 
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { bottom: Math.max(insets.bottom + 8, spacing.md) }]}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
 
