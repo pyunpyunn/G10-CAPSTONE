@@ -1,0 +1,203 @@
+import { StyleSheet } from 'react-native';
+import { palette, radius, spacing } from '@/constants/resqTheme';
+
+export const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: palette.page,
+  },
+  scroll: {
+    flex: 1,
+  },
+  content: {
+    padding: spacing.md,
+    paddingBottom: spacing.xl,
+  },
+  desktopBody: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: palette.page,
+  },
+  desktopSidebar: {
+    width: 260,
+    backgroundColor: palette.card,
+    borderRightWidth: 1,
+    borderColor: palette.border,
+    padding: spacing.md,
+    justifyContent: 'space-between',
+  },
+  desktopProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: palette.page,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: spacing.md,
+  },
+  desktopAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: palette.navActive,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  desktopHouseholdName: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  desktopHouseholdCode: {
+    color: palette.textSoft,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  desktopNavGroup: {
+    flex: 1,
+    gap: 6,
+  },
+  desktopNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+  },
+  desktopNavItemActive: {
+    backgroundColor: '#e0f2fe',
+  },
+  desktopNavItemQr: {
+    backgroundColor: palette.unsafe,
+    marginVertical: 4,
+  },
+  desktopNavText: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  desktopNavTextActive: {
+    color: palette.navActive,
+    fontWeight: '800',
+  },
+  desktopSidebarFooter: {
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderColor: palette.border,
+  },
+  desktopLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+  },
+  desktopLogoutText: {
+    color: palette.unsafe,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  desktopMainScroll: {
+    flex: 1,
+  },
+  desktopMainContent: {
+    padding: spacing.lg,
+    maxWidth: 920,
+    width: '100%',
+    alignSelf: 'center',
+    paddingBottom: spacing.xl * 2,
+  },
+  desktopRightRail: {
+    width: 300,
+    borderLeftWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  desktopSummaryCard: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: palette.page,
+    borderWidth: 1,
+    borderColor: palette.border,
+    gap: 12,
+  },
+  desktopSummaryTitle: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  desktopSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  desktopSummaryLabel: {
+    color: palette.textSoft,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  desktopSummaryValue: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  tabBar: {
+    position: 'absolute',
+    right: spacing.lg,
+    bottom: spacing.md,
+    left: spacing.lg,
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    borderWidth: 1,
+    borderColor: '#1f3e5a',
+    borderRadius: radius.lg,
+    paddingHorizontal: 8,
+    backgroundColor: palette.nav,
+  },
+  tabButton: {
+    width: 58,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderRadius: radius.md,
+  },
+  activeTab: {
+    backgroundColor: '#ffffff20',
+  },
+  tabPressed: {
+    backgroundColor: '#ffffff20',
+  },
+  centerTab: {
+    width: 70,
+    height: 70,
+    marginTop: -34,
+  },
+  centerTabCircle: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: palette.card,
+    borderRadius: 29,
+    backgroundColor: palette.unsafe,
+  },
+  tabLabel: {
+    color: palette.navMuted,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  activeTabLabel: {
+    color: '#fff',
+  },
+});
