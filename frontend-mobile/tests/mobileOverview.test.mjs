@@ -11,6 +11,7 @@ function fixture(read, snapshot = null, persisted = null) {
   const slots = []
   let cursor = 0
   let saved
+  let snapshotWrites = 0
   let reduxView = snapshot
   const mocks = {
     react: {
@@ -40,7 +41,7 @@ function fixture(read, snapshot = null, persisted = null) {
     '@/utils/mobileSnapshot': {
       mobileSnapshotScope: async () => 'session',
       readMobileSnapshot: () => persisted,
-      writeMobileSnapshot: (_scope, _key, value) => { persisted = value },
+      writeMobileSnapshot: (_scope, _key, value) => { snapshotWrites++; persisted = value },
     },
   }
   const output = {}
@@ -50,7 +51,7 @@ function fixture(read, snapshot = null, persisted = null) {
     assert.ok(mocks[name], `Unexpected dependency ${name}`)
     return mocks[name]
   } })
-  return { render() { cursor = 0; return output.useMobileOverview('household', read) }, saved: () => saved, persisted: () => persisted }
+  return { render() { cursor = 0; return output.useMobileOverview('household', read) }, saved: () => saved, persisted: () => persisted, writes: () => snapshotWrites }
 }
 
 function deferred() {
@@ -107,6 +108,14 @@ test('unchanged server data preserves existing object references', async () => {
   const app = fixture(async () => ({ members: [{ member_id: 'HM-8560-1' }] }), { value: previous, savedAt: 123 })
   await app.render().loadOverview(true, true)
   assert.equal(app.render().overview, previous)
+  assert.equal(app.writes(), 0)
+})
+
+test('changed server data writes the offline snapshot only once per refresh', async () => {
+  const app = fixture(async () => ({ status: 'new' }), { value: { status: 'old' }, savedAt: 123 })
+  await app.render().loadOverview(true, true)
+  assert.equal(app.writes(), 1)
+  assert.equal(app.persisted().value.status, 'new')
 })
 
 test('an old slow read cannot overwrite a confirmed write before its queued refresh', async () => {

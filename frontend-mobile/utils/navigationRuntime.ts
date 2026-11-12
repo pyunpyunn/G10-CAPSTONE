@@ -26,14 +26,16 @@ function serial<T>(operation: () => Promise<T>): Promise<T> {
 
 TaskManager.defineTask<{ locations: Location.LocationObject[] }>(taskName, async ({ data, error }) => {
   if (error) { lastNavigationError = error.message; return; }
-  await serial(async () => {
+  try { await serial(async () => {
     const trip = await activeLocalTrip();
     if (!trip) return;
     for (const location of data?.locations || []) {
       await addLocalTripPoint(trip.localTripId, { ...location.coords, recordedAt: new Date(location.timestamp).toISOString() });
       listeners.forEach((listener) => listener(location));
     }
-  });
+  }); } catch (failure) {
+    lastNavigationError = failure instanceof Error ? failure.message : 'Navigation recording is temporarily unavailable.';
+  }
 });
 
 export function subscribeNavigationPosition(listener: (location: Location.LocationObject) => void) {

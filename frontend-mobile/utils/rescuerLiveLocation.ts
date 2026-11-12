@@ -123,17 +123,21 @@ async function acquireCurrent(expected: number) {
 
 TaskManager.defineTask<{ locations: Location.LocationObject[] }>(task, async ({ data, error }) => {
   if (error) { report(error.message); return; }
-  const expected = generation;
-  if (paused) return;
-  const stored = await getStoredItem(targetKey);
-  if (!stored) return;
-  let owner: Target;
-  try { owner = JSON.parse(stored); } catch { report('Saved tracking session is invalid. Reopen your rescue queue.'); return; }
-  if (!owner || !Number.isInteger(owner.assignmentId) || typeof owner.session !== 'string') return;
-  if (await getStoredItem(tokenKey) !== owner.session || paused || expected !== generation) return;
-  target = owner;
-  const newest = [...(data?.locations || [])].sort((a,b) => b.timestamp-a.timestamp)[0];
-  if (newest) await publish(newest, expected);
+  try {
+    const expected = generation;
+    if (paused) return;
+    const stored = await getStoredItem(targetKey);
+    if (!stored) return;
+    let owner: Target;
+    try { owner = JSON.parse(stored); } catch { report('Saved tracking session is invalid. Reopen your rescue queue.'); return; }
+    if (!owner || !Number.isInteger(owner.assignmentId) || typeof owner.session !== 'string') return;
+    if (await getStoredItem(tokenKey) !== owner.session || paused || expected !== generation) return;
+    target = owner;
+    const newest = [...(data?.locations || [])].sort((a,b) => b.timestamp-a.timestamp)[0];
+    if (newest) await publish(newest, expected);
+  } catch {
+    report('Location sync could not access the saved session. It will retry on the next update.');
+  }
 });
 
 export function configureRescuerTracking(assignmentId: number | null) {

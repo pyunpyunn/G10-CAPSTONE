@@ -16,12 +16,13 @@ export function useMobileOverview<T>(key: string, read: (refresh?: boolean) => P
     const next = typeof update === 'function'
       ? (update as (current: T | null) => T | null)(current.current)
       : update;
+    const changed = getViewState(viewKey)?.value !== next;
     current.current = next;
     if (next === null) removeViewState(viewKey);
     else {
       saveViewState(viewKey, next, savedAt);
       setLastSyncedAt(savedAt);
-      if (snapshotScope.current) {
+      if (snapshotScope.current && changed) {
         try { writeMobileSnapshot(snapshotScope.current, key, { value: next, savedAt }); }
         catch { console.warn('Could not save the offline page snapshot.'); }
       }
@@ -73,10 +74,6 @@ export function useMobileOverview<T>(key: string, read: (refresh?: boolean) => P
         setOverview(data, savedAt);
         setLastSyncedAt(savedAt);
         setOffline(false);
-        if (scope && scope === await mobileSnapshotScope().catch(() => null)) {
-          try { writeMobileSnapshot(scope, key, { value: data, savedAt }); }
-          catch { console.warn('Could not save the offline page snapshot.'); }
-        }
         setError('');
         return data;
       } catch (failure: any) {

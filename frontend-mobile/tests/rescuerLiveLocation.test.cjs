@@ -7,7 +7,7 @@ const ts=require('typescript');
 const flush=()=>new Promise(setImmediate);
 function fixture() {
  const storage=new Map([['resqperation_mobile_token','session-a']]);
- const calls=[],tasks={},timers=new Set();let foreground,appListener,background=false,removed=0,clock=Date.now();
+ const calls=[],tasks={},timers=new Set();let foreground,appListener,background=false,removed=0,clock=Date.now(),storageFailure=false;
  class FakeDate extends Date { static now(){return clock;} }
  const fix=(latitude=10.29, timestamp=clock,accuracy=5)=>({timestamp,coords:{latitude,longitude:123.88,accuracy,heading:null,speed:null,altitude:null,altitudeAccuracy:null}});
  const location={Accuracy:{Highest:6,High:4},async requestForegroundPermissionsAsync(){return {granted:true};},async requestBackgroundPermissionsAsync(){return {granted:true};},
@@ -17,10 +17,10 @@ function fixture() {
  const exports={};
  const mocks={'./savedGps':{rememberGps:async()=>{}},'expo-location':location,'expo-task-manager':{defineTask(name,callback){tasks[name]=callback;}},'react-native':{AppState:app,Platform:{OS:'android'}},
  '@/api/client':{api:{async post(url,payload,config){calls.push(['post',url,payload,config]);return {};}}},
- './secureStorage':{async getStoredItem(key){return storage.get(key)||null;},async setStoredItem(key,value){storage.set(key,value);},async deleteStoredItem(key){storage.delete(key);}}};
+ './secureStorage':{async getStoredItem(key){if(storageFailure)throw Error('Storage unavailable');return storage.get(key)||null;},async setStoredItem(key,value){storage.set(key,value);},async deleteStoredItem(key){storage.delete(key);}}};
  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../utils/rescuerLiveLocation.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
  {exports,Date:FakeDate,AbortController,setInterval(fn){timers.add(fn);return fn;},clearInterval(fn){timers.delete(fn);},require(name){if(!(name in mocks))throw Error(name);return mocks[name];}});
- return {runtime:exports,calls,fix,storage,timers,location,background:()=>background,removed:()=>removed,foreground:fix=>foreground(fix),advance(ms){clock+=ms;},now:()=>clock,
+ return {runtime:exports,calls,fix,storage,timers,location,failStorage(){storageFailure=true;},background:()=>background,removed:()=>removed,foreground:fix=>foreground(fix),advance(ms){clock+=ms;},now:()=>clock,
  async sendBackground(fix){await tasks['resq-active-rescuer-live-location']({data:{locations:[fix]}});},state(value){app.currentState=value;appListener?.(value);}};
 }
 test('active dispatch uses paced foreground and background GPS without starting a trip',async()=>{
@@ -30,6 +30,15 @@ test('active dispatch uses paced foreground and background GPS without starting 
  assert.equal(background.timeInterval,15000);assert.equal(background.distanceInterval,15);assert.equal(background.pausesUpdatesAutomatically,false);
  assert.equal(f.calls.find(x=>x[0]==='post')[1],'/rescuer/assignments/71/location');assert.ok(f.background());
  await f.runtime.stopRescuerTracking();
+});
+
+test('native location task contains secure-storage failures instead of rejecting',async()=>{
+ const f=fixture(),errors=[];
+ await f.runtime.configureRescuerTracking(71);await flush();
+ f.runtime.subscribeRescuerPosition(()=>{},message=>errors.push(message));
+ f.failStorage();
+ await assert.doesNotReject(f.sendBackground(f.fix(10.31)));
+ assert.ok(errors.some(message=>message.includes('saved session')));
 });
 test('location uploads are movement- and time-limited with less frequent route refreshes',async()=>{
  const f=fixture();await f.runtime.configureRescuerTracking(71);await flush();

@@ -128,6 +128,13 @@ class RescuerFieldReportWorkflow
 
         $household->full_address = app(\App\Queries\HouseholdAddressQuery::class)->forHouseholds([$household->household_id])->get($household->household_id);
         $head = $members->firstWhere('is_household_head', true);
+        $householdStatusKey = Schema::hasTable('household_disasters') && Schema::hasTable('household_statuses')
+            ? DB::table('household_disasters as hd')
+                ->join('household_statuses as hs', 'hs.status_id', '=', 'hd.current_status_id')
+                ->where('hd.household_id', $assignment->household_id)
+                ->where('hd.disaster_id', $assignment->disaster_id)
+                ->value('hs.status_key')
+            : null;
         $memberStatusOptions = $this->memberStatusOptions();
         $savedFieldReport = Schema::hasTable('responder_field_reports')
             ? DB::table('responder_field_reports')
@@ -166,6 +173,7 @@ class RescuerFieldReportWorkflow
             'event_id' => $assignment->disaster_id,
             'household' => [
                 'household_id' => $household->household_id,
+                'status_key' => $householdStatusKey,
                 'household_code' => $household->household_code,
                 'household_number' => $household->household_number,
                 'household_name' => $household->household_name,

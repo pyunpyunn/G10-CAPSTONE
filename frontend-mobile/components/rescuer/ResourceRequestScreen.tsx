@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, shadow, spacing } from '@/constants/resqTheme';
 import { formatPhilippineDateTime } from '@/utils/time';
+import { getRescuerRequestTypes } from '@/api/rescuer';
 import { ActionButton, EmptyState, RescuerSelect, SectionHeader, StatusBadge } from './RescuerUI';
 
 type ResourceRequestProps = {
@@ -17,13 +18,6 @@ const defaultCategories = [
   { key: 'personnel', label: 'Personnel' },
 ];
 
-const resourceTypeOptions = [
-  'Tools and equipment',
-  'Medical Supplies',
-  'Vehicles and Transportation',
-  'Others',
-];
-
 export function ResourceRequestScreen({
   requests,
   categoryOptions,
@@ -35,6 +29,28 @@ export function ResourceRequestScreen({
   const [location, setLocation] = useState('');
   const [requestCategory, setRequestCategory] = useState(categories[0]?.key || 'resource');
   const [resourceType, setResourceType] = useState('');
+  const [resourceTypeOptions, setResourceTypeOptions] = useState<Array<{ key: string; label: string }>>([]);
+  const [typesLoading, setTypesLoading] = useState(true);
+  const [typesError, setTypesError] = useState('');
+  const [typesRefresh, setTypesRefresh] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    setTypesLoading(true);
+    setTypesError('');
+    getRescuerRequestTypes().then((options) => {
+      if (cancelled) return;
+      setResourceTypeOptions(options);
+      setResourceType((current) => options.some((option) => option.key === current) ? current : '');
+    }).catch(() => {
+      if (cancelled) return;
+      setResourceTypeOptions([]);
+      setResourceType('');
+      setTypesError('Request types could not be loaded. Try again.');
+    }).finally(() => {
+      if (!cancelled) setTypesLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [typesRefresh]);
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [personnelCount, setPersonnelCount] = useState('');
@@ -66,8 +82,8 @@ export function ResourceRequestScreen({
       return;
     }
 
-    if (!isPersonnelRequest && !cleanResourceType) {
-      Alert.alert('Missing category', 'Select a resource category before submitting.');
+    if (!isPersonnelRequest && (typesLoading || !resourceTypeOptions.some((option) => option.key === cleanResourceType))) {
+      Alert.alert('Missing request type', 'Select an available request type before submitting.');
       return;
     }
 
@@ -267,14 +283,22 @@ export function ResourceRequestScreen({
         ) : (
           <>
             <RescuerSelect
-              title="Select resource category"
-              placeholder="Select resource category"
-              options={resourceTypeOptions.map((option) => ({ key: option, label: option }))}
+              title="Select request type"
+              placeholder={typesLoading ? 'Loading request types...' : 'Select request type'}
+              options={resourceTypeOptions}
               value={resourceType}
               onChange={setResourceType}
-              accessibilityLabel="Choose resource category"
+              accessibilityLabel="Choose request type"
               showLabel={false}
             />
+            {!typesLoading && (typesError || resourceTypeOptions.length === 0) ? (
+              <View>
+                <Text>{typesError || 'No request types are available.'}</Text>
+                <Pressable accessibilityRole="button" onPress={() => setTypesRefresh((value) => value + 1)}>
+                  <Text>Reload request types</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             <TextInput
               style={styles.input}
@@ -310,7 +334,7 @@ export function ResourceRequestScreen({
         <ActionButton
           label={submitting ? 'Submitting...' : 'Submit to HQ'}
           icon="cube-outline"
-          disabled={submitting}
+          disabled={submitting || (!isPersonnelRequest && (typesLoading || !resourceTypeOptions.some((option) => option.key === resourceType)))}
           onPress={handleSubmit}
         />
       </View>

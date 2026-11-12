@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn (Request $request) => null);
 
         $middleware->api(prepend: [\App\Http\Middleware\GuardApiHeaders::class], append: [
+            \App\Http\Middleware\RequireTailscaleExternalIntake::class,
             SecurityHeaders::class,
             \App\Http\Middleware\EnsureOperationalDatabaseReachable::class,
             ProfileLocalQueries::class,

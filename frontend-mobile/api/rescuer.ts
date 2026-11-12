@@ -30,6 +30,19 @@ export async function getRescuerOverview(refresh = false) {
   return response.data.data;
 }
 
+export async function getRescuerRequestTypes() {
+  const config = { timeout: 15000, cache: false };
+  const response = await api.get('/rescuer/resource-request-types', config);
+  const data = response.data.data;
+  if (data.source !== 'trackingaid_db' || !Array.isArray(data.categories)) {
+    throw new Error('TrackingAid request types are unavailable.');
+  }
+  const labels = data.categories
+    .filter((category: { key: string; label: string }) => category.key !== 'all' && category.label?.trim())
+    .map((category: { label: string }) => category.label.trim());
+  return [...new Set<string>(labels)].map((label) => ({ key: label, label }));
+}
+
 export async function getAssignedHousehold(assignmentId: number) {
   const response = await api.get(`/rescuer/assignments/${assignmentId}/household`);
   return response.data.data;

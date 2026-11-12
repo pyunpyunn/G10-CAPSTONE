@@ -39,7 +39,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'ResQperation'),
+    'default' => env('DB_CONNECTION', 'resq_local'),
 
     /*
     |--------------------------------------------------------------------------

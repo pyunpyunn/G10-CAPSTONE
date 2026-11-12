@@ -7,7 +7,7 @@ import { ActionButton, SectionHeader } from './RescuerUI';
 import { ReportSelect, type ReportOption } from './ReportSelect';
 
 export function FieldReportScreen({ reports, assignmentId, householdId, onSubmitReport, onCorrectReport, onCompleteHousehold }: {
-  reports: any[]; assignmentId: number; householdId: string; onSubmitReport: (payload: any) => Promise<void>;
+  reports: any[]; assignmentId: number; householdId: string; onSubmitReport: (payload: any) => Promise<number>;
   onCorrectReport: (reportId: number, payload: any) => Promise<void>; onCompleteHousehold?: () => void;
 }) {
   const [household, setHousehold] = useState<any>(null);
@@ -23,21 +23,25 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedReportId, setSavedReportId] = useState<number | null>(null);
-  const [editingSaved, setEditingSaved] = useState(false);
   const [revision, setRevision] = useState(0);
   const requestKey = useRef('');
   const submitted = saved || savedReportId !== null || reports.some(report => String(report.assignment_id) === String(assignmentId) && String(report.household_id) === String(householdId));
-  const fieldsDisabled = busy || (submitted && !editingSaved);
-  const deathCount = counts.death_count ?? members.filter(member => statusOptions.find(option => option.key === member.statusKey)?.counts_as_death).length;
-  const injuredCount = counts.injured_count ?? members.filter(member => statusOptions.find(option => option.key === member.statusKey)?.counts_as_injury).length;
+  const fieldsDisabled = busy || loading;
+  const unsafeStatuses = ['injured', 'missing', 'needs_help', 'need_help', 'needs_assistance', 'unsafe', 'trapped', 'unreachable', 'deceased', 'dead', 'not_evacuated'];
+  const hasUnsafeReport = unsafeStatuses.includes(household?.status_key) || members.some(member => {
+    const option = statusOptions.find(item => item.key === member.statusKey);
+    return unsafeStatuses.includes(member.statusKey) || option?.counts_as_death || option?.counts_as_injury;
+  });
+  const deathCount = hasUnsafeReport ? counts.death_count ?? members.filter(member => statusOptions.find(option => option.key === member.statusKey)?.counts_as_death).length : 0;
+  const injuredCount = hasUnsafeReport ? counts.injured_count ?? members.filter(member => statusOptions.find(option => option.key === member.statusKey)?.counts_as_injury).length : 0;
 
-  const missingCount = counts.missing_count ?? members.filter(member => member.statusKey === 'missing').length;
+  const missingCount = hasUnsafeReport ? counts.missing_count ?? members.filter(member => member.statusKey === 'missing').length : 0;
   function countControls(key: 'death_count' | 'injured_count' | 'missing_count', label: string, value: number) {
     return <View style={styles.counterControls}>{([-1, 1] as const).map(delta => <Pressable key={delta}
       accessibilityRole="button" accessibilityLabel={`${delta < 0 ? 'Decrease' : 'Increase'} ${label.toLowerCase()}`}
-      disabled={fieldsDisabled || (delta < 0 && value === 0) || (delta > 0 && value >= 4294967295)}
+      disabled={fieldsDisabled || !hasUnsafeReport || (delta < 0 && value === 0) || (delta > 0 && value >= 4294967295)}
       onPress={() => setCounts(current => ({ ...current, [key]: Math.max(0, Math.min(4294967295, (current[key] ?? value) + delta)) }))}
-      style={[styles.counterButton, (fieldsDisabled || (delta < 0 && value === 0)) && { opacity: 0.4 }]}><Text style={styles.counterText}>{delta < 0 ? '-' : '+'}</Text></Pressable>)}</View>;
+      style={[styles.counterButton, (fieldsDisabled || !hasUnsafeReport || (delta < 0 && value === 0)) && { opacity: 0.4 }]}><Text style={styles.counterText}>{delta < 0 ? '-' : '+'}</Text></Pressable>)}</View>;
   }
   function countTile(label: string, key: 'death_count' | 'injured_count' | 'missing_count', value: number, tone: 'danger' | 'warning') {
     return <View key={key} style={styles.countTile}>
@@ -51,7 +55,7 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
 
   useEffect(() => {
     let active = true;
-    setHousehold(null); setMembers([]); setMemberPhotos({}); setStatusOptions([]); setDamageOptions([]); setDamage(''); setNotes(''); setCounts({}); setSaved(false); setSavedReportId(null); setEditingSaved(false); setError('');
+    setHousehold(null); setMembers([]); setMemberPhotos({}); setStatusOptions([]); setDamageOptions([]); setDamage(''); setNotes(''); setCounts({}); setSaved(false); setSavedReportId(null); setError('');
     requestKey.current = randomUUID();
     if (!assignmentId || !householdId) { setLoading(false); setError('No current household.'); return; }
     setLoading(true);
@@ -72,7 +76,7 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
   }, [assignmentId, householdId, revision]);
 
   async function submit() {
-    if (busy || (submitted && !editingSaved)) return;
+    if (busy || loading) return;
     if (!damage || !members.length || members.some(member => !statusOptions.some(option => option.key === member.statusKey))) {
       Alert.alert('Report incomplete', 'Select a status for each member and a property damage level.'); return;
     }
@@ -80,22 +84,12 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
     try {
       const payload = { assignment_id: assignmentId, household_id: householdId, idempotency_key: requestKey.current, property_damage: damage,
         death_count: deathCount, injured_count: injuredCount, missing_count: missingCount, notes: notes.trim() || undefined, members: members.map(member => ({ member_id: member.id, status_key: member.statusKey })) };
-      if (editingSaved && savedReportId !== null) await onCorrectReport(savedReportId, payload);
-      else await onSubmitReport(payload);
-      setSaved(true); setEditingSaved(false);
+      if (savedReportId !== null) await onCorrectReport(savedReportId, payload);
+      else setSavedReportId(await onSubmitReport(payload));
+      requestKey.current = randomUUID();
+      setSaved(true);
     } catch (failure: any) { setError(failure.response?.data?.message || 'Unable to save report.'); }
     finally { setBusy(false); }
-  }
-
-  function startCorrection() {
-    if (savedReportId === null) return;
-    requestKey.current = randomUUID();
-    setEditingSaved(true);
-    setSaved(false);
-  }
-
-  function cancelCorrection() {
-    setRevision(value => value + 1);
   }
 
   return <View style={styles.stack}>
@@ -108,7 +102,10 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
           {memberPhotos[member.id] && <Image source={memberPhotos[member.id]} style={styles.memberPhoto} accessibilityLabel={`${member.name} profile picture`} />}
         </View>
         <Text style={styles.memberName}>{member.name}{member.head ? ' · Head' : ''}</Text>
-        <View style={styles.selectColumn}><ReportSelect label={`${member.name} status`} showLabel={false} value={member.statusKey} options={statusOptions} disabled={fieldsDisabled} onChange={statusKey => setMembers(current => current.map(item => item.id === member.id ? { ...item, statusKey } : item))} /></View>
+        <View style={styles.selectColumn}><ReportSelect label={`${member.name} status`} showLabel={false} value={member.statusKey} options={statusOptions} disabled={fieldsDisabled} onChange={statusKey => {
+          setMembers(current => current.map(item => item.id === member.id ? { ...item, statusKey } : item));
+          setCounts({});
+        }} /></View>
       </View>)}
     </View>
     {household && <><View style={styles.card}><SectionHeader title="Property damage" /><ReportSelect label="Damage level" value={damage} options={damageOptions} onChange={setDamage} disabled={fieldsDisabled} />{!damageOptions.length && <Text style={styles.error}>Damage levels are unavailable.</Text>}</View>
@@ -119,10 +116,8 @@ export function FieldReportScreen({ reports, assignmentId, householdId, onSubmit
       </View>
       <View style={styles.card}><SectionHeader title="Notes (optional)" /><TextInput accessibilityLabel="Notes for HQ" style={styles.input} value={notes} onChangeText={setNotes} editable={!fieldsDisabled} multiline maxLength={2000} textAlignVertical="top" />
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <ActionButton label={busy ? 'Saving…' : editingSaved ? 'Save correction' : submitted ? 'Report saved' : 'Submit report'} icon="send-outline" onPress={submit} disabled={busy || (submitted && !editingSaved) || !damageOptions.length} />
-        {submitted && !editingSaved && savedReportId !== null ? <ActionButton label="Edit saved report" tone="light" onPress={startCorrection} /> : null}
-        {submitted && editingSaved ? <ActionButton label="Cancel correction" tone="light" onPress={cancelCorrection} disabled={busy} /> : null}
-        {submitted && !editingSaved && onCompleteHousehold && <ActionButton label="Complete household" icon="flag-outline" onPress={onCompleteHousehold} />}
+        <ActionButton label={busy ? 'Saving…' : submitted ? 'Save updated report' : 'Submit report'} icon="send-outline" onPress={submit} disabled={fieldsDisabled || !damageOptions.length} />
+        {submitted && onCompleteHousehold && <ActionButton label="Complete household" icon="flag-outline" onPress={onCompleteHousehold} disabled={busy} />}
       </View></>}
     {!household && error ? <View style={styles.card}><Text style={styles.error}>{error}</Text><ActionButton label="Retry" onPress={() => setRevision(value => value + 1)} /></View> : null}
   </View>;

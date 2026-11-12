@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-async function screen({ reports = [], saved = null } = {}) {
+async function screen({ reports = [], saved = null, householdStatus = 'safe' } = {}) {
   const state = [], effects = [], submitted = [], corrected = [];
   let cursor = 0, initial = true;
   const options = [
@@ -13,7 +13,7 @@ async function screen({ reports = [], saved = null } = {}) {
     { key:'injured', label:'Injured', counts_as_injury:true },
     { key:'deceased', label:'Deceased', counts_as_death:true },
   ];
-  const data = { household:{household_id:'HH-1',household_name:'Test household'},
+  const data = { household:{household_id:'HH-1',household_name:'Test household',status_key:householdStatus},
     member_status_options:options, property_damage_options:[{key:'db_level',label:'Database damage level'}],
     saved_counts:saved?.counts, saved_property_damage:saved?.damage, saved_notes:saved?.notes || '',
     saved_report_id:saved?.id, members:saved?.members || [
@@ -34,7 +34,7 @@ async function screen({ reports = [], saved = null } = {}) {
     throw Error('Unexpected import '+name);
   }});
   const render=()=>{cursor=0;return exports.FieldReportScreen({reports,assignmentId:7,householdId:'HH-1',
-    onSubmitReport:async payload=>submitted.push(payload),onCorrectReport:async (reportId,payload)=>corrected.push({reportId,payload})});};
+    onSubmitReport:async payload=>{submitted.push(payload);return 42;},onCorrectReport:async (reportId,payload)=>corrected.push({reportId,payload})});};
   render(); initial=false; effects.forEach(fn=>fn()); await new Promise(setImmediate);
   return {render,submitted,corrected};
 }
@@ -58,6 +58,19 @@ test('deaths and injuries change automatically with member selections',async()=>
   selects[0].props.onChange('deceased');selects[1].props.onChange('injured');
   all=nodes(app.render());assert.equal(countValue(all,'Deaths'),1);assert.equal(countValue(all,'Injured'),1);
 });
+
+test('casualty controls are disabled for safe reports and enable with an unsafe assessment',async()=>{
+  const app=await screen();
+  const controls=()=>nodes(app.render()).filter(node=>node.type==='Pressable'&&node.props.accessibilityLabel?.startsWith('Increase'));
+  assert.ok(controls().every(node=>node.props.disabled));
+  nodes(app.render()).filter(node=>node.type==='ReportSelect')[0].props.onChange('injured');
+  assert.ok(controls().every(node=>!node.props.disabled));
+  controls()[0].props.onPress();
+  nodes(app.render()).filter(node=>node.type==='ReportSelect')[0].props.onChange('safe');
+  assert.ok(controls().every(node=>node.props.disabled));
+  assert.equal(countValue(nodes(app.render()),'Deaths'),0);
+  assert.equal(countValue(nodes(app.render()),'Injured'),0);
+});
 test('submission sends selected statuses and calculated counts without an incident type',async()=>{
   const app=await screen();let all=nodes(app.render());const selects=all.filter(x=>x.type==='ReportSelect');
   selects[0].props.onChange('injured');selects[2].props.onChange('db_level');
@@ -77,7 +90,7 @@ test('casualty counter cards keep deaths, injured, and missing on one non-wrappi
 });
 
 test('all three quantity cards have working plus/minus controls and submit their quantities', async () => {
-  const app = await screen();
+  const app = await screen({householdStatus:'unsafe'});
   let all = nodes(app.render());
   const press = label => {
     const button = nodes(app.render()).find(node => node.type === 'Pressable' && node.props.accessibilityLabel === label);
@@ -101,7 +114,10 @@ test('all three quantity cards have working plus/minus controls and submit their
   assert.equal(app.submitted[0].injured_count, 1);
   assert.equal(app.submitted[0].missing_count, 1);
   const saved = nodes(app.render());
-  assert.ok(saved.filter(node => node.type === 'ReportSelect').every(node => node.props.disabled));
+  assert.ok(saved.filter(node => node.type === 'ReportSelect').every(node => !node.props.disabled));
+  await saved.find(node => node.type === 'ActionButton' && node.props.label === 'Save updated report').props.onPress();
+  assert.equal(app.submitted.length,1);
+  assert.equal(app.corrected[0].reportId,42);
 });
 
 test('a saved report can be edited and submitted as a correction', async () => {
@@ -114,15 +130,14 @@ test('a saved report can be edited and submitted as a correction', async () => {
   });
   let all = nodes(app.render());
   assert.equal(all.find(node=>node.type==='TextInput'&&node.props.accessibilityLabel==='Notes for HQ').props.value,'Original note');
-  assert.ok(all.filter(node=>node.type==='ReportSelect').every(node=>node.props.disabled));
-  all.find(node=>node.type==='ActionButton'&&node.props.label==='Edit saved report').props.onPress();
+  assert.ok(!all.some(node=>node.type==='ActionButton'&&node.props.label==='Edit saved report'));
   all=nodes(app.render());
   assert.ok(all.filter(node=>node.type==='ReportSelect').every(node=>!node.props.disabled));
   all.filter(node=>node.type==='ReportSelect')[0].props.onChange('deceased');
   nodes(app.render()).find(node=>node.type==='Pressable'&&node.props.accessibilityLabel==='Increase deaths').props.onPress();
-  await nodes(app.render()).find(node=>node.type==='ActionButton'&&node.props.label==='Save correction').props.onPress();
+  await nodes(app.render()).find(node=>node.type==='ActionButton'&&node.props.label==='Save updated report').props.onPress();
   assert.equal(app.corrected.length,1);
   assert.equal(app.corrected[0].reportId,42);
-  assert.equal(app.corrected[0].payload.death_count,1);
+  assert.equal(app.corrected[0].payload.death_count,2);
   assert.equal(app.corrected[0].payload.injured_count,1);
 });

@@ -37,6 +37,7 @@ class SharedResqDataMerge
                     ], $write);
                 }
             }
+            $this->mergeResponders($source, $write);
             if ($source->getSchemaBuilder()->hasTable('household_member_id_mappings')) {
                 foreach ($source->table('household_member_id_mappings')->get() as $row) {
                     // Existing shared IDs remain authoritative. Do not renumber other systems' members.
@@ -116,6 +117,74 @@ class SharedResqDataMerge
             }
             return $this->report;
         }, 3);
+    }
+
+    private function mergeResponders(Connection $source, bool $write): void
+    {
+        if (! $source->getSchemaBuilder()->hasTable('responders')) return;
+
+        if (! Schema::hasTable('responders')) {
+            $count = $source->table('responders')->count();
+            if ($count) $this->count('deferred', 'responders:target_missing');
+            return;
+        }
+
+        $columns = array_flip(Schema::getColumnListing('responders'));
+        if (! isset($columns['responder_id'])) {
+            $count = $source->table('responders')->count();
+            if ($count) $this->count('deferred', 'responders:incompatible_target');
+            return;
+        }
+
+        foreach ($source->table('responders')->get() as $row) {
+            $values = (array) $row;
+            if (! isset($values['responder_id'])) {
+                $this->count('deferred', 'responders:missing_id');
+                continue;
+            }
+
+            if (isset($columns['user_id']) && ! empty($values['user_id'])
+                && (! Schema::hasTable('users') || ! DB::table('users')->where('user_id', $values['user_id'])->exists())) {
+                $this->count('deferred', 'responders:unmatched_user');
+                continue;
+            }
+
+            if (isset($columns['created_by_admin_id']) && ! empty($values['created_by_admin_id'])
+                && (! Schema::hasTable('users') || ! DB::table('users')->where('user_id', $values['created_by_admin_id'])->exists())) {
+                $this->count('deferred', 'responders:unmatched_creator');
+                continue;
+            }
+
+            if (isset($columns['team_id']) && ! empty($values['team_id'])) {
+                $team = $source->getSchemaBuilder()->hasTable('rescue_teams')
+                    ? $source->table('rescue_teams')->where('team_id', $values['team_id'])->first()
+                    : null;
+                $sharedTeam = $team && ! empty($team->team_code) && Schema::hasTable('rescue_teams')
+                    ? DB::table('rescue_teams')->where('team_code', $team->team_code)->first()
+                    : null;
+                if (! $sharedTeam) {
+                    $this->count('deferred', 'responders:unmatched_team');
+                    continue;
+                }
+                $values['team_id'] = $sharedTeam->team_id;
+            }
+
+            if (isset($columns['responder_code']) && array_key_exists('responder_code', $values)
+                && $values['responder_code'] !== null
+                && DB::table('responders')->where('responder_code', $values['responder_code'])->exists()) {
+                $this->count('preserved', 'responders:existing_code');
+                continue;
+            }
+
+            if (isset($columns['responder_id']) && ! empty($values['responder_id'])
+                && DB::table('responders')->where('responder_id', $values['responder_id'])->exists()) {
+                $values['responder_id'] = $write
+                    ? app(OperationalSequence::class)->nextNumericId('responders', 'responder_id')
+                    : ((int) DB::table('responders')->max('responder_id')) + 1;
+            }
+
+            $this->insert('responders', ['responder_id' => $values['responder_id']], $values, $write);
+        }
     }
 
     private function user(Connection $source, ?string $id): ?object

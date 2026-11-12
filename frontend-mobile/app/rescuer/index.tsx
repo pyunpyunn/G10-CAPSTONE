@@ -236,8 +236,9 @@ export default function RescuerHomeScreen() {
   }
 
   async function handleSubmitFieldReport(payload: any) {
-    await createFieldReport(payload);
+    const result = await createFieldReport(payload);
     void loadOverview(true, true, true);
+    return Number(result.data.report_id);
   }
 
   async function handleCorrectFieldReport(reportId: number, payload: any) {

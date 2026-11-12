@@ -303,6 +303,7 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('HH-4', $response->getData(true)['data']['household']['household_id']);
+        $this->assertSame(DB::table('household_statuses')->where('status_id', 1)->value('status_key'), $response->getData(true)['data']['household']['status_key']);
         $this->assertCount(2, $response->getData(true)['data']['members']);
 
         $notAssigned = $workflow->assignmentHousehold($this->request([], 'rescuer-6'), 7);
