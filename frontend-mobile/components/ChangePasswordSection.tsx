@@ -13,10 +13,12 @@ export function ChangePasswordSection({
   accountIdentifiers,
   standaloneButton = false,
   settingsRow = false,
+  rescuerActions = false,
 }: {
   accountIdentifiers: (string | undefined)[];
   standaloneButton?: boolean;
   settingsRow?: boolean;
+  rescuerActions?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -61,6 +63,12 @@ export function ChangePasswordSection({
     }
   }
 
+  function cancelChange() {
+    setOpen(false);
+    setForm(emptyForm);
+    setError('');
+  }
+
   if (!open && standaloneButton) {
     return (
       <>
@@ -68,7 +76,7 @@ export function ChangePasswordSection({
         <HouseholdButton
           label="Change password"
           icon="lock-closed-outline"
-          tone="nav"
+          tone={rescuerActions ? 'primary' : 'nav'}
           layout={settingsRow ? 'settings' : 'default'}
           onPress={() => { setOpen(true); setMessage(''); }}
         />
@@ -109,16 +117,34 @@ export function ChangePasswordSection({
           </View>
         ))}
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-        <HouseholdButton
-          label={saving ? 'Updating...' : 'Update password'}
-          icon="save-outline"
-          tone="nav"
-          disabled={saving || !canSubmit}
-          onPress={submit}
-        />
-        <Pressable accessibilityRole="button" disabled={saving} onPress={() => { setOpen(false); setForm(emptyForm); setError(''); }}>
-          <Text style={styles.label}>Cancel</Text>
-        </Pressable>
+        {rescuerActions ? (
+          <View style={styles.actionRow}>
+            <View style={styles.actionButton}>
+              <HouseholdButton label="Cancel" tone="light" disabled={saving} onPress={cancelChange} />
+            </View>
+            <View style={styles.actionButton}>
+              <HouseholdButton
+                label={saving ? 'Updating...' : 'Update password'}
+                tone="primary"
+                disabled={saving || !canSubmit}
+                onPress={submit}
+              />
+            </View>
+          </View>
+        ) : (
+          <>
+            <HouseholdButton
+              label={saving ? 'Updating...' : 'Update password'}
+              icon="save-outline"
+              tone="nav"
+              disabled={saving || !canSubmit}
+              onPress={submit}
+            />
+            <Pressable accessibilityRole="button" disabled={saving} onPress={cancelChange}>
+              <Text style={styles.label}>Cancel</Text>
+            </Pressable>
+          </>
+        )}
       </> : <Pressable accessibilityRole="button" onPress={() => { setOpen(true); setMessage(''); }} style={styles.button}>
         <Text style={styles.buttonText}>Change password</Text>
       </Pressable>}
@@ -129,6 +155,8 @@ export function ChangePasswordSection({
 const styles = StyleSheet.create({
   card: { gap: spacing.sm, padding: spacing.lg, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, backgroundColor: palette.card },
   settingsForm: { gap: spacing.sm },
+  actionRow: { flexDirection: 'row', gap: spacing.sm },
+  actionButton: { flex: 1 },
   title: { fontSize: 18, fontWeight: '800', color: palette.text },
   field: { gap: spacing.xs },
   label: { color: palette.textSoft, fontWeight: '700' },

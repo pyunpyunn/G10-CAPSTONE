@@ -153,7 +153,11 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
         <InfoRow label="Mobile" value={responder.emergency_contact_number || 'Not recorded'} />
       </View>
 
-      <ChangePasswordSection accountIdentifiers={[user.user_id, user.username, user.email, responder.responder_code]} />
+      <ChangePasswordSection
+        accountIdentifiers={[user.user_id, user.username, user.email, responder.responder_code]}
+        standaloneButton
+        rescuerActions
+      />
 
       <ActionButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
     </View>
