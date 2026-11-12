@@ -73,6 +73,7 @@ class ArchivePresenter
             'source' => [
                 'title' => $source,
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
                 'meta' => $loggedBy,
             ],
         ];
@@ -90,6 +91,13 @@ class ArchivePresenter
         }
 
         $detailFields = [
+=======
+                'meta' => $remarks,
+            ],
+        ];
+
+        $record['details'] = array_merge($this->details([
+>>>>>>> Stashed changes
 =======
                 'meta' => $remarks,
             ],
@@ -117,6 +125,9 @@ class ArchivePresenter
             'Battery level' => $row->battery_level !== null ? $row->battery_level.'%' : 'Not recorded',
             'Coordinates' => $row->latitude && $row->longitude ? $row->latitude.', '.$row->longitude : 'Not recorded',
         ]), $this->fieldReportDetails($fieldReport));
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
         $record['export'] = [
             'datetime' => $record['datetime'],
