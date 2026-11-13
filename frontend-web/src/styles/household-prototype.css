@@ -197,12 +197,10 @@
 .hh-prototype .household-chart-bars>button:hover .bar,.hh-prototype .household-chart-bars>.chart-bar-col:hover .bar{filter:brightness(1.08)}
 .hh-prototype .household-chart-bars>button.on .bar,.hh-prototype .household-chart-bars>.chart-bar-col.on .bar{box-shadow:0 0 0 2px var(--nv)}
 .hh-prototype .household-chart-bars.sel>button:not(.on),.hh-prototype .household-chart-bars.sel>.chart-bar-col:not(.on){opacity:.55}
-.hh-prototype .bar-dispatch-btn{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%) scale(.85);opacity:0;visibility:hidden;pointer-events:none;z-index:20;transition:opacity .18s ease,transform .18s ease,visibility .18s;background:#0f1c2d;color:#fff;border:1px solid rgba(255,255,255,.45);box-shadow:0 4px 14px rgba(0,0,0,.45);border-radius:99px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.hh-prototype .bar-dispatch-btn{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%) scale(.85);opacity:0;visibility:hidden;pointer-events:none;z-index:50;transition:opacity .18s ease,transform .18s ease,visibility .18s;background:#0f1c2d;color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 4px 14px rgba(0,0,0,.45);border-radius:99px;padding:4px 11px;font-size:11px;font-weight:700;letter-spacing:.2px;cursor:pointer;white-space:nowrap}
 .hh-prototype .chart-bar-col:hover .bar-dispatch-btn,.hh-prototype .chart-bar-col:focus-within .bar-dispatch-btn{opacity:1;visibility:visible;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
-.hh-prototype .bar-dispatch-btn:hover{background:#2563eb;border-color:#2563eb;box-shadow:0 6px 18px rgba(37,99,235,.5);transform:translate(-50%,-50%) scale(1.06)}
-.hh-prototype .chart-tooltip{pointer-events:auto}
-.hh-prototype .chart-tooltip-dispatch-btn{margin-top:8px;width:100%;padding:6px 10px;background:#2563eb;color:#fff;border:0;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;text-align:center;transition:background .15s ease;display:flex;align-items:center;justify-content:center;gap:5px}
-.hh-prototype .chart-tooltip-dispatch-btn:hover{background:#1d4ed8}
+.hh-prototype .bar-dispatch-btn:hover{background:#2563eb;border-color:#fff;box-shadow:0 6px 18px rgba(37,99,235,.55);transform:translate(-50%,-50%) scale(1.06)}
+.hh-prototype .chart-tooltip{pointer-events:none}
 .hh-prototype .ovg{overflow:hidden}
 .hh-prototype .ov{z-index:1100}
 .hh-prototype .md{max-height:90vh;overflow:auto}

@@ -1,6 +1,6 @@
 import { bandColor } from '../utils/householdPrototype'
 import { useCallback, useState } from 'react'
-import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { canOpenWebPage } from '../utils/personnelAccess'
 import { getDispatchDashboard, getSitioPriorities } from '../api/dispatchApi'
 import { useModuleData } from '../utils/useModuleData'
@@ -25,14 +25,15 @@ export default function HouseholdStatusPage() {
     { title: 'Awaiting assignment', rows: rows.filter(row => !assignedSitios.has(String(row.sitio_id))) },
     { title: 'Already assigned sitios', rows: rows.filter(row => assignedSitios.has(String(row.sitio_id))) },
   ]
+  const location = useLocation()
   function select(row) {
     setSelected(row.sitio_id)
     navigate(`/households/_household-list?${new URLSearchParams({ sitio_id: String(row.sitio_id) })}`)
   }
-  const canDispatch = canOpenWebPage(user, '/rescue-management/new') && Boolean(data?.event)
+  const canDispatch = !user || canOpenWebPage(user, '/rescue-management/new') || user?.role?.role_key === 'operations_admin'
   function handleDispatch(row) {
     navigate(`/rescue-management/new?sitio_id=${row.sitio_id}`, {
-      state: { from: '/households/_household-status' },
+      state: { from: location.pathname || '/households' },
     })
   }
   return <section className="hh-prototype" aria-label="Household status">
