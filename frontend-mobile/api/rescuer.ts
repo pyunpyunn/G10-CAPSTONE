@@ -33,9 +33,9 @@ export async function getRescuerOverview(refresh = false) {
 export async function getRescuerRequestTypes() {
   const config = { timeout: 15000, cache: false };
   const response = await api.get('/rescuer/resource-request-types', config);
-  const data = response.data.data;
-  if (data.source !== 'trackingaid_db' || !Array.isArray(data.categories)) {
-    throw new Error('TrackingAid request types are unavailable.');
+  const data = response.data?.data || response.data;
+  if (!Array.isArray(data?.categories)) {
+    throw new Error('Resource request types are unavailable.');
   }
   const labels = data.categories
     .filter((category: { key: string; label: string }) => category.key !== 'all' && category.label?.trim())

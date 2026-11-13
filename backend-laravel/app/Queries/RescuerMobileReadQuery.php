@@ -9,12 +9,10 @@ use App\Support\RequestSchema as Schema;
 
 class RescuerMobileReadQuery
 {
-    public function resourceRequests(?string $userId, int $limit): Collection
+    public function resourceRequests(?string $userId, int $limit = 50): Collection
     {
         if (! Schema::hasTable('resource_requests')) return collect();
         $query = ResourceRequest::query();
-        if (Schema::hasColumn('resource_requests', 'request_source')) $query->where('request_source', 'rescuer_mobile');
-        if ($userId && Schema::hasColumn('resource_requests', 'handled_by')) $query->where('handled_by', $userId);
         return $query->orderByDesc('created_at')->limit($limit)->get()->values();
     }
 

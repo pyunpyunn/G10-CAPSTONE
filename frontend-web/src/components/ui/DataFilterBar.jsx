@@ -159,17 +159,6 @@ export default function DataFilterBar({
             )}
           </div>
         )}
-
-        {hasValues && onReset && (
-          <button
-            className="data-filter-reset"
-            type="button"
-            onClick={onReset}
-            title="Reset active filters"
-          >
-            <RotateCcw size={13} /> Reset
-          </button>
-        )}
       </div>
 
       {trailing && <div className="data-filter-bar-trailing">{trailing}</div>}

@@ -214,7 +214,7 @@ class RescuerMobileService
     public function resourceRequests(Request $request): array
     {
         return [
-            'requests' => $this->readQuery->resourceRequests($request->user()?->user_id, 25),
+            'requests' => $this->readQuery->resourceRequests($request->user()?->user_id, 100),
             'category_options' => $this->resourceRequestPresenter->categoryOptions(),
         ];
     }

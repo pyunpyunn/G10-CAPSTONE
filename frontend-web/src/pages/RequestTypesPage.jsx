@@ -10,6 +10,7 @@ import {
   LifeBuoy,
   MapPin,
   Package,
+  Plus,
   RotateCw,
   ShieldAlert,
 } from 'lucide-react'
@@ -24,6 +25,7 @@ import EmptyState from '../components/ui/EmptyState'
 import RequestTypeCard from '../components/resources/RequestTypeCard'
 import RequestTypeDetailDrawer from '../components/resources/RequestTypeDetailDrawer'
 import RequestTypeFilterDrawer from '../components/resources/RequestTypeFilterDrawer'
+import DeclareRequestTypeModal from '../components/resources/DeclareRequestTypeModal'
 import RequestResourceModal from '../components/resources/RequestResourceModal'
 
 // Dynamic category display from database record
@@ -45,6 +47,7 @@ export default function RequestTypesPage() {
   const [selectedItem, setSelectedItem] = useState(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+  const [isDeclareModalOpen, setIsDeclareModalOpen] = useState(false)
   const [requestModalItem, setRequestModalItem] = useState(null)
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
   const [successToast, setSuccessToast] = useState(null)
@@ -95,6 +98,12 @@ export default function RequestTypesPage() {
     const reqId = res?.data?.request?.request_id || ''
     setSuccessToast(`Resource request ${reqId ? `#${reqId} ` : ''}for ${qty} ${itm.unit || 'units'} of "${itm.name || itm.label}" was successfully submitted!`)
     setTimeout(() => setSuccessToast(null), 6000)
+    refresh()
+  }
+
+  const handleDeclareSuccess = () => {
+    setSuccessToast('New request type successfully registered and prioritized in catalog!')
+    setTimeout(() => setSuccessToast(null), 5000)
     refresh()
   }
 
@@ -205,6 +214,16 @@ export default function RequestTypesPage() {
           >
             <RotateCw size={14} className={loading ? 'spin-icon' : ''} />
             <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="button review"
+            onClick={() => setIsDeclareModalOpen(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Plus size={15} />
+            <span>Declare Request Type</span>
           </button>
         </div>
       </div>
@@ -548,6 +567,13 @@ export default function RequestTypesPage() {
                         setSelectedItem(null)
                       }}
                       onRequestNow={handleRequestNow}
+                    />
+
+                    {/* Declare New Type Modal */}
+                    <DeclareRequestTypeModal
+                      isOpen={isDeclareModalOpen}
+                      onClose={() => setIsDeclareModalOpen(false)}
+                      onSuccess={handleDeclareSuccess}
                     />
 
                     {/* Interactive Resource Request Modal */}
