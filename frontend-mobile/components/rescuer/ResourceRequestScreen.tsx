@@ -334,7 +334,7 @@ export function ResourceRequestScreen({
         <ActionButton
           label={submitting ? 'Submitting...' : 'Submit to HQ'}
           icon="cube-outline"
-          disabled={submitting || (!isPersonnelRequest && (typesLoading || !resourceTypeOptions.some((option) => option.key === resourceType)))}
+          disabled={submitting}
           onPress={handleSubmit}
         />
       </View>

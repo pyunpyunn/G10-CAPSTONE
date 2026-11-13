@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Battery from 'expo-battery';
-import * as Location from 'expo-location';
 import { type Href, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logoutMobile } from '@/api/auth';
@@ -26,6 +25,7 @@ import {
   createFieldReport,
   createResourceRequest,
   getRescuerOverview,
+  sendAssignmentLocation,
   updateAssignmentStatus,
   updateRescuerProfile,
 } from '@/api/rescuer';
@@ -67,7 +67,7 @@ export default function RescuerHomeScreen() {
   const router = useRouter();
   const { isDesktopSite: isDesktop, isWideDesktop } = useWebViewMode();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
-  const { overview, loading, refreshing, error: overviewError, offline, lastSyncedAt, loadOverview }
+  const { overview, setOverview, loading, refreshing, error: overviewError, offline, lastSyncedAt, loadOverview }
     = useMobileOverview<RescuerOverview>('rescuer', getRescuerOverview);
   useEffect(() => {
     for (const assignment of overview?.assignments || []) {
@@ -192,15 +192,22 @@ export default function RescuerHomeScreen() {
     }
 
     try {
-      const payload = ['accepted', 'en_route'].includes(status)
-        ? await currentLocationPayload()
-        : status === 'completed' ? { household_id: assignments.find((item) => Number(item.assignment_id) === Number(assignmentId))?.household_id, household_status_key: completionStatus } : {};
+      const payload = status === 'completed'
+        ? { household_id: assignments.find((item) => Number(item.assignment_id) === Number(assignmentId))?.household_id, household_status_key: completionStatus }
+        : {};
 
-      if (payload === null) {
-        return;
+      const result = await updateAssignmentStatus(assignmentId, status, payload);
+      if (result?.assignment) {
+        setOverview((current) => current ? {
+          ...current,
+          assignments: (current.assignments || []).map((item: any) => Number(item.assignment_id) === Number(assignmentId)
+            ? { ...item, ...result.assignment }
+            : item),
+        } : current);
       }
-
-      await updateAssignmentStatus(assignmentId, status, payload);
+      if (['accepted', 'en_route'].includes(status)) {
+        void syncAssignmentLocation(assignmentId);
+      }
       if (status === 'completed' && Platform.OS !== 'web') {
         await endNavigationTrip().catch(() => Alert.alert('Household saved', 'The household was completed, but trip recording could not be stopped. Open navigation to stop the trip.'));
       }
@@ -220,20 +227,17 @@ export default function RescuerHomeScreen() {
     }
   }
 
-  async function currentLocationPayload() {
-    const permission = await Location.requestForegroundPermissionsAsync();
-
-    if (permission.status !== 'granted') {
-      Alert.alert('Location required', 'Enable location access so the app can create your road route and HQ can track your rescue movement.');
-      return null;
+  async function syncAssignmentLocation(assignmentId: number) {
+    try {
+      const location = await rescueActionGps();
+      await sendAssignmentLocation(assignmentId, {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy_m: location.accuracy_m,
+      });
+    } catch {
+      // The status is already saved; location sync can retry through active tracking.
     }
-
-    const location = await rescueActionGps();
-    return {
-      latitude: location.latitude,
-      longitude: location.longitude,
-      accuracy_m: location.accuracy_m,
-    };
   }
 
   async function handleSubmitFieldReport(payload: any) {
@@ -314,6 +318,7 @@ export default function RescuerHomeScreen() {
         <RescuerDashboardScreen
           pendingAssignmentId={pendingAssignment}
           overview={overview}
+          showIdentity={isDesktop}
           onOpenMap={openMap}
           onOpenReport={openReport}
           onStatusChange={handleStatusChange}

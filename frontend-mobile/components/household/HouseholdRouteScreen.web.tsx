@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.web';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
+import { RescuerSelect } from '@/components/rescuer/RescuerUI';
 
 type RouteProps = {
   active?: boolean;
@@ -142,23 +143,20 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
         <HouseholdSection title="Evacuation centers" />
         {centers.length === 0 ? (
           <HouseholdEmpty icon="business-outline" title="No evacuation centers encoded" />
-        ) : centers.map((center) => {
-          const isSelected = String(center.evacuation_center_id) === String(selectedCenter?.evacuation_center_id);
-
-          return (
-            <Pressable
-              key={center.evacuation_center_id}
-              style={[styles.centerRow, isSelected && styles.centerRowActive]}
-              onPress={() => setSelectedId(String(center.evacuation_center_id))}
-            >
-              <View style={styles.rowText}>
-                <Text style={styles.centerTitle}>{center.name}</Text>
-                <Text style={styles.centerMeta}>{center.address || center.center_type || 'Evacuation center'}</Text>
-              </View>
-              <HouseholdBadge label={center.status || 'Active'} tone={center.status || 'active'} />
-            </Pressable>
-          );
-        })}
+        ) : (
+          <RescuerSelect
+            title="Select evacuation center"
+            placeholder="Select evacuation center"
+            options={centers.map((center) => ({
+              key: String(center.evacuation_center_id),
+              label: center.name || 'Evacuation center',
+            }))}
+            value={selectedId}
+            onChange={setSelectedId}
+            accessibilityLabel="Choose evacuation center"
+            showLabel={false}
+          />
+        )}
       </View>
     </View>
   );

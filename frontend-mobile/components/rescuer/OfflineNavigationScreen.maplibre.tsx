@@ -25,7 +25,6 @@ export default function OfflineNavigationScreen() {
   const appActive = useAppActive();
   const { dispatchId } = useLocalSearchParams<{ dispatchId?: string }>();
   const [chosenDispatch, setChosenDispatch] = useState(dispatchId || '');
-  const [showSettings, setShowSettings] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [showStatuses, setShowStatuses] = useState(false);
   const [snapshot, setSnapshot] = useState<any>(null), [pack, setPack] = useState<any>(null);
@@ -179,11 +178,10 @@ export default function OfflineNavigationScreen() {
       <NavButton title="Zoom in" onPress={() => camera.current?.zoomTo(18, { duration: 250 })} />
       <NavButton title="Recenter GPS" disabled={!gpsFix} onPress={() => camera.current?.jumpTo({ center: gpsFix ? [gpsFix.coords.longitude, gpsFix.coords.latitude] : points[0], zoom: 17, pitch: 45, bearing: points.length >= 2 ? bearingDegrees(points[0], points[1]) : 0 })} />
       <NavButton title="Refresh route" disabled={busy} onPress={() => void action(async () => { await refreshNavigation(); await load(); })} />
-      <NavButton title="Route options" onPress={() => setShowSettings(true)} />
     </View>
-    <Modal visible={showSettings || showStatuses} animationType="slide" onRequestClose={() => { setShowSettings(false); setShowStatuses(false); }}>
+    <Modal visible={showStatuses} animationType="slide" onRequestClose={() => setShowStatuses(false)}>
     <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 48, gap: 12, backgroundColor: palette.page }}>
-    <NavButton title="Back to map" onPress={() => { setShowSettings(false); setShowStatuses(false); }} />
+    <NavButton title="Back to map" onPress={() => setShowStatuses(false)} />
     <Text style={{ fontSize: 22, fontWeight: '700' }}>Dispatch directions</Text>
     <Text>{packMessage}</Text>
     <NavButton title="Refresh assigned routes" disabled={busy} onPress={() => void action(async () => { await refreshNavigation(); await load(); })} />

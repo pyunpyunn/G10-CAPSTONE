@@ -288,8 +288,6 @@ export function HouseholdProfileScreen({
 
       <View style={styles.card}>
         <HouseholdSection title="Household details" />
-        <InfoRow icon="business-outline" label="Barangay" value={household.barangay || 'Not recorded'} />
-        <InfoRow icon="location-outline" label="Sitio" value={household.sitio_name || 'Not recorded'} />
         <InfoRow icon="home-outline" label="Address" value={household.address || 'Not recorded'} />
         <InfoRow icon="people-outline" label="Members" value={String(memberCount)} />
         <InfoRow icon="call-outline" label="Contact" value={household.contact_number || user.contact_number || 'Not recorded'} />

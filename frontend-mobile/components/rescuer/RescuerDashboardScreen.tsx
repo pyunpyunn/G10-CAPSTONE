@@ -7,8 +7,8 @@ import { getRescuerDispatchHistory } from '@/api/rescuer';
 import { DisasterBroadcastBanner } from '@/components/household/DisasterBroadcastBanner';
 import { ActionButton, EmptyState, SectionHeader, StatTile, StatusBadge } from './RescuerUI';
 
-type Props = { overview: any; pendingAssignmentId?: number | null; onOpenMap: (assignment?: any) => void; onOpenReport: (assignment?: any) => void; onStatusChange: (id: number, status: string) => void };
-export function RescuerDashboardScreen({ overview, pendingAssignmentId, onOpenMap, onOpenReport, onStatusChange }: Props) {
+type Props = { overview: any; pendingAssignmentId?: number | null; showIdentity?: boolean; onOpenMap: (assignment?: any) => void; onOpenReport: (assignment?: any) => void; onStatusChange: (id: number, status: string) => void };
+export function RescuerDashboardScreen({ overview, pendingAssignmentId, showIdentity = false, onOpenMap, onOpenReport, onStatusChange }: Props) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -37,7 +37,7 @@ export function RescuerDashboardScreen({ overview, pendingAssignmentId, onOpenMa
   const next = current?.status_key === 'dispatched' ? ['Accept','accepted'] : current?.status_key === 'accepted' ? ['En route','en_route'] : current?.status_key === 'en_route' ? ['Arrived','on_scene'] : null;
   const updating = pendingAssignmentId != null && Number(pendingAssignmentId) === Number(current?.assignment_id);
   return <View style={styles.stack}>
-    <View style={styles.identity}><View style={styles.flex}><Text style={styles.name}>{responder.full_name || overview?.profile?.user?.full_name || 'Rescuer'}</Text><Text style={styles.meta}>{responder.team_name || 'No team'}</Text></View><StatusBadge label={responder.duty_status || 'Standby'} tone={responder.duty_status} /></View>
+    {showIdentity ? <View style={styles.identity}><View style={styles.flex}><Text style={styles.name}>{responder.full_name || overview?.profile?.user?.full_name || 'Rescuer'}</Text><Text style={styles.meta}>{responder.team_name || 'No team'}</Text></View><StatusBadge label={responder.duty_status || 'Standby'} tone={responder.duty_status} /></View> : null}
     {overview?.active_event && <DisasterBroadcastBanner event={overview.active_event} broadcast={overview.recent_alerts?.[0]} />}
     <View style={styles.stats}><StatTile label="Assigned" value={summary.total_assignments || 0} /><StatTile label="Active" value={summary.active_assignments || 0} /><StatTile label="Done" value={summary.completed_assignments || 0} tone="completed" /></View>
     {current ? <View style={styles.card}>

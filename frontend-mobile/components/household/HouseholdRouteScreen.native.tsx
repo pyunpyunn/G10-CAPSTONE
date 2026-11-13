@@ -6,6 +6,7 @@ import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
 import { useMapGps } from '@/hooks/useMapGps';
+import { RescuerSelect } from '@/components/rescuer/RescuerUI';
 
 type RouteProps = {
   active?: boolean;
@@ -36,7 +37,6 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
   const [roadRoute, setRoadRoute] = useState<{ coordinates: { latitude: number; longitude: number }[]; distance_km: number; duration_min: number } | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
-  const [routeRetry, setRouteRetry] = useState(0);
   const successfulRoute = useRef<{ key: string; route: { coordinates: { latitude: number; longitude: number }[]; distance_km: number; duration_min: number } } | null>(null);
   const gps = useMapGps(active && originMode === 'live');
 
@@ -130,7 +130,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
 
     loadRoute();
     return () => { cancelled = true; controller.abort(); };
-  }, [active, originLatitude, originLongitude, centerLatitude, centerLongitude, routeKey, routeRetry]);
+  }, [active, originLatitude, originLongitude, centerLatitude, centerLongitude, routeKey]);
 
   async function useLiveGps() {
     setRouteError('');
@@ -194,17 +194,6 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
         ) : null}
         {gps.error ? <Text style={styles.routeError}>{gps.error}</Text> : null}
         {routeError ? <Text style={styles.routeError}>{routeError}</Text> : null}
-        {active && routeError ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setRouteRetry((attempt) => attempt + 1)}
-            style={styles.retryRoute}
-          >
-            <Ionicons name="refresh-outline" size={16} color={palette.navActive} />
-            <Text style={styles.retryRouteText}>Retry directions</Text>
-          </Pressable>
-        ) : null}
-
         {!householdPoint ? (
           <HouseholdEmpty
             icon="location-outline"
@@ -236,30 +225,18 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
         {centers.length === 0 ? (
           <HouseholdEmpty icon="business-outline" title="No vacant evacuation centers available" />
         ) : (
-          centers.map((center) => {
-            const isSelected = String(center.evacuation_center_id) === selectedId;
-
-            return (
-              <Pressable
-                key={center.evacuation_center_id}
-                style={[styles.centerRow, isSelected && styles.centerRowActive]}
-                onPress={() => setSelectedId(String(center.evacuation_center_id))}
-              >
-                <View style={styles.rowIcon}>
-                  <Ionicons name={isSelected ? 'navigate-outline' : 'business-outline'} size={17} color={palette.navActive} />
-                </View>
-                <View style={styles.rowText}>
-                  <Text style={styles.rowTitle}>{center.name}</Text>
-                  <Text style={styles.rowMeta}>
-                    {center.vacancy !== null && center.vacancy !== undefined
-                      ? `${center.vacancy} slots available`
-                      : 'Capacity not encoded'}
-                  </Text>
-                </View>
-                <HouseholdBadge label={center.status || 'Active'} tone={center.status || 'active'} />
-              </Pressable>
-            );
-          })
+          <RescuerSelect
+            title="Select evacuation center"
+            placeholder="Select evacuation center"
+            options={centers.map((center) => ({
+              key: String(center.evacuation_center_id),
+              label: center.name || 'Evacuation center',
+            }))}
+            value={selectedId}
+            onChange={setSelectedId}
+            accessibilityLabel="Choose evacuation center"
+            showLabel={false}
+          />
         )}
       </View>
     </View>

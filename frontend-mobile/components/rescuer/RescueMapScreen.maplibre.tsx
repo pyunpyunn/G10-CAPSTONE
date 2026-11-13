@@ -10,7 +10,7 @@ import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getActivePack, getCachedCenterRoute, saveCachedCenterRoute } from '@/utils/navigationStore';
 import { navigationPackStatus } from '@/utils/navigationPacks';
 import { decodePolyline6, downsampleRouteCoordinates, type Coordinate } from '@/utils/routeGeometry';
-import { ActionButton, EmptyState, SectionHeader } from './RescuerUI';
+import { ActionButton, EmptyState, RescuerSelect, SectionHeader } from './RescuerUI';
 
 type RescueMapProps = {
   active?: boolean;
@@ -158,27 +158,34 @@ export function RescueMapScreen({
     setRouteLoading(false);
     try {
       const saved = await getCachedCenterRoute(id, 'auto');
-      if (requestId !== requestSequence.current || !saved) return;
+      if (requestId !== requestSequence.current) return;
+      if (!saved) {
+        if (position) void routeToSelectedCenter(center, position);
+        return;
+      }
       setCachedRoute(saved);
       if (position && cachedRouteMatchesLocation(saved, center, position)) {
         setRoutePoints(routeCoordinates(saved.route));
         setRouteSource('Saved road route');
+        return;
       }
+      if (position) void routeToSelectedCenter(center, position);
     } catch (error) {
       console.error('Saved evacuation-center route could not be loaded.', error);
+      if (position) void routeToSelectedCenter(center, position);
     }
   }
 
-  async function routeToSelectedCenter() {
-    if (!selectedCenter || !position) {
+  async function routeToSelectedCenter(centerOverride = selectedCenter, positionOverride = position) {
+    if (!centerOverride || !positionOverride) {
       setRouteError('No saved GPS position yet. Tap Follow GPS once to save your location, then retry.');
       return;
     }
-    if (position.accuracy_m != null && position.accuracy_m > 75) {
+    if (positionOverride.accuracy_m != null && positionOverride.accuracy_m > 75) {
       setRouteError('GPS accuracy is limited. Move to an open area and try again.');
       return;
     }
-    if (cachedRouteMatchesLocation(cachedRoute, selectedCenter, position)) {
+    if (cachedRouteMatchesLocation(cachedRoute, centerOverride, positionOverride)) {
       setRoutePoints(routeCoordinates(cachedRoute?.route));
       setRouteSource('Saved road route');
       setRouteError('');
@@ -186,9 +193,9 @@ export function RescueMapScreen({
     }
 
     const requestId = ++requestSequence.current;
-    const origin = { latitude: position.latitude, longitude: position.longitude };
-    const destination = { latitude: Number(selectedCenter.latitude), longitude: Number(selectedCenter.longitude) };
-    const centerId = String(selectedCenter.evacuation_center_id || selectedCenter.center_id);
+    const origin = { latitude: positionOverride.latitude, longitude: positionOverride.longitude };
+    const destination = { latitude: Number(centerOverride.latitude), longitude: Number(centerOverride.longitude) };
+    const centerId = String(centerOverride.evacuation_center_id || centerOverride.center_id);
     routeRequest.current?.abort();
     const controller = new AbortController();
     routeRequest.current = controller;
@@ -312,38 +319,24 @@ export function RescueMapScreen({
             <Text style={styles.layerCount}>{visibleCenters.length}</Text>
           </View>
           <View style={styles.layerContent}>
-            {visibleCenters.length ? visibleCenters.map((center: any, index: number) => {
-              const id = String(center.evacuation_center_id || center.center_id || index);
-              const selected = selectedCenterId === id;
-              return (
-                <Pressable
-                  key={id}
-                  style={[styles.layerItem, selected && styles.layerItemSelected]}
-                  onPress={() => void selectCenter(center)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                >
-                  <View style={styles.rowText}>
-                    <Text style={styles.rowTitle}>{center.name || center.center_name || 'Evacuation center'}</Text>
-                    <Text style={styles.rowMeta}>{center.status_label || center.status || 'Available'}</Text>
-                  </View>
-                  <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={20} color={palette.navActive} />
-                </Pressable>
-              );
-            }) : <Text style={styles.smallText}>No mapped evacuation centers available.</Text>}
-            {selectedCenter ? (
-              <Pressable
-                style={[styles.routeButton, routeLoading && styles.routeButtonDisabled]}
-                onPress={() => void routeToSelectedCenter()}
-                disabled={routeLoading}
-                accessibilityRole="button"
-              >
-                <Ionicons name="navigate-outline" size={18} color="#fff" />
-                <Text style={styles.routeButtonText}>
-                  {routeLoading ? 'Loading road route…' : routePoints.length ? 'Refresh road route' : `Route to ${selectedCenter.name || 'selected center'}`}
-                </Text>
-              </Pressable>
-            ) : null}
+            {visibleCenters.length ? (
+              <RescuerSelect
+                title="Select evacuation center"
+                placeholder="Select evacuation center"
+                options={visibleCenters.map((item: any, itemIndex: number) => ({
+                  key: String(item.evacuation_center_id || item.center_id || itemIndex),
+                  label: item.name || item.center_name || 'Evacuation center',
+                }))}
+                value={selectedCenterId || ''}
+                onChange={(value) => {
+                  const center = visibleCenters.find((item: any, itemIndex: number) => String(item.evacuation_center_id || item.center_id || itemIndex) === value);
+                  if (center) void selectCenter(center);
+                }}
+                accessibilityLabel="Choose evacuation center"
+                showLabel={false}
+              />
+            ) : <Text style={styles.smallText}>No mapped evacuation centers available.</Text>}
+            {routeLoading ? <Text style={styles.rowMeta}>Loading road route</Text> : null}
             {!!routeSource && <Text style={styles.rowMeta}>{routeSource}</Text>}
             {!tracking && position && <Text style={styles.rowMeta}>Using last saved device GPS. Tap Follow GPS to update your position.</Text>}
           </View>
@@ -421,12 +414,6 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   rowTitle: { color: palette.text, fontSize: 13, fontWeight: '900' },
   rowMeta: { marginTop: 2, color: palette.textSoft, fontSize: 12, fontWeight: '700' },
-  routeButton: {
-    minHeight: 44, marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: spacing.sm, borderRadius: radius.md, backgroundColor: palette.navActive,
-  },
-  routeButtonDisabled: { opacity: 0.6 },
-  routeButtonText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   errorStrip: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.md,
     padding: spacing.sm, backgroundColor: '#96202012',

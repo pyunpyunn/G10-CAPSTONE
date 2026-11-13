@@ -4,8 +4,9 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Location from 'expo-location';
 import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
+import { api } from '@/api/client';
 import { palette, radius, spacing } from '@/constants/resqTheme';
-import { ActionButton, EmptyState, SectionHeader } from './RescuerUI';
+import { ActionButton, EmptyState, RescuerSelect, SectionHeader } from './RescuerUI';
 
 type RescueMapProps = {
   active?: boolean;
@@ -24,12 +25,21 @@ const defaultRegion = {
   longitudeDelta: 0.035,
 };
 
-export function RescueMapScreen({ assignments, activeAssignment, selectedAssignment, showNavigationButton = false, onOpenNavigation }: RescueMapProps) {
+export function RescueMapScreen({ assignments, evacuationCenters = [], activeAssignment, selectedAssignment, showNavigationButton = false, onOpenNavigation }: RescueMapProps) {
   const watcher = useRef<Location.LocationSubscription | null>(null);
   const autoStartedAssignment = useRef<number | null>(null);
   const [tracking, setTracking] = useState(false);
   const [position, setPosition] = useState<any>(null);
   const [locError, setLocError] = useState('');
+  const [selectedCenterId, setSelectedCenterId] = useState('');
+  const [roadRoute, setRoadRoute] = useState<any>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState('');
+  const visibleCenters = useMemo(() => (evacuationCenters || []).filter((center) => (
+    center.latitude != null && center.longitude != null
+      && Number.isFinite(Number(center.latitude)) && Number.isFinite(Number(center.longitude))
+  )), [evacuationCenters]);
+  const selectedCenter = visibleCenters.find((center) => String(center.evacuation_center_id || center.center_id) === selectedCenterId) || visibleCenters[0] || null;
   const mapAssignment = selectedAssignment || activeAssignment;
   const routeCoordinates = useMemo(() => normalizeRoute(mapAssignment?.route?.coordinates), [mapAssignment?.route?.coordinates]);
   const trailCoordinates = useMemo(() => normalizeRoute(mapAssignment?.route?.trail_coordinates), [mapAssignment?.route?.trail_coordinates]);
@@ -46,6 +56,46 @@ export function RescueMapScreen({ assignments, activeAssignment, selectedAssignm
       : activeTarget
         ? { ...activeTarget, latitudeDelta: 0.025, longitudeDelta: 0.025 }
         : defaultRegion;
+
+  useEffect(() => {
+    if (!visibleCenters.some((center) => String(center.evacuation_center_id || center.center_id) === selectedCenterId)) {
+      setSelectedCenterId(visibleCenters.length ? String(visibleCenters[0].evacuation_center_id || visibleCenters[0].center_id) : '');
+    }
+  }, [visibleCenters, selectedCenterId]);
+
+  useEffect(() => {
+    if (!selectedCenter || !position) {
+      setRoadRoute(null);
+      return;
+    }
+    const centerId = String(selectedCenter.evacuation_center_id || selectedCenter.center_id);
+    if (roadRoute?.centerId === centerId) return;
+    let cancelled = false;
+    setRouteLoading(true);
+    setRouteError('');
+    api.post(`/rescuer/evacuation-centers/${encodeURIComponent(centerId)}/route`, {
+      latitude: position.latitude,
+      longitude: position.longitude,
+      profile: 'auto',
+    }).then((response) => {
+      if (cancelled) return;
+      const route = response.data.data;
+      setRoadRoute({
+        centerId,
+        distance_km: route.distance_km,
+        duration_min: route.duration_min,
+        coordinates: normalizeRoute(route.coordinates),
+      });
+    }).catch((error) => {
+      if (!cancelled) {
+        setRoadRoute(null);
+        setRouteError(error.response?.data?.message || error.message || 'Unable to load this road route.');
+      }
+    }).finally(() => {
+      if (!cancelled) setRouteLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [position, position?.latitude, position?.longitude, roadRoute?.centerId, selectedCenter]);
 
   useEffect(() => {
     return () => {
@@ -149,6 +199,23 @@ export function RescueMapScreen({ assignments, activeAssignment, selectedAssignm
           </View>
         ) : null}
 
+        {visibleCenters.length ? (
+          <RescuerSelect
+            title="Select evacuation center"
+            placeholder="Select evacuation center"
+            options={visibleCenters.map((center) => ({
+              key: String(center.evacuation_center_id || center.center_id),
+              label: center.name || center.center_name || 'Evacuation center',
+            }))}
+            value={selectedCenterId}
+            onChange={setSelectedCenterId}
+            accessibilityLabel="Choose evacuation center"
+            showLabel={false}
+          />
+        ) : null}
+        {routeLoading ? <Text style={styles.routeInfoText}>Loading road route...</Text> : null}
+        {routeError ? <Text style={styles.errorText}>{routeError}</Text> : null}
+
         <MapView style={styles.map} region={mapRegion}>
           {routeCoordinates.length >= 2 ? (
             <Polyline coordinates={routeCoordinates} strokeColor={palette.evacuated} strokeWidth={5} />
@@ -157,6 +224,20 @@ export function RescueMapScreen({ assignments, activeAssignment, selectedAssignm
           {trailCoordinates.length >= 2 ? (
             <Polyline coordinates={trailCoordinates} strokeColor={palette.safe} strokeWidth={3} />
           ) : null}
+
+          {roadRoute?.coordinates?.length >= 2 ? (
+            <Polyline coordinates={roadRoute.coordinates} strokeColor={palette.navActive} strokeWidth={5} />
+          ) : null}
+
+          {visibleCenters.map((center) => (
+            <Marker
+              key={String(center.evacuation_center_id || center.center_id)}
+              coordinate={{ latitude: Number(center.latitude), longitude: Number(center.longitude) }}
+              title={center.name || center.center_name || 'Evacuation center'}
+              description={center.address || center.status || 'Evacuation center'}
+              pinColor={String(center.evacuation_center_id || center.center_id) === String(selectedCenter?.evacuation_center_id || selectedCenter?.center_id) ? palette.safe : palette.evacuated}
+            />
+          ))}
 
           {mappedAssignments.map((assignment) => (
             <Marker

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
+import { RescuerSelect } from '@/components/rescuer/RescuerUI';
 
 type RouteProps = {
   active?: boolean;
@@ -170,30 +171,18 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters }: RouteProps) 
         {centers.length === 0 ? (
           <HouseholdEmpty icon="business-outline" title="No evacuation centers encoded" />
         ) : (
-          centers.map((center) => {
-            const isSelected = String(center.evacuation_center_id) === selectedId;
-
-            return (
-              <Pressable
-                key={center.evacuation_center_id}
-                style={[styles.centerRow, isSelected && styles.centerRowActive]}
-                onPress={() => setSelectedId(String(center.evacuation_center_id))}
-              >
-                <View style={styles.rowIcon}>
-                  <Ionicons name={isSelected ? 'navigate-outline' : 'business-outline'} size={17} color={palette.navActive} />
-                </View>
-                <View style={styles.rowText}>
-                  <Text style={styles.rowTitle}>{center.name}</Text>
-                  <Text style={styles.rowMeta}>
-                    {center.vacancy !== null && center.vacancy !== undefined
-                      ? `${center.vacancy} slots available`
-                      : 'Capacity not encoded'}
-                  </Text>
-                </View>
-                <HouseholdBadge label={center.status || 'Active'} tone={center.status || 'active'} />
-              </Pressable>
-            );
-          })
+          <RescuerSelect
+            title="Select evacuation center"
+            placeholder="Select evacuation center"
+            options={centers.map((center) => ({
+              key: String(center.evacuation_center_id),
+              label: center.name || 'Evacuation center',
+            }))}
+            value={selectedId}
+            onChange={setSelectedId}
+            accessibilityLabel="Choose evacuation center"
+            showLabel={false}
+          />
         )}
       </View>
     </View>
