@@ -11,14 +11,16 @@ export default function DeclareRequestTypeModal({
   isOpen,
   onClose,
   onSuccess,
+  categories = [],
 }) {
   const [formData, setFormData] = useState({
     name: '',
-    category: 'FOOD',
-    unit_type: 'packs',
+    category: '',
+    custom_category: '',
+    unit_type: '',
     type: 'consumable',
-    quantity: 50,
-    storage_location: 'Warehouse A',
+    quantity: '',
+    storage_location: '',
     expiration_date: '',
   })
   const [fieldErrors, setFieldErrors] = useState({})
@@ -26,6 +28,11 @@ export default function DeclareRequestTypeModal({
   const [error, setError] = useState(null)
 
   if (!isOpen) return null
+
+  // Filter out meta "all" entry and get unique, valid category items from database
+  const dbCategories = (categories || []).filter(
+    (c) => c && c.key !== 'all' && Boolean(c.label || c.category)
+  )
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -39,10 +46,21 @@ export default function DeclareRequestTypeModal({
   const handleSubmit = async (e) => {
     e.preventDefault()
     const errors = {}
+
     if (!formData.name.trim()) {
       errors.name = 'Please provide a resource name.'
     }
-    if (formData.quantity === '' || isNaN(Number(formData.quantity)) || Number(formData.quantity) < 0) {
+
+    const effectiveCategory =
+      formData.category === '__custom__' || !formData.category
+        ? formData.custom_category.trim()
+        : formData.category.trim()
+
+    if (!effectiveCategory) {
+      errors.category = 'Please select or enter a resource type.'
+    }
+
+    if (formData.quantity !== '' && (isNaN(Number(formData.quantity)) || Number(formData.quantity) < 0)) {
       errors.quantity = 'Stock quantity must be 0 or greater.'
     }
 
@@ -59,10 +77,11 @@ export default function DeclareRequestTypeModal({
       setError(null)
       await createResourceRequestType({
         name: formData.name.trim(),
-        category: formData.category,
+        category: effectiveCategory,
+        resource_type: effectiveCategory,
         unit_type: formData.unit_type.trim() || 'units',
-        type: formData.type,
-        quantity: Math.max(0, parseInt(formData.quantity, 10) || 0),
+        type: formData.type || 'consumable',
+        quantity: formData.quantity === '' ? 0 : Math.max(0, parseInt(formData.quantity, 10) || 0),
         storage_location: formData.storage_location.trim() || 'Warehouse Depot',
         expiration_date: formData.expiration_date || null,
       })
@@ -70,11 +89,12 @@ export default function DeclareRequestTypeModal({
       // Reset form
       setFormData({
         name: '',
-        category: 'FOOD',
-        unit_type: 'packs',
+        category: '',
+        custom_category: '',
+        unit_type: '',
         type: 'consumable',
-        quantity: 50,
-        storage_location: 'Warehouse A',
+        quantity: '',
+        storage_location: '',
         expiration_date: '',
       })
 
@@ -147,22 +167,55 @@ export default function DeclareRequestTypeModal({
 
               <div className="form-field">
                 <label htmlFor="field-category">
-                  Resource Category <span className="req-star">*</span>
+                  Resource Type <span className="req-star">*</span>
                 </label>
-                <select
-                  id="field-category"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className="form-control"
-                >
-                  <option value="FOOD">Food & Water</option>
-                  <option value="MEDICAL">Medical Supplies</option>
-                  <option value="RESCUE">Rescue Equipment</option>
-                  <option value="SHELTER">Emergency Shelter</option>
-                  <option value="RELIEF">General Relief</option>
-                  <option value="OTHER">Other Disaster Supply</option>
-                </select>
+                {dbCategories.length > 0 ? (
+                  <>
+                    <select
+                      id="field-category"
+                      name="category"
+                      value={formData.category}
+                      onChange={handleChange}
+                      className={`form-control ${fieldErrors.category ? 'is-invalid' : ''}`}
+                    >
+                      <option value="">-- Select from Database --</option>
+                      {dbCategories.map((c) => (
+                        <option key={c.key} value={c.category || c.label}>
+                          {c.label || c.category}
+                        </option>
+                      ))}
+                      <option value="__custom__">+ Enter new resource type...</option>
+                    </select>
+
+                    {formData.category === '__custom__' && (
+                      <input
+                        type="text"
+                        name="custom_category"
+                        placeholder="Type resource type name"
+                        value={formData.custom_category}
+                        onChange={handleChange}
+                        className={`form-control ${fieldErrors.category ? 'is-invalid' : ''}`}
+                        style={{ marginTop: '6px' }}
+                        autoFocus
+                      />
+                    )}
+                  </>
+                ) : (
+                  <input
+                    id="field-category"
+                    name="custom_category"
+                    type="text"
+                    placeholder="e.g. Food & Water, Medical Supplies, Rescue Equipment"
+                    value={formData.custom_category}
+                    onChange={handleChange}
+                    className={`form-control ${fieldErrors.category ? 'is-invalid' : ''}`}
+                  />
+                )}
+                {fieldErrors.category && (
+                  <span className="field-error-text">
+                    <AlertCircle size={12} /> {fieldErrors.category}
+                  </span>
+                )}
               </div>
 
               <div className="form-field">
@@ -171,7 +224,7 @@ export default function DeclareRequestTypeModal({
                   id="field-unit"
                   name="unit_type"
                   type="text"
-                  placeholder="e.g. boxes, sacks, kits, pieces"
+                  placeholder="e.g. packs, boxes, sacks, kits, pieces"
                   value={formData.unit_type}
                   onChange={handleChange}
                   className="form-control"
@@ -217,7 +270,7 @@ export default function DeclareRequestTypeModal({
                   id="field-location"
                   name="storage_location"
                   type="text"
-                  placeholder="e.g. Warehouse A, Bay 4"
+                  placeholder="e.g. Warehouse Depot, Bay 1"
                   value={formData.storage_location}
                   onChange={handleChange}
                   className="form-control"
@@ -268,4 +321,3 @@ export default function DeclareRequestTypeModal({
     </div>
   )
 }
-

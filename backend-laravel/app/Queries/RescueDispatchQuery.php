@@ -123,18 +123,49 @@ class RescueDispatchQuery
         $responders = Responder::query()->withoutGlobalScopes()->from('responders as r')->leftJoin('rescue_teams as rt', 'rt.team_id', '=', 'r.team_id')->when(Schema::hasColumn('responders', 'deleted_at'), fn ($q) => $q->whereNull('r.deleted_at'))
             ->when($responderIds !== null, fn($query) => $query->whereIn('r.responder_id',$responderIds))
             ->orderBy('r.full_name')->get(['r.responder_id','r.user_id','r.team_id','r.full_name','r.title','r.contact_number','r.duty_status','r.is_deployed','r.last_active_at','rt.team_name','rt.team_code']);
-        $activeByResponder = $eventId && $responders->isNotEmpty()
-            ? ResponderAssignment::query()->where('disaster_id', $eventId)
-                ->whereIn('responder_id', $responders->pluck('responder_id'))
+        $activeByResponder = collect();
+        if ($eventId && $responders->isNotEmpty()) {
+            $activeRows = ResponderAssignment::query()->where('disaster_id', $eventId)
                 ->whereIn('status', app(DispatchStatusQuery::class)->keys(true))
-                ->orderByDesc('assigned_at')->get(['assignment_id','assignment_code','assigned_area','responder_id','status','assigned_at'])
-                ->unique('responder_id')->keyBy('responder_id')
-            : collect();
+                ->orderByDesc('assigned_at')
+                ->get(['assignment_id', 'assignment_code', 'assigned_area', 'responder_id', 'status', 'assigned_at', 'route_notes']);
+
+            foreach ($activeRows as $assignment) {
+                $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
+                $allIds = collect($notes['selected_responder_ids'] ?? [])
+                    ->push($assignment->responder_id)
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->unique();
+
+                foreach ($allIds as $rid) {
+                    if (! $activeByResponder->has($rid)) {
+                        $activeByResponder->put($rid, $assignment);
+                    }
+                }
+            }
+        }
         return $responders->map(function (object $r) use ($eventId, $activeByResponder): array {
-            $active = $activeByResponder->get($r->responder_id);
-            $key=$this->presenter->statusKey($r->duty_status);
+            $active = $activeByResponder->get((int) $r->responder_id);
+            $key = $this->presenter->statusKey($r->duty_status);
             $available = ! $active && ! (bool) $r->is_deployed && $key === 'available';
-            return ['responder_id'=>$r->responder_id,'user_id'=>$r->user_id,'team_id'=>$r->team_id,'full_name'=>$r->full_name?:'Unnamed responder','title'=>$r->title?:'Responder','contact_number'=>$r->contact_number,'team_name'=>$r->team_name?:'Unassigned','team_code'=>$r->team_code,'status'=>$this->presenter->status($active?$active->status:($eventId?$r->duty_status:'available')),'is_available'=>$available,'active_assignment_id'=>$active?->assignment_id,'active_assignment_code'=>$active?->assignment_code,'active_assigned_area'=>$active?->assigned_area,'last_active_timestamp'=>$r->last_active_at ? \Carbon\Carbon::parse($r->last_active_at)->timestamp : 0,'last_active_at'=>$this->presenter->dateTime($r->last_active_at)];
+            return [
+                'responder_id' => $r->responder_id,
+                'user_id' => $r->user_id,
+                'team_id' => $r->team_id,
+                'full_name' => $r->full_name ?: 'Unnamed responder',
+                'title' => $r->title ?: 'Responder',
+                'contact_number' => $r->contact_number,
+                'team_name' => $r->team_name ?: 'Unassigned',
+                'team_code' => $r->team_code,
+                'status' => $this->presenter->status($active ? $active->status : ($eventId ? $r->duty_status : 'available')),
+                'is_available' => $available,
+                'active_assignment_id' => $active?->assignment_id,
+                'active_assignment_code' => $active?->assignment_code,
+                'active_assigned_area' => $active?->assigned_area,
+                'last_active_timestamp' => $r->last_active_at ? \Carbon\Carbon::parse($r->last_active_at)->timestamp : 0,
+                'last_active_at' => $this->presenter->dateTime($r->last_active_at),
+            ];
         })->values();
     }
 
@@ -298,9 +329,25 @@ class RescueDispatchQuery
     {
         $query = Responder::query()->withoutGlobalScopes()->from('responders as r');
         if (! $eventId) return $query->where('r.duty_status', 'available')->where('r.is_deployed', false);
+
+        $activeAssignments = ResponderAssignment::query()
+            ->where('disaster_id', $eventId)
+            ->whereIn('status', app(DispatchStatusQuery::class)->keys(true))
+            ->get(['responder_id', 'route_notes']);
+
+        $busyResponderIds = collect();
+        foreach ($activeAssignments as $assignment) {
+            $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
+            $busyResponderIds->push((int) $assignment->responder_id);
+            foreach ($notes['selected_responder_ids'] ?? [] as $sid) {
+                $busyResponderIds->push((int) $sid);
+            }
+        }
+        $busyIds = $busyResponderIds->filter()->unique()->values()->all();
+
         return $query->where('r.is_deployed', false)
             ->where('r.duty_status', 'available')
-            ->whereNotExists(function ($q) use ($eventId): void { $q->from('responder_assignments as active_ra')->whereColumn('active_ra.responder_id', 'r.responder_id')->where('active_ra.disaster_id', $eventId)->whereIn('active_ra.status', app(DispatchStatusQuery::class)->keys(true)); });
+            ->when(!empty($busyIds), fn ($q) => $q->whereNotIn('r.responder_id', $busyIds));
     }
 }
 

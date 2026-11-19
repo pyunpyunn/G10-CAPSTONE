@@ -132,7 +132,7 @@ export default function RequestTypesPage() {
     },
     {
       id: 'category',
-      label: 'Category',
+      label: 'Resource Type',
       value: category,
       onChange: (value) => {
         setCategory(value)
@@ -288,8 +288,12 @@ export default function RequestTypesPage() {
         ) : items.length === 0 ? (
           <div style={{ padding: '36px 16px', textAlign: 'center' }}>
             <EmptyState
-              title="No request types found"
-              message="No catalog resources matched your active filters or search query."
+              title={!isTrackingAidLive ? 'TrackingAid Disconnected' : 'No request types found'}
+              message={
+                !isTrackingAidLive
+                  ? 'No data available because TrackingAid is disconnected. Please connect to the TrackingAid network to view live inventory.'
+                  : 'No catalog resources matched your active filters or search query.'
+              }
             />
           </div>
                                     ) : viewMode === 'cards' ? (
@@ -313,7 +317,7 @@ export default function RequestTypesPage() {
                 <tr>
                   <th style = {{ whiteSpace: 'nowrap', width: '12%' }}>SKU / Code</th>
                                   <th style={{ whiteSpace: 'nowrap', width: '22%' }}>Relief Resource Item</th>
-                                  <th style={{ whiteSpace: 'nowrap', width: '13%' }}>Category</th>
+                                  <th style={{ whiteSpace: 'nowrap', width: '13%' }}>Resource Type</th>
                                   <th style={{ whiteSpace: 'nowrap', width: '13%' }}>Classification</th>
                                   <th style={{ whiteSpace: 'nowrap', width: '16%' }}>Depot Location</th>
                                   <th style={{ whiteSpace: 'nowrap', width: '8%' }}>Current Stock</th>
@@ -574,6 +578,7 @@ export default function RequestTypesPage() {
                       isOpen={isDeclareModalOpen}
                       onClose={() => setIsDeclareModalOpen(false)}
                       onSuccess={handleDeclareSuccess}
+                      categories={categories}
                     />
 
                     {/* Interactive Resource Request Modal */}

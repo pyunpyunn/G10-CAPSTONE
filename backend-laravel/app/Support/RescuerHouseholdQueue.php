@@ -38,9 +38,14 @@ class RescuerHouseholdQueue
         $coverage = $notes['responder_households'] ?? [];
         $directId = property_exists($assignment, 'dispatch_household_id')
             ? $assignment->dispatch_household_id : ($assignment->household_id ?? null);
-        $ids = array_key_exists($responderId, $coverage)
-            ? $coverage[$responderId]
-            : ($directId ? [$directId] : ($notes['household_ids'] ?? []));
+
+        $assignedToMe = $coverage[$responderId] ?? ($coverage[(string) $responderId] ?? null);
+
+        if (!empty($assignedToMe)) {
+            $ids = $assignedToMe;
+        } else {
+            $ids = !empty($notes['household_ids']) ? $notes['household_ids'] : ($directId ? [$directId] : []);
+        }
 
         return array_values(array_unique(array_map('strval', array_filter($ids))));
     }

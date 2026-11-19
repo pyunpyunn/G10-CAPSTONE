@@ -310,7 +310,13 @@ api.interceptors.response.use(
   },
   (error) => {
     if (isCancel(error)) return Promise.reject(error);
-    if (error.response?.status === 401) resetApiState();
+    if (error.response?.status === 401) {
+      resetApiState();
+      const url = String(error.config?.url || '');
+      if (!url.includes('/auth/login') && !url.includes('/mobile/login')) {
+        clearToken().catch(() => {});
+      }
+    }
     const config = error.config as (typeof error.config & FailoverRequestConfig) | undefined;
     const currentUrl = config?.baseURL;
     if (!error.response && config && !config._resqFailoverAttempted) {

@@ -14,15 +14,26 @@ class SelectDispatchResponders
 
     public function select(int $teamId, string $eventId, int $requested, ?string $householdId, ?object $destination = null, ?array $requestedIds = null): array
     {
+        $activeAssignments = \App\Models\ResponderAssignment::query()
+            ->where('disaster_id', $eventId)
+            ->whereIn('status', app(\App\Queries\DispatchStatusQuery::class)->keys(true))
+            ->get(['responder_id', 'route_notes']);
+
+        $busyIds = collect();
+        foreach ($activeAssignments as $assignment) {
+            $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
+            $busyIds->push((int) $assignment->responder_id);
+            foreach ($notes['selected_responder_ids'] ?? [] as $sid) {
+                $busyIds->push((int) $sid);
+            }
+        }
+        $busyList = $busyIds->filter()->unique()->values()->all();
+
         $candidates = Responder::query()
             ->where('team_id', $teamId)
             ->where('duty_status', 'available')
             ->where('is_deployed', false)
-            ->whereNotExists(fn ($query) => $query->selectRaw('1')
-                ->from('responder_assignments as active_assignment')
-                ->whereColumn('active_assignment.responder_id', 'responders.responder_id')
-                ->where('active_assignment.disaster_id', $eventId)
-                ->whereIn('active_assignment.status', app(\App\Queries\DispatchStatusQuery::class)->keys(true)))
+            ->when(!empty($busyList), fn ($query) => $query->whereNotIn('responder_id', $busyList))
             ->orderBy('responder_id')
             ->lockForUpdate()
             ->get(['responder_id', 'full_name', 'last_active_at']);

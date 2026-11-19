@@ -138,8 +138,11 @@ class RescuerAssignmentQuery
     private function forResponder(int $responderId): Builder
     {
         $query = DB::table('responder_assignments as ra')
-            ->where(fn (Builder $scope) => $scope->where('ra.responder_id', $responderId)
-                ->orWhereJsonContains('ra.route_notes->selected_responder_ids', $responderId));
+            ->where(function (Builder $scope) use ($responderId) {
+                $scope->where('ra.responder_id', $responderId)
+                    ->orWhereJsonContains('ra.route_notes->selected_responder_ids', $responderId)
+                    ->orWhereJsonContains('ra.route_notes->selected_responder_ids', (string) $responderId);
+            });
         $columns = ['ra.*'];
 
         if (Schema::hasTable('rescue_teams')) {

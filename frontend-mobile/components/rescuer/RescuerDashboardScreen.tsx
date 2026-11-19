@@ -19,9 +19,11 @@ export function RescuerDashboardScreen({ overview, pendingAssignmentId, showIden
   const assignments = overview?.assignments || [];
   const responder = overview?.profile?.responder || {};
   const summary = overview?.summary || {};
-  const current = assignments.find((item: any) => ['dispatched','accepted','en_route','on_scene'].includes(item.status_key) && item.household_id);
+  const current = assignments.find((item: any) => ['dispatched','accepted','en_route','on_scene'].includes(item.status_key) && (item.household_id || (item.route_notes?.assigned_households && item.route_notes.assigned_households.length > 0) || item.assigned_area));
   const queue = assignments.filter((item: any) => !['cancelled','completed'].includes(item.status_key));
-  const household = current?.route_notes?.assigned_households?.find((item: any) => item.household_id === current.household_id);
+  const activeHouseholds = current?.route_notes?.assigned_households || [];
+  const household = activeHouseholds.find((item: any) => item.household_id === current?.household_id) || activeHouseholds[0];
+  const targetHouseholdId = current?.household_id || household?.household_id;
   useEffect(() => {
     if (!historyOpen) return;
     let active = true;
@@ -42,8 +44,8 @@ export function RescuerDashboardScreen({ overview, pendingAssignmentId, showIden
     <View style={styles.stats}><StatTile label="Assigned" value={summary.total_assignments || 0} /><StatTile label="Active" value={summary.active_assignments || 0} /><StatTile label="Done" value={summary.completed_assignments || 0} tone="completed" /></View>
     {current ? <View style={styles.card}>
       <SectionHeader title="Current assignment" action={<StatusBadge label={current.status_label} tone={current.status_key} />} />
-      <Text style={styles.household}>{household?.household_name || current.household_id}</Text>
-      <View style={styles.info}><Text style={[styles.meta, styles.householdInfoText]}>Household <Text style={styles.data}>{current.household_id}</Text></Text><StatusBadge label={current.priority_level || 'medium'} tone={current.priority_level} /></View>
+      <Text style={styles.household}>{household?.household_name || current.assigned_area || targetHouseholdId || 'Active Area Dispatch'}</Text>
+      <View style={styles.info}><Text style={[styles.meta, styles.householdInfoText]}>{targetHouseholdId ? <>Household <Text style={styles.data}>{targetHouseholdId}</Text></> : <>Area <Text style={styles.data}>{current.assigned_area || 'Assigned Area'}</Text></>}</Text><StatusBadge label={current.priority_level || 'medium'} tone={current.priority_level} /></View>
       {next && <ActionButton label={updating ? 'Updating…' : next[0]} loading={updating} icon="navigate-outline" onPress={() => onStatusChange(current.assignment_id,next[1])} />}
       <View style={styles.actions}>
         <TaskAction label="Map" icon="map-outline" onPress={() => onOpenMap(current)} />

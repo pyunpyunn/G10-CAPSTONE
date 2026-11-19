@@ -54,23 +54,28 @@ function AssignmentEditor({ workspace, groups, detail, initialSitio, initialHous
     return { ...card, households, total_households: households.length }
   }), [group, coverage])
   const plans = useMemo(() => planSelectedAreaResponders(cards, selections, workspace?.responders || [], teamId), [cards, selections, workspace, teamId])
-  const householdPlans = useMemo(() => Object.fromEntries(cards.filter((card) => plans[card.id]).map((card) => [card.id, Object.fromEntries(splitCoverageHouseholds(shuffleDispatchItems((card.households || []).filter((household) => household.is_available_for_dispatch)), plans[card.id].length).map((items, index) => [plans[card.id][index].responder_id, items.map((household) => household.household_id)]))])), [cards, plans])
-  const selected = cards.filter((card) => selections[card.id]?.some(Boolean))
+  const householdPlans = useMemo(() => Object.fromEntries(cards.filter((card) => plans[card.id]).map((card) => {
+    const eligible = (card.households || []).filter((household) => household.is_available_for_dispatch)
+    const members = plans[card.id] || []
+    const split = eligible.length > 1
+      ? splitCoverageHouseholds(shuffleDispatchItems(eligible), members.length)
+      : members.map(() => eligible)
+    return [card.id, Object.fromEntries(members.map((member, index) => [member.responder_id, (split[index] || eligible).map((h) => h.household_id)]))]
+  })), [cards, plans])
+  const selected = cards.filter((card) => selections[card.id]?.[0] && selections[card.id]?.[1])
   const closed = ['completed', 'cancelled'].includes(dispatch?.status?.key)
-  const canDispatch = Boolean(workspace?.active_event && allowAssignment && selected.length && selected.every((card) => plans[card.id] && card.households?.some((household) => household.is_available_for_dispatch)))
+  const canDispatch = Boolean(workspace?.active_event && allowAssignment && selected.length && selected.every((card) => plans[card.id]?.length === 2 && card.households?.some((household) => household.is_available_for_dispatch)))
   function autoAssign() {
-    const teams = (workspace.teams || []).filter((team) => (workspace.responders || []).some((member) => member.is_available && String(member.team_id) === String(team.team_id)))
+    const teams = (workspace.teams || []).filter((team) => (workspace.responders || []).some((member) => member.is_available && !member.active_assignment_id && String(member.team_id) === String(team.team_id)))
     const chosenTeam = teamId || String(shuffleDispatchItems(teams)[0]?.team_id || '')
     if (!chosenTeam) { setError('No team has available rescuers.'); return }
-    const available = shuffleDispatchItems((workspace.responders || []).filter((member) => member.is_available && String(member.team_id) === chosenTeam))
+    const available = shuffleDispatchItems((workspace.responders || []).filter((member) => member.is_available && !member.active_assignment_id && String(member.team_id) === chosenTeam))
     const next = {}
     const eligibleCards = cards.filter((card) => card.households?.some((household) => household.is_available_for_dispatch))
-    // Cover as many puroks as possible before assigning a second rescuer.
     for (const card of shuffleDispatchItems(eligibleCards)) {
-      if (available.length) next[card.id] = [String(available.shift().responder_id)]
-    }
-    for (const card of shuffleDispatchItems(eligibleCards)) {
-      if (next[card.id] && available.length && card.households.filter((household) => household.is_available_for_dispatch).length > 1) next[card.id].push(String(available.shift().responder_id))
+      if (available.length >= 2) {
+        next[card.id] = [String(available.shift().responder_id), String(available.shift().responder_id)]
+      }
     }
     setTeamId(chosenTeam)
     setSelections(next)

@@ -171,13 +171,19 @@ export function shuffleDispatchItems(items) {
 }
 
 export function planSelectedAreaResponders(cards, selections, responders, teamId) {
-  const available = new Map(responders.filter((member) => member.is_available && String(member.team_id) === String(teamId)).map((member) => [String(member.responder_id), member]))
+  const available = new Map(
+    responders
+      .filter((member) => member.is_available && !member.active_assignment_id && String(member.team_id) === String(teamId))
+      .map((member) => [String(member.responder_id), member])
+  )
   const used = new Set()
   const plans = {}
   for (const card of cards) {
     const ids = (selections[card.id] || []).filter(Boolean).map(String)
     if (!ids.length) continue
-    plans[card.id] = ids.every((id) => available.has(id) && !used.has(id)) && new Set(ids).size === ids.length ? ids.map((id) => available.get(id)) : null
+    plans[card.id] = (ids.length === 2 && ids.every((id) => available.has(id) && !used.has(id)) && new Set(ids).size === 2)
+      ? ids.map((id) => available.get(id))
+      : null
     ids.forEach((id) => used.add(id))
   }
   return plans

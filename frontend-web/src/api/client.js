@@ -98,7 +98,16 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
-    if (error.response?.status === 401) resetApiState()
+    if (error.response?.status === 401) {
+      resetApiState()
+      const url = String(error.config?.url || '')
+      if (!url.includes('/auth/login') && !url.includes('/auth/password-recovery')) {
+        import('./token.js').then(({ clearToken }) => clearToken())
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login'
+        }
+      }
+    }
     if ([401, 403].includes(error.response?.status) && !String(error.config?.url || '').startsWith('/auth/')) {
       window.dispatchEvent(new Event('personnel-access:changed'))
     }
