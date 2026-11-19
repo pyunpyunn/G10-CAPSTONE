@@ -805,3 +805,66 @@
     justify-content: flex-start;
   }
 }
+
+/* Password Requirements Checklist */
+.password-requirements-card {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius, 8px);
+  background: var(--color-bg-secondary, #f8fafc);
+  padding: 10px 12px;
+  font-size: 12px;
+  margin-top: 2px;
+  text-align: left;
+}
+
+.password-requirements-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--color-text-3, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.password-requirements-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.password-requirement-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-text-muted, #94a3b8);
+  transition: color 0.15s ease-in-out;
+}
+
+.password-requirement-item.met {
+  color: #16a34a;
+  font-weight: 550;
+}
+
+.password-requirement-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.password-requirement-item.unmet .password-requirement-icon {
+  color: #94a3b8;
+}
+
+.password-requirement-item.met .password-requirement-icon {
+  color: #16a34a;
+}
+

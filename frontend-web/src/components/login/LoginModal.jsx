@@ -12,6 +12,7 @@ import {
   validateHouseholdRecoveryContact,
 } from '../../api/authApi'
 import ResQperationLogo from '../layout/ResQperationLogo'
+import PasswordRequirements from '../ui/PasswordRequirements'
 import { passwordPolicyError } from '../../utils/passwordPolicy'
 
 const RECOVERY_RESEND_COOLDOWN_SECONDS = 5 * 60
@@ -372,7 +373,7 @@ export default function LoginModal({ onClose, onLogin }) {
               />
               <div className="login-password-field">
                 <input type={showNewPassword ? 'text' : 'password'} autoComplete="new-password" value={newPassword}
-                  onChange={event => setNewPassword(event.target.value)} aria-label="New password" minLength={8}
+                  onChange={event => setNewPassword(event.target.value)} placeholder="New password" aria-label="New password" minLength={8}
                   maxLength={128} disabled={busy} required />
                 <button className="login-password-toggle" type="button" aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                   title={showNewPassword ? 'Hide password' : 'Show password'} onClick={() => setShowNewPassword(value => !value)}>
@@ -381,13 +382,18 @@ export default function LoginModal({ onClose, onLogin }) {
               </div>
               <div className="login-password-field">
                 <input type={showConfirmation ? 'text' : 'password'} autoComplete="new-password" value={confirmation}
-                  onChange={event => setConfirmation(event.target.value)} aria-label="Confirm new password" minLength={8}
+                  onChange={event => setConfirmation(event.target.value)} placeholder="Confirm new password" aria-label="Confirm new password" minLength={8}
                   maxLength={128} disabled={busy} required />
                 <button className="login-password-toggle" type="button" aria-label={showConfirmation ? 'Hide password' : 'Show password'}
                   title={showConfirmation ? 'Hide password' : 'Show password'} onClick={() => setShowConfirmation(value => !value)}>
                   {showConfirmation ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               </div>
+              <PasswordRequirements
+                password={newPassword}
+                confirmation={confirmation}
+                showConfirmation={true}
+              />
               <div className="login-actions">
                 <button className="primary-button" type="submit" disabled={busy}>{busy ? 'Please wait...' : 'Change password'}</button>
               </div>

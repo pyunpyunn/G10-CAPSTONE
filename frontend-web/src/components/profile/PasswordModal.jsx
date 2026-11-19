@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Eye, EyeOff, KeyRound, X } from 'lucide-react'
 import Modal from '../ui/Modal'
+import PasswordRequirements from '../ui/PasswordRequirements'
 
 export default function PasswordModal({
   isOpen,
@@ -78,6 +79,14 @@ export default function PasswordModal({
             </button>
           </div>
         </label>
+
+        <div className="full">
+          <PasswordRequirements
+            password={form.password}
+            confirmation={form.password_confirmation}
+            showConfirmation={true}
+          />
+        </div>
       </form>
     </Modal>
   )
