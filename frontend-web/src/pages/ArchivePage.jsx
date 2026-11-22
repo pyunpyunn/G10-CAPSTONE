@@ -7,11 +7,10 @@ import {
   deleteArchiveRecords,
   deleteSavedArchiveGroup,
   deleteSavedArchiveGroupRecord,
+  getArchiveCategoryCounts,
   getSavedArchiveGroups,
 } from '../api/archiveApi'
 import InquiryLogsView from './InquiryLogsView'
-import ArchiveDownloadMenu from '../components/archive/ArchiveDownloadMenu'
-import ArchiveFilters from '../components/archive/ArchiveFilters'
 import ArchiveRecordModal from '../components/archive/ArchiveRecordModal'
 import ArchiveSavedLogsModal from '../components/archive/ArchiveSavedLogsModal'
 import ArchiveSelectionTools from '../components/archive/ArchiveSelectionTools'
@@ -19,7 +18,6 @@ import ArchiveTable from '../components/archive/ArchiveTable'
 import ArchiveTabs from '../components/archive/ArchiveTabs'
 import EvaTrackReportsPanel from '../components/archive/EvaTrackReportsPanel'
 import LoadingState from '../components/ui/LoadingState'
-import PageHeader from '../components/ui/PageHeader'
 import RefreshOverlay from '../components/ui/RefreshOverlay'
 import {
   ARCHIVE_TABS,
@@ -32,7 +30,6 @@ import {
 export default function ArchivePage() {
   const { user } = useOutletContext()
   const isSuperAdmin = user?.role?.role_key === 'operations_admin'
-  const [isExporting, setIsExporting] = useState(false)
   const [activeCategory, setActiveCategory] = useState('disaster-events')
   const [message, setMessage] = useState('')
   const [page, setPage] = useState(1)
@@ -44,16 +41,31 @@ export default function ArchivePage() {
   const [openGroupId, setOpenGroupId] = useState('')
   const [isSavedGroupsOpen, setIsSavedGroupsOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [search, setSearch] = useState('')
-  const [purok, setPurok] = useState('all')
-  const [eventId, setEventId] = useState('all')
-  const [status, setStatus] = useState('all')
+  const [selectedEvent, setSelectedEvent] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('archive-selected-event') || 'null') } catch { return null }
+  })
+  const [eventCounts, setEventCounts] = useState({})
 
   const { currentData: payload, isFetching: isLoading, error: queryError, refetch } = useArchiveRecordsQuery(
-    { category: activeCategory, ...archiveParams({ search, purok, eventId, status, page }) },
+    { category: activeCategory, ...archiveParams({ search: '', purok: 'all', eventId: activeCategory === 'disaster-events' ? 'all' : selectedEvent?.id || 'all', status: 'all', page }) },
     { skip: ['inquiry-logs', 'evatrack-reports'].includes(activeCategory), pollingInterval: 30000, skipPollingIfUnfocused: true },
   )
+  const { currentData: eventListPayload } = useArchiveRecordsQuery(
+    { category: 'disaster-events', ...archiveParams({ search: '', purok: 'all', eventId: 'all', status: 'all', page: 1, per_page: 100 }) },
+    { skip: activeCategory === 'disaster-events', pollingInterval: 30000, skipPollingIfUnfocused: true },
+  )
   const error = queryError?.message || ''
+  useEffect(() => {
+    let active = true
+    if (!selectedEvent?.id) {
+      setEventCounts({})
+      return () => { active = false }
+    }
+    getArchiveCategoryCounts(selectedEvent.id)
+      .then(counts => { if (active) setEventCounts(counts) })
+      .catch(() => { if (active) setEventCounts({}) })
+    return () => { active = false }
+  }, [selectedEvent?.id])
   useEffect(() => {
     let ignore = false
 
@@ -78,36 +90,24 @@ export default function ArchivePage() {
     }
   }, [])
 
-  function currentParams() {
-    return archiveParams({ search, purok, eventId, status, page })
-  }
-
   function changeCategory(category) {
     if (category === 'inquiry-logs' && !isSuperAdmin) return
+    if (category !== 'disaster-events' && !selectedEvent) return
     setActiveCategory(category)
     setSelectedRecord(null)
     setSelectedRecordCategory(category)
     setMessage('')
     setPage(1)
-    setSearch('')
-    setPurok('all')
-    setEventId('all')
-    setStatus('all')
   }
 
-  async function downloadCategory(type) {
-    if (isExporting) return
-    setIsExporting(true)
-    setMessage('Generating report. Large exports may take a moment.')
-
-    try {
-      await exportArchive(activeCategory, type, currentParams())
-      setMessage('Archive export generated.')
-    } catch (downloadError) {
-      setMessage(archiveErrorMessage(downloadError, 'Archive export cannot be downloaded right now.'))
-    } finally {
-      setIsExporting(false)
-    }
+  function selectEvent(record) {
+    const nextEvent = { id: String(record.id), name: record.event?.title || record.event_name || record.event || 'Selected disaster event' }
+    setSelectedEvent(nextEvent)
+    sessionStorage.setItem('archive-selected-event', JSON.stringify(nextEvent))
+    setActiveCategory('field-reports')
+    setSelectedByCategory({})
+    setSelectedRecordsByCategory({})
+    setPage(1)
   }
 
   async function downloadSelectedRecord(type) {
@@ -330,11 +330,12 @@ export default function ArchivePage() {
   const isRefreshing = isLoading && Boolean(payload)
   const hasBlockingError = error && !payload
   const filters = payload?.filters || {}
-  const counts = { [activeCategory]: pagination.total || 0 }
+  const counts = selectedEvent ? eventCounts : { [activeCategory]: pagination.total || 0 }
+  const hasSelectedEvent = Boolean(selectedEvent)
 
   if (activeCategory === 'evatrack-reports') {
     return <section className="page active archive-page"><div className="archive-workspace-body">
-      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} isSuperAdmin={isSuperAdmin} />
+      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} selectedEventId={selectedEvent?.id || 'all'} selectedEventName={selectedEvent?.name || ''} />
       <EvaTrackReportsPanel />
     </div></section>
   }
@@ -342,7 +343,7 @@ export default function ArchivePage() {
   if (activeCategory === 'inquiry-logs') {
     if (!isSuperAdmin) return null
     return <section className="page active archive-page"><div className="archive-workspace-body">
-      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} isSuperAdmin={isSuperAdmin} />
+      <ArchiveTabs activeCategory={activeCategory} onChange={changeCategory} isOpen={sidebarOpen} onToggle={() => setSidebarOpen((value) => !value)} counts={counts} selectedEventId={selectedEvent?.id || 'all'} selectedEventName={selectedEvent?.name || ''} />
       <InquiryLogsView />
     </div></section>
   }
@@ -356,35 +357,11 @@ export default function ArchivePage() {
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen((value) => !value)}
           counts={counts}
-          isSuperAdmin={isSuperAdmin}
+          selectedEventId={selectedEvent?.id || 'all'}
+          eventCounts={eventCounts}
+          selectedEventName={selectedEvent?.name || ''}
         />
-        <div className="archive-workspace-main">
-          <PageHeader
-            title={categoryLabel}
-            subtitle={`${pagination.total || 0} records`}
-            actions={<ArchiveDownloadMenu disabled={isExporting || isLoading || !payload} onDownload={downloadCategory} />}
-            filters={(
-              <ArchiveFilters
-              search={search}
-              onSearchChange={(value) => { setSearch(value); setPage(1) }}
-              purok={purok}
-              onPurokChange={(value) => { setPurok(value); setPage(1) }}
-              eventId={eventId}
-              onEventChange={(value) => { setEventId(value); setPage(1) }}
-              status={status}
-              onStatusChange={(value) => { setStatus(value); setPage(1) }}
-              onReset={() => {
-                setSearch('')
-                setPurok('all')
-                setEventId('all')
-                setStatus('all')
-                setPage(1)
-              }}
-              filters={filters}
-              />
-            )}
-          />
-
+        <main className="archive-content">
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
@@ -414,6 +391,8 @@ export default function ArchivePage() {
               onToggleDate={toggleSelectedMany}
               onTogglePage={toggleSelectedMany}
               onView={viewTableRecord}
+              onSelectEvent={selectEvent}
+              selectedEventId={selectedEvent?.id || 'all'}
               onPageChange={setPage}
             />
           </RefreshOverlay>
@@ -440,7 +419,7 @@ export default function ArchivePage() {
         onClose={() => setSelectedRecord(null)}
         onDownload={downloadSelectedRecord}
       />
-        </div>
+        </main>
       </div>
     </section>
   )

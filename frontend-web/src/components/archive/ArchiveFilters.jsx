@@ -11,6 +11,7 @@ export default function ArchiveFilters({
   onStatusChange,
   onReset,
   filters = {},
+  lockEvent = false,
 }) {
   return (
     <DataFilterBar
@@ -25,6 +26,7 @@ export default function ArchiveFilters({
         },
         {
           id: 'event', label: 'Event', value: eventId, onChange: onEventChange,
+          disabled: lockEvent,
           options: [{ value: 'all', label: 'All events' }, ...(filters.events || []).map((item) => ({ value: item.event_id, label: item.label || item.name }))],
         },
         {

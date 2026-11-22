@@ -13,6 +13,7 @@ class ArchiveDeletionWorkflow
     private const DELETE_MAP = [
         'disaster-events' => ['table' => 'disaster_events', 'key' => 'event_id'],
         'household-status-logs' => ['table' => 'household_status_logs', 'key' => 'status_log_id'],
+        'field-reports' => ['table' => 'household_status_logs', 'key' => 'status_log_id'],
         'dispatch-logs' => ['table' => 'responder_assignments', 'key' => 'assignment_id'],
         'radio-communication-logs' => ['table' => 'responder_communication_logs', 'key' => 'communication_id'],
         'resource-requests' => ['table' => 'resource_requests', 'key' => 'request_id'],

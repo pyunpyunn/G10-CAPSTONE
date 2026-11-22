@@ -6,8 +6,22 @@ import { operationsApi } from '../src/state/operationsApi.js'
 globalThis.window = { location: { hostname: 'localhost' }, addEventListener() {}, removeEventListener() {}, dispatchEvent() {} }
 globalThis.localStorage = { getItem: () => null }
 const { default: api } = await import('../src/api/client.js')
+const { getArchiveCategoryCounts } = await import('../src/api/archiveApi.js')
 const wait = () => new Promise(resolve => setTimeout(resolve, 15))
 test.afterEach(() => resetApiState())
+
+test('archive category badges use each selected event category total', async () => {
+  const calls = []
+  api.defaults.adapter = async config => {
+    calls.push({ url: config.url, params: config.params })
+    return { config, status: 200, headers: {}, data: { data: { records: { total: config.url.endsWith('/field-reports') ? 6 : 2 } } } }
+  }
+  const counts = await getArchiveCategoryCounts('EVT-SELECTED')
+  assert.equal(counts['field-reports'], 6)
+  assert.equal(Object.keys(counts).length, 7)
+  assert.ok(calls.every(call => call.params.event_id === 'EVT-SELECTED' && call.params.per_page === 1))
+})
+
 
 test('resource writes invalidate subscribed request and archive queries', async () => {
   const calls = new Map()

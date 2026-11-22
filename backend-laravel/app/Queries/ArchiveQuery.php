@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class ArchiveQuery
 {
-    private const CATEGORIES = ['disaster-events' => 'Disaster Event', 'household-status-logs' => 'Household Status Logs', 'dispatch-logs' => 'Rescue Dispatch Logs', 'radio-communication-logs' => 'Radio Communication Logs', 'resource-requests' => 'Resources & Requests', 'situation-reports' => 'Situation Reporting'];
+    private const CATEGORIES = ['disaster-events' => 'Disaster Event', 'field-reports' => 'Field Reports', 'household-status-logs' => 'Household Status Logs', 'dispatch-logs' => 'Rescue Dispatch Logs', 'radio-communication-logs' => 'Radio Communication Logs', 'resource-requests' => 'Resources & Requests', 'situation-reports' => 'Situation Reporting'];
 
     public function __construct(private ArchivePresenter $presenter, private ArchiveEventPresenter $eventPresenter) {}
 
@@ -21,6 +21,7 @@ class ArchiveQuery
     {
         return match ($category) {
             'household-status-logs' => $this->householdStatusRows($request, $perPage, $asQuery),
+            'field-reports' => $this->fieldReportRows($request, $perPage, $asQuery),
             'dispatch-logs' => $this->dispatchRows($request, $perPage, $asQuery),
             'radio-communication-logs' => $this->radioCommunicationRows($request, $perPage, $asQuery),
             'resource-requests' => $this->resourceRequestRows($request, $perPage, $asQuery),
@@ -34,7 +35,7 @@ class ArchiveQuery
         $query = $this->categoryRows($category, $request, 1000, true);
         $query->select($this->exportSelectColumns($category));
         $column = match ($category) {
-            'household-status-logs' => 'hsl.status_log_id',
+            'household-status-logs', 'field-reports' => 'hsl.status_log_id',
             'dispatch-logs' => 'ra.assignment_id',
             'radio-communication-logs' => 'rcl.communication_id',
             'resource-requests' => 'rr.request_id',
@@ -43,7 +44,7 @@ class ArchiveQuery
         };
         if ($request->filled('ids')) $query->whereIn($column, $request->query('ids'));
         $dateColumn = match ($category) {
-            'household-status-logs' => 'hsl.submitted_at', 'dispatch-logs' => 'ra.assigned_at',
+            'household-status-logs', 'field-reports' => 'hsl.submitted_at', 'dispatch-logs' => 'ra.assigned_at',
             'radio-communication-logs' => 'rcl.timestamp', 'resource-requests' => 'rr.created_at',
             'situation-reports' => 'sr.generated_at', default => 'de.started_at',
         };
@@ -66,7 +67,7 @@ class ArchiveQuery
             ? $source->chunk(500)->flatMap(fn ($chunk) => $this->eventPresenter->presentBatch($chunk))
             : $source->map(function (object $row) use ($category): array {
                 return match ($category) {
-                    'household-status-logs' => $this->presenter->formatHouseholdStatus($row),
+                    'household-status-logs', 'field-reports' => $this->presenter->formatHouseholdStatus($row),
                     'dispatch-logs' => $this->presenter->formatDispatch($row),
                     'radio-communication-logs' => $this->presenter->formatRadioCommunication($row),
                     'resource-requests' => $this->presenter->formatResourceRequest($row),
@@ -80,7 +81,7 @@ class ArchiveQuery
     private function exportSelectColumns(string $category): array
     {
         return match ($category) {
-            'household-status-logs' => [
+            'household-status-logs', 'field-reports' => [
                 'hsl.status_log_id', 'hsl.disaster_id', 'hsl.location_label', 'hsl.location_accuracy_m',
                 'hsl.source', 'hsl.notes', 'hsl.submitted_at', 'hsl.battery_level', 'hsl.latitude', 'hsl.longitude',
                 'de.name as event_name', 'de.ended_at as event_ended_at', 'h.household_code', 'h.household_name',
@@ -126,26 +127,7 @@ class ArchiveQuery
 
     private function householdStatusRows(Request $request, int $perPage, bool $asQuery = false): mixed
     {
-        $query = DB::table('household_status_logs as hsl')
-            ->leftJoin('disaster_events as de', 'de.event_id', '=', 'hsl.disaster_id')
-            ->leftJoin('households as h', 'h.household_id', '=', 'hsl.household_id')
-            ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
-            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
-            ->leftJoin('responders as r', 'r.responder_id', '=', 'hsl.responder_id')
-            ->leftJoin('users as u', 'u.user_id', '=', 'hsl.submitted_by_user_id')
-            ->select([
-                'hsl.*',
-                'de.name as event_name',
-                'de.started_at as event_started_at',
-                'de.ended_at as event_ended_at',
-                'h.household_code',
-                'h.household_name',
-                'a.purok_sitio',
-                'hs.status_key',
-                'hs.status_label',
-                'r.full_name as responder_name',
-                DB::raw("COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.name, u.username) as submitter_name"),
-            ]);
+        $query = $this->householdStatusQuery();
         $this->applySearch($query, $request, ['hsl.status_log_id', 'de.name', 'h.household_code', 'h.household_name', 'hsl.location_label', 'hsl.notes', 'hsl.source', 'hs.status_label', 'r.full_name', 'u.name']);
         $this->applyEventFilter($query, $request, 'hsl.disaster_id');
         $this->applyPurokFilter($query, $request, 'a.purok_sitio');
@@ -154,6 +136,32 @@ class ArchiveQuery
         if ($asQuery) return $query;
         $paginator = $query->orderByDesc('hsl.submitted_at')->orderByDesc('hsl.status_log_id')->paginate($this->perPage($request, $perPage));
         return [$paginator, collect($paginator->items())->map(fn (object $row): array => $this->presenter->formatHouseholdStatus($row))->values()->all()];
+    }
+
+    private function fieldReportRows(Request $request, int $perPage, bool $asQuery = false): mixed
+    {
+        $query = $this->householdStatusQuery()
+            ->where('hsl.notes', 'like', '%"report_type":"rescuer_field_report"%');
+        $this->applySearch($query, $request, ['hsl.status_log_id', 'de.name', 'h.household_code', 'h.household_name', 'hsl.location_label', 'hsl.notes', 'hsl.source', 'hs.status_label', 'r.full_name', 'u.name']);
+        $this->applyEventFilter($query, $request, 'hsl.disaster_id');
+        $this->applyPurokFilter($query, $request, 'a.purok_sitio');
+        $this->applyHouseholdStatusFilter($query, $request);
+        if (!$request->filled('ids')) $this->excludeSavedGroupRecords($query, 'field-reports', 'hsl.status_log_id');
+        if ($asQuery) return $query;
+        $paginator = $query->orderByDesc('hsl.submitted_at')->orderByDesc('hsl.status_log_id')->paginate($this->perPage($request, $perPage));
+        return [$paginator, collect($paginator->items())->map(fn (object $row): array => $this->presenter->formatHouseholdStatus($row))->values()->all()];
+    }
+
+    private function householdStatusQuery(): object
+    {
+        return DB::table('household_status_logs as hsl')
+            ->leftJoin('disaster_events as de', 'de.event_id', '=', 'hsl.disaster_id')
+            ->leftJoin('households as h', 'h.household_id', '=', 'hsl.household_id')
+            ->leftJoin('addresses as a', 'a.address_id', '=', 'h.address_id')
+            ->leftJoin('household_statuses as hs', 'hs.status_id', '=', 'hsl.status_id')
+            ->leftJoin('responders as r', 'r.responder_id', '=', 'hsl.responder_id')
+            ->leftJoin('users as u', 'u.user_id', '=', 'hsl.submitted_by_user_id')
+            ->select(['hsl.*', 'de.name as event_name', 'de.started_at as event_started_at', 'de.ended_at as event_ended_at', 'h.household_code', 'h.household_name', 'a.purok_sitio', 'hs.status_key', 'hs.status_label', 'r.full_name as responder_name', DB::raw("COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.name, u.username) as submitter_name")]);
     }
 
     private function dispatchRows(Request $request, int $perPage, bool $asQuery = false): mixed

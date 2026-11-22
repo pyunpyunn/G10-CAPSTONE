@@ -1,6 +1,7 @@
 export const ARCHIVE_TABS = [
-  { key: 'household-status-logs', label: 'Household Status Logs' },
   { key: 'disaster-events', label: 'Disaster Event Logs' },
+  { key: 'field-reports', label: 'Field Reports' },
+  { key: 'household-status-logs', label: 'Household Status Logs' },
   { key: 'dispatch-logs', label: 'Rescue Dispatch Logs' },
   { key: 'radio-communication-logs', label: 'Radio Logs' },
   { key: 'resource-requests', label: 'Resources & Requests' },
@@ -15,6 +16,10 @@ export const ARCHIVE_TABLE_COPY = {
   'household-status-logs': {
     title: 'Household status logs',
     subtitle: 'Geotagged status reports by date, household, and source',
+  },
+  'field-reports': {
+    title: 'Field report archive',
+    subtitle: 'Responder assessments, casualties, and member status reports',
   },
   'dispatch-logs': {
     title: 'Rescue dispatch status logs',
@@ -51,6 +56,14 @@ export const ARCHIVE_COLUMNS = {
     { key: 'status_change', label: 'Status change' },
     { key: 'source', label: 'Source / remarks' },
   ],
+  'field-reports': [
+    { key: 'datetime', label: 'Date / time' },
+    { key: 'event', label: 'Event' },
+    { key: 'household', label: 'Household / geotag' },
+    { key: 'purok', label: 'Purok' },
+    { key: 'status_change', label: 'Assessment' },
+    { key: 'source', label: 'Reporter' },
+  ],
   'dispatch-logs': [
     { key: 'datetime', label: 'Date / time' },
     { key: 'event', label: 'Event' },
@@ -85,14 +98,14 @@ export const ARCHIVE_COLUMNS = {
   ],
 }
 
-export function archiveParams({ search, purok, eventId, status, page = 1 }) {
+export function archiveParams({ search, purok, eventId, status, page = 1, per_page = 6 }) {
   return {
     search: search.trim(),
     purok,
     event_id: eventId,
     status,
     page,
-    per_page: 6,
+    per_page,
   }
 }
 

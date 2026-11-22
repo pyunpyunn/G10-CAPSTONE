@@ -696,6 +696,7 @@
   top: 0;
   display: flex;
   width: 208px;
+  height: calc(100vh - var(--header-height));
   min-height: calc(100vh - var(--header-height));
   flex: 0 0 208px;
   align-self: stretch;
@@ -806,11 +807,22 @@
   opacity: 0.75;
 }
 
-.archive-workspace-main {
+.archive-content {
   min-width: 0;
   flex: 1 1 auto;
   padding: 16px 20px;
 }
+
+.archive-tab:disabled{opacity:.5;cursor:not-allowed}
+.archive-selected-event{display:grid;gap:6px;margin:12px 10px;padding:10px;background:#e8edf2;border:1px solid var(--ln);border-radius:8px;font-size:11px}
+.archive-selected-event span{color:#66778a}
+.archive-selected-event strong{overflow-wrap:anywhere;color:#102033}
+.archive-selected-event{position:sticky;top:auto;margin-top:auto;margin-bottom:12px}
+.archive-selected-event button{width:100%;padding:8px 10px;border:1px solid #12648f;border-radius:6px;background:#12648f;color:#fff;text-align:center;font-weight:700;cursor:pointer;transition:background-color .15s ease,box-shadow .15s ease}
+.archive-selected-event button:hover,.archive-selected-event button:focus-visible{background:#0d4f72;box-shadow:0 0 0 3px rgba(18,100,143,.18);outline:none}
+.archive-recording-compact{display:flex;align-items:center;gap:7px;max-width:260px}
+.archive-recording-compact audio{display:block;width:190px;height:30px}
+.archive-recording-compact small{font-size:10px;white-space:nowrap}
 
 .archive-section-head {
   display: flex;
@@ -967,7 +979,7 @@
     margin-left: auto;
   }
 
-  .archive-workspace-main {
+  .archive-content {
     padding: 12px 10px;
   }
 

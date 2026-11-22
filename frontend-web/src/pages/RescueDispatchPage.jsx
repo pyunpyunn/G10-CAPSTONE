@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useWorkspaceQuery } from '../state/operationsApi'
 import DispatchSidePanel from '../components/dispatch/DispatchSidePanel'
-import FieldCommunicationPanel from '../components/dispatch/FieldCommunicationPanel'
+import { FieldCommunicationPanel } from '../components/dispatch/FieldCommunicationPanel'
 import { ResponseOperationsLayout } from '../components/ui/PageHeader'
 
 export default function RescueDispatchPage() {
@@ -15,7 +15,6 @@ export default function RescueDispatchPage() {
     {error && <div className="form-error" role="alert">{error}<button className="bt" type="button" onClick={refetch}>Retry</button></div>}
     {loading && <div className="empty-reference" role="status">Loading communications...</div>}
     {!loading && data && <>
-      {!data.active_event && <div className="nb">No active event · dispatch disabled</div>}
       <div className="dispatch-communication-only"><FieldCommunicationPanel compact recordingsOnly /></div>
       <DispatchSidePanel lazy />
     </>}

@@ -280,6 +280,21 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $this->assertSame('unlinked', $data['assignment_status']['key']);
     }
 
+    public function test_admin_field_report_page_only_returns_reports_for_the_active_disaster(): void
+    {
+        app(RescuerFieldReportWorkflow::class)->store($this->request($this->validPayload()));
+        $request = Request::create('/api/v1/field-reports', 'GET', ['event_id' => 'EVT-OTHER']);
+        $active = app(RescuerFieldReportWorkflow::class)->fieldReportsAdmin($request);
+        $this->assertSame(1, $active['reports_meta']['total']);
+        $this->assertSame('EVT-1', (string) $active['active_event']->event_id);
+
+        DB::table('disaster_events')->where('event_id', 'EVT-1')->update(['ended_at' => now()]);
+        $closed = app(RescuerFieldReportWorkflow::class)->fieldReportsAdmin($request);
+        $this->assertNull($closed['active_event']);
+        $this->assertSame(0, $closed['reports_meta']['total']);
+        $this->assertCount(0, $closed['reports']);
+    }
+
     public function test_assignment_report_rejects_incomplete_or_foreign_member_assessments(): void
     {
         $payload = $this->validPayload();

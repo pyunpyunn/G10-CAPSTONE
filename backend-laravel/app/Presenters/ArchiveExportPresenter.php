@@ -8,6 +8,7 @@ class ArchiveExportPresenter
     {
         return match ($category) {
             'household-status-logs' => ['datetime' => 'Date / time', 'event' => 'Event', 'reference' => 'Reference', 'household' => 'Household', 'purok' => 'Purok', 'status' => 'Status', 'source' => 'Source'],
+            'field-reports' => ['datetime' => 'Date / time', 'event' => 'Event', 'reference' => 'Reference', 'household' => 'Household', 'purok' => 'Purok', 'status' => 'Assessment', 'source' => 'Reporter'],
             'dispatch-logs' => ['datetime' => 'Date / time', 'event' => 'Event', 'reference' => 'Reference', 'team_route' => 'Team / route', 'purok' => 'Purok', 'status' => 'Status', 'outcome' => 'Outcome'],
             'radio-communication-logs' => ['datetime' => 'Date / time', 'event' => 'Event', 'reference' => 'Reference', 'team_responder' => 'Team / responder', 'channel' => 'Channel', 'transmission' => 'Transmission', 'status' => 'Status'],
             'resource-requests' => ['datetime' => 'Date / time', 'event' => 'Event', 'reference' => 'Reference', 'request' => 'Request', 'purok_site' => 'Purok / site', 'status' => 'Status', 'handoff' => 'Handoff'],

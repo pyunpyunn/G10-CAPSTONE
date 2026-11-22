@@ -62,21 +62,22 @@ function AssignmentEditor({ workspace, groups, detail, initialSitio, initialHous
       : members.map(() => eligible)
     return [card.id, Object.fromEntries(members.map((member, index) => [member.responder_id, (split[index] || eligible).map((h) => h.household_id)]))]
   })), [cards, plans])
-  const selected = cards.filter((card) => selections[card.id]?.[0] && selections[card.id]?.[1])
+  const selected = cards.filter((card) => selections[card.id]?.some(Boolean))
   const closed = ['completed', 'cancelled'].includes(dispatch?.status?.key)
-  const canDispatch = Boolean(workspace?.active_event && allowAssignment && selected.length && selected.every((card) => plans[card.id]?.length === 2 && card.households?.some((household) => household.is_available_for_dispatch)))
+  const canDispatch = Boolean(workspace?.active_event && allowAssignment && selected.length && selected.every((card) => plans[card.id]?.length > 0 && card.households?.some((household) => household.is_available_for_dispatch)))
   function autoAssign() {
     const teams = (workspace.teams || []).filter((team) => (workspace.responders || []).some((member) => member.is_available && !member.active_assignment_id && String(member.team_id) === String(team.team_id)))
     const chosenTeam = teamId || String(shuffleDispatchItems(teams)[0]?.team_id || '')
     if (!chosenTeam) { setError('No team has available rescuers.'); return }
     const available = shuffleDispatchItems((workspace.responders || []).filter((member) => member.is_available && !member.active_assignment_id && String(member.team_id) === chosenTeam))
+    if (!available.length) { setError('No available rescuers remain in the selected team.'); return }
     const next = {}
     const eligibleCards = cards.filter((card) => card.households?.some((household) => household.is_available_for_dispatch))
-    for (const card of shuffleDispatchItems(eligibleCards)) {
-      if (available.length >= 2) {
-        next[card.id] = [String(available.shift().responder_id), String(available.shift().responder_id)]
-      }
-    }
+    if (!eligibleCards.length) { setError('No uncovered households are currently available for dispatch in this sitio.'); return }
+    available.forEach((member, index) => {
+      const cardId = eligibleCards[index % eligibleCards.length].id
+      next[cardId] = [...(next[cardId] || []), String(member.responder_id)]
+    })
     setTeamId(chosenTeam)
     setSelections(next)
     setError('')
@@ -115,7 +116,7 @@ function AssignmentEditor({ workspace, groups, detail, initialSitio, initialHous
   return <div className="md" role="dialog" aria-modal="true" aria-label={dispatch ? 'Update Dispatch Assignment' : 'New Dispatch'}>
     <div className="mh2"><h3>{dispatch?.assignment_code || 'New Dispatch'}</h3>{dispatch && <div className="ln"><span>Area <b>{dispatch.assigned_area}</b></span><span>Team <b>{dispatch.team_name}</b></span><span>Households <b>{dispatch.households_to_cover}</b></span></div>}<span className="sp" /><button className="x" type="button" disabled={saving} aria-label="Close assignment editor" onClick={close}><X size={16} /></button></div>
     <form className="editor-form" onSubmit={submit}>
-      <DispatchModalForm editingDispatch={dispatch} groups={groups} group={group} coverage={coverage} sitioCoverage={workspace?.sitio_coverage || []} onAddTeam={() => { setAdditionalFor(groupId); setSelections({}); setTeamId('') }} allowAssignment={allowAssignment} onGroupChange={(id) => { setGroupId(id); setAdditionalFor(null); setTeamId(''); setSelections({}); setError('') }} selections={selections} teamId={teamId} onTeamChange={(team) => { setTeamId(team); setSelections({}); setError('') }} onMemberChange={(id, slot, member) => setSelections((current) => { const members = [...(current[id] || ['', ''])]; members[slot] = member; return { ...current, [id]: members } })} householdPlans={householdPlans} plans={plans} teams={workspace?.teams || []} responders={workspace?.responders || []} dispatches={workspace?.active_dispatches || []} coveredHouseholds={detail?.covered_households || []} form={form} setForm={setForm} error={error || (coverageMissing ? 'Rescue coverage could not be verified. Refresh before dispatching.' : initialSitio && !group ? 'The selected sitio is unavailable. Select another sitio explicitly to continue.' : '')} saving={saving} closed={closed} syncing={syncing} onSync={syncOutcomes} onAutoAssign={autoAssign} hasActiveEvent={Boolean(workspace?.active_event)} />
+      <DispatchModalForm editingDispatch={dispatch} groups={groups} group={group} coverage={coverage} sitioCoverage={workspace?.sitio_coverage || []} onAddTeam={() => { setAdditionalFor(groupId); setSelections({}); setTeamId('') }} allowAssignment={allowAssignment} onGroupChange={(id) => { setGroupId(id); setAdditionalFor(null); setTeamId(''); setSelections({}); setError('') }} selections={selections} teamId={teamId} onTeamChange={(team) => { setTeamId(team); setSelections({}); setError('') }} onMemberChange={(id, member) => setSelections((current) => { const selectedMembers = current[id] || []; const responderId = String(member); return selectedMembers.includes(responderId) ? current : { ...current, [id]:[...selectedMembers, responderId] } })} householdPlans={householdPlans} plans={plans} teams={workspace?.teams || []} responders={workspace?.responders || []} dispatches={workspace?.active_dispatches || []} coveredHouseholds={detail?.covered_households || []} form={form} setForm={setForm} error={error || (coverageMissing ? 'Rescue coverage could not be verified. Refresh before dispatching.' : initialSitio && !group ? 'The selected sitio is unavailable. Select another sitio explicitly to continue.' : '')} saving={saving} closed={closed} syncing={syncing} onSync={syncOutcomes} onAutoAssign={autoAssign} hasActiveEvent={Boolean(workspace?.active_event)} />
       <div className="mf">{!dispatch && <span className="mu" style={{ marginRight: 'auto', alignSelf: 'center' }}>{selected.length} puroks · {selected.reduce((sum, card) => sum + (plans[card.id]?.length || 0), 0)} rescuers · {selected.reduce((sum, card) => sum + (card.households || []).filter((household) => household.is_available_for_dispatch).length, 0)} HH</span>}<button className="bt" type="button" disabled={saving} onClick={close}>Cancel</button><button className="bt p" type="submit" disabled={saving || closed || (!dispatch && !canDispatch)}>{saving ? 'Saving…' : dispatch ? 'Save update' : coverage?.is_assigned ? 'Dispatch additional team' : 'Dispatch responders'}<i><ArrowRight size={15} /></i></button></div>
     </form>
   </div>

@@ -40,6 +40,7 @@ class ArchiveEventPresenter
             'status' => ['label' => $row->ended_at ? 'Closed' : 'Active', 'tone' => $row->ended_at ? 'gray' : ($isCritical ? 'red' : 'blue')],
         ];
         $record['details'] = $this->presenter->details(['Event' => $record['event']['title'], 'Event ID' => $row->event_id, 'Disaster / weather' => $record['disaster']['title'], 'Declared / finished' => $record['period']['title'], 'Broadcast logs' => $record['broadcasts']['title'].' - '.$record['broadcasts']['meta'], 'Household scope' => $record['scope']['title'].' - '.$record['scope']['meta'], 'Status' => $record['status']['label']]);
+        $record['category_counts'] = $details['category_counts'] ?? [];
         $record['export'] = ['event' => $row->name, 'reference' => $row->event_id, 'type_weather' => $record['disaster']['title'], 'period' => $record['period']['title'], 'broadcasts' => $record['broadcasts']['title'], 'scope' => $record['scope']['title'], 'status' => $record['status']['label']];
         return $record;
     }

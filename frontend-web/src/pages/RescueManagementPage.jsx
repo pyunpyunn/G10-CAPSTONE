@@ -20,7 +20,6 @@ export default function RescueManagementPage() {
 
   return <ResponseOperationsLayout active={1}><section className="pg on">
     <div className="hd"><span className={`ev${data?.active_event ? '' : ' off'}`}><i />{data?.active_event?.name || 'No active event'}</span><span className="sp" /><button className="bt p pl2" type="button" disabled={loading || !data?.active_event} onClick={() => navigate('/rescue-management/new')}>New Dispatch<i><Plus size={15} /></i></button></div>
-    {!loading && !error && !data?.active_event && <div className="nb">No active event · dispatch disabled</div>}
     <div className="fb">
       <div className="ft">
         {[

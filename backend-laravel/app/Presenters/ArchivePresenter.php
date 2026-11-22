@@ -97,7 +97,12 @@ class ArchivePresenter
         $detailFields['Battery level'] = $row->battery_level !== null ? $row->battery_level.'%' : 'Not recorded';
         $detailFields['Coordinates'] = $row->latitude && $row->longitude ? $row->latitude.', '.$row->longitude : 'Not recorded';
         $record['details'] = $this->details($detailFields);
-        $record['details'] = array_merge($record['details'], $this->fieldReportDetails($fieldReport));
+        $record['details'] = $fieldReport !== null
+            ? array_merge($record['details'], $this->fieldReportDetails($fieldReport))
+            : $record['details'];
+        if ($fieldReport !== null) {
+            $record['status_change']['label'] = 'Field assessment - '.$record['status_change']['label'];
+        }
         $record['export'] = [
             'datetime' => $record['datetime'],
             'event' => $record['event'],

@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ArchiveExportWorkflow
 {
-    private const CATEGORIES = ['disaster-events', 'household-status-logs', 'dispatch-logs', 'radio-communication-logs', 'resource-requests', 'situation-reports'];
+    private const CATEGORIES = ['disaster-events', 'field-reports', 'household-status-logs', 'dispatch-logs', 'radio-communication-logs', 'resource-requests', 'situation-reports'];
 
     public function __construct(private ArchiveQuery $query, private ArchiveExportPresenter $presenter) {}
 

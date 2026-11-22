@@ -180,6 +180,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/disaster-events/{eventId}/situation-summary', [SituationReportController::class, 'eventSummary']);
             Route::get('/archive/disaster-events', [ArchiveController::class, 'disasterEvents']);
             Route::get('/archive/household-status-logs', [ArchiveController::class, 'householdStatusLogs']);
+            Route::get('/archive/field-reports', [ArchiveController::class, 'fieldReports']);
             Route::get('/archive/dispatch-logs', [ArchiveController::class, 'dispatchLogs']);
             Route::get('/archive/radio-communication-logs', [ArchiveController::class, 'radioCommunicationLogs']);
             Route::get('/archive/resource-requests', [ArchiveController::class, 'resourceRequests']);

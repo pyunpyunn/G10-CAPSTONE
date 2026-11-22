@@ -1,9 +1,10 @@
-import { downloadBackendReport } from './reportApi'
-import api from './client'
+import { downloadBackendReport } from './reportApi.js'
+import api from './client.js'
 
 const archiveEndpoints = {
   'disaster-events': '/archive/disaster-events',
   'household-status-logs': '/archive/household-status-logs',
+  'field-reports': '/archive/field-reports',
   'dispatch-logs': '/archive/dispatch-logs',
   'radio-communication-logs': '/archive/radio-communication-logs',
   'resource-requests': '/archive/resource-requests',
@@ -15,6 +16,15 @@ export async function getArchiveRecords(category, params = {}) {
   const response = await api.get(endpoint, { params })
 
   return response.data.data
+}
+
+export async function getArchiveCategoryCounts(eventId) {
+  const categories = Object.keys(archiveEndpoints)
+  const results = await Promise.all(categories.map(async category => {
+    const response = await api.get(archiveEndpoints[category], { params: { event_id: eventId, per_page: 1, page: 1 } })
+    return [category, Number(response.data?.data?.records?.total ?? 0)]
+  }))
+  return Object.fromEntries(results)
 }
 
 export async function getDisasterEventArchives(params = {}) {

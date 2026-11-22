@@ -141,6 +141,7 @@ export default function DataFilterBar({
                       <select
                         aria-label={filter.ariaLabel || filter.label}
                         value={filter.value}
+                        disabled={Boolean(filter.disabled)}
                         onChange={(event) => {
                           table.getColumn(filter.id)?.setFilterValue(event.target.value)
                         }}

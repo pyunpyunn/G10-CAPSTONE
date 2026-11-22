@@ -274,3 +274,49 @@
 .ro-reference .communication-page .rg{display:block}
 .ro-reference .communication-page .ri{width:100%;white-space:normal;text-align:left}
 @media(max-width:640px){.ro-reference .communication-page{grid-template-columns:1fr;grid-template-rows:auto minmax(260px,1fr)}.ro-reference .communication-page .rl{max-height:180px}.ro-reference .communication-page .cth{flex-wrap:wrap}}
+
+.ro-reference .dispatch-communication-only .communication-page .rl{background:#fff;border-right:1px solid var(--ln);padding:0 8px;gap:2px}
+.ro-reference .dispatch-communication-only .communication-page .rg{color:var(--mu);font-size:10px;letter-spacing:.06em;padding:14px 10px 6px}
+.ro-reference .dispatch-communication-only .communication-page .ri{min-height:32px;border-radius:4px;padding:0 10px;gap:8px;color:var(--tx);font-size:11px;font-weight:600}
+.ro-reference .dispatch-communication-only .communication-page .ri:hover{background:#f1f5f9}
+.ro-reference .dispatch-communication-only .communication-page .ri.on{background:#e6edf3;color:#174c72}
+.ro-reference .dispatch-communication-only .communication-page .cf{background:#fff}
+.ro-reference .dispatch-communication-only .communication-page .npb{background:#fff;color:var(--tx);border-top:1px solid var(--ln)}
+.ro-reference .dispatch-communication-only .communication-page .nt2{color:var(--mu)}
+.ro-reference .dispatch-team-select{position:relative;z-index:20;grid-column:1/-1;width:100%;max-width:420px}
+.ro-reference .dispatch-team-trigger{display:flex;width:100%;min-height:40px;align-items:center;gap:10px;border:1px solid #cbd5e1;border-radius:10px;padding:0 12px;background:#fff;text-align:left}
+.ro-reference .dispatch-team-trigger>span:first-child{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ro-reference .dispatch-team-free{flex:none;margin-left:auto;color:var(--mu);font-size:16px;font-weight:600;white-space:nowrap}
+.ro-reference .dispatch-team-options{position:absolute;top:calc(100% + 4px);left:0;z-index:30;display:flex;width:100%;max-height:280px;flex-direction:column;overflow:auto;border:1px solid #cbd5e1;border-radius:8px;background:#fff;box-shadow:0 8px 24px rgba(15,28,45,.18)}
+.ro-reference .dispatch-team-options button{display:flex;min-height:38px;align-items:center;gap:12px;border:0;border-radius:0;padding:6px 12px;background:#fff;text-align:left}
+.ro-reference .dispatch-team-options button:hover,.ro-reference .dispatch-team-options button[aria-selected=true]{background:#eaf1f8}
+.ro-reference .member-selectors-list{display:flex;flex-direction:column;gap:6px}
+.ro-reference .rescuer-picker{position:relative;width:100%;min-width:0}
+.ro-reference .rescuer-picker select{width:100%}
+.ro-reference .rescuer-picker-placeholder{position:absolute;top:50%;left:12px;transform:translateY(-50%);color:#64748b;pointer-events:none}
+.ro-reference .ro-overlay .md{font-size:18px}
+.ro-reference .ro-overlay .md .pkh b,.ro-reference .ro-overlay .md .sh3 b{font-size:20px}
+.ro-reference .ro-overlay .md .pc{font-size:15px}
+.ro-reference .ro-overlay .md .pl{font-size:15px}
+.ro-reference .ro-overlay .md .sr{font-size:16px}
+.ro-reference .ro-overlay .md .sr em{font-size:14px}
+.ro-reference .ro-overlay .md .rk{font-size:16px}
+.ro-reference .ro-overlay .md .er{font-size:16px}
+.ro-reference .ro-overlay .md .hl2{font-size:16px}
+.ro-reference .ro-overlay .md .hl2 span{font-size:15px}
+.ro-reference .ro-overlay .md .sitio-priority-list h3{font-size:16px}
+.ro-reference .ro-overlay .md .sitio-deployment-status .mu{font-size:15px}
+.ro-reference .ro-overlay .md .fl>label{font-size:16px}
+.ro-reference .ro-overlay .md .sh2 em{font-size:15px}
+.ro-reference .dispatch-communication-only .communication-page.teams-collapsed{grid-template-columns:56px minmax(0,1fr)}
+.ro-reference .dispatch-communication-only .communication-page .archive-rail-head{display:flex;height:46px;flex:none;align-items:center;justify-content:space-between;gap:8px;padding:0 4px}
+.ro-reference .dispatch-communication-only .communication-page .archive-rail-label{min-width:0;margin:0;color:var(--mu);font-size:10px;font-weight:650;text-transform:uppercase;white-space:nowrap}
+.ro-reference .dispatch-communication-only .communication-page .archive-rail-toggle{display:grid;width:36px;height:36px;flex:none;place-items:center;border:1px solid var(--ln);border-radius:8px;background:#fff;color:var(--tx)}
+.ro-reference .dispatch-communication-only .communication-page.teams-collapsed .archive-rail-head{justify-content:center}
+.ro-reference .dispatch-communication-only .communication-page.teams-collapsed .archive-rail-label{display:none}
+.ro-reference .dispatch-communication-only .communication-page.teams-collapsed .rl{align-items:center;padding:0 8px}
+.ro-reference .dispatch-communication-only .communication-page.teams-collapsed .ri{justify-content:center;width:36px;height:36px;padding:0;font-size:0}
+.ro-reference .dispatch-communication-only .communication-page.teams-collapsed .ri .av{flex:none}
+.ro-reference .ro-shell:has(.dispatch-communication-only) .pg.on{margin:0!important;padding:0!important;gap:0!important}
+@media(max-width:640px){.ro-reference .dispatch-communication-only .communication-page.teams-collapsed{grid-template-columns:56px minmax(0,1fr)}}
+.page-error-detail{white-space:pre-wrap;overflow-wrap:anywhere;color:#991b1b}

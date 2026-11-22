@@ -288,11 +288,18 @@ class RescuerFieldReportWorkflow
     {
         $status = strtolower(trim((string) $request->query('status', 'all')));
         $statusId = trim((string) $request->query('status_id', ''));
-        $eventId = trim((string) $request->query('event_id', ''));
         $activeEvent = $this->support->activeEvent();
-        if ($eventId === '' && $activeEvent) $eventId = (string) ($activeEvent->event_id ?? '');
-
         $request->validate(['search' => ['nullable', 'string', 'max:255']]);
+        if (! $activeEvent) {
+            return [
+                'active_event' => null,
+                'status_options' => $this->query->assignmentStatusOptions(),
+                'summary' => ['rows' => []],
+                'reports' => collect(),
+                'reports_meta' => ['current_page' => 1, 'per_page' => \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page')), 'total' => 0, 'last_page' => 1, 'from' => null, 'to' => null],
+            ];
+        }
+        $eventId = (string) $activeEvent->event_id;
         $reports = $this->query->paginateAdmin(['status' => $status, 'status_id' => $statusId,
             'event_id' => $eventId, 'search' => $request->query('search', '')],
             \App\Http\Requests\ListRequest::clampPerPage($request->query('per_page')));

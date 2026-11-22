@@ -17,6 +17,7 @@ class Boundary extends Component {
       return <section className="page-error-boundary" role="alert">
         <h2>This page could not be displayed</h2>
         <p>An unexpected error interrupted this page. Reload it to try again.</p>
+        {import.meta.env.DEV && <pre className="page-error-detail">{this.state.error?.message}</pre>}
         <button type="button" onClick={() => window.location.reload()}>Reload page</button>
       </section>
     }

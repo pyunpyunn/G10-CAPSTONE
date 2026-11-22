@@ -33,7 +33,7 @@ class ReportGenerationService
         $data = $request->validate([...$rules,
             'sitrep_type' => 'nullable|in:flash,initial,progress,final', 'approved_by' => 'nullable|string|max:150',
             'report_type' => 'required|in:archive,situation,sitio-ranking,purok-impact,past-event-impact', 'format' => 'nullable|in:pdf,csv,xlsx,excel',
-            'category' => 'required_if:report_type,archive|in:disaster-events,household-status-logs,dispatch-logs,radio-communication-logs,resource-requests,situation-reports',
+            'category' => 'required_if:report_type,archive|in:disaster-events,field-reports,household-status-logs,dispatch-logs,radio-communication-logs,resource-requests,situation-reports',
             'ranking_types' => 'required_if:report_type,sitio-ranking|array|min:1|max:2',
             'ranking_types.*' => 'distinct|in:status,priority',
             'period' => 'required_if:report_type,past-event-impact|in:weekly,monthly,yearly',

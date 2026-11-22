@@ -1,4 +1,4 @@
-import api from './client'
+import api from './client.js'
 
 export async function downloadBackendReport(payload) {
   const timeout = ['situation', 'sitio-ranking', 'purok-impact', 'past-event-impact'].includes(payload.report_type)

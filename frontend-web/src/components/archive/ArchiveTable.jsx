@@ -1,4 +1,4 @@
-import { Eye } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { Fragment } from 'react'
 import { ARCHIVE_COLUMNS, ARCHIVE_TABLE_COPY, archiveDateLabel } from '../../utils/archiveHelpers'
 import Badge from '../ui/Badge'
@@ -14,6 +14,8 @@ export default function ArchiveTable({
   onToggleDate,
   onTogglePage,
   onView,
+  selectedEventId = 'all',
+  onSelectEvent,
   onPageChange,
 }) {
   const columns = ARCHIVE_COLUMNS[category] || ARCHIVE_COLUMNS['disaster-events']
@@ -51,7 +53,7 @@ export default function ArchiveTable({
               {columns.map((column) => (
                 <th key={column.key}>{column.label}</th>
               ))}
-              <th>Action</th>
+              <th>{category === 'disaster-events' ? 'Action' : 'Action'}</th>
             </tr>
           </thead>
           <tbody>
@@ -109,9 +111,8 @@ export default function ArchiveTable({
                         </td>
                       ))}
                       <td>
-                        <button className="btn btn-secondary btn-sm archive-view-button" type="button" onClick={() => onView(record)}>
-                          <Eye size={14} />
-                          View
+                        <button className="btn btn-secondary btn-sm archive-view-button" type="button" onClick={() => category === 'disaster-events' ? onSelectEvent(record) : onView(record)}>
+                          {category === 'disaster-events' ? <><Check size={14} />Select</> : 'View'}
                         </button>
                       </td>
                     </tr>

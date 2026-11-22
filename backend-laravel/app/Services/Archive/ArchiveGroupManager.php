@@ -13,7 +13,7 @@ use Illuminate\Validation\Rule;
 
 class ArchiveGroupManager
 {
-    private const CATEGORIES = ['disaster-events', 'household-status-logs', 'dispatch-logs', 'radio-communication-logs', 'resource-requests', 'situation-reports'];
+    private const CATEGORIES = ['disaster-events', 'field-reports', 'household-status-logs', 'dispatch-logs', 'radio-communication-logs', 'resource-requests', 'situation-reports'];
 
     public function __construct(private ArchivePresenter $presenter, private OperationalSequence $sequence, private ArchiveGroupPayload $payload) {}
 

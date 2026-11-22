@@ -25,7 +25,7 @@ class ExternalReportController extends Controller
             'all_sitios_value' => 'all',
             'api_version' => '4.0',
             'formats' => ['pdf', 'csv', 'xlsx'],
-            'archive_categories' => ['disaster-events', 'household-status-logs', 'dispatch-logs', 'radio-communication-logs', 'resource-requests', 'situation-reports'],
+            'archive_categories' => ['disaster-events', 'field-reports', 'household-status-logs', 'dispatch-logs', 'radio-communication-logs', 'resource-requests', 'situation-reports'],
             'expires_in_minutes' => (int) config('reports.expires_minutes', 30),
         ])->header('Cache-Control', 'no-store');
     }

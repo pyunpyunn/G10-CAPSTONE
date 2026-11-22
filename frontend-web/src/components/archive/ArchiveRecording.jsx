@@ -8,7 +8,7 @@ export default function ArchiveRecording({ recording, recordId }) {
     ? new URL(recording.url, new URL(api.defaults.baseURL, window.location.href)).href
     : null
 
-  return <div className="archive-recording">
+  return <div className="archive-recording archive-recording-compact">
     {url && !failed
       ? <audio key={url} controls preload="none" src={url} aria-label={`Recording for communication ${recordId}`} onError={() => setFailed(true)} />
       : <span role={failed ? 'status' : undefined}>{failed ? 'This recording could not be loaded. Its archive details are still available.' : recording.status || 'Recording unavailable'}</span>}

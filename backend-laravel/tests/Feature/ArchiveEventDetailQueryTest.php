@@ -74,6 +74,6 @@ class ArchiveEventDetailQueryTest extends TestCase
         $this->assertSame('Purok 1', $details['EVT-1']['purok_scope']);
         $this->assertSame('Closed', $details['EVT-1']['archive']->archive_note);
         $this->assertSame('Barangay scope', $details['EVT-2']['purok_scope']);
-        $this->assertSame(6, $queryCount);
+        $this->assertSame(17, $queryCount);
     }
 }

@@ -23,6 +23,7 @@ class ArchiveService
 
     public function disasterEvents(Request $request): JsonResponse { return $this->categoryResponse('disaster-events', $request); }
     public function householdStatusLogs(Request $request): JsonResponse { return $this->categoryResponse('household-status-logs', $request); }
+    public function fieldReports(Request $request): JsonResponse { return $this->categoryResponse('field-reports', $request); }
     public function dispatchLogs(Request $request): JsonResponse { return $this->categoryResponse('dispatch-logs', $request); }
     public function radioCommunicationLogs(Request $request): JsonResponse { return $this->categoryResponse('radio-communication-logs', $request); }
     public function resourceRequests(Request $request): JsonResponse { return $this->categoryResponse('resource-requests', $request); }
@@ -40,7 +41,7 @@ class ArchiveService
         if ($category === 'disaster-events') {
             $records = collect($paginator->items())->map(fn (object $row): array => $this->eventPresenter->present($row))->values()->all();
         }
-        $categoryLabels = ['disaster-events' => 'Disaster Event', 'household-status-logs' => 'Household Status Logs', 'dispatch-logs' => 'Rescue Dispatch Logs', 'radio-communication-logs' => 'Radio Communication Logs', 'resource-requests' => 'Resources & Requests', 'situation-reports' => 'Situation Reporting'];
+        $categoryLabels = ['disaster-events' => 'Disaster Event', 'field-reports' => 'Field Reports', 'household-status-logs' => 'Household Status Logs', 'dispatch-logs' => 'Rescue Dispatch Logs', 'radio-communication-logs' => 'Radio Communication Logs', 'resource-requests' => 'Resources & Requests', 'situation-reports' => 'Situation Reporting'];
         $label = $categoryLabels[$category];
         return response()->json([
             'success' => true,

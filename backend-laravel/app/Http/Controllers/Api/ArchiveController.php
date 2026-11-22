@@ -43,6 +43,11 @@ class ArchiveController extends Controller
         return $this->service->householdStatusLogs($request);
     }
 
+    public function fieldReports(ListRequest $request): JsonResponse
+    {
+        return $this->service->fieldReports($request);
+    }
+
     public function dispatchLogs(ListRequest $request): JsonResponse
     {
         return $this->service->dispatchLogs($request);
