@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Location from 'expo-location';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
@@ -156,11 +157,14 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
     ...(selectedPoint ? [{ ...selectedPoint, label: selectedCenter?.name || 'Evacuation center', color: palette.safe }] : []),
   ];
   const mapRoutes = roadRoute ? [{ id: 'household-evacuation-route', label: 'Route to evacuation center', coordinates: roadRoute.coordinates, color: palette.safe }] : [];
-  const distanceLabel = roadRoute
-    ? `${roadRoute.distance_km} km · ${roadRoute.duration_min} min by road`
-    : routeLoading
-      ? 'Finding road route...'
-      : 'Route distance unavailable';
+  const estimatedDistanceKm = originPoint && selectedPoint
+    ? distanceBetween(originPoint, selectedPoint) * 1.3
+    : null;
+  const distanceKm = roadRoute?.distance_km ?? estimatedDistanceKm;
+  const taxiMinutes = roadRoute?.duration_min
+    ?? (distanceKm != null ? Math.max(1, Math.round((distanceKm / 20) * 60)) : null);
+  const motorcycleMinutes = distanceKm != null ? Math.max(1, Math.round((distanceKm / 24) * 60)) : null;
+  const walkingMinutes = distanceKm != null ? Math.max(1, Math.round((distanceKm / 4) * 60)) : null;
 
   return (
     <View style={styles.stack}>
@@ -202,45 +206,169 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
         ) : null}
       </View>
 
-      <View style={styles.card}>
-        <HouseholdSection title="Selected center" />
-        {selectedCenter ? (
-          <View style={styles.selectedBox}>
-            <View style={styles.centerIcon}>
-              <Ionicons name="business-outline" size={20} color={palette.navActive} />
-            </View>
-            <View style={styles.centerText}>
-              <Text style={styles.centerTitle}>{selectedCenter.name}</Text>
-              <Text style={styles.centerMeta}>{selectedCenter.address || selectedCenter.center_type}</Text>
-              <Text style={styles.distanceText}>{distanceLabel}</Text>
-            </View>
+      <View style={styles.selectedCard}>
+        <View style={styles.selectedHeader}>
+          <Text style={styles.selectedEyebrow}>SELECTED CENTER</Text>
+          <View style={styles.routeReadyBadge}>
+            <Ionicons name={roadRoute ? 'checkmark-circle' : 'time-outline'} size={15} color={roadRoute ? '#1B7A43' : palette.textSoft} />
+            <Text style={[styles.routeReadyText, !roadRoute && styles.routePendingText]}>
+              {roadRoute ? 'Route ready' : routeLoading ? 'Finding route' : 'Route unavailable'}
+            </Text>
           </View>
+        </View>
+        {selectedCenter ? (
+          <>
+            <View style={styles.selectedMain}>
+              <View style={styles.selectedTitleBlock}>
+                <Text style={styles.centerTitle}>{selectedCenter.name}</Text>
+                <Text style={styles.centerMeta}>{selectedCenter.address || 'Address unavailable'}</Text>
+              </View>
+              <Ionicons name="business-outline" size={24} color={palette.textSoft} />
+            </View>
+            <View style={styles.selectedDivider} />
+            <View style={styles.selectedMetrics}>
+              <CenterMetric
+                icon="map-marker-distance"
+                value={distanceKm == null ? '—' : `${roadRoute ? '' : '~'}${distanceKm.toFixed(2)} km`}
+                label="Distance"
+                borderRight
+                borderBottom
+              />
+              <CenterMetric
+                icon="taxi"
+                value={taxiMinutes == null ? '—' : `~${taxiMinutes} min`}
+                label="Taxi"
+                borderBottom
+              />
+              <CenterMetric
+                icon="motorbike"
+                value={motorcycleMinutes == null ? '—' : `~${motorcycleMinutes} min`}
+                label="Motorcycle"
+                borderRight
+              />
+              <CenterMetric
+                icon="walk"
+                value={walkingMinutes == null ? '—' : `~${walkingMinutes} min`}
+                label="Walk"
+              />
+            </View>
+          </>
         ) : (
           <HouseholdEmpty icon="business-outline" title="No vacant evacuation centers available" />
         )}
       </View>
 
-      <View style={styles.card}>
-        <HouseholdSection title="Vacant evacuation centers" />
-        {centers.length === 0 ? (
-          <HouseholdEmpty icon="business-outline" title="No vacant evacuation centers available" />
-        ) : (
+      {centers.length === 0 ? (
+        <HouseholdEmpty icon="business-outline" title="No vacant evacuation centers available" />
+      ) : (
+        <View style={styles.selectorWrap}>
           <RescuerSelect
             title="Select evacuation center"
-            placeholder="Select evacuation center"
+            placeholder="Vacant evacuation centers"
             options={centers.map((center) => ({
               key: String(center.evacuation_center_id),
               label: center.name || 'Evacuation center',
+              icon: centerIcon(center),
+              ...getCenterTravelMetrics(originPoint, center, String(center.evacuation_center_id) === selectedId
+                ? { distanceKm, taxiMinutes, motorcycleMinutes, walkingMinutes, hasRoadRoute: !!roadRoute }
+                : undefined),
             }))}
             value={selectedId}
             onChange={setSelectedId}
             accessibilityLabel="Choose evacuation center"
             showLabel={false}
+            highlightSelectedOption
+            triggerTone="nav"
+            triggerLabel="Vacant evacuation centers"
+            triggerVariant="trustedAction"
           />
-        )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function CenterMetric({
+  icon,
+  value,
+  label,
+  borderRight = false,
+  borderBottom = false,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  value: string;
+  label: string;
+  borderRight?: boolean;
+  borderBottom?: boolean;
+}) {
+  return (
+    <View style={styles.metric}>
+      {borderRight ? <View style={styles.metricRightDivider} /> : null}
+      {borderBottom ? <View style={styles.metricBottomDivider} /> : null}
+      <MaterialCommunityIcons name={icon} size={17} color="#1B7A43" />
+      <View style={styles.metricText}>
+        <Text style={styles.metricValue}>{value}</Text>
+        <Text style={styles.metricMeta}>{label}</Text>
       </View>
     </View>
   );
+}
+
+function centerIcon(center: any): keyof typeof MaterialCommunityIcons.glyphMap {
+  const type = `${center.center_type || ''} ${center.name || ''}`.toLowerCase();
+
+  if (type.includes('school')) return 'school';
+  if (type.includes('barangay hall')) return 'town-hall';
+  if (type.includes('gymnasium') || type.includes('covered court')) return 'home-city';
+
+  return 'domain';
+}
+
+function getCenterTravelMetrics(
+  origin: { latitude: number; longitude: number } | null,
+  center: any,
+  selectedMetrics?: {
+    distanceKm: number | null;
+    taxiMinutes: number | null;
+    motorcycleMinutes: number | null;
+    walkingMinutes: number | null;
+    hasRoadRoute: boolean;
+  },
+) {
+  if (!origin) return { travelTimes: [] };
+
+  const latitude = Number(center.latitude);
+  const longitude = Number(center.longitude);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return { travelTimes: [] };
+
+  const estimatedDistanceKm = distanceBetween(origin, { latitude, longitude }) * 1.3;
+  const distanceKm = selectedMetrics?.distanceKm ?? estimatedDistanceKm;
+  const taxiMinutes = selectedMetrics?.taxiMinutes ?? Math.max(1, Math.round((estimatedDistanceKm / 20) * 60));
+  const motorcycleMinutes = selectedMetrics?.motorcycleMinutes ?? Math.max(1, Math.round((estimatedDistanceKm / 24) * 60));
+  const walkingMinutes = selectedMetrics?.walkingMinutes ?? Math.max(1, Math.round((estimatedDistanceKm / 4) * 60));
+
+  return {
+    travelDistanceKm: distanceKm,
+    travelDistanceEstimated: selectedMetrics ? !selectedMetrics.hasRoadRoute : true,
+    travelTimes: [
+      { mode: 'taxi' as const, minutes: taxiMinutes },
+      { mode: 'motorcycle' as const, minutes: motorcycleMinutes },
+      { mode: 'walk' as const, minutes: walkingMinutes },
+    ],
+  };
+}
+
+function distanceBetween(start: { latitude: number; longitude: number }, end: { latitude: number; longitude: number }) {
+  const toRadians = (degrees: number) => degrees * (Math.PI / 180);
+  const latitudeDifference = toRadians(end.latitude - start.latitude);
+  const longitudeDifference = toRadians(end.longitude - start.longitude);
+  const value = Math.sin(latitudeDifference / 2) ** 2
+    + Math.cos(toRadians(start.latitude))
+    * Math.cos(toRadians(end.latitude))
+    * Math.sin(longitudeDifference / 2) ** 2;
+
+  return 6371 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }
 
 const styles = StyleSheet.create({
@@ -254,6 +382,110 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
     backgroundColor: palette.card,
+  },
+  selectedCard: {
+    gap: 0,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  selectedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: 14,
+  },
+  selectedEyebrow: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.55,
+  },
+  routeReadyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#E8F5E9',
+  },
+  routeReadyText: {
+    color: '#1B7A43',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  routePendingText: {
+    color: palette.textSoft,
+  },
+  selectedMain: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  selectedTitleBlock: {
+    flex: 1,
+  },
+  selectedDivider: {
+    height: 1,
+    marginVertical: 15,
+    backgroundColor: '#E2E8F0',
+  },
+  selectedMetrics: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metric: {
+    position: 'relative',
+    width: '50%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  metricRightDivider: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  metricBottomDivider: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    left: 0,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  metricText: {
+    gap: 1,
+  },
+  metricValue: {
+    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  metricMeta: {
+    color: '#64748B',
+    fontSize: 11,
+  },
+  selectorWrap: {
+    marginTop: -2,
   },
   originSwitch: {
     flexDirection: 'row',
@@ -269,41 +501,17 @@ const styles = StyleSheet.create({
   routeError: { color: palette.unsafe, fontSize: 12, fontWeight: '800' },
   retryRoute: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, paddingVertical: 6 },
   retryRouteText: { color: palette.navActive, fontSize: 12, fontWeight: '900' },
-  selectedBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: palette.secondary,
-  },
-  centerIcon: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    backgroundColor: palette.card,
-  },
-  centerText: {
-    flex: 1,
-  },
   centerTitle: {
-    color: palette.text,
-    fontSize: 15,
-    fontWeight: '900',
+    color: '#0F172A',
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: '700',
   },
   centerMeta: {
-    marginTop: 3,
-    color: palette.textSoft,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  distanceText: {
-    marginTop: 5,
-    color: palette.safe,
-    fontSize: 12,
-    fontWeight: '900',
+    marginTop: 6,
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 18,
   },
   centerRow: {
     flexDirection: 'row',

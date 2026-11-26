@@ -1,6 +1,7 @@
 import { statusColor as unifiedStatusColor } from '@/constants/statusPalette';
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState, type ReactNode } from 'react';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 
@@ -98,16 +99,32 @@ export function RescuerSelect({
   onChange,
   accessibilityLabel,
   showLabel = true,
+  highlightSelectedOption = false,
+  triggerTone = 'default',
+  triggerLabel,
+  triggerVariant = 'default',
 }: {
   title: string;
   placeholder: string;
-  options: Array<{ key: string; label: string }>;
+  options: {
+    key: string;
+    label: string;
+    icon?: keyof typeof MaterialCommunityIcons.glyphMap;
+    travelDistanceKm?: number;
+    travelDistanceEstimated?: boolean;
+    travelTimes?: { mode: 'taxi' | 'motorcycle' | 'walk'; minutes: number }[];
+  }[];
   value: string;
   onChange: (value: string) => void;
   accessibilityLabel?: string;
   showLabel?: boolean;
+  highlightSelectedOption?: boolean;
+  triggerTone?: 'default' | 'nav';
+  triggerLabel?: string;
+  triggerVariant?: 'default' | 'trustedAction';
 }) {
   const [open, setOpen] = useState(false);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const selected = options.find((option) => option.key === value)?.label || placeholder;
 
   return (
@@ -116,44 +133,116 @@ export function RescuerSelect({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel || `${title}: ${selected}`}
-        style={styles.select}
+        style={[
+          styles.select,
+          triggerTone === 'nav' && styles.selectNav,
+          triggerVariant === 'trustedAction' && styles.selectTrustedAction,
+        ]}
         onPress={() => setOpen(true)}
       >
-        <Text style={styles.selectValue} numberOfLines={2}>{selected}</Text>
-        <Ionicons name="chevron-down" size={18} color={palette.textSoft} />
+        <Text style={[styles.selectValue, triggerTone === 'nav' && styles.selectValueNav]} numberOfLines={2}>{triggerLabel || selected}</Text>
+        <Ionicons
+          name={triggerVariant === 'trustedAction' ? 'arrow-forward' : 'chevron-down'}
+          size={18}
+          color={triggerTone === 'nav' ? palette.card : palette.textSoft}
+        />
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <View style={styles.selectOverlay}>
+        <View style={[styles.selectOverlay, highlightSelectedOption && styles.selectOverlayWide]}>
           <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Close list" onPress={() => setOpen(false)} />
-          <View style={styles.selectDialog} accessibilityViewIsModal>
-            <View style={styles.selectHeader}>
-              <Text style={styles.selectTitle}>{title}</Text>
+          <View style={[styles.selectDialog, highlightSelectedOption && styles.selectDialogWide]} accessibilityViewIsModal>
+            {highlightSelectedOption ? <View style={styles.selectHandle} /> : null}
+            <View style={[styles.selectHeader, highlightSelectedOption && styles.selectHeaderWide]}>
+              <Text style={[styles.selectTitle, highlightSelectedOption && styles.selectTitleWide]}>{title}</Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Close list"
                 onPress={() => setOpen(false)}
-                style={styles.selectClose}
+                style={[styles.selectClose, highlightSelectedOption && styles.selectCloseWide]}
               >
-                <Ionicons name="close" size={22} color={palette.text} />
+                <Ionicons name="close" size={22} color={highlightSelectedOption ? palette.textSoft : palette.text} />
               </Pressable>
             </View>
-
             <FlatList
+              style={highlightSelectedOption ? styles.selectListWide : undefined}
               data={options}
               keyExtractor={(option) => option.key}
+              contentContainerStyle={highlightSelectedOption ? styles.selectListContentWide : undefined}
+              showsVerticalScrollIndicator={highlightSelectedOption}
+              scrollIndicatorInsets={highlightSelectedOption ? { top: 8, bottom: 8 } : undefined}
               renderItem={({ item }) => (
                 <Pressable
                   accessibilityRole="radio"
                   accessibilityState={{ checked: value === item.key }}
-                  style={styles.selectOption}
+                  style={[
+                    styles.selectOption,
+                    highlightSelectedOption && styles.selectOptionWide,
+                    highlightSelectedOption && value === item.key && styles.selectOptionSelected,
+                    highlightSelectedOption && hoveredKey === item.key && styles.selectOptionHovered,
+                  ]}
+                  onHoverIn={() => setHoveredKey(item.key)}
+                  onHoverOut={() => setHoveredKey(null)}
                   onPress={() => {
                     onChange(item.key);
                     setOpen(false);
                   }}
                 >
-                  <Text style={styles.selectOptionText}>{item.label}</Text>
-                  {value === item.key ? <Ionicons name="checkmark" size={20} color={palette.navActive} /> : null}
+                  {highlightSelectedOption ? (
+                    <>
+                      <View style={styles.selectOptionIcon}>
+                        <MaterialCommunityIcons name={item.icon || 'domain'} size={29} color={palette.navActive} />
+                      </View>
+                      <View style={styles.selectOptionContent}>
+                        <Text style={[
+                          styles.selectOptionText,
+                          styles.selectOptionTextWide,
+                          value === item.key && styles.selectOptionTextSelected,
+                        ]} numberOfLines={2}>{item.label}</Text>
+                        <View style={styles.selectOptionFooter}>
+                          {item.travelDistanceKm != null || item.travelTimes?.length ? (
+                            <View style={styles.selectTravelTimes}>
+                              {item.travelDistanceKm != null ? (
+                                <View style={[styles.selectTravelTime, styles.selectTravelTimeDivider]}>
+                                  <MaterialCommunityIcons name="map-marker-distance" size={13} color={palette.textSoft} />
+                                  <Text style={styles.selectTravelTimeText}>
+                                    {item.travelDistanceEstimated ? '~' : ''}{item.travelDistanceKm.toFixed(2)} km
+                                  </Text>
+                                </View>
+                              ) : null}
+                              {item.travelTimes?.map((travelTime) => (
+                                <View
+                                  key={travelTime.mode}
+                                  style={[
+                                    styles.selectTravelTime,
+                                    travelTime.mode !== 'walk' && styles.selectTravelTimeDivider,
+                                  ]}
+                                >
+                                  <MaterialCommunityIcons
+                                    name={travelModeIcons[travelTime.mode]}
+                                    size={13}
+                                    color={palette.textSoft}
+                                  />
+                                  <Text style={styles.selectTravelTimeText}>~{travelTime.minutes} min</Text>
+                                </View>
+                              ))}
+                            </View>
+                          ) : (
+                            <Text style={styles.selectTravelUnavailable}>Starting point unavailable</Text>
+                          )}
+                        </View>
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={styles.selectOptionText}>{item.label}</Text>
+                  )}
+                  {value === item.key ? (
+                    highlightSelectedOption ? (
+                      <View style={styles.selectOptionCheck}>
+                        <Ionicons name="checkmark" size={16} color={palette.card} />
+                      </View>
+                    ) : <Ionicons name="checkmark" size={20} color={palette.navActive} />
+                  ) : null}
                 </Pressable>
               )}
             />
@@ -163,6 +252,12 @@ export function RescuerSelect({
     </View>
   );
 }
+
+const travelModeIcons = {
+  taxi: 'taxi',
+  motorcycle: 'motorbike',
+  walk: 'walk',
+} as const;
 
 function toneColor(tone: string) {
   return unifiedStatusColor(tone);
@@ -306,10 +401,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     backgroundColor: '#fff',
   },
+  selectNav: {
+    minHeight: 50,
+    borderWidth: 0,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    backgroundColor: palette.nav,
+  },
+  selectTrustedAction: {
+    width: '100%',
+    minHeight: 56,
+    justifyContent: 'flex-start',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+  },
   selectValue: {
     flex: 1,
     color: palette.text,
     fontSize: 14,
+    fontWeight: '700',
+  },
+  selectValueNav: {
+    color: palette.card,
+    fontSize: 15,
     fontWeight: '700',
   },
   selectOverlay: {
@@ -324,6 +439,28 @@ const styles = StyleSheet.create({
     maxHeight: '75%',
     overflow: 'hidden',
   },
+  selectOverlayWide: {
+    paddingTop: 12,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+  },
+  selectDialogWide: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '100%',
+    alignSelf: 'center',
+    borderRadius: 22,
+    backgroundColor: palette.card,
+  },
+  selectHandle: {
+    width: 42,
+    height: 5,
+    alignSelf: 'center',
+    borderRadius: radius.pill,
+    marginTop: spacing.sm,
+    marginBottom: 4,
+    backgroundColor: palette.borderStrong,
+  },
   selectHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -332,14 +469,34 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     paddingLeft: spacing.md,
   },
+  selectHeaderWide: {
+    minHeight: 60,
+    paddingLeft: spacing.md,
+  },
   selectTitle: {
     flex: 1,
     color: palette.text,
     fontSize: 17,
     fontWeight: '800',
   },
+  selectTitleWide: {
+    color: palette.nav,
+    fontSize: 17,
+  },
   selectClose: {
     padding: 14,
+  },
+  selectCloseWide: {
+    padding: 14,
+  },
+  selectListWide: {
+    flexGrow: 0,
+    flexShrink: 1,
+    backgroundColor: palette.page,
+  },
+  selectListContentWide: {
+    paddingHorizontal: 6,
+    paddingVertical: spacing.xs,
   },
   selectOption: {
     minHeight: 48,
@@ -351,9 +508,104 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
+  selectOptionWide: {
+    minHeight: 96,
+    borderBottomWidth: 0,
+    borderRadius: radius.lg,
+    marginHorizontal: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginVertical: 3,
+    backgroundColor: palette.card,
+    shadowColor: palette.nav,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  selectOptionSelected: {
+    borderWidth: 1,
+    borderColor: palette.navActive,
+    backgroundColor: palette.secondary,
+  },
+  selectOptionHovered: {
+    backgroundColor: palette.secondary,
+  },
   selectOptionText: {
     flex: 1,
     color: palette.text,
     fontSize: 14,
+  },
+  selectOptionTextWide: {
+    color: palette.nav,
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 18,
+    textAlign: 'left',
+  },
+  selectOptionTextSelected: {
+    fontWeight: '900',
+  },
+  selectOptionIcon: {
+    width: 64,
+    height: 64,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: palette.secondary,
+    marginRight: 10,
+  },
+  selectOptionContent: {
+    flex: 1,
+    alignSelf: 'center',
+    justifyContent: 'space-between',
+    minHeight: 64,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  selectOptionFooter: {
+    alignItems: 'stretch',
+    marginTop: 7,
+    paddingTop: 2,
+  },
+  selectOptionCheck: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+    marginLeft: 8,
+    backgroundColor: palette.navActive,
+  },
+  selectTravelTimes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    columnGap: 5,
+    rowGap: 4,
+  },
+  selectTravelTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    gap: 3,
+  },
+  selectTravelTimeDivider: {
+    borderRightWidth: 1,
+    borderRightColor: palette.borderStrong,
+    marginRight: 0,
+    paddingRight: 5,
+  },
+  selectTravelTimeText: {
+    color: palette.textSoft,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  selectTravelUnavailable: {
+    marginTop: 5,
+    color: palette.textSoft,
+    fontSize: 12,
   },
 });
