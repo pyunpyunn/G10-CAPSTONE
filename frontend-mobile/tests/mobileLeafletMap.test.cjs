@@ -139,6 +139,26 @@ test('GPS zooms once, moves one marker, permits panning and recenters on demand'
   assert.equal(button.disabled, true);
 });
 
+test('household map can hide the follow control while retaining GPS location updates', () => {
+  const script = loadMapHtml()({ markers: [], routes: [], showFollowControl: false }).match(/<script>\s*([\s\S]*?)<\/script>/)[1];
+  const views = [];
+  let controls = 0, markers = 0;
+  const map = { setView(point, level) { views.push({ point, level }); return this; }, on() {} };
+  const window = { addEventListener() {} };
+  vm.runInNewContext(script, { window, L: {
+    map: () => map, tileLayer: () => ({ addTo() {} }),
+    latLngBounds: () => ({ isValid: () => false }),
+    control: () => { controls++; return { addTo() { this.onAdd(); } }; },
+    DomUtil: { create: () => ({ style: {}, setAttribute() {} }) },
+    DomEvent: { disableClickPropagation() {}, on() {} },
+    circleMarker: () => { markers++; return { addTo() { return this; }, setLatLng() {} }; },
+  } });
+  window.setGpsPosition([10.29, 123.88]);
+  assert.equal(controls, 0);
+  assert.equal(markers, 1);
+  assert.equal(views.at(-1).level, 17);
+});
+
 test('household picker fits Mambaling borders and publishes the draggable pin on release', () => {
   const html = loadMapHtml()({ markers: [], routes: [], geotagPicker: true });
   const script = html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];

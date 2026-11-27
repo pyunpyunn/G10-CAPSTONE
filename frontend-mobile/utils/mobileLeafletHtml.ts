@@ -21,6 +21,7 @@ export function mobileLeafletHtml({
   interactive = false,
   geotagPicker = false,
   geotagMode = 'drag',
+  showFollowControl = true,
 }: {
   markers: LeafletPoint[];
   routes: LeafletRoute[];
@@ -28,6 +29,7 @@ export function mobileLeafletHtml({
   interactive?: boolean;
   geotagPicker?: boolean;
   geotagMode?: 'drag' | 'center';
+  showFollowControl?: boolean;
 }) {
   const data = JSON.stringify({
     markers,
@@ -35,6 +37,7 @@ export function mobileLeafletHtml({
     interactive,
     geotagPicker,
     geotagMode,
+    showFollowControl,
     boundary: geotagPicker ? mambalingBoundary : null,
     center: center || { latitude: 10.3157, longitude: 123.8854 },
   }).replace(/</g, '\\u003c');
@@ -244,25 +247,27 @@ export function mobileLeafletHtml({
     let followGps = true;
     let initialGpsZoom = true;
     if (!data.geotagPicker) {
-      const followControl = L.control({ position: 'topright' });
       let followButton;
-      followControl.onAdd = () => {
-        const container = L.DomUtil.create('div', 'leaflet-bar');
-        followButton = L.DomUtil.create('button', '', container);
-        followButton.textContent = 'Follow GPS';
-        followButton.setAttribute('aria-label', 'Follow GPS position');
-        followButton.style.cssText = 'background:white;border:0;padding:9px;font:13px system-ui;min-height:40px';
-        followButton.disabled = true;
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(followButton, 'click', () => {
-          if (!gpsPosition) return;
-          followGps = true;
-          initialGpsZoom = true;
-          window.setGpsPosition(gpsPosition);
-        });
-        return container;
-      };
-      followControl.addTo(map);
+      if (data.showFollowControl) {
+        const followControl = L.control({ position: 'topright' });
+        followControl.onAdd = () => {
+          const container = L.DomUtil.create('div', 'leaflet-bar');
+          followButton = L.DomUtil.create('button', '', container);
+          followButton.textContent = 'Follow GPS';
+          followButton.setAttribute('aria-label', 'Follow GPS position');
+          followButton.style.cssText = 'background:white;border:0;padding:9px;font:13px system-ui;min-height:40px';
+          followButton.disabled = true;
+          L.DomEvent.disableClickPropagation(container);
+          L.DomEvent.on(followButton, 'click', () => {
+            if (!gpsPosition) return;
+            followGps = true;
+            initialGpsZoom = true;
+            window.setGpsPosition(gpsPosition);
+          });
+          return container;
+        };
+        followControl.addTo(map);
+      }
       map.on('dragstart', () => { followGps = false; if (followButton) followButton.textContent = 'Follow GPS'; });
       window.setGpsPosition = (point) => {
         if (!point) {

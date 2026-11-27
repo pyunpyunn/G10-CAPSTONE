@@ -5,7 +5,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Location from 'expo-location';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
-import { HouseholdBadge, HouseholdEmpty, HouseholdSection } from './HouseholdUI';
+import { HouseholdEmpty, HouseholdSection } from './HouseholdUI';
 import { useMapGps } from '@/hooks/useMapGps';
 import { RescuerSelect } from '@/components/rescuer/RescuerUI';
 
@@ -169,10 +169,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
   return (
     <View style={styles.stack}>
       <View style={styles.card}>
-        <HouseholdSection
-          title="Evacuation route"
-          action={<HouseholdBadge label={roadRoute ? 'Route ready' : routeLoading ? 'Finding route' : selectedCenter ? 'Select origin' : 'No vacant center'} tone={roadRoute ? 'info' : 'neutral'} />}
-        />
+        <HouseholdSection title="Evacuation route" />
 
         <View style={styles.originSwitch} accessibilityRole="radiogroup">
           <Pressable
@@ -194,7 +191,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
         </View>
 
         {active ? (
-          <MobileLeafletMap markers={mapMarkers} routes={mapRoutes} center={originPoint || selectedPoint || defaultRegion} followPosition={originMode === 'live' ? gps.position || livePoint : null} />
+          <MobileLeafletMap markers={mapMarkers} routes={mapRoutes} center={originPoint || selectedPoint || defaultRegion} followPosition={originMode === 'live' ? gps.position || livePoint : null} showFollowControl={false} />
         ) : null}
         {gps.error ? <Text style={styles.routeError}>{gps.error}</Text> : null}
         {routeError ? <Text style={styles.routeError}>{routeError}</Text> : null}
@@ -209,12 +206,6 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
       <View style={styles.selectedCard}>
         <View style={styles.selectedHeader}>
           <Text style={styles.selectedEyebrow}>SELECTED CENTER</Text>
-          <View style={styles.routeReadyBadge}>
-            <Ionicons name={roadRoute ? 'checkmark-circle' : 'time-outline'} size={15} color={roadRoute ? '#1B7A43' : palette.textSoft} />
-            <Text style={[styles.routeReadyText, !roadRoute && styles.routePendingText]}>
-              {roadRoute ? 'Route ready' : routeLoading ? 'Finding route' : 'Route unavailable'}
-            </Text>
-          </View>
         </View>
         {selectedCenter ? (
           <>
@@ -408,23 +399,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.55,
-  },
-  routeReadyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#E8F5E9',
-  },
-  routeReadyText: {
-    color: '#1B7A43',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  routePendingText: {
-    color: palette.textSoft,
   },
   selectedMain: {
     flexDirection: 'row',

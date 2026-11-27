@@ -21,6 +21,7 @@ export function MobileLeafletMap({
   selectedPoint,
   onPinMoving,
   followPosition,
+  showFollowControl = true,
 }: {
   markers: LeafletPoint[];
   routes: LeafletRoute[];
@@ -32,10 +33,11 @@ export function MobileLeafletMap({
   selectedPoint?: { latitude: number; longitude: number } | null;
   onPinMoving?: () => void;
   followPosition?: { latitude: number; longitude: number } | null;
+  showFollowControl?: boolean;
 }) {
   const webView = useRef<import('react-native-webview').WebView>(null);
   const initialMap = useRef<string | null>(null);
-  if (initialMap.current === null) initialMap.current = mobileLeafletHtml({ markers, routes, center, interactive: !!onMapPress });
+  if (initialMap.current === null) initialMap.current = mobileLeafletHtml({ markers, routes, center, interactive: !!onMapPress, showFollowControl });
   const html = geotagPicker ? mobileLeafletHtml({ markers: [], routes: [], geotagPicker: true, geotagMode }) : initialMap.current;
   const source = useMemo(() => ({ html }), [html]);
   const layerPayload = useMemo(() => JSON.stringify({ markers, routes }).replace(/</g, '\\u003c'), [markers, routes]);
