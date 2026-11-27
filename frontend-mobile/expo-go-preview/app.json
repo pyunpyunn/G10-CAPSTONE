@@ -8,6 +8,10 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "updates": {
+      "enabled": false,
+      "fallbackToCacheTimeout": 0
+    },
     "plugins": ["expo-router"],
     "experiments": {
       "typedRoutes": true

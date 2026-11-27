@@ -14,6 +14,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "jsEngine": "hermes",
+    "updates": {
+      "enabled": false,
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
