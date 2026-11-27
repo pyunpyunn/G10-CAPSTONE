@@ -17,6 +17,16 @@ export default function ResourceRequestStats({ summary = {}, period = 'week', on
       note: 'confirmed by TrackingAid',
     },
     {
+      label: 'Returned',
+      value: summary.returned ?? 0,
+      note: 'returned for info / duplicates',
+    },
+    {
+      label: 'Cancelled',
+      value: summary.cancelled ?? 0,
+      note: 'cancelled requests',
+    },
+    {
       label: 'Total requests',
       value: summary.total_requests ?? 0,
       note: `created ${periodLabel(period)}`,

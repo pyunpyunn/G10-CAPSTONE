@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useResourceRequestsQuery } from '../state/operationsApi'
 import { useNavigate } from 'react-router-dom'
 import {
+  cancelResourceRequest,
   forwardResourceRequest,
   returnResourceRequest,
   validateResourceRequest,
@@ -138,6 +139,21 @@ export default function ResourcesRequestsPage() {
     openExistingModal(request, 'return')
   }
 
+  async function handleCancelFromDrawer(request) {
+    const confirmed = window.confirm(`Are you sure you want to cancel Request #${request.request_id}?`)
+    if (!confirmed) return
+    setIsProcessing(true)
+    try {
+      await cancelResourceRequest(request.request_id, { validation_notes: 'Cancelled from Inspection Drawer' })
+      handleCloseDrawer()
+      await loadRequests(`Request #${request.request_id} successfully cancelled.`)
+    } catch (err) {
+      setError(resourceRequestErrorMessage(err, 'Unable to cancel request.'))
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   // Batch Operations Handlers
   async function handleBatchForward() {
     if (selectedIds.length === 0) return
@@ -207,7 +223,7 @@ export default function ResourcesRequestsPage() {
       {isInitialLoading && <LoadingState />}
       {error && <div className="form-error">{error}</div>}
 
-      {!hasBlockingError && (payload || isLoading) && (
+      {!isInitialLoading && !hasBlockingError && payload && (
         <>
           {message && <div className="rr-message">{message}</div>}
 
@@ -250,7 +266,9 @@ export default function ResourcesRequestsPage() {
         onClose={handleCloseDrawer}
         onValidateAndForward={handleValidateAndForwardFromDrawer}
         onReturn={handleReturnFromDrawer}
+        onCancel={handleCancelFromDrawer}
         onEdit={openEditPage}
+        canApprove={true}
         isProcessing={isProcessing}
       />
 

@@ -23,6 +23,7 @@ export default function ResourceRequestDetailDrawer({
   onClose,
   onValidateAndForward,
   onReturn,
+  onCancel,
   onEdit,
   canApprove = false,
   isProcessing = false,
@@ -354,7 +355,7 @@ export default function ResourceRequestDetailDrawer({
                       {handoffStep >= 3 ? <Send size={15} /> : <ExternalLink size={15} />}
                     </div>
                     <div className="rr-timeline-content">
-                      <div className="rr-timeline-title">TrackingAid Shared DB Forwarding</div>
+                      <div className="rr-timeline-title">TrackingAid</div>
                       <div className="rr-timeline-sub">
                         {request.handoff?.tracking_reference
                           ? `Ref: ${request.handoff.tracking_reference} (resqperation_forwarded_requests)`
@@ -407,6 +408,18 @@ export default function ResourceRequestDetailDrawer({
                   style={{ padding: '7px 14px', fontSize: '12px' }}
                 >
                   <span>Return Request</span>
+                </button>
+              )}
+              {canApprove && onCancel && (
+                <button
+                  className="button secondary"
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => onCancel(request)}
+                  style={{ padding: '7px 14px', fontSize: '12px' }}
+                >
+                  <X size={13} />
+                  <span>Cancel Request</span>
                 </button>
               )}
               {canApprove && (
@@ -477,6 +490,8 @@ function statusTone(status) {
     acknowledged: 'blue',
     approved: 'green',
     rejected: 'red',
+    returned: 'amber',
+    cancelled: 'gray',
     delivered: 'green',
   }[status] || 'gray'
 }
@@ -486,7 +501,8 @@ function validationTone(validationStatus) {
     needs_validation: 'amber',
     verified: 'blue',
     forwarded: 'green',
-    returned: 'red',
+    returned: 'amber',
+    cancelled: 'gray',
   }[validationStatus] || 'gray'
 }
 

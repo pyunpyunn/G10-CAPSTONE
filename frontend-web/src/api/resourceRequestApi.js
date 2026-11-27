@@ -35,6 +35,11 @@ export async function returnResourceRequest(requestId, payload) {
   return response.data.data
 }
 
+export async function cancelResourceRequest(requestId, payload = {}) {
+  const response = await api.post(`/resource-requests/${requestId}/cancel`, payload)
+  return response.data.data
+}
+
 export async function getResourceRequestTypes(params = {}) {
   const response = await api.get('/resource-request-types', { params })
   return response.data.data

@@ -170,6 +170,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/resource-requests/{requestId}/validate', [ResourceRequestController::class, 'validateResource']);
             Route::post('/resource-requests/{requestId}/forward', [ResourceRequestController::class, 'forward']);
             Route::post('/resource-requests/{requestId}/return', [ResourceRequestController::class, 'returnRequest']);
+            Route::post('/resource-requests/{requestId}/cancel', [ResourceRequestController::class, 'cancelRequest']);
             Route::post('/resource-requests/{requestId}/complete', [ResourceRequestController::class, 'complete']);
             Route::get('/situation-reports', [SituationReportController::class, 'index']);
             Route::post('/situation-reports', [SituationReportController::class, 'store']);

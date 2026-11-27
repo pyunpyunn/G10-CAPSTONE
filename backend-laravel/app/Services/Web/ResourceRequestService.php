@@ -246,6 +246,38 @@ class ResourceRequestService
         ]);
     }
 
+    public function cancelRequest(Request $request, string $requestId): JsonResponse
+    {
+        $resourceRequest = $this->query->find($requestId);
+
+        if (! $resourceRequest) {
+            return response()->json([
+                'message' => 'Resource request was not found.',
+            ], 404);
+        }
+
+        $currentStatus = $this->presenter->statusKey($resourceRequest->validation_status ?? 'needs_validation');
+
+        if (in_array($currentStatus, ['fulfilled', 'cancelled'], true)) {
+            return response()->json([
+                'message' => 'Completed or already cancelled requests cannot be cancelled.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'validation_notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $updated = $this->workflow->cancelRequest($request, $requestId, $resourceRequest, $validated);
+
+        return response()->json([
+            'message' => 'Resource request cancelled.',
+            'data' => [
+                'request' => $updated,
+            ],
+        ]);
+    }
+
     public function complete(Request $request, string $requestId): JsonResponse
     {
         $resourceRequest = $this->query->find($requestId);

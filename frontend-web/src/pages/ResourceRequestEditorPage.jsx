@@ -113,7 +113,7 @@ export default function ResourceRequestEditorPage() {
       } else if (mode === 'edit') {
         await updateResourceRequest(requestId, buildUpdatePayload(form))
       } else if (mode === 'validate') {
-        await validateResourceRequest(requestId, buildValidationPayload({ ...form, validation_status: 'verified' }))
+        await validateResourceRequest(requestId, buildValidationPayload({ ...form, validation_status: form.validation_status || 'verified' }))
       }
       closePage()
     } catch (saveError) {

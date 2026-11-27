@@ -67,6 +67,8 @@ export default function RequestTypesPage() {
   )
 
   const { data, error, loading, refresh } = useModuleData(loader)
+  const isInitialLoading = loading && !data
+  const hasBlockingError = Boolean(error && !data)
 
   // Extract pagination, items, summary & categories
   const cardsPagination = data?.cards || data?.inventory || {}
@@ -172,7 +174,21 @@ export default function RequestTypesPage() {
         }
       />
 
-      {/* Success Notification Banner */}
+      {isInitialLoading && <LoadingState />}
+      {hasBlockingError && (
+        <div style={{ padding: '36px 16px', textAlign: 'center' }}>
+          <div className="form-error" role="alert" style={{ maxWidth: '400px', margin: '0 auto 12px' }}>
+            {error}
+          </div>
+          <button type="button" className="btn btn-secondary" onClick={refresh}>
+            Retry Connection
+          </button>
+        </div>
+      )}
+
+      {!isInitialLoading && !hasBlockingError && (
+        <>
+          {/* Success Notification Banner */}
       {successToast && (
         <div className="ra-success" role="status">
           <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
@@ -532,6 +548,8 @@ export default function RequestTypesPage() {
                               </div>
         )}
       </section>
+      </>
+      )}
 
                     {/* Filter Drawer Overlay */}
                     <RequestTypeFilterDrawer

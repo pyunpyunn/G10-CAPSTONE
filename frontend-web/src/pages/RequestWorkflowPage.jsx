@@ -14,6 +14,7 @@ import {
   User,
 } from 'lucide-react'
 import {
+  cancelResourceRequest,
   validateResourceRequest,
   forwardResourceRequest,
 } from '../api/resourceRequestApi'
@@ -140,6 +141,8 @@ export default function RequestWorkflowPage() {
     workflow: external ? 'approval' : 'monitoring',
   }, { pollingInterval: 30000, skipPollingIfUnfocused: true })
   const error = queryError?.message || ''
+  const isInitialLoading = loading && !data
+  const hasBlockingError = Boolean(error && !data)
   // Navigate to editor/viewer
   const open = (row, mode) =>
     navigate(`/resources-requests/${row.request_id}/${mode}`, {
@@ -210,6 +213,24 @@ export default function RequestWorkflowPage() {
     open(req, 'return')
   }
 
+  const handleCancelFromDrawer = async (req) => {
+    const confirmed = window.confirm(`Are you sure you want to cancel Request #${req.request_id}?`)
+    if (!confirmed) return
+    setIsProcessing(true)
+    try {
+      await cancelResourceRequest(req.request_id, { validation_notes: 'Cancelled from Inspection Drawer' })
+      setInspectingRequest(null)
+      setSuccessToast(`Request #${req.request_id} has been cancelled.`)
+      setTimeout(() => setSuccessToast(null), 5000)
+      refresh()
+    } catch (err) {
+      console.error(err)
+      alert(err.message || 'Failed to cancel request.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   // Summary counts
   const summary = data?.summary || {}
   const rawRequests = data?.requests?.data
@@ -270,7 +291,12 @@ export default function RequestWorkflowPage() {
         subtitle={data?.active_event?.name || (external ? 'Inbound relief requests for command review' : 'Active relief fulfillment and handoff tracking')}
       />
 
-      {/* Standby strip if no active disaster event */}
+      {isInitialLoading && <LoadingState />}
+      {hasBlockingError && <div className="form-error" role="alert">{error}</div>}
+
+      {!isInitialLoading && !hasBlockingError && (
+        <>
+          {/* Standby strip if no active disaster event */}
       {!loading && !error && !data?.active_event && (
         <div className="standby-strip">
           <strong>No active disaster event</strong>
@@ -318,6 +344,24 @@ export default function RequestWorkflowPage() {
               onClick={() => { setStatus('fulfilled'); setPage(1) }}
             >
               Completed Requests
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={status === 'returned'}
+              className={status === 'returned' ? 'active' : ''}
+              onClick={() => { setStatus('returned'); setPage(1) }}
+            >
+              Returned Requests
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={status === 'cancelled'}
+              className={status === 'cancelled' ? 'active' : ''}
+              onClick={() => { setStatus('cancelled'); setPage(1) }}
+            >
+              Cancelled Requests
             </button>
           </div>
         ) : (
@@ -402,6 +446,10 @@ export default function RequestWorkflowPage() {
               ? 'Status Tracking of Requests'
               : status === 'fulfilled'
               ? 'Completed Requests'
+              : status === 'returned'
+              ? 'Returned Requests'
+              : status === 'cancelled'
+              ? 'Cancelled Requests'
               : 'Approved Request List'}
           </span>
           <span className="rr-subtle">
@@ -650,6 +698,8 @@ export default function RequestWorkflowPage() {
           <PaginationBar meta={data?.requests || {}} onPageChange={setPage} label="requests" />
         </div>
       </section>
+      </>
+      )}
 
       {/* Live Tracking & Handoff Inspection Drawer */}
       <ResourceRequestDetailDrawer
@@ -659,6 +709,7 @@ export default function RequestWorkflowPage() {
         onClose={() => setInspectingRequest(null)}
         onValidateAndForward={handleValidateAndForwardFromDrawer}
         onReturn={handleReturnFromDrawer}
+        onCancel={handleCancelFromDrawer}
         onEdit={(req) => open(req, 'view')}
         canApprove={canApprove}
         isProcessing={isProcessing}

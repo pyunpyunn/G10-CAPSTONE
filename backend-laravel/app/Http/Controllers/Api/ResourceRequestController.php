@@ -74,9 +74,62 @@ class ResourceRequestController extends Controller
                 $source = 'trackingaid_db';
             }
         } catch (\Throwable $e) {
-            // Strictly return empty data when not connected to TrackingAid
-            $source = 'database_empty';
-            $rawItems = collect();
+            // TrackingAid unreachable, fallback gracefully
+        }
+
+        // 2. Fetch / merge from local system DB (resq_local) so system items are always counted
+        $defaultConn = config('database.default');
+        try {
+            if (\Illuminate\Support\Facades\Schema::connection($defaultConn)->hasTable('items')) {
+                $localItems = \Illuminate\Support\Facades\DB::connection($defaultConn)->table('items')->whereNull('deleted_at')->get();
+                $existingSkus = $rawItems->pluck('sku')->map(fn ($s) => strtoupper((string) $s))->all();
+                $existingNames = $rawItems->pluck('name')->map(fn ($n) => strtolower(trim((string) $n)))->all();
+
+                foreach ($localItems as $item) {
+                    $itemSku = strtoupper($item->sku ?? ('SKU-' . $item->id));
+                    $itemName = strtolower(trim((string) $item->name));
+                    if (in_array($itemSku, $existingSkus, true) || in_array($itemName, $existingNames, true)) {
+                        continue;
+                    }
+
+                    $categoryRaw = trim((string) ($item->category ?? ''));
+                    $categoryCode = $categoryRaw !== '' ? $categoryRaw : 'Uncategorized';
+                    $categoryKey = strtolower($categoryCode);
+
+                    $rawItems->push([
+                        'id' => (int) $item->id,
+                        'name' => $item->name,
+                        'label' => $item->name,
+                        'category' => $categoryCode,
+                        'category_key' => $categoryKey,
+                        'category_label' => $categoryCode,
+                        'sku' => $itemSku,
+                        'unit' => $item->unit_type ?: 'units',
+                        'type' => ucfirst(strtolower($item->type ?: 'consumable')),
+                        'quantity' => 0,
+                        'is_out_of_stock' => true,
+                        'stock_status' => 'out_of_stock',
+                        'status' => 'Out of stock',
+                        'status_label' => 'Out of stock',
+                        'storage_location' => $item->storage_location ?: 'Warehouse Depot',
+                        'detail' => $item->storage_location ?: 'Warehouse Depot',
+                        'expiration_date' => $item->expiration_date ?: null,
+                        'is_new' => false,
+                        'source' => 'local_db',
+                        'created_at' => (string) ($item->created_at ?? now()),
+                    ]);
+
+                    if ($source === 'database_empty') {
+                        $source = 'local_db';
+                    }
+                }
+
+                if ($source === 'database_empty' && $rawItems->isNotEmpty()) {
+                    $source = 'local_db';
+                }
+            }
+        } catch (\Throwable $e) {
+            // Local DB fallback
         }
 
         // Apply filters
@@ -128,10 +181,16 @@ class ResourceRequestController extends Controller
             'to' => min($offset + $perPage, $total),
         ];
 
-        // Summary metrics
-        $inStockCount = $rawItems->where('is_out_of_stock', false)->count();
-        $outOfStockCount = $rawItems->where('is_out_of_stock', true)->count();
-        $totalAvailableUnits = (int) $rawItems->where('is_out_of_stock', false)->sum('quantity');
+        // Summary metrics: reflect active query filter when filtering, or entire catalog
+        $hasActiveFilter = ($categoryFilter !== '' && $categoryFilter !== 'all')
+            || ($statusFilter !== '' && $statusFilter !== 'all')
+            || ($search !== '');
+
+        $targetItems = $hasActiveFilter ? $filtered : $rawItems;
+
+        $inStockCount = $targetItems->where('is_out_of_stock', false)->count();
+        $outOfStockCount = $targetItems->where('is_out_of_stock', true)->count();
+        $totalAvailableUnits = (int) $targetItems->where('is_out_of_stock', false)->sum('quantity');
 
         // Dynamic categories with counts
         $categoriesCounts = $rawItems->groupBy('category_key');
@@ -148,10 +207,14 @@ class ResourceRequestController extends Controller
 
         return response()->json(['data' => [
             'summary' => [
-                'total_types' => $rawItems->count(),
+                'total_types' => $targetItems->count(),
                 'in_stock_count' => $inStockCount,
                 'out_of_stock_count' => $outOfStockCount,
                 'total_available_units' => $totalAvailableUnits,
+                'catalog_total_types' => $rawItems->count(),
+                'catalog_in_stock' => $rawItems->where('is_out_of_stock', false)->count(),
+                'catalog_out_of_stock' => $rawItems->where('is_out_of_stock', true)->count(),
+                'catalog_total_units' => (int) $rawItems->where('is_out_of_stock', false)->sum('quantity'),
             ],
             'categories' => $categoriesList,
             'cards' => $paginator,
@@ -287,6 +350,38 @@ class ResourceRequestController extends Controller
             }
         }
 
+        // 3. Mirror to local DB (resq_local / mysql) so the local system always reflects it
+        $localSaved = false;
+        try {
+            if (\Illuminate\Support\Facades\Schema::connection($defaultConn)->hasTable('items')) {
+                $localCols = \Illuminate\Support\Facades\Schema::connection($defaultConn)->getColumnListing('items');
+                $localRow = [
+                    'name' => trim($validated['name']),
+                    'category' => $category,
+                    'unit_type' => $validated['unit_type'] ?: 'Unit',
+                    'size_weight' => 'STD',
+                    'target_beneficiary' => 'ALL',
+                    'variant' => 'NONE',
+                    'type' => $type,
+                    'storage_location' => $validated['storage_location'] ?: 'Warehouse A',
+                    'expiration_date' => $validated['expiration_date'] ?? null,
+                    'sku' => $sku,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                if (!empty($localCols)) {
+                    $localRow = array_intersect_key($localRow, array_flip($localCols));
+                }
+                \Illuminate\Support\Facades\DB::connection($defaultConn)->table('items')->updateOrInsert(
+                    ['sku' => $sku],
+                    $localRow
+                );
+                $localSaved = true;
+            }
+        } catch (\Throwable $e) {
+            // Local mirror optional
+        }
+
         return response()->json([
             'message' => 'New request type created and added to TrackingAid catalog.',
             'item' => [
@@ -300,6 +395,7 @@ class ResourceRequestController extends Controller
             'synchronized' => [
                 'trackingaid' => $trackingSaved,
                 'shared_db' => $sharedSaved,
+                'local_db' => $localSaved,
             ],
         ], 201);
     }
@@ -374,6 +470,11 @@ class ResourceRequestController extends Controller
     public function returnRequest(Request $request, string $requestId): JsonResponse
     {
         return $this->service->returnRequest($request, $requestId);
+    }
+
+    public function cancelRequest(Request $request, string $requestId): JsonResponse
+    {
+        return $this->service->cancelRequest($request, $requestId);
     }
 
     public function complete(Request $request, string $requestId): JsonResponse

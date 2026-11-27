@@ -48,7 +48,21 @@ class ResourceRequestWriteWorkflow
             return $updated;
         }, 3);
     }
-    public function validate(Request $request,string $id,object $row,array $v):array{return DB::transaction(function()use($request,$id,$row,$v):array{$now=now();$status=$this->presenter->statusKey($v['validation_status']);$old=$this->format($row,true);ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>$status,'validation_notes'=>$v['validation_notes']??null,'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId($status) ?? $row->status_id,'updated_at'=>$now]);$this->trackingAid->syncRequestStatus($id,$status,$now);$this->query->insertValidation($id,$status,$request->user()?->user_id,$v['validation_notes']??null,$v['missing_information']??null,$v['duplicate_request_id']??null,$now);$result=$this->format($this->query->find($id),true);$this->audit($request,'validate',$id,$old,$result);return$result;}, 3);}
+    public function validate(Request $request,string $id,object $row,array $v):array{return DB::transaction(function()use($request,$id,$row,$v):array{$now=now();$status=$this->presenter->statusKey($v['validation_status']);$old=$this->format($row,true);ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>$status,'validation_notes'=>$v['validation_notes']??null,'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId($status) ?? $row->status_id,'updated_at'=>$now]);$this->trackingAid->syncRequestStatus($id,$status,$now);if($status==='cancelled'||$status==='returned'){$this->trackingAid->restoreStock($row->item_name??null,null,(int)$row->quantity,$id);}$this->query->insertValidation($id,$status,$request->user()?->user_id,$v['validation_notes']??null,$v['missing_information']??null,$v['duplicate_request_id']??null,$now);$result=$this->format($this->query->find($id),true);$this->audit($request,'validate',$id,$old,$result);return$result;}, 3);}
+    public function cancelRequest(Request $request,string $id,object $row,array $v):array{
+        return DB::transaction(function()use($request,$id,$row,$v):array{
+            $now=now();
+            $old=$this->format($row,true);
+            $notes=$v['validation_notes']??'Request cancelled by HQ.';
+            ResourceRequest::query()->where('request_id',$id)->update(['validation_status'=>'cancelled','validation_notes'=>$notes,'validated_by_user_id'=>$request->user()?->user_id,'validated_at'=>$now,'handled_by'=>$request->user()?->user_id,'status_id'=>$this->query->statusId('cancelled'),'updated_at'=>$now]);
+            $this->trackingAid->syncRequestStatus($id,'cancelled',$now);
+            $this->trackingAid->restoreStock($row->item_name ?? null, null, (int)$row->quantity, $id);
+            $this->query->insertValidation($id,'cancelled',$request->user()?->user_id,$notes,null,null,$now);
+            $result=$this->format($this->query->find($id),true);
+            $this->audit($request,'cancel',$id,$old,$result);
+            return $result;
+        }, 3);
+    }
     public function returnRequest(Request $request,string $id,object $row,array $v):array{
         return DB::transaction(function()use($request,$id,$row,$v):array{
             $now=now();
