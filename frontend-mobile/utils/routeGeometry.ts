@@ -41,6 +41,28 @@ export function distanceMeters(a: Coordinate, b: Coordinate) {
   return 12742000 * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
 }
 
+export function rankEvacuationCenters<T extends { latitude?: string | number | null; longitude?: string | number | null }>(
+  centers: T[],
+  origin: { latitude: number; longitude: number } | null | undefined,
+) {
+  if (!origin || !Number.isFinite(origin.latitude) || !Number.isFinite(origin.longitude)
+    || Math.abs(origin.latitude) > 90 || Math.abs(origin.longitude) > 180) return [];
+
+  return centers
+    .map((center) => {
+      const latitude = Number(center.latitude);
+      const longitude = Number(center.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
+        || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+      return {
+        center,
+        distanceMeters: distanceMeters([origin.longitude, origin.latitude], [longitude, latitude]),
+      };
+    })
+    .filter((entry): entry is { center: T; distanceMeters: number } => entry !== null)
+    .sort((first, second) => first.distanceMeters - second.distanceMeters);
+}
+
 export function bearingDegrees(a: Coordinate, b: Coordinate) {
   const r = Math.PI / 180, delta = (b[0] - a[0]) * r;
   return (Math.atan2(Math.sin(delta) * Math.cos(b[1] * r),

@@ -495,8 +495,14 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         };
         $change('accepted',5,['latitude'=>10.28,'longitude'=>123.87]);
         $enRoute = $change('en_route',5,['latitude'=>10.281,'longitude'=>123.871]);
-        $this->assertSame('HH-4',$enRoute['route']->household_id);
-        $this->assertNotEmpty(json_decode($enRoute['route']->route_polyline,true));
+        $this->assertNull($enRoute['route']->route_polyline);
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\RefreshResponderRoadRoute::class,
+            fn ($job) => $job->assignmentId === $id && (float) $job->start['latitude'] === 10.281);
+        $this->assertCount(0, \Illuminate\Support\Facades\Http::recorded());
+        $workflow->refreshPlannedRoadRoute($id, ['responder_id'=>5,'latitude'=>10.281,'longitude'=>123.871]);
+        $route = $query->routeForAssignment($id, 5);
+        $this->assertSame('HH-4',$route->household_id);
+        $this->assertNotEmpty(json_decode($route->route_polyline,true));
         $routeCalls = count(\Illuminate\Support\Facades\Http::recorded());
         $fresh = $workflow->storeLocation($this->request(['latitude'=>10.282,'longitude'=>123.872,'refresh_route'=>true]),$id);
         $this->assertSame(200,$fresh->getStatusCode());

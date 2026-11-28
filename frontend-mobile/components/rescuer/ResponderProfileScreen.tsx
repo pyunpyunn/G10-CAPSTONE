@@ -1,5 +1,5 @@
 import { ChangePasswordSection } from '@/components/ChangePasswordSection';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -32,30 +32,40 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
   const initials = makeInitials(responder.full_name || user.full_name || user.username || 'R');
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const savePending = useRef(false);
   const [form, setForm] = useState<ProfileForm>(() => profileForm(user, responder));
 
   useEffect(() => {
+    if (isEditing || saving) return;
     const currentUser = profile?.user || {};
     const currentResponder = profile?.responder || {};
 
     setForm(profileForm(currentUser, currentResponder));
-  }, [profile]);
+  }, [profile, isEditing, saving]);
 
   async function handleSave() {
+    if (savePending.current) return;
+    savePending.current = true;
     setSaving(true);
+    setSaveMessage('');
 
     try {
       if (await onSaveProfile(form)) {
         setIsEditing(false);
+        setSaveMessage('Profile updated successfully.');
       }
     } finally {
+      savePending.current = false;
       setSaving(false);
     }
   }
 
   function cancelEditing() {
+    if (savePending.current) return;
     setForm(profileForm(user, responder));
     setIsEditing(false);
+    setSaveMessage('');
   }
 
   if (isEditing) {
@@ -68,7 +78,9 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
               <Pressable
                 style={styles.iconButton}
                 onPress={cancelEditing}
+                disabled={saving}
                 accessibilityRole="button"
+                accessibilityState={{ disabled: saving }}
                 accessibilityLabel="Back to profile"
               >
                 <Ionicons name="arrow-back" size={18} color={palette.navActive} />
@@ -90,7 +102,7 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
           </View>
           <View style={styles.actionRow}>
             <ActionButton label="Cancel" icon="close" tone="light" disabled={saving} onPress={cancelEditing} />
-            <ActionButton label={saving ? 'Saving...' : 'Save profile'} icon="save-outline" disabled={saving} onPress={handleSave} />
+            <ActionButton label={saving ? 'Saving...' : 'Save profile'} icon="save-outline" loading={saving} disabled={saving} onPress={handleSave} />
           </View>
         </View>
       </View>
@@ -99,6 +111,7 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
 
   return (
     <View style={styles.stack}>
+      {saveMessage ? <Text accessibilityRole="alert" style={styles.success}>{saveMessage}</Text> : null}
       <View style={styles.hero}>
         <View style={styles.heroIdentity}>
           <View style={styles.avatar}>
@@ -157,6 +170,7 @@ export function ResponderProfileScreen({ profile, onSaveProfile, onLogout }: Pro
         accountIdentifiers={[user.user_id, user.username, user.email, responder.responder_code]}
         standaloneButton
         pairedActions
+        showPasswordRequirements
       />
 
       <ActionButton label="Log out" icon="log-out-outline" tone="danger" onPress={onLogout} />
@@ -411,5 +425,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     textAlign: 'right',
+  },
+  success: {
+    color: palette.safe,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

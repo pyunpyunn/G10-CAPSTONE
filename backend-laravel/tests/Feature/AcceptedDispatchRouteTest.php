@@ -58,8 +58,9 @@ class AcceptedDispatchRouteTest extends TestCase
         }]);
     }
 
-    public function test_acceptance_persists_road_route_to_coverage_household_without_a_worker(): void
+    public function test_status_response_does_not_wait_for_road_routing(): void
     {
+        \Illuminate\Support\Facades\Bus::fake();
         $support = Mockery::mock(RescuerMobileSupport::class)->makePartial();
         $support->shouldReceive('responderForUser')->andReturn((object) ['responder_id'=>5,'team_id'=>null]);
         $support->shouldReceive('writeAuditLog')->andReturnNull();
@@ -68,12 +69,27 @@ class AcceptedDispatchRouteTest extends TestCase
             $request = Request::create('/', 'PATCH', ['status'=>$status,'latitude'=>10.29,'longitude'=>123.88]);
             $request->setUserResolver(fn () => (object) ['user_id'=>'rescuer-5']);
             $result = $workflow->updateAssignmentStatus($request,12);
-            $this->assertNotNull($result['route']->route_polyline);
-            $this->assertSame('HH-A',$result['route']->household_id);
-            $this->assertSame(10.292,(float) $result['route']->end_latitude);
-            $this->assertNotEmpty(json_decode($result['route']->navigation_steps,true));
+            $this->assertNull($result['route']->route_polyline);
             $this->assertDatabaseHas('responder_assignments',['assignment_id'=>12,'status'=>$status,'arrived_at'=>null]);
         }
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\RefreshResponderRoadRoute::class,
+            fn ($job) => $job->assignmentId === 12
+                && (float) $job->start['latitude'] === 10.29
+                && $job->connection === 'operations_outbox'
+                && $job->queue === 'operations');
+        $this->assertCount(0, Http::recorded());
+        $this->assertDatabaseCount('responder_routes', 1);
+        $this->assertDatabaseHas('responder_routes', ['assignment_id' => 12, 'route_polyline' => null]);
+
+        // The queued job still produces the road route after the status response returns.
+        (new \App\Jobs\RefreshResponderRoadRoute(12, [
+            'responder_id' => 5, 'latitude' => 10.29, 'longitude' => 123.88,
+        ]))->handle($workflow);
+        $route = app(RescuerAssignmentQuery::class)->routeForAssignment(12, 5);
+        $this->assertNotNull($route->route_polyline);
+        $this->assertSame('HH-A', $route->household_id);
+        $this->assertSame(10.292, (float) $route->end_latitude);
+        $this->assertNotEmpty(json_decode($route->navigation_steps, true));
         $this->assertDatabaseCount('responder_routes',1);
     }
 

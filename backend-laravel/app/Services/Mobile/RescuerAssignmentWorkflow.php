@@ -165,10 +165,10 @@ class RescuerAssignmentWorkflow
             $this->support->writeAuditLog($request, 'mobile_update_assignment', 'responder_assignments', (string) $assignmentId, $updates + ['previous_status' => $current->status]);
         }, 3);
 
-        // The accepted response must contain a route even without a queue worker.
-        // Network routing happens after the assignment transaction has committed.
+        // Route calculation uses an external provider and must not delay the status response.
         if (in_array($status, ['accepted', 'en_route'], true) && $this->hasPoint($validated)) {
-            $this->refreshPlannedRoadRoute($assignmentId, $validated);
+            RefreshResponderRoadRoute::dispatch($assignmentId, $validated)
+                ->onConnection('operations_outbox')->onQueue('operations');
         }
 
         $updatedAssignment = $this->assignmentQuery->find($assignmentId, $responder?->responder_id);

@@ -7,7 +7,7 @@ const output = ts.transpileModule(fs.readFileSync(require('node:path').join(__di
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText;
 const context = { exports: {} }; vm.runInNewContext(output, context);
-const { decodePolyline6, distanceMeters, routeProgress, bearingDegrees, downsampleRouteCoordinates } = context.exports;
+const { decodePolyline6, distanceMeters, rankEvacuationCenters, routeProgress, bearingDegrees, downsampleRouteCoordinates } = context.exports;
 
 test('precision-six geometry decodes longitude first and rejects truncated data', () => {
   const decoded = decodePolyline6('_izlhA~rlgdF_{geC~ywl@_kwzCn`{nI');
@@ -23,6 +23,15 @@ test('a one kilometer path measures correctly and snaps to a segment midpoint', 
   assert.ok(progress.offRouteM > 10 && progress.offRouteM < 12);
   assert.equal(progress.segment, 0);
   assert.ok(Math.abs(bearingDegrees(points[0], points[1])) < 0.01);
+});
+test('evacuation centers are ranked by GPS distance and invalid coordinates are excluded', () => {
+  const near = { center_id: 'near', latitude: '10.291', longitude: '123.88' };
+  const far = { center_id: 'far', latitude: 10.31, longitude: 123.88 };
+  const invalid = { center_id: 'invalid', latitude: 120, longitude: 123.88 };
+  const ranked = rankEvacuationCenters([far, invalid, near], { latitude: 10.29, longitude: 123.88 });
+  assert.deepEqual(ranked.map(({ center }) => center.center_id), ['near', 'far']);
+  assert.ok(ranked[0].distanceMeters < ranked[1].distanceMeters);
+  assert.equal(rankEvacuationCenters([near], null).length, 0);
 });
 test('progress clamps at route ends and detects an off-route fix', () => {
   const points = [[123.88, 10.29], [123.88, 10.30]];

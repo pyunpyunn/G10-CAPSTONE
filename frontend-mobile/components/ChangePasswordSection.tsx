@@ -15,12 +15,14 @@ export function ChangePasswordSection({
   settingsRow = false,
   pairedActions = false,
   pairedUpdateTone = 'primary',
+  showPasswordRequirements = false,
 }: {
   accountIdentifiers: (string | undefined)[];
   standaloneButton?: boolean;
   settingsRow?: boolean;
   pairedActions?: boolean;
   pairedUpdateTone?: 'primary' | 'nav';
+  showPasswordRequirements?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -116,6 +118,11 @@ export function ChangePasswordSection({
                 <Ionicons name={visible[key] ? 'eye-off-outline' : 'eye-outline'} size={20} color={palette.textSoft} />
               </Pressable>
             </View>
+            {key === 'password' && showPasswordRequirements ? (
+              <Text style={styles.requirements}>
+                Password requirements: 8–128 characters, at least one uppercase letter, one number, and one symbol.
+              </Text>
+            ) : null}
           </View>
         ))}
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
@@ -162,6 +169,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '800', color: palette.text },
   field: { gap: spacing.xs },
   label: { color: palette.textSoft, fontWeight: '700' },
+  requirements: { color: palette.textSoft, fontSize: 12, lineHeight: 18 },
   passwordInput: { minHeight: 44, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: palette.border, borderRadius: radius.md, backgroundColor: palette.page },
   input: { flex: 1, minHeight: 44, paddingHorizontal: spacing.md, color: palette.text },
   eyeButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Network from 'expo-network';
 import { useIsFocused } from '@react-navigation/native';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Camera, GeoJSONSource, Layer, Map, Marker, type CameraRef } from '@maplibre/maplibre-react-native';
 import { api } from '@/api/client';
@@ -9,7 +9,7 @@ import { useMapGps } from '@/hooks/useMapGps';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { getActivePack, getCachedCenterRoute, saveCachedCenterRoute } from '@/utils/navigationStore';
 import { navigationPackStatus } from '@/utils/navigationPacks';
-import { decodePolyline6, downsampleRouteCoordinates, type Coordinate } from '@/utils/routeGeometry';
+import { decodePolyline6, downsampleRouteCoordinates, rankEvacuationCenters, type Coordinate } from '@/utils/routeGeometry';
 import { ActionButton, EmptyState, RescuerSelect, SectionHeader } from './RescuerUI';
 
 type RescueMapProps = {
@@ -66,6 +66,7 @@ export function RescueMapScreen({
   const routeRequest = useRef<AbortController | null>(null);
   const gpsCentered = useRef(false);
   const fittedRoute = useRef<Coordinate[] | null>(null);
+  const centerSelectionManuallyChosen = useRef(false);
 
   const visibleCenters = useMemo(() => evacuationCenters.filter((center) =>
     center.latitude !== null && center.latitude !== undefined && center.latitude !== ''
@@ -73,9 +74,14 @@ export function RescueMapScreen({
       && Number.isFinite(Number(center.latitude)) && Number.isFinite(Number(center.longitude))
       && Math.abs(Number(center.latitude)) <= 90 && Math.abs(Number(center.longitude)) <= 180
   ), [evacuationCenters]);
+  const centerDistances = useMemo(
+    () => rankEvacuationCenters(visibleCenters, position),
+    [visibleCenters, position],
+  );
+  const nearestCenter = centerDistances[0]?.center;
   const selectedCenter = visibleCenters.find((center) =>
     String(center.evacuation_center_id || center.center_id) === selectedCenterId
-  );
+  ) || nearestCenter;
   const focusedAssignment = selectedAssignment || activeAssignment;
   const displayRoutePoints = useMemo(() => downsampleRouteCoordinates(routePoints, 800), [routePoints]);
   const activeAssignments = useMemo(() => assignments.filter((item) =>
@@ -175,6 +181,26 @@ export function RescueMapScreen({
       if (position) void routeToSelectedCenter(center, position);
     }
   }
+
+  const selectCenterRef = useRef(selectCenter);
+  selectCenterRef.current = selectCenter;
+
+  useEffect(() => {
+    if (selectedCenterId && !visibleCenters.some((center) =>
+      String(center.evacuation_center_id || center.center_id) === selectedCenterId
+    )) {
+      centerSelectionManuallyChosen.current = false;
+      setSelectedCenterId(null);
+    }
+  }, [selectedCenterId, visibleCenters]);
+
+  useEffect(() => {
+    const nearestCenterId = nearestCenter
+      ? String(nearestCenter.evacuation_center_id || nearestCenter.center_id)
+      : null;
+    if (!position || !nearestCenter || centerSelectionManuallyChosen.current || selectedCenterId === nearestCenterId) return;
+    void selectCenterRef.current(nearestCenter);
+  }, [position, nearestCenter, selectedCenterId]);
 
   async function routeToSelectedCenter(centerOverride = selectedCenter, positionOverride = position) {
     if (!centerOverride || !positionOverride) {
@@ -323,19 +349,54 @@ export function RescueMapScreen({
               <RescuerSelect
                 title="Select evacuation center"
                 placeholder="Select evacuation center"
-                options={visibleCenters.map((item: any, itemIndex: number) => ({
+                options={(centerDistances.length ? centerDistances.map(({ center }) => center) : visibleCenters).map((item, itemIndex) => ({
                   key: String(item.evacuation_center_id || item.center_id || itemIndex),
                   label: item.name || item.center_name || 'Evacuation center',
                 }))}
-                value={selectedCenterId || ''}
+                value={selectedCenterId || String(nearestCenter?.evacuation_center_id || nearestCenter?.center_id || '')}
                 onChange={(value) => {
-                  const center = visibleCenters.find((item: any, itemIndex: number) => String(item.evacuation_center_id || item.center_id || itemIndex) === value);
-                  if (center) void selectCenter(center);
+                  const center = visibleCenters.find((item: any) => String(item.evacuation_center_id || item.center_id) === value);
+                  if (center) {
+                    centerSelectionManuallyChosen.current = true;
+                    void selectCenter(center);
+                  }
                 }}
                 accessibilityLabel="Choose evacuation center"
                 showLabel={false}
               />
             ) : <Text style={styles.smallText}>No mapped evacuation centers available.</Text>}
+            {position ? (
+              <>
+                <Text style={styles.rowMeta}>Distances from your GPS (straight-line)</Text>
+                <ScrollView nestedScrollEnabled style={styles.centerDistanceList}>
+                  {centerDistances.map(({ center, distanceMeters }, index) => (
+                    <View key={String(center.evacuation_center_id || center.center_id)} style={styles.centerDistanceRow}>
+                      <Text style={styles.centerDistanceName}>
+                        {index === 0 ? 'Nearest · ' : ''}{center.name || center.center_name || 'Evacuation center'}
+                      </Text>
+                      <Text style={styles.centerDistanceValue}>{(distanceMeters / 1000).toFixed(1)} km</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+                {nearestCenter ? (
+                  <ActionButton
+                    label={`Route to nearest · ${(centerDistances[0].distanceMeters / 1000).toFixed(1)} km`}
+                    icon="navigate-outline"
+                    disabled={routeLoading}
+                    onPress={() => {
+                      centerSelectionManuallyChosen.current = false;
+                      void selectCenter(nearestCenter);
+                    }}
+                  />
+                ) : null}
+                {cachedRoute?.centerId === String(selectedCenter?.evacuation_center_id || selectedCenter?.center_id)
+                  && Number.isFinite(Number(cachedRoute.route?.distance_km ?? cachedRoute.route?.distance_m / 1000)) ? (
+                    <Text style={styles.rowMeta}>
+                      Road route: {Number(cachedRoute.route.distance_km ?? cachedRoute.route.distance_m / 1000).toFixed(1)} km
+                    </Text>
+                  ) : null}
+              </>
+            ) : <Text style={styles.rowMeta}>Follow GPS to calculate distances to mapped evacuation centers.</Text>}
             {routeLoading ? <Text style={styles.rowMeta}>Loading road route</Text> : null}
             {!!routeSource && <Text style={styles.rowMeta}>{routeSource}</Text>}
             {!tracking && position && <Text style={styles.rowMeta}>Using last saved device GPS. Tap Follow GPS to update your position.</Text>}
@@ -414,6 +475,10 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   rowTitle: { color: palette.text, fontSize: 13, fontWeight: '900' },
   rowMeta: { marginTop: 2, color: palette.textSoft, fontSize: 12, fontWeight: '700' },
+  centerDistanceList: { maxHeight: 160 },
+  centerDistanceRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: palette.border },
+  centerDistanceName: { flex: 1, color: palette.text, fontSize: 12, fontWeight: '700' },
+  centerDistanceValue: { color: palette.navActive, fontSize: 12, fontWeight: '900' },
   errorStrip: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.md,
     padding: spacing.sm, backgroundColor: '#96202012',

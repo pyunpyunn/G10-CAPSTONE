@@ -191,9 +191,29 @@ export default function RescuerHomeScreen() {
       if (!completionStatus) return;
     }
 
+    const previousAssignment = assignments.find((item) => Number(item.assignment_id) === Number(assignmentId));
+    const previousDutyStatus = overview?.profile?.responder?.duty_status;
+    const optimisticStatusLabel: Record<string, string> = {
+      accepted: 'Accepted',
+      en_route: 'En route',
+      on_scene: 'On-scene',
+    };
+    if (previousAssignment && optimisticStatusLabel[status]) {
+      setOverview((current) => current ? {
+        ...current,
+        assignments: (current.assignments || []).map((item: any) => Number(item.assignment_id) === Number(assignmentId)
+          ? { ...item, status_key: status, status_label: optimisticStatusLabel[status] }
+          : item),
+        profile: current.profile ? {
+          ...current.profile,
+          responder: { ...(current.profile.responder || {}), duty_status: 'deployed' },
+        } : current.profile,
+      } : current);
+    }
+
     try {
       const payload = status === 'completed'
-        ? { household_id: assignments.find((item) => Number(item.assignment_id) === Number(assignmentId))?.household_id, household_status_key: completionStatus }
+        ? { household_id: previousAssignment?.household_id, household_status_key: completionStatus }
         : {};
 
       const result = await updateAssignmentStatus(assignmentId, status, payload);
@@ -209,7 +229,7 @@ export default function RescuerHomeScreen() {
         void syncAssignmentLocation(assignmentId);
       }
       if (status === 'completed' && Platform.OS !== 'web') {
-        await endNavigationTrip().catch(() => Alert.alert('Household saved', 'The household was completed, but trip recording could not be stopped. Open navigation to stop the trip.'));
+        void endNavigationTrip().catch(() => Alert.alert('Household saved', 'The household was completed, but trip recording could not be stopped. Open navigation to stop the trip.'));
       }
 
       void loadOverview(true, true, true);
@@ -223,6 +243,19 @@ export default function RescuerHomeScreen() {
         }
       }
     } catch (error: any) {
+      if (previousAssignment && optimisticStatusLabel[status]) {
+        setOverview((current) => current ? {
+          ...current,
+          assignments: (current.assignments || []).map((item: any) => Number(item.assignment_id) === Number(assignmentId)
+            ? previousAssignment
+            : item),
+          profile: current.profile && previousDutyStatus ? {
+            ...current.profile,
+            responder: { ...(current.profile.responder || {}), duty_status: previousDutyStatus },
+          } : current.profile,
+        } : current);
+        void loadOverview(true, true, true);
+      }
       Alert.alert('Unable to update assignment', errorMessage(error));
     }
   }
@@ -289,9 +322,13 @@ export default function RescuerHomeScreen() {
 
   async function handleUpdateProfile(payload: any): Promise<boolean> {
     try {
-      await updateRescuerProfile(payload);
-      Alert.alert('Profile updated', 'Your profile changes were saved.');
-      void loadOverview(true, true, true);
+      const updatedProfile = await updateRescuerProfile(payload);
+      if (updatedProfile?.user && updatedProfile?.responder) {
+        setOverview((current) => current ? {
+          ...current,
+          profile: { ...current.profile, ...updatedProfile },
+        } : current);
+      }
       return true;
     } catch (error: any) {
       Alert.alert('Unable to update profile', errorMessage(error));

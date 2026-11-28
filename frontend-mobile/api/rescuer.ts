@@ -73,7 +73,7 @@ export async function updateAssignmentStatus(
     status,
     ...payload,
   });
-  await stopAcceptedDispatchAlarm(assignmentId, status);
+  void stopAcceptedDispatchAlarm(assignmentId, status);
 
   return response.data.data;
 }
