@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import * as Location from 'expo-location';
 import { MobileLeafletMap } from '@/components/MobileLeafletMap.native';
 import { palette, radius, spacing } from '@/constants/resqTheme';
 import { HouseholdEmpty, HouseholdSection } from './HouseholdUI';
@@ -34,7 +33,6 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
   }), [evacuationCenters]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [originMode, setOriginMode] = useState<'geotag' | 'live'>('geotag');
-  const [livePoint, setLivePoint] = useState<{ latitude: number; longitude: number } | null>(null);
   const [roadRoute, setRoadRoute] = useState<{ coordinates: { latitude: number; longitude: number }[]; distance_km: number; duration_min: number } | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
@@ -65,7 +63,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
       }
     : null;
 
-  const originPoint = originMode === 'live' ? livePoint : householdPoint;
+  const originPoint = originMode === 'live' ? gps.position : householdPoint;
   const originLatitude = originPoint?.latitude;
   const originLongitude = originPoint?.longitude;
   const centerLatitude = selectedPoint?.latitude;
@@ -133,23 +131,9 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
     return () => { cancelled = true; controller.abort(); };
   }, [active, originLatitude, originLongitude, centerLatitude, centerLongitude, routeKey]);
 
-  async function useLiveGps() {
+  function useLiveGps() {
     setRouteError('');
-
-    try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-
-      if (permission.status !== 'granted') {
-        setRouteError('Allow location access to route from your live GPS position.');
-        return;
-      }
-
-      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      setLivePoint({ latitude: current.coords.latitude, longitude: current.coords.longitude });
-      setOriginMode('live');
-    } catch {
-      setRouteError('Unable to get your current location. Use your household geotag instead.');
-    }
+    setOriginMode('live');
   }
 
   const mapMarkers = [
@@ -191,7 +175,7 @@ export function HouseholdRouteScreen({ geotag, evacuationCenters, active = true 
         </View>
 
         {active ? (
-          <MobileLeafletMap markers={mapMarkers} routes={mapRoutes} center={originPoint || selectedPoint || defaultRegion} followPosition={originMode === 'live' ? gps.position || livePoint : null} showFollowControl={false} />
+          <MobileLeafletMap markers={mapMarkers} routes={mapRoutes} center={originPoint || selectedPoint || defaultRegion} followPosition={originMode === 'live' ? gps.position : null} showFollowControl={false} />
         ) : null}
         {gps.error ? <Text style={styles.routeError}>{gps.error}</Text> : null}
         {routeError ? <Text style={styles.routeError}>{routeError}</Text> : null}
@@ -397,7 +381,7 @@ const styles = StyleSheet.create({
   selectedEyebrow: {
     color: '#64748B',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '900',
     letterSpacing: 0.55,
   },
   selectedMain: {
@@ -452,11 +436,12 @@ const styles = StyleSheet.create({
   metricValue: {
     color: '#0F172A',
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '900',
   },
   metricMeta: {
     color: '#64748B',
     fontSize: 11,
+    fontWeight: '800',
   },
   selectorWrap: {
     marginTop: -2,
@@ -477,15 +462,16 @@ const styles = StyleSheet.create({
   retryRouteText: { color: palette.navActive, fontSize: 12, fontWeight: '900' },
   centerTitle: {
     color: '#0F172A',
-    fontSize: 19,
-    lineHeight: 24,
-    fontWeight: '700',
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: '900',
   },
   centerMeta: {
     marginTop: 6,
     color: '#64748B',
-    fontSize: 13,
+    fontSize: 12,
     lineHeight: 18,
+    fontWeight: '700',
   },
   centerRow: {
     flexDirection: 'row',
