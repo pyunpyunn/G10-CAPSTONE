@@ -54,11 +54,13 @@ class RescueDispatchService
             'search' => ['nullable', 'string', 'max:255'],
         ]);
         $event = $this->query->activeEvent();
-        $logs = app(\App\Queries\FieldCommunicationQuery::class)->paginate($request, $event?->event_id);
+        $communicationQuery = app(\App\Queries\FieldCommunicationQuery::class);
+        $logs = $communicationQuery->paginate($request, $event?->event_id);
         $compact = $request->boolean('compact');
         return [
             'active_event' => $event ? $this->presenter->activeEvent($event) : null,
             'logs' => $logs,
+            'ptt_counts' => $compact ? $communicationQuery->pttCounts($event?->event_id) : [],
             'responders' => $this->query->responders($event?->event_id, $compact ? collect($logs->items())->pluck('responder_id')->filter()->unique()->all() : null),
             'teams' => $compact ? RescueTeam::query()->orderBy('team_name')->get(['team_id','team_code','team_name'])
                 : $this->query->teamCards($event?->event_id)->filter(fn ($team) => $team['team_id'])->values(),

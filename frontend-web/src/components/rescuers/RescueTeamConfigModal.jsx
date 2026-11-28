@@ -80,5 +80,5 @@ export default function RescueTeamConfigModal({ isOpen, workspace, isLoading, is
       </div>
     </>}
   </div>
-  return embedded ? content : createPortal(<div className="tm-page ov on"><div className="md" role="dialog" aria-modal="true" aria-label="Team management"><div className="mh2"><h3>Team Management</h3><span className="sp" /><button className="x" onClick={onClose} aria-label="Close">×</button></div>{content}</div></div>, document.body)
+  return embedded ? content : createPortal(<div className="tm-page tm-teams-page ov on"><div className="md" role="dialog" aria-modal="true" aria-label="Team management"><div className="mh2"><h3>Team Management</h3><span className="sp" /><button className="x" onClick={onClose} aria-label="Close">×</button></div>{content}</div></div>, document.body)
 }

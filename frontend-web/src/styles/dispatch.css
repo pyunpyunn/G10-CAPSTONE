@@ -275,11 +275,13 @@
 .ro-reference .communication-page .ri{width:100%;white-space:normal;text-align:left}
 @media(max-width:640px){.ro-reference .communication-page{grid-template-columns:1fr;grid-template-rows:auto minmax(260px,1fr)}.ro-reference .communication-page .rl{max-height:180px}.ro-reference .communication-page .cth{flex-wrap:wrap}}
 
-.ro-reference .dispatch-communication-only .communication-page .rl{background:#fff;border-right:1px solid var(--ln);padding:0 8px;gap:2px}
+.ro-reference .dispatch-communication-only .communication-page .rl{background:linear-gradient(145deg,#0f1c2d,#162a47);border-right:1px solid #1b3050;padding:0 8px;gap:2px;color:#e8eef7}
 .ro-reference .dispatch-communication-only .communication-page .rg{color:var(--mu);font-size:10px;letter-spacing:.06em;padding:14px 10px 6px}
-.ro-reference .dispatch-communication-only .communication-page .ri{min-height:32px;border-radius:4px;padding:0 10px;gap:8px;color:var(--tx);font-size:11px;font-weight:600}
-.ro-reference .dispatch-communication-only .communication-page .ri:hover{background:#f1f5f9}
-.ro-reference .dispatch-communication-only .communication-page .ri.on{background:#e6edf3;color:#174c72}
+.ro-reference .dispatch-communication-only .communication-page .ri{min-height:32px;border-radius:4px;padding:0 10px;gap:8px;color:#e8eef7;font-size:11px;font-weight:600}
+.ro-reference .dispatch-communication-only .communication-page .ri:hover{background:rgba(255,255,255,.07)}
+.ro-reference .dispatch-communication-only .communication-page .ri.on{background:rgba(255,255,255,.14);color:#fff}
+.ro-reference .dispatch-communication-only .communication-page .ri .av{background:#e6edf3;color:#0f1c2d}
+.ro-reference .dispatch-communication-only .communication-page .communication-new-count{display:inline-flex;min-width:20px;height:18px;align-items:center;justify-content:center;margin-left:auto;padding:0 6px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;line-height:1}
 .ro-reference .dispatch-communication-only .communication-page .cf{background:#fff}
 .ro-reference .dispatch-communication-only .communication-page .npb{background:#fff;color:var(--tx);border-top:1px solid var(--ln)}
 .ro-reference .dispatch-communication-only .communication-page .nt2{color:var(--mu)}
@@ -310,13 +312,14 @@
 .ro-reference .ro-overlay .md .sh2 em{font-size:15px}
 .ro-reference .dispatch-communication-only .communication-page.teams-collapsed{grid-template-columns:56px minmax(0,1fr)}
 .ro-reference .dispatch-communication-only .communication-page .archive-rail-head{display:flex;height:46px;flex:none;align-items:center;justify-content:space-between;gap:8px;padding:0 4px}
-.ro-reference .dispatch-communication-only .communication-page .archive-rail-label{min-width:0;margin:0;color:var(--mu);font-size:10px;font-weight:650;text-transform:uppercase;white-space:nowrap}
+.ro-reference .dispatch-communication-only .communication-page .archive-rail-label{min-width:0;margin:0;color:#c9d6e6;font-size:10px;font-weight:650;text-transform:uppercase;white-space:nowrap}
 .ro-reference .dispatch-communication-only .communication-page .archive-rail-toggle{display:grid;width:36px;height:36px;flex:none;place-items:center;border:1px solid var(--ln);border-radius:8px;background:#fff;color:var(--tx)}
 .ro-reference .dispatch-communication-only .communication-page.teams-collapsed .archive-rail-head{justify-content:center}
 .ro-reference .dispatch-communication-only .communication-page.teams-collapsed .archive-rail-label{display:none}
 .ro-reference .dispatch-communication-only .communication-page.teams-collapsed .rl{align-items:center;padding:0 8px}
-.ro-reference .dispatch-communication-only .communication-page.teams-collapsed .ri{justify-content:center;width:36px;height:36px;padding:0;font-size:0}
+.ro-reference .dispatch-communication-only .communication-page.teams-collapsed .ri{position:relative;justify-content:center;width:36px;height:36px;padding:0;font-size:0}
 .ro-reference .dispatch-communication-only .communication-page.teams-collapsed .ri .av{flex:none}
+.ro-reference .dispatch-communication-only .communication-page.teams-collapsed .ri .communication-new-count{position:absolute;top:-3px;right:-4px;min-width:14px;height:14px;padding:0 3px;border:1px solid #0f1c2d;font-size:8px}
 .ro-reference .ro-shell:has(.dispatch-communication-only) .pg.on{margin:0!important;padding:0!important;gap:0!important}
 @media(max-width:640px){.ro-reference .dispatch-communication-only .communication-page.teams-collapsed{grid-template-columns:56px minmax(0,1fr)}}
 .page-error-detail{white-space:pre-wrap;overflow-wrap:anywhere;color:#991b1b}

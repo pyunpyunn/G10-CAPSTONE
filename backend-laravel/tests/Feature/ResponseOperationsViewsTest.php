@@ -147,14 +147,33 @@ class ResponseOperationsViewsTest extends TestCase
         DB::table('responder_communication_logs')->insert(['communication_id' => 56, 'disaster_id' => 'EV-OLD',
             'responder_id' => 4, 'team_id' => 2, 'team_name' => 'SAR', 'timestamp' => '2026-10-08 12:00:00',
             'message' => json_encode(['channel' => 'command'])]);
+        DB::table('responder_communication_logs')->insert([
+            ['communication_id' => 57, 'disaster_id' => 'EV-1', 'responder_id' => 4, 'team_id' => 3,
+                'team_name' => 'Team Three', 'timestamp' => '2026-10-08 12:00:00',
+                'message' => json_encode(['type' => 'ptt_audio', 'audio_path' => 'radio/team-three.webm'])],
+            ['communication_id' => 58, 'disaster_id' => 'EV-1', 'responder_id' => 4, 'team_id' => 3,
+                'team_name' => 'Team Three', 'timestamp' => '2026-10-08 12:00:00',
+                'message' => json_encode(['type' => 'ptt_audio'])],
+            ['communication_id' => 59, 'disaster_id' => 'EV-OLD', 'responder_id' => 4, 'team_id' => 4,
+                'team_name' => 'Old Event Team', 'timestamp' => '2026-10-08 12:00:00',
+                'message' => json_encode(['type' => 'ptt_audio', 'audio_path' => 'radio/old-event.webm'])],
+            ['communication_id' => 60, 'disaster_id' => 'EV-1', 'responder_id' => 4, 'team_id' => 3,
+                'team_name' => 'Team Three', 'timestamp' => '2026-10-08 12:00:00',
+                'message' => json_encode(['type' => 'message', 'audio_path' => 'radio/non-ptt.webm'])],
+        ]);
         $request = Request::create('/', 'GET', ['channel' => 'command', 'team_id' => 2, 'page' => 3, 'per_page' => 20]);
         $logs = app(FieldCommunicationQuery::class)->paginate($request, 'EV-1');
         $this->assertSame(55, $logs->total());
         $this->assertCount(15, $logs->items());
-        $response = (new FieldCommunicationWorkspaceResource(['logs' => $logs, 'teams' => [], 'active_event' => null]))->response($request)->getData(true);
+        $pttCounts = app(FieldCommunicationQuery::class)->pttCounts('EV-1');
+        $this->assertSame(55, $pttCounts[2] ?? null);
+        $this->assertSame(1, $pttCounts[3] ?? null);
+        $this->assertArrayNotHasKey(4, $pttCounts);
+        $response = (new FieldCommunicationWorkspaceResource(['logs' => $logs, 'teams' => [], 'active_event' => null, 'ptt_counts' => $pttCounts]))->response($request)->getData(true);
         $this->assertSame(3, $response['data']['meta']['current_page']);
         $this->assertSame('Alex', $response['data']['logs'][0]['responder_name']);
         $this->assertStringContainsString('radio/clip.webm', $response['data']['logs'][0]['audio_url']);
+        $this->assertSame(55, $response['data']['ptt_counts'][2] ?? null);
         $this->assertSame(0, app(FieldCommunicationQuery::class)->paginate(Request::create('/', 'GET', ['channel' => 'team']), 'EV-1')->total());
         $this->assertSame(0, app(FieldCommunicationQuery::class)->paginate(Request::create('/', 'GET', ['search' => 'missing']), 'EV-1')->total());
     }

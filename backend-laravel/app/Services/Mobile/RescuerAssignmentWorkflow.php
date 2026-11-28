@@ -12,6 +12,11 @@ use Illuminate\Validation\Rule;
 
 class RescuerAssignmentWorkflow
 {
+    private const ARRIVAL_RADIUS_METERS = 25.0;
+    private const ARRIVAL_MAX_ACCURACY_METERS = 25.0;
+    private const ARRIVAL_REQUIRED_FIXES = 2;
+    private const ARRIVAL_MAX_FIX_GAP_SECONDS = 120;
+
     public function __construct(private \App\Services\Shared\RoutingService $routingService, private \App\Services\Mobile\RescuerMobileSupport $support, private RescuerAssignmentQuery $assignmentQuery) {}
 
     public function updateAssignmentStatus(Request $request, int $assignmentId): JsonResponse|array
@@ -227,6 +232,7 @@ class RescuerAssignmentWorkflow
             }
             $logId = $this->saveResponderLocation($responder, $validated, $now);
             $this->routeWriter()->saveRouteCoordinate($assignmentId, $validated, $now);
+            $this->checkAutomaticArrival($current, (int) $responder->responder_id, $validated, $request, $now);
             if (!empty($validated['refresh_route'])) {
                 RefreshResponderRoadRoute::dispatch($assignmentId, $validated)
                     ->onConnection('operations_outbox')->onQueue('operations');
@@ -240,6 +246,127 @@ class RescuerAssignmentWorkflow
             'message' => 'Location updated.',
             'data' => ['route' => $route ? (new \App\Http\Resources\RescuerMobileRouteResource($route))->resolve($request) : null],
         ]);
+    }
+
+    private function checkAutomaticArrival(object $assignment, int $responderId, array $location, Request $request, $now): void
+    {
+        $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
+        $checks = $notes['arrival_geofence_checks'] ?? [];
+        $responderKey = (string) $responderId;
+        $status = \App\Support\RescuerHouseholdQueue::status($assignment, $responderId);
+        $householdId = $status === 'en_route'
+            ? \App\Support\RescuerHouseholdQueue::target($assignment, $responderId)
+            : null;
+        $accuracy = isset($location['accuracy_m']) ? (float) $location['accuracy_m'] : null;
+        $point = $householdId && Schema::hasTable('geotagged_locations')
+            ? DB::table('geotagged_locations')->where('household_id', $householdId)
+                ->whereNotNull('latitude')->whereNotNull('longitude')
+                ->orderByDesc('updated_at')->orderByDesc('location_id')->first()
+            : null;
+
+        $distance = $point
+            ? $this->distanceInMeters(
+                (float) $location['latitude'],
+                (float) $location['longitude'],
+                (float) $point->latitude,
+                (float) $point->longitude,
+            )
+            : null;
+        $eligible = $status === 'en_route'
+            && $point
+            && $accuracy !== null
+            && $accuracy <= self::ARRIVAL_MAX_ACCURACY_METERS
+            && $distance <= self::ARRIVAL_RADIUS_METERS;
+
+        if (! $eligible) {
+            if (isset($checks[$responderKey])) {
+                unset($checks[$responderKey]);
+                if ($checks) {
+                    $notes['arrival_geofence_checks'] = $checks;
+                } else {
+                    unset($notes['arrival_geofence_checks']);
+                }
+                $assignment->route_notes = json_encode($notes);
+                DB::table('responder_assignments')
+                    ->where('assignment_id', $assignment->assignment_id)
+                    ->update(['route_notes' => $assignment->route_notes]);
+            }
+
+            return;
+        }
+
+        $capturedAt = ! empty($location['recorded_at'])
+            ? \Illuminate\Support\Carbon::parse($location['recorded_at'])
+            : $now;
+        $previous = $checks[$responderKey] ?? null;
+        $count = 1;
+        if (
+            $previous
+            && (string) ($previous['household_id'] ?? '') === (string) $householdId
+            && ! empty($previous['last_fix_at'])
+        ) {
+            $previousAt = \Illuminate\Support\Carbon::parse($previous['last_fix_at']);
+            if (
+                $previousAt->lt($capturedAt)
+                && $previousAt->diffInSeconds($capturedAt) <= self::ARRIVAL_MAX_FIX_GAP_SECONDS
+            ) {
+                $count = (int) ($previous['consecutive_fixes'] ?? 0) + 1;
+            }
+        }
+
+        if ($count < self::ARRIVAL_REQUIRED_FIXES) {
+            $checks[$responderKey] = [
+                'household_id' => (string) $householdId,
+                'consecutive_fixes' => $count,
+                'last_fix_at' => $capturedAt->toISOString(),
+            ];
+            $notes['arrival_geofence_checks'] = $checks;
+            $assignment->route_notes = json_encode($notes);
+            DB::table('responder_assignments')
+                ->where('assignment_id', $assignment->assignment_id)
+                ->update(['route_notes' => $assignment->route_notes]);
+
+            return;
+        }
+
+        $notes['responder_statuses'] ??= [];
+        $notes['responder_statuses'][$responderId] = 'on_scene';
+        unset($checks[$responderKey]);
+        if ($checks) {
+            $notes['arrival_geofence_checks'] = $checks;
+        } else {
+            unset($notes['arrival_geofence_checks']);
+        }
+
+        $assignment->route_notes = json_encode($notes);
+        $assignment->status = \App\Support\RescuerHouseholdQueue::overallStatus($assignment);
+        $arrivedAt = $assignment->arrived_at ?? $now;
+        DB::table('responder_assignments')
+            ->where('assignment_id', $assignment->assignment_id)
+            ->update($this->support->filterColumns('responder_assignments', [
+                'route_notes' => $assignment->route_notes,
+                'status' => $assignment->status,
+                'arrived_at' => $arrivedAt,
+                'updated_at' => $now,
+            ]));
+
+        $this->support->writeAuditLog($request, 'mobile_auto_arrival', 'responder_assignments', (string) $assignment->assignment_id, [
+            'previous_status' => $status,
+            'status' => 'on_scene',
+            'household_id' => (string) $householdId,
+            'distance_m' => round($distance, 2),
+            'accuracy_m' => $accuracy,
+        ]);
+    }
+
+    private function distanceInMeters(float $latitude, float $longitude, float $targetLatitude, float $targetLongitude): float
+    {
+        $latitudeDelta = deg2rad($targetLatitude - $latitude);
+        $longitudeDelta = deg2rad($targetLongitude - $longitude);
+        $a = sin($latitudeDelta / 2) ** 2
+            + cos(deg2rad($latitude)) * cos(deg2rad($targetLatitude)) * sin($longitudeDelta / 2) ** 2;
+
+        return 6371000 * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     private function recordHouseholdCompletion(object $assignment, string $householdId, array $data, Request $request, int $responderId, $now): void

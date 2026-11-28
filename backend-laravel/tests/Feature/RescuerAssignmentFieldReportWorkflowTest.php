@@ -454,6 +454,68 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
         $this->assertSame(0, $summary['active_units']);
     }
 
+    public function test_two_accurate_gps_fixes_inside_the_arrival_radius_mark_only_that_responder_on_scene(): void
+    {
+        $workflow = $this->createArrivalWorkflow();
+        $location = ['latitude' => 10.29022, 'longitude' => 123.88, 'accuracy_m' => 25];
+
+        $workflow->storeLocation($this->request($location), 7);
+        $this->assertDatabaseHas('responder_assignments', ['assignment_id' => 7, 'status' => 'en_route']);
+
+        $workflow->storeLocation($this->request($location), 7);
+
+        $assignment = DB::table('responder_assignments')->where('assignment_id', 7)->first();
+        $notes = json_decode($assignment->route_notes, true);
+        $this->assertSame('on_scene', $notes['responder_statuses'][5]);
+        $this->assertSame('accepted', $notes['responder_statuses'][6]);
+        $this->assertSame('on_scene', $assignment->status);
+        $this->assertNotNull($assignment->arrived_at);
+        $this->assertArrayNotHasKey('arrival_geofence_checks', $notes);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'mobile_auto_arrival',
+            'reference_table' => 'responder_assignments',
+            'reference_id' => '7',
+        ]);
+    }
+
+    public function test_arrival_confirmation_resets_for_inaccurate_or_outside_radius_fixes(): void
+    {
+        $workflow = $this->createArrivalWorkflow();
+        $inside = ['latitude' => 10.29005, 'longitude' => 123.88005, 'accuracy_m' => 10];
+
+        $workflow->storeLocation($this->request($inside), 7);
+        $workflow->storeLocation($this->request(array_merge($inside, [
+            'accuracy_m' => 30,
+        ])), 7);
+        $workflow->storeLocation($this->request($inside), 7);
+        $workflow->storeLocation($this->request([
+            'latitude' => 10.29023,
+            'longitude' => 123.88,
+            'accuracy_m' => 10,
+        ]), 7);
+        $workflow->storeLocation($this->request($inside), 7);
+        $this->assertDatabaseHas('responder_assignments', ['assignment_id' => 7, 'status' => 'en_route']);
+
+        $workflow->storeLocation($this->request($inside), 7);
+
+        $this->assertDatabaseHas('responder_assignments', ['assignment_id' => 7, 'status' => 'on_scene']);
+    }
+
+    public function test_arrival_geofence_does_not_change_an_assignment_until_the_responder_is_en_route(): void
+    {
+        $workflow = $this->createArrivalWorkflow('accepted');
+        $location = ['latitude' => 10.29005, 'longitude' => 123.88005, 'accuracy_m' => 10];
+
+        $workflow->storeLocation($this->request($location), 7);
+        $workflow->storeLocation($this->request($location), 7);
+
+        $assignment = DB::table('responder_assignments')->where('assignment_id', 7)->first();
+        $notes = json_decode($assignment->route_notes, true);
+        $this->assertSame('accepted', $assignment->status);
+        $this->assertSame('accepted', $notes['responder_statuses'][5]);
+        $this->assertArrayNotHasKey('arrival_geofence_checks', $notes);
+    }
+
     public function test_web_ranking_dispatch_mobile_routes_optional_reports_and_queue_completion(): void
     {
         $this->lifecycleFixture();
@@ -695,6 +757,29 @@ class RescuerAssignmentFieldReportWorkflowTest extends TestCase
                 ['member_id' => 'M-2', 'status_key' => 'safe'],
             ],
         ];
+    }
+
+    private function createArrivalWorkflow(string $status = 'en_route'): RescuerAssignmentWorkflow
+    {
+        $this->lifecycleFixture();
+        DB::table('responder_assignments')->insert([
+            'assignment_id' => 7,
+            'responder_id' => 5,
+            'team_id' => 1,
+            'disaster_id' => 'EVT-1',
+            'household_id' => 'HH-4',
+            'status' => $status,
+            'route_notes' => json_encode([
+                'responder_statuses' => [5 => $status, 6 => 'accepted'],
+                'responder_households' => [5 => ['HH-4'], 6 => ['HH-5']],
+            ]),
+        ]);
+
+        return new RescuerAssignmentWorkflow(
+            Mockery::mock(RoutingService::class),
+            app(RescuerMobileSupport::class),
+            app(RescuerAssignmentQuery::class),
+        );
     }
 
     private function createTables(): void

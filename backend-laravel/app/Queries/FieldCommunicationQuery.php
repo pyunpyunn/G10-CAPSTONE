@@ -10,6 +10,24 @@ use Illuminate\Support\Facades\DB;
 
 class FieldCommunicationQuery
 {
+    public function pttCounts(?string $eventId): array
+    {
+        abort_unless(Schema::hasTable('responder_communication_logs'), 503, 'Field communication records are currently unavailable.');
+        $query = DB::table('responder_communication_logs as rcl');
+        $eventId ? $query->where('rcl.disaster_id', $eventId) : $query->whereNull('rcl.disaster_id');
+
+        return $query->where('rcl.message->type', 'ptt_audio')
+            ->whereNotNull('rcl.message->audio_path')
+            ->where('rcl.message->audio_path', '<>', '')
+            ->whereNotNull('rcl.team_id')
+            ->select('rcl.team_id')
+            ->selectRaw('COUNT(*) as ptt_count')
+            ->groupBy('rcl.team_id')
+            ->pluck('ptt_count', 'team_id')
+            ->map(fn ($count): int => (int) $count)
+            ->all();
+    }
+
     public function paginate(Request $request, ?string $eventId): LengthAwarePaginator
     {
         abort_unless(Schema::hasTable('responder_communication_logs'), 503, 'Field communication records are currently unavailable.');

@@ -107,7 +107,7 @@ export default function LegacyTeamManagementPage() {
     },
   } : workspace
 
-  return <div className={activeView === 'teams' ? 'tm-page' : 'annex-h-workspace'} aria-label="Team management">
+  return <div className={activeView === 'teams' ? 'tm-page tm-teams-page' : 'annex-h-workspace tm-teams-page'} aria-label="Team management">
     {activeView === 'teams' ? <>
       {notice && <div className="tm-feedback tm-success" role="status">{notice}<button className="bt sm" type="button" onClick={() => setNotice('')}>Dismiss</button></div>}
       <RescueTeamConfigModal
@@ -160,7 +160,7 @@ function DeleteTeamDialog({ team, busy, error, onCancel, onConfirm }) {
       previous?.focus()
     }
   }, [])
-  return createPortal(<div className="tm-page ov on team-delete-overlay" onClick={event => { if (event.target === event.currentTarget && !busy) onCancel() }} onKeyDown={event => {
+  return createPortal(<div className="tm-page tm-teams-page ov on team-delete-overlay" onClick={event => { if (event.target === event.currentTarget && !busy) onCancel() }} onKeyDown={event => {
     if (event.key === 'Escape' && !busy) onCancel()
     if (event.key === 'Tab') {
       const buttons = [...dialog.current.querySelectorAll('button:not(:disabled)')]

@@ -6708,3 +6708,155 @@ main.tm-page {
   .tm-page .tm-category { width: 100%; }
   .tm-page .mf { flex-wrap: wrap; }
 }
+
+.tm-teams-page {
+  font-family: var(--font-sans, Aptos, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.tm-teams-page * {
+  font-family: var(--font-sans, Aptos, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif) !important;
+  font-style: normal !important;
+}
+
+.tm-teams-page a {
+  text-decoration: none !important;
+}
+
+.tm-teams-page.tm-page {
+  --bg: #dfe6ef;
+  --ln: #c6d1e0;
+  --cd: #f7f9fc;
+  --in: #ffffff;
+  --tx: #0f1c2d;
+  --mu: #3a4d61;
+  --nv: #0f1c2d;
+  --nv2: #1f3e5a;
+  --bl: #2a5a90;
+  background: var(--bg);
+  color: var(--tx);
+  font: 12px/1.5 var(--font-sans, Aptos, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif);
+}
+
+.tm-teams-page .tm-team-workspace {
+  --tx: #0f1c2d;
+  --mu: #3a4d61;
+}
+
+.tm-teams-page .tm-team-panel,
+.tm-teams-page .tm-team-list {
+  background: #f7f9fc;
+  border-color: #c6d1e0;
+}
+
+.tm-teams-page .tm-team-panel .th {
+  border: 1px solid #1f3e5a;
+  background: #1f3e5a;
+  color: #ffffff;
+}
+
+.tm-teams-page .tm-team-panel .th .cdc {
+  border: 1px solid rgb(255 255 255 / 24%);
+  background: rgb(255 255 255 / 12%);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.tm-teams-page .tm-team-panel .th .bt:not(.d) {
+  border-color: #a9b8cc;
+  background: #f7f9fc;
+  color: #0f1c2d;
+}
+
+.tm-teams-page .tm-team-panel .th .bg {
+  color: #ffffff;
+}
+
+.tm-teams-page .tm-team-panel .ln {
+  border-color: #c6d1e0;
+  background: #eaeff6;
+}
+
+.tm-teams-page .tm-team-panel .ln b {
+  color: #0f1c2d;
+}
+
+.tm-teams-page .tm-team-panel .mr {
+  border-color: #c6d1e0;
+  background: #ffffff;
+}
+
+.tm-teams-page .tm-team-panel .mr:nth-child(even) {
+  background: #f7f9fc;
+}
+
+.tm-teams-page .tm-team-panel .mr em {
+  font-size: 11px;
+}
+
+.tm-teams-page .tm-team-panel .mr .personnel-name-link {
+  color: #2a5a90;
+  font-weight: 600;
+  text-decoration: none !important;
+}
+
+.tm-teams-page .tm-team-panel .mr .personnel-name-link:hover {
+  color: #0f1c2d;
+  text-decoration: none !important;
+}
+
+.tm-teams-page .tm-team-list .ch {
+  background: #eaeff6;
+  color: #0f1c2d;
+}
+
+.tm-teams-page .tm-team-list .tr > b {
+  font-size: 12px;
+}
+
+.tm-teams-page .tm-team-list .tr > em {
+  background: #eaeff6;
+}
+
+.tm-teams-page .tm-team-list .tr {
+  border-color: #c6d1e0;
+  background: #ffffff;
+  color: #0f1c2d;
+}
+
+.tm-teams-page .tm-team-list .tr:hover {
+  border-color: #2a5a90;
+  background: #eaeff6;
+}
+
+.tm-teams-page .tm-team-list .tr.on {
+  border-color: #0f1c2d;
+  background: #0f1c2d;
+  box-shadow: inset 3px 0 #2a5a90;
+  color: #ffffff;
+}
+
+.tm-teams-page .tm-team-list .tr.on > em,
+.tm-teams-page .tm-team-list .tr.on .s {
+  background: transparent;
+  color: #c9d6e6;
+}
+
+.tm-teams-page .tm-team-panel .th .tt {
+  font-size: 16px;
+}
+
+.tm-teams-page .tm-feedback {
+  border-color: #c6d1e0;
+  background: #f7f9fc;
+  color: #0f1c2d;
+}
+
+.tm-teams-page .tm-success {
+  border-color: #a7cfb5;
+  background: #edf7f0;
+  color: #24613f;
+}

@@ -10,6 +10,7 @@ let pollingSubscriptions = 0
 let pollingTimer = null
 
 const initials = (name) => String(name || 'Responder').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('')
+const teamLabel = (team) => String(team.team_code || '').trim() || String(team.team_name || 'Team').trim() || 'Team'
 const durationLabel = (seconds) => `${Math.floor((Number(seconds) || 0) / 60)}:${String(Math.floor((Number(seconds) || 0) % 60)).padStart(2, '0')}`
 
 export function FieldCommunicationPanel({ compact = false, recordingsOnly = false, onClose }) {
@@ -20,10 +21,37 @@ export function FieldCommunicationPanel({ compact = false, recordingsOnly = fals
   const [page, setPage] = useState(1)
   const [player, setPlayer] = useState(null)
   const [playbackError, setPlaybackError] = useState('')
+  const [newPttCounts, setNewPttCounts] = useState({})
+  const previousPttCounts = useRef(null)
+  const previousEventId = useRef(undefined)
   const audioRef = useRef(null)
   const loader = useCallback(() => getFieldCommunications({ page, per_page: 20, search, channel,
     ...(compact ? { compact: 1 } : {}), ...(recordingsOnly ? { recordings_only: 1 } : {}), ...(team === 'all' ? {} : { team_id: team }) }), [page, search, channel, team, recordingsOnly, compact])
   const { data, loading, error, refresh } = useModuleData(loader, ['dispatch', 'communications', 'disasters'], { keepPreviousData: true })
+  useEffect(() => {
+    if (!data || !data.ptt_counts) return
+    const eventId = data.active_event?.event_id ?? null
+    const counts = data.ptt_counts
+    if (previousEventId.current !== eventId) {
+      previousEventId.current = eventId
+      previousPttCounts.current = counts
+      setNewPttCounts({})
+      return
+    }
+    const deltas = Object.entries(counts).flatMap(([teamId, count]) => {
+      const currentCount = Number(count) || 0
+      const previousCount = Number(previousPttCounts.current?.[teamId]) || 0
+      return currentCount > previousCount ? [[teamId, currentCount - previousCount]] : []
+    })
+    previousPttCounts.current = counts
+    if (deltas.length) {
+      setNewPttCounts((current) => {
+        const next = { ...current }
+        for (const [teamId, delta] of deltas) next[teamId] = (Number(next[teamId]) || 0) + delta
+        return next
+      })
+    }
+  }, [data])
   useEffect(() => {
     pollingSubscriptions += 1
     if (!pollingTimer) pollingTimer = window.setInterval(() => {
@@ -33,7 +61,13 @@ export function FieldCommunicationPanel({ compact = false, recordingsOnly = fals
   }, [])
   useEffect(() => () => { audioRef.current?.pause() }, [])
   const stop = () => { audioRef.current?.pause(); setPlayer(null); setPlaybackError('') }
-  const changeTeam = (value) => { stop(); setTeam(value); setPage(1) }
+  const changeTeam = (value) => {
+    stop()
+    setTeam(value)
+    setPage(1)
+    if (value === 'all') setNewPttCounts({})
+    else setNewPttCounts((current) => ({ ...current, [String(value)]: 0 }))
+  }
   async function play(log) {
     setPlaybackError('')
     let audio = audioRef.current
@@ -74,7 +108,12 @@ export function FieldCommunicationPanel({ compact = false, recordingsOnly = fals
     <div className="msg" key={log.id}><span className="av" style={{ '--c':['#3b82f6','#8b5cf6','#f59e0b','#0ea5e9'][Math.max(0, teams.findIndex((item) => String(item.team_id) === String(log.team_id))) % 4] }}>{initials(log.responder_name)}</span><div className="mb2"><div className="mt2"><b><PersonnelProfileLink id={log.responder_id}>{log.responder_name}</PersonnelProfileLink></b><span className="tg2">{log.team_name}</span><span className="tm">{log.timestamp}</span></div><div className="bb2">{log.audio_url ? voices(log) : <p>{log.message}</p>}{badge(log)}</div></div></div>)
   const pagination = Number(data?.meta?.last_page) > 1 ? <PaginationBar reference meta={data.meta} onPageChange={(value) => { stop(); setPage(value) }} label="communications" /> : null
   const problems = <>{error && <div className="form-error" role="alert">{error}<button className="bt" type="button" onClick={refresh}>Retry</button></div>}{playbackError && <div className="audio-error" role="alert">{playbackError}</div>}</>
-  return <div className={`communication-page${compact ? ' cd nv' : ''}${compact && !teamsOpen ? ' teams-collapsed' : ''}`}><aside className="rl"><div className="archive-rail-head"><p className="archive-rail-label">Teams</p><button className="archive-rail-toggle" type="button" aria-label="Toggle teams" aria-expanded={teamsOpen} onClick={() => setTeamsOpen((open) => !open)}><Menu size={15} /></button></div>{teamsOpen && <><button className={`ri${team === 'all' ? ' on' : ''}`} type="button" onClick={() => changeTeam('all')}><span className="av s" style={{ '--c':'#64748b' }}>∗</span>All</button>{teams.map((item) => <button key={item.team_id} className={`ri${team === String(item.team_id) ? ' on' : ''}`} type="button" onClick={() => changeTeam(String(item.team_id))}><span className="av s">{String(item.team_name).slice(0, 1)}</span>{item.team_name}</button>)}</>}</aside><section className="ct"><div className="cth"><b>Field Communication</b><span className="live"><i />Live · 5s</span><span className="sp" />{onClose && <button className="x" type="button" aria-label="Close communications" onClick={onClose}><X size={16} /></button>}</div><div className="cf">{problems}{messages}</div>{pagination}<div className="npb" style={{ visibility: player ? 'visible' : 'hidden' }}><div><div className="nn">{player?.log.responder_name}</div><div className="nt2">{player?.log.team_name} · {durationLabel(player?.current)}</div></div><div className="pbar"><i className="pf" style={{ width: `${player ? player.current / (player.duration || 1) * 100 : 0}%` }} /></div><button type="button" disabled={!player} onClick={() => play(player.log)}>{player?.playing ? 'Pause' : 'Play'}</button><button type="button" disabled={!player} aria-label="Playback speed" onClick={() => { const rate = player.rate === 1 ? 1.5 : player.rate === 1.5 ? 2 : 1; audioRef.current.playbackRate = rate; setPlayer({ ...player, rate }) }}>{player?.rate || 1}×</button></div></section></div>
+  const renderTeamButton = (item) => {
+    const label = teamLabel(item)
+    const count = Number(newPttCounts[String(item.team_id)]) || 0
+    return <button key={item.team_id} className={`ri${team === String(item.team_id) ? ' on' : ''}`} type="button" aria-label={`${label}${count ? `, ${count} new PTT message${count === 1 ? '' : 's'}` : ''}`} onClick={() => changeTeam(String(item.team_id))}><span className="av s">{label.slice(0, 1)}</span>{label}{count > 0 && <span className="communication-new-count">{count > 99 ? '99+' : count}</span>}</button>
+  }
+  return <div className={`communication-page${compact ? ' cd nv' : ''}${compact && !teamsOpen ? ' teams-collapsed' : ''}`}><aside className="rl"><div className="archive-rail-head"><p className="archive-rail-label">Teams</p><button className="archive-rail-toggle" type="button" aria-label="Toggle teams" aria-expanded={teamsOpen} onClick={() => setTeamsOpen((open) => !open)}><Menu size={15} /></button></div>{teamsOpen && <><button className={`ri${team === 'all' ? ' on' : ''}`} type="button" onClick={() => changeTeam('all')}><span className="av s" style={{ '--c':'#64748b' }}>∗</span>All</button>{teams.map(renderTeamButton)}</>}</aside><section className="ct"><div className="cth"><b>Field Communication</b><span className="sp" />{onClose && <button className="x" type="button" aria-label="Close communications" onClick={onClose}><X size={16} /></button>}</div><div className="cf">{problems}{messages}</div>{pagination}<div className="npb" style={{ visibility: player ? 'visible' : 'hidden' }}><div><div className="nn">{player?.log.responder_name}</div><div className="nt2">{player?.log.team_name} · {durationLabel(player?.current)}</div></div><div className="pbar"><i className="pf" style={{ width: `${player ? player.current / (player.duration || 1) * 100 : 0}%` }} /></div><button type="button" disabled={!player} onClick={() => play(player.log)}>{player?.playing ? 'Pause' : 'Play'}</button><button type="button" disabled={!player} aria-label="Playback speed" onClick={() => { const rate = player.rate === 1 ? 1.5 : player.rate === 1.5 ? 2 : 1; audioRef.current.playbackRate = rate; setPlayer({ ...player, rate }) }}>{player?.rate || 1}×</button></div></section></div>
 }
 
 export default FieldCommunicationPanel
