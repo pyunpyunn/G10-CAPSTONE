@@ -121,7 +121,52 @@ class DashboardEventClosureWorkflow
         if (Schema::hasColumn('responder_assignments', 'status')) $updates['status'] = 'cancelled';
         if (Schema::hasColumn('responder_assignments', 'outcome_notes')) $updates['outcome_notes'] = 'Automatically closed because the disaster event ended.';
         if (Schema::hasColumn('responder_assignments', 'updated_at')) $updates['updated_at'] = $endedAt;
-        return $updates ? $query->update($updates) : 0;
+        $closed = $updates ? $query->update($updates) : 0;
+        $this->releaseEventResponders($eventId, $endedAt);
+        return $closed;
+    }
+
+    private function releaseEventResponders(string $eventId, Carbon $endedAt): void
+    {
+        if (! Schema::hasTable('responders') || ! Schema::hasTable('responder_assignments')
+            || ! Schema::hasColumn('responder_assignments', 'disaster_id')
+            || ! Schema::hasColumn('responder_assignments', 'responder_id')) return;
+
+        $assignmentColumns = ['responder_id'];
+        $hasRouteNotes = Schema::hasColumn('responder_assignments', 'route_notes');
+        if ($hasRouteNotes) $assignmentColumns[] = 'route_notes';
+        $eventAssignments = DB::table('responder_assignments')->where('disaster_id', $eventId)->get($assignmentColumns);
+        $eventResponderIds = collect();
+        foreach ($eventAssignments as $assignment) {
+            $eventResponderIds->push((int) $assignment->responder_id);
+            if ($hasRouteNotes) {
+                $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
+                foreach ($notes['selected_responder_ids'] ?? [] as $id) $eventResponderIds->push((int) $id);
+            }
+        }
+        $eventResponderIds = $eventResponderIds->filter()->unique()->values();
+        if ($eventResponderIds->isEmpty()) return;
+
+        $busyResponderIds = collect();
+        if (Schema::hasColumn('responder_assignments', 'status')) {
+            $openAssignments = DB::table('responder_assignments')->whereNotIn('status', ['completed', 'cancelled'])->get($assignmentColumns);
+            foreach ($openAssignments as $assignment) {
+                $busyResponderIds->push((int) $assignment->responder_id);
+                if ($hasRouteNotes) {
+                    $notes = json_decode($assignment->route_notes ?? '{}', true) ?: [];
+                    foreach ($notes['selected_responder_ids'] ?? [] as $id) $busyResponderIds->push((int) $id);
+                }
+            }
+        }
+        $responderIds = $eventResponderIds->diff($busyResponderIds->filter()->unique())->all();
+        if (! $responderIds) return;
+
+        $updates = [];
+        if (Schema::hasColumn('responders', 'duty_status')) $updates['duty_status'] = 'available';
+        if (Schema::hasColumn('responders', 'is_deployed')) $updates['is_deployed'] = false;
+        if (Schema::hasColumn('responders', 'last_active_at')) $updates['last_active_at'] = $endedAt;
+        if (Schema::hasColumn('responders', 'updated_at')) $updates['updated_at'] = $endedAt;
+        if ($updates) DB::table('responders')->whereIn('responder_id', $responderIds)->update($updates);
     }
 
     private function writeAuditLog(object $event, mixed $user, Carbon $endedAt, string $note, Request $request, int $released, ?int $sitRepId, int $closedAssignments): void

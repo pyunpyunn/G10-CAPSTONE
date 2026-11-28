@@ -36,8 +36,12 @@ class DisasterEventClosureTest extends TestCase
         }
         Schema::create('resource_requests', fn (Blueprint $t) => $t->string('source_reference'));
         Schema::create('responder_assignments', function (Blueprint $t): void {
-            $t->integer('assignment_id')->primary(); $t->string('disaster_id'); $t->string('status');
+            $t->integer('assignment_id')->primary(); $t->string('disaster_id'); $t->integer('responder_id')->nullable(); $t->text('route_notes')->nullable(); $t->string('status');
             $t->text('outcome_notes')->nullable(); $t->timestamp('updated_at')->nullable();
+        });
+        Schema::create('responders', function (Blueprint $t): void {
+            $t->integer('responder_id')->primary(); $t->integer('team_id')->nullable(); $t->string('duty_status');
+            $t->boolean('is_deployed'); $t->timestamp('last_active_at')->nullable(); $t->timestamp('updated_at')->nullable();
         });
         Schema::create('household_disasters', function (Blueprint $t): void {
             $t->string('disaster_id'); $t->boolean('needs_dispatch'); $t->timestamp('updated_at')->nullable();
@@ -58,7 +62,11 @@ class DisasterEventClosureTest extends TestCase
             ['event_id' => 'CURRENT', 'name' => 'Current event', 'started_at' => now(), 'ended_at' => null],
         ]);
         DB::table('situation_reports')->insert(['sit_rep_id' => 1, 'report_number' => '1', 'disaster_id' => 'OLD', 'summary' => '{"original":true}']);
-        DB::table('responder_assignments')->insert(['assignment_id' => 1, 'disaster_id' => 'CURRENT', 'status' => 'dispatched']);
+        DB::table('responders')->insert([
+            ['responder_id' => 21, 'team_id' => 1, 'duty_status' => 'deployed', 'is_deployed' => true],
+            ['responder_id' => 22, 'team_id' => 1, 'duty_status' => 'deployed', 'is_deployed' => true],
+        ]);
+        DB::table('responder_assignments')->insert(['assignment_id' => 1, 'disaster_id' => 'CURRENT', 'responder_id' => 21, 'route_notes' => json_encode(['selected_responder_ids' => [21, 22]]), 'status' => 'dispatched']);
         DB::table('household_disasters')->insert(['disaster_id' => 'CURRENT', 'needs_dispatch' => true]);
         $this->mock(DashboardQuery::class, fn ($mock) => $mock->shouldReceive('getHouseholdSummary')->andReturn(['reported' => 0, 'total' => 0, 'safe_total' => 0, 'evacuated' => 0, 'unsafe' => 0]));
         $query = \Mockery::mock(SituationReportQuery::class)->makePartial();
@@ -86,9 +94,13 @@ class DisasterEventClosureTest extends TestCase
         $result = $workflow->close($this->request());
         $this->assertSame('CURRENT', $result['event_id']);
         $this->assertNotNull(DB::table('disaster_events')->where('event_id', 'CURRENT')->value('ended_at'));
-        $this->assertDatabaseHas('situation_reports', ['disaster_id' => 'CURRENT', 'report_number' => '2', 'sitrep_type' => 'final']);
+        $finalReport = DB::table('situation_reports')->where('disaster_id', 'CURRENT')->where('sitrep_type', 'final')->first();
+        $this->assertNotNull($finalReport);
+        $this->assertMatchesRegularExpression('/^SITREP-\d{8}-\d{4}$/', $finalReport->report_number);
         $this->assertSame('{"original":true}', DB::table('situation_reports')->where('sit_rep_id', 1)->value('summary'));
         $this->assertDatabaseHas('responder_assignments', ['assignment_id' => 1, 'status' => 'cancelled']);
+        $this->assertDatabaseHas('responders', ['responder_id' => 21, 'duty_status' => 'available', 'is_deployed' => false]);
+        $this->assertDatabaseHas('responders', ['responder_id' => 22, 'duty_status' => 'available', 'is_deployed' => false]);
         $this->assertDatabaseHas('household_disasters', ['disaster_id' => 'CURRENT', 'needs_dispatch' => false]);
         $this->assertDatabaseCount('incident_archives', 1);
         $this->assertDatabaseCount('audit_logs', 1);
@@ -108,6 +120,7 @@ class DisasterEventClosureTest extends TestCase
         }
         $this->assertNull(DB::table('disaster_events')->where('event_id', 'CURRENT')->value('ended_at'));
         $this->assertDatabaseHas('responder_assignments', ['assignment_id' => 1, 'status' => 'dispatched']);
+        $this->assertDatabaseHas('responders', ['responder_id' => 21, 'duty_status' => 'deployed', 'is_deployed' => true]);
         $this->assertDatabaseHas('household_disasters', ['disaster_id' => 'CURRENT', 'needs_dispatch' => true]);
         $this->assertDatabaseCount('situation_reports', 1);
         $this->assertDatabaseCount('incident_archives', 0);

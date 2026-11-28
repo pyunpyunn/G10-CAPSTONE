@@ -57,10 +57,8 @@ function AssignmentEditor({ workspace, groups, detail, initialSitio, initialHous
   const householdPlans = useMemo(() => Object.fromEntries(cards.filter((card) => plans[card.id]).map((card) => {
     const eligible = (card.households || []).filter((household) => household.is_available_for_dispatch)
     const members = plans[card.id] || []
-    const split = eligible.length > 1
-      ? splitCoverageHouseholds(shuffleDispatchItems(eligible), members.length)
-      : members.map(() => eligible)
-    return [card.id, Object.fromEntries(members.map((member, index) => [member.responder_id, (split[index] || eligible).map((h) => h.household_id)]))]
+    const split = splitCoverageHouseholds(shuffleDispatchItems(eligible), members.length)
+    return [card.id, Object.fromEntries(members.map((member, index) => [member.responder_id, (split[index] || []).map((household) => household.household_id)]))]
   })), [cards, plans])
   const selected = cards.filter((card) => selections[card.id]?.some(Boolean))
   const closed = ['completed', 'cancelled'].includes(dispatch?.status?.key)
