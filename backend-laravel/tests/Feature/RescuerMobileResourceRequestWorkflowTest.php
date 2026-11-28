@@ -22,16 +22,18 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
             $table->string('request_id')->primary();
             $table->string('request_source')->nullable();
             $table->string('source_reference')->nullable();
-            $table->string('request_category')->nullable();
+            $table->string('category', 30)->nullable();
             $table->string('evacuation_center_id')->nullable();
             $table->string('requested_by')->nullable();
             $table->foreign('requested_by')->references('user_id')->on('users');
             $table->string('handled_by')->nullable();
+            $table->integer('resource_type_id')->nullable();
             $table->string('resource_type')->nullable();
             $table->string('item_name')->nullable();
             $table->integer('quantity')->nullable();
             $table->string('unit')->nullable();
             $table->text('description')->nullable();
+            $table->string('destination')->nullable();
             $table->integer('urgency_id')->nullable();
             $table->integer('status_id')->nullable();
             $table->string('validation_status')->nullable();
@@ -63,7 +65,7 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
         DB::table('users')->insert(['user_id' => $userId]);
         $request = Request::create('/api/v1/rescuer/resource-requests', 'POST', [
             'location' => 'Zone 2',
-            'request_category' => 'resource',
+            'category' => 'resource',
             'resource_type' => 'Water',
             'item_name' => 'Drinking water',
             'quantity' => 5,
@@ -89,7 +91,7 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
         $this->assertDatabaseHas('resource_requests', [
             'request_id' => $requestId,
             'request_source' => 'rescuer_mobile',
-            'request_category' => 'resource',
+            'category' => 'resource',
             'requested_by' => $userId,
             'resource_type' => 'Water',
             'urgency_id' => 3,
@@ -103,7 +105,7 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
     {
         $request = Request::create('/api/v1/rescuer/resource-requests', 'POST', [
             'location' => 'Zone 2',
-            'request_category' => 'personnel',
+            'category' => 'personnel',
             'resource_type' => 'Personnel',
             'item_name' => 'Search and rescue team',
             'quantity' => 3,
@@ -117,7 +119,7 @@ class RescuerMobileResourceRequestWorkflowTest extends TestCase
         $this->assertSame(201, $response->getStatusCode());
         $this->assertDatabaseHas('resource_requests', [
             'request_id' => $requestId,
-            'request_category' => 'personnel',
+            'category' => 'personnel',
             'resource_type' => 'Personnel',
             'item_name' => 'Search and rescue team',
             'quantity' => 3,

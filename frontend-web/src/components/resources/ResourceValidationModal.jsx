@@ -30,6 +30,7 @@ export default function ResourceValidationModal({
   const modalSub = modalSubFor(mode, selectedRequestId)
   const sourceOptions = options.sources || []
   const categoryOptions = options.categories || []
+  const resourceTypes = options.resource_types || []
   const urgencyOptions = options.urgencies || []
   const statusOptions = options.statuses || []
   const validationOptions = statusOptions.filter((status) => ['needs_validation', 'verified', 'cancelled'].includes(status.key))
@@ -83,6 +84,34 @@ export default function ResourceValidationModal({
                 <select value={form.request_category} disabled={requestFieldsDisabled} onChange={(event) => setField('request_category', event.target.value)}>
                   {categoryOptions.map((category) => (
                     <option value={category.key} key={category.key}>{category.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="rr-mini-label">Registered resource type</label>
+                <select
+                  value={form.resource_type_id}
+                  disabled={requestFieldsDisabled}
+                  onChange={(event) => {
+                    const selectedType = resourceTypes.find((type) => String(type.type_id) === event.target.value)
+                    setForm((current) => ({
+                      ...current,
+                      resource_type_id: event.target.value,
+                      ...(selectedType ? {
+                        request_category: String(selectedType.category || current.request_category).trim().toLowerCase().replace(/[ -]/g, '_'),
+                        resource_type: selectedType.resource_type || current.resource_type,
+                        item_name: selectedType.item_name || current.item_name,
+                        quantity: selectedType.quantity || current.quantity,
+                        unit: selectedType.unit || current.unit,
+                      } : {}),
+                    }))
+                  }}
+                >
+                  <option value="">Select a saved resource type (optional)</option>
+                  {resourceTypes.map((type) => (
+                    <option value={type.type_id} key={type.type_id}>
+                      {type.type_label || type.item_name || type.resource_type || `Type ${type.type_id}`}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -144,6 +173,17 @@ export default function ResourceValidationModal({
                 </select>
               </div>
 
+              <div className="full">
+                <label className="rr-mini-label">Destination</label>
+                <input
+                  type="text"
+                  maxLength={255}
+                  value={form.destination}
+                  readOnly={requestFieldsDisabled}
+                  placeholder="Delivery site or destination"
+                  onChange={(event) => setField('destination', event.target.value)}
+                />
+              </div>
               <div className="full">
                 <label className="rr-mini-label">Area / beneficiaries</label>
                 <select value={form.evacuation_center_id} disabled={requestFieldsDisabled} onChange={(event) => setField('evacuation_center_id', event.target.value)}>

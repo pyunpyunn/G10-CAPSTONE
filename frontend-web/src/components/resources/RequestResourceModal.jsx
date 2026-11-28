@@ -276,13 +276,14 @@ export default function RequestResourceModal({
 
       const payload = {
         request_source: 'hq_desk',
-        request_category: 'resource',
+        category: 'resource',
         resource_type: categoryLabel,
         item_name: titleDisplay,
         quantity: reqQty,
         unit: item.unit || 'units',
         requested_by: requestedBy.trim(),
         evacuation_center_id: evacuationCenterId || null,
+        destination: selectedCenter?.name || locationText,
         urgency_id: urgencyId ? Number(urgencyId) : 2,
         description: description.trim() || `Disaster resource request for ${titleDisplay} (${itemSku})`,
         sku: itemSku || null,

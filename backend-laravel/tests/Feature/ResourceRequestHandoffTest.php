@@ -131,15 +131,17 @@ class ResourceRequestHandoffTest extends TestCase
                 $table->string('request_id')->primary();
                 $table->string('request_source')->default('hq_desk');
                 $table->string('source_reference')->nullable();
-                $table->string('request_category')->default('resource');
+                $table->string('category', 30)->default('resource');
                 $table->string('evacuation_center_id')->nullable();
                 $table->string('requested_by')->nullable();
                 $table->string('handled_by')->nullable();
+                $table->integer('resource_type_id')->nullable();
                 $table->string('resource_type');
                 $table->string('item_name')->nullable();
                 $table->integer('quantity')->default(1);
                 $table->string('unit')->default('units');
                 $table->text('description')->nullable();
+                $table->string('destination')->nullable();
                 $table->integer('urgency_id')->default(2);
                 $table->integer('status_id')->default(1);
                 $table->string('validation_status')->default('needs_validation');
@@ -235,7 +237,7 @@ class ResourceRequestHandoffTest extends TestCase
         // 1. Create request
         $response = $this->actingAs($user)->postJson('/api/v1/resource-requests', [
             'request_source' => 'hq_desk',
-            'request_category' => 'resource',
+            'category' => 'resource',
             'resource_type' => 'Food packs and clean water',
             'quantity' => 150,
             'unit' => 'packs',

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ResourceRequest;
 use App\Services\Web\ResourceRequestWriteWorkflow;
+use App\Services\Web\ResourceRequestPayloadValidator;
 use App\Queries\ResourceRequestQuery;
 use App\Services\Shared\TrackingAidForwardingService;
 use Illuminate\Database\Schema\Blueprint;
@@ -20,14 +21,15 @@ class ResourceRequestWriteWorkflowTest extends TestCase
         parent::setUp();
         Schema::create('resource_request_status', function (Blueprint $table): void { $table->increments('status_id'); $table->string('status_key'); $table->string('status_label'); });
         Schema::create('urgency_levels', function (Blueprint $table): void { $table->increments('urgency_id'); $table->string('urgency_key'); $table->string('urgency_label'); });
-        Schema::create('resource_requests', function (Blueprint $table): void { $table->string('request_id')->primary(); $table->string('request_source')->nullable(); $table->string('source_reference')->nullable(); $table->string('request_category')->nullable(); $table->string('evacuation_center_id')->nullable(); $table->string('requested_by')->nullable(); $table->string('handled_by')->nullable(); $table->string('resource_type')->nullable(); $table->string('item_name')->nullable(); $table->integer('quantity')->nullable(); $table->string('unit')->nullable(); $table->text('description')->nullable(); $table->integer('urgency_id')->nullable(); $table->integer('status_id')->nullable(); $table->string('validation_status')->nullable(); $table->text('validation_notes')->nullable(); $table->string('validated_by_user_id')->nullable(); $table->timestamp('validated_at')->nullable(); $table->timestamp('released_for_tracking_at')->nullable(); $table->string('tracking_reference')->nullable(); $table->timestamps(); });
+        Schema::create('resource_request_types', function (Blueprint $table): void { $table->increments('type_id'); $table->string('type_key', 60)->nullable(); $table->string('type_label', 100)->nullable(); $table->string('category', 30)->nullable(); $table->string('resource_type', 100)->nullable(); $table->string('item_name', 150)->nullable(); $table->integer('quantity')->nullable(); $table->string('unit', 50)->nullable(); $table->string('storage_depot', 150)->nullable(); $table->date('exp_date')->nullable(); });
+        Schema::create('resource_requests', function (Blueprint $table): void { $table->string('request_id')->primary(); $table->string('request_source')->nullable(); $table->string('source_reference')->nullable(); $table->string('category', 30)->nullable(); $table->string('evacuation_center_id')->nullable(); $table->string('requested_by')->nullable(); $table->string('handled_by')->nullable(); $table->integer('resource_type_id')->nullable(); $table->string('resource_type', 100)->nullable(); $table->string('item_name', 150)->nullable(); $table->integer('quantity')->nullable(); $table->string('unit', 50)->nullable(); $table->text('description')->nullable(); $table->string('destination')->nullable(); $table->integer('urgency_id')->nullable(); $table->integer('status_id')->nullable(); $table->string('validation_status')->nullable(); $table->text('validation_notes')->nullable(); $table->string('validated_by_user_id')->nullable(); $table->timestamp('validated_at')->nullable(); $table->timestamp('released_for_tracking_at')->nullable(); $table->string('tracking_reference')->nullable(); $table->timestamps(); });
         Schema::create('evacuation_centers', function (Blueprint $table): void { $table->string('evacuation_center_id')->primary(); $table->string('name')->nullable(); $table->string('osm_address')->nullable(); $table->string('current_event_id')->nullable(); $table->softDeletes(); });
         Schema::create('disaster_events', function (Blueprint $table): void { $table->string('event_id')->primary(); $table->string('name')->nullable(); $table->timestamp('ended_at')->nullable(); $table->timestamp('deleted_at')->nullable(); });        Schema::create('request_validations', function (Blueprint $table): void { $table->increments('validation_id'); $table->string('request_id'); $table->string('validation_status'); $table->string('validator_user_id')->nullable(); $table->text('validation_notes')->nullable(); $table->text('missing_information')->nullable(); $table->string('duplicate_request_id')->nullable(); $table->timestamp('validated_at')->nullable(); $table->timestamps(); });
         Schema::create('audit_logs', function (Blueprint $table): void { $table->increments('audit_id'); $table->string('user_id')->nullable(); $table->string('role_key')->nullable(); $table->string('module'); $table->string('action'); $table->string('reference_table'); $table->string('reference_id'); $table->text('old_values')->nullable(); $table->text('new_values')->nullable(); $table->string('ip_address')->nullable(); $table->string('user_agent')->nullable(); $table->timestamp('created_at')->nullable(); });
         Schema::create('jobs', function (Blueprint $table): void { $table->bigIncrements('id'); $table->string('queue')->index(); $table->longText('payload'); $table->unsignedTinyInteger('attempts'); $table->unsignedInteger('reserved_at')->nullable(); $table->unsignedInteger('available_at'); $table->unsignedInteger('created_at'); });
         DB::table('resource_request_status')->insert([['status_id'=>1,'status_key'=>'pending','status_label'=>'Pending'],['status_id'=>2,'status_key'=>'approved','status_label'=>'Approved']]);
         DB::table('urgency_levels')->insert(['urgency_id'=>1,'urgency_key'=>'medium','urgency_label'=>'Medium']);
-        ResourceRequest::create(['request_id'=>'RR-1','request_source'=>'field_team','request_category'=>'resource','requested_by'=>'Requester','resource_type'=>'Water','quantity'=>2,'unit'=>'boxes','urgency_id'=>1,'status_id'=>1,'validation_status'=>'needs_validation']);
+        ResourceRequest::create(['request_id'=>'RR-1','request_source'=>'field_team','category'=>'resource','requested_by'=>'Requester','resource_type'=>'Water','quantity'=>2,'unit'=>'boxes','urgency_id'=>1,'status_id'=>1,'validation_status'=>'needs_validation']);
     }
 
     public function test_validation_workflow_updates_status_history_and_syncs_tracking_mirror(): void
@@ -52,7 +54,7 @@ class ResourceRequestWriteWorkflowTest extends TestCase
         $tracking->expects($this->exactly(2))->method('deductStock');
         $workflow = new ResourceRequestWriteWorkflow($tracking, app(ResourceRequestQuery::class), app(\App\Presenters\ResourceRequestPresenter::class));
         $payload = [
-            'request_source' => 'hq_desk', 'request_category' => 'resource', 'requested_by' => 'Alex',
+            'request_source' => 'hq_desk', 'category' => 'resource', 'requested_by' => 'Alex',
             'resource_type' => 'Water', 'item_name' => 'Bottled water', 'quantity' => 4, 'unit' => 'boxes',
             'urgency_id' => 3,
         ];
@@ -67,6 +69,73 @@ class ResourceRequestWriteWorkflowTest extends TestCase
         $this->assertDatabaseHas('resource_requests', ['request_id' => $medium['request_id'], 'urgency_id' => 1]);
     }
 
+    public function test_web_request_resolves_registered_type_and_persists_new_schema_columns(): void
+    {
+        DB::table('resource_request_types')->insert([
+            'type_id' => 1,
+            'type_key' => 'meal-kit',
+            'type_label' => 'Meal kit',
+            'category' => 'resource',
+            'resource_type' => 'Food',
+            'item_name' => 'Ready-to-eat meal kit',
+            'quantity' => 5,
+            'unit' => 'boxes',
+            'storage_depot' => 'Central depot',
+            'exp_date' => '2027-01-31',
+        ]);
+        $payload = [
+            'request_source' => 'hq_desk',
+            'resource_type_id' => 1,
+            'category' => 'vehicle',
+            'resource_type' => 'Untrusted label',
+            'requested_by' => 'Alex',
+            'quantity' => 3,
+            'destination' => 'North evacuation center',
+        ];
+        $request = Request::create('/api/v1/resource-requests', 'POST', $payload);
+        $validated = app(ResourceRequestPayloadValidator::class)->request($request);
+
+        $this->assertSame('resource', $validated['category']);
+        $this->assertSame('Food', $validated['resource_type']);
+        $this->assertSame('Ready-to-eat meal kit', $validated['item_name']);
+        $this->assertSame('boxes', $validated['unit']);
+
+        $tracking = $this->createMock(TrackingAidForwardingService::class);
+        $tracking->expects($this->once())->method('deductStock');
+        $workflow = new ResourceRequestWriteWorkflow($tracking, app(ResourceRequestQuery::class), app(\App\Presenters\ResourceRequestPresenter::class));
+        $created = $workflow->create($request, $validated, null);
+
+        $this->assertDatabaseHas('resource_requests', [
+            'request_id' => $created['request_id'],
+            'category' => 'resource',
+            'resource_type_id' => 1,
+            'resource_type' => 'Food',
+            'item_name' => 'Ready-to-eat meal kit',
+            'quantity' => 3,
+            'unit' => 'boxes',
+            'destination' => 'North evacuation center',
+        ]);
+        $this->assertSame('Meal kit', ResourceRequest::find($created['request_id'])->resourceType->type_label);
+    }
+
+    public function test_web_request_accepts_legacy_request_category_input(): void
+    {
+        $validated = app(ResourceRequestPayloadValidator::class)->request(Request::create(
+            '/api/v1/resource-requests',
+            'POST',
+            [
+                'request_source' => 'hq_desk',
+                'request_category' => 'resource',
+                'resource_type' => 'Water',
+                'requested_by' => 'Alex',
+                'quantity' => 1,
+            ],
+        ));
+
+        $this->assertSame('resource', $validated['category']);
+        $this->assertArrayNotHasKey('request_category', $validated);
+    }
+
     public function test_request_list_filters_by_urgency_on_the_server(): void
     {
         DB::table('urgency_levels')->insert([
@@ -74,7 +143,7 @@ class ResourceRequestWriteWorkflowTest extends TestCase
             ['urgency_id' => 3, 'urgency_key' => 'high', 'urgency_label' => 'High'],
         ]);
         DB::table('resource_requests')->insert([
-            'request_id' => 'RR-HIGH', 'request_source' => 'hq_desk', 'request_category' => 'resource',
+            'request_id' => 'RR-HIGH', 'request_source' => 'hq_desk', 'category' => 'resource',
             'requested_by' => 'Alex', 'resource_type' => 'Water', 'quantity' => 2, 'urgency_id' => 3,
             'status_id' => 1, 'validation_status' => 'needs_validation',
         ]);
@@ -82,6 +151,26 @@ class ResourceRequestWriteWorkflowTest extends TestCase
         [$requests] = app(ResourceRequestQuery::class)->list(Request::create('/api/v1/resource-requests', 'GET', ['urgency' => 'high']));
 
         $this->assertSame(['RR-HIGH'], collect($requests->items())->pluck('request_id')->all());
+    }
+
+    public function test_request_list_filters_by_the_new_category_column(): void
+    {
+        DB::table('resource_requests')->insert([
+            'request_id' => 'RR-VEHICLE',
+            'request_source' => 'hq_desk',
+            'category' => 'Vehicle',
+            'requested_by' => 'Alex',
+            'resource_type' => 'Transport',
+            'quantity' => 1,
+            'status_id' => 1,
+            'validation_status' => 'needs_validation',
+        ]);
+
+        [$requests] = app(ResourceRequestQuery::class)->list(
+            Request::create('/api/v1/resource-requests', 'GET', ['category' => 'vehicle']),
+        );
+
+        $this->assertSame(['RR-VEHICLE'], collect($requests->items())->pluck('request_id')->all());
     }
 
     public function test_external_handshake_and_intake_accept_the_same_key(): void

@@ -20,7 +20,7 @@ class TrackingAidPayloadPresenter
             'source_reference' => $resourceRequest->source_reference,
             'request_source' => $resourceRequest->request_source,
             'source_system' => $this->sourceSystem($resourceRequest->request_source ?? null),
-            'request_category' => $resourceRequest->request_category,
+            'request_category' => $resourceRequest->category ?? null,
             'resource_type' => $resourceRequest->resource_type,
             'item_name' => $resourceRequest->item_name,
             'quantity' => $quantity,

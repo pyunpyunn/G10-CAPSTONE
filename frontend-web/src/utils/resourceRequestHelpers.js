@@ -5,6 +5,7 @@ export function emptyResourceRequestForm(payload = {}) {
     request_source: 'hq_desk',
     source_reference: payload.active_event?.event_id || '',
     request_category: 'resource',
+    resource_type_id: '',
     resource_type: '',
     item_name: '',
     quantity: 1,
@@ -12,6 +13,7 @@ export function emptyResourceRequestForm(payload = {}) {
     urgency_id: Number(mediumUrgency?.urgency_id || 2),
     requested_by: '',
     evacuation_center_id: '',
+    destination: '',
     description: '',
     validation_status: 'needs_validation',
     validation_notes: '',
@@ -25,7 +27,8 @@ export function formFromResourceRequest(request) {
   return {
     request_source: request.request_source?.key || 'shared_db',
     source_reference: request.source_reference || '',
-    request_category: request.request_category?.key || 'resource',
+    request_category: request.category?.key || request.request_category?.key || 'resource',
+    resource_type_id: request.resource_type_id ? String(request.resource_type_id) : '',
     resource_type: request.need?.type || '',
     item_name: request.need?.item_name || '',
     quantity: request.need?.quantity || 1,
@@ -33,6 +36,7 @@ export function formFromResourceRequest(request) {
     urgency_id: Number(request.urgency?.urgency_id || 2),
     requested_by: request.requested_by || '',
     evacuation_center_id: request.area?.evacuation_center_id || '',
+    destination: request.destination || '',
     description: request.description || '',
     validation_status: request.validation?.key || 'needs_validation',
     validation_notes: request.validation_notes || '',
@@ -46,7 +50,8 @@ export function buildCreatePayload(form) {
   return {
     request_source: form.request_source,
     source_reference: emptyToNull(form.source_reference),
-    request_category: form.request_category,
+    category: form.request_category,
+    resource_type_id: Number(form.resource_type_id) || null,
     resource_type: form.resource_type,
     item_name: emptyToNull(form.item_name),
     quantity: Number(form.quantity) || 1,
@@ -54,6 +59,7 @@ export function buildCreatePayload(form) {
     urgency_id: Number(form.urgency_id) || 2,
     requested_by: form.requested_by,
     evacuation_center_id: emptyToNull(form.evacuation_center_id),
+    destination: emptyToNull(form.destination),
     description: emptyToNull(form.description),
   }
 }

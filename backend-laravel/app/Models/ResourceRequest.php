@@ -20,15 +20,17 @@ class ResourceRequest extends Model
         'request_id',
         'request_source',
         'source_reference',
-        'request_category',
+        'category',
         'evacuation_center_id',
         'requested_by',
         'handled_by',
+        'resource_type_id',
         'resource_type',
         'item_name',
         'quantity',
         'unit',
         'description',
+        'destination',
         'urgency_id',
         'status_id',
         'validation_status',
@@ -43,6 +45,7 @@ class ResourceRequest extends Model
     {
         return [
             'quantity' => 'integer',
+            'resource_type_id' => 'integer',
             'urgency_id' => 'integer',
             'status_id' => 'integer',
             'validated_at' => 'datetime',
@@ -55,6 +58,11 @@ class ResourceRequest extends Model
     public function status(): BelongsTo
     {
         return $this->belongsTo(ResourceRequestStatus::class, 'status_id', 'status_id');
+    }
+
+    public function resourceType(): BelongsTo
+    {
+        return $this->belongsTo(ResourceRequestType::class, 'resource_type_id', 'type_id');
     }
 
     public function evacuationCenter(): BelongsTo

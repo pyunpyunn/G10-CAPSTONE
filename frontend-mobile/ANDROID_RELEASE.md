@@ -1,14 +1,13 @@
 # Standalone Android APK
 
-## Latest local APK — version 2.0.0, build 70
+## Latest local APK — version 2.0.0, build 76
 
-Installable file: [`releases/RESQPERATION-build70.apk`](./releases/RESQPERATION-build70.apk).
+Installable file: [`releases/RESQPERATION-build76.apk`](./releases/RESQPERATION-build76.apk).
 
-- Built from local `main` commit `69427d6da811bf8e75d6e2e6b28e7207dcb4f25e`, which includes fetched `origin/main` commit `850012d73e3301720d554f80803d93f7a2b1744d` and the latest MapLibre/Expo Go changes. Uncommitted standalone Expo Go preview files were preserved.
-- Version code 70; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified; non-debuggable and HTTPS-only manifest checks passed.
-- SHA-256: `E69ED0D2F67629167B33BDF53FF459DF143160C5DE893747E9E3D7824AF06467`.
-- Verification: TypeScript and signed Android release build passed. Mobile regressions: 150 passed, 8 failed. Failures involve stale fixtures: two password tests lack the password-policy mock, five map tests still target the pre-wrapper native component, and one push-registration test supplies a user without the required role. App source was not changed for this release.
-- Physical-device installation and runtime behavior remain unverified; no Android device was connected. Backend changes require separate deployment.
+- Built from fetched `origin/main` and local `main` commit `39ec6cdc3a9d683c5ada458fc661eff85ee6a9d0`.
+- Version code 76; package `com.kathlnbarro.resqperationmobile`; existing release signing certificate verified; non-debuggable and release manifest checks passed.
+- SHA-256: `4C7245062E065AAFF6779E1965AEA0E1B110220DDDBECDDA617242543F8FDEA5`.
+- Verification: TypeScript check, signed Android release build, APK identity/version, and signing certificate checks passed. Physical-device installation and runtime behavior were not tested.
 
 ## Latest local APK — version 2.0.0, build 69
 

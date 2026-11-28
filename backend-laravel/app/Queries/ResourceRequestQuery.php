@@ -7,6 +7,7 @@ use App\Models\EvacuationCenter;
 use App\Models\RequestValidation;
 use App\Models\ResourceRequest;
 use App\Models\ResourceRequestStatus;
+use App\Models\ResourceRequestType;
 use App\Presenters\ResourceRequestPresenter;
 use App\Services\Shared\TrackingAidForwardingService;
 use App\Services\Shared\OperationalSequence;
@@ -44,7 +45,7 @@ class ResourceRequestQuery
     {
         $search=trim((string)$request->query('search',''));$status=$this->presenter->statusKey((string)$request->query('status','all'));$statusId=trim((string)$request->query('status_id',''));$source=$this->presenter->sourceKey((string)$request->query('source','all'));$category=$this->presenter->categoryKey((string)$request->query('category','all'));$purok=trim((string)$request->query('purok','all'));$eventId=trim((string)$request->query('event_id',''));$core=$request->boolean('core');$period=$this->periodKey((string)$request->query('period','week'));$q=$this->requestQuery();
         if($search!=='')$q->where(function($x)use($search):void{$x->where('rr.request_id','like',"%$search%")->orWhere('rr.request_source','like',"%$search%")->orWhere('rr.source_reference','like',"%$search%")->orWhere('rr.requested_by','like',"%$search%")->orWhere('rr.resource_type','like',"%$search%")->orWhere('rr.item_name','like',"%$search%")->orWhere('rr.description','like',"%$search%")->orWhere('ec.name','like',"%$search%")->orWhere('ec.osm_address','like',"%$search%");});
-        if($status!=='all')$this->applyStatusFilter($q,$status);if($statusId!=='')$q->where('rr.status_id',$statusId);if($source!=='all')$q->where('rr.request_source',$source);if($category!=='all')$q->where('rr.request_category',$category);if($purok!==''&&$purok!=='all')$q->where(fn($x)=>$x->where('ec.name','like',"%$purok%")->orWhere('ec.osm_address','like',"%$purok%")->orWhere('rr.description','like',"%$purok%")->orWhere('rr.evacuation_center_id','like',"%$purok%"));if($eventId!==''&&$eventId!=='all')$q->where(fn($x)=>$x->where('rr.source_reference',$eventId)->orWhere('ec.current_event_id',$eventId));
+        if($status!=='all')$this->applyStatusFilter($q,$status);if($statusId!=='')$q->where('rr.status_id',$statusId);if($source!=='all')$q->where('rr.request_source',$source);if($category!=='all')$q->whereRaw("LOWER(REPLACE(REPLACE(rr.category, ' ', '_'), '-', '_')) = ?", [$category]);if($purok!==''&&$purok!=='all')$q->where(fn($x)=>$x->where('ec.name','like',"%$purok%")->orWhere('ec.osm_address','like',"%$purok%")->orWhere('rr.description','like',"%$purok%")->orWhere('rr.evacuation_center_id','like',"%$purok%"));if($eventId!==''&&$eventId!=='all')$q->where(fn($x)=>$x->where('rr.source_reference',$eventId)->orWhere('ec.current_event_id',$eventId));
         $urgency = strtolower(trim((string) $request->query('urgency', $request->query('priority', 'all'))));
         if (in_array($urgency, ['low', 'medium', 'high', 'critical'], true)) {
             if (Schema::hasColumn('resource_requests', 'urgency_id') && Schema::hasTable('urgency_levels')) {
@@ -134,7 +135,54 @@ class ResourceRequestQuery
     public function trackingMirror():array{$connection=(string)config('services.trackingaid.connection','trackingaid');try{if(Schema::connection($connection)->hasTable('inventory')){$items=DB::connection($connection)->table('inventory')->whereNull('deleted_at')->orderByDesc('quantity')->orderBy('name')->limit(12)->get(['id','name','category','sku','type','quantity','expiration','storage_location'])->map(fn($i)=>['label'=>$i->name?:'Unnamed resource','source'=>'TrackingAid inventory','status'=>max(0,(int)($i->quantity??0)).' available','detail'=>trim(($i->category?:'Uncategorized').' - '.($i->storage_location?:'No storage location')),'sku'=>$i->sku,'quantity'=>max(0,(int)($i->quantity??0)),'type'=>$i->type,'expiration'=>$i->expiration])->values()->all();return $items?:[['label'=>'No TrackingAid inventory yet','source'=>'TrackingAid inventory','status'=>'0 available','detail'=>'TrackingAid inventory table is reachable but has no resources recorded.']];}}catch(Throwable){}return [];}
     public function validationHistory(string $id):array{if(!Schema::hasTable('request_validations'))return[];return RequestValidation::query()->where('request_id',$id)->orderByDesc('created_at')->limit(8)->get()->map(fn($r)=>['validation_id'=>$r->validation_id,'validation_status'=>$this->presenter->validation($r->validation_status),'validator_user_id'=>$r->validator_user_id,'validation_notes'=>$r->validation_notes,'missing_information'=>$r->missing_information,'duplicate_request_id'=>$r->duplicate_request_id,'validated_at'=>$this->presenter->dateTime($r->validated_at)])->values()->all();}
     public function insertValidation(string $id,string $status,?string $user,?string $notes,?string $missing,?string $duplicate,Carbon $now):void{if(Schema::hasTable('request_validations'))RequestValidation::create(['request_id'=>$id,'validation_status'=>$status,'validator_user_id'=>$user,'validation_notes'=>$notes,'missing_information'=>$missing,'duplicate_request_id'=>$duplicate,'validated_at'=>$now,'created_at'=>$now,'updated_at'=>$now]);}
-    public function options():array{return['sources'=>collect(self::SOURCES)->map(fn($label,$key)=>['key'=>$key,'label'=>$label])->values()->all(),'categories'=>collect(self::CATEGORIES)->map(fn($label,$key)=>['key'=>$key,'label'=>$label])->values()->all(),'statuses'=>collect(self::STATUSES)->map(fn($label,$key)=>['key'=>$key,'label'=>$label,'status_id'=>$this->statusId($key)])->values()->all(),'resource_statuses'=>ResourceRequestStatus::query()->orderBy('status_id')->get(['status_id','status_key','status_label'])->map(fn($row)=>['status_id'=>(int)$row->status_id,'key'=>$row->status_key,'label'=>$row->status_label])->all(),'urgencies'=>$this->urgencies(),'evacuation_centers'=>$this->centers(),'puroks'=>$this->puroks()];}
+    public function options():array{return['sources'=>collect(self::SOURCES)->map(fn($label,$key)=>['key'=>$key,'label'=>$label])->values()->all(),'categories'=>$this->categories(),'resource_types'=>$this->resourceTypes(),'statuses'=>collect(self::STATUSES)->map(fn($label,$key)=>['key'=>$key,'label'=>$label,'status_id'=>$this->statusId($key)])->values()->all(),'resource_statuses'=>ResourceRequestStatus::query()->orderBy('status_id')->get(['status_id','status_key','status_label'])->map(fn($row)=>['status_id'=>(int)$row->status_id,'key'=>$row->status_key,'label'=>$row->status_label])->all(),'urgencies'=>$this->urgencies(),'evacuation_centers'=>$this->centers(),'puroks'=>$this->puroks()];}
+    private function categories():array
+    {
+        $categories = collect();
+        if (Schema::hasTable('resource_request_types')) {
+            $categories = ResourceRequestType::query()
+                ->whereNotNull('category')
+                ->where('category', '<>', '')
+                ->distinct()
+                ->orderBy('category')
+                ->pluck('category')
+                ->map(fn ($category) => [
+                    'key' => str_replace([' ', '-'], '_', strtolower(trim((string) $category))),
+                    'label' => ucfirst(trim((string) $category)),
+                ])
+                ->unique('key');
+        }
+
+        return $categories
+            ->merge(collect(self::CATEGORIES)->map(fn($label,$key)=>['key'=>$key,'label'=>$label]))
+            ->unique('key')
+            ->values()
+            ->all();
+    }
+    private function resourceTypes():array
+    {
+        if (! Schema::hasTable('resource_request_types')) {
+            return [];
+        }
+
+        return ResourceRequestType::query()
+            ->orderBy('type_label')
+            ->orderBy('type_id')
+            ->get(['type_id','type_key','type_label','category','resource_type','item_name','quantity','unit','storage_depot','exp_date'])
+            ->map(fn (ResourceRequestType $type) => [
+                'type_id' => (int) $type->type_id,
+                'type_key' => $type->type_key,
+                'type_label' => $type->type_label,
+                'category' => $type->category,
+                'resource_type' => $type->resource_type,
+                'item_name' => $type->item_name,
+                'quantity' => $type->quantity,
+                'unit' => $type->unit,
+                'storage_depot' => $type->storage_depot,
+                'exp_date' => $type->exp_date?->toDateString(),
+            ])
+            ->all();
+    }
     public function defaultUrgencyId():?int
     {
         if(!Schema::hasTable('urgency_levels'))return null;

@@ -14,7 +14,7 @@ class ResourceRequestPresenterTest extends TestCase
         $presenter = new ResourceRequestPresenter($tracking);
         $row = (object) [
             'request_id' => 'RR-1', 'validation_status' => 'needs_validation', 'quantity' => 4, 'unit' => 'boxes',
-            'request_source' => 'field_team', 'request_category' => 'resource', 'source_reference' => 'EV-1',
+            'request_source' => 'field_team', 'category' => 'resource', 'source_reference' => 'EV-1',
             'resource_type' => 'Water', 'item_name' => 'Bottled water', 'description' => 'For families',
             'evacuation_center_name' => 'Center A', 'evacuation_center_id' => 'EC-1', 'evacuation_center_address' => 'Sitio Uno',
             'evacuation_event_id' => 'EV-1', 'evacuation_event_name' => 'Flood', 'evacuation_event_ended_at' => null,

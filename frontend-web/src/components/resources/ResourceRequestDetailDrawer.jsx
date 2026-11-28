@@ -196,7 +196,7 @@ export default function ResourceRequestDetailDrawer({
                   {request.area?.meta && (
                     <div className="rr-detail-row">
                       <span className="rr-detail-label">Destination Address:</span>
-                      <span className="rr-detail-value">{request.area.meta}</span>
+                      <span className="rr-detail-value">{request.destination || request.area.meta}</span>
                     </div>
                   )}
                   {request.area?.event?.name && (
